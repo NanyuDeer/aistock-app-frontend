@@ -1,0 +1,21 @@
+@import './variables.scss';
+@import './reset.scss';
+
+page {
+  background-color: $uni-bg-color;
+  color: $uni-text-color;
+  font-size: $uni-font-size-base;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 通用卡片 */
+.card {
+  background-color: $uni-bg-color-grey;
+  border-radius: $uni-border-radius-base;
+  padding: $uni-spacing-row-base $uni-spacing-col-base;
+  margin-bottom: $uni-spacing-row-base;
+}
+
+/* 涨跌色 */
+.text-up { color: $uni-color-error; }
+.text-down { color: $uni-color-success; }
