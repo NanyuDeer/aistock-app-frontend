@@ -20,10 +20,10 @@ export function usePushNotification() {
   })
 
   // 监听推送消息点击
-  uni.onPushMessage((res) => {
+  uni.onPushMessage((res: any) => {
     console.log('[Push] message:', res.type, res.data)
     if (res.type === 'click') {
-      const payload = res.data?.payload
+      const payload = res.data?.payload as { page?: string } | undefined
       if (payload?.page) {
         uni.navigateTo({ url: payload.page })
       }

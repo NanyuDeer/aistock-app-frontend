@@ -52,19 +52,19 @@ async function handleWxLogin() {
 </script>
 
 <style lang="scss" scoped>
-.page-login { padding: 80rpx 40rpx; display: flex; flex-direction: column; align-items: center; }
-.logo { font-size: 48rpx; font-weight: bold; margin-bottom: 80rpx; color: #007AFF; }
+.page-login { padding: 80rpx 40rpx; display: flex; flex-direction: column; align-items: center; min-height: 100vh; background: #f5f7fa; }
+.logo { font-size: 48rpx; font-weight: 600; margin-bottom: 80rpx; color: #4d7cfe; }
 .form { width: 100%; }
 .input {
-  width: 100%; background: #1a1a2e; border-radius: 12rpx; padding: 24rpx;
-  margin-bottom: 20rpx; color: #fff;
+  width: 100%; background: #ffffff; border-radius: 12rpx; padding: 24rpx;
+  margin-bottom: 20rpx; color: #1a1d24; border: 1rpx solid #e5e7eb;
 }
 .btn-primary {
-  width: 100%; background: #007AFF; color: #fff; border-radius: 12rpx;
+  width: 100%; background: #4d7cfe; color: #fff; border-radius: 12rpx;
   padding: 24rpx; font-size: 32rpx;
 }
 .btn-wx {
-  width: 100%; background: #34C759; color: #fff; border-radius: 12rpx;
+  width: 100%; background: #22c55e; color: #fff; border-radius: 12rpx;
   padding: 24rpx; font-size: 32rpx;
 }
 </style>

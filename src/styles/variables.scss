@@ -1,20 +1,45 @@
 /**
- * 样式变量 - 与 uni.scss 保持一致，供全局使用
+ * 样式变量 - 参照网页风格，浅色主题
  */
-$primary-color: #007AFF;
-$success-color: #34C759;
-$warning-color: #FF9500;
-$error-color: #FF3B30;
 
-$bg-color: #0f0f1e;
-$bg-color-grey: #1a1a2e;
-$bg-color-hover: #252540;
+/* 主题色 */
+$primary-color: #409EFF;
+$success-color: #67C23A;
+$warning-color: #E6A23C;
+$error-color: #F56C6C;
+$info-color: #909399;
 
-$text-color: #ffffff;
-$text-color-grey: #999999;
+/* 背景色 */
+$bg-color: #f5f7fa;
+$bg-color-grey: #ffffff;
+$bg-color-hover: #f0f2f5;
 
-$border-color: #2a2a4a;
+/* 文字色 */
+$text-color: #303133;
+$text-color-secondary: #606266;
+$text-color-tertiary: #909399;
 
-$font-size-sm: 24rpx;
-$font-size-base: 28rpx;
-$font-size-lg: 32rpx;
+/* 边框 */
+$border-color: #dcdfe6;
+$border-color-light: #e4e7ed;
+
+/* 涨跌色（A 股：红涨绿跌） */
+$stock-up-color: #F56C6C;
+$stock-down-color: #67C23A;
+$stock-flat-color: #909399;
+
+/* 字号 */
+$font-size-xs: 20rpx;
+$font-size-sm: 22rpx;
+$font-size-base: 26rpx;
+$font-size-lg: 30rpx;
+$font-size-xl: 34rpx;
+
+/* 圆角 */
+$radius-sm: 6rpx;
+$radius-base: 10rpx;
+$radius-lg: 14rpx;
+
+/* 阴影 */
+$shadow-base: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+$shadow-card: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);

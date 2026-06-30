@@ -1,64 +1,79 @@
 {
-  "name": "AI Stock",
-  "appid": "__UNI__AISTOCK",
-  "description": "AI 智能体驱动的中长线投资 App",
-  "versionName": "0.1.0",
-  "versionCode": 100,
-  "transformPx": false,
-  "app-plus": {
-    "usingComponents": true,
-    "nvueStyleCompiler": "uni-app",
-    "compilerVersion": 3,
-    "splashscreen": {
-      "alwaysShowBeforeRender": true,
-      "waiting": true,
-      "autoclose": true,
-      "delay": 0
-    },
-    "modules": {
-      "Push": {}
-    },
-    "distribute": {
-      "android": {
-        "permissions": [
-          "<uses-permission android:name=\"android.permission.INTERNET\"/>",
-          "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
-          "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>"
-        ]
-      },
-      "ios": {},
-      "sdkConfigs": {
-        "push": {
-          "unipush": {}
+    "name" : "AI Stock",
+    "appid" : "__UNI__73E911F",
+    "description" : "AI 智能体驱动的中长线投资 App",
+    "versionName" : "0.1.0",
+    "versionCode" : 100,
+    "transformPx" : false,
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueStyleCompiler" : "uni-app",
+        "compilerVersion" : 3,
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "waiting" : true,
+            "autoclose" : true,
+            "delay" : 0
+        },
+        "modules" : {
+            "Push" : {}
+        },
+        "distribute" : {
+            "android" : {
+                "minSdkVersion" : 21,
+                "targetSdkVersion" : 30,
+                "abiFilters" : [ "armeabi-v7a", "arm64-v8a" ],
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>",
+                    "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>",
+                    "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
+                    "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>"
+                ]
+            },
+            "ios" : {
+                "dSYMs" : false
+            },
+            "sdkConfigs" : {
+                "push" : {
+                    "unipush" : {
+                        "offline" : false
+                    }
+                }
+            }
+        },
+        "privacyPolicy" : {
+            "title" : "用户协议与隐私政策",
+            "content" : "本应用仅提供股票信息查询与 AI 分析辅助功能，不构成投资建议。应用会收集设备标识用于推送服务，不会收集与本应用功能无关的其他信息。详细隐私政策请参阅应用内说明。"
         }
-      }
-    }
-  },
-  "quickapp": {},
-  "mp-weixin": {
-    "appid": "",
-    "setting": {
-      "urlCheck": false,
-      "es6": true,
-      "minified": true,
-      "postcss": true
     },
-    "usingComponents": true,
-    "permission": {},
-    "optimization": {
-      "subPackages": true
-    }
-  },
-  "h5": {
-    "title": "AI Stock",
-    "router": {
-      "mode": "history",
-      "base": "/"
+    "quickapp" : {},
+    "mp-weixin" : {
+        "appid" : "",
+        "setting" : {
+            "urlCheck" : false,
+            "es6" : true,
+            "minified" : true,
+            "postcss" : true
+        },
+        "usingComponents" : true,
+        "permission" : {},
+        "optimization" : {
+            "subPackages" : true
+        }
     },
-    "devServer": {
-      "port": 5173,
-      "https": false
-    }
-  },
-  "vueVersion": "3"
+    "h5" : {
+        "title" : "AI Stock",
+        "router" : {
+            "mode" : "history",
+            "base" : "/"
+        },
+        "devServer" : {
+            "port" : 5173,
+            "https" : false
+        }
+    },
+    "vueVersion" : "3"
 }

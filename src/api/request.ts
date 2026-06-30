@@ -1,29 +1,24 @@
 /**
- * Axios 请求实例 - 跨端适配
- * 使用 @uni-helper/axios-uni 适配器，支持 App/H5/小程序
+ * HTTP 请求工具 - 基于 luch-request（uni-app 生态标准请求库）
+ * 提供兼容 axios 的 API，方便 api/modules/*.ts 使用
  */
-import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
-// #ifdef MP-WEIXIN || APP-PLUS
-import { axiosUniAdapter } from '@uni-helper/axios-uni'
-// #endif
+import Request from 'luch-request'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
-const request: AxiosInstance = axios.create({
+const http = new Request({
   baseURL: BASE_URL,
   timeout: 15000,
-  // #ifdef MP-WEIXIN || APP-PLUS
-  adapter: axiosUniAdapter as any,
-  // #endif
+  header: { 'Content-Type': 'application/json' }
 })
 
 // 请求拦截器：注入 token
-request.interceptors.request.use(
+http.interceptors.request.use(
   (config) => {
     const token = uni.getStorageSync('token')
     if (token) {
-      config.headers = config.headers || {}
-      config.headers.Authorization = `Bearer ${token}`
+      config.header = config.header || {}
+      config.header.Authorization = `Bearer ${token}`
     }
     return config
   },
@@ -31,25 +26,41 @@ request.interceptors.request.use(
 )
 
 // 响应拦截器：统一错误处理
-request.interceptors.response.use(
+http.interceptors.response.use(
   (response) => {
     const { code, message, data } = response.data || {}
     if (code === 200 || code === undefined) {
       return data ?? response.data
     }
-    uni.showToast({ title: message || '请求失败', icon: 'none' })
+    // 业务错误不弹 toast（让调用方自行处理），仅 reject
     return Promise.reject(new Error(message || '请求失败'))
   },
   (error) => {
-    if (error.response?.status === 401) {
+    // 401 只清除 token，不强制跳转登录页（登录是非必要的，仅自选股等功能需要）
+    if (error.statusCode === 401) {
       uni.removeStorageSync('token')
-      uni.reLaunch({ url: '/pages/user/login' })
     }
-    const msg = error.response?.data?.message || error.message || '网络错误'
-    uni.showToast({ title: msg, icon: 'none' })
     return Promise.reject(error)
   }
 )
 
+/**
+ * 兼容 axios API 的请求实例
+ * 支持泛型：request.get<T>(url, { params })
+ */
+const request = {
+  get<T = any>(url: string, config: { params?: any; headers?: any } = {}): Promise<T> {
+    return http.get(url, { params: config.params, header: config.headers }) as unknown as Promise<T>
+  },
+  post<T = any>(url: string, data?: any, config: { headers?: any } = {}): Promise<T> {
+    return http.post(url, data, { header: config.headers }) as unknown as Promise<T>
+  },
+  put<T = any>(url: string, data?: any, config: { headers?: any } = {}): Promise<T> {
+    return http.put(url, data, { header: config.headers }) as unknown as Promise<T>
+  },
+  delete<T = any>(url: string, config: { params?: any; data?: any; headers?: any } = {}): Promise<T> {
+    return http.delete(url, { params: config.params, data: config.data, header: config.headers }) as unknown as Promise<T>
+  }
+}
+
 export default request
-export type { AxiosRequestConfig }

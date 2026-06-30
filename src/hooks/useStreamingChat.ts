@@ -55,7 +55,7 @@ export function useStreamingChat() {
     chatStore.appendMessage({ role: 'user', content, timestamp: Date.now() })
     chatStore.streaming = true
 
-    if (ws.value && ws.value.readyState === 1) {
+    if (ws.value && (ws.value as any).readyState === 1) {
       ws.value.send({ data: JSON.stringify({ type: 'chat', message: content }) })
     } else {
       // WebSocket 未连接，降级为 HTTP

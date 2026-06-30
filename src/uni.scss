@@ -1,43 +1,44 @@
 /**
  * uni-app 全局样式变量（uni.scss 会被自动注入到所有组件）
+ * 参照网页风格，浅色主题
  */
 
-/* 颜色变量 - 深色主题 */
-$uni-color-primary: #007AFF;
-$uni-color-success: #34C759;
-$uni-color-warning: #FF9500;
-$uni-color-error: #FF3B30;
+/* 颜色变量 */
+$uni-color-primary: #409EFF;
+$uni-color-success: #67C23A;
+$uni-color-warning: #E6A23C;
+$uni-color-error: #F56C6C;
 
 /* 背景色 */
-$uni-bg-color: #0f0f1e;
-$uni-bg-color-grey: #1a1a2e;
-$uni-bg-color-hover: #252540;
+$uni-bg-color: #f5f7fa;
+$uni-bg-color-grey: #ffffff;
+$uni-bg-color-hover: #f0f2f5;
 $uni-bg-color-mask: rgba(0, 0, 0, 0.4);
 
 /* 文字颜色 */
-$uni-text-color: #ffffff;
-$uni-text-color-inverse: #000000;
-$uni-text-color-grey: #999999;
-$uni-text-color-placeholder: #666666;
-$uni-text-color-disable: #555555;
+$uni-text-color: #303133;
+$uni-text-color-inverse: #ffffff;
+$uni-text-color-grey: #909399;
+$uni-text-color-placeholder: #c0c4cc;
+$uni-text-color-disable: #c0c4cc;
 
 /* 边框颜色 */
-$uni-border-color: #2a2a4a;
+$uni-border-color: #dcdfe6;
 
 /* 尺寸 */
-$uni-font-size-sm: 24rpx;
-$uni-font-size-base: 28rpx;
-$uni-font-size-lg: 32rpx;
-$uni-font-size-title: 36rpx;
+$uni-font-size-sm: 22rpx;
+$uni-font-size-base: 26rpx;
+$uni-font-size-lg: 30rpx;
+$uni-font-size-title: 34rpx;
 
 /* 间距 */
-$uni-spacing-row-sm: 10rpx;
-$uni-spacing-row-base: 20rpx;
-$uni-spacing-col-sm: 8rpx;
-$uni-spacing-col-base: 16rpx;
+$uni-spacing-row-sm: 8rpx;
+$uni-spacing-row-base: 16rpx;
+$uni-spacing-col-sm: 6rpx;
+$uni-spacing-col-base: 12rpx;
 
 /* 圆角 */
-$uni-border-radius-sm: 8rpx;
-$uni-border-radius-base: 12rpx;
-$uni-border-radius-lg: 16rpx;
+$uni-border-radius-sm: 6rpx;
+$uni-border-radius-base: 10rpx;
+$uni-border-radius-lg: 14rpx;
 $uni-border-radius-circle: 50%;

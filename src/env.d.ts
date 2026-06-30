@@ -1,4 +1,5 @@
 /// <reference types="@dcloudio/types" />
+/// <reference types="vite/client" />
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string
@@ -13,4 +14,9 @@ declare module '*.vue' {
   import { DefineComponent } from 'vue'
   const component: DefineComponent<{}, {}, any>
   export default component
+}
+
+declare module '@qiun/ucharts' {
+  const uCharts: any
+  export default uCharts
 }

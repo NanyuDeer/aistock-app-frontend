@@ -33,14 +33,45 @@ export const stockApi = {
     return request.get('/cn/stocks', { params })
   },
 
-  /** 获取个股实时行情 */
+  /** 获取个股实时行情（activity 级别，含完整数据） */
   getQuote(symbol: string) {
-    return request.get<StockQuote>(`/cn/stock/quotes/realtime`, { params: { symbol } })
+    return request.get('/cn/stock/quotes/activity', { params: { symbols: symbol } }).then((res: any) => {
+      const quote = res?.行情?.[0] || res?.data?.行情?.[0] || null
+      if (!quote) return null
+      return {
+        symbol: quote['股票代码'] || symbol,
+        name: quote['股票简称'] || '',
+        price: quote['最新价'] || 0,
+        change: quote['涨跌额'] || 0,
+        changePercent: quote['涨跌幅'] || 0,
+        open: quote['今开价'] || 0,
+        high: quote['最高价'] || 0,
+        low: quote['最低价'] || 0,
+        prevClose: quote['昨收价'] || 0,
+        volume: quote['成交量'] || 0,
+        amount: quote['成交额'] || 0,
+        turnoverRate: quote['换手率'] || 0,
+        peRatio: quote['市盈率'] || 0,
+        pbRatio: quote['市净率'] || 0,
+        amplitude: quote['振幅'] || 0,
+        avgPrice: quote['均价'] || 0,
+        limitUp: quote['涨停价'] || 0,
+        limitDown: quote['跌停价'] || 0,
+      }
+    })
   },
 
-  /** 批量获取核心行情 */
+  /** 批量获取核心行情（返回适配后的数组） */
   getCoreQuotes(symbols: string[]) {
-    return request.get('/cn/stock/quotes/core', { params: { symbols: symbols.join(',') } })
+    return request.get('/cn/stock/quotes/core', { params: { symbols: symbols.join(',') } }).then((res: any) => {
+      const list = res?.行情 || res?.data?.行情 || []
+      return list.map((q: any) => ({
+        symbol: q['股票代码'] || '',
+        name: q['股票简称'] || '',
+        price: q['最新价'] || 0,
+        changePercent: q['涨跌幅'] || 0,
+      }))
+    })
   },
 
   /** 获取 K 线数据 */
@@ -63,14 +94,52 @@ export const stockApi = {
     return request.get(`/cn/stocks/${symbol}/tenx-score`)
   },
 
-  /** 获取板块龙头 */
+  /** 获取板块龙头（指定板块 code） */
   getTagLeaders(tagCode: string) {
     return request.get(`/cn/tags/${tagCode}/leaders`)
   },
 
-  /** 获取自选股 */
+  /** 获取风口龙头（长线风口，返回 hot_sectors 数组） */
+  getWindLeaders(limit = 8) {
+    return request.get('/cn/wind-leaders', { params: { limit } }).then((res: any) => res)
+  },
+
+  /** 获取趋势风口事件（重磅消息） */
+  getTrendEvents(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
+    return request.get('/cn/trend-hotspots/events', { params }).then((res: any) => res)
+  },
+
+  /** 获取财联社头条新闻 */
+  getNewsHeadlines() {
+    return request.get('/news/headlines').then((res: any) => res)
+  },
+
+  /** 获取新闻详情 */
+  getNewsDetail(newsId: string) {
+    return request.get(`/news/${newsId}`, { timeout: 15000 }).then((res: any) => {
+      const item = res?.data || res
+      return {
+        id: newsId,
+        title: item['标题'] || item.title || '',
+        content: item['正文'] || item.content || '',
+        summary: item['摘要'] || item.summary || '',
+        publishTime: item['发布时间'] || item.publish_time || '',
+        url: item['原文链接'] || item.url || '',
+        source: item['来源'] || item.source || '财联社',
+      }
+    })
+  },
+
+  /** 获取自选股（通过 /users/me 返回的用户信息提取） */
   getFavorites() {
-    return request.get('/users/me/favorites')
+    return request.get('/users/me').then((res: any) => {
+      // 后端返回中文字段名，适配为前端期望的格式
+      const favorites = res?.['自选股'] || res?.favorites || []
+      return favorites.map((item: any) => ({
+        symbol: item['股票代码'] || item.symbol,
+        name: item['股票简称'] || item.name || '',
+      }))
+    })
   },
 
   /** 添加自选股 */

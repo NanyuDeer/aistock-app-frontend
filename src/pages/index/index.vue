@@ -1,114 +1,538 @@
 <template>
   <view class="page-index">
-    <!-- 顶栏 -->
-    <view class="header">
-      <text class="title">☀️ 早点听</text>
-      <!-- #ifdef APP-PLUS -->
-      <view class="chat-entry" @tap="goChat">🎙️ AI 对话</view>
-      <!-- #endif -->
-    </view>
+    <PageCard title="早点听">
+      <view class="content-wrap">
+        <!-- 今日专属晨报卡片 -->
+        <view class="briefing-card" @tap="goBriefing">
+          <view class="briefing-left">
+            <view class="briefing-top">
+              <text class="briefing-tag">今日专属</text>
+              <text class="briefing-period">{{ briefingPeriod }}</text>
+            </view>
+            <view class="briefing-highlight">
+              <text class="highlight-prefix">重点看</text>
+              <text class="highlight-stock">{{ briefingHighlight.stock }}</text>
+              <text class="highlight-reason">获{{ briefingHighlight.reason }}</text>
+            </view>
+            <view class="briefing-desc">
+              <text>{{ briefingHighlight.sub }}</text>
+              <text class="desc-arrow">›</text>
+            </view>
+            <view class="briefing-btn">
+              <text class="btn-icon">◉</text>
+              <text class="btn-text">专属播报</text>
+            </view>
+          </view>
+          <view class="briefing-right">
+            <view class="ai-avatar-wrap">
+              <text class="ai-avatar-emoji">🎧</text>
+            </view>
+            <view class="ai-avatar-ring ring-1"></view>
+            <view class="ai-avatar-ring ring-2"></view>
+          </view>
+        </view>
 
-    <!-- 今日晨报卡片 -->
-    <view class="card briefing-card" @tap="goBriefing">
-      <view class="briefing-title">📻 今日晨报</view>
-      <view class="briefing-desc">双人对话播报 · 8 分钟</view>
-      <view class="briefing-play">▶️ 播放</view>
-    </view>
+        <!-- 两列卡片：长线风口 + 异动捕手 -->
+        <view class="feature-row">
+          <view class="feature-card leader-card" @tap="goSectors">
+            <view class="feature-header">
+              <text class="feature-title">长线风口</text>
+              <text class="feature-more">›</text>
+            </view>
+            <text class="feature-sub">主力最新动向</text>
+            <view class="feature-list">
+              <view v-for="(item, idx) in leaderStocks" :key="idx" class="feature-item">
+                <text class="item-name">{{ item.name }}</text>
+                <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+              </view>
+            </view>
+          </view>
 
-    <!-- 核心入口 -->
-    <view class="entry-grid">
-      <view class="entry-item" @tap="goEvent">
-        <text class="entry-icon">📰</text>
-        <text class="entry-label">重磅消息</text>
-      </view>
-      <view class="entry-item" @tap="goSectors">
-        <text class="entry-icon">🚀</text>
-        <text class="entry-label">长线风口</text>
-      </view>
-    </view>
+          <view class="feature-card event-card" @tap="goEvent">
+            <view class="feature-header">
+              <text class="feature-title">异动捕手</text>
+              <text class="feature-more">›</text>
+            </view>
+            <view class="event-top-badge">
+              <text class="badge-hot">TOP1</text>
+              <text class="badge-sector">{{ topEvent.sector }}</text>
+            </view>
+            <text class="event-top-title">{{ topEvent.title }}</text>
+            <view class="feature-list">
+              <view v-for="(item, idx) in eventStocks" :key="idx" class="feature-item event-item">
+                <text v-if="idx === 0" class="item-badge">最新</text>
+                <text class="item-name">{{ item.name }}</text>
+                <text class="item-change up">{{ item.change }}</text>
+              </view>
+            </view>
+          </view>
+        </view>
 
-    <!-- 自选股异动 -->
-    <view class="card">
-      <view class="card-title">📌 自选股异动</view>
-      <view v-if="favorites.length === 0" class="empty">暂无自选股</view>
-      <view v-else class="stock-list">
-        <view v-for="stock in favorites" :key="stock.symbol" class="stock-item" @tap="goStockDetail(stock.symbol)">
-          <text class="stock-name">{{ stock.name }}</text>
-          <text class="stock-price">{{ stock.price || '--' }}</text>
+        <!-- 重磅事件跟踪 -->
+        <view class="event-track-card" @tap="goTrackDetail">
+          <view class="track-header">
+            <text class="track-title">重磅事件跟踪</text>
+            <text class="track-more">›</text>
+          </view>
+          <view class="track-item">
+            <text class="track-label">事件</text>
+            <text class="track-content">{{ trackEvent.title }}</text>
+          </view>
+          <view class="track-footer">
+            <text class="track-arrow">∧</text>
+            <text class="track-tip">点击查看资讯详情</text>
+          </view>
         </view>
       </view>
-    </view>
+    </PageCard>
 
-    <!-- #ifdef H5 -->
-    <view class="download-tip">下载 App 体验完整 AI 投顾功能 →</view>
-    <!-- #endif -->
+    <AppBottomBar current-tab="morning" />
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { useFavoritesStore } from '@/store/modules/favorites'
+import PageCard from '@/components/layout/PageCard.vue'
+import AppBottomBar from '@/components/layout/AppBottomBar.vue'
 
-const favoritesStore = useFavoritesStore()
-const favorites = computed(() => favoritesStore.stocks)
+const briefingPeriod = ref('晚报 ⌄')
+const briefingHighlight = ref({
+  stock: '山西焦化',
+  reason: '主力抢筹',
+  sub: '或存反弹机会'
+})
+
+const leaderStocks = ref([
+  { name: '成都银行', tag: '洗盘', tagType: 'wash' },
+  { name: '华润材料', tag: '洗盘', tagType: 'wash' },
+  { name: '技源集团', tag: '出货', tagType: 'sell' },
+  { name: '诺唯赞', tag: '出货', tagType: 'sell' },
+  { name: '美锦能源', tag: '吸筹', tagType: 'buy' },
+  { name: '比亚迪', tag: '吸筹', tagType: 'buy' }
+])
+
+const topEvent = ref({
+  sector: '创新药',
+  title: '美国标普生物科技指数上周大涨'
+})
+
+const eventStocks = ref([
+  { name: '舒泰神', change: '+20.00%' },
+  { name: '广生堂', change: '+20.00%' },
+  { name: '药明康德', change: '+8.52%' },
+  { name: '恒瑞医药', change: '+5.33%' }
+])
+
+const trackEvent = ref({
+  title: '动力煤需求阶段性回落，旺季...'
+})
 
 onShow(() => {
-  favoritesStore.fetchFavorites()
 })
 
 function goChat() {
-  // #ifdef APP-PLUS
   uni.navigateTo({ url: '/pages-sub-app/chat/index' })
-  // #endif
 }
 
 function goBriefing() {
-  // #ifdef APP-PLUS
   uni.navigateTo({ url: '/pages-sub-app/briefing/index' })
-  // #endif
 }
 
 function goEvent() {
-  uni.navigateTo({ url: '/pages/news/wechat-message' })
+  uni.navigateTo({ url: '/pages/tag/event-catcher' })
 }
 
 function goSectors() {
   uni.navigateTo({ url: '/pages/tag/leaders' })
 }
 
+function goTrackDetail() {
+  uni.navigateTo({ url: '/pages/news/detail' })
+}
+
+function goSearch() {
+  uni.navigateTo({ url: '/pages/stock/search' })
+}
+
 function goStockDetail(symbol: string) {
   uni.navigateTo({ url: `/pages/stock/detail?symbol=${symbol}` })
+}
+
+function goLogin() {
+  uni.navigateTo({ url: '/pages/user/login' })
 }
 </script>
 
 <style lang="scss" scoped>
-.page-index { padding: 20rpx; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20rpx; }
-.title { font-size: 36rpx; font-weight: bold; }
-.chat-entry { color: #007AFF; font-size: 28rpx; }
+.page-index {
+  height: 100vh;
+  background: #f5f7fb;
+}
 
+/* ===== 内容区 ===== */
+.content-wrap {
+  padding: 24rpx;
+}
+
+/* ===== 晨报卡片 ===== */
 .briefing-card {
-  background: linear-gradient(135deg, #1a1a2e, #252540);
-  .briefing-title { font-size: 32rpx; font-weight: bold; }
-  .briefing-desc { color: #999; font-size: 24rpx; margin-top: 8rpx; }
-  .briefing-play { color: #007AFF; margin-top: 16rpx; }
+  display: flex;
+  align-items: stretch;
+  padding: 24rpx 24rpx 20rpx;
+  background: #f5f7fb;
+  border-radius: 16rpx;
+  margin-bottom: 20rpx;
+  position: relative;
+  overflow: hidden;
 }
 
-.entry-grid { display: flex; gap: 20rpx; margin-bottom: 20rpx; }
-.entry-item {
-  flex: 1; background: #1a1a2e; border-radius: 12rpx; padding: 30rpx;
-  display: flex; flex-direction: column; align-items: center;
+.briefing-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4rpx;
+  background: linear-gradient(90deg, #4d7cfe, #6366f1);
 }
-.entry-icon { font-size: 48rpx; }
-.entry-label { margin-top: 12rpx; font-size: 28rpx; }
 
-.card { background: #1a1a2e; border-radius: 12rpx; padding: 24rpx; margin-bottom: 20rpx; }
-.card-title { font-size: 30rpx; font-weight: bold; margin-bottom: 16rpx; }
-.empty { color: #666; text-align: center; padding: 40rpx 0; }
-.stock-list { display: flex; flex-direction: column; gap: 16rpx; }
-.stock-item { display: flex; justify-content: space-between; }
-.stock-name { color: #fff; }
-.stock-price { color: #007AFF; }
-.download-tip { text-align: center; color: #666; padding: 40rpx 0; }
+.briefing-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.briefing-top {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.briefing-tag {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #1a1d24;
+}
+
+.briefing-period {
+  font-size: 20rpx;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+}
+
+.briefing-highlight {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4rpx;
+}
+
+.highlight-prefix {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.highlight-stock {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #1a1d24;
+}
+
+.highlight-reason {
+  font-size: 24rpx;
+  color: #f43f5e;
+  font-weight: 500;
+}
+
+.briefing-desc {
+  display: flex;
+  align-items: center;
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.desc-arrow {
+  margin-left: 4rpx;
+  color: #9ca3af;
+  font-size: 24rpx;
+}
+
+.briefing-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 8rpx 18rpx;
+  background: linear-gradient(135deg, #4d7cfe, #6366f1);
+  border-radius: 24rpx;
+  align-self: flex-start;
+  margin-top: 6rpx;
+}
+
+.btn-icon {
+  font-size: 18rpx;
+  color: #ffffff;
+}
+
+.btn-text {
+  font-size: 22rpx;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+/* AI 头像右侧 */
+.briefing-right {
+  width: 130rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.ai-avatar-wrap {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 4rpx 12rpx rgba(251, 191, 36, 0.3);
+}
+
+.ai-avatar-emoji {
+  font-size: 44rpx;
+}
+
+.ai-avatar-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2rpx solid rgba(77, 124, 254, 0.15);
+  pointer-events: none;
+}
+
+.ai-avatar-ring.ring-1 {
+  width: 120rpx;
+  height: 120rpx;
+}
+
+.ai-avatar-ring.ring-2 {
+  width: 140rpx;
+  height: 140rpx;
+  opacity: 0.5;
+}
+
+/* ===== 两列功能卡片 ===== */
+.feature-row {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.feature-card {
+  flex: 1;
+  background: #f5f7fb;
+  border-radius: 14rpx;
+  padding: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.feature-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.feature-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1d24;
+}
+
+.feature-more {
+  font-size: 28rpx;
+  color: #9ca3af;
+  font-weight: 300;
+}
+
+.feature-sub {
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-top: 6rpx;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8rpx;
+}
+
+.item-name {
+  font-size: 24rpx;
+  color: #374151;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-tag {
+  font-size: 18rpx;
+  padding: 2rpx 8rpx;
+  border-radius: 4rpx;
+  flex-shrink: 0;
+
+  &.wash {
+    background: rgba(251, 146, 60, 0.1);
+    color: #fb923c;
+  }
+  &.sell {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+  }
+  &.buy {
+    background: rgba(77, 124, 254, 0.1);
+    color: #4d7cfe;
+  }
+}
+
+/* 异动捕手卡片特有 */
+.event-top-badge {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 2rpx;
+}
+
+.badge-hot {
+  font-size: 18rpx;
+  background: rgba(244, 63, 94, 0.1);
+  color: #f43f5e;
+  padding: 2rpx 8rpx;
+  border-radius: 4rpx;
+  font-weight: 600;
+}
+
+.badge-sector {
+  font-size: 22rpx;
+  color: #1a1d24;
+  font-weight: 500;
+}
+
+.event-top-title {
+  font-size: 22rpx;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-item {
+  .item-badge {
+    font-size: 18rpx;
+    background: rgba(244, 63, 94, 0.1);
+    color: #f43f5e;
+    padding: 1rpx 6rpx;
+    border-radius: 4rpx;
+    flex-shrink: 0;
+    margin-right: 4rpx;
+  }
+  .item-name {
+    flex: 1;
+  }
+}
+
+.item-change {
+  font-size: 22rpx;
+  flex-shrink: 0;
+  font-weight: 500;
+
+  &.up { color: #f43f5e; }
+  &.down { color: #22c55e; }
+}
+
+/* ===== 重磅事件跟踪 ===== */
+.event-track-card {
+  background: #f5f7fb;
+  border-radius: 14rpx;
+  padding: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.track-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.track-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #1a1d24;
+}
+
+.track-more {
+  font-size: 28rpx;
+  color: #9ca3af;
+  font-weight: 300;
+}
+
+.track-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.track-label {
+  flex-shrink: 0;
+  font-size: 20rpx;
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.1);
+  padding: 2rpx 8rpx;
+  border-radius: 4rpx;
+  font-weight: 500;
+  margin-top: 2rpx;
+}
+
+.track-content {
+  flex: 1;
+  font-size: 24rpx;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.track-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  margin-top: 14rpx;
+  padding-top: 12rpx;
+  border-top: 1rpx solid #f3f4f6;
+}
+
+.track-arrow {
+  font-size: 20rpx;
+  color: #9ca3af;
+}
+
+.track-tip {
+  font-size: 20rpx;
+  color: #6b7280;
+}
 </style>

@@ -18,14 +18,13 @@
     "@dcloudio/uni-components": "3.0.0-4030620241128001",
     "@dcloudio/uni-h5": "3.0.0-4030620241128001",
     "@dcloudio/uni-mp-weixin": "3.0.0-4030620241128001",
-    "@uni-helper/axios-uni": "^1.0.4",
-    "axios": "^1.7.9",
+    "@qiun/ucharts": "2.5.0-20230101",
     "dayjs": "^1.11.13",
     "lodash-es": "^4.17.21",
+    "luch-request": "^3.1.0",
     "mp-html": "^2.5.0",
-    "pinia": "^2.3.0",
+    "pinia": "^2.3.1",
     "pinia-plugin-unistorage": "^0.1.2",
-    "ucharts": "^2.5.0-20240129",
     "vue": "^3.4.21",
     "vue-i18n": "^9.14.2",
     "wot-design-uni": "^1.5.0"
@@ -44,5 +43,6 @@
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "vue-tsc": "^2.1.10"
-  }
+  },
+  "packageManager": "pnpm@11.9.0+sha512.bd682d5d03fe525ef7c9fd6780c6884d1e756ac4c9c9fe00c538782824310dcf90e3ddc4f53835f06dfaebd5085e41855e0bcbb3b60de2ac5bbab89e5036f03b"
 }

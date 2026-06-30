@@ -10,7 +10,8 @@
       "path": "pages/index/index",
       "style": {
         "navigationBarTitleText": "早点听",
-        "enablePullDownRefresh": true
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
       }
     },
     {
@@ -26,22 +27,45 @@
       }
     },
     {
-      "path": "pages/favorites/index",
+      "path": "pages/stock/monitor",
       "style": {
-        "navigationBarTitleText": "自选股",
-        "enablePullDownRefresh": true
+        "navigationBarTitleText": "异动监控"
       }
     },
     {
-      "path": "pages/news/wechat-message",
+      "path": "pages/stock/favorites",
       "style": {
-        "navigationBarTitleText": "资讯"
+        "navigationBarTitleText": "自选",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/favorites/index",
+      "style": {
+        "navigationBarTitleText": "特别提醒",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/tag/event-catcher",
+      "style": {
+        "navigationBarTitleText": "异动捕手",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/news/detail",
+      "style": {
+        "navigationBarTitleText": "资讯详情"
       }
     },
     {
       "path": "pages/tag/leaders",
       "style": {
-        "navigationBarTitleText": "板块龙头"
+        "navigationBarTitleText": "长线风口",
+        "navigationStyle": "custom"
       }
     },
     {
@@ -53,7 +77,8 @@
     {
       "path": "pages/user/profile",
       "style": {
-        "navigationBarTitleText": "我的"
+        "navigationBarTitleText": "我的",
+        "navigationStyle": "custom"
       }
     },
     {
@@ -119,30 +144,10 @@
     }
   ],
   "globalStyle": {
-    "navigationBarTextStyle": "white",
+    "navigationBarTextStyle": "black",
     "navigationBarTitleText": "AI Stock",
-    "navigationBarBackgroundColor": "#1a1a2e",
-    "backgroundColor": "#0f0f1e",
-    "backgroundTextStyle": "light"
-  },
-  "tabBar": {
-    "color": "#999999",
-    "selectedColor": "#007AFF",
-    "backgroundColor": "#1a1a2e",
-    "borderStyle": "black",
-    "list": [
-      {
-        "pagePath": "pages/index/index",
-        "text": "早点听"
-      },
-      {
-        "pagePath": "pages/favorites/index",
-        "text": "自选"
-      },
-      {
-        "pagePath": "pages/user/profile",
-        "text": "我的"
-      }
-    ]
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f5f7fa",
+    "backgroundTextStyle": "dark"
   }
 }
