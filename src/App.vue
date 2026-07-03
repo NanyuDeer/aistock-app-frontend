@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
-import { usePushNotification } from '@/hooks/usePushNotification'
+import { usePushNotification } from '@/shared/utils/usePushNotification'
 
 onLaunch(() => {
   console.log('App Launch - AI Stock')
@@ -20,5 +20,5 @@ onHide(() => {
 </script>
 
 <style lang="scss">
-@import '@/styles/global.scss';
+@import '@/shared/styles/global.scss';
 </style>

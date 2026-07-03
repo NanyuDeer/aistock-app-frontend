@@ -16,23 +16,40 @@ AI Stock App 前端，基于 uni-app + Vue 3 + TypeScript + Pinia，一套代码
 ## 目录结构
 ```
 src/
-├── pages/            # 主包页面（三端共享）
-├── pages-sub-app/    # App 专属分包（AI 对话/双人播报/持仓等）
-├── pages-sub-mp/     # 小程序专属分包（微信智能体）
-├── components/       # 全局组件
-├── api/              # 接口层（modules/ 按功能拆分）
-├── store/            # Pinia 状态管理
-├── hooks/            # 组合式函数
-├── utils/            # 工具函数
-├── styles/           # 全局样式
-└── static/           # 静态资源
+├── shared/              # 共享层
+│   ├── api/             # API 接口层（modules/ 按功能拆分）
+│   ├── store/           # Pinia 状态管理
+│   ├── styles/          # 全局样式
+│   ├── components/      # 全局组件（PageCard, SubPageCard, AppBottomBar, SvgIcon 等）
+│   └── utils/           # 工具函数 + 组合式函数（hooks）
+├── modules/
+│   ├── home/            # 首页模块
+│   │   ├── pages/       # 首页主页面
+│   │   └── components/  # 晨报组件等
+│   ├── favorites/       # 自选股模块
+│   │   ├── pages/       # 自选股列表、个股详情、搜索、异动监控、特别提醒
+│   │   └── components/  # 股票卡片、K线图等
+│   ├── chat/            # AI 对话模块
+│   │   ├── pages/       # AI 对话页面
+│   │   └── components/  # 对话气泡、Skill 组件等
+│   ├── market/          # 行情模块
+│   │   ├── pages/       # 异动捕手、长线风口
+│   │   └── components/  # 大盘概览、事件卡片等
+│   ├── user/            # 用户模块
+│   │   └── pages/       # 登录、个人中心、更新日志
+│   └── news/            # 资讯模块
+│       └── pages/       # 资讯详情
+├── pages-sub-app/       # App 专属分包（双人播报/持仓等）
+├── pages-sub-mp/        # 小程序专属分包（微信智能体）
+├── assets/              # 图标等静态资源
+└── static/              # 静态资源
 ```
 
 ## 开发规范
 1. **条件编译**：App 专属功能用 `#ifdef APP-PLUS` 包裹，放在 `pages-sub-app/`
-2. **API 层**：所有请求通过 `api/modules/*.ts`，禁止直接在组件中写 axios
+2. **API 层**：所有请求通过 `shared/api/modules/*.ts`，禁止直接在组件中写 axios
 3. **状态管理**：跨页面共享数据用 Pinia，页面内私有数据用 ref/reactive
-4. **样式**：使用 SCSS + rpx 单位，深色主题（背景 #0f0f1e）
+4. **样式**：使用 SCSS + rpx 单位，浅色主题（背景 #f5f7fb，卡片白色 #ffffff）
 5. **类型**：所有 .ts 文件需有类型注解，禁止 any（必要时用 unknown）
 
 ## 常用命令
@@ -47,6 +64,13 @@ pnpm build:h5        # H5 构建
 - 股票行情必须通过后端 API 获取，禁止前端直连第三方
 - A 股涨跌色：红涨绿跌（#FF3B30 / #34C759）
 - App 专属功能（AI 对话/双人播报）不能影响 H5/小程序编译
+
+## AI 开发工作流
+
+> 工作流由 .trae/rules/aistock-workflow.md 定义，AI 自动执行 9 步流程：上下文加载→需求确认→编码→跨端同步检查→验证→文档维护→用户验收→技能缺口记录→修改记录。
+
+### 小任务自动执行规则
+修 bug、改样式、改文案、改配置等意图明确的任务，无需等待用户确认，直接执行后说明改了什么。
 
 ## 参考文档
 - 架构设计: ../../AI投资App架构设计文档.md

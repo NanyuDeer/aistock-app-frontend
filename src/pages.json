@@ -7,7 +7,7 @@
   },
   "pages": [
     {
-      "path": "pages/index/index",
+      "path": "modules/home/pages/index",
       "style": {
         "navigationBarTitleText": "早点听",
         "navigationStyle": "custom",
@@ -15,25 +15,25 @@
       }
     },
     {
-      "path": "pages/stock/detail",
+      "path": "modules/favorites/pages/detail",
       "style": {
         "navigationBarTitleText": "个股详情"
       }
     },
     {
-      "path": "pages/stock/search",
+      "path": "modules/favorites/pages/search",
       "style": {
         "navigationBarTitleText": "搜索"
       }
     },
     {
-      "path": "pages/stock/monitor",
+      "path": "modules/favorites/pages/monitor",
       "style": {
         "navigationBarTitleText": "异动监控"
       }
     },
     {
-      "path": "pages/stock/favorites",
+      "path": "modules/favorites/pages/favorites",
       "style": {
         "navigationBarTitleText": "自选",
         "navigationStyle": "custom",
@@ -41,7 +41,7 @@
       }
     },
     {
-      "path": "pages/favorites/index",
+      "path": "modules/favorites/pages/index",
       "style": {
         "navigationBarTitleText": "特别提醒",
         "navigationStyle": "custom",
@@ -49,40 +49,41 @@
       }
     },
     {
-      "path": "pages/tag/event-catcher",
+      "path": "modules/market/pages/event-catcher",
       "style": {
         "navigationBarTitleText": "异动捕手",
         "navigationStyle": "custom"
       }
     },
     {
-      "path": "pages/news/detail",
+      "path": "modules/news/pages/detail",
       "style": {
         "navigationBarTitleText": "资讯详情"
       }
     },
     {
-      "path": "pages/tag/leaders",
+      "path": "modules/market/pages/leaders",
       "style": {
         "navigationBarTitleText": "长线风口",
         "navigationStyle": "custom"
       }
     },
     {
-      "path": "pages/user/login",
+      "path": "modules/user/pages/login",
       "style": {
-        "navigationBarTitleText": "登录"
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom"
       }
     },
     {
-      "path": "pages/user/profile",
+      "path": "modules/user/pages/profile",
       "style": {
         "navigationBarTitleText": "我的",
         "navigationStyle": "custom"
       }
     },
     {
-      "path": "pages/about/update-logs",
+      "path": "modules/user/pages/update-logs",
       "style": {
         "navigationBarTitleText": "更新日志"
       }
