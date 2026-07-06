@@ -3,35 +3,37 @@
     <view class="push-history-content">
       <!-- 日期筛选区域 -->
       <view class="filter-section">
-        <uni-datetime-picker
-          v-model="selectedDate"
-          type="date"
-          :clear-icon="true"
-          @change="loadData"
-        />
+        <view v-if="selectedDate" class="filter-active">
+          <text class="filter-label">筛选日期: {{ selectedDate }}</text>
+          <text class="filter-clear" @tap="clearFilter">清除</text>
+        </view>
+        <view v-else class="filter-hint">
+          <text class="filter-label">显示全部推送记录</text>
+        </view>
       </view>
 
       <!-- 推送记录列表 -->
-      <uni-list v-if="!loading && records.length">
-        <uni-list-item
+      <view v-if="!loading && records.length" class="record-list">
+        <view
           v-for="item in records"
           :key="item.stock_code + item.push_date"
-          :title="item.stock_name"
-          :note="formatNote(item)"
+          class="record-item"
         >
-          <template #header>
+          <view class="item-header">
             <text class="item-date">{{ formatDate(item.push_date) }}</text>
-          </template>
-          <template #footer>
+            <text class="item-name">{{ item.stock_name }}</text>
+          </view>
+          <view class="item-body">
+            <text class="item-note">{{ formatNote(item) }}</text>
             <view class="item-footer">
               <text class="item-return" :class="getReturnClass(item)">
                 {{ formatReturn(item) }}
               </text>
               <text class="item-time">{{ item.realtime_time || '--' }}</text>
             </view>
-          </template>
-        </uni-list-item>
-      </uni-list>
+          </view>
+        </view>
+      </view>
 
       <!-- 加载状态 -->
       <view v-if="loading" class="loading-state">
@@ -99,6 +101,11 @@ function getReturnClass(item: PushHistoryItem): string {
   return returnPct >= 0 ? 'up' : 'down'
 }
 
+function clearFilter() {
+  selectedDate.value = ''
+  loadData()
+}
+
 onMounted(() => {
   loadData()
 })
@@ -113,6 +120,27 @@ onMounted(() => {
   margin-bottom: 24rpx;
 }
 
+.filter-active,
+.filter-hint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 20rpx;
+  background: #f0f2f5;
+  border-radius: 8rpx;
+}
+
+.filter-label {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.filter-clear {
+  font-size: 24rpx;
+  color: #4d7cfe;
+  font-weight: 500;
+}
+
 .loading-state,
 .empty-state {
   padding: 48rpx;
@@ -120,7 +148,44 @@ onMounted(() => {
   color: #6b7280;
 }
 
+.record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.record-item {
+  background: #ffffff;
+  border-radius: 12rpx;
+  padding: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
 .item-date {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.item-name {
+  font-size: 28rpx;
+  color: #1a1d24;
+  font-weight: 600;
+}
+
+.item-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-note {
   font-size: 24rpx;
   color: #6b7280;
 }
