@@ -168,4 +168,5 @@ export interface PushHistoryItem {
   return_pct?: number | null
   realtime_return_pct?: number | null
   realtime_time?: string
+  latest_change_pct?: number | null
 }

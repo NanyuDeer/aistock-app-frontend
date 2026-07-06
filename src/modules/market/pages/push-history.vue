@@ -90,15 +90,29 @@ function formatNote(item: PushHistoryItem): string {
 }
 
 function formatReturn(item: PushHistoryItem): string {
-  const returnPct = item.realtime_return_pct || item.return_pct
-  if (!returnPct) return '--'
-  return `${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%`
+  // 优先显示累计收益率（非零时）
+  const returnPct = item.realtime_return_pct ?? item.return_pct
+  if (returnPct !== undefined && returnPct !== null && returnPct !== 0) {
+    return `${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%`
+  }
+  // 累计收益率为 0 或无数据时，显示当日涨跌幅
+  const changePct = item.latest_change_pct
+  if (changePct !== undefined && changePct !== null) {
+    return `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`
+  }
+  return '--'
 }
 
 function getReturnClass(item: PushHistoryItem): string {
-  const returnPct = item.realtime_return_pct || item.return_pct
-  if (!returnPct) return ''
-  return returnPct >= 0 ? 'up' : 'down'
+  const returnPct = item.realtime_return_pct ?? item.return_pct
+  if (returnPct !== undefined && returnPct !== null && returnPct !== 0) {
+    return returnPct >= 0 ? 'up' : 'down'
+  }
+  const changePct = item.latest_change_pct
+  if (changePct !== undefined && changePct !== null) {
+    return changePct >= 0 ? 'up' : 'down'
+  }
+  return ''
 }
 
 function clearFilter() {
