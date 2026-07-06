@@ -1,11 +1,12 @@
 <template>
   <view class="sub-page-wrapper" :style="{ paddingTop: statusBarHeight + 'px' }">
-    <!-- 透明导航栏：返回按钮 + 标题在按钮右侧 -->
+    <!-- 透明导航栏：返回按钮 + 标题 + 右侧按钮 -->
     <view class="sub-nav">
       <view class="nav-back" @tap="goBack">
         <text class="back-icon">‹</text>
       </view>
       <text class="sub-nav-title">{{ title }}</text>
+      <slot name="header-right" />
     </view>
 
     <!-- 内容直接放在页面背景上，无卡片包裹 -->
@@ -97,12 +98,13 @@ function goBack() {
   line-height: 1;
 }
 
-/* 标题在返回按钮右侧 */
+/* 标题在返回按钮右侧，右侧 slot 在最右边 */
 .sub-nav-title {
   font-size: 36rpx;
   font-weight: 600;
   color: #1a1d24;
   margin-left: 8rpx;
+  flex: 1;
 }
 
 /* 内容区域：底部留白避免被 GlobalChatBar 遮挡 */
