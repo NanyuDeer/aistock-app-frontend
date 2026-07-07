@@ -87,6 +87,13 @@
       "style": {
         "navigationBarTitleText": "更新日志"
       }
+    },
+    {
+      "path": "modules/analytics/pages/forecast",
+      "style": {
+        "navigationBarTitleText": "业绩预测",
+        "navigationStyle": "custom"
+      }
     }
   ],
   "subPackages": [

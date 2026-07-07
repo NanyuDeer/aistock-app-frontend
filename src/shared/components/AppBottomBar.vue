@@ -28,7 +28,7 @@ const emit = defineEmits<{
 
 const tabs = [
   { id: 'discover', name: '发现', icon: 'rocket-line', path: '' },
-  { id: 'market', name: '行情', icon: 'bar-chart-line', path: '' },
+  { id: 'market', name: '行情', icon: 'bar-chart-line', path: '/modules/analytics/pages/forecast' },
   { id: 'morning', name: '早点听', icon: 'broadcast-line', path: '/pages/index/index' },
   { id: 'alert', name: '提醒', icon: 'bell-line', path: '/pages/favorites/index' },
 ]
