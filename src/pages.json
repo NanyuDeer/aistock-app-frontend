@@ -69,6 +69,13 @@
       }
     },
     {
+      "path": "modules/market/pages/hot-burst",
+      "style": {
+        "navigationBarTitleText": "机构调研热门股",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "modules/user/pages/login",
       "style": {
         "navigationBarTitleText": "登录",

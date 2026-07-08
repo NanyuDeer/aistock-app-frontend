@@ -104,6 +104,11 @@ export const stockApi = {
     return request.get('/cn/wind-leaders', { params: { limit } }).then((res: any) => res)
   },
 
+  /** 获取机构调研热门股（共振检测） */
+  getHotBursts(params?: { hours?: number; min_resonance?: number; limit?: number }) {
+    return request.get('/cn/hot-bursts', { params }).then((res: any) => res)
+  },
+
   /** 获取趋势风口事件（重磅消息） */
   getTrendEvents(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
     return request.get('/cn/trend-hotspots/events', { params }).then((res: any) => res)
