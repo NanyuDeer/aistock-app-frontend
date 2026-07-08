@@ -133,13 +133,20 @@ interface RawForecastItem {
   forecast_eps?: string
   ['预测EPS']?: string
   eps?: string
+  eps_growth?: string
+  ['EPS同比']?: string
+  epsGrowth?: string
   rating?: string
   ['评级']?: string
   forecast_rating?: string
   institution_count?: number
   ['机构数量']?: number
   institutionCount?: number
+  ['净利润预测']?: string
   ['净利润同比(%)']?: number
+  ['更新时间']?: string
+  update_time?: string
+  updateTime?: string
   ['摘要']?: string
 }
 
