@@ -150,5 +150,15 @@ export const stockApi = {
   /** 删除自选股 */
   removeFavorites(symbols: string[]) {
     return request.delete('/users/me/favorites', { data: { symbols } })
+  },
+
+  /** 获取业绩预测列表 */
+  getProfitForecastList(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
+    return request.get('/cn/stocks/profit-forecast', { params })
+  },
+
+  /** 搜索业绩预测 */
+  searchProfitForecast(params?: { keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
+    return request.get('/cn/stocks/profit-forecast/search', { params })
   }
 }
