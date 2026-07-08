@@ -35,7 +35,7 @@ const tabs = [
 
 const handleTabTap = (tab: typeof tabs[0]) => {
   if (tab.path) {
-    uni.redirectTo({ url: tab.path })
+    uni.navigateTo({ url: tab.path })
   } else {
     uni.showToast({ title: `${tab.name}功能开发中`, icon: 'none' })
   }
