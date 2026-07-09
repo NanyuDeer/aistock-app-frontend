@@ -1,6 +1,15 @@
 <template>
   <SubPageCard title="机构调研热门股">
     <view class="hot-burst-content">
+      <!-- 【新增】引导卡片：点击查看今日分析报告 -->
+      <view class="report-guide-card" @tap="goAgentReport">
+        <view class="guide-left">
+          <SvgIcon name="file-line" color="#ffffff" size="40rpx" />
+          <text class="guide-title">点击查看今日分析报告</text>
+        </view>
+        <SvgIcon name="arrow-right-line" color="#ffffff" size="32rpx" />
+      </view>
+
       <!-- 统计概览 -->
       <view v-if="signals.length" class="stats-bar">
         <text class="stats-text">共 {{ signals.length }} 只热门股</text>
@@ -74,6 +83,7 @@ import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 interface HotBurstSignal {
   symbol: string
@@ -165,6 +175,13 @@ function goStockDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
 }
 
+function goAgentReport() {
+  const today = new Date().toISOString().split('T')[0]
+  uni.navigateTo({
+    url: `/modules/chat/pages/agent-report?intent=hot_burst&date=${today}`
+  })
+}
+
 onShow(() => {
   loadData()
 })
@@ -173,6 +190,30 @@ onShow(() => {
 <style lang="scss" scoped>
 .hot-burst-content {
   padding: 24rpx;
+}
+
+/* ===== 引导卡片 ===== */
+.report-guide-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 32rpx;
+  margin-bottom: 24rpx;
+  background: linear-gradient(135deg, #4d7cfe 0%, #667eea 100%);
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
+}
+
+.guide-left {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.guide-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #ffffff;
 }
 
 /* ===== 统计栏 ===== */
