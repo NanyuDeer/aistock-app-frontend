@@ -1,5 +1,10 @@
 <template>
   <SubPageCard title="长线风口">
+    <template #header-right>
+      <view class="history-btn" @tap="goPushHistory">
+        <text class="history-btn-text">历史推送</text>
+      </view>
+    </template>
     <view class="leaders-content">
       <!-- 引导卡片：点击查看今日分析报告 -->
       <view class="report-guide-card" @tap="goAgentReport">
@@ -520,6 +525,10 @@ function goStockDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
 }
 
+function goPushHistory() {
+  uni.navigateTo({ url: '/modules/market/pages/push-history' })
+}
+
 onShow(() => {
   loadData()
 })
@@ -877,5 +886,17 @@ onShow(() => {
 .update-time-text {
   font-size: 22rpx;
   color: #9ca3af;
+}
+
+.history-btn {
+  padding: 8rpx 16rpx;
+  background: rgba(77, 124, 254, 0.1);
+  border-radius: 8rpx;
+}
+
+.history-btn-text {
+  font-size: 24rpx;
+  color: #4d7cfe;
+  font-weight: 500;
 }
 </style>

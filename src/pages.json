@@ -83,6 +83,13 @@
       }
     },
     {
+      "path": "modules/market/pages/push-history",
+      "style": {
+        "navigationBarTitleText": "",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "modules/chat/pages/agent-report",
       "style": {
         "navigationBarTitleText": "分析报告",

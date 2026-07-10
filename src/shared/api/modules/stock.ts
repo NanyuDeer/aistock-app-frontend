@@ -165,5 +165,27 @@ export const stockApi = {
   /** 搜索业绩预测 */
   searchProfitForecast(params?: { keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
     return request.get('/cn/stocks/profit-forecast/search', { params })
+  },
+
+  /** 获取推送历史 */
+  getPushHistory(params?: { date?: string }) {
+    return request.get<{ items: PushHistoryItem[] }>('/potential-stocks/push-history', { params }).then((res: any) => res)
   }
+}
+
+export interface PushHistoryItem {
+  push_date: string
+  stock_name: string
+  stock_code: string
+  theme?: string
+  reason?: string
+  score?: number | null
+  chain_position?: string
+  push_price: number | null
+  latest_price?: number | null
+  latest_trade_date?: string
+  return_pct?: number | null
+  realtime_return_pct?: number | null
+  realtime_time?: string
+  latest_change_pct?: number | null
 }
