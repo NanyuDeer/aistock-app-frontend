@@ -82,6 +82,19 @@ export const agentApi = {
   /** 注册推送 Token（App 端） */
   registerPushToken(token: string, provider: string) {
     return request.post('/agent/push/token', { token, provider })
+  },
+
+  /** 获取 Agent 分析报告 */
+  getReport(intent: string, date: string) {
+    return request.get(`/agent/report/${intent}/${date}`)
+  },
+
+  /** 异动提醒 AI 解读 SSE 流 URL（不走 request 拦截器，直接拼接） */
+  getAlertBriefingUrl(symbol: string, cycle: string = '') {
+    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    let url = `${base}/agent/briefing/alert?symbol=${encodeURIComponent(symbol)}`
+    if (cycle) url += `&cycle=${encodeURIComponent(cycle)}`
+    return url
   }
 }
 

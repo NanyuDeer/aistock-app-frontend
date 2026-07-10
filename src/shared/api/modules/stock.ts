@@ -104,6 +104,11 @@ export const stockApi = {
     return request.get('/cn/wind-leaders', { params: { limit } }).then((res: any) => res)
   },
 
+  /** 获取机构调研热门股（共振检测） */
+  getHotBursts(params?: { hours?: number; min_resonance?: number; limit?: number }) {
+    return request.get('/cn/hot-bursts', { params }).then((res: any) => res)
+  },
+
   /** 获取趋势风口事件（重磅消息） */
   getTrendEvents(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
     return request.get('/cn/trend-hotspots/events', { params }).then((res: any) => res)
@@ -150,5 +155,37 @@ export const stockApi = {
   /** 删除自选股 */
   removeFavorites(symbols: string[]) {
     return request.delete('/users/me/favorites', { data: { symbols } })
+  },
+
+  /** 获取业绩预测列表 */
+  getProfitForecastList(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
+    return request.get('/cn/stocks/profit-forecast', { params })
+  },
+
+  /** 搜索业绩预测 */
+  searchProfitForecast(params?: { keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
+    return request.get('/cn/stocks/profit-forecast/search', { params })
+  },
+
+  /** 获取推送历史 */
+  getPushHistory(params?: { date?: string }) {
+    return request.get<{ items: PushHistoryItem[] }>('/potential-stocks/push-history', { params }).then((res: any) => res)
   }
+}
+
+export interface PushHistoryItem {
+  push_date: string
+  stock_name: string
+  stock_code: string
+  theme?: string
+  reason?: string
+  score?: number | null
+  chain_position?: string
+  push_price: number | null
+  latest_price?: number | null
+  latest_trade_date?: string
+  return_pct?: number | null
+  realtime_return_pct?: number | null
+  realtime_time?: string
+  latest_change_pct?: number | null
 }

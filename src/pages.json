@@ -15,6 +15,13 @@
       }
     },
     {
+      "path": "modules/chat/pages/index",
+      "style": {
+        "navigationBarTitleText": "AI 投顾",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "modules/favorites/pages/detail",
       "style": {
         "navigationBarTitleText": "个股详情"
@@ -69,6 +76,27 @@
       }
     },
     {
+      "path": "modules/market/pages/hot-burst",
+      "style": {
+        "navigationBarTitleText": "机构调研热门股",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "modules/market/pages/push-history",
+      "style": {
+        "navigationBarTitleText": "",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "modules/chat/pages/agent-report",
+      "style": {
+        "navigationBarTitleText": "分析报告",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "modules/user/pages/login",
       "style": {
         "navigationBarTitleText": "登录",
@@ -86,6 +114,34 @@
       "path": "modules/user/pages/update-logs",
       "style": {
         "navigationBarTitleText": "更新日志"
+      }
+    },
+    {
+      "path": "modules/analytics/pages/forecast",
+      "style": {
+        "navigationBarTitleText": "业绩预测",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "modules/chat/pages/event/list",
+      "style": {
+        "navigationBarTitleText": "事件传导",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "modules/chat/pages/event/detail",
+      "style": {
+        "navigationBarTitleText": "AI事件传导解析",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "modules/chat/pages/news/detail",
+      "style": {
+        "navigationBarTitleText": "新闻原文",
+        "navigationStyle": "custom"
       }
     }
   ],
