@@ -1,6 +1,15 @@
 <template>
   <SubPageCard title="长线风口">
     <view class="leaders-content">
+      <!-- 引导卡片：点击查看今日分析报告 -->
+      <view class="report-guide-card" @tap="goAgentReport">
+        <view class="guide-left">
+          <SvgIcon name="file-line" color="#ffffff" size="40rpx" />
+          <text class="guide-title">点击查看今日分析报告</text>
+        </view>
+        <SvgIcon name="arrow-right-line" color="#ffffff" size="32rpx" />
+      </view>
+
       <!-- 风口概念泡泡图 -->
       <view class="bubble-card">
         <view class="bubble-title-row">
@@ -209,6 +218,7 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 interface SectorStock {
   code: string
@@ -397,6 +407,13 @@ function selectBubble(b: Bubble) {
   uni.showToast({ title: b.name, icon: 'none', duration: 800 })
 }
 
+function goAgentReport() {
+  const today = new Date().toISOString().split('T')[0]
+  uni.navigateTo({
+    url: `/modules/chat/pages/agent-report?intent=wind_leader&date=${today}`
+  })
+}
+
 // ===== Mock 板块数据 =====
 const mockSectors = [
   {
@@ -511,6 +528,30 @@ onShow(() => {
 <style lang="scss" scoped>
 .leaders-content {
   padding: 24rpx;
+}
+
+/* ===== 引导卡片 ===== */
+.report-guide-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 32rpx;
+  margin-bottom: 24rpx;
+  background: linear-gradient(135deg, #4d7cfe 0%, #667eea 100%);
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
+}
+
+.guide-left {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.guide-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #ffffff;
 }
 
 /* ===== 泡泡图 ===== */

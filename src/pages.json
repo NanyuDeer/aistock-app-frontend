@@ -76,6 +76,13 @@
       }
     },
     {
+      "path": "modules/chat/pages/agent-report",
+      "style": {
+        "navigationBarTitleText": "分析报告",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "modules/user/pages/login",
       "style": {
         "navigationBarTitleText": "登录",

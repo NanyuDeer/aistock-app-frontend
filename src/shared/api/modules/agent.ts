@@ -82,6 +82,11 @@ export const agentApi = {
   /** 注册推送 Token（App 端） */
   registerPushToken(token: string, provider: string) {
     return request.post('/agent/push/token', { token, provider })
+  },
+
+  /** 获取 Agent 分析报告 */
+  getReport(intent: string, date: string) {
+    return request.get(`/agent/report/${intent}/${date}`)
   }
 }
 
