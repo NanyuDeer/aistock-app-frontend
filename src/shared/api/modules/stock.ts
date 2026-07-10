@@ -162,9 +162,13 @@ export interface PushHistoryItem {
   push_date: string
   stock_name: string
   stock_code: string
+  theme?: string
+  reason?: string
+  score?: number | null
+  chain_position?: string
   push_price: number | null
-  realtime_price?: number | null
   latest_price?: number | null
+  latest_trade_date?: string
   return_pct?: number | null
   realtime_return_pct?: number | null
   realtime_time?: string
