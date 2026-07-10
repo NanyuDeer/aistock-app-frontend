@@ -12,14 +12,14 @@
           <view class="summary-card">
             <text class="summary-label">上涨股票数量</text>
             <text class="summary-value">{{ summary.winners || 0 }}</text>
-            <text class="summary-sub">胜率 {{ formatPercent(summary.win_rate) }}</text>
+            <text class="summary-sub">盈亏比 {{ formatRatio(profitLossRatio) }}</text>
           </view>
           <view class="summary-card">
             <text class="summary-label">平均收益</text>
             <text class="summary-value" :class="returnClass(summary.average_return_pct)">
               {{ formatPercent(summary.average_return_pct) }}
             </text>
-            <text class="summary-sub">实时 {{ latestUpdateTime }}</text>
+            <text class="summary-sub">更新 {{ latestUpdateDate }}</text>
           </view>
           <view class="summary-card">
             <text class="summary-label">最高收益</text>
@@ -33,12 +33,15 @@
 
       <!-- 日期筛选区域 -->
       <view class="filter-section">
-        <uni-datetime-picker
-          v-model="selectedDate"
-          type="date"
-          :clear-icon="true"
-          @change="onDateChange"
-        />
+        <picker mode="date" :value="selectedDate" fields="day" @change="onDateChange">
+          <view class="date-picker-trigger">
+            <text class="date-picker-label">筛选日期</text>
+            <text class="date-picker-value">{{ selectedDate || '全部日期' }}</text>
+          </view>
+        </picker>
+        <view v-if="selectedDate" class="date-clear-btn" @tap="clearDate">
+          <text>清除</text>
+        </view>
       </view>
 
       <!-- 推送记录列表 -->
@@ -60,7 +63,7 @@
           </view>
           <view class="item-footer">
             <text class="item-note">{{ formatNote(item) }}</text>
-            <text class="item-time">{{ formatUpdateTime(item.realtime_time) }}</text>
+            <text class="item-time">更新 {{ formatUpdateDate(item) }}</text>
           </view>
         </view>
       </view>
@@ -97,22 +100,26 @@ const summary = ref<{
   best?: { stock_name?: string; return_pct?: number }
 }>({})
 
-const latestUpdateTime = computed(() => {
-  const times = records.value
-    .map(r => r.realtime_time)
-    .filter((time): time is string => Boolean(time))
+const latestUpdateDate = computed(() => {
+  const dates = records.value
+    .map(r => normalizeDate(r.latest_trade_date || r.push_date))
+    .filter((date): date is string => Boolean(date))
     .sort()
     .reverse()
-  if (!times.length) return '--'
-  try {
-    const d = new Date(times[0])
-    const h = String(d.getHours()).padStart(2, '0')
-    const m = String(d.getMinutes()).padStart(2, '0')
-    const s = String(d.getSeconds()).padStart(2, '0')
-    return `${h}:${m}:${s}`
-  } catch {
-    return '--'
-  }
+  return dates[0] || '--'
+})
+
+const profitLossRatio = computed(() => {
+  const returns = records.value
+    .map(item => item.return_pct)
+    .filter((value): value is number => value !== undefined && value !== null && Number.isFinite(Number(value)))
+  const gains = returns.filter(value => value > 0)
+  const losses = returns.filter(value => value < 0)
+  if (!gains.length || !losses.length) return null
+
+  const averageGain = gains.reduce((sum, value) => sum + value, 0) / gains.length
+  const averageLoss = Math.abs(losses.reduce((sum, value) => sum + value, 0) / losses.length)
+  return averageLoss > 0 ? Number((averageGain / averageLoss).toFixed(2)) : null
 })
 
 async function loadData(date?: string) {
@@ -133,39 +140,37 @@ async function loadData(date?: string) {
 }
 
 function onDateChange(e: any) {
-  // uni-datetime-picker 的 change 事件参数格式：
-  // 单选模式: e = { value: '2026-07-09' } 或 e = '2026-07-09'
-  // 清除后: e = { value: '' } 或 e = '' 或 null
-  const newDate = e?.value || e || ''
+  const newDate = e?.detail?.value || e?.value || e || ''
   selectedDate.value = newDate
   loadData(newDate)
 }
 
-function formatDate(date: string): string {
-  if (!date) return '--'
-  if (/^\d{8}$/.test(date)) {
-    return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
-  }
-  const d = new Date(date)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+function clearDate() {
+  selectedDate.value = ''
+  loadData()
 }
 
-function formatUpdateTime(time?: string): string {
-  if (!time) return '--'
-  try {
-    const d = new Date(time)
-    const year = d.getFullYear()
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    const hour = String(d.getHours()).padStart(2, '0')
-    const minute = String(d.getMinutes()).padStart(2, '0')
-    return `${year}-${month}-${day} ${hour}:${minute}`
-  } catch {
-    return '--'
+function normalizeDate(value?: string): string {
+  if (!value) return ''
+  const text = String(value).trim()
+  if (/^\d{8}$/.test(text)) {
+    return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}`
   }
+  const normalized = text.replace(/\//g, '-')
+  const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (match) {
+    const [, year, month, day] = match
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+  }
+  return text
+}
+
+function formatDate(date: string): string {
+  return normalizeDate(date) || '--'
+}
+
+function formatUpdateDate(item: PushHistoryItem): string {
+  return normalizeDate(item.latest_trade_date || item.push_date) || '--'
 }
 
 function formatNote(item: PushHistoryItem): string {
@@ -195,6 +200,11 @@ function getReturnClass(item: PushHistoryItem): string {
 function formatPercent(value: number | undefined | null): string {
   if (value === undefined || value === null) return '--'
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
+}
+
+function formatRatio(value: number | undefined | null): string {
+  if (value === undefined || value === null) return '--'
+  return value.toFixed(2)
 }
 
 function returnClass(value: number | undefined | null): string {
@@ -268,6 +278,45 @@ onMounted(() => {
 
 .filter-section {
   margin-bottom: 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.date-picker-trigger {
+  min-width: 360rpx;
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 14rpx;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.date-picker-label {
+  color: #6b7280;
+  font-size: 24rpx;
+}
+
+.date-picker-value {
+  color: #111827;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.date-clear-btn {
+  height: 72rpx;
+  padding: 0 22rpx;
+  border-radius: 14rpx;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .record-list {
