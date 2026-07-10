@@ -52,7 +52,13 @@ try {
 }
 
 function goBack() {
-  uni.navigateBack({ delta: 1 })
+  const pages = getCurrentPages()
+  if (pages.length > 1) {
+    uni.navigateBack({ delta: 1 })
+  } else {
+    // 页面栈为空时返回首页
+    uni.redirectTo({ url: '/modules/home/pages/index' })
+  }
 }
 </script>
 

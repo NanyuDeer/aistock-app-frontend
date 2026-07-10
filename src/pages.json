@@ -1,8 +1,7 @@
 {
-  "easycom": {
+  "easyCom": {
     "autoscan": true,
     "custom": {
-      "^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue",
       "^wd-(.*)": "wot-design-uni/components/wd-$1/wd-$1.vue"
     }
   },
@@ -70,6 +69,13 @@
       }
     },
     {
+      "path": "modules/market/pages/hot-burst",
+      "style": {
+        "navigationBarTitleText": "机构调研热门股",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "modules/market/pages/push-history",
       "style": {
         "navigationBarTitleText": "",
@@ -94,6 +100,13 @@
       "path": "modules/user/pages/update-logs",
       "style": {
         "navigationBarTitleText": "更新日志"
+      }
+    },
+    {
+      "path": "modules/analytics/pages/forecast",
+      "style": {
+        "navigationBarTitleText": "业绩预测",
+        "navigationStyle": "custom"
       }
     }
   ],

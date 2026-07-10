@@ -10,6 +10,10 @@
       <text v-if="currentTab === tab.id" class="as-tab-active-text">{{ tab.name }}</text>
       <SvgIcon v-else :name="tab.icon" size="28rpx" color="#9ca3af" />
     </view>
+    <!-- 机构调研热门股入口 -->
+    <view class="as-tab-item as-extra-entry" @tap="goHotBurst">
+      <SvgIcon name="search-eye-line" size="28rpx" color="#9ca3af" />
+    </view>
   </view>
 </template>
 
@@ -28,18 +32,22 @@ const emit = defineEmits<{
 
 const tabs = [
   { id: 'discover', name: '发现', icon: 'rocket-line', path: '' },
-  { id: 'market', name: '行情', icon: 'bar-chart-line', path: '' },
-  { id: 'morning', name: '早点听', icon: 'broadcast-line', path: '/pages/index/index' },
-  { id: 'alert', name: '提醒', icon: 'bell-line', path: '/pages/favorites/index' },
+  { id: 'market', name: '行情', icon: 'bar-chart-line', path: '/modules/analytics/pages/forecast' },
+  { id: 'morning', name: '早点听', icon: 'broadcast-line', path: '/modules/home/pages/index' },
+  { id: 'alert', name: '提醒', icon: 'bell-line', path: '/modules/favorites/pages/index' },
 ]
 
 const handleTabTap = (tab: typeof tabs[0]) => {
   if (tab.path) {
-    uni.redirectTo({ url: tab.path })
+    uni.navigateTo({ url: tab.path })
   } else {
     uni.showToast({ title: `${tab.name}功能开发中`, icon: 'none' })
   }
   emit('change', tab.id)
+}
+
+function goHotBurst() {
+  uni.navigateTo({ url: '/modules/market/pages/hot-burst' })
 }
 </script>
 
@@ -86,5 +94,15 @@ const handleTabTap = (tab: typeof tabs[0]) => {
   font-size: 20rpx;
   font-weight: 600;
   color: #4d7cfe;
+}
+
+/* 额外功能入口 */
+.as-extra-entry {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+
+  &:active {
+    opacity: 1;
+  }
 }
 </style>

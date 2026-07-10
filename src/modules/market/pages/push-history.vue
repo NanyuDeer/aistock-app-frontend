@@ -100,7 +100,7 @@ const summary = ref<{
 const latestUpdateTime = computed(() => {
   const times = records.value
     .map(r => r.realtime_time)
-    .filter(Boolean)
+    .filter((time): time is string => Boolean(time))
     .sort()
     .reverse()
   if (!times.length) return '--'
@@ -153,7 +153,7 @@ function formatDate(date: string): string {
   return `${year}-${month}-${day}`
 }
 
-function formatUpdateTime(time: string): string {
+function formatUpdateTime(time?: string): string {
   if (!time) return '--'
   try {
     const d = new Date(time)

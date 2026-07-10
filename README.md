@@ -1,6 +1,8 @@
 # AI Stock App 前端
 
 > AI 投资助手 App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 App/H5/小程序三端。
+>
+> **AI 开发助手请先阅读 [AGENTS.md](./AGENTS.md)** — 模块架构地图、开发规范、硬约束、API 契约、组件/Hooks 速查。本 README 面向人类开发者，介绍项目全貌、快速开始和部署。
 
 ## 快速开始
 
@@ -27,11 +29,18 @@ npx tsc --noEmit
 ## 技术栈
 
 - 框架: uni-app (Vue 3) + Vite
-- 状态管理: Pinia
+- 状态管理: Pinia（+ pinia-plugin-unistorage 持久化）
 - UI: wot-design-uni
-- 网络: Axios + @uni-helper/axios-uni
+- 网络: luch-request（uni-app 生态标准请求库，兼容 axios API）
 - 图表: uCharts + renderjs(ECharts)
 - 语言: TypeScript
+- 国际化: vue-i18n
+
+### 环境变量
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `VITE_API_BASE_URL` | 后端 API 地址 | `/api`（H5 走代理），App 需配置完整地址 |
 
 ## 项目架构
 
