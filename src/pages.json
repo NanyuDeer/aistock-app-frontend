@@ -15,6 +15,13 @@
       }
     },
     {
+      "path": "modules/chat/pages/index",
+      "style": {
+        "navigationBarTitleText": "AI 投顾",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "modules/favorites/pages/detail",
       "style": {
         "navigationBarTitleText": "个股详情"
@@ -99,6 +106,27 @@
       "path": "modules/analytics/pages/forecast",
       "style": {
         "navigationBarTitleText": "业绩预测",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "modules/chat/pages/event/list",
+      "style": {
+        "navigationBarTitleText": "事件传导",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "modules/chat/pages/event/detail",
+      "style": {
+        "navigationBarTitleText": "AI事件传导解析",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "modules/chat/pages/news/detail",
+      "style": {
+        "navigationBarTitleText": "新闻原文",
         "navigationStyle": "custom"
       }
     }
