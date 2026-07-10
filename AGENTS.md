@@ -30,7 +30,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 |------|------|---------|-----------------|
 | 首页 | `modules/home` | 早点听、市场概览、长线风口、异动捕手 | [home/AGENTS.md](./src/modules/home/AGENTS.md) |
 | 自选股 | `modules/favorites` | 自选股列表、特别提醒、股票详情、搜索、异动监控 | [favorites/AGENTS.md](./src/modules/favorites/AGENTS.md) |
-| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话 | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
+| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示 | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
 | 行情 | `modules/market` | 龙头股、重磅消息、板块标签、异动捕手、长线风口 | [market/AGENTS.md](./src/modules/market/AGENTS.md) |
 | 用户 | `modules/user` | 个人中心、登录设置、更新日志 | [user/AGENTS.md](./src/modules/user/AGENTS.md) |
 | 资讯 | `modules/news` | 公告、新闻详情 | [news/AGENTS.md](./src/modules/news/AGENTS.md) |
@@ -39,14 +39,15 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 
 | 页面 | 文件 | 说明 |
 |------|------|------|
-| 双人播报 | `briefing/index.vue` | 双人对话播报播放 |
+| 双人播报 | `briefing/index.vue` | 双人对话播报（音频播放 + 对话文本展示，已实现） |
 | 持仓管理 | `portfolio/index.vue` | 持仓分析 |
 | 事件传导链 | `event-chain/index.vue` | 事件传导链路可视化 |
 | 估值分析 | `valuation/index.vue` | 个股估值 |
 | 交易复盘 | `review/index.vue` | 复盘归因 |
 | AI 对话 | `chat/index.vue` | App 专属 AI 对话 |
 
-> 分包页面为占位实现，待后端 Agent/Skills 完成后对接。
+> 分包页面除 `briefing/index.vue`（已实现）外，其余为占位实现，待后端 Agent/Skills 完成后对接。
+> 主包 `modules/chat/pages/agent-report.vue` 为通用分析报告展示页，被 leaders.vue 和 hot-burst.vue 跳转调用。
 
 ## 3. 目录结构速览
 
@@ -203,7 +204,7 @@ src/
 
 | 模块文件 | 说明 | 后端路径 |
 |---------|------|---------|
-| `agent.ts` | Agent 反代（SSE 流式对话） | `/api/agent/*` |
+| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务） | `/api/agent/*` |
 | `auth.ts` | 认证（登录、用户信息） | `/api/auth/wechat/*` |
 | `briefing.ts` | 晨报 | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |

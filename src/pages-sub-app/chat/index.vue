@@ -153,7 +153,7 @@ function scrollToBottom() {
 .back { font-size: 40rpx; color: #1a1d24; }
 .title { font-size: 32rpx; font-weight: 600; color: #1a1d24; }
 
-.message-list { flex: 1; padding: 20rpx; }
+.message-list { flex: 1; min-height: 0; padding: 20rpx; }
 .message-item { margin-bottom: 24rpx; }
 .message-item.user { display: flex; justify-content: flex-end; }
 .msg-content.user {
