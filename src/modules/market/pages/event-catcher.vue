@@ -51,22 +51,10 @@
               <text class="meta-text">{{ evt.change_type_name || evt.info_type }}</text>
             </view>
             <view class="meta-right">
-              <view class="ai-btn" @tap.stop="toggleAnalysis(evt.event_id, evt.stock_code, evt.cycle)">
+              <view class="ai-btn" @tap.stop="goAlertAnalysis(evt.stock_code, evt.cycle)">
                 <text class="ai-btn-text">AI解读</text>
               </view>
               <text class="meta-time">{{ formatTime(evt.event_time) }}</text>
-            </view>
-          </view>
-          <view v-if="expandedEventId === evt.event_id" class="analysis-panel" @tap.stop>
-            <view v-if="analysisError" class="analysis-error">
-              <text class="analysis-error-text">{{ analysisError }}</text>
-            </view>
-            <view v-else-if="analysisContent || analysisLoading" class="analysis-body">
-              <text v-if="analysisContent" class="analysis-text">{{ analysisContent }}</text>
-              <text v-if="analysisLoading" class="analysis-cursor">|</text>
-            </view>
-            <view v-else class="analysis-loading-state">
-              <text class="analysis-loading-tip">AI 正在分析异动数据...</text>
             </view>
           </view>
         </view>
@@ -108,22 +96,10 @@
               <text class="meta-text">{{ evt.info_type }}</text>
             </view>
             <view class="meta-right">
-              <view class="ai-btn" @tap.stop="toggleAnalysis(evt.event_id, evt.stock_code, evt.cycle)">
+              <view class="ai-btn" @tap.stop="goAlertAnalysis(evt.stock_code, evt.cycle)">
                 <text class="ai-btn-text">AI解读</text>
               </view>
               <text class="meta-time">{{ evt.event_time }}</text>
-            </view>
-          </view>
-          <view v-if="expandedEventId === evt.event_id" class="analysis-panel" @tap.stop>
-            <view v-if="analysisError" class="analysis-error">
-              <text class="analysis-error-text">{{ analysisError }}</text>
-            </view>
-            <view v-else-if="analysisContent || analysisLoading" class="analysis-body">
-              <text v-if="analysisContent" class="analysis-text">{{ analysisContent }}</text>
-              <text v-if="analysisLoading" class="analysis-cursor">|</text>
-            </view>
-            <view v-else class="analysis-loading-state">
-              <text class="analysis-loading-tip">AI 正在分析异动数据...</text>
             </view>
           </view>
         </view>
@@ -133,10 +109,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
-import { useAlertSSE } from '@/modules/market/utils/useAlertSSE'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 
 interface TrendEvent {
@@ -176,10 +151,6 @@ const page = ref(0)
 const pageSize = 20
 
 const hasMore = computed(() => events.value.length < total.value)
-
-// AI 分析状态（对接 alert_agent SSE 流）
-const { content: analysisContent, loading: analysisLoading, error: analysisError, start: analysisStart, stop: analysisStop } = useAlertSSE()
-const expandedEventId = ref('')
 
 async function loadEvents(append = false) {
   if (!append) {
@@ -259,15 +230,9 @@ function goStockDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
 }
 
-function toggleAnalysis(eventId: string, symbol: string, cycle: string) {
-  if (expandedEventId.value === eventId) {
-    analysisStop()
-    expandedEventId.value = ''
-  } else {
-    analysisStop()
-    expandedEventId.value = eventId
-    analysisStart(symbol, cycle)
-  }
+function goAlertAnalysis(symbol: string, cycle: string) {
+  if (!symbol) return
+  uni.navigateTo({ url: `/modules/market/pages/alert-analysis?symbol=${symbol}&cycle=${cycle}` })
 }
 
 function goNewsDetail(id: string) {
@@ -364,10 +329,6 @@ const mockEvents: TrendEvent[] = [
 
 onShow(() => {
   loadEvents(false)
-})
-
-onUnmounted(() => {
-  analysisStop()
 })
 </script>
 
@@ -583,61 +544,6 @@ onUnmounted(() => {
   font-size: 20rpx;
   color: #ffffff;
   font-weight: 500;
-}
-
-/* AI 分析展开面板 */
-.analysis-panel {
-  margin-top: 16rpx;
-  padding: 20rpx;
-  background: #f8f9ff;
-  border-radius: 12rpx;
-  border-left: 4rpx solid #4d7cfe;
-}
-
-.analysis-body {
-  position: relative;
-}
-
-.analysis-text {
-  font-size: 26rpx;
-  color: #374151;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.analysis-cursor {
-  display: inline;
-  color: #4d7cfe;
-  font-weight: 700;
-  font-size: 26rpx;
-  animation: blink 0.8s infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-.analysis-loading-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32rpx 0;
-}
-
-.analysis-loading-tip {
-  font-size: 26rpx;
-  color: #9ca3af;
-}
-
-.analysis-error {
-  padding: 16rpx 0;
-}
-
-.analysis-error-text {
-  font-size: 26rpx;
-  color: #ef4444;
 }
 
 .load-more {

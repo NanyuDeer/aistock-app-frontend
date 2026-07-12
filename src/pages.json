@@ -56,6 +56,12 @@
       }
     },
     {
+      "path": "modules/market/pages/alert-analysis",
+      "style": {
+        "navigationBarTitleText": "AI 异动解读"
+      }
+    },
+    {
       "path": "modules/news/pages/detail",
       "style": {
         "navigationBarTitleText": "资讯详情"
