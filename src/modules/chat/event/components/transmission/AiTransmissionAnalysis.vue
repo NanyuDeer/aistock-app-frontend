@@ -171,7 +171,7 @@ defineProps<Props>()
 .var-neutral .var-direction { color: var(--ev-text-tertiary); }
 
 .var-strength { display: flex; gap: 2rpx; }
-.var-star { font-size: 18rpx; color: #2A2E3F; }
+.var-star { font-size: 18rpx; color: var(--ev-border); }
 .var-star.filled { color: var(--ev-warning); }
 
 .var-reason { font-size: 20rpx; color: var(--ev-text-muted); line-height: 1.5; }
@@ -191,16 +191,16 @@ defineProps<Props>()
 .dot-bearish { background: var(--ev-positive); box-shadow: 0 0 6rpx rgba(34,197,94,0.3); }
 .dot-neutral { background: var(--ev-text-muted); }
 
-.chain-line { width: 2rpx; flex: 1; background: rgba(148, 163, 184, 0.12); margin: 4rpx 0; }
+.chain-line { width: 2rpx; flex: 1; background: var(--ev-border); margin: 4rpx 0; }
 
 .chain-info { flex: 1; padding-bottom: 14rpx; }
 .chain-top { display: flex; align-items: center; gap: 10rpx; margin-bottom: 4rpx; }
 .chain-industry { font-size: 24rpx; font-weight: 600; color: var(--ev-text-primary); }
-.chain-level { font-size: 18rpx; padding: 1rpx 8rpx; border-radius: 9999rpx; background: rgba(148,163,184,0.1); color: var(--ev-text-muted); }
+.chain-level { font-size: 18rpx; padding: 1rpx 8rpx; border-radius: 9999rpx; background: var(--ev-border-light); color: var(--ev-text-muted); }
 .chain-reason { font-size: 20rpx; color: var(--ev-text-muted); line-height: 1.45; display: block; margin-bottom: 6rpx; }
 
 .chain-bar-wrap { display: flex; align-items: center; gap: 8rpx; }
-.chain-bar-bg { flex: 1; height: 4rpx; border-radius: 2rpx; background: rgba(255,255,255,0.06); overflow: hidden; }
+.chain-bar-bg { flex: 1; height: 4rpx; border-radius: 2rpx; background: var(--ev-border); overflow: hidden; }
 .chain-bar-fill { height: 100%; border-radius: 2rpx; }
 .fill-bullish { background: var(--ev-negative); }
 .fill-bearish { background: var(--ev-positive); }

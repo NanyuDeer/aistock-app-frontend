@@ -134,7 +134,8 @@ async function startScanLogin() {
     startPolling()
   } catch (e: any) {
     // 页面内显示错误，而非仅 toast，避免用户以为"没反应"
-    const msg = e?.data?.message || e?.message || '获取二维码失败，请检查网络后重试'
+    // 兼容 App 端错误对象：uni-app 网络错误是 { errMsg: 'request:fail' }，没有 message 属性
+    const msg = e?.data?.message || e?.errMsg || e?.message || '获取二维码失败，请检查网络后重试'
     errorMsg.value = msg
   }
 }
@@ -209,7 +210,8 @@ async function handleWxLogin() {
         uni.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => goHome(), 500)
       } catch (e: any) {
-        uni.showToast({ title: e.message || '登录失败', icon: 'none' })
+        const msg = e?.errMsg || e?.message || '登录失败'
+        uni.showToast({ title: msg, icon: 'none' })
       }
     }
   })

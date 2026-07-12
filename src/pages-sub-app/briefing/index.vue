@@ -1,5 +1,5 @@
 <template>
-  <view class="briefing-page">
+  <view class="briefing-page" :style="{ paddingTop: statusBarHeight + 'px' }">
     <!-- 顶部标题栏 -->
     <view class="briefing-header">
       <text class="header-title">双人对话播报</text>
@@ -65,6 +65,20 @@ import { onLoad } from '@dcloudio/uni-app'
 import { agentApi } from '@/shared/api/modules/agent'
 import { API_BASE_URL } from '@/shared/utils/constants'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+
+// 状态栏高度（App 端需要除以 zoom 补偿）
+const statusBarHeight = ref(0)
+try {
+  const raw = uni.getSystemInfoSync().statusBarHeight || 0
+  // #ifdef APP-PLUS
+  statusBarHeight.value = raw / 1.2
+  // #endif
+  // #ifndef APP-PLUS
+  statusBarHeight.value = raw
+  // #endif
+} catch (e) {
+  statusBarHeight.value = 0
+}
 
 interface DialogueLine {
   role: 'host' | 'analyst'
@@ -210,7 +224,7 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .briefing-page {
   min-height: 100vh;
-  background: #f5f6fa;
+  background: #f5f7fb;
 }
 
 .briefing-header {

@@ -78,7 +78,7 @@ defineProps<Props>()
   top: 40rpx;
   bottom: -16rpx;
   width: 2rpx;
-  background: rgba(148, 163, 184, 0.15);
+  background: var(--ev-border);
   z-index: 1;
   pointer-events: none;
 }
@@ -87,7 +87,7 @@ defineProps<Props>()
 .timeline-card {
   padding: 20rpx 24rpx;
   border-radius: 16rpx;
-  background: rgba(30, 35, 55, 0.8);
+  background: var(--ev-bg-card-muted);
   border: 1px solid var(--ev-border);
 }
 
@@ -113,7 +113,7 @@ defineProps<Props>()
 
 .tag-bullish { background: var(--ev-negative-soft); color: var(--ev-negative); }
 .tag-bearish { background: var(--ev-positive-soft); color: var(--ev-positive); }
-.tag-neutral { background: rgba(148,163,184,0.1); color: var(--ev-text-tertiary); }
+.tag-neutral { background: var(--ev-border-light); color: var(--ev-text-tertiary); }
 
 .timeline-title {
   display: block;

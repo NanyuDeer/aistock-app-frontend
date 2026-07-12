@@ -40,6 +40,15 @@ http.interceptors.response.use(
     if (error.statusCode === 401) {
       uni.removeStorageSync('token')
     }
+    // 兼容 App 端：请求成功但 statusCode 非 2xx 时，error.errMsg 可能是 'request:ok'
+    // （uni.request 层面成功），但 luch-request 因状态码非 2xx 走错误回调
+    // 此时 error 含 statusCode 和 data，提取有用的错误信息给调用方
+    if (error.errMsg === 'request:ok' && error.statusCode) {
+      const statusCode = error.statusCode
+      const responseData = error.data
+      const msg = typeof responseData === 'object' ? responseData?.message : responseData
+      return Promise.reject(new Error(`服务异常(${statusCode}): ${msg || '请稍后重试'}`))
+    }
     return Promise.reject(error)
   }
 )

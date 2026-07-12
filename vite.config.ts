@@ -4,6 +4,9 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [uni()],
+  // 指定 env 文件目录（env/.env.development 和 env/.env.production）
+  // 不指定时 Vite 默认读取项目根目录的 .env 文件，会导致 env/ 目录下的文件被忽略
+  envDir: path.resolve(__dirname, 'env'),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src')

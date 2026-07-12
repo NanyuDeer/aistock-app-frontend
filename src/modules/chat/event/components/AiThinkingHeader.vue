@@ -84,7 +84,7 @@ const activeLogIdx = computed(() => {
   right: 0;
   z-index: 20;
   padding: 20rpx 32rpx 16rpx;
-  background: rgba(15, 17, 25, 0.94);
+  background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(20rpx);
   border-bottom: 1px solid var(--ev-accent-soft);
   transition: border-color 0.4s;
@@ -98,11 +98,11 @@ const activeLogIdx = computed(() => {
 .title-row { gap: 10rpx; margin-bottom: 12rpx; }
 .back-btn {
   width: 48rpx; height: 48rpx; border-radius: 50%;
-  background: rgba(255,255,255,0.06);
+  background: rgba(0, 0, 0, 0.04);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.back-btn:active { background: rgba(255,255,255,0.12); }
+.back-btn:active { background: rgba(0, 0, 0, 0.08); }
 .back-arrow { font-size: 28rpx; color: var(--ev-text-tertiary); line-height: 1; }
 .header-icon { font-size: 30rpx; line-height: 1; }
 .header-title { font-size: 30rpx; font-weight: 700; color: var(--ev-text-primary); }

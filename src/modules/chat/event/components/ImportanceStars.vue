@@ -39,7 +39,7 @@ withDefaults(defineProps<Props>(), {
 }
 
 .importance-star {
-  color: #2A2E3F;
+  color: var(--ev-border);
   line-height: 1;
   transition: color 0.2s;
 }
