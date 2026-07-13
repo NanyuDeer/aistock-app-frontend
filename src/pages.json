@@ -123,10 +123,19 @@
       }
     },
     {
+      "path": "modules/analytics/pages/index",
+      "style": {
+        "navigationBarTitleText": "洞察",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "modules/analytics/pages/forecast",
       "style": {
-        "navigationBarTitleText": "业绩预测",
-        "navigationStyle": "custom"
+        "navigationBarTitleText": "业绩",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
       }
     },
     {

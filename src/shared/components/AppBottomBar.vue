@@ -10,10 +10,6 @@
       <text v-if="activeTabId === tab.id" class="as-tab-active-text">{{ tab.name }}</text>
       <SvgIcon v-else :name="tab.icon" size="28rpx" color="#9ca3af" />
     </view>
-    <!-- 机构调研热门股入口 -->
-    <view class="as-tab-item as-extra-entry" @tap="goHotBurst">
-      <SvgIcon name="search-eye-line" size="28rpx" color="#9ca3af" />
-    </view>
   </view>
 </template>
 
@@ -33,10 +29,9 @@ const emit = defineEmits<{
 }>()
 
 const tabs = [
-  { id: 'discover', name: '发现', icon: 'rocket-line', path: '' },
-  { id: 'market', name: '行情', icon: 'bar-chart-line', path: '/modules/analytics/pages/forecast' },
-  { id: 'event', name: '事件传导', icon: 'flow-chart', path: '/modules/chat/pages/event/list' },
   { id: 'morning', name: '早点听', icon: 'broadcast-line', path: '/modules/home/pages/index' },
+  { id: 'insight', name: '洞察', icon: 'search-eye-line', path: '/modules/analytics/pages/index' },
+  { id: 'forecast', name: '业绩', icon: 'bar-chart-line', path: '/modules/analytics/pages/forecast' },
   { id: 'alert', name: '提醒', icon: 'bell-line', path: '/modules/favorites/pages/index' },
 ]
 
@@ -47,14 +42,16 @@ const activeTabId = computed(() => {
     const currentPage = pages[pages.length - 1]
     const route = currentPage?.route || ''
 
-    // 事件传导页面 → 激活 event tab
-    if (route.includes('chat/pages/event')) return 'event'
     // 首页 → 激活 morning tab
     if (route.includes('home/pages/index')) return 'morning'
+    // 洞察主页或机构调研/趋势评分 → 激活 insight tab
+    if (route.includes('analytics/pages/index')) return 'insight'
+    if (route.includes('market/pages/hot-burst')) return 'insight'
+    if (route.includes('analytics/pages/trend-score')) return 'insight'
+    // 业绩预测 → 激活 forecast tab
+    if (route.includes('analytics/pages/forecast')) return 'forecast'
     // 提醒页 → 激活 alert tab
     if (route.includes('favorites/pages/index')) return 'alert'
-    // 行情/业绩预测 → 激活 market tab
-    if (route.includes('analytics/pages/forecast')) return 'market'
 
   } catch (_) { /* ignore */ }
 
@@ -63,18 +60,10 @@ const activeTabId = computed(() => {
 })
 
 const handleTabTap = (tab: typeof tabs[0]) => {
-  if (tab.path) {
-    // 如果当前已在该页面，不重复跳转
-    if (activeTabId.value === tab.id) return
-    uni.navigateTo({ url: tab.path })
-  } else {
-    uni.showToast({ title: `${tab.name}功能开发中`, icon: 'none' })
-  }
+  // 如果当前已在该页面，不重复跳转
+  if (activeTabId.value === tab.id) return
+  uni.navigateTo({ url: tab.path })
   emit('change', tab.id)
-}
-
-function goHotBurst() {
-  uni.navigateTo({ url: '/modules/market/pages/hot-burst' })
 }
 </script>
 
@@ -123,13 +112,4 @@ function goHotBurst() {
   to { opacity: 1; transform: scale(1); }
 }
 
-/* 额外功能入口 */
-.as-extra-entry {
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
-
-  &:active {
-    opacity: 1;
-  }
-}
 </style>

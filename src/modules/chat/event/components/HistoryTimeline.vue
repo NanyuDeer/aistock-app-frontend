@@ -87,8 +87,8 @@ defineProps<Props>()
 .timeline-card {
   padding: 20rpx 24rpx;
   border-radius: 16rpx;
-  background: var(--ev-bg-card-muted);
-  border: 1px solid var(--ev-border);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
 }
 
 .timeline-header {

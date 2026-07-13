@@ -111,7 +111,12 @@ watch(currentStep, async (stepId) => {
 <style scoped>
 .ai-event-report { padding: 120rpx 0 48rpx; }
 
-.report-content { padding-top: 16rpx; }
+.report-content {
+  padding-top: 16rpx;
+  --ev-text-secondary: #374151;
+  --ev-text-muted: #4b5563;
+  --ev-text-tertiary: #6b7280;
+}
 
 .report-footer { padding: 32rpx 48rpx 0; display: flex; justify-content: center; }
 .footer-text { font-size: 20rpx; color: var(--ev-text-muted); }

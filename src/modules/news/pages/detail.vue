@@ -1,5 +1,5 @@
 <template>
-  <view class="page-news-detail">
+  <SubPageCard :title="detail?.title ? '' : '资讯详情'">
     <!-- 加载中 -->
     <view v-if="loading" class="loading">
       <text class="loading-text">加载中...</text>
@@ -26,6 +26,13 @@
       <view v-if="detail.url" class="news-footer">
         <text class="footer-link" @tap="openOriginal">查看原文 ›</text>
       </view>
+
+      <!-- 事件传导关联按钮：仅在 eventId 参数存在时显示 -->
+      <view v-if="relatedEventId" class="news-event-footer">
+        <view class="event-btn" @tap="goToEventDetail">
+          <text class="event-btn-text">查看关联事件详情 ›</text>
+        </view>
+      </view>
     </view>
 
     <!-- 加载失败 -->
@@ -33,13 +40,14 @@
       <SvgIcon name="file-text-line" size="80rpx" color="#d1d5db" />
       <text class="empty-text">暂无资讯详情</text>
     </view>
-  </view>
+  </SubPageCard>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
+import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 const loading = ref(false)
@@ -53,6 +61,9 @@ const detail = ref<{
   source: string
 } | null>(null)
 
+// 事件传导关联ID：从URL参数传入，存在时显示"查看关联事件详情"按钮
+const relatedEventId = ref('')
+
 // 将纯文本换行转为HTML段落
 const formattedContent = computed(() => {
   if (!detail.value?.content) return ''
@@ -62,6 +73,7 @@ const formattedContent = computed(() => {
 
 onLoad((options) => {
   const newsId = options?.id || ''
+  relatedEventId.value = options?.eventId || ''
   if (newsId) {
     loadDetail(newsId)
   } else {
@@ -103,13 +115,17 @@ function openOriginal() {
     // #endif
   }
 }
+
+function goToEventDetail() {
+  if (relatedEventId.value) {
+    uni.navigateTo({ url: `/modules/chat/pages/event/detail?id=${relatedEventId.value}` })
+  }
+}
 </script>
 
 <style lang="scss" scoped>
-.page-news-detail {
-  min-height: 100vh;
-  background: #ffffff;
-  padding: 32rpx 28rpx;
+.news-content {
+  padding: 0 24rpx 40rpx;
 }
 
 .loading, .empty {
@@ -124,10 +140,6 @@ function openOriginal() {
 .loading-text, .empty-text {
   font-size: 28rpx;
   color: #6b7280;
-}
-
-.empty-icon {
-  font-size: 64rpx;
 }
 
 .news-header {
@@ -190,6 +202,28 @@ function openOriginal() {
 .footer-link {
   font-size: 28rpx;
   color: #4d7cfe;
+  font-weight: 500;
+}
+
+/* 事件传导关联按钮 */
+.news-event-footer {
+  margin-top: 32rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid #f0f2f5;
+  display: flex;
+  justify-content: center;
+}
+
+.event-btn {
+  padding: 16rpx 40rpx;
+  border-radius: 9999rpx;
+  background: linear-gradient(135deg, #4d7cfe, #6366f1);
+  box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
+}
+
+.event-btn-text {
+  font-size: 26rpx;
+  color: #ffffff;
   font-weight: 500;
 }
 </style>

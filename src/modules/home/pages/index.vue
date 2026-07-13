@@ -32,8 +32,8 @@
           </view>
         </view>
 
-        <!-- 两列卡片：长线风口 + 异动捕手 -->
-        <view class="feature-row">
+        <!-- 功能入口 2x2 网格 -->
+        <view class="feature-grid">
           <view class="feature-card leader-card" @tap="goSectors">
             <view class="feature-header">
               <text class="feature-title">长线风口</text>
@@ -41,7 +41,7 @@
             </view>
             <text class="feature-sub">主力最新动向</text>
             <view class="feature-list">
-              <view v-for="(item, idx) in leaderStocks" :key="idx" class="feature-item">
+              <view v-for="(item, idx) in leaderStocks.slice(0, 3)" :key="idx" class="feature-item">
                 <text class="item-name">{{ item.name }}</text>
                 <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
               </view>
@@ -53,16 +53,40 @@
               <text class="feature-title">异动捕手</text>
               <text class="feature-more">›</text>
             </view>
-            <view class="event-top-badge">
-              <text class="badge-hot">TOP1</text>
-              <text class="badge-sector">{{ topEvent.sector }}</text>
-            </view>
-            <text class="event-top-title">{{ topEvent.title }}</text>
+            <text class="feature-sub">实时异动监控</text>
             <view class="feature-list">
-              <view v-for="(item, idx) in eventStocks" :key="idx" class="feature-item event-item">
+              <view v-for="(item, idx) in eventStocks.slice(0, 3)" :key="idx" class="feature-item event-item">
                 <text v-if="idx === 0" class="item-badge">最新</text>
                 <text class="item-name">{{ item.name }}</text>
                 <text class="item-change up">{{ item.change }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="feature-card chain-card" @tap="goEventChain">
+            <view class="feature-header">
+              <text class="feature-title">事件传导</text>
+              <text class="feature-more">›</text>
+            </view>
+            <text class="feature-sub">产业链追踪</text>
+            <view class="feature-list">
+              <view v-for="(item, idx) in chainEvents.slice(0, 3)" :key="idx" class="feature-item">
+                <text class="item-name">{{ item.name }}</text>
+                <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="feature-card ai-card" @tap="goAgentReport">
+            <view class="feature-header">
+              <text class="feature-title">今日AI分析</text>
+              <text class="feature-more">›</text>
+            </view>
+            <text class="feature-sub">Agent报告</text>
+            <view class="feature-list">
+              <view v-for="(item, idx) in aiReports.slice(0, 3)" :key="idx" class="feature-item">
+                <text class="item-name">{{ item.name }}</text>
+                <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
               </view>
             </view>
           </view>
@@ -130,6 +154,18 @@ const trackEvent = ref({
   title: '动力煤需求阶段性回落，旺季...'
 })
 
+const chainEvents = ref([
+  { name: '创新药', tag: '利好', tagType: 'buy' },
+  { name: '半导体', tag: '关注', tagType: 'wash' },
+  { name: '新能源', tag: '利空', tagType: 'sell' },
+])
+
+const aiReports = ref([
+  { name: '晨报', tag: '已更新', tagType: 'buy' },
+  { name: '风口龙头', tag: '已更新', tagType: 'buy' },
+  { name: '机构调研', tag: '待更新', tagType: 'wash' },
+])
+
 onShow(() => {
 })
 
@@ -147,6 +183,14 @@ function goEvent() {
 
 function goSectors() {
   uni.navigateTo({ url: '/modules/market/pages/leaders' })
+}
+
+function goEventChain() {
+  uni.navigateTo({ url: '/modules/chat/pages/event/list' })
+}
+
+function goAgentReport() {
+  uni.navigateTo({ url: '/modules/chat/pages/agent-report' })
 }
 
 function goTrackDetail() {
@@ -329,15 +373,15 @@ function goLogin() {
   opacity: 0.5;
 }
 
-/* ===== 两列功能卡片 ===== */
-.feature-row {
-  display: flex;
+/* ===== 功能入口 2x2 网格 ===== */
+.feature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 16rpx;
   margin-bottom: 20rpx;
 }
 
 .feature-card {
-  flex: 1;
   background: #f5f7fb;
   border-radius: 14rpx;
   padding: 20rpx;

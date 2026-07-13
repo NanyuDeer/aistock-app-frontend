@@ -8,7 +8,7 @@
       </view>
 
       <view class="graph-arrow">
-        <text class="arrow-line">│</text>
+        <view class="arrow-line-bar" />
         <text class="arrow-head">▼</text>
       </view>
 
@@ -24,7 +24,7 @@
       </view>
 
       <view class="graph-arrow">
-        <text class="arrow-line">│</text>
+        <view class="arrow-line-bar" />
         <text class="arrow-head">▼</text>
       </view>
 
@@ -35,34 +35,31 @@
         <text class="node-impact-text">{{ data.coreIndustry?.impact || '' }}</text>
       </view>
 
-      <view class="graph-arrow" v-if="upChain.length || downChain.length">
-        <view class="arrow-split">
-          <text class="arrow-line">│</text>
-          <view class="split-lines">
-            <text class="split-left">├</text>
-            <text class="split-right">┤</text>
-          </view>
+      <!-- 上下游分叉 -->
+      <view class="branch-section" v-if="upChain.length || downChain.length">
+        <view class="branch-trunk">
+          <view class="arrow-line-bar" />
         </view>
-      </view>
-
-      <!-- 上下游分流 -->
-      <view class="branch-row" v-if="upChain.length || downChain.length">
-        <view class="branch-col" v-if="upChain.length">
-          <view class="branch-arrow-left">
-            <text class="arrow-head">▼</text>
-          </view>
-          <view v-for="c in upChain" :key="c.industry" class="graph-node chain-node" :class="'node-' + c.direction">
-            <text class="node-type-label">{{ c.relation }}</text>
-            <text class="node-main-text small">{{ c.industry }}</text>
-          </view>
-        </view>
-        <view class="branch-col" v-if="downChain.length">
-          <view class="branch-arrow-right">
-            <text class="arrow-head">▼</text>
-          </view>
-          <view v-for="c in downChain" :key="c.industry" class="graph-node chain-node" :class="'node-' + c.direction">
-            <text class="node-type-label">{{ c.relation }}</text>
-            <text class="node-main-text small">{{ c.industry }}</text>
+        <!-- 统一的分叉布局：横条 + 两列 -->
+        <view class="branch-fork-wrapper">
+          <view class="fork-h-bar" />
+          <view class="branch-fork">
+            <view v-if="upChain.length" class="branch-col">
+              <view class="branch-line-bar" />
+              <text class="arrow-head">▼</text>
+              <view v-for="c in upChain" :key="c.industry" class="graph-node chain-node" :class="'node-' + c.direction">
+                <text class="node-type-label">{{ c.relation }}</text>
+                <text class="node-main-text small">{{ c.industry }}</text>
+              </view>
+            </view>
+            <view v-if="downChain.length" class="branch-col">
+              <view class="branch-line-bar" />
+              <text class="arrow-head">▼</text>
+              <view v-for="c in downChain" :key="c.industry" class="graph-node chain-node" :class="'node-' + c.direction">
+                <text class="node-type-label">{{ c.relation }}</text>
+                <text class="node-main-text small">{{ c.industry }}</text>
+              </view>
+            </view>
           </view>
         </view>
       </view>
@@ -121,7 +118,9 @@ const downChain = computed<TransmissionChainNode[]>(() =>
   flex-direction: column;
   align-items: center;
   width: 100%;
-  padding: 8rpx 0;
+  padding: 16rpx 0;
+  background: #ffffff;
+  border-radius: 14rpx;
 }
 
 /* ===== 节点卡片 ===== */
@@ -155,7 +154,7 @@ const downChain = computed<TransmissionChainNode[]>(() =>
 .dir-bearish { color: var(--ev-positive); }
 .dir-neutral { color: var(--ev-text-muted); }
 
-/* ===== 箭头 ===== */
+/* ===== 连线箭头 ===== */
 .graph-arrow {
   display: flex;
   flex-direction: column;
@@ -163,21 +162,69 @@ const downChain = computed<TransmissionChainNode[]>(() =>
   padding: 2rpx 0;
 }
 
-.arrow-line { font-size: 18rpx; color: var(--ev-text-muted); line-height: 1; }
-.arrow-head { font-size: 18rpx; color: var(--ev-accent); line-height: 1; }
+.arrow-line-bar {
+  width: 2rpx;
+  height: 24rpx;
+  background: #c7d2e0;
+}
 
-/* 分叉箭头 */
-.arrow-split { display: flex; flex-direction: column; align-items: center; }
-.split-lines { display: flex; gap: 80rpx; }
-.split-left { font-size: 18rpx; color: var(--ev-text-muted); }
-.split-right { font-size: 18rpx; color: var(--ev-text-muted); }
+.arrow-head {
+  font-size: 18rpx;
+  color: var(--ev-accent);
+  line-height: 1;
+}
 
-/* 上下游行 */
-.branch-row { display: flex; gap: 40rpx; width: 100%; justify-content: center; }
-.branch-col { display: flex; flex-direction: column; align-items: center; gap: 4rpx; }
+/* ===== 分叉区域 ===== */
+.branch-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 
-.branch-arrow-left, .branch-arrow-right {
-  padding: 2rpx 0;
+.branch-trunk {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.branch-trunk .arrow-line-bar {
+  height: 20rpx;
+}
+
+/* 分叉外层包裹 */
+.branch-fork-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 横条连接线 */
+.fork-h-bar {
+  width: calc(100% - 120rpx);
+  height: 2rpx;
+  background: #c7d2e0;
+}
+
+.branch-fork {
+  display: flex;
+  gap: 48rpx;
+  width: 100%;
+  justify-content: center;
+}
+
+.branch-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.branch-line-bar {
+  width: 2rpx;
+  height: 16rpx;
+  background: #c7d2e0;
 }
 
 .chain-node { min-width: 140rpx; padding: 12rpx 18rpx; }
