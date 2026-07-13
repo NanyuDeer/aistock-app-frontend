@@ -184,6 +184,10 @@ src/
 | 布局 | 用 `position:fixed`，禁止 `100vh` |
 | 样式单位 | 使用 SCSS + rpx 单位 |
 | 浅色主题 | 背景 `#f5f7fb`，卡片白色 `#ffffff` |
+| Design Token | 所有颜色/字号/圆角必须用 `shared/styles/variables.scss` 中的变量，禁止硬编码（如 `#4d7cfe` 用 `$brand-color`） |
+| App 端 envDir | `vite.config.ts` 必须配置 `envDir: 'env'`，否则 App 打包时 env 文件不加载，所有 API 请求失败 |
+| App 端错误对象 | catch 块中读取错误信息用 `e?.errMsg || e?.message`，因为 uni-app 网络错误对象是 `{ errMsg }` 格式，没有 `message` 属性 |
+| App 端状态栏 | 自定义导航栏的页面必须设置 `paddingTop: statusBarHeight + 'px'`，否则顶部内容被状态栏遮挡 |
 | 类型安全 | 所有 .ts 文件需有类型注解，禁止 any（用 unknown） |
 | 模块解耦 | 模块间零直接依赖，组件解耦可插拔 |
 | 登录非必须 | 未登录用户可看核心功能，仅自选股需登录 |

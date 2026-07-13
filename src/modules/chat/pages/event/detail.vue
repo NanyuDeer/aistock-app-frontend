@@ -84,14 +84,14 @@ function goBack() {
 
 .state-icon { font-size: 64rpx; margin-bottom: 24rpx; }
 .state-text { font-size: 28rpx; color: var(--ev-text-muted); margin-bottom: 24rpx; }
-.error-text { color: #F43F5E; }
 
 .retry-btn {
   padding: 16rpx 48rpx;
   border-radius: 9999rpx;
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: var(--ev-accent-soft);
+  border: 1px solid var(--ev-accent);
 }
 
-.retry-text { font-size: 26rpx; color: #60A5FA; font-weight: 500; }
+.retry-text { font-size: 26rpx; color: var(--ev-accent); font-weight: 500; }
+.error-text { color: var(--ev-negative); }
 </style>

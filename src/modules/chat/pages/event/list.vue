@@ -242,23 +242,22 @@ async function handleFollow(event: EventItem) {
 }
 
 /* H5 端自定义滚动条样式 */
-/* 轨道宽度 3px，滑块圆角，暗色主题 */
 .event-stream::-webkit-scrollbar {
   width: 3px;
 }
 
 .event-stream::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.04);
   border-radius: 4px;
 }
 
 .event-stream::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 4px;
 }
 
 .event-stream::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.25);
 }
 .state-container {
   display: flex;
@@ -280,19 +279,19 @@ async function handleFollow(event: EventItem) {
 }
 
 .error-text {
-  color: #F43F5E;
+  color: var(--ev-negative);
 }
 
 .retry-btn {
   padding: 16rpx 48rpx;
   border-radius: 9999rpx;
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: var(--ev-accent-soft);
+  border: 1px solid var(--ev-accent);
 }
 
 .retry-text {
   font-size: 26rpx;
-  color: #60A5FA;
+  color: var(--ev-accent);
   font-weight: 500;
 }
 
@@ -306,17 +305,17 @@ async function handleFollow(event: EventItem) {
 .load-more-btn {
   padding: 20rpx 56rpx;
   border-radius: 9999rpx;
-  background: rgba(59, 130, 246, 0.08);
-  border: 1px solid rgba(59, 130, 246, 0.15);
+  background: var(--ev-accent-soft);
+  border: 1px solid var(--ev-border);
 }
 
 .load-more-btn:active {
-  background: rgba(59, 130, 246, 0.15);
+  background: var(--ev-accent-bg);
 }
 
 .load-more-text {
   font-size: 26rpx;
-  color: #60A5FA;
+  color: var(--ev-accent);
   font-weight: 500;
 }
 
@@ -330,36 +329,5 @@ async function handleFollow(event: EventItem) {
   flex-shrink: 0;
   z-index: 10;
   height: 210rpx;
-}
-
-/* 深色主题覆盖：AppBottomBar 默认 #f5f7fb → #161A26 */
-.event-bottom-wrapper :deep(.as-tab-bar) {
-  background: #161A26;
-}
-
-/* 深色主题覆盖：GlobalChatBar 整体背景 #f5f7fb → #161A26 */
-.event-chatbar-wrapper :deep(.global-chat-bar) {
-  background: #161A26;
-}
-
-/* 深色主题覆盖：GlobalChatBar 白色按钮 → 暗色 */
-.event-chatbar-wrapper :deep(.gcb-side-btn) {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(148, 163, 184, 0.12);
-}
-
-/* 深色主题覆盖：GlobalChatBar 白色输入框 → 暗色 */
-.event-chatbar-wrapper :deep(.gcb-chat-input) {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(148, 163, 184, 0.12);
-}
-
-/* 深色主题覆盖：按钮文字 / 占位文字适配暗色背景 */
-.event-chatbar-wrapper :deep(.gcb-side-text) {
-  color: var(--ev-text-tertiary);
-}
-
-.event-chatbar-wrapper :deep(.gcb-chat-placeholder) {
-  color: var(--ev-text-muted);
 }
 </style>

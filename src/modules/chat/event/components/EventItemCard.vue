@@ -96,7 +96,7 @@ defineEmits<{
 
 /** 事件类型颜色（按类型映射） */
 const typeColor = computed(() => {
-  return EVENT_TYPE_COLORS[props.event.eventType] || { bg: '#1E293B', text: '#94A3B8' }
+  return EVENT_TYPE_COLORS[props.event.eventType] || { bg: '#f0f2f5', text: '#6b7280' }
 })
 
 // ========== 工具函数 ==========
@@ -112,11 +112,11 @@ function formatTime(time: string): string {
 
 <style scoped>
 .event-card {
-  background: linear-gradient(135deg, rgba(30, 35, 55, 0.92), rgba(26, 28, 42, 0.96));
+  background: var(--ev-bg-card);
   border-radius: 20rpx;
   padding: 20rpx 22rpx;
-  border: 1px solid rgba(148, 163, 184, 0.08);
-  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--ev-border);
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
 }
 
 /* ========== 第一行：事件类型 + 时间 + 重要程度 ========== */
@@ -155,7 +155,7 @@ function formatTime(time: string): string {
 .card-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #FFFFFF;
+  color: var(--ev-text-primary);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -167,7 +167,7 @@ function formatTime(time: string): string {
 }
 
 .card-title:active {
-  color: #69C0FF;
+  color: var(--ev-accent);
 }
 
 /* ========== AI 摘要（最多2行，超出省略） ========== */
@@ -270,7 +270,7 @@ function formatTime(time: string): string {
 .item-bearish {
   background: rgba(34, 197, 94, 0.08);
   border: 1px solid rgba(34, 197, 94, 0.15);
-  color: #86EFAC;
+  color: var(--ev-positive);
 }
 
 .item-bearish .industry-arrow {

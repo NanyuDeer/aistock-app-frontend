@@ -1,45 +1,65 @@
 /**
  * 样式变量 - 参照网页风格，浅色主题
+ * 统一 design token：所有页面必须使用这些变量，禁止硬编码颜色值
+ * 历史遗留的 #4d7cfe / #1a1d24 / #9ca3af 等硬编码值逐步替换为以下变量
  */
 
-/* 主题色 */
-$primary-color: #409EFF;
-$success-color: #67C23A;
-$warning-color: #E6A23C;
-$error-color: #F56C6C;
-$info-color: #909399;
+/* ===== 品牌色（实际使用的主色，与 SubPageCard/PageCard 渐变一致） ===== */
+$brand-color: #4d7cfe;                    // 品牌主色（顶栏渐变、按钮、链接）
+$brand-color-secondary: #6366f1;          // 品牌辅助色（渐变终点）
+$brand-gradient: linear-gradient(135deg, #4d7cfe 0%, #6366f1 100%);  // 品牌渐变
 
-/* 背景色 */
-$bg-color: #f5f7fa;
-$bg-color-grey: #ffffff;
-$bg-color-hover: #f0f2f5;
+/* 兼容旧变量（保持向后兼容，新代码请用 $brand-color） */
+$primary-color: #4d7cfe;
+$success-color: #22c55e;                  // 与页面中使用的 #22c55e 统一
+$warning-color: #f59e0b;                  // 与页面中使用的 #f59e0b 统一
+$error-color: #f43f5e;                     // 与页面中使用的 #f43f5e 统一
+$info-color: #6b7280;
 
-/* 文字色 */
-$text-color: #303133;
-$text-color-secondary: #606266;
-$text-color-tertiary: #909399;
+/* ===== 背景色 ===== */
+$bg-color: #f5f7fb;                       // 页面背景（与 SubPageCard/PageCard 统一）
+$bg-color-grey: #ffffff;                  // 卡片背景
+$bg-color-hover: #f0f2f5;                 // 悬停背景
+$bg-color-muted: #f5f7fa;                 // 次要背景（分析框等）
 
-/* 边框 */
-$border-color: #dcdfe6;
-$border-color-light: #e4e7ed;
+/* ===== 文字色 ===== */
+$text-color-title: #1a1d24;               // 标题文字（最深）
+$text-color: #1a1d24;                     // 主文字（与标题一致，保持兼容）
+$text-color-secondary: #6b7280;           // 次要文字（描述、副标题）
+$text-color-tertiary: #9ca3af;            // 辅助文字（时间、提示）
+$text-color-placeholder: #c0c4cc;         // 占位文字
 
-/* 涨跌色（A 股：红涨绿跌） */
-$stock-up-color: #F56C6C;
-$stock-down-color: #67C23A;
-$stock-flat-color: #909399;
+/* ===== 边框 ===== */
+$border-color: #e5e7eb;                   // 主边框
+$border-color-light: #f0f2f5;             // 浅边框（卡片分隔线）
 
-/* 字号 */
-$font-size-xs: 20rpx;
-$font-size-sm: 22rpx;
-$font-size-base: 26rpx;
-$font-size-lg: 30rpx;
-$font-size-xl: 34rpx;
+/* ===== 涨跌色（A 股：红涨绿跌，与页面硬编码统一） ===== */
+$stock-up-color: #f43f5e;
+$stock-down-color: #22c55e;
+$stock-flat-color: #9ca3af;
 
-/* 圆角 */
-$radius-sm: 6rpx;
-$radius-base: 10rpx;
-$radius-lg: 14rpx;
+/* ===== 字号（统一档位：20/22/26/30/34/48） ===== */
+$font-size-xs: 20rpx;                     // 标签、辅助文字
+$font-size-sm: 22rpx;                     // 次要文字
+$font-size-base: 26rpx;                   // 正文
+$font-size-lg: 30rpx;                     // 卡片标题
+$font-size-xl: 34rpx;                     // 页面标题
+$font-size-xxl: 48rpx;                    // 大标题
 
-/* 阴影 */
-$shadow-base: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+/* ===== 圆角（统一档位：8/12/16/20） ===== */
+$radius-xs: 8rpx;                         // 小标签
+$radius-sm: 12rpx;                        // 小卡片
+$radius-base: 16rpx;                      // 标准卡片
+$radius-lg: 20rpx;                        // 大卡片
+$radius-pill: 9999rpx;                    // 胶囊按钮
+
+/* ===== 间距（统一档位：8/16/24/32） ===== */
+$spacing-xs: 8rpx;
+$spacing-sm: 16rpx;
+$spacing-base: 24rpx;                     // 标准内边距
+$spacing-lg: 32rpx;                       // 大间距
+
+/* ===== 阴影 ===== */
+$shadow-base: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 $shadow-card: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+$shadow-strong: 0 4rpx 16rpx rgba(77, 124, 254, 0.3);  // 品牌色阴影

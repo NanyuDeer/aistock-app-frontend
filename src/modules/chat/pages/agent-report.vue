@@ -1,5 +1,5 @@
 <template>
-  <view class="agent-report-page">
+  <view class="agent-report-page" :style="{ paddingTop: statusBarHeight + 'px' }">
     <!-- 顶部标题栏 -->
     <view class="report-header">
       <view class="header-left" @tap="goBack">
@@ -39,6 +39,20 @@ import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { agentApi } from '@/shared/api/modules/agent'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+
+// 状态栏高度（App 端需要除以 zoom 补偿）
+const statusBarHeight = ref(0)
+try {
+  const raw = uni.getSystemInfoSync().statusBarHeight || 0
+  // #ifdef APP-PLUS
+  statusBarHeight.value = raw / 1.2
+  // #endif
+  // #ifndef APP-PLUS
+  statusBarHeight.value = raw
+  // #endif
+} catch (e) {
+  statusBarHeight.value = 0
+}
 
 interface AgentReport {
   report_type: string
@@ -94,7 +108,7 @@ onLoad((options) => {
 <style lang="scss" scoped>
 .agent-report-page {
   min-height: 100vh;
-  background: #f5f6fa;
+  background: #f5f7fb;
 }
 
 .report-header {

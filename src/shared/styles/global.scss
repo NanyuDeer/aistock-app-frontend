@@ -1,41 +1,41 @@
 @import './variables.scss';
 @import './reset.scss';
 
-/* ===== Event 模块暗色主题 CSS 变量 ===== */
+/* ===== Event 模块主题 CSS 变量（浅色系，与其他页面统一） ===== */
 page {
   /* 背景 */
-  --ev-bg-page: #0F1119;
-  --ev-bg-card: rgba(30, 35, 55, 0.85);
-  --ev-bg-card-muted: rgba(20, 22, 35, 0.6);
-  --ev-bg-elevated: rgba(30, 35, 55, 0.5);
+  --ev-bg-page: #f5f7fb;
+  --ev-bg-card: #ffffff;
+  --ev-bg-card-muted: #f5f7fa;
+  --ev-bg-elevated: #ffffff;
 
   /* 文字 */
-  --ev-text-primary: #F1F5F9;
-  --ev-text-secondary: #CBD5E1;
-  --ev-text-tertiary: #94A3B8;
-  --ev-text-muted: #475569;
+  --ev-text-primary: #1a1d24;
+  --ev-text-secondary: #6b7280;
+  --ev-text-tertiary: #9ca3af;
+  --ev-text-muted: #9ca3af;
 
   /* 强调色 */
-  --ev-accent: #818CF8;
-  --ev-accent-soft: rgba(99, 102, 241, 0.12);
-  --ev-accent-bg: rgba(99, 102, 241, 0.06);
+  --ev-accent: #4d7cfe;
+  --ev-accent-soft: rgba(77, 124, 254, 0.12);
+  --ev-accent-bg: rgba(77, 124, 254, 0.06);
 
   /* 正向 / 负向 */
-  --ev-positive: #34D399;
+  --ev-positive: #22c55e;
   --ev-positive-soft: rgba(34, 197, 94, 0.1);
   --ev-positive-bg: rgba(34, 197, 94, 0.06);
-  --ev-negative: #FCA5A5;
+  --ev-negative: #f43f5e;
   --ev-negative-soft: rgba(244, 63, 94, 0.1);
   --ev-negative-bg: rgba(244, 63, 94, 0.06);
 
   /* 边框 */
-  --ev-border: rgba(148, 163, 184, 0.06);
-  --ev-border-light: rgba(148, 163, 184, 0.04);
+  --ev-border: #e5e7eb;
+  --ev-border-light: #f0f2f5;
 
   /* 特殊 */
-  --ev-blue-gradient: linear-gradient(135deg, #3B82F6, #2563EB);
-  --ev-blue-shadow: rgba(59, 130, 246, 0.3);
-  --ev-warning: #F59E0B;
+  --ev-blue-gradient: linear-gradient(135deg, #4d7cfe, #6366f1);
+  --ev-blue-shadow: rgba(77, 124, 254, 0.3);
+  --ev-warning: #f59e0b;
 
   /* 页面基础 */
   background-color: $bg-color;

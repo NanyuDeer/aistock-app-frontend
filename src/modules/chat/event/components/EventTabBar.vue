@@ -77,8 +77,8 @@ function handleChange(value: string) {
   flex-shrink: 0;
   padding: 12rpx 28rpx;
   border-radius: 9999rpx;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: var(--ev-bg-card-muted);
+  border: 1px solid var(--ev-border);
   transition: all 0.2s;
 }
 
