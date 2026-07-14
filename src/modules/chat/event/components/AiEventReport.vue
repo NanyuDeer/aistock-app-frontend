@@ -56,7 +56,6 @@
 import { onMounted, watch, nextTick } from 'vue'
 import type { EventDetailResponse } from '../types'
 import { useAiReasoning } from '../composables/useAiReasoning'
-import type { AnalysisContext } from '../composables/useAiReasoning'
 import AiThinkingHeader from './AiThinkingHeader.vue'
 import AiAnalysisSection from './AiAnalysisSection.vue'
 import AiEventUnderstanding from './AiEventUnderstanding.vue'
@@ -81,15 +80,7 @@ const {
 
 onMounted(() => {
   if (!props.detail) return
-  const a = props.detail.aiAnalysis
-  startAnalysis({
-    eventType: props.detail.event.eventType,
-    source: props.detail.event.source,
-    publishTime: props.detail.event.publishTime,
-    transferDirection: a?.transferDirection,
-    transferReason: a?.transferReason,
-    persistenceReason: a?.persistenceReason,
-  })
+  startAnalysis()
 })
 
 // ===== 自动滚动到当前步骤 =====
