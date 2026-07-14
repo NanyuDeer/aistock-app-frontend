@@ -153,7 +153,8 @@ const records = computed(() => {
 })
 
 const historyDateRange = computed(() => {
-  const dates = allRecords.value
+  if (selectedDate.value) return selectedDate.value
+  const dates = records.value
     .map(item => normalizeDate(item.push_date))
     .filter(Boolean)
     .sort()
