@@ -17,11 +17,13 @@ export function useFavorites() {
 
   async function toggle(symbol: string, name: string) {
     if (isFavorite(symbol)) {
-      await favoritesStore.remove(symbol)
-      uni.showToast({ title: '已移除自选', icon: 'none' })
+      const removed = await favoritesStore.remove(symbol)
+      if (removed) uni.showToast({ title: '已移除自选', icon: 'none' })
+      return removed
     } else {
-      await favoritesStore.add(symbol, name)
-      uni.showToast({ title: '已加入自选', icon: 'none' })
+      const added = await favoritesStore.add(symbol, name)
+      if (added) uni.showToast({ title: '已加入自选', icon: 'none' })
+      return added
     }
   }
 

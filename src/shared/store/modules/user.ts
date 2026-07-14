@@ -12,7 +12,16 @@ export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(storage.get(STORAGE_KEYS.USER_INFO))
   const settings = ref<UserSettings>({})
 
-  const isLoggedIn = () => !!token.value
+  const isLoggedIn = () => !!token.value || !!userInfo.value?.openid
+
+  function clearSession() {
+    token.value = ''
+    userInfo.value = null
+    settings.value = {}
+    storage.remove(STORAGE_KEYS.TOKEN)
+    storage.remove(STORAGE_KEYS.USER_INFO)
+    storage.remove(STORAGE_KEYS.FAVORITES)
+  }
 
   /** 账号密码登录（保留兼容） */
   async function login(params: { username?: string; password?: string; code?: string }) {
@@ -42,12 +51,20 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function fetchUserInfo() {
+    const info = await authApi.getUserInfo()
+    userInfo.value = info
+    storage.set(STORAGE_KEYS.USER_INFO, info)
+    return info
+  }
+
+  async function restoreSession() {
     try {
-      const info = await authApi.getUserInfo()
-      userInfo.value = info
-      storage.set(STORAGE_KEYS.USER_INFO, info)
+      await fetchUserInfo()
+      return true
     } catch (e) {
-      console.error('[user] fetchUserInfo failed:', e)
+      const statusCode = (e as { statusCode?: number })?.statusCode
+      if (statusCode === 401) clearSession()
+      return false
     }
   }
 
@@ -75,11 +92,7 @@ export const useUserStore = defineStore('user', () => {
 
   function logout() {
     authApi.logout().catch(() => {})
-    token.value = ''
-    userInfo.value = null
-    settings.value = {}
-    storage.remove(STORAGE_KEYS.TOKEN)
-    storage.remove(STORAGE_KEYS.USER_INFO)
+    clearSession()
   }
 
   return {
@@ -91,8 +104,10 @@ export const useUserStore = defineStore('user', () => {
     wxLogin,
     handleScanLoginSuccess,
     fetchUserInfo,
+    restoreSession,
     fetchSettings,
     updateSetting,
-    logout
+    logout,
+    clearSession
   }
 })

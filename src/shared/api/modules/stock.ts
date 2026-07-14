@@ -27,6 +27,43 @@ export interface KLineItem {
   volume: number
 }
 
+export interface FavoriteStock {
+  symbol: string
+  name: string
+  market?: string | null
+  addedAt?: string | null
+}
+
+interface FavoriteStockPayload {
+  股票代码?: string
+  股票简称?: string | null
+  市场代码?: string | null
+  添加时间?: string | null
+  symbol?: string
+  name?: string | null
+  market?: string | null
+  added_at?: string | null
+}
+
+interface UserFavoritesPayload {
+  自选股?: FavoriteStockPayload[]
+  favorites?: FavoriteStockPayload[]
+}
+
+function normalizeFavorites(payload: UserFavoritesPayload | null | undefined): FavoriteStock[] {
+  const favorites = payload?.自选股 || payload?.favorites || []
+  if (!Array.isArray(favorites)) return []
+
+  return favorites
+    .map((item) => ({
+      symbol: String(item.股票代码 || item.symbol || '').trim(),
+      name: String(item.股票简称 || item.name || ''),
+      market: item.市场代码 ?? item.market ?? null,
+      addedAt: item.添加时间 ?? item.added_at ?? null,
+    }))
+    .filter((item) => item.symbol)
+}
+
 export const stockApi = {
   /** 获取股票列表 */
   getStockList(params?: { keyword?: string; page?: number; size?: number }) {
@@ -137,24 +174,17 @@ export const stockApi = {
 
   /** 获取自选股（通过 /users/me 返回的用户信息提取） */
   getFavorites() {
-    return request.get('/users/me').then((res: any) => {
-      // 后端返回中文字段名，适配为前端期望的格式
-      const favorites = res?.['自选股'] || res?.favorites || []
-      return favorites.map((item: any) => ({
-        symbol: item['股票代码'] || item.symbol,
-        name: item['股票简称'] || item.name || '',
-      }))
-    })
+    return request.get<UserFavoritesPayload>('/users/me').then(normalizeFavorites)
   },
 
   /** 添加自选股 */
   addFavorites(symbols: string[]) {
-    return request.post('/users/me/favorites', { symbols })
+    return request.post<UserFavoritesPayload>('/users/me/favorites', { symbols }).then(normalizeFavorites)
   },
 
   /** 删除自选股 */
   removeFavorites(symbols: string[]) {
-    return request.delete('/users/me/favorites', { data: { symbols } })
+    return request.delete<UserFavoritesPayload>('/users/me/favorites', { data: { symbols } }).then(normalizeFavorites)
   },
 
   /** 获取业绩预测列表 */
