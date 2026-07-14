@@ -64,6 +64,60 @@ function normalizeFavorites(payload: UserFavoritesPayload | null | undefined): F
     .filter((item) => item.symbol)
 }
 
+export interface WindLeaderAiAnalysis {
+  persistence?: string
+  persistence_reason?: string
+  heat_transfer?: boolean
+  transfer_direction?: string
+  transfer_reason?: string
+  risk_warning?: string
+}
+
+export interface WindLeaderStock {
+  code: string
+  name: string
+  industry?: string
+  score?: number
+  reason?: string
+  reason_tag?: string
+  reason_tag_class?: string
+  in_concept?: boolean
+  chain_position?: string
+  source?: string
+  overlap_ratio?: number
+  transmission_factor?: number
+  related_industry?: string
+  price?: number | null
+  change_pct?: number | null
+}
+
+export interface WindLeaderSector {
+  code?: string
+  name: string
+  type?: string
+  frequency?: number | string
+  avg_change?: number
+  today_change?: number
+  amount_trend?: number
+  net_inflow?: number
+  score?: number
+  leading_stock?: string
+  leading_change?: number
+  up_count?: number
+  down_count?: number
+  driver?: string
+  ai_analysis?: WindLeaderAiAnalysis | string | null
+  main_stocks?: WindLeaderStock[]
+  upstream_stocks?: WindLeaderStock[]
+  downstream_stocks?: WindLeaderStock[]
+  leading_stock_info?: WindLeaderStock | null
+}
+
+export interface WindLeaderResponse {
+  update_time?: string
+  hot_sectors: WindLeaderSector[]
+}
+
 export const stockApi = {
   /** 获取股票列表 */
   getStockList(params?: { keyword?: string; page?: number; size?: number }) {
@@ -138,7 +192,7 @@ export const stockApi = {
 
   /** 获取风口龙头（长线风口，返回 hot_sectors 数组） */
   getWindLeaders(limit = 8) {
-    return request.get('/cn/wind-leaders', { params: { limit } }).then((res: any) => res)
+    return request.get<WindLeaderResponse>('/cn/wind-leaders', { params: { limit } })
   },
 
   /** 获取机构调研热门股（共振检测） */
