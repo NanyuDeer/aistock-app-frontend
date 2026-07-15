@@ -29,7 +29,7 @@ http.interceptors.request.use(
 http.interceptors.response.use(
   (response) => {
     const { code, message, data } = response.data || {}
-    if (code === 200 || code === undefined) {
+    if (code === 0 || code === 200 || code === undefined) {
       return data ?? response.data
     }
     // 业务错误不弹 toast（让调用方自行处理），仅 reject
