@@ -20,7 +20,7 @@
         class="card-content"
         :enhanced="true"
         :bounces="false"
-        :style="{ height: scrollHeight + 'px' }"
+        :style="cardContentStyle"
       >
         <!-- Tab 内容（v-show 保持组件状态，切换不销毁） -->
         <MorningContent v-show="activeTab === 'morning'" />
@@ -97,6 +97,15 @@ const scrollHeight = computed(() => {
   const marginH = rpx2px(207)      // page-card marginBottom
   const total = windowHeight.value - statusBarHeight.value - navH - headerH - marginH
   return Math.max(total, 100)
+})
+
+const cardContentStyle = computed(() => {
+  // #ifdef H5
+  return {}
+  // #endif
+  // #ifndef H5
+  return { height: `${scrollHeight.value}px` }
+  // #endif
 })
 
 function onTabChange(tab: string) {
@@ -177,6 +186,12 @@ function goProfile() {
 
 /* 可滚动内容区域 */
 .card-content {
+  box-sizing: border-box;
+  padding-bottom: 24rpx;
+  /* #ifdef H5 */
+  flex: 1;
+  min-height: 0;
+  /* #endif */
   background: #ffffff;
   touch-action: auto;
   overscroll-behavior: contain;
