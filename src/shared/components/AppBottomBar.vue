@@ -35,8 +35,11 @@ const tabs = [
   { id: 'alert', name: '提醒', icon: 'bell-line', path: '/modules/favorites/pages/index' },
 ]
 
-/** 根据当前页面路由自动检测活跃 Tab */
+/** 活跃 Tab：优先使用外部传入的 currentTab，否则根据路由自动检测 */
 const activeTabId = computed(() => {
+  // 外部显式传入时直接使用（MainTabs 统一容器模式）
+  if (props.currentTab) return props.currentTab
+
   try {
     const pages = getCurrentPages()
     const currentPage = pages[pages.length - 1]
@@ -55,14 +58,14 @@ const activeTabId = computed(() => {
 
   } catch (_) { /* ignore */ }
 
-  // 兜底：使用外部传入的 currentTab
-  return props.currentTab
+  return 'morning'
 })
 
 const handleTabTap = (tab: typeof tabs[0]) => {
-  // 如果当前已在该页面，不重复跳转
+  // 如果当前已在该Tab，不重复触发
   if (activeTabId.value === tab.id) return
-  uni.navigateTo({ url: tab.path })
+  // 仅触发 change 事件，由父组件（MainTabs）决定如何切换
+  // 不再使用 reLaunch，避免销毁整个页面导致闪烁
   emit('change', tab.id)
 }
 </script>

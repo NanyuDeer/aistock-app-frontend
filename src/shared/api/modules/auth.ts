@@ -27,6 +27,10 @@ export interface ScanLoginResult {
 
 export interface ScanStatusResult {
   status: 'waiting' | 'scanned' | 'confirmed' | 'expired'
+  /** confirmed 时后端返回的 JWT token */
+  token?: string
+  /** confirmed 时返回的 openid */
+  openid?: string
 }
 
 export interface UserSettings {
@@ -36,7 +40,7 @@ export interface UserSettings {
 }
 
 export const authApi = {
-  /** 微信登录（小程序） */
+  /** 微信登录（App 端 uni.login → code → 后端换取 token） */
   wxLogin(code: string) {
     return request.post('/auth/wx-login', { code })
   },

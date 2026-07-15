@@ -1,116 +1,99 @@
 <template>
-  <view class="page-forecast" :style="{ paddingTop: statusBarHeight + 'px' }">
-    <!-- 透明导航区域 -->
-    <view class="nav-area">
-      <view class="nav-avatar" @tap="goProfile">
-        <SvgIcon name="bear-smile-line" size="30rpx" color="#ffffff" />
+  <view class="forecast-content">
+    <!-- 固定区域：搜索栏 + 排序栏 -->
+    <view class="forecast-fixed">
+      <view class="search-bar">
+        <view class="search-input-wrap">
+          <SvgIcon name="search-line" size="28rpx" color="#9ca3af" />
+          <input
+            v-model="keyword"
+            class="search-input"
+            placeholder="搜索股票代码/简称"
+            confirm-type="search"
+            @input="handleSearchInput"
+            @confirm="handleSearch"
+          />
+          <text v-if="keyword" class="search-clear" @tap="handleReset">✕</text>
+        </view>
+      </view>
+
+      <view class="sort-bar">
+        <text class="sort-label">排序方式</text>
+        <picker
+          mode="selector"
+          :range="sortFieldLabels"
+          :value="sortFieldIndex"
+          @change="onSortFieldChange"
+        >
+          <view class="sort-picker">
+            <text class="sort-picker-text">{{ currentSortLabel }}</text>
+            <SvgIcon name="arrow-down-s" size="24rpx" color="#6b7280" />
+          </view>
+        </picker>
+        <view class="sort-order">
+          <text
+            :class="['order-btn', sortOrder === 'desc' ? 'active' : '']"
+            @tap="switchOrder('desc')"
+          >降序</text>
+          <text
+            :class="['order-btn', sortOrder === 'asc' ? 'active' : '']"
+            @tap="switchOrder('asc')"
+          >升序</text>
+        </view>
       </view>
     </view>
 
-    <!-- 白色圆角卡片 -->
-    <view class="page-card">
-      <view class="card-header">
-        <text class="card-title">业绩</text>
+    <!-- 列表区域 -->
+    <view class="forecast-list-wrap">
+      <view v-if="loading && !list.length" class="loading-state">
+        <LoadingState />
       </view>
 
-      <!-- 固定区域：搜索栏 + 排序栏 -->
-      <view class="forecast-fixed">
-        <view class="search-bar">
-          <view class="search-input-wrap">
-            <SvgIcon name="search-line" size="28rpx" color="#9ca3af" />
-            <input
-              v-model="keyword"
-              class="search-input"
-              placeholder="搜索股票代码/简称"
-              confirm-type="search"
-              @input="handleSearchInput"
-              @confirm="handleSearch"
-            />
-            <text v-if="keyword" class="search-clear" @tap="handleReset">✕</text>
-          </view>
-        </view>
+      <view v-if="!loading && !list.length" class="empty-state">
+        <EmptyState tip="暂无业绩预测数据" />
+      </view>
 
-        <view class="sort-bar">
-          <text class="sort-label">排序方式</text>
-          <picker
-            mode="selector"
-            :range="sortFieldLabels"
-            :value="sortFieldIndex"
-            @change="onSortFieldChange"
-          >
-            <view class="sort-picker">
-              <text class="sort-picker-text">{{ currentSortLabel }}</text>
-              <SvgIcon name="arrow-down-s" size="24rpx" color="#6b7280" />
+      <view v-if="list.length" class="forecast-list">
+        <view
+          v-for="item in list"
+          :key="item.code"
+          class="forecast-card"
+          @tap="goStockDetail(item.code)"
+        >
+          <view class="info-row">
+            <view class="info-col stock-col">
+              <text class="stock-name">{{ item.name }}</text>
+              <view class="code-rating-row">
+                <text class="stock-code">{{ item.code }}</text>
+                <text :class="['rating-tag', ratingClass(item.rating)]">{{ item.rating }}</text>
+              </view>
             </view>
-          </picker>
-          <view class="sort-order">
-            <text
-              :class="['order-btn', sortOrder === 'desc' ? 'active' : '']"
-              @tap="switchOrder('desc')"
-            >降序</text>
-            <text
-              :class="['order-btn', sortOrder === 'asc' ? 'active' : '']"
-              @tap="switchOrder('asc')"
-            >升序</text>
+            <view class="info-col forecast-col">
+              <text class="col-main">净利润预测 <text class="col-value forecast-val">{{ item.netProfitForecast }}</text></text>
+              <text class="col-growth">同比增长 <text :class="['growth-val', item.netProfitGrowth?.startsWith('-') ? 'down' : 'up']">{{ item.netProfitGrowth }}</text></text>
+            </view>
+            <view class="info-col eps-col">
+              <text class="col-main">EPS预测 <text class="col-value eps-val">{{ item.eps }}元</text></text>
+              <text class="col-growth">同比增长 <text :class="['growth-val', item.epsGrowth?.startsWith('-') ? 'down' : 'up']">{{ item.epsGrowth }}</text></text>
+            </view>
+          </view>
+
+          <view class="divider" />
+
+          <view class="meta-row">
+            <text class="update-time">更新时间：{{ item.updateTime }}</text>
+            <view class="institution-info">
+              <text class="info-label">机构</text>
+              <text class="institution-value">{{ item.institutionCount }}家</text>
+            </view>
           </view>
         </view>
       </view>
 
-      <!-- 可滚动区域：列表 -->
-      <scroll-view class="forecast-scroll" scroll-y :enhanced="true" :bounces="false" :style="{ height: scrollHeight + 'px' }">
-        <view v-if="loading && !list.length" class="loading-state">
-          <LoadingState />
-        </view>
-
-        <view v-if="!loading && !list.length" class="empty-state">
-          <EmptyState tip="暂无业绩预测数据" />
-        </view>
-
-        <view v-if="list.length" class="forecast-list">
-          <view
-            v-for="item in list"
-            :key="item.code"
-            class="forecast-card"
-            @tap="goStockDetail(item.code)"
-          >
-            <view class="info-row">
-              <view class="info-col stock-col">
-                <text class="stock-name">{{ item.name }}</text>
-                <view class="code-rating-row">
-                  <text class="stock-code">{{ item.code }}</text>
-                  <text :class="['rating-tag', ratingClass(item.rating)]">{{ item.rating }}</text>
-                </view>
-              </view>
-              <view class="info-col forecast-col">
-                <text class="col-main">净利润预测 <text class="col-value forecast-val">{{ item.netProfitForecast }}</text></text>
-                <text class="col-growth">同比增长 <text :class="['growth-val', item.netProfitGrowth?.startsWith('-') ? 'down' : 'up']">{{ item.netProfitGrowth }}</text></text>
-              </view>
-              <view class="info-col eps-col">
-                <text class="col-main">EPS预测 <text class="col-value eps-val">{{ item.eps }}元</text></text>
-                <text class="col-growth">同比增长 <text :class="['growth-val', item.epsGrowth?.startsWith('-') ? 'down' : 'up']">{{ item.epsGrowth }}</text></text>
-              </view>
-            </view>
-
-            <view class="divider" />
-
-            <view class="meta-row">
-              <text class="update-time">更新时间：{{ item.updateTime }}</text>
-              <view class="institution-info">
-                <text class="info-label">机构</text>
-                <text class="institution-value">{{ item.institutionCount }}家</text>
-              </view>
-            </view>
-          </view>
-        </view>
-
-        <view v-if="hasMore" class="load-more" @tap="loadMore">
-          <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
-        </view>
-      </scroll-view>
+      <view v-if="hasMore" class="load-more" @tap="loadMore">
+        <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
+      </view>
     </view>
-
-    <AppBottomBar current-tab="forecast" />
-    <GlobalChatBar />
   </view>
 </template>
 
@@ -118,48 +101,9 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
-import AppBottomBar from '@/shared/components/AppBottomBar.vue'
-import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
-
-// 获取真实状态栏高度及窗口高度
-const windowHeight = ref(0)
-const statusBarHeight = ref(0)
-try {
-  const sysInfo = uni.getSystemInfoSync()
-  const raw = sysInfo.statusBarHeight || 0
-  windowHeight.value = sysInfo.windowHeight || 667
-  // #ifdef APP-PLUS
-  statusBarHeight.value = raw / 1.2
-  // #endif
-  // #ifndef APP-PLUS
-  statusBarHeight.value = raw
-  // #endif
-} catch (e) {
-  statusBarHeight.value = 0
-  windowHeight.value = 667
-}
-
-const rpx2px = (rpx: number) => {
-  try {
-    const w = uni.getSystemInfoSync().windowWidth || 375
-    return rpx * w / 750
-  } catch { return rpx / 2 }
-}
-
-const scrollHeight = computed(() => {
-  const navH = rpx2px(88)          // nav-area
-  const headerH = rpx2px(88)       // card-header
-  const fixedH = rpx2px(200)       // forecast-fixed (搜索栏+排序栏)
-  const marginH = rpx2px(207)      // page-card marginBottom
-  return windowHeight.value - statusBarHeight.value - navH - headerH - fixedH - marginH
-})
-
-function goProfile() {
-  uni.navigateTo({ url: '/modules/user/pages/profile' })
-}
 
 interface ForecastItem {
   code: string
@@ -430,84 +374,18 @@ onShow(() => {
 </script>
 
 <style lang="scss" scoped>
-/* 页面外层：与 PageCard 一致 */
-.page-forecast {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: #f5f7fb;
-  overscroll-behavior: none;
-  touch-action: none;
-}
-
-/* 透明导航区域 */
-.nav-area {
-  flex-shrink: 0;
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 24rpx;
-  background: transparent;
-}
-
-.nav-avatar {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
-}
-
-/* 白色圆角卡片 */
-.page-card {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  margin: 0 24rpx;
+.forecast-content {
   background: #ffffff;
-  border-radius: 24rpx;
-  overflow: hidden;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
-  min-height: 0;
-  margin-bottom: 207rpx;
-}
-
-.card-header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24rpx;
-  border-bottom: 1rpx solid #f0f2f5;
-}
-
-.card-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #1a1d24;
 }
 
 /* 固定区域：搜索+排序 */
 .forecast-fixed {
-  flex-shrink: 0;
   padding: 16rpx 24rpx 0;
 }
 
-/* 可滚动区域：列表 */
-.forecast-scroll {
+/* 列表区域 */
+.forecast-list-wrap {
   padding: 0 24rpx 24rpx;
-  min-height: 0;
-  touch-action: auto;
-  overscroll-behavior: contain;
 }
 
 /* 搜索栏 */

@@ -1,19 +1,20 @@
 <template>
-  <view class="page-wrapper" :style="{ paddingTop: statusBarHeight + 'px' }">
-    <!-- 透明导航区域：小熊头像在右侧，作为"我的"页面入口 -->
+  <view class="main-tabs" :style="{ paddingTop: statusBarHeight + 'px' }">
+    <!-- 透明导航区域（共享，不闪烁） -->
     <view class="nav-area">
       <view class="nav-avatar" @tap="goProfile">
         <SvgIcon name="bear-smile-line" size="30rpx" color="#ffffff" />
       </view>
     </view>
 
-    <!-- 白色圆角卡片：标题固定 + 内容可滚动 -->
-    <view class="page-card" :style="{ marginBottom: cardMarginBottom }">
+    <!-- 白色圆角卡片 -->
+    <view class="page-card" :style="{ marginBottom: '207rpx' }">
+      <!-- 卡片标题（随Tab切换） -->
       <view class="card-header">
-        <text class="card-title">{{ title }}</text>
-        <slot name="header-right" />
+        <text class="card-title">{{ tabTitles[activeTab] }}</text>
       </view>
-      <!-- 用 JS 算出精确像素高度绑定给 scroll-view，避免 flex:1 在 App 端失效 -->
+
+      <!-- 可滚动内容区域 -->
       <scroll-view
         scroll-y
         class="card-content"
@@ -21,37 +22,53 @@
         :bounces="false"
         :style="{ height: scrollHeight + 'px' }"
       >
-        <slot />
+        <!-- Tab 内容（v-show 保持组件状态，切换不销毁） -->
+        <MorningContent v-show="activeTab === 'morning'" />
+        <InsightContent v-show="activeTab === 'insight'" />
+        <ForecastContent v-show="activeTab === 'forecast'" />
+        <AlertContent v-show="activeTab === 'alert'" />
       </scroll-view>
-      <!-- 可选底部操作栏插槽 -->
-      <slot name="footer" />
     </view>
 
-    <!-- 全局AI对话栏：所有主页面都有 -->
-    <GlobalChatBar :active-panel="activePanel" />
+    <!-- Tab 栏（共享，不闪烁） -->
+    <AppBottomBar :current-tab="activeTab" @change="onTabChange" />
+    <!-- 全局 AI 对话栏（共享，不闪烁） -->
+    <GlobalChatBar />
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import MorningContent from '@/modules/home/components/MorningContent.vue'
+import InsightContent from '@/modules/analytics/components/InsightContent.vue'
+import ForecastContent from '@/modules/analytics/components/ForecastContent.vue'
+import AlertContent from '@/modules/favorites/components/AlertContent.vue'
 
-const props = withDefaults(defineProps<{
-  title?: string
-  cardMarginBottom?: string
-  /** 当前激活的面板页：'favorites' | 'trade' | '' */
-  activePanel?: string
-}>(), {
-  title: '',
-  cardMarginBottom: '207rpx', /* 底部留白：Tab栏 + 间距 + GlobalChatBar */
-  activePanel: '',
-})
+const tabTitles: Record<string, string> = {
+  morning: '早点听',
+  insight: '洞察',
+  forecast: '业绩',
+  alert: '特别提醒',
+}
 
-// 获取真实状态栏高度（px），真机/H5 均可用
-// App 端 zoom:1.2 会放大 padding，需除以 1.2 补偿
-const statusBarHeight = ref(0)
+const validTabs = ['morning', 'insight', 'forecast', 'alert']
+const activeTab = ref('morning')
+
+/** 从外部设置激活的 Tab（如从 URL 参数或页面 props） */
+function setActiveTab(tab: string) {
+  if (validTabs.includes(tab)) {
+    activeTab.value = tab
+  }
+}
+
+defineExpose({ setActiveTab })
+
+// 获取真实状态栏高度及窗口高度
 const windowHeight = ref(0)
+const statusBarHeight = ref(0)
 try {
   const sysInfo = uni.getSystemInfoSync()
   const raw = sysInfo.statusBarHeight || 0
@@ -67,25 +84,24 @@ try {
   windowHeight.value = 667
 }
 
-/**
- * 动态计算 scroll-view 像素高度
- * windowHeight - statusBar - navArea(44px) - cardHeader(约40px) - marginBottom
- * rpx 转 px：1rpx = windowWidth/750 px
- */
+const rpx2px = (rpx: number) => {
+  try {
+    const w = uni.getSystemInfoSync().windowWidth || 375
+    return rpx * w / 750
+  } catch { return rpx / 2 }
+}
+
 const scrollHeight = computed(() => {
-  // navArea: 88rpx → px
-  const rpx2px = (rpx: number) => {
-    try {
-      const w = uni.getSystemInfoSync().windowWidth || 375
-      return rpx * w / 750
-    } catch { return rpx / 2 }
-  }
-  const navH = rpx2px(88)
-  const headerH = rpx2px(88) // card-header 约 88rpx (padding+text)
-  const marginB = rpx2px(parseInt(props.cardMarginBottom) || 207)
-  const total = windowHeight.value - statusBarHeight.value - navH - headerH - marginB
-  return Math.max(total, 100) // 下限 100px
+  const navH = rpx2px(88)          // nav-area
+  const headerH = rpx2px(88)       // card-header
+  const marginH = rpx2px(207)      // page-card marginBottom
+  const total = windowHeight.value - statusBarHeight.value - navH - headerH - marginH
+  return Math.max(total, 100)
 })
+
+function onTabChange(tab: string) {
+  activeTab.value = tab
+}
 
 function goProfile() {
   uni.navigateTo({ url: '/modules/user/pages/profile' })
@@ -94,7 +110,7 @@ function goProfile() {
 
 <style lang="scss" scoped>
 /* 用 fixed 撑满屏幕，避免 100vh 在拖动时重算导致拉伸 */
-.page-wrapper {
+.main-tabs {
   position: fixed;
   top: 0;
   left: 0;
@@ -105,7 +121,7 @@ function goProfile() {
   overflow: hidden;
   background: #f5f7fb;
   overscroll-behavior: none;
-  touch-action: none; /* 禁止整体页面的橡皮筋效果 */
+  touch-action: none;
 }
 
 /* 透明导航区域 */
@@ -128,10 +144,6 @@ function goProfile() {
   align-items: center;
   justify-content: center;
   box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
-}
-
-.avatar-emoji {
-  font-size: 30rpx;
 }
 
 /* 白色圆角卡片 */
@@ -163,7 +175,7 @@ function goProfile() {
   color: #1a1d24;
 }
 
-/* 可滚动内容区域：白色背景，恢复触摸滚动 */
+/* 可滚动内容区域 */
 .card-content {
   background: #ffffff;
   touch-action: auto;

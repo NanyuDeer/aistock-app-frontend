@@ -137,7 +137,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { PushHistoryItem } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
@@ -316,7 +317,7 @@ function returnClass(value: number | undefined | null): string {
   return value >= 0 ? 'up' : 'down'
 }
 
-onMounted(() => {
+onLoad(() => {
   loadData()
 })
 </script>

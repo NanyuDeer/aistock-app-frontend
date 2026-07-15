@@ -2,6 +2,26 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [master] 2026-07-15 — 自选股双向同步合并 + 事件详情页重构 + H5扫码登录修复
+**开发者**: Aria
+
+### 合并
+- 合并 PR #11《App 自选股与网页端双向同步》：统一自选股接口读写、修正扫码登录 Cookie、补充添加/删除入口、回前台自动同步、异常保留缓存
+- 解决 `leaders.vue` 合并冲突（保留远程 top 10 + `??` 运算符版本）
+
+### 改进
+- `src/modules/market/pages/leaders.vue`：风口概念泡泡图横向溢出修复，动态计算容器宽度
+- `src/shared/components/GlobalChatBar.vue`：下拉箭头符号改用 `‹` 旋转样式
+- `src/shared/components/SubPageCard2.vue`：新建白色顶栏子页面组件
+- `src/modules/chat/pages/event/detail.vue`：移除 AiThinkingHeader，改用 SubPageCard2
+- `src/modules/chat/pages/agent-report.vue`：改用 SubPageCard2 组件
+- `src/modules/user/pages/login.vue`：H5 保留扫码登录，APP-PLUS 改为微信 App 授权登录
+- `src/shared/store/modules/user.ts`：适配后端返回 `{ token, userInfo }` 格式
+- `src/pages.json`：自选页面动画改为 slide-in-bottom，禁用 agent-report H5 导航栏
+- `src/manifest.json`：新增 oauth.weixin 配置
+
+---
+
 ## [master] 2026-07-10 — 事件传导组件暗色值清理 + AI 投顾错误处理改善
 **开发者**: Aria
 

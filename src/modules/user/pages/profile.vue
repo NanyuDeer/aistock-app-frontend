@@ -187,7 +187,7 @@ function goFavorites() {
 }
 
 function goAlerts() {
-  uni.reLaunch({ url: '/modules/favorites/pages/index' })
+  uni.reLaunch({ url: '/modules/home/pages/index?tab=alert' })
 }
 
 function goAbout() {

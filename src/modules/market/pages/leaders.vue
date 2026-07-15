@@ -196,16 +196,28 @@ interface BubbleLayout extends Bubble {
   y: number
 }
 
-const bubbleHeight = 380 // 容器高度 px
+const bubbleHeight = 200 // 容器高度 px（横向椭圆布局，纵向更短）
 
-// 根据持续性决定半径，参考网页版
+// 动态计算容器宽度：windowWidth - 两侧padding（leaders-content 24rpx×2 + bubble-card 24rpx×2）
+// 不能硬编码，否则不同设备屏幕宽度下泡泡会溢出画布
+const containerWidth = ref(320)
+try {
+  const sysInfo = uni.getSystemInfoSync()
+  const winW = sysInfo.windowWidth || 375
+  const rpx2px = (rpx: number) => rpx * winW / 750
+  containerWidth.value = Math.round(winW - rpx2px(24) * 4)
+} catch {
+  containerWidth.value = 320
+}
+
+// 根据持续性决定半径，横向椭圆布局允许稍大半径
 function calcRadius(persistence: string, score: number): number {
-  let base = 22 // 短期
-  if (persistence.includes('长期')) base = 50
-  else if (persistence.includes('中期')) base = 35
+  let base = 20 // 短期
+  if (persistence.includes('长期')) base = 36
+  else if (persistence.includes('中期')) base = 27
   // score 微调
-  base += (score - 50) * 0.08
-  return Math.max(18, Math.min(60, Math.round(base)))
+  base += (score - 50) * 0.05
+  return Math.max(16, Math.min(40, Math.round(base)))
 }
 
 const bubbleData = computed<Bubble[]>(() => {
@@ -224,33 +236,48 @@ const bubbleData = computed<Bubble[]>(() => {
   }))
 })
 
-// 简单 force simulation：碰撞检测 + 居中
+// force simulation：碰撞检测 + 居中 + 自适应缩放（确定性布局，同数据同结果）
 const bubbleLayout = computed<BubbleLayout[]>(() => {
   const items = bubbleData.value
   if (!items.length) return []
-  const W = 320 // 容器宽度近似
+  const W = containerWidth.value // 动态容器宽度，匹配实际画布大小
   const H = bubbleHeight
   const cx = W / 2
   const cy = H / 2
 
-  // 初始化随机位置
-  const nodes = items.map(b => ({
-    ...b,
-    x: cx + (Math.random() - 0.5) * W * 0.6,
-    y: cy + (Math.random() - 0.5) * H * 0.6,
-    vx: 0,
-    vy: 0,
-  }))
+  // 自适应缩放：如果泡泡总面积占画布面积超过45%，等比缩小半径
+  const totalArea = items.reduce((sum, b) => sum + Math.PI * b.radius * b.radius, 0)
+  const canvasArea = W * H
+  let scale = 1
+  if (totalArea / canvasArea > 0.45) {
+    scale = Math.sqrt(0.45 * canvasArea / totalArea)
+  }
+
+  // 确定性初始位置：按 index 在横向椭圆上均匀分布
+  const ellipseA = W * 0.4  // 横向半轴（更宽）
+  const ellipseB = H * 0.3  // 纵向半轴（更窄）
+  const nodes = items.map((b, idx) => {
+    const r = b.radius * scale
+    const angle = (idx / items.length) * Math.PI * 2 - Math.PI / 2
+    return {
+      ...b,
+      radius: r,
+      x: cx + Math.cos(angle) * ellipseA,
+      y: cy + Math.sin(angle) * ellipseB,
+      vx: 0,
+      vy: 0,
+    }
+  })
 
   // 迭代模拟
-  const iterations = 200
+  const iterations = 300
   for (let i = 0; i < iterations; i++) {
     const alpha = 1 - i / iterations
 
-    // 居中力
+    // 居中力（Y方向更强，X方向更弱，让泡泡横向展开）
     for (const n of nodes) {
-      n.vx += (cx - n.x) * 0.005 * alpha
-      n.vy += (cy - n.y) * 0.005 * alpha
+      n.vx += (cx - n.x) * 0.06 * alpha  // X: 弱居中
+      n.vy += (cy - n.y) * 0.15 * alpha  // Y: 强居中
     }
 
     // 碰撞检测
@@ -261,9 +288,9 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
         const dx = nb.x - na.x
         const dy = nb.y - na.y
         const dist = Math.sqrt(dx * dx + dy * dy) || 1
-        const minDist = na.radius + nb.radius + 4
+        const minDist = na.radius + nb.radius + 3
         if (dist < minDist) {
-          const push = (minDist - dist) / 2
+          const push = (minDist - dist) / 2 * 0.9
           const ux = dx / dist
           const uy = dy / dist
           na.x -= ux * push
@@ -274,10 +301,19 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
       }
     }
 
-    // 边界约束
+    // 应用速度
     for (const n of nodes) {
-      n.x = Math.max(n.radius + 4, Math.min(W - n.radius - 4, n.x))
-      n.y = Math.max(n.radius + 4, Math.min(H - n.radius - 4, n.y))
+      n.x += n.vx * 0.3
+      n.y += n.vy * 0.3
+      n.vx *= 0.6
+      n.vy *= 0.6
+    }
+
+    // 边界约束（更强：确保泡泡完全在画布内，留2px安全边距）
+    for (const n of nodes) {
+      const safeR = n.radius + 2
+      n.x = Math.max(safeR, Math.min(W - safeR, n.x))
+      n.y = Math.max(safeR, Math.min(H - safeR, n.y))
     }
   }
 
