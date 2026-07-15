@@ -9,6 +9,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const http = new Request({
   baseURL: BASE_URL,
   timeout: 15000,
+  withCredentials: true,
   header: { 'Content-Type': 'application/json' }
 })
 
@@ -39,6 +40,8 @@ http.interceptors.response.use(
     // 401 只清除 token，不强制跳转登录页（登录是非必要的，仅自选股等功能需要）
     if (error.statusCode === 401) {
       uni.removeStorageSync('token')
+      uni.removeStorageSync('user_info')
+      uni.removeStorageSync('favorites')
     }
     // 兼容 App 端：请求成功但 statusCode 非 2xx 时，error.errMsg 可能是 'request:ok'
     // （uni.request 层面成功），但 luch-request 因状态码非 2xx 走错误回调
@@ -47,7 +50,9 @@ http.interceptors.response.use(
       const statusCode = error.statusCode
       const responseData = error.data
       const msg = typeof responseData === 'object' ? responseData?.message : responseData
-      return Promise.reject(new Error(`服务异常(${statusCode}): ${msg || '请稍后重试'}`))
+      const normalizedError = new Error(`服务异常(${statusCode}): ${msg || '请稍后重试'}`) as Error & { statusCode?: number }
+      normalizedError.statusCode = statusCode
+      return Promise.reject(normalizedError)
     }
     return Promise.reject(error)
   }

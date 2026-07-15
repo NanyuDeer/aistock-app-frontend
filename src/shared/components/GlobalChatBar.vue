@@ -5,7 +5,7 @@
     <view class="gcb-chat-row">
       <!-- 交易按钮：在交易面板页时变为下拉箭头，点击返回 -->
       <view class="gcb-side-btn" :class="{ 'gcb-side-active': activePanel === 'trade' }" @tap="handleTrade">
-        <text v-if="activePanel === 'trade'" class="gcb-side-arrow">∨</text>
+        <view v-if="activePanel === 'trade'" class="gcb-side-arrow"><text class="gcb-side-arrow-icon">‹</text></view>
         <text v-else class="gcb-side-text">交易</text>
       </view>
 
@@ -19,7 +19,7 @@
 
       <!-- 自选按钮：在自选面板页时变为下拉箭头，点击返回 -->
       <view class="gcb-side-btn" :class="{ 'gcb-side-active': activePanel === 'favorites' }" @tap="handleFavorites">
-        <text v-if="activePanel === 'favorites'" class="gcb-side-arrow">∨</text>
+        <view v-if="activePanel === 'favorites'" class="gcb-side-arrow"><text class="gcb-side-arrow-icon">‹</text></view>
         <text v-else class="gcb-side-text">自选</text>
       </view>
     </view>
@@ -112,8 +112,17 @@ const handleFavorites = () => {
 }
 
 .gcb-side-arrow {
-  font-size: 36rpx;
-  font-weight: 700;
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-90deg);
+}
+
+.gcb-side-arrow-icon {
+  font-size: 48rpx;
+  font-weight: 300;
   color: #4d7cfe;
   line-height: 1;
 }

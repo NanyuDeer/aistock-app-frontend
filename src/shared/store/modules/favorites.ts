@@ -1,10 +1,10 @@
 /**
  * 自选股状态管理
- * 未登录时使用模拟数据，登录后从后端获取
+ * 未登录时使用演示数据，登录后以服务器完整列表为唯一数据源。
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { stockApi } from '@/shared/api/modules/stock'
+import { stockApi, type FavoriteStock as ApiFavoriteStock } from '@/shared/api/modules/stock'
 import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 import { useUserStore } from './user'
 
@@ -13,9 +13,10 @@ export interface FavoriteStock {
   name: string
   price?: number
   changePercent?: number
+  market?: string | null
+  addedAt?: string | null
 }
 
-// 未登录时的模拟自选股（热门股票）
 const MOCK_FAVORITES: FavoriteStock[] = [
   { symbol: '600519', name: '贵州茅台' },
   { symbol: '300750', name: '宁德时代' },
@@ -24,76 +25,153 @@ const MOCK_FAVORITES: FavoriteStock[] = [
   { symbol: '000858', name: '五粮液' },
 ]
 
+interface SyncOptions {
+  silent?: boolean
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  return (error as { statusCode?: number } | null)?.statusCode
+}
+
 export const useFavoritesStore = defineStore('favorites', () => {
   const stocks = ref<FavoriteStock[]>(storage.get(STORAGE_KEYS.FAVORITES) || [])
+  const syncing = ref(false)
+  const syncError = ref('')
+  const pendingSymbols = ref<string[]>([])
+  let syncPromise: Promise<boolean> | null = null
 
-  async function fetchFavorites() {
-    const userStore = useUserStore()
-    // 未登录时使用模拟数据
-    if (!userStore.isLoggedIn()) {
-      stocks.value = MOCK_FAVORITES
-      // 拉取实时行情补充 price / changePercent
-      refreshQuotes()
-      return
-    }
-    try {
-      const data: any = await stockApi.getFavorites()
-      stocks.value = data || []
-      storage.set(STORAGE_KEYS.FAVORITES, stocks.value)
-      // 同步实时行情
-      refreshQuotes()
-    } catch (e) {
-      // 登录后获取失败，回退到模拟数据
-      stocks.value = MOCK_FAVORITES
-      refreshQuotes()
-    }
+  function replaceWithServerStocks(data: ApiFavoriteStock[]) {
+    stocks.value = Array.isArray(data) ? data : []
+    storage.set(STORAGE_KEYS.FAVORITES, stocks.value)
   }
 
-  /** 批量拉取自选股实时行情，回填 price / changePercent */
+  async function fetchFavorites(options: SyncOptions = {}) {
+    const userStore = useUserStore()
+    if (!userStore.isLoggedIn()) {
+      syncError.value = ''
+      stocks.value = MOCK_FAVORITES
+      void refreshQuotes()
+      return false
+    }
+
+    if (syncPromise) return syncPromise
+
+    syncPromise = (async () => {
+      syncing.value = true
+      syncError.value = ''
+      try {
+        const data = await stockApi.getFavorites()
+        replaceWithServerStocks(data)
+        void refreshQuotes()
+        return true
+      } catch (error: unknown) {
+        if (getErrorStatus(error) === 401) {
+          userStore.clearSession()
+          stocks.value = []
+          storage.remove(STORAGE_KEYS.FAVORITES)
+          return false
+        }
+
+        const detail = error as { errMsg?: string; message?: string }
+        syncError.value = detail?.errMsg || detail?.message || '自选股同步失败'
+        if (!options.silent) {
+          uni.showToast({ title: '同步失败，已保留上次数据', icon: 'none' })
+        }
+        return false
+      } finally {
+        syncing.value = false
+        syncPromise = null
+      }
+    })()
+
+    return syncPromise
+  }
+
   async function refreshQuotes() {
-    const symbols = stocks.value.map(s => s.symbol).filter(Boolean)
+    const symbols = stocks.value.map(stock => stock.symbol).filter(Boolean)
     if (!symbols.length) return
+
     try {
       const quotes = await stockApi.getCoreQuotes(symbols)
-      const map = new Map<string, { price: number; changePercent: number }>()
-      quotes.forEach((q: any) => {
-        if (q?.symbol) map.set(q.symbol, { price: q.price, changePercent: q.changePercent })
+      const quoteMap = new Map<string, { price: number; changePercent: number }>()
+      quotes.forEach((quote: { symbol?: string; price: number; changePercent: number }) => {
+        if (quote?.symbol) {
+          quoteMap.set(quote.symbol, { price: quote.price, changePercent: quote.changePercent })
+        }
       })
-      stocks.value = stocks.value.map(s => {
-        const q = map.get(s.symbol)
-        return q ? { ...s, price: q.price, changePercent: q.changePercent } : s
+      stocks.value = stocks.value.map(stock => {
+        const quote = quoteMap.get(stock.symbol)
+        return quote ? { ...stock, price: quote.price, changePercent: quote.changePercent } : stock
       })
-    } catch (e) {
-      // 行情拉取失败不影响列表展示
-      console.warn('[FavoritesStore] refreshQuotes failed:', e)
+    } catch (error: unknown) {
+      console.warn('[FavoritesStore] refreshQuotes failed:', error)
     }
   }
 
-  async function add(symbol: string, name: string) {
+  async function add(symbol: string, _name: string) {
     const userStore = useUserStore()
     if (!userStore.isLoggedIn()) {
       uni.showToast({ title: '请先登录', icon: 'none' })
-      return
+      return false
     }
-    await stockApi.addFavorites([symbol])
-    stocks.value.push({ symbol, name })
-    storage.set(STORAGE_KEYS.FAVORITES, stocks.value)
+    if (pendingSymbols.value.includes(symbol)) return false
+
+    pendingSymbols.value = [...pendingSymbols.value, symbol]
+    try {
+      const data = await stockApi.addFavorites([symbol])
+      replaceWithServerStocks(data)
+      void refreshQuotes()
+      return true
+    } catch (error: unknown) {
+      if (getErrorStatus(error) === 401) userStore.clearSession()
+      uni.showToast({ title: '添加自选失败，请重试', icon: 'none' })
+      return false
+    } finally {
+      pendingSymbols.value = pendingSymbols.value.filter(item => item !== symbol)
+    }
   }
 
   async function remove(symbol: string) {
     const userStore = useUserStore()
     if (!userStore.isLoggedIn()) {
       uni.showToast({ title: '请先登录', icon: 'none' })
-      return
+      return false
     }
-    await stockApi.removeFavorites([symbol])
-    stocks.value = stocks.value.filter((s: FavoriteStock) => s.symbol !== symbol)
-    storage.set(STORAGE_KEYS.FAVORITES, stocks.value)
+    if (pendingSymbols.value.includes(symbol)) return false
+
+    pendingSymbols.value = [...pendingSymbols.value, symbol]
+    try {
+      const data = await stockApi.removeFavorites([symbol])
+      replaceWithServerStocks(data)
+      void refreshQuotes()
+      return true
+    } catch (error: unknown) {
+      if (getErrorStatus(error) === 401) userStore.clearSession()
+      uni.showToast({ title: '移除自选失败，请重试', icon: 'none' })
+      return false
+    } finally {
+      pendingSymbols.value = pendingSymbols.value.filter(item => item !== symbol)
+    }
   }
 
   function isFavorite(symbol: string) {
-    return stocks.value.some(s => s.symbol === symbol)
+    return stocks.value.some(stock => stock.symbol === symbol)
   }
 
-  return { stocks, fetchFavorites, refreshQuotes, add, remove, isFavorite }
+  function isPending(symbol: string) {
+    return pendingSymbols.value.includes(symbol)
+  }
+
+  return {
+    stocks,
+    syncing,
+    syncError,
+    pendingSymbols,
+    fetchFavorites,
+    refreshQuotes,
+    add,
+    remove,
+    isFavorite,
+    isPending,
+  }
 })

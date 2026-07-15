@@ -12,7 +12,16 @@ export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(storage.get(STORAGE_KEYS.USER_INFO))
   const settings = ref<UserSettings>({})
 
-  const isLoggedIn = () => !!token.value
+  const isLoggedIn = () => !!token.value || !!userInfo.value?.openid
+
+  function clearSession() {
+    token.value = ''
+    userInfo.value = null
+    settings.value = {}
+    storage.remove(STORAGE_KEYS.TOKEN)
+    storage.remove(STORAGE_KEYS.USER_INFO)
+    storage.remove(STORAGE_KEYS.FAVORITES)
+  }
 
   /** 账号密码登录（保留兼容） */
   async function login(params: { username?: string; password?: string; code?: string }) {
@@ -22,17 +31,33 @@ export const useUserStore = defineStore('user', () => {
     await fetchUserInfo()
   }
 
-  /** 微信登录（小程序） */
+  /** 微信登录（App 端 uni.login → code → 后端换取 token + 用户信息） */
   async function wxLogin(code: string) {
     const result: any = await authApi.wxLogin(code)
     token.value = result.token
     storage.set(STORAGE_KEYS.TOKEN, result.token)
+    // 后端直接返回用户信息，优先使用
+    if (result.userInfo) {
+      userInfo.value = {
+        id: 0,
+        openid: result.userInfo.openid,
+        nickname: result.userInfo.nickname,
+        avatar: result.userInfo.avatar,
+      }
+      storage.set(STORAGE_KEYS.USER_INFO, userInfo.value)
+    }
+    // 再调 getUserInfo 获取完整信息（id, createdAt 等）
     await fetchUserInfo()
   }
 
-  /** 扫码登录成功后，验证登录态并获取用户信息 */
-  async function handleScanLoginSuccess() {
+  /** 扫码登录成功后，存储 token 并获取用户信息 */
+  async function handleScanLoginSuccess(scanData?: { token?: string; openid?: string }) {
     try {
+      // 后端在 poll 响应中返回 JWT token，存储后后续请求用 Authorization 头认证
+      if (scanData?.token) {
+        token.value = scanData.token
+        storage.set(STORAGE_KEYS.TOKEN, scanData.token)
+      }
       await fetchUserInfo()
       return true
     } catch (e) {
@@ -42,12 +67,20 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function fetchUserInfo() {
+    const info = await authApi.getUserInfo()
+    userInfo.value = info
+    storage.set(STORAGE_KEYS.USER_INFO, info)
+    return info
+  }
+
+  async function restoreSession() {
     try {
-      const info = await authApi.getUserInfo()
-      userInfo.value = info
-      storage.set(STORAGE_KEYS.USER_INFO, info)
+      await fetchUserInfo()
+      return true
     } catch (e) {
-      console.error('[user] fetchUserInfo failed:', e)
+      const statusCode = (e as { statusCode?: number })?.statusCode
+      if (statusCode === 401) clearSession()
+      return false
     }
   }
 
@@ -75,11 +108,7 @@ export const useUserStore = defineStore('user', () => {
 
   function logout() {
     authApi.logout().catch(() => {})
-    token.value = ''
-    userInfo.value = null
-    settings.value = {}
-    storage.remove(STORAGE_KEYS.TOKEN)
-    storage.remove(STORAGE_KEYS.USER_INFO)
+    clearSession()
   }
 
   return {
@@ -91,8 +120,10 @@ export const useUserStore = defineStore('user', () => {
     wxLogin,
     handleScanLoginSuccess,
     fetchUserInfo,
+    restoreSession,
     fetchSettings,
     updateSetting,
-    logout
+    logout,
+    clearSession
   }
 })

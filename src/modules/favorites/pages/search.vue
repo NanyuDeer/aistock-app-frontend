@@ -49,7 +49,16 @@
           <text class="result-name">{{ item.name }}</text>
           <text class="result-code">{{ item.symbol }}</text>
         </view>
-        <text class="result-arrow">›</text>
+        <view class="result-actions">
+          <view
+            class="favorite-btn"
+            :class="{ active: favoritesStore.isFavorite(item.symbol), disabled: favoritesStore.isPending(item.symbol) }"
+            @tap.stop="toggleFavorite(item)"
+          >
+            <text>{{ favoritesStore.isFavorite(item.symbol) ? '已自选' : '加自选' }}</text>
+          </view>
+          <text class="result-arrow">›</text>
+        </view>
       </view>
     </view>
 
@@ -61,13 +70,25 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
+import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
+interface StockSearchItem {
+  symbol: string
+  name: string
+}
+
 const keyword = ref('')
-const results = ref<any[]>([])
+const results = ref<StockSearchItem[]>([])
 const loading = ref(false)
 const searched = ref(false)
+const favoritesStore = useFavoritesStore()
+
+onShow(() => {
+  void favoritesStore.fetchFavorites({ silent: true })
+})
 
 const hotStocks = [
   { symbol: '600519', name: '贵州茅台' },
@@ -114,13 +135,34 @@ function clearKeyword() {
 function goDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
 }
+
+async function toggleFavorite(stock: StockSearchItem) {
+  if (favoritesStore.isPending(stock.symbol)) return
+  const changed = favoritesStore.isFavorite(stock.symbol)
+    ? await favoritesStore.remove(stock.symbol)
+    : await favoritesStore.add(stock.symbol, stock.name)
+  if (changed) {
+    uni.showToast({
+      title: favoritesStore.isFavorite(stock.symbol) ? '已加入自选' : '已移除自选',
+      icon: 'none',
+    })
+  }
+}
 </script>
 
 <style lang="scss" scoped>
+@import '@/shared/styles/variables.scss';
+
 .page-search {
-  padding: 24rpx;
-  min-height: 100vh;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: #f5f7fa;
+  overscroll-behavior: none;
+  touch-action: none;
+  padding: 24rpx;
 }
 
 /* 搜索栏 */
@@ -248,6 +290,32 @@ function goDetail(symbol: string) {
 .result-arrow {
   font-size: 36rpx;
   color: #9ca3af;
+}
+
+.result-actions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.favorite-btn {
+  min-width: 96rpx;
+  padding: 10rpx 16rpx;
+  color: $brand-color;
+  font-size: $font-size-sm;
+  text-align: center;
+  border: 1rpx solid $brand-color;
+  border-radius: $radius-pill;
+
+  &.active {
+    color: $text-color-secondary;
+    background: $bg-color-hover;
+    border-color: $border-color;
+  }
+
+  &.disabled {
+    opacity: 0.5;
+  }
 }
 
 /* 加载/空状态 */

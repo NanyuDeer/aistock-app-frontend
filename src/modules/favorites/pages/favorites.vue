@@ -1,6 +1,9 @@
 <template>
   <SubPageCard title="自选" active-panel="favorites">
     <view class="favorites-content">
+      <view v-if="favoritesStore.syncError" class="sync-error" @tap="retrySync">
+        <text>同步失败，点击重试</text>
+      </view>
       <!-- 顶部统计 -->
       <view class="stats-bar">
         <view class="stat-item">
@@ -75,6 +78,13 @@
             <text :class="['stock-amount', stock.changeAmount >= 0 ? 'up' : 'down']">
               {{ stock.changeAmount >= 0 ? '+' : '' }}{{ stock.changeAmount.toFixed(2) }}
             </text>
+            <view
+              class="remove-stock-btn"
+              :class="{ disabled: favoritesStore.isPending(stock.symbol) }"
+              @tap.stop="confirmRemove(stock)"
+            >
+              <text>删除</text>
+            </view>
           </view>
         </view>
       </view>
@@ -141,29 +151,17 @@ function toggleSort(key: SortKey) {
 /* ===== 数据 ===== */
 const favoritesStore = useFavoritesStore()
 
-const mockStocks = ref<StockItem[]>([
-  { symbol: '603256', name: '宏和科技', price: 265.33, changePercent: -0.74, changeAmount: -1.97, margin: false, specialAlert: false },
-  { symbol: '600740', name: '山西焦化', price: 3.19, changePercent: -2.45, changeAmount: -0.08, margin: true, specialAlert: false },
-  { symbol: '605598', name: '上海港湾', price: 38.43, changePercent: -1.91, changeAmount: -0.75, margin: false, specialAlert: true },
-  { symbol: '600971', name: '恒源煤电', price: 6.90, changePercent: -2.27, changeAmount: -0.16, margin: true, specialAlert: false },
-  { symbol: '603071', name: '物产环能', price: 11.06, changePercent: -1.78, changeAmount: -0.20, margin: false, specialAlert: false },
-])
-
 const stocks = computed<StockItem[]>(() => {
   const list = favoritesStore.stocks
-  if (list && list.length) {
-    // 兼容后端数据：补全 changeAmount 字段
-    return list.map((s: any) => ({
-      symbol: s.symbol,
-      name: s.name,
-      price: s.price || 0,
-      changePercent: s.changePercent || 0,
-      changeAmount: s.changeAmount ?? (s.price && s.changePercent ? s.price * s.changePercent / 100 : 0),
-      margin: s.margin || false,
-      specialAlert: s.specialAlert || false,
-    }))
-  }
-  return mockStocks.value
+  return list.map((stock) => ({
+    symbol: stock.symbol,
+    name: stock.name,
+    price: stock.price || 0,
+    changePercent: stock.changePercent || 0,
+    changeAmount: stock.price && stock.changePercent ? stock.price * stock.changePercent / 100 : 0,
+    margin: false,
+    specialAlert: false,
+  }))
 })
 
 const sortedStocks = computed(() => {
@@ -184,7 +182,25 @@ const totalChange = computed(() => {
   return list.reduce((sum, s) => sum + (s.changePercent || 0), 0)
 })
 
-onShow(() => favoritesStore.fetchFavorites())
+onShow(() => favoritesStore.fetchFavorites({ silent: false }))
+
+function retrySync() {
+  void favoritesStore.fetchFavorites({ silent: false })
+}
+
+function confirmRemove(stock: StockItem) {
+  if (favoritesStore.isPending(stock.symbol)) return
+  uni.showModal({
+    title: '删除自选股',
+    content: `确认将 ${stock.name} 从自选股中删除吗？`,
+    confirmText: '删除',
+    success: async ({ confirm }) => {
+      if (!confirm) return
+      const removed = await favoritesStore.remove(stock.symbol)
+      if (removed) uni.showToast({ title: '已移除自选', icon: 'none' })
+    },
+  })
+}
 
 function goDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
@@ -196,8 +212,20 @@ function goSearch() {
 </script>
 
 <style lang="scss" scoped>
+@import '@/shared/styles/variables.scss';
+
 .favorites-content {
   padding: 0 24rpx 24rpx;
+}
+
+.sync-error {
+  margin-bottom: $spacing-sm;
+  padding: $spacing-sm $spacing-base;
+  color: $error-color;
+  font-size: $font-size-base;
+  text-align: center;
+  background: rgba(244, 63, 94, 0.08);
+  border-radius: $radius-base;
 }
 
 /* ===== 统计栏 ===== */
@@ -408,6 +436,18 @@ function goSearch() {
   font-weight: 500;
   min-width: 80rpx;
   text-align: right;
+}
+
+.remove-stock-btn {
+  padding: 8rpx 12rpx;
+  color: $error-color;
+  font-size: $font-size-sm;
+  border: 1rpx solid rgba(244, 63, 94, 0.3);
+  border-radius: $radius-xs;
+
+  &.disabled {
+    opacity: 0.5;
+  }
 }
 
 .up { color: #f43f5e; }

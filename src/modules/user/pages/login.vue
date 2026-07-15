@@ -26,8 +26,8 @@
       </button>
       <!-- #endif -->
 
-      <!-- #ifdef H5 || APP-PLUS -->
-      <!-- H5/App：微信扫码登录 -->
+      <!-- #ifdef H5 -->
+      <!-- H5：微信扫码登录 -->
       <view v-if="!qrCodeUrl && !loginLoading && !errorMsg" class="login-methods">
         <button @click="startScanLogin" class="btn-wx-login">
           <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
@@ -70,6 +70,37 @@
       </view>
 
       <!-- 登录验证中 -->
+      <view v-else class="loading-section">
+        <text class="loading-text">登录中...</text>
+      </view>
+      <!-- #endif -->
+
+      <!-- #ifdef APP-PLUS -->
+      <!-- App：拉起微信 App 授权登录 -->
+      <view v-if="!loginLoading && !errorMsg" class="login-methods">
+        <button @tap="handleWxLogin" class="btn-wx-login">
+          <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
+          <text class="btn-text">微信登录</text>
+        </button>
+        <view class="login-tip">
+          <text class="tip-text">登录后可同步自选股、接收异动提醒</text>
+        </view>
+        <view class="skip-btn" @tap="goHome">
+          <text class="skip-text">暂不登录，先看看</text>
+        </view>
+      </view>
+
+      <view v-else-if="errorMsg && !loginLoading" class="error-section">
+        <text class="error-icon">⚠</text>
+        <text class="error-text">{{ errorMsg }}</text>
+        <view class="error-retry" @tap="handleWxLogin">
+          <text class="retry-text">重试</text>
+        </view>
+        <view class="skip-btn" @tap="goHome">
+          <text class="skip-text">暂不登录，先看看</text>
+        </view>
+      </view>
+
       <view v-else class="loading-section">
         <text class="loading-text">登录中...</text>
       </view>
@@ -157,7 +188,7 @@ function startPolling() {
 
       if (result.status === 'confirmed') {
         stopPolling()
-        await handleLoginSuccess()
+        await handleLoginSuccess({ token: result.token, openid: result.openid })
       } else if (result.status === 'expired') {
         stopPolling()
       }
@@ -184,10 +215,10 @@ function cancelScanLogin() {
 }
 
 /** 扫码登录成功处理 */
-async function handleLoginSuccess() {
+async function handleLoginSuccess(scanData?: { token?: string; openid?: string }) {
   loginLoading.value = true
-  // 后端通过 Set-Cookie 设置了 httpOnly Cookie，验证登录态
-  const success = await userStore.handleScanLoginSuccess()
+  // 传入 poll 返回的 token，存储后用 Authorization 头认证
+  const success = await userStore.handleScanLoginSuccess(scanData)
   loginLoading.value = false
 
   if (success) {
@@ -200,19 +231,34 @@ async function handleLoginSuccess() {
   }
 }
 
-/** 微信小程序登录 */
+/** 微信登录（App 端拉起微信 App） */
 async function handleWxLogin() {
+  loginLoading.value = true
+  errorMsg.value = ''
+
   uni.login({
     provider: 'weixin',
     success: async (res) => {
       try {
         await userStore.wxLogin(res.code)
+        loginLoading.value = false
         uni.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => goHome(), 500)
       } catch (e: any) {
-        const msg = e?.errMsg || e?.message || '登录失败'
-        uni.showToast({ title: msg, icon: 'none' })
+        loginLoading.value = false
+        const msg = e?.data?.message || e?.errMsg || e?.message || '登录失败，请重试'
+        errorMsg.value = msg
       }
+    },
+    fail: (err) => {
+      loginLoading.value = false
+      // 用户取消登录时 errCode 为 -2 或 -8
+      if (err.errCode === -2 || err.errCode === -8) {
+        // 用户取消，静默处理
+        return
+      }
+      const msg = err?.errMsg || err?.message || '微信授权失败'
+      errorMsg.value = msg
     }
   })
 }

@@ -10,11 +10,13 @@ export interface LoginParams {
 }
 
 export interface UserInfo {
-  id: number
+  id?: number | string
   openid: string
   nickname: string
-  avatar: string
+  avatar?: string
+  avatar_url?: string
   createdAt?: string
+  created_at?: string
 }
 
 export interface ScanLoginResult {
@@ -25,6 +27,10 @@ export interface ScanLoginResult {
 
 export interface ScanStatusResult {
   status: 'waiting' | 'scanned' | 'confirmed' | 'expired'
+  /** confirmed 时后端返回的 JWT token */
+  token?: string
+  /** confirmed 时返回的 openid */
+  openid?: string
 }
 
 export interface UserSettings {
@@ -34,7 +40,7 @@ export interface UserSettings {
 }
 
 export const authApi = {
-  /** 微信登录（小程序） */
+  /** 微信登录（App 端 uni.login → code → 后端换取 token） */
   wxLogin(code: string) {
     return request.post('/auth/wx-login', { code })
   },
@@ -75,7 +81,4 @@ export const authApi = {
   },
 
   /** 获取用户自选股列表 */
-  getFavoriteStocks() {
-    return request.get('/users/me/favorites')
-  },
 }
