@@ -10,11 +10,13 @@ export interface LoginParams {
 }
 
 export interface UserInfo {
-  id: number
+  id?: number | string
   openid: string
   nickname: string
-  avatar: string
+  avatar?: string
+  avatar_url?: string
   createdAt?: string
+  created_at?: string
 }
 
 export interface ScanLoginResult {
@@ -75,7 +77,4 @@ export const authApi = {
   },
 
   /** 获取用户自选股列表 */
-  getFavoriteStocks() {
-    return request.get('/users/me/favorites')
-  },
 }

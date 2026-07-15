@@ -10,6 +10,13 @@
         <view class="stock-name-row">
           <text class="stock-name">{{ quote.name }}</text>
           <text class="stock-code">{{ quote.symbol }}</text>
+          <view
+            class="favorite-toggle"
+            :class="{ active: isFavorite, disabled: favoritesStore.isPending(quote.symbol) }"
+            @tap="toggleFavorite"
+          >
+            <text>{{ isFavorite ? '已自选' : '加自选' }}</text>
+          </view>
         </view>
         <view class="stock-price-row">
           <text :class="['stock-price', quote.changePercent >= 0 ? 'up' : 'down']">
@@ -135,15 +142,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { computed, ref } from 'vue'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
+import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 const loading = ref(true)
 const quote = ref<any>(null)
 const capitalFlow = ref<any>(null)
 const symbol = ref('')
+const favoritesStore = useFavoritesStore()
+const isFavorite = computed(() => favoritesStore.isFavorite(symbol.value))
+
+onShow(() => {
+  void favoritesStore.fetchFavorites({ silent: true })
+})
 
 onLoad((options: any) => {
   symbol.value = options?.symbol || ''
@@ -174,6 +188,16 @@ async function loadData() {
   }
 }
 
+async function toggleFavorite() {
+  if (!quote.value || favoritesStore.isPending(symbol.value)) return
+  const changed = isFavorite.value
+    ? await favoritesStore.remove(symbol.value)
+    : await favoritesStore.add(symbol.value, quote.value.name || '')
+  if (changed) {
+    uni.showToast({ title: isFavorite.value ? '已加入自选' : '已移除自选', icon: 'none' })
+  }
+}
+
 function formatVolume(vol: number): string {
   if (!vol) return '--'
   if (vol >= 100000000) return (vol / 100000000).toFixed(2) + '亿股'
@@ -199,6 +223,8 @@ function goChat() {
 </script>
 
 <style lang="scss" scoped>
+@import '@/shared/styles/variables.scss';
+
 .page-detail {
   padding: 24rpx;
   min-height: 100vh;
@@ -245,6 +271,27 @@ function goChat() {
   padding: 4rpx 16rpx;
   background: #f0f2f5;
   border-radius: 8rpx;
+}
+
+.favorite-toggle {
+  margin-left: auto;
+  min-width: 104rpx;
+  padding: 10rpx 18rpx;
+  color: $brand-color;
+  font-size: $font-size-sm;
+  text-align: center;
+  border: 1rpx solid $brand-color;
+  border-radius: $radius-pill;
+
+  &.active {
+    color: $text-color-secondary;
+    background: $bg-color-hover;
+    border-color: $border-color;
+  }
+
+  &.disabled {
+    opacity: 0.5;
+  }
 }
 
 .stock-price-row {
