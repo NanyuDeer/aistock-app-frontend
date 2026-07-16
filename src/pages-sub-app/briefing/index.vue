@@ -199,8 +199,9 @@ async function loadReport() {
   }
   try {
     const res: unknown = await agentApi.getReport('broadcast', currentDate.value)
-    const data = (res as Record<string, unknown>)?.data ?? res
-    report.value = (data as BroadcastReport) || null
+    // 响应拦截器已解包: 返回的是 {content: {text, audio_path}, ...} 或 null
+    const data = (res as Record<string, unknown>) ?? null
+    report.value = (data as unknown as BroadcastReport) || null
   } catch {
     report.value = null
   } finally {
