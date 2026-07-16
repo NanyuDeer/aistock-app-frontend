@@ -8,8 +8,8 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 // WebSocket 地址（Node.js 服务）
 export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:3000/ws'
 
-// Agent Python 后端 WebSocket 地址
-export const AGENT_WS_BASE_URL = import.meta.env.VITE_AGENT_WS_BASE || 'ws://localhost:8000/ws'
+// Agent Python 后端 WebSocket 地址（后端路由前缀 /api/agent + /ws/chat）
+export const AGENT_WS_BASE_URL = import.meta.env.VITE_AGENT_WS_BASE || 'ws://localhost:8000/api/agent/ws'
 
 // 平台标识
 export const PLATFORM = {
