@@ -32,6 +32,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 | 自选股 | `modules/favorites` | 自选股列表、特别提醒、股票详情、搜索、异动监控 | [favorites/AGENTS.md](./src/modules/favorites/AGENTS.md) |
 | AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示 | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
 | 行情 | `modules/market` | 龙头股、重磅消息、板块标签、异动捕手、长线风口 | [market/AGENTS.md](./src/modules/market/AGENTS.md) |
+| 业绩分析 | `modules/analytics` | 业绩预测、业绩报告列表、财报详情 | — |
 | 用户 | `modules/user` | 个人中心、登录设置、更新日志 | [user/AGENTS.md](./src/modules/user/AGENTS.md) |
 | 资讯 | `modules/news` | 公告、新闻详情 | [news/AGENTS.md](./src/modules/news/AGENTS.md) |
 
