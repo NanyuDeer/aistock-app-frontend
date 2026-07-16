@@ -108,11 +108,12 @@
                 <text class="step-label">{{ step.label }}</text>
               </view>
             </view>
-            <!-- 逐 token 流式文本 + 内联光标 -->
-            <view v-if="streamingText" class="streaming-text-wrap">
-              <mp-html :content="markdownToHtml(streamingText)" class="bubble-html" />
-              <text class="streaming-cursor">▊</text>
-            </view>
+            <!-- 逐 token 流式文本（光标内嵌在文本末尾） -->
+            <mp-html
+              v-if="streamingText"
+              :content="markdownToHtml(streamingText + ' ▊')"
+              class="bubble-html streaming-blink"
+            />
           </view>
         </view>
       </scroll-view>
@@ -241,18 +242,11 @@ onUnmounted(() => {
 :deep(.md-table th) { background: #f5f7fa; font-size: 24rpx; padding: 8rpx; border: 1rpx solid #e5e7eb; }
 :deep(.md-table td) { font-size: 24rpx; padding: 8rpx; border: 1rpx solid #e5e7eb; }
 
-/* 流式文本区域 — block 布局，光标内联在末尾 */
-.streaming-text-wrap {
-  position: relative;
-}
-.streaming-cursor {
-  color: #4d7cfe;
+/* 流式光标动画（mp-html 内嵌 ▊ 字符的闪烁效果） */
+:deep(.streaming-blink) {
   animation: blink 1s step-end infinite;
-  font-size: 28rpx;
-  line-height: 1.6;
-  display: inline;
 }
-@keyframes blink { 50% { opacity: 0; } }
+@keyframes blink { 50% { opacity: 0.6; } }
 
 /* 涨跌色 */
 .up { color: #f43f5e; }
