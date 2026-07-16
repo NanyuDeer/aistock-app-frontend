@@ -2,6 +2,24 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [changer] 2026-07-16 — 简报卡片接入真实 API 数据
+**开发者**: 37588
+
+### 改进
+- `src/modules/home/components/MorningContent.vue`：简报卡片改用真实 API 数据渲染，替换 mock 数据
+- `src/pages-sub-app/briefing-detail/index.vue`：简报详情页重构，接入后端报告 API，支持双层 display_report 结构解析
+- `src/shared/utils/useBriefingCard.ts`：适配真实数据格式
+- `src/pages.json`：路由配置更新
+
+### 新增
+- `src/shared/utils/reportSplitter.ts`：报告内容分段工具（按标题分割文本段落）
+
+### 文档
+- `docs/superpowers/plans/2026-07-16-briefing-card-real-data.md`：实施计划
+- `docs/superpowers/specs/2026-07-16-briefing-card-real-data-design.md`：设计文档
+
+---
+
 ## [master] 2026-07-15 — 自选股双向同步合并 + 事件详情页重构 + H5扫码登录修复
 **开发者**: Aria
 

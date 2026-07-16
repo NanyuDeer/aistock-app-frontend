@@ -252,6 +252,14 @@
           }
         },
         {
+          "path": "briefing-detail/index",
+          "style": {
+            "navigationStyle": "custom",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+          }
+        },
+        {
           "path": "event-chain/index",
           "style": {
             "navigationBarTitleText": "事件传导",
