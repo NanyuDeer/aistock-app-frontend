@@ -16,23 +16,31 @@
       <text class="logo-desc">AI 智能体驱动的中长线投资助手</text>
     </view>
 
-    <!-- 登录方式区域 -->
+    <!-- 登录方式区域（统一模板：H5 / APP-PLUS / MP-WEIXIN 共用二维码 + 错误状态） -->
     <view class="login-body">
-      <!-- #ifdef MP-WEIXIN -->
-      <!-- 小程序：微信一键登录 -->
-      <button @tap="handleWxLogin" class="btn-wx-login">
-        <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
-        <text class="btn-text">微信一键登录</text>
-      </button>
-      <!-- #endif -->
-
-      <!-- #ifdef H5 -->
-      <!-- H5：微信扫码登录 -->
+      <!-- 初始状态：登录方式选择 -->
       <view v-if="!qrCodeUrl && !loginLoading && !errorMsg" class="login-methods">
+        <!-- #ifdef MP-WEIXIN -->
+        <button @tap="handleWxLogin" class="btn-wx-login">
+          <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
+          <text class="btn-text">微信一键登录</text>
+        </button>
+        <!-- #endif -->
+
+        <!-- #ifdef H5 -->
         <button @click="startScanLogin" class="btn-wx-login">
           <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
           <text class="btn-text">微信扫码登录</text>
         </button>
+        <!-- #endif -->
+
+        <!-- #ifdef APP-PLUS -->
+        <button @tap="handleWxLogin" class="btn-wx-login">
+          <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
+          <text class="btn-text">微信登录</text>
+        </button>
+        <!-- #endif -->
+
         <view class="login-tip">
           <text class="tip-text">登录后可同步自选股、接收异动提醒</text>
         </view>
@@ -41,7 +49,7 @@
         </view>
       </view>
 
-      <!-- 扫码登录中：显示二维码 -->
+      <!-- 扫码登录中：显示二维码（全平台通用） -->
       <view v-else-if="qrCodeUrl && !loginLoading" class="qr-section">
         <text class="qr-title">微信扫一扫登录</text>
         <image :src="qrCodeUrl" class="qr-image" mode="aspectFit" />
@@ -57,13 +65,18 @@
         </view>
       </view>
 
-      <!-- 错误状态：页面内显示，不只是 toast -->
+      <!-- 错误状态 -->
       <view v-else-if="errorMsg && !loginLoading" class="error-section">
         <text class="error-icon">⚠</text>
         <text class="error-text">{{ errorMsg }}</text>
-        <view class="error-retry" @tap="startScanLogin">
+        <view class="error-retry" @tap="handleRetry">
           <text class="retry-text">重试</text>
         </view>
+        <!-- #ifdef APP-PLUS -->
+        <view class="scan-fallback" @tap="startScanLogin">
+          <text class="scan-fallback-text">使用扫码登录</text>
+        </view>
+        <!-- #endif -->
         <view class="skip-btn" @tap="goHome">
           <text class="skip-text">暂不登录，先看看</text>
         </view>
@@ -73,38 +86,6 @@
       <view v-else class="loading-section">
         <text class="loading-text">登录中...</text>
       </view>
-      <!-- #endif -->
-
-      <!-- #ifdef APP-PLUS -->
-      <!-- App：拉起微信 App 授权登录 -->
-      <view v-if="!loginLoading && !errorMsg" class="login-methods">
-        <button @tap="handleWxLogin" class="btn-wx-login">
-          <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
-          <text class="btn-text">微信登录</text>
-        </button>
-        <view class="login-tip">
-          <text class="tip-text">登录后可同步自选股、接收异动提醒</text>
-        </view>
-        <view class="skip-btn" @tap="goHome">
-          <text class="skip-text">暂不登录，先看看</text>
-        </view>
-      </view>
-
-      <view v-else-if="errorMsg && !loginLoading" class="error-section">
-        <text class="error-icon">⚠</text>
-        <text class="error-text">{{ errorMsg }}</text>
-        <view class="error-retry" @tap="handleWxLogin">
-          <text class="retry-text">重试</text>
-        </view>
-        <view class="skip-btn" @tap="goHome">
-          <text class="skip-text">暂不登录，先看看</text>
-        </view>
-      </view>
-
-      <view v-else class="loading-section">
-        <text class="loading-text">登录中...</text>
-      </view>
-      <!-- #endif -->
     </view>
 
     <!-- 底部协议 -->
@@ -231,7 +212,7 @@ async function handleLoginSuccess(scanData?: { token?: string; openid?: string }
   }
 }
 
-/** 微信登录（App 端拉起微信 App） */
+/** 微信登录（App 端拉起微信 App，失败时自动降级到扫码登录） */
 async function handleWxLogin() {
   loginLoading.value = true
   errorMsg.value = ''
@@ -257,10 +238,35 @@ async function handleWxLogin() {
         // 用户取消，静默处理
         return
       }
+      // #ifdef APP-PLUS
+      // 微信 SDK 登录失败（未安装微信 / 签名不匹配 / SDK 通信失败），
+      // 自动降级到扫码登录（二维码），不直接显示错误
+      startScanLogin()
+      // #endif
+      // #ifndef APP-PLUS
       const msg = err?.errMsg || err?.message || '微信授权失败'
       errorMsg.value = msg
+      // #endif
     }
   })
+}
+
+/** 错误重试：优先重试扫码登录（因为 uni.login 已失败过一次） */
+function handleRetry() {
+  errorMsg.value = ''
+  // #ifdef APP-PLUS
+  // APP 端：直接用扫码登录重试（uni.login 已知失败）
+  startScanLogin()
+  // #endif
+  // #ifndef APP-PLUS
+  // H5 / 小程序：重试对应平台的登录方式
+  // #ifdef H5
+  startScanLogin()
+  // #endif
+  // #ifdef MP-WEIXIN
+  handleWxLogin()
+  // #endif
+  // #endif
 }
 
 function goHome() {
@@ -502,12 +508,22 @@ function goBack() {
   padding: 16rpx 64rpx;
   background: #4d7cfe;
   border-radius: 32rpx;
-  margin-bottom: 32rpx;
+  margin-bottom: 24rpx;
 
   .retry-text {
     font-size: 28rpx;
     color: #ffffff;
     font-weight: 500;
+  }
+}
+
+.scan-fallback {
+  padding: 12rpx 48rpx;
+  margin-bottom: 24rpx;
+
+  .scan-fallback-text {
+    font-size: 26rpx;
+    color: #4d7cfe;
   }
 }
 
