@@ -154,7 +154,7 @@ function scrollToBottom() {
 .back { font-size: 40rpx; color: #1a1d24; }
 .title { font-size: 32rpx; font-weight: 600; color: #1a1d24; }
 
-.message-list { flex: 1; min-height: 0; padding: 20rpx; }
+.message-list { flex: 1; min-height: 0; padding: 20rpx; overflow: hidden; }
 .message-item { margin-bottom: 24rpx; }
 .message-item.user { display: flex; justify-content: flex-end; }
 .msg-content.user {
@@ -167,7 +167,7 @@ function scrollToBottom() {
   background: #ffffff; border-radius: 16rpx 16rpx 16rpx 4rpx; padding: 16rpx 24rpx;
   max-width: 80%; box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
-.bubble-text { font-size: 28rpx; color: #1a1d24; line-height: 1.5; display: block; }
+.bubble-text { font-size: 28rpx; color: #1a1d24; line-height: 1.5; display: block; word-break: keep-all; overflow-wrap: break-word; }
 
 /* 涨跌色 */
 .up { color: #f43f5e; }

@@ -72,10 +72,7 @@
         <view class="info-row">
           <view class="stock-col">
             <text class="stock-name">{{ item.name }}</text>
-            <view class="code-rating-row">
-              <text class="stock-code">{{ item.code }}</text>
-              <text :class="['rating-tag', ratingClass(item.rating)]">{{ item.rating }}</text>
-            </view>
+            <text class="stock-code">{{ item.code }}</text>
           </view>
           <view class="metrics-area">
             <view class="metric-line">
@@ -242,7 +239,7 @@ async function fetchData(append = false) {
       netProfitForecast: item['净利润预测'] || '--',
       netProfitGrowth: formatNetProfitGrowth(item['净利润同比(%)']),
       eps: item['EPS预测'] || '--',
-      epsGrowth: item['EPS同比'] || '--',
+      epsGrowth: formatEpsGrowth(item['EPS同比']),
       rating: '--',
       institutionCount: item['机构数量'] || 0,
       updateTime: item['更新时间'] || item.update_time || item.updateTime || '--',
@@ -293,12 +290,21 @@ function retry() {
   fetchData(false)
 }
 
-function ratingClass(rating?: string): string {
-  if (!rating) return ''
-  if (rating.includes('买入') || rating.includes('增持') || rating.includes('推荐')) return 'rating-buy'
-  if (rating.includes('持有') || rating.includes('中性')) return 'rating-hold'
-  if (rating.includes('卖出') || rating.includes('减持')) return 'rating-sell'
-  return ''
+function formatEpsGrowth(val: unknown): string {
+  if (val === null || val === undefined || val === '') return '--'
+  const str = String(val).trim()
+  // 已带 % 或 + / - 前缀的字符串，补加号
+  if (str.includes('%')) {
+    const numStr = str.replace('%', '').trim()
+    const num = Number(numStr)
+    if (!Number.isFinite(num)) return str
+    const prefix = num > 0 && !str.startsWith('+') && !str.startsWith('-') ? '+' : ''
+    return `${prefix}${num.toFixed(2)}%`
+  }
+  const num = Number(str)
+  if (!Number.isFinite(num)) return str
+  const prefix = num > 0 ? '+' : ''
+  return `${prefix}${num.toFixed(2)}%`
 }
 
 function formatNetProfitGrowth(val: unknown): string {
@@ -480,7 +486,7 @@ onShow(() => {
 
 .stock-col {
   flex-shrink: 0;
-  width: 180rpx;
+  width: 140rpx;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
@@ -515,7 +521,7 @@ onShow(() => {
 }
 
 .metric-value {
-  font-size: 26rpx;
+  font-size: 22rpx;
   font-weight: 600;
   color: #4d7cfe;
 }
@@ -532,23 +538,7 @@ onShow(() => {
   background: #f0f2f5;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
-}
-
-.code-rating-row {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.rating-tag {
-  font-size: 20rpx;
-  font-weight: 500;
-  padding: 4rpx 14rpx;
-  border-radius: 8rpx;
-
-  &.rating-buy { color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
-  &.rating-hold { color: #f59f0b; background: rgba(245, 158, 11, 0.1); }
-  &.rating-sell { color: #22c55e; background: rgba(34, 197, 94, 0.1); }
+  align-self: flex-start;
 }
 
 .growth-val {

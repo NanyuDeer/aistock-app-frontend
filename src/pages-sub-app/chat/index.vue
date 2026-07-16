@@ -211,7 +211,7 @@ onUnmounted(() => {
   height: 100%;
 }
 
-.message-list { flex: 1; min-height: 0; padding: 20rpx; }
+.message-list { flex: 1; min-height: 0; padding: 20rpx; overflow: hidden; }
 .message-item { margin-bottom: 24rpx; }
 .message-item.user { display: flex; justify-content: flex-end; }
 .msg-content.user {
@@ -230,6 +230,8 @@ onUnmounted(() => {
   font-size: 28rpx;
   color: #1a1d24;
   line-height: 1.6;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 :deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
 :deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }
@@ -318,7 +320,7 @@ onUnmounted(() => {
 }
 .skill-text { font-size: 26rpx; color: #6b7280; line-height: 1.5; }
 
-.quick-skills { display: flex; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; }
+.quick-skills { display: flex; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; flex-shrink: 0; }
 .skill-btn {
   display: inline-flex; align-items: center; gap: 6rpx;
   background: rgba(77, 124, 254, 0.08); color: #4d7cfe; border-radius: 20rpx;
@@ -326,7 +328,7 @@ onUnmounted(() => {
 }
 .skill-btn-text { font-size: 24rpx; color: #4d7cfe; }
 
-.input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; }
+.input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
 .input { flex: 1; background: #f5f7fa; border-radius: 12rpx; padding: 16rpx; color: #1a1d24; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
 .send-btn { background: #4d7cfe; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
 </style>

@@ -153,7 +153,9 @@ const scrollHeight = computed(() => {
   const navH = rpx2px(88)          // nav-area
   const headerH = rpx2px(88)       // card-header
   const marginH = getBottomFixedHeightPx()
-  const total = windowHeight.value - statusBarHeight.value - navH - headerH - marginH
+  // 特别提醒 tab 显示 footer-bar（约 68rpx + padding），需扣除其高度避免挤下
+  const footerH = activeTab.value === 'alert' ? rpx2px(68) : 0
+  const total = windowHeight.value - statusBarHeight.value - navH - headerH - marginH - footerH
   return Math.max(total, 100)
 })
 
@@ -277,6 +279,7 @@ function goProfile() {
   /* #ifdef H5 */
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   /* #endif */
   background: #ffffff;
   touch-action: auto;

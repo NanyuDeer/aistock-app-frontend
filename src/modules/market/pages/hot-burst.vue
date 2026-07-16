@@ -60,8 +60,8 @@
             </view>
             <view class="signal-meta-right">
               <view v-if="sig.resonanceScore != null" class="signal-score">
-                <text class="score-label">得分</text>
                 <text class="score-val">{{ sig.resonanceScore }}</text>
+                <text class="score-label">分</text>
               </view>
               <text :class="['level-tag', sig.resonanceLevel || 'low']">
                 {{ levelLabel(sig.resonanceLevel) }}
@@ -303,7 +303,7 @@ onShow(() => {
 .level-tag {
   display: inline-flex;
   align-items: center;
-  padding: 4rpx 16rpx;
+  padding: 4rpx 10rpx;
   border-radius: 8rpx;
   font-size: 22rpx;
   font-weight: 600;
@@ -360,8 +360,8 @@ onShow(() => {
 
 .signal-score {
   display: flex;
-  align-items: center;
-  gap: 8rpx;
+  align-items: baseline;
+  gap: 2rpx;
 }
 
 .score-label {

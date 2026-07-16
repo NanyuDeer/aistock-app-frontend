@@ -12,18 +12,21 @@
       <slot name="header-right" />
     </view>
 
-    <!-- 内容用 scroll-view 包裹，JS 动态算出精确像素高度 -->
-    <scroll-view
-      scroll-y
-      class="sub-page-2-content"
-      :enhanced="true"
-      :bounces="false"
-      :style="{ height: scrollHeight + 'px' }"
-    >
-      <slot />
-    </scroll-view>
-    <!-- 可选底部操作栏插槽 -->
-    <slot name="footer" />
+    <!-- 中间内容区域：flex 容器包裹 scroll-view 和 footer，参照 SubPageCard -->
+    <view class="sub-page-2-body" :class="{ 'no-chat-bar': noChatBar }">
+      <scroll-view
+        scroll-y
+        class="sub-page-2-content"
+        :enhanced="true"
+        :bounces="false"
+      >
+        <slot />
+      </scroll-view>
+      <!-- 可选底部操作栏插槽（flex-shrink:0 固定在内容区底部） -->
+      <view v-if="$slots.footer" class="sub-page-2-footer">
+        <slot name="footer" />
+      </view>
+    </view>
 
     <!-- 全局AI对话栏（可通过 noChatBar 隐藏） -->
     <GlobalChatBar v-if="!noChatBar" :active-panel="activePanel" />
@@ -31,9 +34,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
-import { rpx2px, getChatBarHeightPx } from '@/shared/utils/layout'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -58,11 +60,9 @@ const props = withDefaults(defineProps<{
 // 获取真实状态栏高度
 // App 端 zoom:1.2 会放大 padding，需除以 1.2 补偿
 const statusBarHeight = ref(0)
-const windowHeight = ref(0)
 try {
   const sysInfo = uni.getSystemInfoSync()
   const raw = sysInfo.statusBarHeight || 0
-  windowHeight.value = sysInfo.windowHeight || 667
   // #ifdef APP-PLUS
   statusBarHeight.value = raw / 1.2
   // #endif
@@ -71,25 +71,7 @@ try {
   // #endif
 } catch {
   statusBarHeight.value = 0
-  windowHeight.value = 667
 }
-
-/**
- * 动态计算 scroll-view 像素高度
- * 有副标题时导航栏更高（120rpx），无副标题时 88rpx
- *
- * 必须使用 shared/utils/layout 的 rpx2px（基于 uni.upx2px），
- * 不能用 getSystemInfoSync().windowWidth 自行换算：
- * H5 dev 模式下 windowWidth 返回浏览器全宽（如 1463px）而非模拟移动端宽度（375px），
- * 会导致 navH/chatBarH 严重偏大、scrollHeight 过小甚至被钳到 100，
- * scroll-view 下方出现灰色空隙，内容 div 无法占满。
- */
-const scrollHeight = computed(() => {
-  const navH = rpx2px(props.subtitle ? 120 : 88)
-  const chatBarH = props.noChatBar ? 0 : getChatBarHeightPx()
-  const total = windowHeight.value - statusBarHeight.value - navH - chatBarH
-  return Math.max(total, 100)
-})
 
 function goBack() {
   const pages = getCurrentPages()
@@ -171,10 +153,32 @@ function goBack() {
   margin-top: 4rpx;
 }
 
-/* 内容区域：浅灰背景，恢复触摸滚动 */
+/* 中间内容区域：flex:1 撑满剩余空间，参照 SubPageCard 的 .sub-page-body */
+.sub-page-2-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* 底部留白：GlobalChatBar 高度（148rpx + 安全区），noChatBar 时无需留白 */
+  padding-bottom: var(--sub2-pad-b, calc(148rpx + env(safe-area-inset-bottom)));
+}
+
+.sub-page-2-body.no-chat-bar {
+  padding-bottom: 0;
+}
+
+/* scroll-view 在 body 容器内 flex:1 撑满，footer 固定在底部 */
 .sub-page-2-content {
+  flex: 1;
+  min-height: 0;
   touch-action: auto;
   overscroll-behavior: contain;
   background: #f5f7fb;
+}
+
+/* footer 插槽容器：不压缩，固定在内容区底部 */
+.sub-page-2-footer {
+  flex-shrink: 0;
 }
 </style>

@@ -224,6 +224,8 @@ onLoad((options) => {
   font-size: 28rpx;
   color: #1a1d24;
   line-height: 1.8;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 :deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
 :deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }

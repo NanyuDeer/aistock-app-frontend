@@ -2,6 +2,24 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [master] 2026-07-17 — 微信登录修复 + 业绩预测卡片优化 + Markdown换行/布局溢出修复 + SubPageCard2重构
+**开发者**: Aria
+
+### 修复
+- `src/manifest.json`：从后端 `.env` 获取 `WECHAT_SECRET` 填入 `appsecret`，移除空值 `UniversalLinks`（仅安卓端），修复 `login:fail 业务参数配置缺失`
+- `env/.env.development` + `env/.env.production`：新增 `VITE_WX_APPID`/`VITE_WX_APPSECRET` 配置项（文档化）
+- `src/modules/analytics/components/ForecastContent.vue`：移除"增持"评级标签（无后端逻辑）；`stock-col` 宽度 180→140rpx 防换行；`metric-value` 字体 26→22rpx 与 `growth-val` 一致；新增 `formatEpsGrowth()`/`formatNetProfitGrowth()` 为正数补 `+` 前缀
+- `src/pages-sub-app/chat/index.vue`：`.bubble-html` 改用 `word-break: keep-all`（CJK 不在标点处断行）；`.message-list` 添加 `overflow: hidden`；`.quick-skills`+`.input-bar` 添加 `flex-shrink: 0` 防止消息过多时输入栏消失
+- `src/modules/chat/pages/agent-report.vue`：`.report-html` 同上 keep-all 换行策略
+- `src/modules/chat/pages/index.vue`：`.bubble-text` 同上 keep-all 换行策略 + `.message-list` overflow hidden
+- `src/shared/components/MainTabs.vue`：`scrollHeight` 计算新增 `footerH` 扣减（alert 标签页底部 footer-bar 之前未计入导致内容被挤出）；`.card-content` 添加 `overflow: hidden`
+- `src/modules/market/pages/hot-burst.vue`：分数显示 `得分 95`→`95分`（数值在前单位在后）；`level-tag` padding `4rpx 16rpx`→`4rpx 10rpx` 减小按钮宽度
+
+### 重构
+- `src/shared/components/SubPageCard2.vue`：移除 JS 计算 scrollHeight 逻辑（`computed`/`windowHeight`/`rpx2px`/`getChatBarHeightPx`），改用 flex 布局（`.sub-page-2-body` flex 容器 + `padding-bottom` 为 GlobalChatBar 留白），参照 SubPageCard 模式，修复底部内容被 AI 对话栏遮挡
+
+---
+
 ## [master] 2026-07-17 — 业绩预测卡片重构 + card-header 高度对齐
 **开发者**: Aria
 
