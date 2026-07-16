@@ -1,5 +1,5 @@
 <template>
-  <view class="event-detail-page">
+  <SubPageCard2 title="AI事件分析" back-url="/modules/chat/pages/event/list">
     <!-- ===== 加载状态 ===== -->
     <template v-if="loading">
       <view class="state-container">
@@ -19,8 +19,10 @@
     </template>
 
     <!-- ===== AI 事件分析报告 ===== -->
-    <AiEventReport v-else-if="detail" :detail="detail" @back="goBack" />
-  </view>
+    <template v-else-if="detail">
+      <AiEventReport :detail="detail" />
+    </template>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
@@ -28,11 +30,12 @@
  * 事件详情页
  *
  * 职责：获取事件ID → 获取基础信息 → 调用 AiEventReport 展示 AI 分析报告。
- * 不再直接管理分析模块，统一由 AiEventReport 控制分析流程。
+ * 使用 SubPageCard2 白色顶栏组件，思考状态通过副标题展示。
  */
 import { onMounted, ref } from 'vue'
 import { useEventDetail } from '@/modules/chat/event/composables/useEventDetail'
 import AiEventReport from '@/modules/chat/event/components/AiEventReport.vue'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 
 // ========== Composable ==========
 const { detail, loading, error, fetchDetail } = useEventDetail()
@@ -55,24 +58,9 @@ onMounted(() => {
 function handleRetry() {
   if (eventId.value) fetchDetail(eventId.value)
 }
-
-/** 返回上一页（优先返回事件列表） */
-function goBack() {
-  const pages = getCurrentPages()
-  if (pages.length > 1) {
-    uni.navigateBack()
-  } else {
-    uni.navigateTo({ url: '/modules/chat/pages/event/list' })
-  }
-}
 </script>
 
 <style scoped>
-.event-detail-page {
-  min-height: 100vh;
-  background: var(--ev-bg-page);
-}
-
 /* 状态 */
 .state-container {
   display: flex;

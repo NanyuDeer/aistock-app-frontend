@@ -15,8 +15,30 @@
         <SvgIcon name="arrow-right-line" color="#ffffff" size="32rpx" />
       </view>
 
+      <view v-if="errorMessage" class="state-card">
+        <text class="state-text">{{ errorMessage }}</text>
+        <text class="state-hint">请检查网络连接后重新加载</text>
+        <button
+          class="retry-button"
+          :class="{ disabled: loading }"
+          :disabled="loading"
+          @tap="loadData"
+        >
+          {{ loading ? '加载中...' : '重新加载' }}
+        </button>
+      </view>
+
+      <view v-else-if="loading && !sectors.length" class="state-card">
+        <text class="state-text">正在加载长线风口数据...</text>
+      </view>
+
+      <view v-else-if="!sectors.length" class="state-card">
+        <text class="state-text">暂无长线风口数据</text>
+        <text class="state-hint">数据更新后将在这里展示</text>
+      </view>
+
       <!-- 风口概念泡泡图 -->
-      <view class="bubble-card">
+      <view v-if="sectors.length" class="bubble-card">
         <view class="bubble-title-row">
           <text class="bubble-title">风口概念</text>
           <text class="bubble-hint">泡泡越大持续性越强</text>
@@ -141,79 +163,6 @@
       </view>
     </view>
 
-    <!-- 无板块数据时显示mock -->
-    <view v-else class="sector-list">
-      <view
-        v-for="(sector, idx) in mockSectors"
-        :key="'mock-' + idx"
-        class="sector-card"
-      >
-        <view class="sector-top">
-          <view class="sector-info">
-            <text class="sector-rank">No.{{ idx + 1 }}</text>
-            <text class="sector-name">{{ sector.name }}</text>
-            <text class="sector-freq">频次 {{ sector.frequency }}</text>
-          </view>
-          <view class="sector-change-wrap">
-            <text :class="['sector-change', sector.today_change >= 0 ? 'up' : 'down']">
-              {{ sector.today_change >= 0 ? '+' : '' }}{{ sector.today_change.toFixed(2) }}%
-            </text>
-          </view>
-        </view>
-        <view class="leader-row">
-          <view class="leader-left">
-            <text class="leader-label">龙头</text>
-            <text class="leader-name">{{ sector.leader }}</text>
-            <text :class="['leader-change', sector.leader_change >= 0 ? 'up' : 'down']">
-              {{ sector.leader_change >= 0 ? '+' : '' }}{{ sector.leader_change.toFixed(2) }}%
-            </text>
-          </view>
-        </view>
-        <view class="driver-row">
-          <text class="driver-label">驱动</text>
-          <text class="driver-text">{{ sector.driver }}</text>
-        </view>
-        <view class="analysis-box">
-          <view class="analysis-row">
-            <text class="analysis-label">持续性</text>
-            <text class="analysis-value">{{ sector.persistence }}</text>
-          </view>
-          <view class="analysis-row">
-            <text class="analysis-label">理由</text>
-            <text class="analysis-value">{{ sector.persistence_reason }}</text>
-          </view>
-          <view v-if="sector.risk" class="analysis-row">
-            <text class="analysis-label">风险</text>
-            <text class="analysis-value risk">{{ sector.risk }}</text>
-          </view>
-        </view>
-        <view class="count-row">
-          <text class="count-up">↑ {{ sector.up_count }}</text>
-          <text class="count-down">↓ {{ sector.down_count }}</text>
-        </view>
-        <view class="stocks-section">
-          <text class="stocks-section-title">主线个股</text>
-          <view class="stocks-list">
-            <view
-              v-for="stock in sector.stocks"
-              :key="stock.code"
-              class="stock-item"
-            >
-              <view class="stock-info">
-                <text class="stock-name">{{ stock.name }}</text>
-                <text class="stock-code">{{ stock.code }}</text>
-              </view>
-              <view class="stock-quote">
-                <text class="stock-price">{{ stock.price }}</text>
-                <text :class="['stock-change', stock.change >= 0 ? 'up' : 'down']">
-                  {{ stock.change >= 0 ? '+' : '' }}{{ stock.change.toFixed(2) }}%
-                </text>
-              </view>
-            </view>
-          </view>
-        </view>
-      </view>
-    </view>
     </view>
   </SubPageCard>
 </template>
@@ -222,55 +171,13 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
+import type { WindLeaderAiAnalysis, WindLeaderSector } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
-interface SectorStock {
-  code: string
-  name: string
-  industry?: string
-  score?: number
-  reason?: string
-  reason_tag?: string
-  price?: number | null
-  change_pct?: number | null
-}
-
-interface AiAnalysis {
-  persistence?: string
-  persistence_reason?: string
-  heat_transfer?: boolean
-  transfer_direction?: string
-  transfer_reason?: string
-  risk_warning?: string
-}
-
-interface HotSector {
-  code?: string
-  name: string
-  type?: string
-  frequency?: string
-  avg_change?: number
-  today_change?: number
-  net_inflow?: number
-  score?: number
-  leading_stock?: string
-  leading_change?: number
-  up_count?: number
-  down_count?: number
-  driver?: string
-  ai_analysis?: AiAnalysis | string | null
-  main_stocks?: SectorStock[]
-  leading_stock_info?: {
-    code?: string
-    name?: string
-    price?: number | null
-    change_pct?: number | null
-  } | null
-}
-
 const loading = ref(false)
-const sectors = ref<HotSector[]>([])
+const errorMessage = ref('')
+const sectors = ref<WindLeaderSector[]>([])
 const updateTime = ref('')
 
 // ===== 泡泡图数据 =====
@@ -289,27 +196,39 @@ interface BubbleLayout extends Bubble {
   y: number
 }
 
-const bubbleHeight = 380 // 容器高度 px
+const bubbleHeight = 200 // 容器高度 px（横向椭圆布局，纵向更短）
 
-// 根据持续性决定半径，参考网页版
+// 动态计算容器宽度：windowWidth - 两侧padding（leaders-content 24rpx×2 + bubble-card 24rpx×2）
+// 不能硬编码，否则不同设备屏幕宽度下泡泡会溢出画布
+const containerWidth = ref(320)
+try {
+  const sysInfo = uni.getSystemInfoSync()
+  const winW = sysInfo.windowWidth || 375
+  const rpx2px = (rpx: number) => rpx * winW / 750
+  containerWidth.value = Math.round(winW - rpx2px(24) * 4)
+} catch {
+  containerWidth.value = 320
+}
+
+// 根据持续性决定半径，横向椭圆布局允许稍大半径
 function calcRadius(persistence: string, score: number): number {
-  let base = 22 // 短期
-  if (persistence.includes('长期')) base = 50
-  else if (persistence.includes('中期')) base = 35
+  let base = 20 // 短期
+  if (persistence.includes('长期')) base = 36
+  else if (persistence.includes('中期')) base = 27
   // score 微调
-  base += (score - 50) * 0.08
-  return Math.max(18, Math.min(60, Math.round(base)))
+  base += (score - 50) * 0.05
+  return Math.max(16, Math.min(40, Math.round(base)))
 }
 
 const bubbleData = computed<Bubble[]>(() => {
-  const source = sectors.value.length
-    ? sectors.value.slice(0, 10).map(s => ({
-        name: s.name,
-        change: s.today_change || 0,
-        score: s.score || 50,
-        persistence: typeof s.ai_analysis === 'object' ? s.ai_analysis?.persistence || '短期' : '短期',
-      }))
-    : mockBubbles
+  const source = sectors.value.slice(0, 10).map(s => ({
+    name: s.name,
+    change: s.today_change ?? 0,
+    score: s.score ?? 50,
+    persistence: typeof s.ai_analysis === 'object'
+      ? s.ai_analysis?.persistence || '短期'
+      : '短期',
+  }))
   return source.map(s => ({
     ...s,
     radius: calcRadius(s.persistence, s.score),
@@ -317,33 +236,48 @@ const bubbleData = computed<Bubble[]>(() => {
   }))
 })
 
-// 简单 force simulation：碰撞检测 + 居中
+// force simulation：碰撞检测 + 居中 + 自适应缩放（确定性布局，同数据同结果）
 const bubbleLayout = computed<BubbleLayout[]>(() => {
   const items = bubbleData.value
   if (!items.length) return []
-  const W = 320 // 容器宽度近似
+  const W = containerWidth.value // 动态容器宽度，匹配实际画布大小
   const H = bubbleHeight
   const cx = W / 2
   const cy = H / 2
 
-  // 初始化随机位置
-  const nodes = items.map(b => ({
-    ...b,
-    x: cx + (Math.random() - 0.5) * W * 0.6,
-    y: cy + (Math.random() - 0.5) * H * 0.6,
-    vx: 0,
-    vy: 0,
-  }))
+  // 自适应缩放：如果泡泡总面积占画布面积超过45%，等比缩小半径
+  const totalArea = items.reduce((sum, b) => sum + Math.PI * b.radius * b.radius, 0)
+  const canvasArea = W * H
+  let scale = 1
+  if (totalArea / canvasArea > 0.45) {
+    scale = Math.sqrt(0.45 * canvasArea / totalArea)
+  }
+
+  // 确定性初始位置：按 index 在横向椭圆上均匀分布
+  const ellipseA = W * 0.4  // 横向半轴（更宽）
+  const ellipseB = H * 0.3  // 纵向半轴（更窄）
+  const nodes = items.map((b, idx) => {
+    const r = b.radius * scale
+    const angle = (idx / items.length) * Math.PI * 2 - Math.PI / 2
+    return {
+      ...b,
+      radius: r,
+      x: cx + Math.cos(angle) * ellipseA,
+      y: cy + Math.sin(angle) * ellipseB,
+      vx: 0,
+      vy: 0,
+    }
+  })
 
   // 迭代模拟
-  const iterations = 200
+  const iterations = 300
   for (let i = 0; i < iterations; i++) {
     const alpha = 1 - i / iterations
 
-    // 居中力
+    // 居中力（Y方向更强，X方向更弱，让泡泡横向展开）
     for (const n of nodes) {
-      n.vx += (cx - n.x) * 0.005 * alpha
-      n.vy += (cy - n.y) * 0.005 * alpha
+      n.vx += (cx - n.x) * 0.06 * alpha  // X: 弱居中
+      n.vy += (cy - n.y) * 0.15 * alpha  // Y: 强居中
     }
 
     // 碰撞检测
@@ -354,9 +288,9 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
         const dx = nb.x - na.x
         const dy = nb.y - na.y
         const dist = Math.sqrt(dx * dx + dy * dy) || 1
-        const minDist = na.radius + nb.radius + 4
+        const minDist = na.radius + nb.radius + 3
         if (dist < minDist) {
-          const push = (minDist - dist) / 2
+          const push = (minDist - dist) / 2 * 0.9
           const ux = dx / dist
           const uy = dy / dist
           na.x -= ux * push
@@ -367,10 +301,19 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
       }
     }
 
-    // 边界约束
+    // 应用速度
     for (const n of nodes) {
-      n.x = Math.max(n.radius + 4, Math.min(W - n.radius - 4, n.x))
-      n.y = Math.max(n.radius + 4, Math.min(H - n.radius - 4, n.y))
+      n.x += n.vx * 0.3
+      n.y += n.vy * 0.3
+      n.vx *= 0.6
+      n.vy *= 0.6
+    }
+
+    // 边界约束（更强：确保泡泡完全在画布内，留2px安全边距）
+    for (const n of nodes) {
+      const safeR = n.radius + 2
+      n.x = Math.max(safeR, Math.min(W - safeR, n.x))
+      n.y = Math.max(safeR, Math.min(H - safeR, n.y))
     }
   }
 
@@ -396,17 +339,6 @@ function bubbleItemStyle(b: BubbleLayout) {
   }
 }
 
-const mockBubbles = [
-  { name: '创新药', change: 3.52, score: 85, persistence: '长期(5-10天)' },
-  { name: '光伏', change: 2.18, score: 72, persistence: '中期(3-5天)' },
-  { name: '半导体', change: 1.85, score: 68, persistence: '中期(3-5天)' },
-  { name: '动力煤', change: -0.92, score: 55, persistence: '短期(1-3天)' },
-  { name: '锂电池', change: 1.45, score: 62, persistence: '中期(3-5天)' },
-  { name: '白酒', change: 0.78, score: 48, persistence: '短期(1-3天)' },
-  { name: 'AI算力', change: 4.22, score: 90, persistence: '长期(5-10天)' },
-  { name: '稀土', change: -1.35, score: 42, persistence: '短期(1-3天)' },
-]
-
 function selectBubble(b: Bubble) {
   // 点击泡泡时滚动到对应板块卡片
   uni.showToast({ title: b.name, icon: 'none', duration: 800 })
@@ -419,75 +351,21 @@ function goAgentReport() {
   })
 }
 
-// ===== Mock 板块数据 =====
-const mockSectors = [
-  {
-    name: '创新药',
-    frequency: 12,
-    today_change: 3.52,
-    leader: '药明康德',
-    leader_change: 8.52,
-    driver: '美国标普生物科技指数大涨，创新药出海预期升温',
-    persistence: '长期(5-10天)',
-    persistence_reason: '海外临床进展密集发布，政策支持创新药审评加速',
-    risk: '部分标的估值偏高，注意回调风险',
-    up_count: 38,
-    down_count: 7,
-    stocks: [
-      { name: '舒泰神', code: '300204', price: '18.52', change: 20.00 },
-      { name: '广生堂', code: '300436', price: '32.15', change: 20.00 },
-      { name: '药明康德', code: '603259', price: '68.90', change: 8.52 },
-      { name: '恒瑞医药', code: '600276', price: '42.30', change: 5.33 },
-    ],
-  },
-  {
-    name: '光伏',
-    frequency: 9,
-    today_change: 2.18,
-    leader: '隆基绿能',
-    leader_change: 4.15,
-    driver: '硅料价格企稳，组件排产环比提升',
-    persistence: '中期(3-5天)',
-    persistence_reason: '欧洲能源转型需求旺盛，国内装机数据超预期',
-    risk: '',
-    up_count: 25,
-    down_count: 12,
-    stocks: [
-      { name: '隆基绿能', code: '601012', price: '22.45', change: 4.15 },
-      { name: '通威股份', code: '600438', price: '28.90', change: 3.22 },
-      { name: '阳光电源', code: '300274', price: '75.60', change: 2.88 },
-    ],
-  },
-  {
-    name: 'AI算力',
-    frequency: 15,
-    today_change: 4.22,
-    leader: '中际旭创',
-    leader_change: 6.78,
-    driver: '英伟达再创新高，光模块需求持续爆发',
-    persistence: '长期(5-10天)',
-    persistence_reason: 'AI大模型训练和推理需求指数级增长，算力基础设施扩容确定性强',
-    risk: '部分概念股缺乏实际业绩支撑',
-    up_count: 42,
-    down_count: 5,
-    stocks: [
-      { name: '中际旭创', code: '300308', price: '128.50', change: 6.78 },
-      { name: '新易盛', code: '300502', price: '85.20', change: 5.42 },
-      { name: '浪潮信息', code: '000977', price: '35.80', change: 3.95 },
-    ],
-  },
-]
-
 async function loadData() {
+  if (loading.value) return
   loading.value = true
   try {
-    const res: any = await stockApi.getWindLeaders(10)
-    const data = res?.data ?? res
-    sectors.value = data?.hot_sectors || []
-    updateTime.value = data?.update_time || ''
+    const data = await stockApi.getWindLeaders(10)
+    const hotSectors = Array.isArray(data?.hot_sectors) ? data.hot_sectors : []
+    sectors.value = hotSectors.filter(
+      (sector): sector is WindLeaderSector => Boolean(sector && typeof sector.name === 'string' && sector.name.trim())
+    )
+    updateTime.value = typeof data?.update_time === 'string' ? data.update_time : ''
+    errorMessage.value = ''
   } catch {
-    // 本地降级模式下数据库不可用，静默处理
     sectors.value = []
+    updateTime.value = ''
+    errorMessage.value = '长线风口数据加载失败'
   } finally {
     loading.value = false
   }
@@ -498,9 +376,9 @@ function formatPct(val?: number | null): string {
   return Number(val).toFixed(2) + '%'
 }
 
-function getAnalysisRows(a: AiAnalysis | string | null | undefined): Array<{ label: string; value: string; risk?: boolean }> {
+function getAnalysisRows(a: WindLeaderAiAnalysis | string | null | undefined): Array<{ label: string; value: string; risk?: boolean }> {
   if (!a) return []
-  const obj: AiAnalysis = typeof a === 'string' ? { persistence_reason: a } : a
+  const obj: WindLeaderAiAnalysis = typeof a === 'string' ? { persistence_reason: a } : a
   const rows: Array<{ label: string; value: string; risk?: boolean }> = []
   if (obj.persistence) rows.push({ label: '持续性', value: obj.persistence })
   if (obj.persistence_reason) rows.push({ label: '理由', value: obj.persistence_reason })
@@ -561,6 +439,52 @@ onShow(() => {
   font-size: 28rpx;
   font-weight: 600;
   color: #ffffff;
+}
+
+.state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 260rpx;
+  padding: 40rpx 32rpx;
+  margin-bottom: 24rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  text-align: center;
+}
+
+.state-text {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #374151;
+}
+
+.state-hint {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #9ca3af;
+}
+
+.retry-button {
+  min-width: 200rpx;
+  margin-top: 28rpx;
+  padding: 0 32rpx;
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 72rpx;
+  background: #4d7cfe;
+  border: 0;
+  border-radius: 36rpx;
+
+  &::after {
+    border: 0;
+  }
+
+  &.disabled {
+    opacity: 0.6;
+  }
 }
 
 /* ===== 泡泡图 ===== */

@@ -1,38 +1,51 @@
 <template>
-  <view class="page-news-detail">
+  <view class="news-detail-page">
     <!-- 加载中 -->
-    <view v-if="loading" class="loading">
-      <text class="loading-text">加载中...</text>
+    <view v-if="loading" class="state-container">
+      <text class="state-text">加载中...</text>
     </view>
 
     <!-- 新闻内容 -->
-    <view v-else-if="detail" class="news-content">
-      <view class="news-header">
-        <text class="news-title">{{ detail.title }}</text>
-        <view class="news-meta">
-          <text class="news-source">{{ detail.source }}</text>
-          <text class="news-time">{{ detail.publishTime }}</text>
+    <template v-else-if="detail">
+      <scroll-view scroll-y class="news-scroll" :enhanced="true" :bounces="false" :style="{ height: scrollHeight + 'px' }">
+        <view class="news-content">
+          <view class="news-header">
+            <text class="news-title">{{ detail.title }}</text>
+            <view class="news-meta">
+              <text class="news-source">{{ detail.source }}</text>
+              <text class="meta-dot">·</text>
+              <text class="news-time">{{ detail.publishTime }}</text>
+            </view>
+          </view>
+
+          <view v-if="detail.summary" class="news-summary">
+            <text class="summary-text">{{ detail.summary }}</text>
+          </view>
+
+          <view class="news-body">
+            <rich-text :nodes="formattedContent" />
+          </view>
+
+          <view v-if="detail.url" class="news-footer">
+            <text class="footer-link" @tap="openOriginal">查看原文 ›</text>
+          </view>
+
+          <view v-if="relatedEventId" class="news-event-footer">
+            <view class="event-btn" @tap="goToEventDetail">
+              <text class="event-btn-text">查看关联事件详情 ›</text>
+            </view>
+          </view>
         </view>
-      </view>
+      </scroll-view>
+    </template>
 
-      <view v-if="detail.summary" class="news-summary">
-        <text class="summary-text">{{ detail.summary }}</text>
-      </view>
-
-      <view class="news-body">
-        <rich-text :nodes="formattedContent" />
-      </view>
-
-      <view v-if="detail.url" class="news-footer">
-        <text class="footer-link" @tap="openOriginal">查看原文 ›</text>
-      </view>
+    <!-- 加载失败 / 空状态 -->
+    <view v-else class="state-container">
+      <text class="state-text">暂无资讯详情</text>
     </view>
 
-    <!-- 加载失败 -->
-    <view v-else class="empty">
-      <SvgIcon name="file-text-line" size="80rpx" color="#d1d5db" />
-      <text class="empty-text">暂无资讯详情</text>
-    </view>
+    <!-- 全局AI对话栏 -->
+    <GlobalChatBar />
   </view>
 </template>
 
@@ -40,7 +53,7 @@
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
-import SvgIcon from '@/shared/components/SvgIcon.vue'
+import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 
 const loading = ref(false)
 const detail = ref<{
@@ -53,19 +66,31 @@ const detail = ref<{
   source: string
 } | null>(null)
 
-// 将纯文本换行转为HTML段落
+const relatedEventId = ref('')
+
 const formattedContent = computed(() => {
   if (!detail.value?.content) return ''
   const text = detail.value.content
   return text.split(/\n+/).map(p => `<p style="margin:0 0 16rpx 0;line-height:1.8;font-size:28rpx;color:#374151;">${p}</p>`).join('')
 })
 
+// 动态计算 scroll-view 高度
+const windowHeight = ref(0)
+try {
+  const sysInfo = uni.getSystemInfoSync()
+  windowHeight.value = sysInfo.windowHeight || 667
+} catch (e) {
+  windowHeight.value = 667
+}
+// 系统导航栏页面：windowHeight 已排除导航栏区域
+const scrollHeight = computed(() => windowHeight.value)
+
 onLoad((options) => {
   const newsId = options?.id || ''
+  relatedEventId.value = options?.eventId || ''
   if (newsId) {
     loadDetail(newsId)
   } else {
-    // 没有id时使用mock数据
     loadMockDetail()
   }
 })
@@ -85,7 +110,7 @@ function loadMockDetail() {
   detail.value = {
     id: 'mock-1',
     title: '动力煤需求阶段性回落，旺季预期仍存',
-    content: '近日，动力煤市场价格出现阶段性回落。受气温回升、工业用电需求放缓等因素影响，港口煤价连续三日下调。\n\n不过，市场对旺季预期仍然较强。分析人士指出，夏季用电高峰即将来临，电厂日耗有望回升，叠加进口煤政策收紧预期，动力煤价格在短暂调整后仍有支撑。\n\n从基本面来看，当前港口库存处于中位水平，下游电厂库存相对充裕，短期采购意愿不强。但长期来看，环保限产政策的持续推进可能对供给端形成约束，需持续关注政策动向。\n\n总体而言，动力煤市场短期承压但中期偏强，投资者可关注相关上市公司如美锦能源、山西焦化等的波段操作机会。',
+    content: '近日，动力煤市场价格出现阶段性回落。受气温回升、工业用电需求放缓等因素影响，港口煤价连续三日下调。\n\n不过，市场对旺季预期仍然较强。分析人士指出，夏季用电高峰即将来临，电厂日耗有望回升，叠加进口煤政策收紧预期，动力煤价格在短暂调整后仍有支撑。',
     summary: '动力煤价格阶段性回落，但夏季用电高峰预期仍存，中期偏强格局未改。',
     publishTime: '2026-06-30 14:30',
     url: '',
@@ -103,31 +128,38 @@ function openOriginal() {
     // #endif
   }
 }
+
+function goToEventDetail() {
+  if (relatedEventId.value) {
+    uni.navigateTo({ url: `/modules/chat/pages/event/detail?id=${relatedEventId.value}` })
+  }
+}
 </script>
 
-<style lang="scss" scoped>
-.page-news-detail {
+<style scoped>
+/* 系统导航栏页面：不需要 position:fixed，disableScroll 已在 pages.json 中配置 */
+.news-detail-page {
   min-height: 100vh;
   background: #ffffff;
-  padding: 32rpx 28rpx;
 }
 
-.loading, .empty {
+.state-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 200rpx 0;
-  gap: 16rpx;
+  padding: 300rpx 0;
+}
+.state-text { font-size: 28rpx; color: #6b7280; }
+
+/* Scroll */
+.news-scroll {
+  min-height: 0;
+  touch-action: auto;
+  overscroll-behavior: contain;
 }
 
-.loading-text, .empty-text {
-  font-size: 28rpx;
-  color: #6b7280;
-}
-
-.empty-icon {
-  font-size: 64rpx;
+.news-content {
+  padding: 16rpx 32rpx 40rpx;
 }
 
 .news-header {
@@ -146,19 +178,20 @@ function openOriginal() {
 .news-meta {
   display: flex;
   align-items: center;
-  gap: 20rpx;
+  gap: 10rpx;
 }
 
 .news-source {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: #4d7cfe;
+  font-weight: 500;
   background: rgba(77, 124, 254, 0.08);
-  padding: 4rpx 14rpx;
+  padding: 2rpx 12rpx;
   border-radius: 6rpx;
 }
-
+.meta-dot { font-size: 22rpx; color: #9ca3af; }
 .news-time {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: #9ca3af;
 }
 
@@ -190,6 +223,27 @@ function openOriginal() {
 .footer-link {
   font-size: 28rpx;
   color: #4d7cfe;
+  font-weight: 500;
+}
+
+.news-event-footer {
+  margin-top: 32rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid #f0f2f5;
+  display: flex;
+  justify-content: center;
+}
+
+.event-btn {
+  padding: 16rpx 40rpx;
+  border-radius: 9999rpx;
+  background: linear-gradient(135deg, #4d7cfe, #6366f1);
+  box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
+}
+
+.event-btn-text {
+  font-size: 26rpx;
+  color: #ffffff;
   font-weight: 500;
 }
 </style>

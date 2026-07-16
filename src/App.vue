@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
 import { usePushNotification } from '@/shared/utils/usePushNotification'
+import { useUserStore } from '@/shared/store/modules/user'
+import { useFavoritesStore } from '@/shared/store/modules/favorites'
 
 onLaunch(() => {
   console.log('App Launch - AI Stock')
@@ -10,8 +12,14 @@ onLaunch(() => {
   // #endif
 })
 
-onShow(() => {
+onShow(async () => {
   console.log('App Show')
+  const userStore = useUserStore()
+  const favoritesStore = useFavoritesStore()
+  const authenticated = await userStore.restoreSession()
+  if (authenticated) {
+    await favoritesStore.fetchFavorites({ silent: true })
+  }
 })
 
 onHide(() => {

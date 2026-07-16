@@ -208,8 +208,14 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .page-alert-analysis {
-  min-height: 100vh;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: #f5f7fa;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 /* 头部 */
@@ -356,7 +362,6 @@ onUnmounted(() => {
 .summary-icon { font-size: 24rpx; }
 .summary-title { font-size: 24rpx; font-weight: 600; color: #92400e; }
 
-.summary-body { }
 .summary-text {
   font-size: 28rpx;
   color: #1a1d24;

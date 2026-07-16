@@ -20,3 +20,9 @@ declare module '@qiun/ucharts' {
   const uCharts: any
   export default uCharts
 }
+
+declare module 'mp-html/dist/uni-app/components/mp-html/mp-html' {
+  import { DefineComponent } from 'vue'
+  const component: DefineComponent<{}, {}, any>
+  export default component
+}

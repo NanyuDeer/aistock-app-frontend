@@ -77,8 +77,9 @@ function handleChange(value: string) {
   flex-shrink: 0;
   padding: 12rpx 28rpx;
   border-radius: 9999rpx;
-  background: var(--ev-bg-card-muted);
-  border: 1px solid var(--ev-border);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
   transition: all 0.2s;
 }
 
@@ -91,7 +92,7 @@ function handleChange(value: string) {
 .tab-text {
   font-size: 24rpx;
   font-weight: 500;
-  color: var(--ev-text-muted);
+  color: #1a1d24;
   white-space: nowrap;
 }
 

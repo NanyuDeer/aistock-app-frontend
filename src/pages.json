@@ -11,32 +11,42 @@
       "style": {
         "navigationBarTitleText": "早点听",
         "navigationStyle": "custom",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "none", "animationDuration": 0 }
       }
     },
     {
       "path": "modules/chat/pages/index",
       "style": {
         "navigationBarTitleText": "AI 投顾",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
       }
     },
     {
       "path": "modules/favorites/pages/detail",
       "style": {
-        "navigationBarTitleText": "个股详情"
+        "navigationBarTitleText": "个股详情",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/favorites/pages/search",
       "style": {
-        "navigationBarTitleText": "搜索"
+        "navigationBarTitleText": "搜索",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
       }
     },
     {
       "path": "modules/favorites/pages/monitor",
       "style": {
-        "navigationBarTitleText": "异动监控"
+        "navigationBarTitleText": "异动监控",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
@@ -44,7 +54,9 @@
       "style": {
         "navigationBarTitleText": "自选",
         "navigationStyle": "custom",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
       }
     },
     {
@@ -52,102 +64,136 @@
       "style": {
         "navigationBarTitleText": "特别提醒",
         "navigationStyle": "custom",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "disableScroll": true,
+        "app-plus": { "bounce": "none" }
       }
     },
     {
       "path": "modules/market/pages/event-catcher",
       "style": {
         "navigationBarTitleText": "异动捕手",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/market/pages/alert-analysis",
       "style": {
-        "navigationBarTitleText": "AI 异动解读"
+        "navigationBarTitleText": "AI 异动解读",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/news/pages/detail",
       "style": {
-        "navigationBarTitleText": "资讯详情"
+        "navigationBarTitleText": "资讯详情",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/market/pages/leaders",
       "style": {
         "navigationBarTitleText": "长线风口",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/market/pages/hot-burst",
       "style": {
         "navigationBarTitleText": "机构调研热门股",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/market/pages/push-history",
       "style": {
         "navigationBarTitleText": "",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/chat/pages/agent-report",
       "style": {
         "navigationBarTitleText": "分析报告",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "h5": { "titleNView": false },
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/user/pages/login",
       "style": {
         "navigationBarTitleText": "登录",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "zoom-in", "animationDuration": 200 }
       }
     },
     {
       "path": "modules/user/pages/profile",
       "style": {
         "navigationBarTitleText": "我的",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/user/pages/update-logs",
       "style": {
-        "navigationBarTitleText": "更新日志"
+        "navigationBarTitleText": "更新日志",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
+      "path": "modules/analytics/pages/index",
+      "style": {
+        "navigationBarTitleText": "洞察",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false,
+        "disableScroll": true,
+        "app-plus": { "bounce": "none" }
       }
     },
     {
       "path": "modules/analytics/pages/forecast",
       "style": {
-        "navigationBarTitleText": "业绩预测",
-        "navigationStyle": "custom"
+        "navigationBarTitleText": "业绩",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false,
+        "disableScroll": true,
+        "app-plus": { "bounce": "none" }
       }
     },
     {
       "path": "modules/chat/pages/event/list",
       "style": {
         "navigationBarTitleText": "事件传导",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/chat/pages/event/detail",
       "style": {
         "navigationBarTitleText": "AI事件传导解析",
-        "navigationStyle": "custom"
-      }
-    },
-    {
-      "path": "modules/chat/pages/news/detail",
-      "style": {
-        "navigationBarTitleText": "新闻原文",
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "h5": { "titleNView": false },
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     }
   ],
@@ -159,37 +205,49 @@
           "path": "chat/index",
           "style": {
             "navigationBarTitleText": "AI 投顾",
-            "navigationStyle": "custom"
+            "navigationStyle": "custom",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
           }
         },
         {
           "path": "briefing/index",
           "style": {
-            "navigationBarTitleText": "双人对话播报"
+            "navigationBarTitleText": "双人对话播报",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
           }
         },
         {
           "path": "event-chain/index",
           "style": {
-            "navigationBarTitleText": "事件传导"
+            "navigationBarTitleText": "事件传导",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
           }
         },
         {
           "path": "valuation/index",
           "style": {
-            "navigationBarTitleText": "动态估值"
+            "navigationBarTitleText": "动态估值",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
           }
         },
         {
           "path": "portfolio/index",
           "style": {
-            "navigationBarTitleText": "持仓陪伴"
+            "navigationBarTitleText": "持仓陪伴",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
           }
         },
         {
           "path": "review/index",
           "style": {
-            "navigationBarTitleText": "交易复盘"
+            "navigationBarTitleText": "交易复盘",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
           }
         }
       ]
@@ -200,7 +258,9 @@
         {
           "path": "wechat-bot/index",
           "style": {
-            "navigationBarTitleText": "微信智能体"
+            "navigationBarTitleText": "微信智能体",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
           }
         }
       ]
@@ -211,6 +271,10 @@
     "navigationBarTitleText": "AI Stock",
     "navigationBarBackgroundColor": "#ffffff",
     "backgroundColor": "#f5f7fa",
-    "backgroundTextStyle": "dark"
+    "backgroundTextStyle": "dark",
+    "disableScroll": true,
+    "app-plus": {
+      "bounce": "none"
+    }
   }
 }

@@ -1,22 +1,12 @@
 <template>
-  <view class="event-list-page">
-    <!-- 固定头部区域：返回按钮 + 标题 + 副标题 + 分类Tab -->
-    <view class="event-header">
-      <view class="page-header">
-        <view class="header-top">
-          <view class="back-btn" @tap="goBack">
-            <text class="back-arrow">←</text>
-            <text class="back-text">返回</text>
-          </view>
-        </view>
-        <text class="page-title">事件传导</text>
-        <text class="page-subtitle">AI解析事件影响链，追踪产业链机会</text>
-      </view>
-      <EventTabBar :active="activeType" @change="handleFilterChange" />
-    </view>
+  <SubPageCard title="事件传导">
+    <view class="event-list-content">
+      <!-- 副标题 -->
+      <text class="page-subtitle">AI解析事件影响链，追踪产业链机会</text>
 
-    <!-- 独立滚动的事件流区域 -->
-    <scroll-view class="event-stream" scroll-y="true" :show-scrollbar="true" :enhanced="true" :bounces="false">
+      <!-- 分类Tab -->
+      <EventTabBar :active="activeType" @change="handleFilterChange" />
+
       <!-- 加载中 -->
       <view v-if="loading && events.length === 0" class="state-container">
         <text class="state-text">加载中...</text>
@@ -66,33 +56,22 @@
           </view>
         </view>
       </template>
-    </scroll-view>
-
-    <!-- 底部区域：AppBottomBar + GlobalChatBar（两者均为 position:fixed，此处仅为 flex 占位） -->
-    <view class="event-footer">
-      <view class="event-bottom-wrapper">
-        <AppBottomBar current-tab="event" />
-      </view>
-      <view class="event-chatbar-wrapper">
-        <GlobalChatBar />
-      </view>
     </view>
-  </view>
+  </SubPageCard>
 </template>
 
 <script setup lang="ts">
 /**
- * 事件传导 — 一级页面
+ * 事件传导 — 子页面
  *
- * 底部 Tab 直达，展示 AI 事件影响链分析。
+ * 从早点听卡片入口进入，展示 AI 事件影响链分析。
  * 支持分类筛选、分页加载、关注事件。
  */
 import { onMounted } from 'vue'
 import type { EventItem } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
-import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
-import AppBottomBar from '@/shared/components/AppBottomBar.vue'
+import SubPageCard from '@/shared/components/SubPageCard.vue'
 import EventTabBar from '@/modules/chat/event/components/EventTabBar.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 
@@ -120,16 +99,6 @@ onMounted(() => {
 
 // ========== 事件处理 ==========
 
-/** 返回上一页 */
-function goBack() {
-  const pages = getCurrentPages()
-  if (pages.length > 1) {
-    uni.navigateBack()
-  } else {
-    uni.navigateTo({ url: '/modules/home/pages/index' })
-  }
-}
-
 /** 事件类型筛选切换 */
 function handleFilterChange(value: string) {
   setEventType(value)
@@ -146,7 +115,7 @@ function goToDetail(event: EventItem) {
 function goToNews(event: EventItem) {
   const newsId = event.newsId
   if (newsId) {
-    uni.navigateTo({ url: `/modules/chat/pages/news/detail?id=${newsId}` })
+    uni.navigateTo({ url: `/modules/news/pages/detail?id=${newsId}&eventId=${event.eventId}` })
   }
 }
 
@@ -160,64 +129,8 @@ async function handleFollow(event: EventItem) {
 </script>
 
 <style scoped>
-.event-list-page {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--ev-bg-page);
-}
-
-/* ===== 固定头部区域 ===== */
-.event-header {
-  flex-shrink: 0;
-  z-index: 10;
-  background: var(--ev-bg-page);
-}
-
-/* ===== 页面标题区 ===== */
-.page-header {
-  padding: 28rpx 32rpx 20rpx;
-}
-
-.header-top {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12rpx;
-}
-
-.back-btn {
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-  padding: 8rpx 20rpx 8rpx 12rpx;
-  border-radius: 9999rpx;
-  background: rgba(148, 163, 184, 0.08);
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  transition: all 0.2s;
-}
-
-.back-btn:active {
-  background: rgba(148, 163, 184, 0.15);
-}
-
-.back-arrow {
-  font-size: 28rpx;
-  color: var(--ev-text-tertiary);
-  line-height: 1;
-}
-
-.back-text {
-  font-size: 24rpx;
-  color: var(--ev-text-tertiary);
-}
-
-.page-title {
-  display: block;
-  font-size: 40rpx;
-  font-weight: 700;
-  color: var(--ev-text-primary);
-  margin-bottom: 8rpx;
+.event-list-content {
+  padding: 0 32rpx 40rpx;
 }
 
 .page-subtitle {
@@ -225,40 +138,15 @@ async function handleFollow(event: EventItem) {
   font-size: 24rpx;
   color: var(--ev-text-muted);
   line-height: 1.5;
+  margin-bottom: 16rpx;
 }
 
-/* ===== 独立滚动事件流 ===== */
-.event-stream {
-  flex: 1;
-  overflow: hidden;
-}
-
-/* 事件流内容区域：底部留白防遮挡 */
 .event-list {
-  padding: 16rpx 32rpx 40rpx;
   display: flex;
   flex-direction: column;
   gap: 20rpx;
 }
 
-/* H5 端自定义滚动条样式 */
-.event-stream::-webkit-scrollbar {
-  width: 3px;
-}
-
-.event-stream::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.04);
-  border-radius: 4px;
-}
-
-.event-stream::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-}
-
-.event-stream::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
-}
 .state-container {
   display: flex;
   flex-direction: column;
@@ -295,7 +183,6 @@ async function handleFollow(event: EventItem) {
   font-weight: 500;
 }
 
-/* 加载更多 */
 .load-more-area {
   padding: 32rpx;
   display: flex;
@@ -321,13 +208,5 @@ async function handleFollow(event: EventItem) {
 
 .done-text {
   color: var(--ev-text-muted);
-}
-
-/* ===== 底部区域 ===== */
-/* AppBottomBar / GlobalChatBar 均为 position:fixed，此处仅提供 flex 占位高度 */
-.event-footer {
-  flex-shrink: 0;
-  z-index: 10;
-  height: 210rpx;
 }
 </style>

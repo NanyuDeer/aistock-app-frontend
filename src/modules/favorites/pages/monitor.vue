@@ -173,7 +173,12 @@ onUnmounted(() => disconnectWs())
 </script>
 
 <style lang="scss" scoped>
-.page-monitor { padding: 20rpx; min-height: 100vh; }
+.page-monitor {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  overscroll-behavior: none; touch-action: none;
+  padding: 20rpx;
+}
 
 .monitor-header { padding: 20rpx 0; }
 .monitor-title { font-size: 40rpx; font-weight: 600; color: #1a1d24; display: block; }

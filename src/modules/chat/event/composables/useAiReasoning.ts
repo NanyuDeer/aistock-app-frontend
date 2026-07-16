@@ -92,7 +92,7 @@ export function useAiReasoning(stepConfigs: ReasoningStepConfig[]) {
 
       // processing — 2-3s
       step.status = 'processing'
-      await delay(2000 + Math.random() * 1000)
+      await delay(800 + Math.random() * 400)
 
       // generating — 60-120ms/字符
       step.status = 'generating'
@@ -129,7 +129,7 @@ export function useAiReasoning(stepConfigs: ReasoningStepConfig[]) {
     if (!step || !fullText) return
     for (let i = 1; i <= fullText.length; i++) {
       step.content = { ...step.content, text: fullText.slice(0, i) }
-      await delay(60 + Math.random() * 60)
+      await delay(20 + Math.random() * 30)
     }
   }
 

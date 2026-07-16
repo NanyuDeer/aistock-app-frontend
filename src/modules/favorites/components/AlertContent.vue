@@ -1,95 +1,87 @@
 <template>
-  <view class="page-alerts">
-    <PageCard title="特别提醒">
-      <!-- 堆叠卡片容器 -->
-      <view class="stack-container" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
-        <!-- 后方堆叠卡片预览（最多显示2张） -->
-        <view
-          v-for="i in Math.min(2, alertStocks.length - currentStockIdx - 1)"
-          :key="'behind-' + i"
-          class="stack-card-behind"
-          :style="getBehindStyle(i)"
-        >
-          <view class="behind-card-inner" :style="{ opacity: 1 - i * 0.4 }"></view>
+  <view class="alert-content">
+    <!-- 堆叠卡片容器 -->
+    <view class="stack-container" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
+      <!-- 后方堆叠卡片预览（最多显示2张） -->
+      <view
+        v-for="i in Math.min(2, alertStocks.length - currentStockIdx - 1)"
+        :key="'behind-' + i"
+        class="stack-card-behind"
+        :style="getBehindStyle(i)"
+      >
+        <view class="behind-card-inner" :style="{ opacity: 1 - i * 0.4 }"></view>
+      </view>
+
+      <!-- 当前卡片 -->
+      <view
+        class="stack-card-current"
+        :style="currentCardStyle"
+      >
+        <!-- 股票头部 -->
+        <view class="stock-header">
+          <view class="stock-info">
+            <text class="stock-name">{{ currentStock.name }}</text>
+            <text class="stock-code">{{ currentStock.symbol }}</text>
+          </view>
+          <view class="stock-quote">
+            <text :class="['stock-price', currentStock.changePercent >= 0 ? 'up' : 'down']">
+              {{ currentStock.price.toFixed(2) }}
+            </text>
+            <text :class="['stock-change', currentStock.changePercent >= 0 ? 'up' : 'down']">
+              {{ currentStock.changePercent >= 0 ? '+' : '' }}{{ currentStock.changePercent.toFixed(2) }}%
+            </text>
+          </view>
         </view>
 
-        <!-- 当前卡片 -->
-        <view
-          class="stack-card-current"
-          :style="currentCardStyle"
-        >
-          <!-- 股票头部 -->
-          <view class="stock-header">
-            <view class="stock-info">
-              <text class="stock-name">{{ currentStock.name }}</text>
-              <text class="stock-code">{{ currentStock.symbol }}</text>
+        <!-- 异动时间线 -->
+        <view class="timeline">
+          <view
+            v-for="(item, itemIdx) in currentStock.alerts"
+            :key="itemIdx"
+            :class="['timeline-item', { 'has-date-badge': item.dateBadge }]"
+          >
+            <!-- 日期标记 -->
+            <view v-if="item.dateBadge" class="date-badge">
+              <text class="date-badge-text">{{ item.dateBadge }}</text>
             </view>
-            <view class="stock-quote">
-              <text :class="['stock-price', currentStock.changePercent >= 0 ? 'up' : 'down']">
-                {{ currentStock.price.toFixed(2) }}
-              </text>
-              <text :class="['stock-change', currentStock.changePercent >= 0 ? 'up' : 'down']">
-                {{ currentStock.changePercent >= 0 ? '+' : '' }}{{ currentStock.changePercent.toFixed(2) }}%
-              </text>
+
+            <view class="timeline-dot-wrap">
+              <view :class="['timeline-dot', item.type === 'main' ? 'main' : 'sub']"></view>
+              <view v-if="itemIdx < currentStock.alerts.length - 1" class="timeline-line"></view>
             </view>
-          </view>
 
-          <!-- 异动时间线 -->
-          <view class="timeline">
-            <view
-              v-for="(item, itemIdx) in currentStock.alerts"
-              :key="itemIdx"
-              :class="['timeline-item', { 'has-date-badge': item.dateBadge }]"
-            >
-              <!-- 日期标记 -->
-              <view v-if="item.dateBadge" class="date-badge">
-                <text class="date-badge-text">{{ item.dateBadge }}</text>
+            <view class="timeline-content">
+              <view class="alert-header">
+                <text v-if="item.type === 'main'" class="alert-time">{{ item.time }}</text>
+                <view class="alert-tag">{{ item.tag }}</view>
               </view>
-
-              <view class="timeline-dot-wrap">
-                <view :class="['timeline-dot', item.type === 'main' ? 'main' : 'sub']"></view>
-                <view v-if="itemIdx < currentStock.alerts.length - 1" class="timeline-line"></view>
-              </view>
-
-              <view class="timeline-content">
-                <view class="alert-header">
-                  <text v-if="item.type === 'main'" class="alert-time">{{ item.time }}</text>
-                  <view class="alert-tag">{{ item.tag }}</view>
-                </view>
-                <text class="alert-desc">{{ item.desc }}</text>
-                <text v-if="item.hasMore" class="alert-more">›</text>
-              </view>
+              <text class="alert-desc">{{ item.desc }}</text>
+              <text v-if="item.hasMore" class="alert-more">›</text>
             </view>
           </view>
         </view>
       </view>
+    </view>
 
-      <!-- 底部操作栏：1/N 买 帮我分析 -->
-      <template #footer>
-        <view class="card-footer-bar">
-          <view class="footer-progress">
-            <text class="progress-text">{{ currentStockIdx + 1 }}/{{ alertStocks.length }}</text>
-          </view>
-          <view class="footer-actions">
-            <view class="action-tag buy">
-              <text class="action-tag-text">买</text>
-            </view>
-            <view class="action-btn" @tap="goAnalyze">
-              <text class="action-btn-text">帮我分析</text>
-            </view>
-          </view>
+    <!-- 底部操作栏：1/N 买 帮我分析 -->
+    <view class="card-footer-bar">
+      <view class="footer-progress">
+        <text class="progress-text">{{ currentStockIdx + 1 }}/{{ alertStocks.length }}</text>
+      </view>
+      <view class="footer-actions">
+        <view class="action-tag buy">
+          <text class="action-tag-text">买</text>
         </view>
-      </template>
-    </PageCard>
-
-    <AppBottomBar current-tab="alert" />
+        <view class="action-btn" @tap="goAnalyze">
+          <text class="action-btn-text">帮我分析</text>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import PageCard from '@/shared/components/PageCard.vue'
-import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 
 interface AlertItem {
   type: 'main' | 'sub'
@@ -248,9 +240,9 @@ function goAnalyze() {
 </script>
 
 <style lang="scss" scoped>
-.page-alerts {
-  height: 100%;
-  background: #f5f7fb;
+.alert-content {
+  background: #ffffff;
+  padding: 0 24rpx;
 }
 
 /* ===== 堆叠卡片容器 ===== */
@@ -277,11 +269,11 @@ function goAnalyze() {
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-/* 当前卡片：自然流式布局，由 PageCard 的 scroll-view 提供滚动 */
+/* 当前卡片：自然流式布局 */
 .stack-card-current {
   position: relative;
   background: transparent;
-  padding: 0 24rpx;
+  padding: 0;
   z-index: 20;
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
@@ -443,7 +435,7 @@ function goAnalyze() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16rpx 24rpx;
+  padding: 16rpx 0;
   background: #ffffff;
   border-top: 1rpx solid #f0f2f5;
 }

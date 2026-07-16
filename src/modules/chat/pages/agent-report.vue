@@ -1,16 +1,6 @@
 <template>
-  <view class="agent-report-page" :style="{ paddingTop: statusBarHeight + 'px' }">
-    <!-- 顶部标题栏 -->
-    <view class="report-header">
-      <view class="header-left" @tap="goBack">
-        <SvgIcon name="arrow-left-line" size="40rpx" color="#1a1d24" />
-      </view>
-      <text class="header-title">{{ titleMap[intent] || '分析报告' }}</text>
-      <view class="header-right"></view>
-    </view>
-
-    <!-- 报告内容 -->
-    <view class="report-content">
+  <SubPageCard2 :title="titleMap[intent] || '分析报告'" :subtitle="subtitleText">
+    <view class="report-content-wrap">
       <!-- 加载中 -->
       <view v-if="loading" class="loading-state">
         <text class="loading-text">报告加载中...</text>
@@ -31,28 +21,15 @@
         <text class="empty-hint">请在 9:10 后查看</text>
       </view>
     </view>
-  </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { agentApi } from '@/shared/api/modules/agent'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-
-// 状态栏高度（App 端需要除以 zoom 补偿）
-const statusBarHeight = ref(0)
-try {
-  const raw = uni.getSystemInfoSync().statusBarHeight || 0
-  // #ifdef APP-PLUS
-  statusBarHeight.value = raw / 1.2
-  // #endif
-  // #ifndef APP-PLUS
-  statusBarHeight.value = raw
-  // #endif
-} catch (e) {
-  statusBarHeight.value = 0
-}
 
 interface AgentReport {
   report_type: string
@@ -75,14 +52,17 @@ const titleMap: Record<string, string> = {
   broadcast: '双人播报',
 }
 
+const subtitleText = computed(() => {
+  if (report.value?.report_date) {
+    return `${report.value.report_date} · AI 生成内容，仅供参考`
+  }
+  return 'AI 生成内容，仅供参考'
+})
+
 const reportText = computed(() => {
   if (!report.value?.content?.text) return ''
   return report.value.content.text
 })
-
-function goBack() {
-  uni.navigateBack()
-}
 
 async function loadReport() {
   if (!intent.value || !date.value) return
@@ -106,33 +86,7 @@ onLoad((options) => {
 </script>
 
 <style lang="scss" scoped>
-.agent-report-page {
-  min-height: 100vh;
-  background: #f5f7fb;
-}
-
-.report-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24rpx 32rpx;
-  background: #ffffff;
-  border-bottom: 1rpx solid #e5e7eb;
-}
-
-.header-left, .header-right {
-  width: 60rpx;
-  display: flex;
-  align-items: center;
-}
-
-.header-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #1a1d24;
-}
-
-.report-content {
+.report-content-wrap {
   padding: 32rpx;
 }
 

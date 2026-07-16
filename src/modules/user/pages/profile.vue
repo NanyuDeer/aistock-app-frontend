@@ -76,15 +76,15 @@
             v-for="(stock, idx) in favoriteStocks"
             :key="idx"
             class="favorite-row"
-            @tap="goStockDetail(stock.symbol || stock.code)"
+            @tap="goStockDetail(stock.symbol)"
           >
             <view class="fav-left">
-              <text class="fav-name">{{ stock.name || stock.stockName }}</text>
-              <text class="fav-code">{{ stock.symbol || stock.code }}</text>
+              <text class="fav-name">{{ stock.name }}</text>
+              <text class="fav-code">{{ stock.symbol }}</text>
             </view>
             <view class="fav-right">
               <text class="fav-market">{{ stock.market || 'SH' }}</text>
-              <text class="fav-date">{{ formatDate(stock.addTime || stock.createdAt) }}</text>
+              <text class="fav-date">{{ formatDate(stock.addedAt || '') }}</text>
             </view>
           </view>
         </view>
@@ -127,19 +127,21 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/shared/store/modules/user'
+import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { authApi, type UserSettings } from '@/shared/api/modules/auth'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 const userStore = useUserStore()
+const favoritesStore = useFavoritesStore()
 const isLoggedIn = computed(() => userStore.isLoggedIn())
 const userInfo = computed(() => userStore.userInfo)
 const settings = ref<UserSettings>({})
-const favoriteStocks = ref<any[]>([])
+const favoriteStocks = computed(() => favoritesStore.stocks)
 
 onShow(async () => {
   if (!isLoggedIn.value) return
-  await Promise.all([loadSettings(), loadFavorites()])
+  await Promise.all([loadSettings(), favoritesStore.fetchFavorites({ silent: true })])
 })
 
 async function loadSettings() {
@@ -148,15 +150,6 @@ async function loadSettings() {
     settings.value = s || {}
   } catch (e) {
     // 未登录或接口未实现时静默
-  }
-}
-
-async function loadFavorites() {
-  try {
-    const list = await authApi.getFavoriteStocks()
-    favoriteStocks.value = Array.isArray(list) ? list : []
-  } catch (e) {
-    // 静默
   }
 }
 
@@ -178,7 +171,6 @@ function handleLogout() {
     success: (res) => {
       if (res.confirm) {
         userStore.logout()
-        favoriteStocks.value = []
         settings.value = {}
         uni.showToast({ title: '已退出登录', icon: 'none' })
       }
@@ -195,7 +187,7 @@ function goFavorites() {
 }
 
 function goAlerts() {
-  uni.reLaunch({ url: '/modules/favorites/pages/index' })
+  uni.reLaunch({ url: '/modules/home/pages/index?tab=alert' })
 }
 
 function goAbout() {
