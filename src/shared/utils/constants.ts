@@ -5,8 +5,12 @@
 // API 基础地址
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
-// WebSocket 地址
+// WebSocket 地址（Node.js 服务）
 export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:3000/ws'
+
+// Agent Python 后端 WebSocket 地址（后端路由前缀 /api/agent + /ws/chat）
+// 本地开发默认 8080，可通过 VITE_AGENT_WS_BASE 环境变量覆盖
+export const AGENT_WS_BASE_URL = import.meta.env.VITE_AGENT_WS_BASE || 'ws://localhost:8080/api/agent/ws'
 
 // 平台标识
 export const PLATFORM = {

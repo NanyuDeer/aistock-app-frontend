@@ -13,7 +13,14 @@
         <text class="card-title">{{ title }}</text>
         <slot name="header-right" />
       </view>
-      <scroll-view scroll-y class="card-content" :enhanced="true" :bounces="false">
+      <!-- 用 JS 算出精确像素高度绑定给 scroll-view，避免 flex:1 在 App 端失效 -->
+      <scroll-view
+        scroll-y
+        class="card-content"
+        :enhanced="true"
+        :bounces="false"
+        :style="{ height: scrollHeight + 'px' }"
+      >
         <slot />
       </scroll-view>
       <!-- 可选底部操作栏插槽 -->
@@ -26,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
@@ -44,8 +51,11 @@ const props = withDefaults(defineProps<{
 // 获取真实状态栏高度（px），真机/H5 均可用
 // App 端 zoom:1.2 会放大 padding，需除以 1.2 补偿
 const statusBarHeight = ref(0)
+const windowHeight = ref(0)
 try {
-  const raw = uni.getSystemInfoSync().statusBarHeight || 0
+  const sysInfo = uni.getSystemInfoSync()
+  const raw = sysInfo.statusBarHeight || 0
+  windowHeight.value = sysInfo.windowHeight || 667
   // #ifdef APP-PLUS
   statusBarHeight.value = raw / 1.2
   // #endif
@@ -54,7 +64,28 @@ try {
   // #endif
 } catch (e) {
   statusBarHeight.value = 0
+  windowHeight.value = 667
 }
+
+/**
+ * 动态计算 scroll-view 像素高度
+ * windowHeight - statusBar - navArea(44px) - cardHeader(约40px) - marginBottom
+ * rpx 转 px：1rpx = windowWidth/750 px
+ */
+const scrollHeight = computed(() => {
+  // navArea: 88rpx → px
+  const rpx2px = (rpx: number) => {
+    try {
+      const w = uni.getSystemInfoSync().windowWidth || 375
+      return rpx * w / 750
+    } catch { return rpx / 2 }
+  }
+  const navH = rpx2px(88)
+  const headerH = rpx2px(88) // card-header 约 88rpx (padding+text)
+  const marginB = rpx2px(parseInt(props.cardMarginBottom) || 207)
+  const total = windowHeight.value - statusBarHeight.value - navH - headerH - marginB
+  return Math.max(total, 100) // 下限 100px
+})
 
 function goProfile() {
   uni.navigateTo({ url: '/modules/user/pages/profile' })
@@ -134,9 +165,7 @@ function goProfile() {
 
 /* 可滚动内容区域：白色背景，恢复触摸滚动 */
 .card-content {
-  flex: 1;
   background: #ffffff;
-  min-height: 0;
   touch-action: auto;
   overscroll-behavior: contain;
 }

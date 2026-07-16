@@ -86,6 +86,7 @@ src/
 | 自选股 | modules/favorites | 自选股列表、特别提醒、股票详情 |
 | AI 对话 | modules/chat | 聊天页、Skill 按钮、流式对话 |
 | 行情 | modules/market | 龙头股、重磅消息、板块标签 |
+| 业绩分析 | modules/analytics | 业绩预测、业绩报告列表、财报详情 |
 | 用户 | modules/user | 个人中心、登录设置 |
 | 资讯 | modules/news | 公告、新闻列表 |
 

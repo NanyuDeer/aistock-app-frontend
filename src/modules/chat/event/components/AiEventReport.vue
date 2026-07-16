@@ -11,35 +11,46 @@
     />
 
     <view class="report-content">
-    <AiAnalysisSection
-      v-for="(step, index) in visibleSteps"
-      :key="step.id"
-      :id="'step-' + step.id"
-      :step-number="step.id"
-      :title="step.title"
-      :status="step.status"
-      :explanation="(step.content.explanation as string) || ''"
-      :streaming-text="(step.content.text as string) || ''"
-      :is-first="index === 0"
-      :is-last="index === visibleSteps.length - 1"
-    >
-      <template v-if="step.status === 'completed'">
-        <!-- Step 1: 事件理解 — AI 事件本质分析 -->
-        <AiEventUnderstanding
-          v-if="step.id === 1"
-          :data="detail.eventUnderstanding"
-        />
+      <!-- Step 1: AI投资机会 -->
+      <AiAnalysisSection
+        v-for="(step, index) in mainSteps"
+        :key="step.id"
+        :id="'step-' + step.id"
+        :step-number="step.id"
+        :title="step.title"
+        :status="step.status"
+        :explanation="(step.content.explanation as string) || ''"
+        :streaming-text="(step.content.text as string) || ''"
+        :is-first="index === 0"
+        :is-last="index === mainSteps.length - 1"
+      >
+        <template v-if="step.status === 'completed'">
+          <InvestmentSummaryCard :data="detail.investmentSummary" />
+        </template>
+      </AiAnalysisSection>
 
-        <!-- Step 2: AI影响传导推理（TransmissionAnalysis 驱动） -->
-        <AiTransmissionAnalysis
-          v-else-if="step.id === 2"
-          :data="detail.transmissionAnalysis"
-          :event-title="detail.event.title"
-        />
-        <HistoryTimeline v-else-if="step.id === 3" :events="detail.historyEvents" />
-        <InvestmentSummaryCard v-else-if="step.id === 4" :data="detail.investmentSummary" />
-      </template>
-    </AiAnalysisSection>
+      <!-- Step 2: 投资逻辑解析（过渡模块） -->
+      <InvestmentLogicHeader v-if="logicStep?.status === 'completed'" />
+
+      <!-- Step 3~5: 深度分析模块 -->
+      <AiAnalysisSection
+        v-for="(step, index) in analysisSteps"
+        :key="step.id"
+        :id="'step-' + step.id"
+        :step-number="step.id"
+        :title="step.title"
+        :status="step.status"
+        :explanation="(step.content.explanation as string) || ''"
+        :streaming-text="(step.content.text as string) || ''"
+        :is-first="index === 0"
+        :is-last="index === analysisSteps.length - 1"
+      >
+        <template v-if="step.status === 'completed'">
+          <AiEventUnderstanding v-if="step.id === 3" :data="detail.eventUnderstanding" />
+          <AiTransmissionAnalysis v-else-if="step.id === 4" :data="detail.transmissionAnalysis" :event-title="detail.event.title" />
+          <HistoryTimeline v-else-if="step.id === 5" :events="detail.historyEvents" />
+        </template>
+      </AiAnalysisSection>
     </view>
 
     <view class="report-footer" v-if="isAllCompleted">
@@ -53,15 +64,15 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch, nextTick } from 'vue'
+import { onMounted, watch, nextTick, computed } from 'vue'
 import type { EventDetailResponse } from '../types'
 import { useAiReasoning } from '../composables/useAiReasoning'
-import type { AnalysisContext } from '../composables/useAiReasoning'
 import AiThinkingHeader from './AiThinkingHeader.vue'
 import AiAnalysisSection from './AiAnalysisSection.vue'
 import AiEventUnderstanding from './AiEventUnderstanding.vue'
 import AiTransmissionAnalysis from './transmission/AiTransmissionAnalysis.vue'
 import InvestmentSummaryCard from './InvestmentSummaryCard.vue'
+import InvestmentLogicHeader from './InvestmentLogicHeader.vue'
 import HistoryTimeline from './HistoryTimeline.vue'
 
 interface Props { detail?: EventDetailResponse | null }
@@ -73,24 +84,26 @@ const {
   currentTask, isAllCompleted, currentStep, thinkingLogs, currentStepTitle,
   startAnalysis,
 } = useAiReasoning([
+  { title: 'AI投资机会' },
+  { title: '投资逻辑解析' },
   { title: '事件理解' },
   { title: 'AI影响传导推理' },
   { title: '历史验证' },
-  { title: '投资总结' },
 ])
 
 onMounted(() => {
   if (!props.detail) return
-  const a = props.detail.aiAnalysis
-  startAnalysis({
-    eventType: props.detail.event.eventType,
-    source: props.detail.event.source,
-    publishTime: props.detail.event.publishTime,
-    transferDirection: a?.transferDirection,
-    transferReason: a?.transferReason,
-    persistenceReason: a?.persistenceReason,
-  })
+  startAnalysis()
 })
+
+/** Step 1: AI投资机会 */
+const mainSteps = computed(() => visibleSteps.value.filter(s => s.id === 1))
+
+/** Step 2: 投资逻辑解析（过渡） */
+const logicStep = computed(() => visibleSteps.value.find(s => s.id === 2))
+
+/** Step 3~5: 深度分析 */
+const analysisSteps = computed(() => visibleSteps.value.filter(s => s.id >= 3))
 
 // ===== 自动滚动到当前步骤 =====
 watch(currentStep, async (stepId) => {

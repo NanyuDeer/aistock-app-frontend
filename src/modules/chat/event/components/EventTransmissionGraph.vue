@@ -42,8 +42,9 @@
         </view>
         <!-- 统一的分叉布局：横条 + 两列 -->
         <view class="branch-fork-wrapper">
-          <view class="fork-h-bar" />
-          <view class="branch-fork">
+          <view class="branch-fork-inner">
+            <view class="fork-h-bar" />
+            <view class="branch-fork">
             <view v-if="upChain.length" class="branch-col">
               <view class="branch-line-bar" />
               <text class="arrow-head">▼</text>
@@ -60,6 +61,7 @@
                 <text class="node-main-text small">{{ c.industry }}</text>
               </view>
             </view>
+          </view>
           </view>
         </view>
       </view>
@@ -196,13 +198,19 @@ const downChain = computed<TransmissionChainNode[]>(() =>
 .branch-fork-wrapper {
   width: 100%;
   display: flex;
+  justify-content: center;
+}
+
+/* 内层：收缩到内容宽度，使横线与分叉列对齐 */
+.branch-fork-inner {
+  display: inline-flex;
   flex-direction: column;
   align-items: center;
 }
 
-/* 横条连接线 */
+/* 横条连接线：宽度匹配两列竖线中心的距离 */
 .fork-h-bar {
-  width: calc(100% - 120rpx);
+  width: calc(100% - 140rpx);
   height: 2rpx;
   background: #c7d2e0;
 }
@@ -210,7 +218,6 @@ const downChain = computed<TransmissionChainNode[]>(() =>
 .branch-fork {
   display: flex;
   gap: 48rpx;
-  width: 100%;
   justify-content: center;
 }
 
