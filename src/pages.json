@@ -192,6 +192,14 @@
       }
     },
     {
+      "path": "modules/analytics/pages/forecast",
+      "style": {
+        "navigationBarTitleText": "业绩预测",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "modules/analytics/pages/report-detail",
       "style": {
         "navigationBarTitleText": "财报详情",

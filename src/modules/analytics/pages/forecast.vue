@@ -1,115 +1,127 @@
 <template>
-  <view class="forecast-content">
-    <!-- 搜索栏 + 排序栏 -->
-    <view class="forecast-fixed">
-      <view class="search-bar">
-        <view class="search-input-wrap">
-          <SvgIcon name="search-line" size="28rpx" color="#9ca3af" />
-          <input
-            v-model="keyword"
-            class="search-input"
-            placeholder="搜索股票代码/简称"
-            confirm-type="search"
-            @input="handleSearchInput"
-            @confirm="handleSearch"
-          />
-          <text v-if="keyword" class="search-clear" @tap="handleReset">✕</text>
+  <view class="page-forecast">
+    <PageCard title="业绩">
+      <!-- 标题右侧切换按钮 -->
+      <template #header-right>
+        <view class="toggle-group">
+          <text
+            :class="['toggle-btn', 'active']"
+            @tap="switchTo('forecast')"
+          >预测</text>
+          <text
+            class="toggle-btn"
+            @tap="switchTo('reports')"
+          >报告</text>
+        </view>
+      </template>
+
+      <!-- 搜索栏 + 排序栏 -->
+      <view class="forecast-fixed">
+        <view class="search-bar">
+          <view class="search-input-wrap">
+            <SvgIcon name="search-line" size="28rpx" color="#9ca3af" />
+            <input
+              v-model="keyword"
+              class="search-input"
+              placeholder="搜索股票代码/简称"
+              confirm-type="search"
+              @input="handleSearchInput"
+              @confirm="handleSearch"
+            />
+            <text v-if="keyword" class="search-clear" @tap="handleReset">✕</text>
+          </view>
+        </view>
+
+        <view class="sort-bar">
+          <text class="sort-label">排序方式</text>
+          <picker
+            mode="selector"
+            :range="sortFieldLabels"
+            :value="sortFieldIndex"
+            @change="onSortFieldChange"
+          >
+            <view class="sort-picker">
+              <text class="sort-picker-text">{{ currentSortLabel }}</text>
+              <SvgIcon name="arrow-down-s" size="24rpx" color="#6b7280" />
+            </view>
+          </picker>
+          <view class="sort-order">
+            <text
+              :class="['order-btn', sortOrder === 'desc' ? 'active' : '']"
+              @tap="switchOrder('desc')"
+            >降序</text>
+            <text
+              :class="['order-btn', sortOrder === 'asc' ? 'active' : '']"
+              @tap="switchOrder('asc')"
+            >升序</text>
+          </view>
         </view>
       </view>
 
-      <view class="sort-bar">
-        <text class="sort-label">排序方式</text>
-        <picker
-          mode="selector"
-          :range="sortFieldLabels"
-          :value="sortFieldIndex"
-          @change="onSortFieldChange"
+      <!-- 加载中 -->
+      <view v-if="loading" class="loading-state">
+        <LoadingState />
+      </view>
+
+      <!-- API 请求失败 -->
+      <view v-else-if="error" class="error-state">
+        <SvgIcon name="cloud-off-line" size="80rpx" color="#d1d5db" />
+        <text class="error-text">数据获取失败</text>
+        <text class="error-desc">网络异常或服务暂时不可用，请稍后重试</text>
+        <view class="retry-btn" @tap="retry">重试</view>
+      </view>
+
+      <!-- 搜索无结果 -->
+      <view v-else-if="!list.length" class="empty-state">
+        <EmptyState :text="keyword ? '未搜索到相关股票' : '暂无业绩预测数据'" />
+      </view>
+
+      <!-- 列表 -->
+      <view v-if="list.length" class="forecast-list">
+        <view
+          v-for="item in list"
+          :key="item.code"
+          class="forecast-card"
+          @tap="goStockDetail(item.code)"
         >
-          <view class="sort-picker">
-            <text class="sort-picker-text">{{ currentSortLabel }}</text>
-            <SvgIcon name="arrow-down-s" size="24rpx" color="#6b7280" />
-          </view>
-        </picker>
-        <view class="sort-order">
-          <text
-            :class="['order-btn', sortOrder === 'desc' ? 'active' : '']"
-            @tap="switchOrder('desc')"
-          >降序</text>
-          <text
-            :class="['order-btn', sortOrder === 'asc' ? 'active' : '']"
-            @tap="switchOrder('asc')"
-          >升序</text>
-        </view>
-      </view>
-    </view>
-
-    <!-- 加载中 -->
-    <view v-if="loading" class="loading-state">
-      <LoadingState />
-    </view>
-
-    <!-- API 请求失败 -->
-    <view v-else-if="error" class="error-state">
-      <SvgIcon name="cloud-off-line" size="80rpx" color="#d1d5db" />
-      <text class="error-text">数据获取失败</text>
-      <text class="error-desc">网络异常或服务暂时不可用，请稍后重试</text>
-      <view class="retry-btn" @tap="retry">重试</view>
-    </view>
-
-    <!-- 搜索无结果 -->
-    <view v-else-if="!list.length" class="empty-state">
-      <EmptyState :text="keyword ? '未搜索到相关股票' : '暂无业绩预测数据'" />
-    </view>
-
-    <!-- 列表 -->
-    <view v-if="list.length" class="forecast-list">
-      <view
-        v-for="item in list"
-        :key="item.code"
-        class="forecast-card"
-        @tap="goStockDetail(item.code)"
-      >
-        <view class="info-row">
-          <view class="stock-col">
-            <text class="stock-name">{{ item.name }}</text>
-            <view class="code-rating-row">
-              <text class="stock-code">{{ item.code }}</text>
-              <text :class="['rating-tag', ratingClass(item.rating)]">{{ item.rating }}</text>
-            </view>
-          </view>
-          <view class="metrics-area">
-            <view class="metric-line">
-              <view class="metric-info">
-                <text class="metric-label">预测EPS</text>
-                <text class="metric-value">{{ item.eps }}</text>
+          <view class="info-row">
+            <view class="info-col stock-col">
+              <text class="stock-name">{{ item.name }}</text>
+              <view class="code-rating-row">
+                <text class="stock-code">{{ item.code }}</text>
+                <text :class="['rating-tag', ratingClass(item.rating)]">{{ item.rating }}</text>
               </view>
-              <text :class="['growth-val', item.epsGrowth?.startsWith('-') ? 'down' : 'up']">{{ item.epsGrowth }}</text>
             </view>
-            <view class="metric-line">
-              <view class="metric-info">
-                <text class="metric-label">预测净利润</text>
-                <text class="metric-value">{{ item.netProfitForecast }}</text>
+            <view class="data-cols">
+              <view class="info-col forecast-col">
+                <text class="col-main">净利润预测 <text class="col-value forecast-val">{{ item.netProfitForecast }}</text></text>
+                <text class="col-growth">同比增长 <text :class="['growth-val', item.netProfitGrowth?.startsWith('-') ? 'down' : 'up']">{{ item.netProfitGrowth }}</text></text>
               </view>
-              <text :class="['growth-val', item.netProfitGrowth?.startsWith('-') ? 'down' : 'up']">{{ item.netProfitGrowth }}</text>
+              <view class="info-col eps-col">
+                <text class="col-main">EPS预测 <text class="col-value eps-val">{{ item.eps }}元</text></text>
+                <text class="col-growth">同比增长 <text :class="['growth-val', item.epsGrowth?.startsWith('-') ? 'down' : 'up']">{{ item.epsGrowth }}</text></text>
+              </view>
             </view>
           </view>
-        </view>
 
-        <view class="divider" />
+          <view class="divider" />
 
-        <view class="meta-row">
-          <text class="update-time">更新时间：{{ item.updateTime }}</text>
-          <view class="institution-info">
-            <text class="info-label">机构</text>
-            <text class="institution-value">{{ item.institutionCount }}家</text>
+          <view class="meta-row">
+            <text class="update-time">更新时间：{{ item.updateTime }}</text>
+            <view class="institution-info">
+              <text class="info-label">机构</text>
+              <text class="institution-value">{{ item.institutionCount }}家</text>
+            </view>
           </view>
         </view>
       </view>
-    </view>
 
-    <view v-if="hasMore" class="load-more" @tap="loadMore">
-      <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
-    </view>
+      <view v-if="hasMore" class="load-more" @tap="loadMore">
+        <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
+      </view>
+    </PageCard>
+
+    <AppBottomBar current-tab="forecast" />
   </view>
 </template>
 
@@ -117,6 +129,8 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
+import PageCard from '@/shared/components/PageCard.vue'
+import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
@@ -182,13 +196,13 @@ const currentSortLabel = computed(() => {
   return f ? f.label : '净利润预测'
 })
 
-function onSortFieldChange(e: unknown) {
-  const detail = (e as { detail?: { value?: number } })?.detail
-  const idx = detail?.value ?? 0
+function onSortFieldChange(e: any) {
+  const idx = e.detail.value
   const key = sortFields[idx]?.key
   if (key) switchSort(key)
 }
 
+// 搜索结果缓存，避免每次输入都重新过滤
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const hasMore = computed(() => list.value.length < total.value)
@@ -200,6 +214,7 @@ function switchSort(key: string) {
     activeSort.value = key
     sortOrder.value = 'desc'
   }
+  // 切换排序后刷新数据
   fetchData()
 }
 
@@ -220,19 +235,21 @@ async function fetchData(append = false) {
     loadingMore.value = true
   }
   try {
-    const params: Record<string, unknown> = {
+    const params: any = {
       page: page.value,
       pageSize,
       sortBy: activeSort.value,
       sortOrder: sortOrder.value,
     }
     const kw = keyword.value.trim()
-    const res = kw
+    const res: any = kw
       ? await stockApi.searchProfitForecast({ ...params, keyword: kw })
       : await stockApi.getProfitForecastList(params)
 
+    // 如果API返回null或空，视为失败，展示失败状态
     if (!res) throw new Error('API returned empty')
 
+    // 响应拦截器已提取 data，res 即为数据对象
     const items = res['盈利预测列表'] || res.list || res.items || []
     total.value = res['总数量'] || res.total || res.totalCount || 0
 
@@ -268,6 +285,7 @@ async function fetchData(append = false) {
 }
 
 function handleSearchInput() {
+  // 输入时立即搜索（防抖300ms）
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     fetchData(false)
@@ -301,12 +319,18 @@ function ratingClass(rating?: string): string {
   return ''
 }
 
-function formatNetProfitGrowth(val: unknown): string {
+function formatNetProfitGrowth(val: any): string {
   if (val === null || val === undefined || val === '') return '--'
   const num = typeof val === 'number' ? val : Number(val)
   if (!Number.isFinite(num)) return '--'
   const prefix = num > 0 ? '+' : ''
   return `${prefix}${num.toFixed(2)}%`
+}
+
+function switchTo(tab: string) {
+  if (tab === 'reports') {
+    uni.redirectTo({ url: '/modules/analytics/pages/reports' })
+  }
 }
 
 function goStockDetail(code: string) {
@@ -315,13 +339,36 @@ function goStockDetail(code: string) {
 }
 
 onShow(() => {
+  // 加载业绩预测数据，失败时展示失败状态页并提供重试
   fetchData(false)
 })
 </script>
 
 <style lang="scss" scoped>
-.forecast-content {
-  background: #ffffff;
+.page-forecast {
+  height: 100%;
+  background: #f5f7fb;
+}
+
+/* 切换按钮组 */
+.toggle-group {
+  display: flex;
+  background: #f0f2f5;
+  border-radius: 12rpx;
+  padding: 4rpx;
+}
+
+.toggle-btn {
+  font-size: 24rpx;
+  color: #6b7280;
+  padding: 8rpx 24rpx;
+  border-radius: 10rpx;
+  font-weight: 500;
+
+  &.active {
+    color: #ffffff;
+    background: #4d7cfe;
+  }
 }
 
 /* 搜索+排序区域 */
@@ -331,7 +378,7 @@ onShow(() => {
 
 /* 搜索栏 */
 .search-bar {
-  margin-bottom: 16rpx;
+  margin-bottom: 24rpx;
 }
 
 .search-input-wrap {
@@ -362,7 +409,7 @@ onShow(() => {
   display: flex;
   align-items: center;
   gap: 12rpx;
-  margin-bottom: 16rpx;
+  margin-bottom: 24rpx;
   padding: 12rpx 16rpx;
   background: #ffffff;
   border-radius: 16rpx;
@@ -370,7 +417,7 @@ onShow(() => {
 }
 
 .sort-label {
-  font-size: 22rpx;
+  font-size: 24rpx;
   color: #9ca3af;
   flex-shrink: 0;
 }
@@ -378,35 +425,34 @@ onShow(() => {
 .sort-picker {
   display: flex;
   align-items: center;
-  gap: 4rpx;
-  padding: 6rpx 12rpx;
-  border-radius: 8rpx;
+  gap: 6rpx;
+  padding: 10rpx 20rpx;
+  border-radius: 10rpx;
   background: #f0f2f5;
+  min-width: 140rpx;
 }
 
 .sort-picker-text {
-  font-size: 22rpx;
+  font-size: 24rpx;
   color: #4d7cfe;
   font-weight: 500;
-  white-space: nowrap;
 }
 
 .sort-order {
   display: flex;
   gap: 0;
   flex-shrink: 0;
-  border-radius: 8rpx;
+  border-radius: 10rpx;
   overflow: hidden;
   border: 1rpx solid #e0e3e8;
 }
 
 .order-btn {
-  font-size: 20rpx;
+  font-size: 22rpx;
   color: #6b7280;
-  padding: 6rpx 12rpx;
+  padding: 8rpx 16rpx;
   background: #f9fafb;
   font-weight: 500;
-  white-space: nowrap;
 
   &.active {
     color: #fff;
@@ -460,7 +506,6 @@ onShow(() => {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
-  padding: 0 24rpx 24rpx;
 }
 
 .forecast-card {
@@ -471,53 +516,42 @@ onShow(() => {
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-/* 信息行：股票信息(左) + 指标区(右) */
+/* 三列信息行 */
 .info-row {
   display: flex;
-  align-items: center;
-  gap: 16rpx;
+  align-items: flex-start;
+  gap: 4rpx;
+}
+
+.info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
 }
 
 .stock-col {
   flex-shrink: 0;
-  width: 180rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
+  width: 190rpx;
 }
 
-/* 指标区：两行，每行 = 标签+值(左) + 增长率(右) */
-.metrics-area {
-  flex: 1;
+.data-cols {
   display: flex;
-  flex-direction: column;
+  flex: 1;
+  align-items: flex-start;
   gap: 12rpx;
   min-width: 0;
 }
 
-.metric-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.metric-info {
-  display: flex;
-  align-items: baseline;
-  gap: 8rpx;
+.forecast-col {
+  flex: 1;
   min-width: 0;
+  align-items: flex-start;
 }
 
-.metric-label {
-  font-size: 20rpx;
-  color: #9ca3af;
-  flex-shrink: 0;
-}
-
-.metric-value {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #4d7cfe;
+.eps-col {
+  flex: 1;
+  min-width: 0;
+  align-items: flex-start;
 }
 
 .stock-name {
@@ -527,7 +561,7 @@ onShow(() => {
 }
 
 .stock-code {
-  font-size: 20rpx;
+  font-size: 22rpx;
   color: #6b7280;
   background: #f0f2f5;
   padding: 2rpx 10rpx;
@@ -538,23 +572,48 @@ onShow(() => {
   display: flex;
   align-items: center;
   gap: 8rpx;
+  margin-top: 2rpx;
 }
 
 .rating-tag {
-  font-size: 20rpx;
+  font-size: 18rpx;
   font-weight: 500;
-  padding: 4rpx 14rpx;
-  border-radius: 8rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
 
   &.rating-buy { color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
   &.rating-hold { color: #f59f0b; background: rgba(245, 158, 11, 0.1); }
   &.rating-sell { color: #22c55e; background: rgba(34, 197, 94, 0.1); }
 }
 
+.col-main {
+  font-size: 20rpx;
+  color: #1a1d24;
+  white-space: nowrap;
+}
+
+.col-value {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #1a1d24;
+}
+
+.eps-val {
+  color: #4d7cfe;
+}
+
+.forecast-val {
+  color: #4d7cfe;
+}
+
+.col-growth {
+  font-size: 18rpx;
+  color: #9ca3af;
+  font-weight: 400;
+}
+
 .growth-val {
-  font-size: 22rpx;
-  font-weight: 600;
-  flex-shrink: 0;
+  font-weight: 500;
 
   &.up { color: #f43f5e; }
   &.down { color: #22c55e; }
@@ -581,18 +640,18 @@ onShow(() => {
 }
 
 .info-label {
-  font-size: 22rpx;
+  font-size: 24rpx;
   color: #9ca3af;
 }
 
 .institution-value {
-  font-size: 22rpx;
+  font-size: 24rpx;
   font-weight: 600;
   color: #1a1d24;
 }
 
 .update-time {
-  font-size: 20rpx;
+  font-size: 22rpx;
   color: #9ca3af;
 }
 

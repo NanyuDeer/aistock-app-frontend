@@ -8,7 +8,7 @@
     </view>
 
     <!-- 白色圆角卡片 -->
-    <view class="page-card" :style="{ marginBottom: '207rpx' }">
+    <view class="page-card" :style="{ marginBottom: dynamicMarginBottom }">
       <!-- 卡片标题（随Tab切换） -->
       <view class="card-header">
         <text class="card-title">{{ tabTitles[activeTab] }}</text>
@@ -69,6 +69,7 @@ import { ref, computed, nextTick } from 'vue'
 import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { rpx2px, px2rpx, getBottomFixedHeightPx } from '@/shared/utils/layout'
 import MorningContent from '@/modules/home/components/MorningContent.vue'
 import InsightContent from '@/modules/analytics/components/InsightContent.vue'
 import ForecastContent from '@/modules/analytics/components/ForecastContent.vue'
@@ -132,17 +133,26 @@ try {
   windowHeight.value = 667
 }
 
-const rpx2px = (rpx: number) => {
-  try {
-    const w = uni.getSystemInfoSync().windowWidth || 375
-    return rpx * w / 750
-  } catch { return rpx / 2 }
-}
+/**
+ * 动态计算卡片底部 marginBottom（rpx）
+ * 与 PageCard 保持一致：使用 getBottomFixedHeightPx() 计算底部固定栏总高度
+ * （Tab栏 + 间距 + GlobalChatBar + safeAreaInsetBottom），解决刘海屏底部遮挡问题。
+ * 不能硬编码 207rpx——非刘海屏会留过多空白、刘海屏会遮挡内容。
+ */
+const dynamicMarginBottom = computed(() => {
+  return px2rpx(getBottomFixedHeightPx()) + 'rpx'
+})
 
+/**
+ * scroll-view 高度：H5 端用 CSS flex:1 撑满（无需 JS 计算）；
+ * App 端用 JS 计算精确像素高度（uni-app scroll-view 在 App 下需显式高度才滚动）。
+ * rpx2px 来自 shared/utils/layout（基于 uni.upx2px），不能用 getSystemInfoSync().windowWidth
+ * 自行换算——H5 dev 模式下 windowWidth 返回浏览器全宽导致换算严重偏大。
+ */
 const scrollHeight = computed(() => {
   const navH = rpx2px(88)          // nav-area
   const headerH = rpx2px(88)       // card-header
-  const marginH = rpx2px(207)      // page-card marginBottom
+  const marginH = getBottomFixedHeightPx()
   const total = windowHeight.value - statusBarHeight.value - navH - headerH - marginH
   return Math.max(total, 100)
 })
@@ -222,6 +232,7 @@ function goProfile() {
 /* 卡片标题（固定位置） */
 .card-header {
   flex-shrink: 0;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -235,8 +246,12 @@ function goProfile() {
   color: #1a1d24;
 }
 
-/* 业绩 Tab 预测/报告切换按钮 */
+/* 业绩 Tab 预测/报告切换按钮（绝对定位，不影响 header 高度，与无 toggle 的 tab 一致） */
 .toggle-group {
+  position: absolute;
+  right: 24rpx;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   background: #f0f2f5;
   border-radius: 12rpx;
@@ -245,6 +260,7 @@ function goProfile() {
 
 .toggle-btn {
   font-size: 24rpx;
+  white-space: nowrap;
   color: #6b7280;
   padding: 8rpx 24rpx;
   border-radius: 10rpx;
@@ -258,8 +274,6 @@ function goProfile() {
 
 /* 可滚动内容区域 */
 .card-content {
-  box-sizing: border-box;
-  padding-bottom: 24rpx;
   /* #ifdef H5 */
   flex: 1;
   min-height: 0;
