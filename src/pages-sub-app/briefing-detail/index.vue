@@ -383,6 +383,8 @@ onLoad((options) => {
   font-size: 26rpx;
   color: var(--ev-text-secondary);
   line-height: 1.8;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 
   :deep(.md-h2) {
     font-size: 32rpx;

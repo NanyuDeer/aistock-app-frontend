@@ -219,13 +219,16 @@ onLoad((options) => {
   margin-top: 8rpx;
 }
 
-/* mp-html 样式覆盖 */
+/* mp-html 样式覆盖：keep-all 必须覆盖到内部所有子元素（p/div/span 等） */
+:deep(.report-html),
+:deep(.report-html *) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
 :deep(.report-html) {
   font-size: 28rpx;
   color: #1a1d24;
   line-height: 1.8;
-  word-break: keep-all;
-  overflow-wrap: break-word;
 }
 :deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
 :deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }

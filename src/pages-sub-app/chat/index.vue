@@ -225,13 +225,16 @@ onUnmounted(() => {
   max-width: 80%; box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-/* mp-html 样式覆盖 */
+/* mp-html 样式覆盖：keep-all 必须覆盖到内部所有子元素（p/div/span 等） */
+:deep(.bubble-html),
+:deep(.bubble-html *) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
 :deep(.bubble-html) {
   font-size: 28rpx;
   color: #1a1d24;
   line-height: 1.6;
-  word-break: keep-all;
-  overflow-wrap: break-word;
 }
 :deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
 :deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }

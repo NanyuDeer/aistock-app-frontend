@@ -2,6 +2,18 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [master] 2026-07-17 — 彻底修复提醒页"帮我分析"按钮被挤下 + mp-html符号换行
+**开发者**: Aria
+
+### 修复
+- `src/shared/components/MainTabs.vue`：移除 JS 计算 scrollHeight 方案（`footerH=rpx2px(68)` 远小于实际92rpx），`.card-content` 改为全平台 `flex:1; min-height:0`，footer 靠 `flex-shrink:0` 固定，不再被挤下
+- `src/pages-sub-app/chat/index.vue`：`:deep(.bubble-html)` → `:deep(.bubble-html), :deep(.bubble-html *)` 通配符覆盖，确保 `word-break: keep-all` 应用到 mp-html 内部所有子元素
+- `src/modules/chat/pages/agent-report.vue`：同上 `:deep(.report-html)` 通配符覆盖
+- `src/pages-sub-app\briefing-detail\index.vue`：添加 `word-break: keep-all; overflow-wrap: break-word`（之前缺失）
+- `src/modules/market/pages/alert-analysis.vue`：同上添加 keep-all
+
+---
+
 ## [master] 2026-07-17 — APP端微信登录失败自动降级到扫码登录
 **开发者**: Aria
 

@@ -31,7 +31,6 @@
         class="card-content"
         :enhanced="true"
         :bounces="false"
-        :style="cardContentStyle"
       >
         <!-- Tab 内容（v-show 保持组件状态，切换不销毁） -->
         <MorningContent v-show="activeTab === 'morning'" />
@@ -69,7 +68,7 @@ import { ref, computed, nextTick } from 'vue'
 import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { rpx2px, px2rpx, getBottomFixedHeightPx } from '@/shared/utils/layout'
+import { px2rpx, getBottomFixedHeightPx } from '@/shared/utils/layout'
 import MorningContent from '@/modules/home/components/MorningContent.vue'
 import InsightContent from '@/modules/analytics/components/InsightContent.vue'
 import ForecastContent from '@/modules/analytics/components/ForecastContent.vue'
@@ -115,13 +114,11 @@ function setActiveTab(tab: string) {
 
 defineExpose({ setActiveTab })
 
-// 获取真实状态栏高度及窗口高度
-const windowHeight = ref(0)
+// 获取真实状态栏高度
 const statusBarHeight = ref(0)
 try {
   const sysInfo = uni.getSystemInfoSync()
   const raw = sysInfo.statusBarHeight || 0
-  windowHeight.value = sysInfo.windowHeight || 667
   // #ifdef APP-PLUS
   statusBarHeight.value = raw / 1.2
   // #endif
@@ -130,7 +127,6 @@ try {
   // #endif
 } catch (e) {
   statusBarHeight.value = 0
-  windowHeight.value = 667
 }
 
 /**
@@ -141,31 +137,6 @@ try {
  */
 const dynamicMarginBottom = computed(() => {
   return px2rpx(getBottomFixedHeightPx()) + 'rpx'
-})
-
-/**
- * scroll-view 高度：H5 端用 CSS flex:1 撑满（无需 JS 计算）；
- * App 端用 JS 计算精确像素高度（uni-app scroll-view 在 App 下需显式高度才滚动）。
- * rpx2px 来自 shared/utils/layout（基于 uni.upx2px），不能用 getSystemInfoSync().windowWidth
- * 自行换算——H5 dev 模式下 windowWidth 返回浏览器全宽导致换算严重偏大。
- */
-const scrollHeight = computed(() => {
-  const navH = rpx2px(88)          // nav-area
-  const headerH = rpx2px(88)       // card-header
-  const marginH = getBottomFixedHeightPx()
-  // 特别提醒 tab 显示 footer-bar（约 68rpx + padding），需扣除其高度避免挤下
-  const footerH = activeTab.value === 'alert' ? rpx2px(68) : 0
-  const total = windowHeight.value - statusBarHeight.value - navH - headerH - marginH - footerH
-  return Math.max(total, 100)
-})
-
-const cardContentStyle = computed(() => {
-  // #ifdef H5
-  return {}
-  // #endif
-  // #ifndef H5
-  return { height: `${scrollHeight.value}px` }
-  // #endif
 })
 
 function onTabChange(tab: string) {
@@ -274,13 +245,11 @@ function goProfile() {
   }
 }
 
-/* 可滚动内容区域 */
+/* 可滚动内容区域：全平台 flex:1 撑满，footer 用 flex-shrink:0 固定底部 */
 .card-content {
-  /* #ifdef H5 */
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  /* #endif */
   background: #ffffff;
   touch-action: auto;
   overscroll-behavior: contain;
