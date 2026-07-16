@@ -8,10 +8,43 @@
 
       <!-- 有报告 -->
       <view v-else-if="report" class="report-body">
-        <text class="report-date">{{ report.report_date }}</text>
-        <view class="report-text-wrap">
-          <text class="report-text">{{ reportText }}</text>
-        </view>
+        <text class="report-date">{{ reportDateText }}</text>
+
+        <!-- wind_leader / hot_burst: 结构化展示 -->
+        <template v-if="displayReport">
+          <!-- 龙头股票 -->
+          <view v-if="leaderStocks.length" class="section">
+            <text class="section-title">龙头股票</text>
+            <view class="stock-tags">
+              <view v-for="code in leaderStocks" :key="code" class="stock-tag">
+                <text class="stock-tag-text">{{ code }}</text>
+              </view>
+            </view>
+          </view>
+
+          <!-- 详细分析 -->
+          <view v-if="detailsText" class="section">
+            <text class="section-title">详细分析</text>
+            <view class="report-text-wrap">
+              <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
+            </view>
+          </view>
+
+          <!-- 风险提示 -->
+          <view v-if="risks.length" class="section">
+            <text class="section-title">风险提示</text>
+            <view v-for="(risk, idx) in risks" :key="idx" class="risk-item">
+              <text class="risk-text">· {{ risk }}</text>
+            </view>
+          </view>
+        </template>
+
+        <!-- broadcast / morning: 纯文本展示 -->
+        <template v-else>
+          <view class="report-text-wrap">
+            <text class="report-text">{{ reportText }}</text>
+          </view>
+        </template>
       </view>
 
       <!-- 无报告 -->
@@ -28,8 +61,16 @@
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { agentApi } from '@/shared/api/modules/agent'
+import { markdownToHtml } from '@/shared/utils/markdown'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
+
+interface DisplayReport {
+  risks?: string[]
+  stocks?: string[]
+  details?: string
+}
 
 interface AgentReport {
   report_type: string
@@ -37,6 +78,9 @@ interface AgentReport {
   content: {
     text?: string
     audio_path?: string | null
+    display_report?: DisplayReport
+    podcast_brief?: string
+    schema_version?: string
   }
 }
 
@@ -59,9 +103,32 @@ const subtitleText = computed(() => {
   return 'AI 生成内容，仅供参考'
 })
 
+const reportDateText = computed(() => {
+  if (!report.value?.report_date) return ''
+  // report_date 可能是 ISO 字符串（含时区），截取日期部分
+  return String(report.value.report_date).split('T')[0]
+})
+
+// wind_leader / hot_burst 的结构化数据
+const displayReport = computed(() => {
+  return report.value?.content?.display_report || null
+})
+
+const leaderStocks = computed(() => {
+  return displayReport.value?.stocks || []
+})
+
+const risks = computed(() => {
+  return displayReport.value?.risks || []
+})
+
+const detailsText = computed(() => {
+  return displayReport.value?.details || ''
+})
+
+// broadcast / morning 的纯文本
 const reportText = computed(() => {
-  if (!report.value?.content?.text) return ''
-  return report.value.content.text
+  return report.value?.content?.text || ''
 })
 
 async function loadReport() {
@@ -69,8 +136,8 @@ async function loadReport() {
   loading.value = true
   try {
     const res: unknown = await agentApi.getReport(intent.value, date.value)
-    const data = (res as Record<string, unknown>)?.data ?? res
-    report.value = (data as AgentReport) || null
+    // 响应拦截器已解包: 返回的是 {report_type, report_date, content: {...}, ...}
+    report.value = (res as AgentReport) || null
   } catch {
     report.value = null
   } finally {
@@ -114,15 +181,73 @@ onLoad((options) => {
   display: block;
 }
 
-.report-text-wrap {
-  margin-top: 16rpx;
+.section {
+  margin-bottom: 32rpx;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 }
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1a1d24;
+  margin-bottom: 16rpx;
+  display: block;
+}
+
+.stock-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.stock-tag {
+  background: #eff6ff;
+  border-radius: 12rpx;
+  padding: 8rpx 20rpx;
+}
+
+.stock-tag-text {
+  font-size: 26rpx;
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.report-text-wrap {
+  margin-top: 8rpx;
+}
+
+/* mp-html 样式覆盖 */
+:deep(.report-html) {
+  font-size: 28rpx;
+  color: #1a1d24;
+  line-height: 1.8;
+}
+:deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
+:deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }
+:deep(.md-hr) { border: none; border-top: 1rpx solid #e5e7eb; margin: 12rpx 0; }
+:deep(.md-ul) { padding-left: 20rpx; margin: 8rpx 0; }
+:deep(.md-ol) { padding-left: 20rpx; margin: 8rpx 0; }
+:deep(.md-ul-li) { font-size: 28rpx; color: #1a1d24; line-height: 1.8; }
+:deep(.md-ol-li) { font-size: 28rpx; color: #1a1d24; line-height: 1.8; }
 
 .report-text {
   font-size: 28rpx;
   line-height: 1.8;
   color: #1a1d24;
   white-space: pre-wrap;
+}
+
+.risk-item {
+  margin-bottom: 12rpx;
+}
+
+.risk-text {
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: #6b7280;
 }
 
 .empty-state {

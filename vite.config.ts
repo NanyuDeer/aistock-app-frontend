@@ -23,28 +23,31 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // Agent 报告查询和音频文件 → Node.js app-api（publicRouter，端口 56790）
       '/api/agent/report': {
-        target: process.env.VITE_API_BASE || 'http://localhost:3000',
+        target: process.env.VITE_API_BASE || 'http://localhost:56790',
         changeOrigin: true
       },
       '/api/agent/audio': {
-        target: process.env.VITE_API_BASE || 'http://localhost:3000',
+        target: process.env.VITE_API_BASE || 'http://localhost:56790',
         changeOrigin: true
       },
+      // 事件传导路由 → Node.js（端口 56790，publicRouter）
       '/api/agent/event': {
-        target: process.env.VITE_API_BASE || 'http://localhost:3000',
+        target: process.env.VITE_API_BASE || 'http://localhost:56790',
         changeOrigin: true
       },
+      // 其他 Agent 路由 → Python FastAPI（端口 8080）
       '/api/agent': {
-        target: 'http://localhost:8000',
+        target: process.env.VITE_AGENT_API_BASE || 'http://localhost:8080',
         changeOrigin: true
       },
       '/api': {
-        target: process.env.VITE_API_BASE || 'http://localhost:3000',
+        target: process.env.VITE_API_BASE || 'http://localhost:56790',
         changeOrigin: true
       },
       '/ws': {
-        target: process.env.VITE_WS_BASE || 'ws://localhost:3000',
+        target: process.env.VITE_WS_BASE || 'ws://localhost:56790',
         ws: true,
         changeOrigin: true
       }

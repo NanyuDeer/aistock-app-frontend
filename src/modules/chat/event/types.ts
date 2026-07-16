@@ -27,7 +27,7 @@ export type EventCategory = 'driving' | 'hot'
 
 // ==================== 事件列表 ====================
 
-/** 受影响的行业 */
+/** 受影响的行业（列表页与详情页通用） */
 export interface AffectedIndustry {
   /** 行业名称 */
   name: string
@@ -35,8 +35,12 @@ export interface AffectedIndustry {
   impactLevel: number
   /** 市场情绪 */
   sentiment: MarketSentiment
+  /** 影响强度 0-1（详情页传导链强度柱用） */
+  impactStrength: number
   /** 影响幅度百分比（如 +8.5 或 -3.2） */
   impactPercentage: number
+  /** AI 推理原因 */
+  reason: string
 }
 
 /** 事件列表项 */
@@ -84,24 +88,6 @@ export interface EventListResponse {
   hasMore: boolean
 }
 
-// ==================== AI 推演影响 ====================
-
-/** 推演影响项 */
-export interface ImpactItem {
-  /** 影响层级 1-4 */
-  level: number
-  /** 层级标签，如 "一级影响" */
-  levelLabel: string
-  /** 受影响行业名 */
-  industry: string
-  /** 星级评分 1-5 */
-  rating: number
-  /** 影响百分比，如 +15.0 */
-  impactPercentage: number
-  /** 市场情绪 */
-  sentiment: MarketSentiment
-}
-
 // ==================== 产业链图谱 ====================
 
 /** 图谱节点位置 */
@@ -140,18 +126,6 @@ export interface EventGraph {
   connections: GraphConnection[]
 }
 
-// ==================== 影响变量 ====================
-
-/** 影响变量 */
-export interface ImpactVariable {
-  /** 变量名称 */
-  name: string
-  /** 影响强度 0-1 */
-  strength: number
-  /** 市场情绪方向 */
-  sentiment: MarketSentiment
-}
-
 // ==================== AI 影响传导分析 ====================
 
 /** 传导变量 */
@@ -188,24 +162,6 @@ export interface TransmissionAnalysis {
   chain: TransmissionChainNode[]
 }
 
-// ==================== AI 分析 ====================
-
-/** AI 分析结果 */
-export interface AiAnalysisResult {
-  /** 持续性判断，如 "长期(1月+)" */
-  persistence: string
-  /** 持续性原因，≥100字 */
-  persistenceReason: string
-  /** 热度是否在板块间传递 */
-  heatTransfer: boolean
-  /** 传递方向描述 */
-  transferDirection: string
-  /** 传递判断理由 */
-  transferReason: string
-  /** 风险提示 */
-  riskWarning: string
-}
-
 // ==================== 历史事件 ====================
 
 /** 历史相似事件 */
@@ -224,32 +180,6 @@ export interface HistoryEvent {
   industryChange: string
   /** 行业指数变化百分比 */
   changePercentage: number
-}
-
-// ==================== 事件详情 ====================
-
-/** 事件详情 API 响应 */
-export interface EventDetailResponse {
-  /** 事件ID */
-  eventId: string
-  /** 事件基本信息 */
-  event: EventItem
-  /** AI 推演影响列表 */
-  impacts: ImpactItem[]
-  /** 产业链图谱 */
-  graph: EventGraph
-  /** 影响变量列表 */
-  impactVariables: ImpactVariable[]
-  /** AI 分析结果 */
-  aiAnalysis: AiAnalysisResult
-  /** 历史相似事件 */
-  historyEvents: HistoryEvent[]
-  /** AI 影响传导分析 */
-  transmissionAnalysis?: TransmissionAnalysis
-  /** AI 事件理解 */
-  eventUnderstanding?: EventUnderstanding
-  /** AI 投资总结 */
-  investmentSummary?: InvestmentSummary
 }
 
 // ==================== 事件理解 ====================
@@ -285,6 +215,26 @@ export interface InvestmentSummary {
   rating: 'positive' | 'neutral' | 'negative'
 }
 
+// ==================== 事件详情 ====================
+
+/** 事件详情 API 响应 */
+export interface EventDetailResponse {
+  /** 事件ID */
+  eventId: string
+  /** 事件基本信息 */
+  event: EventItem
+  /** 产业链图谱 */
+  graph: EventGraph
+  /** 历史相似事件 */
+  historyEvents: HistoryEvent[]
+  /** AI 影响传导分析 */
+  transmissionAnalysis?: TransmissionAnalysis
+  /** AI 事件理解 */
+  eventUnderstanding?: EventUnderstanding
+  /** AI 投资总结 */
+  investmentSummary?: InvestmentSummary
+}
+
 // ==================== API 请求参数 ====================
 
 /** 事件列表请求参数 */
@@ -299,20 +249,6 @@ export interface EventListParams {
   eventType?: EventType
   /** 只显示已关注 */
   followedOnly?: boolean
-}
-
-// ==================== 图谱交互状态 ====================
-
-/** 图谱交互状态 */
-export interface GraphInteractionState {
-  /** 缩放比例 */
-  scale: number
-  /** X 偏移 */
-  translateX: number
-  /** Y 偏移 */
-  translateY: number
-  /** 当前选中节点ID */
-  selectedNodeId: string | null
 }
 
 // ==================== 新闻原文 ====================

@@ -25,8 +25,8 @@
     <!-- 可选底部操作栏插槽 -->
     <slot name="footer" />
 
-    <!-- 全局AI对话栏 -->
-    <GlobalChatBar :active-panel="activePanel" />
+    <!-- 全局AI对话栏（可通过 noChatBar 隐藏） -->
+    <GlobalChatBar v-if="!noChatBar" :active-panel="activePanel" />
   </view>
 </template>
 
@@ -43,12 +43,15 @@ const props = withDefaults(defineProps<{
   activePanel?: string
   /** 无历史记录时的回退页面 URL */
   backUrl?: string
+  /** 隐藏底部全局 AI 对话栏（对话页等自带输入栏时使用） */
+  noChatBar?: boolean
 }>(), {
   title: '',
   subtitle: '',
   cardMarginBottom: '40rpx',
   activePanel: '',
   backUrl: '/modules/home/pages/index',
+  noChatBar: false,
 })
 
 // 获取真实状态栏高度
@@ -82,7 +85,7 @@ const scrollHeight = computed(() => {
     } catch { return rpx / 2 }
   }
   const navH = rpx2px(props.subtitle ? 120 : 88)
-  const chatBarH = rpx2px(147)
+  const chatBarH = props.noChatBar ? 0 : rpx2px(147)
   const total = windowHeight.value - statusBarHeight.value - navH - chatBarH
   return Math.max(total, 100)
 })
