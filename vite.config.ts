@@ -23,6 +23,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // 事件传导路由 → Node.js（端口3000，publicRouter）
+      '/api/agent/event': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      },
+      // 其他 Agent 路由 → Python FastAPI（端口8000）
       '/api/agent': {
         target: process.env.VITE_AGENT_API_BASE || 'http://localhost:8080',
         changeOrigin: true

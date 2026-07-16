@@ -1,35 +1,30 @@
 /**
  * 事件传导模块 - API 封装
  *
- * 当前阶段全部调用 mock 数据。
- * 接入后端 Agent 时只需修改此文件中的函数实现，
- * 保持函数签名不变即可无缝切换。
+ * 已接入真实后端 Agent 接口。
+ * 通过 eventAdapter 处理数据映射和降级逻辑。
  */
 
 import type { EventListResponse, EventListParams, EventDetailResponse, EventGraph, NewsArticle } from '../types'
-import { mockEventList, mockEventDetail, mockEventGraph, mockNewsArticle } from '../mock-data'
-
-// 模拟网络延迟（ms）
-const MOCK_DELAY_MIN = 200
-const MOCK_DELAY_MAX = 500
-
-/** 模拟网络延迟 */
-async function delay(): Promise<void> {
-  const ms = MOCK_DELAY_MIN + Math.random() * (MOCK_DELAY_MAX - MOCK_DELAY_MIN)
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
+import type { BackendEventListData, BackendEventDetailData } from './eventAdapter'
+import { adaptEventList, adaptEventDetail } from './eventAdapter'
+import request from '@/shared/api/request'
 
 /**
  * 获取事件列表（分页）
  *
  * @param params.page - 页码
- * @param params.pageSize - 每页条数，默认4
- * @param params.type - 分类筛选
- * @param params.followedOnly - 仅已关注
+ * @param params.pageSize - 每页条数，默认10
  */
 export async function getEventList(params: EventListParams = {}): Promise<EventListResponse> {
-  await delay()
-  return mockEventList(params)
+  const response = await request.get<BackendEventListData>('/agent/event/list', {
+    params: {
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+    },
+  })
+
+  return adaptEventList(response)
 }
 
 /**
@@ -38,74 +33,71 @@ export async function getEventList(params: EventListParams = {}): Promise<EventL
  * @param eventId - 事件ID
  */
 export async function getEventDetail(eventId: string): Promise<EventDetailResponse> {
-  await delay()
-  const detail = mockEventDetail(eventId)
-  if (!detail) {
-    throw new Error(`事件 ${eventId} 不存在`)
-  }
-  return detail
+  const response = await request.get<BackendEventDetailData>(`/agent/event/${eventId}`)
+
+  return adaptEventDetail(response)
 }
 
 /**
  * 获取事件产业链图谱
  *
+ * 注意：图谱数据已包含在详情接口中，通过 eventAdapter 生成。
+ * 此函数保留供后续独立调用使用。
+ *
  * @param eventId - 事件ID
  */
 export async function getEventGraph(eventId: string): Promise<EventGraph> {
-  await delay()
-  const graph = mockEventGraph(eventId)
-  if (!graph) {
-    throw new Error(`事件 ${eventId} 图谱数据不存在`)
-  }
-  return graph
+  // 图谱数据已包含在详情接口中，通过 eventAdapter 生成
+  // 此函数保留供后续独立调用使用
+  const response = await request.get<BackendEventDetailData>(`/agent/event/${eventId}`)
+  const adapted = adaptEventDetail(response)
+  return adapted.graph
 }
 
 /**
  * 关注事件
  *
+ * 注意：功能暂未实现，后端需要新增接口。
+ *
  * @param eventId - 事件ID
  */
 export async function followEvent(eventId: string): Promise<void> {
-  await delay()
-  // TODO: 接入后端 API
-  // await request.post(`/agent/event/${eventId}/follow`)
-  console.log('[eventApi] followEvent:', eventId)
+  // TODO: 需要后端新增关注接口
+  console.warn('[eventApi] followEvent 功能暂未实现:', eventId)
 }
 
 /**
  * 取消关注事件
  *
+ * 注意：功能暂未实现，后端需要新增接口。
+ *
  * @param eventId - 事件ID
  */
 export async function unfollowEvent(eventId: string): Promise<void> {
-  await delay()
-  // TODO: 接入后端 API
-  // await request.post(`/agent/event/${eventId}/unfollow`)
-  console.log('[eventApi] unfollowEvent:', eventId)
+  // TODO: 需要后端新增取消关注接口
+  console.warn('[eventApi] unfollowEvent 功能暂未实现:', eventId)
 }
 
 /**
  * 设置事件盯盘
  *
+ * 注意：功能暂未实现，后端需要新增接口。
+ *
  * @param eventId - 事件ID
  */
 export async function watchEvent(eventId: string): Promise<void> {
-  await delay()
-  // TODO: 接入后端 API
-  // await request.post(`/agent/event/${eventId}/watch`)
-  console.log('[eventApi] watchEvent:', eventId)
+  // TODO: 需要后端新增盯盘接口
+  console.warn('[eventApi] watchEvent 功能暂未实现:', eventId)
 }
 
 /**
  * 获取新闻原文
  *
+ * 注意：功能暂未实现，需要后端提供新闻详情接口。
+ *
  * @param newsId - 新闻ID
  */
 export async function getNewsArticle(newsId: string): Promise<NewsArticle> {
-  await delay()
-  const article = mockNewsArticle(newsId)
-  if (!article) {
-    throw new Error(`新闻 ${newsId} 不存在`)
-  }
-  return article
+  // TODO: 需要后端新增新闻详情接口
+  throw new Error(`新闻功能暂未实现: ${newsId}`)
 }
