@@ -221,7 +221,7 @@
         {
           "path": "briefing-detail/index",
           "style": {
-            "navigationBarTitleText": "晨报详情",
+            "navigationStyle": "custom",
             "disableScroll": true,
             "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
           }

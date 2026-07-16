@@ -5,21 +5,23 @@
       <view class="briefing-card" @tap="goBriefingDetail">
         <view class="briefing-left">
           <view class="briefing-top">
-            <text class="briefing-tag">今日专属</text>
-            <text class="briefing-period">{{ briefingTypeLabel }}</text>
+            <text class="briefing-title">今日专属 · {{ briefingTypeLabel }}</text>
           </view>
-          <!-- 有数据时：显示摘要 -->
-          <view v-if="briefingStatus === 'ready'" class="briefing-highlight">
-            <text class="highlight-prefix">重点看</text>
-            <text class="highlight-stock">{{ briefingSummary }}</text>
-          </view>
+          <!-- 有数据时：显示线索数量和简洁摘要 -->
+          <template v-if="briefingStatus === 'ready'">
+            <view class="briefing-clue">
+              <text class="clue-text">{{ report?.stocks?.length || 0 }}条关键线索需关注</text>
+            </view>
+            <view class="briefing-tags">
+              <view v-for="(tag, idx) in summaryTags" :key="idx" class="summary-tag">
+                <text class="tag-text">{{ tag }}</text>
+              </view>
+              <text class="tags-arrow">›</text>
+            </view>
+          </template>
           <!-- 空状态/错误/加载时：显示提示 -->
-          <view v-else class="briefing-highlight">
-            <text class="highlight-prefix">{{ getBriefingDesc() }}</text>
-          </view>
-          <view v-if="briefingStatus === 'ready'" class="briefing-desc">
-            <text>查看完整报告</text>
-            <text class="desc-arrow">›</text>
+          <view v-else class="briefing-clue">
+            <text class="clue-text">{{ getBriefingDesc() }}</text>
           </view>
           <view class="briefing-btn" @tap.stop="goBriefing">
             <text class="btn-icon">◉</text>
@@ -115,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { useBriefingCard } from '@/shared/utils/useBriefingCard'
@@ -123,10 +125,21 @@ import { useBriefingCard } from '@/shared/utils/useBriefingCard'
 const {
   typeLabel: briefingTypeLabel,
   summary: briefingSummary,
+  report,
   status: briefingStatus,
   loading: briefingLoading,
   refresh: briefingRefresh,
 } = useBriefingCard()
+
+/** 摘要拆分为标签：按标点切割，去掉标点，最多4个 */
+const summaryTags = computed(() => {
+  const text = briefingSummary.value || ''
+  return text
+    .split(/[，,、+]/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0)
+    .slice(0, 4)
+})
 
 // 卡片描述文案（根据状态）
 function getBriefingDesc(): string {
@@ -243,25 +256,33 @@ function goLogin() {
 </script>
 
 <style lang="scss" scoped>
+@use '@/shared/styles/variables.scss' as *;
+
 .morning-content {
-  background: #ffffff;
+  background: $bg-color-grey;
 }
 
-/* ===== 内容区 ===== */
 .content-wrap {
-  padding: 24rpx;
+  padding: $spacing-base;
 }
 
 /* ===== 晨报卡片 ===== */
 .briefing-card {
   display: flex;
   align-items: stretch;
-  padding: 24rpx 24rpx 20rpx;
-  background: #f5f7fb;
-  border-radius: 16rpx;
-  margin-bottom: 20rpx;
+  padding: $spacing-base;
+  background: $bg-color-grey;
+  border-radius: $radius-base;
+  margin-bottom: $spacing-sm;
   position: relative;
   overflow: hidden;
+  box-shadow: $shadow-card;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: $shadow-base;
+  }
 }
 
 .briefing-card::before {
@@ -271,71 +292,63 @@ function goLogin() {
   left: 0;
   right: 0;
   height: 4rpx;
-  background: linear-gradient(90deg, #4d7cfe, #6366f1);
+  background: $brand-gradient;
 }
 
 .briefing-left {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10rpx;
+  gap: $spacing-xs;
 }
 
 .briefing-top {
   display: flex;
   align-items: center;
-  gap: 12rpx;
 }
 
-.briefing-tag {
-  font-size: 24rpx;
+.briefing-title {
+  font-size: $font-size-lg;
   font-weight: 600;
-  color: #1a1d24;
+  color: $text-color-title;
 }
 
-.briefing-period {
-  font-size: 20rpx;
-  color: #6b7280;
-  background: #f3f4f6;
-  padding: 2rpx 10rpx;
+.briefing-clue {
+  margin-top: 4rpx;
+}
+
+.clue-text {
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+}
+
+.briefing-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 8rpx;
+}
+
+.summary-tag {
+  padding: 6rpx 14rpx;
+  background: rgba($brand-color, 0.08);
+  border: 1rpx solid rgba($brand-color, 0.15);
   border-radius: 6rpx;
 }
 
-.briefing-highlight {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4rpx;
-}
-
-.highlight-prefix {
-  font-size: 24rpx;
-  color: #6b7280;
-}
-
-.highlight-stock {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #1a1d24;
-}
-
-.highlight-reason {
-  font-size: 24rpx;
-  color: #f43f5e;
+.tag-text {
+  font-size: $font-size-xs;
+  color: $brand-color;
   font-weight: 500;
+  line-height: 1.4;
 }
 
-.briefing-desc {
-  display: flex;
-  align-items: center;
-  font-size: 22rpx;
-  color: #6b7280;
-}
-
-.desc-arrow {
-  margin-left: 4rpx;
-  color: #9ca3af;
-  font-size: 24rpx;
+.tags-arrow {
+  font-size: $font-size-lg;
+  color: $text-color-tertiary;
+  margin-left: 2rpx;
+  line-height: 1.4;
 }
 
 .briefing-btn {
@@ -343,10 +356,15 @@ function goLogin() {
   align-items: center;
   gap: 6rpx;
   padding: 8rpx 18rpx;
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
-  border-radius: 24rpx;
+  background: $brand-gradient;
+  border-radius: $radius-pill;
   align-self: flex-start;
   margin-top: 6rpx;
+  transition: opacity 0.2s ease;
+
+  &:active {
+    opacity: 0.85;
+  }
 }
 
 .btn-icon {
@@ -355,7 +373,7 @@ function goLogin() {
 }
 
 .btn-text {
-  font-size: 22rpx;
+  font-size: $font-size-sm;
   color: #ffffff;
   font-weight: 500;
 }
@@ -389,28 +407,48 @@ function goLogin() {
 .ai-avatar-ring {
   position: absolute;
   border-radius: 50%;
-  border: 2rpx solid rgba(77, 124, 254, 0.15);
+  border: 2rpx solid rgba($brand-color, 0.15);
   pointer-events: none;
 }
 
 .ai-avatar-ring.ring-1 {
   width: 120rpx;
   height: 120rpx;
+  animation: ring-pulse 2s ease-out infinite;
 }
 
 .ai-avatar-ring.ring-2 {
   width: 140rpx;
   height: 140rpx;
   opacity: 0.5;
+  animation: ring-pulse 2s ease-out infinite 0.5s;
 }
 
 .ai-avatar-loading {
-  animation: pulse 1.2s ease-in-out infinite;
+  animation: avatar-pulse 1.2s ease-in-out infinite;
+
+  .ai-avatar-ring.ring-1 {
+    animation: ring-pulse-fast 1.2s ease-out infinite;
+  }
+
+  .ai-avatar-ring.ring-2 {
+    animation: ring-pulse-fast 1.2s ease-out infinite 0.3s;
+  }
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+@keyframes avatar-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.95); }
+}
+
+@keyframes ring-pulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+
+@keyframes ring-pulse-fast {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.15); opacity: 0; }
 }
 
 /* ===== 功能入口 2x2 网格 ===== */

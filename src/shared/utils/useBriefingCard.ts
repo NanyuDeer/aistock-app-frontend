@@ -71,9 +71,11 @@ function parseReport(content: unknown): BriefingReport | null {
   }
 }
 
-/** 获取今天日期字符串 YYYY-MM-DD */
+/** 获取今天日期字符串 YYYY-MM-DD（本地时区） */
 function todayStr(): string {
-  return new Date().toISOString().split('T')[0]
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 export function useBriefingCard(
