@@ -43,7 +43,7 @@
               <text class="preview-rank preview-rank--trend">{{ idx + 1 }}</text>
               <text class="preview-name">{{ item.name }}</text>
               <text class="preview-score">{{ item.score }}分</text>
-              <text :class="['preview-trend', item.trend === 'up' ? 'up' : 'down']">{{ item.trend === 'up' ? '↑' : '↓' }}</text>
+              <text class="preview-grade">{{ item.label }}</text>
             </view>
           </view>
           <view class="insight-card-footer">
@@ -59,9 +59,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import PageCard from '@/shared/components/PageCard.vue'
 import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { trendScoreApi } from '@/shared/api/modules/trend-score'
 
 const hotBurstPreview = ref([
   { name: '舒泰神', count: 3 },
@@ -69,11 +71,20 @@ const hotBurstPreview = ref([
   { name: '药明康德', count: 5 },
 ])
 
-const trendScorePreview = ref([
-  { name: '山西焦化', score: 85, trend: 'up' },
-  { name: '宁德时代', score: 78, trend: 'down' },
-  { name: '比亚迪', score: 72, trend: 'up' },
-])
+const trendScorePreview = ref<Array<{ name: string; score: number; label: string }>>([])
+
+async function loadTrendScorePreview() {
+  try {
+    const items = await trendScoreApi.getTop(3)
+    trendScorePreview.value = items.map((item) => ({
+      name: item.name || item.symbol,
+      score: item.score,
+      label: item.label,
+    }))
+  } catch {
+    trendScorePreview.value = []
+  }
+}
 
 function goHotBurst() {
   uni.navigateTo({ url: '/modules/market/pages/hot-burst' })
@@ -82,6 +93,8 @@ function goHotBurst() {
 function goTrendScore() {
   uni.navigateTo({ url: '/modules/analytics/pages/trend-score' })
 }
+
+onShow(loadTrendScorePreview)
 </script>
 
 <style lang="scss" scoped>
@@ -245,12 +258,12 @@ function goTrendScore() {
   font-weight: 600;
 }
 
-.preview-trend {
+.preview-grade {
+  min-width: 32rpx;
+  color: #4d7cfe;
   font-size: 24rpx;
-  font-weight: 600;
-
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  font-weight: 700;
+  text-align: center;
 }
 
 /* ===== 底部操作 ===== */
