@@ -28,11 +28,11 @@ export default defineConfig({
         changeOrigin: true
       },
       '/api': {
-        target: process.env.VITE_API_BASE || 'http://localhost:3000',
+        target: process.env.VITE_API_BASE || 'http://127.0.0.1:3000',
         changeOrigin: true
       },
       '/ws': {
-        target: process.env.VITE_WS_BASE || 'ws://localhost:3000',
+        target: process.env.VITE_WS_BASE || 'ws://127.0.0.1:3000',
         ws: true,
         changeOrigin: true
       }

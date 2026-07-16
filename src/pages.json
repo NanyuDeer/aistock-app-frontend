@@ -131,6 +131,22 @@
       }
     },
     {
+      "path": "modules/analytics/pages/trend-score",
+      "style": {
+        "navigationBarTitleText": "趋势股评分",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "modules/analytics/pages/trend-score-detail",
+      "style": {
+        "navigationBarTitleText": "趋势评分详情",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "modules/analytics/pages/forecast",
       "style": {
         "navigationBarTitleText": "业绩",
