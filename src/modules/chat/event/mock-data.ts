@@ -12,12 +12,9 @@ import type {
   EventListResponse,
   EventListParams,
   EventDetailResponse,
-  ImpactItem,
   GraphNode,
   GraphConnection,
   EventGraph,
-  ImpactVariable,
-  AiAnalysisResult,
   HistoryEvent,
   TransmissionAnalysis,
   EventUnderstanding,
@@ -36,10 +33,10 @@ const ALL_EVENTS: EventItem[] = [
     eventType: '产业政策',
     importance: 5,
     affectedIndustries: [
-      { name: '新能源汽车', impactLevel: 5, sentiment: 'bullish', impactPercentage: 15.0 },
-      { name: '动力电池', impactLevel: 5, sentiment: 'bullish', impactPercentage: 12.0 },
-      { name: '锂矿', impactLevel: 4, sentiment: 'bullish', impactPercentage: 8.5 },
-      { name: '充电桩', impactLevel: 3, sentiment: 'bullish', impactPercentage: 6.0 },
+      { name: '新能源汽车', impactLevel: 5, sentiment: 'bullish', impactPercentage: 15.0, impactStrength: 1.0, reason: '补贴直接刺激终端消费，销量确定性增长' },
+      { name: '动力电池', impactLevel: 5, sentiment: 'bullish', impactPercentage: 12.0, impactStrength: 1.0, reason: '整车销量增长直接拉动电池装机需求' },
+      { name: '锂矿', impactLevel: 4, sentiment: 'bullish', impactPercentage: 8.5, impactStrength: 0.8, reason: '电池扩产传导至锂资源需求增加' },
+      { name: '充电桩', impactLevel: 3, sentiment: 'bullish', impactPercentage: 6.0, impactStrength: 0.6, reason: '新能源车保有量增加推升充电需求' },
     ],
     aiSummary: '补贴延续至2027年，新能源车产业链需求确定性增强',
     isFollowed: false,
@@ -53,10 +50,10 @@ const ALL_EVENTS: EventItem[] = [
     eventType: '地缘政治',
     importance: 5,
     affectedIndustries: [
-      { name: 'AI芯片', impactLevel: 5, sentiment: 'bearish', impactPercentage: -10.0 },
-      { name: '国产替代', impactLevel: 5, sentiment: 'bullish', impactPercentage: 8.0 },
-      { name: '半导体设备', impactLevel: 4, sentiment: 'bearish', impactPercentage: -5.0 },
-      { name: '算力租赁', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.5 },
+      { name: 'AI芯片', impactLevel: 5, sentiment: 'bearish', impactPercentage: -10.0, impactStrength: 1.0, reason: '进口芯片供给受限，国内企业短期承压' },
+      { name: '国产替代', impactLevel: 5, sentiment: 'bullish', impactPercentage: 8.0, impactStrength: 1.0, reason: '管制倒逼国产芯片加速替代进程' },
+      { name: '半导体设备', impactLevel: 4, sentiment: 'bearish', impactPercentage: -5.0, impactStrength: 0.8, reason: '管制间接影响设备进口和技术合作' },
+      { name: '算力租赁', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.5, impactStrength: 0.6, reason: '芯片短缺推高算力价格，租赁企业受益' },
     ],
     aiSummary: '国产AI芯片替代进程有望加速，算力自主可控成为主线',
     isFollowed: false,
@@ -70,9 +67,9 @@ const ALL_EVENTS: EventItem[] = [
     eventType: '产业政策',
     importance: 4,
     affectedIndustries: [
-      { name: '智慧医疗', impactLevel: 5, sentiment: 'bullish', impactPercentage: 10.0 },
-      { name: '医疗信息化', impactLevel: 4, sentiment: 'bullish', impactPercentage: 7.0 },
-      { name: 'AI制药', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.0 },
+      { name: '智慧医疗', impactLevel: 5, sentiment: 'bullish', impactPercentage: 10.0, impactStrength: 1.0, reason: '医保支付解决商业化瓶颈，市场空间释放' },
+      { name: '医疗信息化', impactLevel: 4, sentiment: 'bullish', impactPercentage: 7.0, impactStrength: 0.8, reason: 'AI部署带动医院信息化系统升级需求' },
+      { name: 'AI制药', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.0, impactStrength: 0.6, reason: '诊断AI商业模式为AI制药提供参考范本' },
     ],
     aiSummary: '医疗AI商业化落地拐点到来，智慧医疗赛道加速成长',
     isFollowed: false,
@@ -86,11 +83,11 @@ const ALL_EVENTS: EventItem[] = [
     eventType: '产业政策',
     importance: 4,
     affectedIndustries: [
-      { name: '机器人', impactLevel: 5, sentiment: 'bullish', impactPercentage: 12.0 },
-      { name: '减速器', impactLevel: 4, sentiment: 'bullish', impactPercentage: 9.0 },
-      { name: '工业自动化', impactLevel: 4, sentiment: 'bullish', impactPercentage: 7.5 },
-      { name: '传感器', impactLevel: 3, sentiment: 'bullish', impactPercentage: 6.0 },
-      { name: '伺服电机', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.0 },
+      { name: '机器人', impactLevel: 5, sentiment: 'bullish', impactPercentage: 12.0, impactStrength: 1.0, reason: '政策顶层设计明确，整机企业直接受益' },
+      { name: '减速器', impactLevel: 4, sentiment: 'bullish', impactPercentage: 9.0, impactStrength: 0.8, reason: '减速器占机器人成本约30%，需求直接拉动' },
+      { name: '工业自动化', impactLevel: 4, sentiment: 'bullish', impactPercentage: 7.5, impactStrength: 0.8, reason: '机器人技术外溢提升工业自动化水平' },
+      { name: '传感器', impactLevel: 3, sentiment: 'bullish', impactPercentage: 6.0, impactStrength: 0.6, reason: '人形机器人传感器用量远超工业机器人' },
+      { name: '伺服电机', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.0, impactStrength: 0.6, reason: '高精度伺服电机是人形机器人核心驱动部件' },
     ],
     aiSummary: '人形机器人产业顶层设计落地，核心零部件需求爆发在即',
     isFollowed: false,
@@ -104,9 +101,9 @@ const ALL_EVENTS: EventItem[] = [
     eventType: '技术突破',
     importance: 5,
     affectedIndustries: [
-      { name: '人工智能', impactLevel: 5, sentiment: 'bullish', impactPercentage: 15.0 },
-      { name: '云计算', impactLevel: 4, sentiment: 'bullish', impactPercentage: 8.0 },
-      { name: '数据中心', impactLevel: 3, sentiment: 'bullish', impactPercentage: 6.0 },
+      { name: '人工智能', impactLevel: 5, sentiment: 'bullish', impactPercentage: 15.0, impactStrength: 1.0, reason: '大模型能力跃升直接提升AI产业竞争力' },
+      { name: '云计算', impactLevel: 4, sentiment: 'bullish', impactPercentage: 8.0, impactStrength: 0.8, reason: 'AI应用爆发需要大规模云资源支撑' },
+      { name: '数据中心', impactLevel: 3, sentiment: 'bullish', impactPercentage: 6.0, impactStrength: 0.6, reason: '算力需求增长驱动数据中心扩容升级' },
     ],
     aiSummary: '大模型能力跃升推动AI应用大规模落地，算力需求持续增长',
     isFollowed: false,
@@ -120,9 +117,9 @@ const ALL_EVENTS: EventItem[] = [
     eventType: '市场动态',
     importance: 3,
     affectedIndustries: [
-      { name: '动力电池', impactLevel: 4, sentiment: 'bearish', impactPercentage: -8.0 },
-      { name: '锂材料', impactLevel: 4, sentiment: 'bearish', impactPercentage: -10.0 },
-      { name: '新能源车', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.0 },
+      { name: '动力电池', impactLevel: 4, sentiment: 'bearish', impactPercentage: -8.0, impactStrength: 0.8, reason: '价格持续下行，企业毛利率承压严重' },
+      { name: '锂材料', impactLevel: 4, sentiment: 'bearish', impactPercentage: -10.0, impactStrength: 0.8, reason: '碳酸锂价格回落超60%，矿企利润大幅缩水' },
+      { name: '新能源车', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.0, impactStrength: 0.6, reason: '电池降价有利于整车企业控制制造成本' },
     ],
     aiSummary: '电池降价利好下游整车，但上游锂材料短期承压明显',
     isFollowed: false,
@@ -136,9 +133,9 @@ const ALL_EVENTS: EventItem[] = [
     eventType: '公司公告',
     importance: 3,
     affectedIndustries: [
-      { name: 'AI应用', impactLevel: 4, sentiment: 'bullish', impactPercentage: 8.0 },
-      { name: '软件服务', impactLevel: 3, sentiment: 'bullish', impactPercentage: 6.0 },
-      { name: '云计算', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.0 },
+      { name: 'AI应用', impactLevel: 4, sentiment: 'bullish', impactPercentage: 8.0, impactStrength: 0.8, reason: '巨头入局加速AI应用生态构建和商业化' },
+      { name: '软件服务', impactLevel: 3, sentiment: 'bullish', impactPercentage: 6.0, impactStrength: 0.6, reason: 'AI能力融入企业软件提升产品价值' },
+      { name: '云计算', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.0, impactStrength: 0.6, reason: 'AI应用部署和运行需要云资源支撑' },
     ],
     aiSummary: '互联网巨头入局加速AI应用生态构建，软件服务行业受益',
     isFollowed: true,
@@ -152,9 +149,9 @@ const ALL_EVENTS: EventItem[] = [
     eventType: '监管变化',
     importance: 4,
     affectedIndustries: [
-      { name: '金融科技', impactLevel: 4, sentiment: 'neutral', impactPercentage: 2.0 },
-      { name: '证券IT', impactLevel: 3, sentiment: 'neutral', impactPercentage: 1.5 },
-      { name: '数据服务', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.0 },
+      { name: '金融科技', impactLevel: 4, sentiment: 'neutral', impactPercentage: 2.0, impactStrength: 0.8, reason: '合规门槛提高利好已具备完善体系的头部企业' },
+      { name: '证券IT', impactLevel: 3, sentiment: 'neutral', impactPercentage: 1.5, impactStrength: 0.6, reason: '券商需升级AI交易系统以满足合规要求' },
+      { name: '数据服务', impactLevel: 3, sentiment: 'bullish', impactPercentage: 5.0, impactStrength: 0.6, reason: '合规需求创造新的数据服务和风险监测市场' },
     ],
     aiSummary: 'AI应用规范短期偏中性，但数据服务合规需求提升利好龙头',
     isFollowed: false,
@@ -201,24 +198,6 @@ export function mockEventList(params: EventListParams = {}): EventListResponse {
 
 // ==================== 详情 Mock 数据 ====================
 
-/** AI 推演影响的辅助函数 */
-function makeImpacts(eventType: string): ImpactItem[] {
-  if (eventType === '产业政策') {
-    return [
-      { level: 1, levelLabel: '一级影响', industry: '新能源汽车', rating: 5, impactPercentage: 15.0, sentiment: 'bullish' },
-      { level: 2, levelLabel: '二级影响', industry: '动力电池', rating: 5, impactPercentage: 12.0, sentiment: 'bullish' },
-      { level: 3, levelLabel: '三级影响', industry: '锂矿', rating: 4, impactPercentage: 8.5, sentiment: 'bullish' },
-      { level: 4, levelLabel: '四级影响', industry: '充电桩', rating: 3, impactPercentage: 6.0, sentiment: 'bullish' },
-    ]
-  }
-  return [
-    { level: 1, levelLabel: '一级影响', industry: 'AI芯片', rating: 5, impactPercentage: -10.0, sentiment: 'bearish' },
-    { level: 2, levelLabel: '二级影响', industry: '国产替代', rating: 5, impactPercentage: 8.0, sentiment: 'bullish' },
-    { level: 3, levelLabel: '三级影响', industry: '半导体设备', rating: 4, impactPercentage: -5.0, sentiment: 'bearish' },
-    { level: 4, levelLabel: '四级影响', industry: '算力租赁', rating: 3, impactPercentage: 5.5, sentiment: 'bullish' },
-  ]
-}
-
 /** 产业链图谱辅助函数 */
 function makeGraph(eventType: string): EventGraph {
   const eventNode: GraphNode = { nodeId: 'node_event', name: '政策发布', type: 'event', position: { x: 200, y: 20 } }
@@ -261,49 +240,7 @@ function makeGraph(eventType: string): EventGraph {
   return { nodes, connections }
 }
 
-/** 影响变量辅助函数 */
-function makeVariables(eventType: string): ImpactVariable[] {
-  if (eventType === '产业政策') {
-    return [
-      { name: '补贴金额', strength: 0.9, sentiment: 'bullish' },
-      { name: '政策延续性', strength: 0.85, sentiment: 'bullish' },
-      { name: '行业竞争格局', strength: 0.6, sentiment: 'neutral' },
-      { name: '原材料价格', strength: 0.4, sentiment: 'bearish' },
-    ]
-  }
-  return [
-    { name: '出口管制力度', strength: 0.9, sentiment: 'bearish' },
-    { name: '国产替代速度', strength: 0.8, sentiment: 'bullish' },
-    { name: '算力需求增长', strength: 0.7, sentiment: 'bullish' },
-    { name: '国际关系变化', strength: 0.5, sentiment: 'neutral' },
-  ]
-}
 
-/** AI 分析辅助函数 */
-function makeAnalysis(eventType: string): AiAnalysisResult {
-  if (eventType === '产业政策') {
-    return {
-      persistence: '长期(1月+)',
-      persistenceReason:
-        '新能源汽车补贴政策延续至2027年，时间跨度长、金额明确，将长期稳定产业预期。政策传导路径清晰：补贴→终端销量增长→电池装机量提升→上游锂矿需求增加→下游充电桩配套加速。各环节均有明确受益逻辑，预计持续性较强。',
-      heatTransfer: true,
-      transferDirection: '政策发布→整车制造→动力电池→锂矿材料→充电桩配套',
-      transferReason:
-        '补贴政策从整车端开始传导，先拉动终端消费，再向上游动力电池传导，进一步扩散至最上游锂矿原材料。下游充电桩作为配套设施也将受益于新能源车保有量提升。传导系数整车→电池0.9、电池→锂矿0.75',
-      riskWarning: '需关注补贴执行细则发布时间和实际退坡节奏，以及地方政府配套政策力度差异',
-    }
-  }
-  return {
-    persistence: '中期(1-2周)',
-    persistenceReason:
-      '美国AI芯片出口管制政策影响深远，短期市场情绪波动较大。但国产替代进程已进入加速期，中长期看国内AI芯片企业和半导体设备厂商将受益于自主可控趋势。管制力度可能随国际关系变化有所调整，需持续跟踪政策动态。',
-    heatTransfer: true,
-    transferDirection: '出口管制→AI芯片供应受限→国产替代加速→半导体设备需求↑→算力租赁涨价→AI应用成本↑',
-    transferReason:
-      '出口管制直接限制高端AI芯片供给，短期利空AI芯片进口依赖型企业，但中长期利好国产芯片和半导体设备厂商。下游算力租赁价格可能因供给受限而上涨，最终传导至AI应用开发成本。',
-    riskWarning: '若管制政策出现松动或中美关系缓和，国产替代短期逻辑可能受到冲击',
-  }
-}
 
 /** 历史事件辅助函数 */
 function makeHistory(eventType: string): HistoryEvent[] {
@@ -374,10 +311,7 @@ const EVENT_DETAIL_MAP: Record<string, EventDetailResponse> = {
   evt_001: {
     eventId: 'evt_001',
     event: ALL_EVENTS[0],
-    impacts: makeImpacts('产业政策'),
     graph: makeGraph('产业政策'),
-    impactVariables: makeVariables('产业政策'),
-    aiAnalysis: makeAnalysis('产业政策'),
     historyEvents: makeHistory('产业政策'),
     transmissionAnalysis: makeTransmission('evt_001'),
     eventUnderstanding: makeUnderstanding('evt_001'),
@@ -386,10 +320,7 @@ const EVENT_DETAIL_MAP: Record<string, EventDetailResponse> = {
   evt_002: {
     eventId: 'evt_002',
     event: ALL_EVENTS[1],
-    impacts: makeImpacts('地缘政治'),
     graph: makeGraph('地缘政治'),
-    impactVariables: makeVariables('地缘政治'),
-    aiAnalysis: makeAnalysis('地缘政治'),
     historyEvents: makeHistory('地缘政治'),
     transmissionAnalysis: makeTransmission('evt_002'),
     eventUnderstanding: makeUnderstanding('evt_002'),
@@ -415,10 +346,7 @@ export function mockEventDetail(eventId: string): EventDetailResponse | null {
   return {
     eventId: event.eventId,
     event,
-    impacts: makeImpacts(event.eventType),
     graph: makeGraph(event.eventType),
-    impactVariables: makeVariables(event.eventType),
-    aiAnalysis: makeAnalysis(event.eventType),
     historyEvents: makeHistory(event.eventType),
     transmissionAnalysis: makeTransmission(event.eventId),
     eventUnderstanding: makeUnderstanding(event.eventId),

@@ -15,45 +15,37 @@
     <!-- 事件标题（最多2行，点击跳转新闻） -->
     <text class="card-title" @tap.stop="$emit('view-news', event)">{{ event.title }}</text>
 
-    <!-- AI 摘要（最多2行，超出省略） -->
-    <view class="card-ai-summary" v-if="event.aiSummary">
-      <text class="ai-badge">AI</text>
-      <text class="ai-text">{{ event.aiSummary }}</text>
+    <!-- Top5 影响行业（排序后取前5，不换行） -->
+    <view class="card-top5">
+      <text
+        v-for="ind in top5Industries"
+        :key="ind.name"
+        class="top5-item"
+        :class="'t5-' + ind.sentiment"
+      >
+        {{ ind.name }}<text class="t5-arrow">{{ ind.sentiment === 'bullish' ? '↑' : ind.sentiment === 'bearish' ? '↓' : '→' }}</text>
+      </text>
     </view>
 
-    <!-- 底部：影响行业（独占一行）+ 横向滚动标签 + 按钮 -->
-    <view class="card-footer">
-      <text class="industries-label">影响行业</text>
-      <view class="industries-row">
-        <scroll-view class="industries-scroll" scroll-x="true" :show-scrollbar="false">
-          <view class="industries-tags">
-            <text
-              v-for="ind in event.affectedIndustries"
-              :key="ind.name"
-              class="industry-item"
-              :class="'item-' + ind.sentiment"
-            >
-              {{ ind.name }}
-              <text class="industry-arrow">
-                {{ ind.sentiment === 'bullish' ? '↑' : ind.sentiment === 'bearish' ? '↓' : '→' }}
-              </text>
-            </text>
+    <!-- AI 摘要 + 操作按钮 -->
+    <view class="card-bottom">
+      <view class="card-ai-summary" v-if="event.aiSummary">
+        <text class="ai-badge">AI</text>
+        <text class="ai-text">{{ event.aiSummary }}</text>
+      </view>
+      <view class="card-actions">
+        <view
+          class="follow-btn"
+          :class="{ followed: event.isFollowed }"
+          @tap.stop="$emit('toggle-follow', event)"
+        >
+          <text class="follow-text">{{ event.isFollowed ? '✓ 已关注' : '+ 关注' }}</text>
+        </view>
+        <view class="detail-btn" @tap.stop="$emit('view-detail', event)">
+          <view class="robot-avatar">
+            <text class="robot-face">🤖</text>
           </view>
-        </scroll-view>
-        <view class="footer-actions">
-          <view
-            class="follow-btn"
-            :class="{ followed: event.isFollowed }"
-            @tap.stop="$emit('toggle-follow', event)"
-          >
-            <text class="follow-text">{{ event.isFollowed ? '✓ 已关注' : '+ 关注' }}</text>
-          </view>
-          <view class="detail-btn" @tap.stop="$emit('view-detail', event)">
-            <view class="robot-avatar">
-              <text class="robot-face">🤖</text>
-            </view>
-            <text class="detail-text">AI解析 ›</text>
-          </view>
+          <text class="detail-text">AI解析 ›</text>
         </view>
       </view>
     </view>
@@ -97,6 +89,13 @@ defineEmits<{
 /** 事件类型颜色（按类型映射） */
 const typeColor = computed(() => {
   return EVENT_TYPE_COLORS[props.event.eventType] || { bg: '#f0f2f5', text: '#6b7280' }
+})
+
+/** 按 impactLevel 降序取前5个行业 */
+const top5Industries = computed(() => {
+  return [...props.event.affectedIndustries]
+    .sort((a, b) => b.impactLevel - a.impactLevel)
+    .slice(0, 5)
 })
 
 // ========== 工具函数 ==========
@@ -209,88 +208,99 @@ function formatTime(time: string): string {
   overflow: hidden;
 }
 
-/* ========== 底部：影响行业（独占一行）+ 横向滚动标签 + 按钮 ========== */
-.card-footer {
+/* ========== Top5 影响行业 ========== */
+.card-top5 {
   display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-  padding-top: 10rpx;
-  border-top: 1px solid var(--ev-border);
-}
-
-.industries-label {
-  font-size: 20rpx;
-  color: var(--ev-text-muted);
-  flex-shrink: 0;
-  line-height: 1;
-}
-
-/* 行业标签行：横向滚动区域 + 右侧按钮 */
-.industries-row {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-}
-
-.industries-scroll {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.industries-tags {
-  display: inline-flex;
+  flex-wrap: nowrap;
   gap: 6rpx;
-  white-space: nowrap;
+  margin-bottom: 12rpx;
+  overflow: hidden;
 }
 
-.industry-item {
+.top5-item {
   font-size: 20rpx;
+  font-weight: 600;
   padding: 4rpx 12rpx;
   border-radius: 5rpx;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.industry-arrow {
-  margin-left: 3rpx;
+.t5-arrow {
+  margin-left: 2rpx;
   font-weight: 700;
   font-size: 18rpx;
 }
 
-.item-bullish {
+.t5-bullish {
   background: rgba(244, 63, 94, 0.08);
   border: 1px solid rgba(244, 63, 94, 0.15);
-  color: var(--ev-negative);
-}
-
-.item-bullish .industry-arrow {
   color: #F43F5E;
 }
 
-.item-bearish {
+.t5-bearish {
   background: rgba(34, 197, 94, 0.08);
   border: 1px solid rgba(34, 197, 94, 0.15);
-  color: var(--ev-positive);
-}
-
-.item-bearish .industry-arrow {
   color: #22C55E;
 }
 
-.item-neutral {
+.t5-neutral {
   background: var(--ev-border);
   border: 1px solid rgba(148, 163, 184, 0.1);
   color: var(--ev-text-tertiary);
 }
 
+/* ========== 底部：AI 摘要 + 操作按钮 ========== */
+.card-bottom {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  padding-top: 10rpx;
+  border-top: 1px solid var(--ev-border);
+}
+
+/* AI 摘要 */
+.card-ai-summary {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8rpx;
+  min-width: 0;
+}
+
+.ai-badge {
+  flex-shrink: 0;
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  background: var(--ev-accent);
+  color: #FFFFFF;
+  font-size: 16rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  margin-top: 2rpx;
+}
+
+.ai-text {
+  flex: 1;
+  font-size: 22rpx;
+  color: var(--ev-text-tertiary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* 按钮组 */
-.footer-actions {
+.card-actions {
   display: flex;
   gap: 8rpx;
   flex-shrink: 0;
 }
-
-/* 关注按钮 */
 .follow-btn {
   padding: 8rpx 16rpx;
   border-radius: 9999rpx;
