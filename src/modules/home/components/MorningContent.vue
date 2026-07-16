@@ -2,28 +2,32 @@
   <view class="morning-content">
     <view class="content-wrap">
       <!-- 今日专属晨报卡片 -->
-      <view class="briefing-card" @tap="goBriefing">
+      <view class="briefing-card" @tap="goBriefingDetail">
         <view class="briefing-left">
           <view class="briefing-top">
             <text class="briefing-tag">今日专属</text>
-            <text class="briefing-period">{{ briefingPeriod }}</text>
+            <text class="briefing-period">{{ briefingTypeLabel }}</text>
           </view>
-          <view class="briefing-highlight">
+          <!-- 有数据时：显示摘要 -->
+          <view v-if="briefingStatus === 'ready'" class="briefing-highlight">
             <text class="highlight-prefix">重点看</text>
-            <text class="highlight-stock">{{ briefingHighlight.stock }}</text>
-            <text class="highlight-reason">获{{ briefingHighlight.reason }}</text>
+            <text class="highlight-stock">{{ briefingSummary }}</text>
           </view>
-          <view class="briefing-desc">
-            <text>{{ briefingHighlight.sub }}</text>
+          <!-- 空状态/错误/加载时：显示提示 -->
+          <view v-else class="briefing-highlight">
+            <text class="highlight-prefix">{{ getBriefingDesc() }}</text>
+          </view>
+          <view v-if="briefingStatus === 'ready'" class="briefing-desc">
+            <text>查看完整报告</text>
             <text class="desc-arrow">›</text>
           </view>
-          <view class="briefing-btn">
+          <view class="briefing-btn" @tap.stop="goBriefing">
             <text class="btn-icon">◉</text>
             <text class="btn-text">专属播报</text>
           </view>
         </view>
         <view class="briefing-right">
-          <view class="ai-avatar-wrap">
+          <view class="ai-avatar-wrap" :class="{ 'ai-avatar-loading': briefingLoading }">
             <SvgIcon name="headphone-line" size="40rpx" color="#4d7cfe" />
           </view>
           <view class="ai-avatar-ring ring-1"></view>
@@ -114,13 +118,47 @@
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { useBriefingCard } from '@/shared/utils/useBriefingCard'
 
-const briefingPeriod = ref('晚报 ⌄')
-const briefingHighlight = ref({
-  stock: '山西焦化',
-  reason: '主力抢筹',
-  sub: '或存反弹机会'
-})
+const {
+  typeLabel: briefingTypeLabel,
+  summary: briefingSummary,
+  status: briefingStatus,
+  loading: briefingLoading,
+  refresh: briefingRefresh,
+} = useBriefingCard()
+
+// 卡片描述文案（根据状态）
+function getBriefingDesc(): string {
+  switch (briefingStatus.value) {
+    case 'empty':
+      return briefingTypeLabel.value === '晨报'
+        ? '晨报生成中，9:00后查看'
+        : '晚报生成中，15:30后查看'
+    case 'error':
+      return '暂不可用，点击重试'
+    case 'loading':
+      return '加载中...'
+    default:
+      return ''
+  }
+}
+
+// 卡片点击
+function goBriefingDetail() {
+  if (briefingStatus.value === 'ready') {
+    const type = briefingTypeLabel.value === '晨报' ? 'morning' : 'review'
+    uni.navigateTo({ url: `/pages-sub-app/briefing-detail/index?type=${type}` })
+  } else if (briefingStatus.value === 'error') {
+    // 触发重试
+    briefingRefresh()
+  } else {
+    uni.showToast({
+      title: getBriefingDesc(),
+      icon: 'none',
+    })
+  }
+}
 
 const leaderStocks = ref([
   { name: '成都银行', tag: '洗盘', tagType: 'wash' },
@@ -160,6 +198,7 @@ const aiReports = ref([
 ])
 
 onShow(() => {
+  briefingRefresh()
 })
 
 function goChat() {
@@ -363,6 +402,15 @@ function goLogin() {
   width: 140rpx;
   height: 140rpx;
   opacity: 0.5;
+}
+
+.ai-avatar-loading {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* ===== 功能入口 2x2 网格 ===== */
