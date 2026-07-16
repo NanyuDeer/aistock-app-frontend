@@ -115,6 +115,62 @@
         </view>
       </view>
 
+      <!-- 半年报信息 -->
+      <view v-if="semiAnnualReport" class="section-card">
+        <view class="section-header">
+          <text class="section-title">半年报财务数据</text>
+          <text v-if="semiAnnualReport.reports?.length" class="section-sub">
+            {{ semiAnnualReport.reports[0]?.end_date?.slice(0, 4) }}年半年报
+          </text>
+        </view>
+        <view class="semi-grid">
+          <view v-if="semiAnnualReport.reports?.length" class="semi-table">
+            <view class="semi-row semi-header">
+              <text class="semi-cell semi-cell-label">财务指标</text>
+              <text class="semi-cell semi-cell-value">本期</text>
+              <text class="semi-cell semi-cell-value">同比</text>
+            </view>
+            <view class="semi-row">
+              <text class="semi-cell semi-cell-label">营业总收入</text>
+              <text class="semi-cell semi-cell-value">{{ formatSemiAmount(semiAnnualReport.reports[0]?.total_revenue) }}</text>
+              <text :class="['semi-cell', 'semi-cell-value', growthClass(semiAnnualReport.total_revenue_yoy)]">
+                {{ formatGrowth(semiAnnualReport.total_revenue_yoy) }}
+              </text>
+            </view>
+            <view class="semi-row">
+              <text class="semi-cell semi-cell-label">净利润</text>
+              <text class="semi-cell semi-cell-value">{{ formatSemiAmount(semiAnnualReport.reports[0]?.n_income) }}</text>
+              <text :class="['semi-cell', 'semi-cell-value', growthClass(semiAnnualReport.n_income_yoy)]">
+                {{ formatGrowth(semiAnnualReport.n_income_yoy) }}
+              </text>
+            </view>
+            <view class="semi-row">
+              <text class="semi-cell semi-cell-label">归母净利润</text>
+              <text class="semi-cell semi-cell-value">{{ formatSemiAmount(semiAnnualReport.reports[0]?.n_income_attr_p) }}</text>
+              <text :class="['semi-cell', 'semi-cell-value', growthClass(semiAnnualReport.n_income_attr_p_yoy)]">
+                {{ formatGrowth(semiAnnualReport.n_income_attr_p_yoy) }}
+              </text>
+            </view>
+            <view class="semi-row">
+              <text class="semi-cell semi-cell-label">基本每股收益</text>
+              <text class="semi-cell semi-cell-value">{{ semiAnnualReport.reports[0]?.basic_eps ?? '--' }}元</text>
+              <text class="semi-cell semi-cell-value">--</text>
+            </view>
+            <view class="semi-row">
+              <text class="semi-cell semi-cell-label">研发费用</text>
+              <text class="semi-cell semi-cell-value">{{ formatSemiAmount(semiAnnualReport.reports[0]?.rd_exp) }}</text>
+              <text class="semi-cell semi-cell-value">--</text>
+            </view>
+          </view>
+          <view v-else class="semi-empty">
+            <text class="semi-empty-text">暂无半年报数据</text>
+          </view>
+        </view>
+        <view class="semi-footer">
+          <text class="semi-link" @tap="openDisclosureUrl">查看完整公告 ›</text>
+        </view>
+      </view>
+
       <!-- AI 投顾入口 -->
       <view class="ai-card" @tap="goChat">
         <view class="ai-icon-wrap">
@@ -143,6 +199,8 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 const loading = ref(true)
 const quote = ref<any>(null)
 const capitalFlow = ref<any>(null)
+const semiAnnualReport = ref<any>(null)
+const disclosureUrl = ref('')
 const symbol = ref('')
 
 onLoad((options: any) => {
@@ -155,9 +213,10 @@ onLoad((options: any) => {
 async function loadData() {
   loading.value = true
   try {
-    const [quoteData, flowData] = await Promise.allSettled([
+    const [quoteData, flowData, semiData] = await Promise.allSettled([
       stockApi.getQuote(symbol.value),
       stockApi.getCapitalFlow(symbol.value),
+      stockApi.getSemiAnnualReport(symbol.value),
     ])
     if (quoteData.status === 'fulfilled') {
       quote.value = quoteData.value
@@ -166,6 +225,11 @@ async function loadData() {
       // 适配资金流向数据格式
       const flow = flowData.value as any
       capitalFlow.value = flow?.data || flow
+    }
+    if (semiData.status === 'fulfilled') {
+      const semi = semiData.value as any
+      semiAnnualReport.value = semi?.data || semi
+      disclosureUrl.value = semiAnnualReport.value?.disclosure_url || ''
     }
   } catch (err) {
     console.error('[StockDetail] load error:', err)
@@ -186,6 +250,42 @@ function formatAmount(amt: number): string {
   if (Math.abs(amt) >= 100000000) return (amt / 100000000).toFixed(2) + '亿'
   if (Math.abs(amt) >= 10000) return (amt / 10000).toFixed(2) + '万'
   return amt.toFixed(2) + '元'
+}
+
+function formatSemiAmount(amt: number): string {
+  if (!amt) return '--'
+  const yi = Math.abs(amt) / 100000000
+  if (yi >= 1) return yi.toFixed(2) + '亿'
+  const wan = Math.abs(amt) / 10000
+  if (wan >= 1) return wan.toFixed(2) + '万'
+  return amt.toFixed(2) + '元'
+}
+
+function formatGrowth(val: number | null): string {
+  if (val === null || val === undefined) return '--'
+  const prefix = val > 0 ? '+' : ''
+  return `${prefix}${val.toFixed(2)}%`
+}
+
+function growthClass(val: number | null): string {
+  if (val === null || val === undefined) return ''
+  return val >= 0 ? 'up' : 'down'
+}
+
+function openDisclosureUrl() {
+  if (disclosureUrl.value) {
+    // #ifdef H5
+    window.open(disclosureUrl.value, '_blank')
+    // #endif
+    // #ifndef H5
+    uni.setClipboardData({
+      data: disclosureUrl.value,
+      success: () => {
+        uni.showToast({ title: '链接已复制', icon: 'none' })
+      },
+    })
+    // #endif
+  }
 }
 
 function goChat() {
@@ -434,5 +534,88 @@ function goChat() {
 .ai-arrow {
   font-size: 36rpx;
   color: #4d7cfe;
+}
+
+/* 半年报 */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.section-sub {
+  font-size: 24rpx;
+  color: #4d7cfe;
+  font-weight: 500;
+}
+
+.semi-grid {
+  margin-bottom: 16rpx;
+}
+
+.semi-table {
+  border-radius: 12rpx;
+  overflow: hidden;
+  border: 1rpx solid #e5e7eb;
+}
+
+.semi-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1rpx solid #f0f2f5;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &.semi-header {
+    background: #f5f7fa;
+    font-weight: 600;
+  }
+}
+
+.semi-cell {
+  flex: 1;
+  padding: 16rpx 12rpx;
+  font-size: 24rpx;
+  color: #374151;
+  text-align: center;
+
+  &.semi-cell-label {
+    flex: 1.2;
+    text-align: left;
+    padding-left: 16rpx;
+    color: #6b7280;
+  }
+
+  &.semi-cell-value {
+    font-weight: 500;
+
+    &.up { color: #f43f5e; }
+    &.down { color: #22c55e; }
+  }
+}
+
+.semi-empty {
+  padding: 40rpx;
+  text-align: center;
+}
+
+.semi-empty-text {
+  font-size: 26rpx;
+  color: #9ca3af;
+}
+
+.semi-footer {
+  border-top: 1rpx solid #f0f2f5;
+  padding-top: 16rpx;
+  text-align: center;
+}
+
+.semi-link {
+  font-size: 26rpx;
+  color: #4d7cfe;
+  font-weight: 500;
 }
 </style>

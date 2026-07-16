@@ -170,6 +170,11 @@ export const stockApi = {
   /** 获取推送历史 */
   getPushHistory(params?: { date?: string }) {
     return request.get<{ items: PushHistoryItem[] }>('/potential-stocks/push-history', { params }).then((res: any) => res)
+  },
+
+  /** 获取半年报关键财务数据 */
+  getSemiAnnualReport(symbol: string) {
+    return request.get(`/cn/stocks/${symbol}/semi-annual-report`).then((res: any) => res?.data || res)
   }
 }
 
