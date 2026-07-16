@@ -6,16 +6,13 @@
  *   - 进度步骤展示（"正在理解你的问题..." → "正在查阅分析报告..." → "正在生成回复..."）
  *   - 工具调用进度（"正在查询个股行情..."）
  *   - 自动降级到 HTTP 非流式（WS 连接失败时）
+ *   - 完成后保留进度步骤（折叠显示）
  */
 import { ref } from 'vue'
-import { createAgentWebSocket, agentApi, type ChatMessage } from '@/shared/api/modules/agent'
+import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep } from '@/shared/api/modules/agent'
 import { useChatStore } from '@/shared/store/modules/chat'
 
-export interface ProgressStep {
-  label: string
-  status: 'pending' | 'done'
-  timestamp: number
-}
+export type { ProgressStep }
 
 export function useChatStream() {
   const chatStore = useChatStore()
@@ -25,6 +22,7 @@ export function useChatStream() {
 
   let socket: UniApp.SocketTask | null = null
   let wsConnected = false
+  let doneReceived = false
 
   function connect(): Promise<boolean> {
     return new Promise((resolve) => {
@@ -59,6 +57,9 @@ export function useChatStream() {
   }
 
   function handleWsMessage(data: any, onDone: () => void) {
+    // 防止 done 后继续处理事件
+    if (doneReceived) return
+
     const type = data.type
 
     switch (type) {
@@ -98,12 +99,16 @@ export function useChatStream() {
 
       case 'done':
         {
+          doneReceived = true
           const finalText = data.content || streamingText.value
+          // 保存进度步骤到消息（所有步骤标记为完成）
+          const savedSteps = progressSteps.value.map(s => ({ ...s, status: 'done' as const }))
           progressSteps.value = []
           streamingText.value = ''
           chatStore.appendMessage({
             role: 'assistant',
             content: finalText,
+            progressSteps: savedSteps.length > 0 ? savedSteps : undefined,
             timestamp: Date.now()
           })
           onDone()
@@ -111,14 +116,19 @@ export function useChatStream() {
         break
 
       case 'error':
-        progressSteps.value = []
-        streamingText.value = ''
-        chatStore.appendMessage({
-          role: 'assistant',
-          content: `抱歉，出错了：${data.content || '未知错误'}`,
-          timestamp: Date.now()
-        })
-        onDone()
+        {
+          doneReceived = true
+          const savedSteps = progressSteps.value.map(s => ({ ...s, status: 'done' as const }))
+          progressSteps.value = []
+          streamingText.value = ''
+          chatStore.appendMessage({
+            role: 'assistant',
+            content: `抱歉，出错了：${data.content || '未知错误'}`,
+            progressSteps: savedSteps.length > 0 ? savedSteps : undefined,
+            timestamp: Date.now()
+          })
+          onDone()
+        }
         break
     }
   }
@@ -132,6 +142,7 @@ export function useChatStream() {
     streaming.value = true
     progressSteps.value = []
     streamingText.value = ''
+    doneReceived = false
 
     // 尝试 WebSocket 流式
     if (!wsConnected) {
@@ -146,6 +157,7 @@ export function useChatStream() {
           resolve()
         }
 
+        // 注册 onMessage（uni-app 会替换之前的回调）
         socket!.onMessage((msg: any) => {
           try {
             const data = JSON.parse(msg.data)
@@ -169,21 +181,25 @@ export function useChatStream() {
       try {
         const result: any = await agentApi.sendMessage(content, chatStore.sessionId)
         if (result.session_id) chatStore.sessionId = result.session_id
+        const savedSteps = progressSteps.value.map(s => ({ ...s, status: 'done' as const }))
         progressSteps.value = []
         chatStore.appendMessage({
           role: 'assistant',
           content: result.content || result.message || '',
           skillResult: result.skill_result,
+          progressSteps: savedSteps,
           timestamp: Date.now()
         })
       } catch (e: any) {
         const errMsg = e?.errMsg === 'request:ok'
           ? '服务响应格式异常，请稍后重试'
           : (e?.errMsg || e?.message || '网络错误，请稍后重试')
+        const savedSteps = progressSteps.value.map(s => ({ ...s, status: 'done' as const }))
         progressSteps.value = []
         chatStore.appendMessage({
           role: 'assistant',
           content: `抱歉，出错了：${errMsg}`,
+          progressSteps: savedSteps,
           timestamp: Date.now()
         })
       } finally {

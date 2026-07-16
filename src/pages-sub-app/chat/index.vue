@@ -4,11 +4,42 @@
       <!-- 消息列表 -->
       <scroll-view scroll-y class="message-list" :scroll-top="scrollTop">
         <view v-for="(msg, idx) in messages" :key="idx" class="message-item" :class="msg.role">
+          <!-- 用户消息 -->
           <text v-if="msg.role === 'user'" class="msg-content user">{{ msg.content }}</text>
+
+          <!-- AI 消息 -->
           <view v-else class="msg-content assistant">
             <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#4d7cfe" />
             <view class="bubble">
+              <!-- 折叠的进度步骤（完成后保留） -->
+              <view
+                v-if="msg.progressSteps && msg.progressSteps.length > 0"
+                class="progress-collapse"
+                @tap="toggleProgress(idx)"
+              >
+                <text class="progress-collapse-title">运行过程 ({{ msg.progressSteps.length }})</text>
+                <SvgIcon
+                  :name="expandedProgress[idx] ? 'arrow-up-s-line' : 'arrow-down-s-line'"
+                  size="24rpx"
+                  color="#9ca3af"
+                />
+              </view>
+              <view v-if="msg.progressSteps && expandedProgress[idx]" class="progress-card static">
+                <view
+                  v-for="(step, sIdx) in msg.progressSteps"
+                  :key="sIdx"
+                  class="progress-step done"
+                >
+                  <view class="step-icon">
+                    <text class="step-check">✓</text>
+                  </view>
+                  <text class="step-label">{{ step.label }}</text>
+                </view>
+              </view>
+
+              <!-- Markdown 渲染的回复内容 -->
               <mp-html v-if="msg.content" :content="markdownToHtml(msg.content)" class="bubble-html" />
+
               <!-- 股票行情卡片 -->
               <view
                 v-if="msg.skillResult?.data?.symbol && msg.skillResult?.data?.price !== undefined"
@@ -35,6 +66,7 @@
                   <text class="detail-item">开 {{ Number(msg.skillResult.data.open).toFixed(2) }}</text>
                 </view>
               </view>
+
               <!-- 资金流向卡片 -->
               <view
                 v-else-if="msg.skillResult?.data?.netAmount !== undefined || msg.skillResult?.data?.net_amount !== undefined"
@@ -48,6 +80,7 @@
                   </text>
                 </view>
               </view>
+
               <!-- 纯文本 Skill 结果 -->
               <view v-else-if="msg.skillResult?.narrative && msg.skillResult.type === 'text'" class="skill-text-card">
                 <text class="skill-text">{{ msg.skillResult.narrative }}</text>
@@ -56,7 +89,7 @@
           </view>
         </view>
 
-        <!-- 流式进度卡片 -->
+        <!-- 流式进度卡片（当前正在生成） -->
         <view v-if="streaming" class="message-item assistant">
           <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#4d7cfe" />
           <view class="bubble">
@@ -75,10 +108,10 @@
                 <text class="step-label">{{ step.label }}</text>
               </view>
             </view>
-            <!-- 逐 token 流式文本 -->
+            <!-- 逐 token 流式文本 + 内联光标 -->
             <view v-if="streamingText" class="streaming-text-wrap">
-              <mp-html :content="markdownToHtml(streamingText)" class="bubble-html streaming-text" />
-              <text class="cursor">▊</text>
+              <mp-html :content="markdownToHtml(streamingText)" class="bubble-html" />
+              <text class="streaming-cursor">▊</text>
             </view>
           </view>
         </view>
@@ -110,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onUnmounted } from 'vue'
+import { ref, reactive, nextTick, onUnmounted } from 'vue'
 import { useChatStream } from '@/shared/utils/useChatStream'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
@@ -121,6 +154,11 @@ const { messages, streaming, progressSteps, streamingText, send, disconnect } = 
 
 const inputText = ref('')
 const scrollTop = ref(0)
+const expandedProgress = reactive<Record<number, boolean>>({})
+
+function toggleProgress(idx: number) {
+  expandedProgress[idx] = !expandedProgress[idx]
+}
 
 function handleSend() {
   const content = inputText.value.trim()
@@ -203,18 +241,40 @@ onUnmounted(() => {
 :deep(.md-table th) { background: #f5f7fa; font-size: 24rpx; padding: 8rpx; border: 1rpx solid #e5e7eb; }
 :deep(.md-table td) { font-size: 24rpx; padding: 8rpx; border: 1rpx solid #e5e7eb; }
 
-/* 流式文本光标动画 */
-.streaming-text-wrap { display: flex; align-items: flex-end; }
-.streaming-text { flex: 1; }
-.cursor { color: #4d7cfe; animation: blink 1s step-end infinite; }
+/* 流式文本区域 — block 布局，光标内联在末尾 */
+.streaming-text-wrap {
+  position: relative;
+}
+.streaming-cursor {
+  color: #4d7cfe;
+  animation: blink 1s step-end infinite;
+  font-size: 28rpx;
+  line-height: 1.6;
+  display: inline;
+}
 @keyframes blink { 50% { opacity: 0; } }
 
 /* 涨跌色 */
 .up { color: #f43f5e; }
 .down { color: #22c55e; }
 
+/* 折叠的进度步骤 */
+.progress-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 0;
+  margin-bottom: 4rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+.progress-collapse-title {
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
 /* 进度卡片 */
 .progress-card { padding: 4rpx 0 12rpx; }
+.progress-card.static { padding-top: 8rpx; }
 .progress-step {
   display: flex; align-items: center; gap: 12rpx; padding: 6rpx 0;
 }

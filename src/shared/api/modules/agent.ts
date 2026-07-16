@@ -4,10 +4,17 @@
 import request from '../request'
 import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
 
+export interface ProgressStep {
+  label: string
+  status: 'pending' | 'done'
+  timestamp: number
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   skillResult?: SkillResult
+  progressSteps?: ProgressStep[]
   timestamp: number
 }
 
