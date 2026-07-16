@@ -2,7 +2,7 @@
  * AI 智能体相关 API（App 专属功能）
  */
 import request from '../request'
-import { WS_BASE_URL } from '@/shared/utils/constants'
+import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -109,5 +109,18 @@ export function createWebSocket() {
     url,
     success: () => console.log('[WS] connecting...'),
     fail: (err) => console.error('[WS] connect failed:', err)
+  })
+}
+
+/**
+ * 创建 Agent Python 后端 WebSocket 连接（用于 AI 对话流式 + 进度反馈）
+ * 连接地址: {AGENT_WS_BASE_URL}/chat
+ */
+export function createAgentWebSocket() {
+  const url = `${AGENT_WS_BASE_URL}/chat`
+  return uni.connectSocket({
+    url,
+    success: () => console.log('[AgentWS] connecting...'),
+    fail: (err) => console.error('[AgentWS] connect failed:', err)
   })
 }

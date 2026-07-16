@@ -60,6 +60,30 @@
           </view>
         </view>
       </view>
+
+      <!-- 流式进度卡片 -->
+      <view v-if="streaming" class="message-item assistant">
+        <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#4d7cfe" />
+        <view class="bubble">
+          <!-- 进度步骤 -->
+          <view v-if="progressSteps.length > 0" class="progress-card">
+            <view
+              v-for="(step, sIdx) in progressSteps"
+              :key="sIdx"
+              class="progress-step"
+              :class="step.status"
+            >
+              <view class="step-icon">
+                <text v-if="step.status === 'done'" class="step-check">✓</text>
+                <view v-else class="step-spinner" />
+              </view>
+              <text class="step-label">{{ step.label }}</text>
+            </view>
+          </view>
+          <!-- 逐 token 流式文本 -->
+          <text v-if="streamingText" class="bubble-text streaming-text">{{ streamingText }}<text class="cursor">▊</text></text>
+        </view>
+      </view>
     </scroll-view>
 
     <!-- 快捷 Skills -->
@@ -87,13 +111,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
-import { useChatStore } from '@/shared/store/modules/chat'
+import { ref, nextTick, onUnmounted } from 'vue'
+import { useChatStream } from '@/shared/utils/useChatStream'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
-const chatStore = useChatStore()
-const messages = chatStore.messages
-const streaming = chatStore.streaming
+const { messages, streaming, progressSteps, streamingText, send, disconnect } = useChatStream()
 
 const inputText = ref('')
 const scrollTop = ref(0)
@@ -102,15 +124,15 @@ try { statusBarHeight.value = uni.getSystemInfoSync().statusBarHeight || 0 } cat
 
 function handleSend() {
   const content = inputText.value.trim()
-  if (!content || streaming) return
+  if (!content || streaming.value) return
   inputText.value = ''
-  chatStore.sendMessage(content)
+  send(content)
   scrollToBottom()
 }
 
 function quickAsk(text: string) {
-  if (streaming) return
-  chatStore.sendMessage(text)
+  if (streaming.value) return
+  send(text)
   scrollToBottom()
 }
 
@@ -141,6 +163,10 @@ function scrollToBottom() {
     scrollTop.value = 99999
   })
 }
+
+onUnmounted(() => {
+  disconnect()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -168,9 +194,32 @@ function scrollToBottom() {
 }
 .bubble-text { font-size: 28rpx; color: #1a1d24; line-height: 1.5; display: block; }
 
+/* 流式文本光标动画 */
+.streaming-text { color: #1a1d24; }
+.cursor { color: #4d7cfe; animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
 /* 涨跌色 */
 .up { color: #f43f5e; }
 .down { color: #22c55e; }
+
+/* 进度卡片 */
+.progress-card { padding: 4rpx 0 12rpx; }
+.progress-step {
+  display: flex; align-items: center; gap: 12rpx; padding: 6rpx 0;
+}
+.step-icon {
+  width: 32rpx; height: 32rpx; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.step-check { font-size: 24rpx; color: #22c55e; font-weight: 700; }
+.step-spinner {
+  width: 24rpx; height: 24rpx; border: 3rpx solid #e5e7eb; border-top-color: #4d7cfe;
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.step-label { font-size: 24rpx; color: #6b7280; }
+.progress-step.done .step-label { color: #9ca3af; }
 
 /* 行情卡片 */
 .quote-card {
