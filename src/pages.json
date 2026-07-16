@@ -178,6 +178,22 @@
       }
     },
     {
+      "path": "modules/analytics/pages/reports",
+      "style": {
+        "navigationBarTitleText": "业绩",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "modules/analytics/pages/report-detail",
+      "style": {
+        "navigationBarTitleText": "财报详情",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "modules/chat/pages/event/list",
       "style": {
         "navigationBarTitleText": "事件传导",
