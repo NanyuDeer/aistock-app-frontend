@@ -230,6 +230,7 @@
           "path": "briefing/index",
           "style": {
             "navigationBarTitleText": "双人对话播报",
+            "navigationStyle": "custom",
             "disableScroll": true,
             "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
           }

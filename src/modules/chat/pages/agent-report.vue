@@ -26,7 +26,7 @@
           <view v-if="detailsText" class="section">
             <text class="section-title">详细分析</text>
             <view class="report-text-wrap">
-              <text class="report-text">{{ detailsText }}</text>
+              <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
             </view>
           </view>
 
@@ -61,8 +61,10 @@
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { agentApi } from '@/shared/api/modules/agent'
+import { markdownToHtml } from '@/shared/utils/markdown'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 interface DisplayReport {
   risks?: string[]
@@ -216,6 +218,20 @@ onLoad((options) => {
 .report-text-wrap {
   margin-top: 8rpx;
 }
+
+/* mp-html 样式覆盖 */
+:deep(.report-html) {
+  font-size: 28rpx;
+  color: #1a1d24;
+  line-height: 1.8;
+}
+:deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
+:deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }
+:deep(.md-hr) { border: none; border-top: 1rpx solid #e5e7eb; margin: 12rpx 0; }
+:deep(.md-ul) { padding-left: 20rpx; margin: 8rpx 0; }
+:deep(.md-ol) { padding-left: 20rpx; margin: 8rpx 0; }
+:deep(.md-ul-li) { font-size: 28rpx; color: #1a1d24; line-height: 1.8; }
+:deep(.md-ol-li) { font-size: 28rpx; color: #1a1d24; line-height: 1.8; }
 
 .report-text {
   font-size: 28rpx;
