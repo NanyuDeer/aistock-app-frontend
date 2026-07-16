@@ -184,16 +184,6 @@
       }
     },
     {
-      "path": "modules/analytics/pages/forecast",
-      "style": {
-        "navigationBarTitleText": "业绩",
-        "navigationStyle": "custom",
-        "enablePullDownRefresh": false,
-        "disableScroll": true,
-        "app-plus": { "bounce": "none" }
-      }
-    },
-    {
       "path": "modules/analytics/pages/reports",
       "style": {
         "navigationBarTitleText": "业绩",

@@ -28,11 +28,13 @@
           <!-- 卡片头部：股票名称 + 股票代码 + 板块标签 + 行情数据 -->
           <view class="signal-top">
             <view class="signal-stock">
-              <text class="stock-name">{{ sig.stockName || sig.symbol }}</text>
+              <view class="stock-name-row">
+                <text class="stock-name">{{ sig.stockName || sig.symbol }}</text>
+                <text v-if="sig.sectorInfo || sig.thsSectorName" class="sector-tag">
+                  {{ sig.sectorInfo || sig.thsSectorName }}
+                </text>
+              </view>
               <text class="stock-code">{{ sig.symbol }}</text>
-              <text v-if="sig.sectorInfo || sig.thsSectorName" class="sector-tag">
-                {{ sig.sectorInfo || sig.thsSectorName }}
-              </text>
             </view>
             <view class="signal-quote">
               <text v-if="sig.price != null" class="price-val">
@@ -245,7 +247,7 @@ onShow(() => {
 .signal-card {
   background: #ffffff;
   border-radius: 20rpx;
-  padding: 28rpx;
+  padding: 24rpx 28rpx 20rpx;
   border-left: 6rpx solid #e2e8f0;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 
@@ -259,10 +261,17 @@ onShow(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16rpx;
+  margin-bottom: 12rpx;
 }
 
 .signal-stock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4rpx;
+}
+
+.stock-name-row {
   display: flex;
   align-items: center;
   gap: 12rpx;
@@ -331,7 +340,7 @@ onShow(() => {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  margin-bottom: 16rpx;
+  margin-bottom: 0;
 }
 
 .signal-meta .signal-tags {
@@ -377,7 +386,7 @@ onShow(() => {
   display: inline-block;
   padding: 4rpx 16rpx;
   border-radius: 20rpx;
-  font-size: 22rpx;
+  font-size: 20rpx;
   font-weight: 500;
   background: rgba(77, 124, 254, 0.08);
   color: #4d7cfe;

@@ -1,6 +1,6 @@
 <template>
   <view class="page-alerts">
-    <PageCard title="特别提醒">
+    <PageCard title="特别提醒" :footer-height="88">
       <!-- 堆叠卡片容器 -->
       <view class="stack-container" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
         <!-- 后方堆叠卡片预览（最多显示2张） -->

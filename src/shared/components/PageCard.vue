@@ -8,22 +8,21 @@
     </view>
 
     <!-- 白色圆角卡片：标题固定 + 内容可滚动 -->
-    <view class="page-card" :style="{ marginBottom: cardMarginBottom }">
+    <view class="page-card" :style="{ marginBottom: dynamicMarginBottom }">
       <view class="card-header">
         <text class="card-title">{{ title }}</text>
         <slot name="header-right" />
       </view>
-      <!-- 用 JS 算出精确像素高度绑定给 scroll-view，避免 flex:1 在 App 端失效 -->
+      <!-- 用 flex:1 撑满剩余空间，footer 自然固定在底部 -->
       <scroll-view
         scroll-y
         class="card-content"
         :enhanced="true"
         :bounces="false"
-        :style="{ height: scrollHeight + 'px' }"
       >
         <slot />
       </scroll-view>
-      <!-- 可选底部操作栏插槽 -->
+      <!-- 可选底部操作栏插槽（flex-shrink:0 固定在卡片底部） -->
       <slot name="footer" />
     </view>
 
@@ -36,16 +35,20 @@
 import { ref, computed } from 'vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { rpx2px, getBottomFixedHeightPx, px2rpx } from '@/shared/utils/layout'
 
 const props = withDefaults(defineProps<{
   title?: string
   cardMarginBottom?: string
   /** 当前激活的面板页：'favorites' | 'trade' | '' */
   activePanel?: string
+  /** 底部 footer 插槽高度（rpx），用于从 scroll-view 高度中扣除，保证 footer 固定可见 */
+  footerHeight?: number
 }>(), {
   title: '',
   cardMarginBottom: '207rpx', /* 底部留白：Tab栏 + 间距 + GlobalChatBar */
   activePanel: '',
+  footerHeight: 0,
 })
 
 // 获取真实状态栏高度（px），真机/H5 均可用
@@ -69,22 +72,18 @@ try {
 
 /**
  * 动态计算 scroll-view 像素高度
- * windowHeight - statusBar - navArea(44px) - cardHeader(约40px) - marginBottom
- * rpx 转 px：1rpx = windowWidth/750 px
+ * windowHeight - statusBar - navArea(88rpx) - cardHeader(88rpx) - 底部固定栏(动态高度含安全区)
+ *
+ * 使用共享布局工具计算底部高度，解决刘海屏设备底部内容被遮挡的问题。
+ * 如果外部传入了自定义 cardMarginBottom，则使用传入值（向后兼容）。
  */
-const scrollHeight = computed(() => {
-  // navArea: 88rpx → px
-  const rpx2px = (rpx: number) => {
-    try {
-      const w = uni.getSystemInfoSync().windowWidth || 375
-      return rpx * w / 750
-    } catch { return rpx / 2 }
+const dynamicMarginBottom = computed(() => {
+  // 外部传入了非默认值时，沿用传入值
+  if (props.cardMarginBottom && props.cardMarginBottom !== '207rpx') {
+    return props.cardMarginBottom
   }
-  const navH = rpx2px(88)
-  const headerH = rpx2px(88) // card-header 约 88rpx (padding+text)
-  const marginB = rpx2px(parseInt(props.cardMarginBottom) || 207)
-  const total = windowHeight.value - statusBarHeight.value - navH - headerH - marginB
-  return Math.max(total, 100) // 下限 100px
+  // 默认：动态计算底部固定栏总高度并转为 rpx
+  return px2rpx(getBottomFixedHeightPx()) + 'rpx'
 })
 
 function goProfile() {
@@ -163,8 +162,10 @@ function goProfile() {
   color: #1a1d24;
 }
 
-/* 可滚动内容区域：白色背景，恢复触摸滚动 */
+/* 可滚动内容区域：flex:1 撑满剩余空间，footer 固定在底部 */
 .card-content {
+  flex: 1;
+  min-height: 0;
   background: #ffffff;
   touch-action: auto;
   overscroll-behavior: contain;

@@ -33,6 +33,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
+import { rpx2px, getChatBarHeightPx } from '@/shared/utils/layout'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -76,16 +77,16 @@ try {
 /**
  * 动态计算 scroll-view 像素高度
  * 有副标题时导航栏更高（120rpx），无副标题时 88rpx
+ *
+ * 必须使用 shared/utils/layout 的 rpx2px（基于 uni.upx2px），
+ * 不能用 getSystemInfoSync().windowWidth 自行换算：
+ * H5 dev 模式下 windowWidth 返回浏览器全宽（如 1463px）而非模拟移动端宽度（375px），
+ * 会导致 navH/chatBarH 严重偏大、scrollHeight 过小甚至被钳到 100，
+ * scroll-view 下方出现灰色空隙，内容 div 无法占满。
  */
 const scrollHeight = computed(() => {
-  const rpx2px = (rpx: number) => {
-    try {
-      const w = uni.getSystemInfoSync().windowWidth || 375
-      return rpx * w / 750
-    } catch { return rpx / 2 }
-  }
   const navH = rpx2px(props.subtitle ? 120 : 88)
-  const chatBarH = props.noChatBar ? 0 : rpx2px(147)
+  const chatBarH = props.noChatBar ? 0 : getChatBarHeightPx()
   const total = windowHeight.value - statusBarHeight.value - navH - chatBarH
   return Math.max(total, 100)
 })

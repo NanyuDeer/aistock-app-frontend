@@ -2,6 +2,39 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [master] 2026-07-17 — 布局系统性修复 + 业绩 Tab 重构 + 多项 UI 优化
+**开发者**: Aria
+
+### 修复
+- `src/shared/components/SubPageCard2.vue`：删除基于 `getSystemInfoSync().windowWidth` 的本地 `rpx2px`，改复用 `@/shared/utils/layout` 的 `rpx2px`/`getChatBarHeightPx`，修复 H5 dev 模式 scroll-view 内容未占满
+- `src/shared/utils/layout.ts`（新建）：共享布局工具，`rpx2px` 改用 `uni.upx2px`，提供 `getSafeAreaInsetBottom`/`getChatBarHeightPx`/`getTabBarBottomPx`/`getBottomFixedHeightPx`，修复 H5 dev 模式 rpx 换算严重偏大导致滚动失效
+- `src/shared/components/SubPageCard.vue`：scrollHeight 改用 `getChatBarHeightPx()`，新增 `.sub-page-body` flex 容器，修复刘海屏底部约 69rpx 重叠 + H5 滚动失效
+- `src/shared/components/PageCard.vue`：移除动态 `:style` 高度，改用 `flex:1; min-height:0`；新增 `footerHeight` prop 保证 footer 固定；`marginBottom` 改用 `getBottomFixedHeightPx()`
+- `src/shared/components/AppBottomBar.vue`：`.as-tab-bar` 的 `bottom` 改用 `:style` 绑定 `getTabBarBottomPx()`；"业绩"tab 路径改为 `/modules/home/pages/index?tab=forecast`
+- `src/modules/chat/pages/index.vue`：`.message-list` 添加 `min-height:0`，`.chat-header`/`.quick-skills`/`.input-bar` 添加 `flex-shrink:0`，修复输入框被对话内容挤没
+- `src/modules/user/pages/profile.vue`：`handleLogout()` 退出后跳转首页；`DEFAULT_SETTINGS` 改回全 `false`；`getSwitchValue()` 替换 3 处 `any`
+- `src/shared/utils/useAuth.ts`：`requireLogin()` 跳转路径修正为 `/modules/user/pages/login`
+- `src/modules/market/pages/leaders.vue`：`onReady` 测量 `.bubble-wrap` 实际宽度更新 `containerWidth`，修复 App 端 zoom:1.2 导致泡泡图偏右
+- `src/modules/market/pages/hot-burst.vue`：股票代码改垂直排列；卡片 padding 紧凑化；`.kw-tag` 字号 22rpx→20rpx
+- `src/modules/favorites/pages/favorites.vue`：删除按钮改左滑揭示，新增 touch 事件处理
+- `src/modules/favorites/components/AlertContent.vue`：移除内部 footer，通过 `defineExpose` 暴露状态
+- `src/shared/components/MainTabs.vue`：alert tab footer 移至 scroll-view 外固定；新增"业绩"tab 预测/报告切换按钮
+- `src/shared/components/GlobalChatBar.vue`：`unreadCount` 默认值 11→0，移除硬编码徽章
+- `src/modules/home/components/MorningContent.vue`：`.briefing-card` 背景改为 `#f5f7fb`
+- `src/modules/news/pages/detail.vue`：适配 SubPageCard 外壳
+- `src/modules/analytics/pages/report-detail.vue`：改用 SubPageCard；修复 H5 canvas `getContext` 错误（取 `uni-canvas` 内部真实 canvas）；走势图高度 360→240px；修复 `ctx.scale` 与 uCharts `pixelRatio` 叠加缩放问题；类型修复 `any`→具体类型
+
+### 重构
+- `src/modules/analytics/pages/trend-score.vue` + `trend-score-detail.vue`：移除自定义 position:fixed 外壳，改用 `<SubPageCard>` 统一收敛
+- `src/modules/analytics/pages/report-detail.vue`：同上，改用 SubPageCard
+- `src/modules/analytics/components/ReportsContent.vue`（新建）：从 reports.vue 提取业绩报告内容组件
+- `src/modules/analytics/components/ForecastContent.vue`：替换为原 forecast.vue 内容，保留卡片样式与真实 API
+- `src/modules/analytics/pages/forecast.vue`：删除（功能由 MainTabs 接管）
+- `src/modules/analytics/pages/reports.vue`：switchTo 路径更新
+- `src/pages.json`：移除 forecast 路由
+
+---
+
 ## [changer] 2026-07-16 — 简报卡片接入真实 API 数据
 **开发者**: 37588
 

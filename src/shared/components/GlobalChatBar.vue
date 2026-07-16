@@ -38,7 +38,7 @@ const props = withDefaults(defineProps<{
   /** 当前激活的面板页：'favorites' | 'trade' | '' */
   activePanel?: string
 }>(), {
-  unreadCount: 11,
+  unreadCount: 0,
   activePanel: ''
 })
 

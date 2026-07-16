@@ -1,15 +1,13 @@
 <template>
-  <view class="trend-page" :style="{ paddingTop: statusBarHeight + 'px' }">
-    <view class="trend-nav">
-      <view class="nav-button" @tap="goBack">
-        <SvgIcon name="arrow-left-s-line" size="44rpx" color="#1a1d24" />
-      </view>
-      <text class="nav-title">趋势股评分</text>
-      <view class="nav-button" @tap="loadTopStocks">
+  <SubPageCard title="趋势股评分">
+    <!-- 导航栏右侧刷新按钮 -->
+    <template #header-right>
+      <view class="nav-refresh" @tap="loadTopStocks">
         <SvgIcon name="refresh-line" size="34rpx" color="#4d7cfe" />
       </view>
-    </view>
+    </template>
 
+    <!-- 搜索栏 -->
     <view class="search-wrap">
       <SvgIcon name="search-line" size="32rpx" color="#9ca3af" />
       <input
@@ -29,45 +27,45 @@
       </view>
     </view>
 
-    <scroll-view scroll-y class="trend-scroll" :enhanced="true" :bounces="false">
-      <LoadingState v-if="loading" text="正在加载趋势评分" />
-      <view v-else-if="errorMessage" class="state-panel">
-        <SvgIcon name="error-warning-line" size="64rpx" color="#f59e0b" />
-        <text class="state-title">趋势评分暂时无法加载</text>
-        <text class="state-desc">{{ errorMessage }}</text>
-        <button class="retry-button" @tap="loadTopStocks">重新加载</button>
-      </view>
-      <EmptyState v-else-if="!filteredStocks.length" icon="search-eye-line" text="没有找到匹配的趋势股" />
-      <view v-else class="stock-list">
-        <view
-          v-for="stock in filteredStocks"
-          :key="stock.symbol"
-          class="stock-row"
-          @tap="openDetail(stock)"
-        >
-          <view class="stock-main">
-            <text class="stock-name">{{ stock.name || stock.symbol }}</text>
-            <view class="stock-meta">
-              <text class="stock-symbol">{{ stock.symbol }}</text>
-              <text v-if="stock.industry" class="industry-tag">{{ stock.industry }}</text>
-            </view>
+    <!-- 列表内容（SubPageCard 内部已有 scroll-view，无需自行包裹） -->
+    <LoadingState v-if="loading" text="正在加载趋势评分" />
+    <view v-else-if="errorMessage" class="state-panel">
+      <SvgIcon name="error-warning-line" size="64rpx" color="#f59e0b" />
+      <text class="state-title">趋势评分暂时无法加载</text>
+      <text class="state-desc">{{ errorMessage }}</text>
+      <button class="retry-button" @tap="loadTopStocks">重新加载</button>
+    </view>
+    <EmptyState v-else-if="!filteredStocks.length" icon="search-eye-line" text="没有找到匹配的趋势股" />
+    <view v-else class="stock-list">
+      <view
+        v-for="stock in filteredStocks"
+        :key="stock.symbol"
+        class="stock-row"
+        @tap="openDetail(stock)"
+      >
+        <view class="stock-main">
+          <text class="stock-name">{{ stock.name || stock.symbol }}</text>
+          <view class="stock-meta">
+            <text class="stock-symbol">{{ stock.symbol }}</text>
+            <text v-if="stock.industry" class="industry-tag">{{ stock.industry }}</text>
           </view>
-          <view class="score-block">
-            <text class="total-score">{{ stock.score }}</text>
-          </view>
-          <text :class="['grade', `grade-${stock.label.toLowerCase()}`]">{{ stock.label }}</text>
-          <SvgIcon name="arrow-right-s-line" size="30rpx" color="#c6cad2" />
         </view>
-        <view class="list-footnote">评分基于公开数据与模型测算，仅供参考，不构成投资建议。</view>
+        <view class="score-block">
+          <text class="total-score">{{ stock.score }}</text>
+        </view>
+        <text :class="['grade', `grade-${stock.label.toLowerCase()}`]">{{ stock.label }}</text>
+        <SvgIcon name="arrow-right-s-line" size="30rpx" color="#c6cad2" />
       </view>
-    </scroll-view>
-  </view>
+      <view class="list-footnote">评分基于公开数据与模型测算，仅供参考，不构成投资建议。</view>
+    </view>
+  </SubPageCard>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { trendScoreApi, type TrendScoreListItem } from '@/shared/api/modules/trend-score'
+import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
@@ -76,19 +74,6 @@ const stocks = ref<TrendScoreListItem[]>([])
 const keyword = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
-
-const statusBarHeight = ref(0)
-try {
-  const raw = uni.getSystemInfoSync().statusBarHeight || 0
-  // #ifdef APP-PLUS
-  statusBarHeight.value = raw / 1.2
-  // #endif
-  // #ifndef APP-PLUS
-  statusBarHeight.value = raw
-  // #endif
-} catch {
-  statusBarHeight.value = 0
-}
 
 const filteredStocks = computed(() => {
   const query = keyword.value.trim().toLowerCase()
@@ -129,6 +114,8 @@ function openDetail(stock: TrendScoreListItem) {
   })
 }
 
+// 保留：直接 URL 访问（页面栈为空）时的模块级返回兜底。
+// 常规返回由 SubPageCard 自带返回按钮处理；此处保留 fallback 不丢失。
 function goBack() {
   const pages = getCurrentPages()
   if (pages.length > 1) uni.navigateBack()
@@ -143,37 +130,12 @@ onShow(() => {
 <style lang="scss" scoped>
 @import '@/shared/styles/variables.scss';
 
-.trend-page {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: $bg-color;
-}
-
-.trend-nav {
-  height: 88rpx;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  padding: 0 $spacing-base;
-}
-
-.nav-button {
+.nav-refresh {
   width: 64rpx;
   height: 64rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.nav-title {
-  flex: 1;
-  text-align: center;
-  color: $text-color-title;
-  font-size: $font-size-xl;
-  font-weight: 650;
 }
 
 .search-wrap {
@@ -222,8 +184,6 @@ onShow(() => {
   font-size: $font-size-xs;
   font-weight: 600;
 }
-
-.trend-scroll { flex: 1; min-height: 0; }
 
 .stock-list {
   margin: 0 $spacing-base $spacing-lg;

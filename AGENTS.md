@@ -82,7 +82,8 @@ src/
 │   │       └── user.ts      # 用户状态
 │   ├── components/      # 全局组件
 │   │   ├── SvgIcon.vue     # SVG 图标组件（统一图标方案）
-│   │   ├── PageCard.vue    # 页面卡片容器
+│   │   ├── PageCard.vue    # 页面卡片容器（主tab页用）
+│   │   ├── SubPageCard.vue # 子页面卡片容器（子页用，含返回+scroll+ChatBar）
 │   │   ├── GlobalChatBar.vue # 全局聊天栏
 │   │   ├── AppBottomBar.vue # 底部导航栏
 │   │   ├── Card.vue / Button.vue / Avatar.vue # 基础组件
@@ -91,6 +92,7 @@ src/
 │   │   ├── LoadingState.vue / EmptyState.vue # 状态组件
 │   │   └── svg-cache.ts    # SVG 缓存
 │   ├── utils/           # 工具函数和 hooks
+│   │   ├── layout.ts        # 布局工具（底部固定栏高度计算，含安全区补偿）
 │   │   ├── useAuth.ts         # 认证 hook
 │   │   ├── useFavorites.ts    # 自选股 hook
 │   │   ├── useStreamingChat.ts # 流式对话 hook
@@ -230,14 +232,17 @@ src/
 | 组件 | 说明 |
 |------|------|
 | `SvgIcon.vue` | SVG 图标组件（统一图标方案，从 `assets/icons/` 加载） |
-| `PageCard.vue` | 页面卡片容器 |
+| `PageCard.vue` | 页面卡片容器（主 tab 页用，含动态底部高度计算） |
+| `SubPageCard.vue` | 子页面卡片容器（子页用，含返回按钮 + scroll-view + GlobalChatBar） |
 | `GlobalChatBar.vue` | 全局聊天栏（悬浮入口） |
-| `AppBottomBar.vue` | 底部导航栏 |
+| `AppBottomBar.vue` | 底部导航栏（bottom 动态绑定 ChatBar 高度） |
 | `Card.vue` / `Button.vue` / `Avatar.vue` | 基础 UI 组件 |
 | `RadarChart.vue` | 雷达图 |
 | `RelationGraph.vue` | 关系图谱 |
 | `LoadingState.vue` | 加载状态 |
 | `EmptyState.vue` | 空状态 |
+
+> **布局约束**: 所有需要预留底部空间的组件必须使用 `@/shared/utils/layout.ts` 中的函数（`getChatBarHeightPx` / `getBottomFixedHeightPx` / `getTabBarBottomPx`），禁止硬编码 rpx 值，以避免刘海屏设备底部内容被遮挡。
 
 ## 8. 共享 Hooks 速查
 

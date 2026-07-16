@@ -271,7 +271,7 @@ function goLogin() {
   display: flex;
   align-items: stretch;
   padding: $spacing-base;
-  background: $bg-color-grey;
+  background: #f5f7fb;
   border-radius: $radius-base;
   margin-bottom: $spacing-sm;
   position: relative;

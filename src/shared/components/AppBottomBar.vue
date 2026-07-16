@@ -1,5 +1,5 @@
 <template>
-  <view class="as-tab-bar">
+  <view class="as-tab-bar" :style="{ bottom: tabBarBottomPx + 'px' }">
     <view
       v-for="tab in tabs"
       :key="tab.id"
@@ -16,6 +16,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { getTabBarBottomPx } from '@/shared/utils/layout'
 
 /** 外部传入的当前 Tab（可选，优先级高于自动检测） */
 const props = withDefaults(defineProps<{
@@ -31,9 +32,12 @@ const emit = defineEmits<{
 const tabs = [
   { id: 'morning', name: '早点听', icon: 'broadcast-line', path: '/modules/home/pages/index' },
   { id: 'insight', name: '洞察', icon: 'search-eye-line', path: '/modules/analytics/pages/index' },
-  { id: 'forecast', name: '业绩', icon: 'bar-chart-line', path: '/modules/analytics/pages/forecast' },
+  { id: 'forecast', name: '业绩', icon: 'bar-chart-line', path: '/modules/home/pages/index?tab=forecast' },
   { id: 'alert', name: '提醒', icon: 'bell-line', path: '/modules/favorites/pages/index' },
 ]
+
+/** Tab 栏 bottom 定位值（px）= GlobalChatBar 高度（含安全区补偿） */
+const tabBarBottomPx = getTabBarBottomPx()
 
 /** 活跃 Tab：优先使用外部传入的 currentTab，否则根据路由自动检测 */
 const activeTabId = computed(() => {
@@ -45,14 +49,16 @@ const activeTabId = computed(() => {
     const currentPage = pages[pages.length - 1]
     const route = currentPage?.route || ''
 
-    // 首页 → 激活 morning tab
-    if (route.includes('home/pages/index')) return 'morning'
+    // 首页 → 默认激活 morning tab，但如果 URL 带 tab=forecast 则激活 forecast tab
+    if (route.includes('home/pages/index')) {
+      const page = currentPage as unknown as { $page?: { options?: Record<string, string> }; options?: Record<string, string> }
+      const options = page?.$page?.options || page?.options || {}
+      return options.tab === 'forecast' ? 'forecast' : 'morning'
+    }
     // 洞察主页或机构调研/趋势评分 → 激活 insight tab
     if (route.includes('analytics/pages/index')) return 'insight'
     if (route.includes('market/pages/hot-burst')) return 'insight'
     if (route.includes('analytics/pages/trend-score')) return 'insight'
-    // 业绩预测 → 激活 forecast tab
-    if (route.includes('analytics/pages/forecast')) return 'forecast'
     // 提醒页 → 激活 alert tab
     if (route.includes('favorites/pages/index')) return 'alert'
 
@@ -71,12 +77,11 @@ const handleTabTap = (tab: typeof tabs[0]) => {
 </script>
 
 <style lang="scss" scoped>
-/* Tab栏：固定底部，位于 GlobalChatBar 上方 */
+/* Tab栏：固定底部，位于 GlobalChatBar 上方（bottom 由 JS 动态计算） */
 .as-tab-bar {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 147rpx;
   z-index: 9998;
   display: flex;
   align-items: center;
