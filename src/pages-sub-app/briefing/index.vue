@@ -1,62 +1,65 @@
 <template>
-  <view class="briefing-page" :style="{ paddingTop: statusBarHeight + 'px' }">
-    <!-- 顶部标题栏 -->
-    <view class="briefing-header">
-      <text class="header-title">双人对话播报</text>
-      <text class="header-date">{{ currentDate }}</text>
-    </view>
-
-    <!-- 播放控制 -->
-    <view v-if="report" class="player-bar">
-      <view class="play-btn" @tap="togglePlay">
-        <SvgIcon :name="isPlaying ? 'pause-fill' : 'play-fill'" size="48rpx" color="#ffffff" />
+  <SubPageCard2 :title="'双人对话播报'" :subtitle="subtitleText">
+    <view class="briefing-content">
+      <!-- 加载中 -->
+      <view v-if="loading" class="loading-state">
+        <text class="loading-text">报告加载中...</text>
       </view>
-      <view class="player-info">
-        <text class="player-status">{{ audioStatusText }}</text>
-      </view>
-    </view>
 
-    <!-- 对话文本 -->
-    <view v-if="dialogueLines.length" class="dialogue-list">
-      <view
-        v-for="(line, idx) in dialogueLines"
-        :key="idx"
-        :class="['dialogue-item', line.role]"
-      >
-        <view class="role-avatar">
-          <text class="avatar-text">{{ line.role === 'host' ? '主' : '析' }}</text>
+      <template v-else>
+        <!-- 播放控制 -->
+        <view v-if="report" class="player-bar">
+          <view class="play-btn" @tap="togglePlay">
+            <SvgIcon :name="isPlaying ? 'pause-fill' : 'play-fill'" size="48rpx" color="#ffffff" />
+          </view>
+          <view class="player-info">
+            <text class="player-status">{{ audioStatusText }}</text>
+          </view>
         </view>
-        <view class="dialogue-bubble">
-          <text class="role-name">{{ line.role === 'host' ? '主持人' : '分析师' }}</text>
-          <text class="dialogue-text">{{ line.content }}</text>
+
+        <!-- 对话文本 -->
+        <view v-if="dialogueLines.length" class="dialogue-list">
+          <view
+            v-for="(line, idx) in dialogueLines"
+            :key="idx"
+            :class="['dialogue-item', line.role]"
+          >
+            <view class="role-avatar">
+              <text class="avatar-text">{{ line.role === 'host' ? '主' : '析' }}</text>
+            </view>
+            <view class="dialogue-bubble">
+              <text class="role-name">{{ line.role === 'host' ? '主持人' : '分析师' }}</text>
+              <text class="dialogue-text">{{ line.content }}</text>
+            </view>
+          </view>
         </view>
-      </view>
-    </view>
 
-    <!-- 纯文本降级展示 -->
-    <view v-else-if="reportText && !dialogueLines.length" class="report-text-wrap">
-      <text class="report-text">{{ reportText }}</text>
-    </view>
+        <!-- 纯文本降级展示 -->
+        <view v-else-if="reportText && !dialogueLines.length" class="report-text-wrap">
+          <text class="report-text">{{ reportText }}</text>
+        </view>
 
-    <!-- 无报告 -->
-    <view v-else-if="!loading" class="empty-state">
-      <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
-      <text class="empty-text">今日播报尚未生成</text>
-      <text class="empty-hint">请在 9:10 后查看</text>
-    </view>
+        <!-- 无报告 -->
+        <view v-else class="empty-state">
+          <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
+          <text class="empty-text">今日播报尚未生成</text>
+          <text class="empty-hint">请在 9:10 后查看</text>
+        </view>
 
-    <!-- 日期切换 -->
-    <view class="date-nav">
-      <view class="date-btn" @tap="changeDate(-1)">
-        <SvgIcon name="arrow-left-line" size="32rpx" color="#4d7cfe" />
-        <text class="date-btn-text">前一天</text>
-      </view>
-      <view class="date-btn" @tap="changeDate(1)">
-        <text class="date-btn-text">后一天</text>
-        <SvgIcon name="arrow-right-line" size="32rpx" color="#4d7cfe" />
-      </view>
+        <!-- 日期切换 -->
+        <view class="date-nav">
+          <view class="date-btn" @tap="changeDate(-1)">
+            <SvgIcon name="arrow-left-line" size="32rpx" color="#4d7cfe" />
+            <text class="date-btn-text">前一天</text>
+          </view>
+          <view class="date-btn" @tap="changeDate(1)">
+            <text class="date-btn-text">后一天</text>
+            <SvgIcon name="arrow-right-line" size="32rpx" color="#4d7cfe" />
+          </view>
+        </view>
+      </template>
     </view>
-  </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
@@ -64,21 +67,8 @@ import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { agentApi } from '@/shared/api/modules/agent'
 import { API_BASE_URL } from '@/shared/utils/constants'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-
-// 状态栏高度（App 端需要除以 zoom 补偿）
-const statusBarHeight = ref(0)
-try {
-  const raw = uni.getSystemInfoSync().statusBarHeight || 0
-  // #ifdef APP-PLUS
-  statusBarHeight.value = raw / 1.2
-  // #endif
-  // #ifndef APP-PLUS
-  statusBarHeight.value = raw
-  // #endif
-} catch (e) {
-  statusBarHeight.value = 0
-}
 
 interface DialogueLine {
   role: 'host' | 'analyst'
@@ -97,6 +87,13 @@ const loading = ref(true)
 const report = ref<BroadcastReport | null>(null)
 const isPlaying = ref(false)
 const audioContext = ref<UniApp.InnerAudioContext | null>(null)
+
+const subtitleText = computed(() => {
+  if (currentDate.value) {
+    return `${currentDate.value} · AI 生成内容，仅供参考`
+  }
+  return 'AI 生成内容，仅供参考'
+})
 
 const reportText = computed(() => {
   return report.value?.content?.text || ''
@@ -200,8 +197,7 @@ async function loadReport() {
   try {
     const res: unknown = await agentApi.getReport('broadcast', currentDate.value)
     // 响应拦截器已解包: 返回的是 {content: {text, audio_path}, ...} 或 null
-    const data = (res as Record<string, unknown>) ?? null
-    report.value = (data as unknown as BroadcastReport) || null
+    report.value = (res as BroadcastReport) || null
   } catch {
     report.value = null
   } finally {
@@ -223,35 +219,19 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.briefing-page {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: #f5f7fb;
-  overscroll-behavior: none;
-  touch-action: none;
-}
-
-.briefing-header {
+.briefing-content {
   padding: 32rpx;
-  background: linear-gradient(135deg, #4d7cfe 0%, #667eea 100%);
-  text-align: center;
 }
 
-.header-title {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: #ffffff;
-  display: block;
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding: 120rpx 0;
 }
 
-.header-date {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.8);
-  margin-top: 8rpx;
-  display: block;
+.loading-text {
+  font-size: 28rpx;
+  color: #6b7280;
 }
 
 .player-bar {
@@ -260,7 +240,7 @@ onUnmounted(() => {
   gap: 24rpx;
   padding: 32rpx;
   background: #ffffff;
-  margin: 24rpx;
+  margin-bottom: 24rpx;
   border-radius: 20rpx;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
@@ -287,10 +267,10 @@ onUnmounted(() => {
 }
 
 .dialogue-list {
-  padding: 0 24rpx 24rpx;
   display: flex;
   flex-direction: column;
   gap: 24rpx;
+  margin-bottom: 24rpx;
 }
 
 .dialogue-item {
@@ -350,6 +330,9 @@ onUnmounted(() => {
 
 .report-text-wrap {
   padding: 32rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  margin-bottom: 24rpx;
 }
 
 .report-text {
@@ -381,8 +364,8 @@ onUnmounted(() => {
 .date-nav {
   display: flex;
   justify-content: space-between;
-  padding: 32rpx;
   gap: 24rpx;
+  margin-bottom: 32rpx;
 }
 
 .date-btn {
@@ -398,6 +381,5 @@ onUnmounted(() => {
 .date-btn-text {
   font-size: 26rpx;
   color: #4d7cfe;
-  font-weight: 500;
 }
 </style>
