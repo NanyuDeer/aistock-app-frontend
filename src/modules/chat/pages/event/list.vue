@@ -14,7 +14,7 @@
 
       <!-- 空状态 -->
       <view v-else-if="isEmpty" class="state-container">
-        <text class="state-icon">📭</text>
+        <SvgIcon name="inbox-line" size="64rpx" color="#9ca3af" />
         <text class="state-text">暂无事件数据</text>
         <view class="retry-btn" @tap="refresh">
           <text class="retry-text">点击刷新</text>
@@ -23,7 +23,7 @@
 
       <!-- 错误状态 -->
       <view v-else-if="error" class="state-container">
-        <text class="state-icon">⚠</text>
+        <SvgIcon name="error-warning-line" size="64rpx" color="#ef4444" />
         <text class="state-text error-text">{{ error }}</text>
         <view class="retry-btn" @tap="refresh">
           <text class="retry-text">重试</text>
@@ -72,6 +72,7 @@ import type { EventItem } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 import EventTabBar from '@/modules/chat/event/components/EventTabBar.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 

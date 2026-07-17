@@ -8,7 +8,7 @@
           <text class="analysis-back-arrow">←</text>
         </view>
         <view class="analysis-header-icon">
-          <text class="analysis-header-emoji">🤖</text>
+          <SvgIcon name="robot-line" size="36rpx" color="#ffffff" />
         </view>
         <view class="analysis-header-info">
           <text class="analysis-header-title">AI 异动解读</text>
@@ -18,14 +18,15 @@
           <text class="analysis-header-badge-text">分析中</text>
         </view>
         <view v-else-if="done" class="analysis-header-badge done">
-          <text class="analysis-header-badge-text">✓ 完成</text>
+          <SvgIcon name="check-line" size="20rpx" color="#ffffff" />
+          <text class="analysis-header-badge-text">完成</text>
         </view>
       </view>
     </view>
 
     <!-- 错误状态 -->
     <view v-if="error" class="analysis-error-card">
-      <text class="analysis-error-icon">⚠️</text>
+      <SvgIcon name="error-warning-line" size="48rpx" color="#ef4444" />
       <text class="analysis-error-text">{{ error }}</text>
       <view class="analysis-retry-btn" @tap="retry">
         <text class="analysis-retry-text">重试</text>
@@ -44,7 +45,7 @@
     <!-- 精简摘要卡片（优先展示，第一时间了解异动） -->
     <view v-if="!error && (analysisSummary || loading)" class="summary-card">
       <view class="summary-header">
-        <text class="summary-icon">⚡</text>
+        <SvgIcon name="flashlight-line" size="24rpx" color="#92400e" />
         <text class="summary-title">一句话速览</text>
       </view>
       <view v-if="analysisSummary" class="summary-body">
@@ -64,8 +65,8 @@
           :key="idx"
           :class="['analysis-tool-chip', step.endTime != null ? 'done' : 'running']"
         >
-          <text v-if="step.endTime != null" class="analysis-tool-chip-icon">✓</text>
-          <text v-else class="analysis-tool-chip-spinner">◌</text>
+          <SvgIcon v-if="step.endTime != null" name="check-line" size="18rpx" color="#059669" />
+          <SvgIcon v-else name="loader-line" size="20rpx" color="#3b82f6" class="analysis-tool-chip-spinner" />
           <text class="analysis-tool-chip-label">{{ step.label }}</text>
         </view>
       </view>
@@ -99,6 +100,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useAlertSSE } from '@/modules/market/utils/useAlertSSE'
 import { markdownToHtml } from '@/shared/utils/markdown'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 const symbol = ref('')
@@ -269,7 +271,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.analysis-header-emoji { font-size: 32rpx; }
+.analysis-header-emoji { display: none; }
 
 .analysis-header-info { flex: 1; min-width: 0; }
 
@@ -292,6 +294,9 @@ onUnmounted(() => {
   background: rgba(255,255,255,0.2);
   border-radius: 20rpx;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
   &.done { background: rgba(52,211,153,0.3); }
 }
 
@@ -313,7 +318,7 @@ onUnmounted(() => {
   gap: 16rpx;
 }
 
-.analysis-error-icon { font-size: 48rpx; }
+.analysis-error-icon { display: none; }
 .analysis-error-text { font-size: 28rpx; color: #ef4444; text-align: center; }
 .analysis-retry-btn {
   padding: 12rpx 40rpx;
@@ -359,7 +364,7 @@ onUnmounted(() => {
   margin-bottom: 10rpx;
 }
 
-.summary-icon { font-size: 24rpx; }
+.summary-icon { display: none; }
 .summary-title { font-size: 24rpx; font-weight: 600; color: #92400e; }
 
 .summary-text {
@@ -404,8 +409,8 @@ onUnmounted(() => {
   &.running { color: #3b82f6; background: #eff6ff; }
 }
 
-.analysis-tool-chip-icon { font-size: 18rpx; font-weight: 700; }
-.analysis-tool-chip-spinner { font-size: 20rpx; animation: spin 1s linear infinite; }
+.analysis-tool-chip-icon { display: none; }
+.analysis-tool-chip-spinner { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .analysis-tool-chip-label { font-size: 22rpx; }
 

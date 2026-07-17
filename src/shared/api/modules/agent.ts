@@ -52,23 +52,27 @@ export const agentApi = {
   },
 
   /** 获取今日晚报 */
+  // TODO: 后端 evening briefing 尚未实现（Python 仅有 morning/alert），待 Agent 落地后启用
   getEveningBriefing() {
     return request.get<BriefingData>('/agent/briefing/evening')
   },
 
   /** 生成双人对话音频 */
+  // TODO: 实际端点为 Node /internal/briefing/generate-audio（需 X-Internal-Token，非公开路由），
+  // 参数为 {date} 而非 {type}。需后端补充公开路由后对齐，暂保留
   generateAudio(type: 'morning' | 'evening') {
     return request.post('/agent/briefing/generate-audio', { type })
   },
 
   /** 获取动态估值 */
+  // TODO: 后端 valuation 接口尚未实现，待 Agent 落地后启用
   getValuation(symbol: string) {
     return request.get(`/agent/valuation/${symbol}`)
   },
 
   /** 获取事件传导链 */
   getEventChain(eventId: string) {
-    return request.get(`/agent/event/chain/${eventId}`)
+    return request.get(`/agent/event/${eventId}`)
   },
 
   /** 获取事件列表 */
@@ -77,16 +81,19 @@ export const agentApi = {
   },
 
   /** 获取提醒列表 */
+  // TODO: 后端 alert/list 接口尚未实现，待 Agent 落地后启用
   getAlertList() {
     return request.get('/agent/alert/list')
   },
 
   /** 订阅异动提醒 */
+  // TODO: 后端 alert/subscribe 接口尚未实现，待 Agent 落地后启用
   subscribeAlert(symbols: string[]) {
     return request.post('/agent/alert/subscribe', { symbols })
   },
 
   /** 注册推送 Token（App 端） */
+  // TODO: 后端 push/token 接口尚未实现，待 Agent 落地后启用
   registerPushToken(token: string, provider: string) {
     return request.post('/agent/push/token', { token, provider })
   },
