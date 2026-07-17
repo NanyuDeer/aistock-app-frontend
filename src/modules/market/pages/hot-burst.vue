@@ -13,7 +13,7 @@
       <!-- 统计概览 -->
       <view v-if="signals.length" class="stats-bar">
         <text class="stats-text">共 {{ signals.length }} 只热门股</text>
-        <text class="stats-time">最近 {{ hours }} 小时</text>
+        <text class="stats-time">近三天</text>
       </view>
 
       <!-- 热门股列表 -->
@@ -109,11 +109,11 @@ interface HotBurstResponse {
 }
 
 const signals = ref<HotBurstSignal[]>([])
-const hours = ref(6)
+const hours = ref(72)
 
 async function loadData() {
   try {
-    const res: unknown = await stockApi.getHotBursts({ hours: hours.value, min_resonance: 0 })
+    const res: unknown = await stockApi.getHotBursts({ hours: hours.value, min_resonance: 3 })
     const payload = res as { data?: HotBurstResponse }
     const data: HotBurstResponse = payload.data ?? (res as HotBurstResponse)
     signals.value = data.outbreaks ?? data.records ?? []
