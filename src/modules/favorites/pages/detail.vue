@@ -40,50 +40,6 @@
         </view>
       </view>
 
-      <!-- 行情明细（直接放在页面上，无卡片包装） -->
-      <view class="detail-grid">
-        <view class="detail-item">
-          <text class="detail-label">今开</text>
-          <text :class="['detail-value', quote.open >= quote.prevClose ? 'up' : 'down']">{{ quote.open.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">最高</text>
-          <text class="detail-value up">{{ quote.high.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">最低</text>
-          <text class="detail-value down">{{ quote.low.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">昨收</text>
-          <text class="detail-value">{{ quote.prevClose.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">成交量</text>
-          <text class="detail-value">{{ formatVolume(quote.volume) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">成交额</text>
-          <text class="detail-value">{{ formatAmount(quote.amount) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">换手率</text>
-          <text class="detail-value">{{ quote.turnoverRate.toFixed(2) }}%</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">振幅</text>
-          <text class="detail-value">{{ quote.amplitude.toFixed(2) }}%</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">市盈率</text>
-          <text class="detail-value">{{ quote.peRatio.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">市净率</text>
-          <text class="detail-value">{{ quote.pbRatio.toFixed(2) }}</text>
-        </view>
-      </view>
-
       <!-- 2. AI 资讯分析（第2个组件，含关键词标签+刷新按钮） -->
       <view class="section-card">
         <view class="section-header-row">
@@ -242,7 +198,51 @@
         </view>
       </view>
 
-      <!-- 6. AI 投顾入口（页面最底部） -->
+      <!-- 6. 基础行情明细（无卡片外壳，直接展示） -->
+      <view class="detail-grid">
+        <view class="detail-item">
+          <text class="detail-label">今开</text>
+          <text :class="['detail-value', quote.open >= quote.prevClose ? 'up' : 'down']">{{ quote.open.toFixed(2) }}</text>
+        </view>
+        <view class="detail-item">
+          <text class="detail-label">最高</text>
+          <text class="detail-value up">{{ quote.high.toFixed(2) }}</text>
+        </view>
+        <view class="detail-item">
+          <text class="detail-label">最低</text>
+          <text class="detail-value down">{{ quote.low.toFixed(2) }}</text>
+        </view>
+        <view class="detail-item">
+          <text class="detail-label">昨收</text>
+          <text class="detail-value">{{ quote.prevClose.toFixed(2) }}</text>
+        </view>
+        <view class="detail-item">
+          <text class="detail-label">成交量</text>
+          <text class="detail-value">{{ formatVolume(quote.volume) }}</text>
+        </view>
+        <view class="detail-item">
+          <text class="detail-label">成交额</text>
+          <text class="detail-value">{{ formatAmount(quote.amount) }}</text>
+        </view>
+        <view class="detail-item">
+          <text class="detail-label">换手率</text>
+          <text class="detail-value">{{ quote.turnoverRate.toFixed(2) }}%</text>
+        </view>
+        <view class="detail-item">
+          <text class="detail-label">振幅</text>
+          <text class="detail-value">{{ quote.amplitude.toFixed(2) }}%</text>
+        </view>
+        <view class="detail-item">
+          <text class="detail-label">市盈率</text>
+          <text class="detail-value">{{ quote.peRatio.toFixed(2) }}</text>
+        </view>
+        <view class="detail-item">
+          <text class="detail-label">市净率</text>
+          <text class="detail-value">{{ quote.pbRatio.toFixed(2) }}</text>
+        </view>
+      </view>
+
+      <!-- 7. AI 投顾入口（页面最底部） -->
       <view class="ai-card" @tap="goChat">
         <view class="ai-icon-wrap">
           <SvgIcon name="robot-line" size="36rpx" color="#4d7cfe" />
@@ -524,8 +524,8 @@ function openDisclosureUrl() {
 
 function goChat() {
   const name = quote.value?.name || symbol.value
-  const msg = `分析一下${name}(${symbol.value})的行情`
-  uni.navigateTo({ url: `/modules/chat/pages/index?message=${encodeURIComponent(msg)}` })
+  const q = `帮我分析一下${name}(${symbol.value})的最新行情和投资建议`
+  uni.navigateTo({ url: `/modules/chat/pages/index?q=${q}` })
 }
 </script>
 

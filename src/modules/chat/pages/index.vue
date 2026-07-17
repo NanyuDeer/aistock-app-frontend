@@ -93,6 +93,17 @@ import { useChatStore } from '@/shared/store/modules/chat'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 const chatStore = useChatStore()
+
+// 接收外部跳转传入的自动发送消息
+onLoad((options: any) => {
+  const q = options?.q
+  if (q) {
+    nextTick(() => {
+      chatStore.sendMessage(q)
+      scrollToBottom()
+    })
+  }
+})
 const messages = chatStore.messages
 const streaming = chatStore.streaming
 
@@ -100,17 +111,6 @@ const inputText = ref('')
 const scrollTop = ref(0)
 const statusBarHeight = ref(0)
 try { statusBarHeight.value = uni.getSystemInfoSync().statusBarHeight || 0 } catch (e) {}
-
-onLoad((options: any) => {
-  const msg = options?.message
-  if (msg) {
-    const text = decodeURIComponent(msg)
-    nextTick(() => {
-      chatStore.sendMessage(text)
-      scrollToBottom()
-    })
-  }
-})
 
 function handleSend() {
   const content = inputText.value.trim()
