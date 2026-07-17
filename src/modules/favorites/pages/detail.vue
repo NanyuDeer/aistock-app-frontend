@@ -30,6 +30,14 @@
             </text>
           </view>
         </view>
+        <!-- 涨跌停（紧贴价格行下方） -->
+        <view class="limit-inline">
+          <text class="limit-inline-label">涨停 <text class="up">{{ quote.limitUp.toFixed(2) }}</text></text>
+          <text class="limit-inline-sep">|</text>
+          <text class="limit-inline-label">跌停 <text class="down">{{ quote.limitDown.toFixed(2) }}</text></text>
+          <text class="limit-inline-sep">|</text>
+          <text class="limit-inline-label">均价 <text>{{ quote.avgPrice.toFixed(2) }}</text></text>
+        </view>
       </view>
 
       <!-- 2. AI 资讯分析（第2个组件，含关键词标签+刷新按钮） -->
@@ -190,19 +198,7 @@
         </view>
       </view>
 
-      <!-- 6. AI 投顾入口 -->
-      <view class="ai-card" @tap="goChat">
-        <view class="ai-icon-wrap">
-          <SvgIcon name="robot-line" size="36rpx" color="#4d7cfe" />
-        </view>
-        <view class="ai-content">
-          <text class="ai-title">AI 智能投顾</text>
-          <text class="ai-desc">询问 "{{ quote.name }}" 相关问题</text>
-        </view>
-        <text class="ai-arrow">›</text>
-      </view>
-
-      <!-- 7. 基础行情明细 + 涨跌停（页面底部，合并为一个卡片） -->
+      <!-- 6. 基础行情明细（页面底部） -->
       <view class="section-card">
         <text class="section-title">行情明细</text>
         <view class="detail-grid">
@@ -247,14 +243,18 @@
             <text class="detail-value">{{ quote.pbRatio.toFixed(2) }}</text>
           </view>
         </view>
-        <!-- 涨跌停（在行情明细卡片内，一行内联） -->
-        <view class="limit-inline">
-          <text class="limit-inline-label">涨停 <text class="up">{{ quote.limitUp.toFixed(2) }}</text></text>
-          <text class="limit-inline-sep">|</text>
-          <text class="limit-inline-label">跌停 <text class="down">{{ quote.limitDown.toFixed(2) }}</text></text>
-          <text class="limit-inline-sep">|</text>
-          <text class="limit-inline-label">均价 <text>{{ quote.avgPrice.toFixed(2) }}</text></text>
+      </view>
+
+      <!-- 7. AI 投顾入口（页面最底部） -->
+      <view class="ai-card" @tap="goChat">
+        <view class="ai-icon-wrap">
+          <SvgIcon name="robot-line" size="36rpx" color="#4d7cfe" />
         </view>
+        <view class="ai-content">
+          <text class="ai-title">AI 智能投顾</text>
+          <text class="ai-desc">询问 "{{ quote.name }}" 相关问题</text>
+        </view>
+        <text class="ai-arrow">›</text>
       </view>
     </template>
 
