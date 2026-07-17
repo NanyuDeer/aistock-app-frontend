@@ -5,7 +5,9 @@
 
 ## 页面
 - `pages/event-catcher.vue` - 异动捕手
-- `pages/leaders.vue` - 长线风口
+- `pages/leaders.vue` - 长线风口（概览入口页：泡泡图 + 板块入口卡片列表，点击板块跳转详情）
+- `pages/sector-detail.vue` - 板块详情子页面（板块统计、龙头股、AI 分析、主线/上游/下游个股列表）
+- `pages/push-history.vue` - 历史推送
 
 ## 组件
 - `components/MarketOverview.vue` - 大盘概览
@@ -27,5 +29,7 @@
 - `@/shared/components/SvgIcon.vue` - 图标组件
 
 ## 开发注意事项
-- 事件和板块数据支持 API 不可用时降级到 mock 数据
+- 长线风口数据通过 `stockApi.getWindLeaders(limit)` 获取，API 不可用时显示错误状态
+- `leaders.vue` 为概览入口页，板块详情在 `sector-detail.vue` 子页面展示（通过 name 参数筛选）
+- `sector-detail.vue` 调用同一 API 并按板块名称过滤，支持精确匹配和模糊匹配
 - 长线风口页面包含泡泡图可视化布局

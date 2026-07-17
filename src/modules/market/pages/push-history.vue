@@ -33,33 +33,33 @@
         </view>
       </view>
 
-      <!-- 日期筛选区域 -->
-      <view class="filter-section">
-        <picker mode="date" :value="selectedDate" fields="day" @change="onDateChange">
-          <view class="date-picker-trigger">
-            <text class="date-picker-label">筛选日期</text>
-            <text class="date-picker-value">{{ selectedDate || '全部日期' }}</text>
+      <!-- 标签栏 + 日期筛选合并行 -->
+      <view class="tabs-filter-row">
+        <view class="history-tabs">
+          <view
+            class="history-tab"
+            :class="{ active: activeTab === 'history' }"
+            @tap="activeTab = 'history'"
+          >
+            <text>历史表现</text>
           </view>
-        </picker>
-        <view v-if="selectedDate" class="date-clear-btn" @tap="clearDate">
-          <text>清除</text>
+          <view
+            class="history-tab"
+            :class="{ active: activeTab === 'ranking' }"
+            @tap="activeTab = 'ranking'"
+          >
+            <text>收益榜单</text>
+          </view>
         </view>
-      </view>
-
-      <view class="history-tabs">
-        <view
-          class="history-tab"
-          :class="{ active: activeTab === 'history' }"
-          @tap="activeTab = 'history'"
-        >
-          <text>历史表现</text>
-        </view>
-        <view
-          class="history-tab"
-          :class="{ active: activeTab === 'ranking' }"
-          @tap="activeTab = 'ranking'"
-        >
-          <text>收益榜单</text>
+        <view class="filter-section">
+          <picker mode="date" :value="selectedDate" fields="day" @change="onDateChange">
+            <view class="date-picker-trigger">
+              <text class="date-picker-value">{{ selectedDate || '筛选日期' }}</text>
+            </view>
+          </picker>
+          <view v-if="selectedDate" class="date-clear-btn" @tap="clearDate">
+            <text class="clear-icon">×</text>
+          </view>
         </view>
       </view>
 
@@ -75,7 +75,10 @@
             <text class="item-date">{{ formatDate(item.push_date) }}</text>
           </view>
           <view class="item-main">
-            <text class="item-name">{{ item.stock_name }}</text>
+            <view class="item-name-wrap">
+              <text class="item-name">{{ item.stock_name }}</text>
+              <text class="item-code">{{ item.stock_code }}</text>
+            </view>
             <text class="item-return" :class="getReturnClass(item)">
               {{ formatReturn(item) }}
             </text>
@@ -275,10 +278,13 @@ function formatUpdateDate(item: PushHistoryItem): string {
 }
 
 function formatNote(item: PushHistoryItem): string {
-  const pushPrice = item.push_price ? `推送价: ${item.push_price.toFixed(2)}` : '--'
-  const currentPrice = item.latest_price
-  const priceText = currentPrice ? `现价: ${currentPrice.toFixed(2)}` : '--'
-  return `${pushPrice} | ${priceText}`
+  // 防御：后端 NUMERIC 列可能返回字符串，必须经 toFiniteNumber 转换后再 toFixed，
+  // 否则字符串.toFixed() 抛 TypeError 导致 App 端渲染崩溃（一闪而过空白根因）。
+  const pushPrice = toFiniteNumber(item.push_price)
+  const priceText = pushPrice !== null ? `推送价: ${pushPrice.toFixed(2)}` : '--'
+  const currentPrice = toFiniteNumber(item.latest_price)
+  const latestText = currentPrice !== null ? `现价: ${currentPrice.toFixed(2)}` : '--'
+  return `${priceText} | ${latestText}`
 }
 
 function formatReturn(item: PushHistoryItem): string {
@@ -328,37 +334,37 @@ onLoad(() => {
 }
 
 .summary-section {
-  margin-bottom: 32rpx;
+  margin-bottom: 24rpx;
 }
 
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20rpx;
+  gap: 16rpx;
 }
 
 .summary-card {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 16rpx;
-  padding: 28rpx 24rpx;
+  padding: 18rpx 24rpx;
   box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 140rpx;
+  min-height: 96rpx;
 }
 
 .summary-label {
   color: #6b7280;
   font-size: 24rpx;
-  margin-bottom: 12rpx;
+  margin-bottom: 6rpx;
 }
 
 .summary-value {
   color: #111827;
-  font-size: 44rpx;
+  font-size: 36rpx;
   font-weight: bold;
   line-height: 1.2;
 }
@@ -378,63 +384,65 @@ onLoad(() => {
 .summary-sub {
   color: #9ca3af;
   font-size: 22rpx;
-  margin-top: 8rpx;
+  margin-top: 4rpx;
 }
 
 .summary-metrics {
   width: 100%;
-  font-size: 18rpx;
-  letter-spacing: -0.5rpx;
   text-align: center;
   white-space: nowrap;
 }
 
+.tabs-filter-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  border-bottom: 1px solid #e5e7eb;
+}
+
 .filter-section {
-  margin-bottom: 32rpx;
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: 8rpx;
+  padding-bottom: 12rpx;
 }
 
 .date-picker-trigger {
-  min-width: 360rpx;
-  height: 72rpx;
-  padding: 0 24rpx;
-  border-radius: 14rpx;
+  height: 48rpx;
+  padding: 0 14rpx;
+  border-radius: 10rpx;
   border: 1px solid #d1d5db;
   background: #fff;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   box-sizing: border-box;
 }
 
-.date-picker-label {
+.date-picker-value {
   color: #6b7280;
   font-size: 24rpx;
-}
-
-.date-picker-value {
-  color: #111827;
-  font-size: 26rpx;
-  font-weight: 600;
+  white-space: nowrap;
 }
 
 .date-clear-btn {
-  height: 72rpx;
-  padding: 0 22rpx;
-  border-radius: 14rpx;
-  background: #eef2ff;
-  color: #4f46e5;
-  font-size: 24rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: #e5e7eb;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+}
+
+.clear-icon {
+  color: #6b7280;
+  font-size: 28rpx;
+  line-height: 1;
 }
 
 .history-tabs {
   display: flex;
-  border-bottom: 1px solid #e5e7eb;
 }
 
 .history-tab {
@@ -495,10 +503,24 @@ onLoad(() => {
   margin-bottom: 12rpx;
 }
 
+.item-name-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+}
+
 .item-name {
   color: #111827;
   font-size: 32rpx;
   font-weight: bold;
+}
+
+.item-code {
+  font-size: 20rpx;
+  color: #6b7280;
+  background: #f0f2f5;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
 }
 
 .item-return {

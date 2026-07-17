@@ -91,6 +91,25 @@ export interface WindLeaderStock {
   change_pct?: number | null
 }
 
+export interface WindLeaderFlowNode {
+  id: string
+  type: 'main' | 'related' | 'upstream' | 'downstream'
+  label: string
+}
+
+export interface WindLeaderFlowLink {
+  source: string
+  target: string
+  factor: number
+  direction: 'related' | 'upstream' | 'downstream'
+}
+
+export interface WindLeaderFlowData {
+  nodes: WindLeaderFlowNode[]
+  links: WindLeaderFlowLink[]
+  transfer_direction?: string
+}
+
 export interface WindLeaderSector {
   code?: string
   name: string
@@ -111,6 +130,7 @@ export interface WindLeaderSector {
   upstream_stocks?: WindLeaderStock[]
   downstream_stocks?: WindLeaderStock[]
   leading_stock_info?: WindLeaderStock | null
+  flow_data?: WindLeaderFlowData | null
 }
 
 export interface WindLeaderResponse {
