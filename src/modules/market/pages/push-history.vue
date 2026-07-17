@@ -183,12 +183,7 @@ function toFiniteNumber(value: unknown): number | null {
 }
 
 function displayReturn(item: PushHistoryItem): number | null {
-  const returnPct = toFiniteNumber(item.return_pct)
-  if (returnPct !== null) return returnPct
-  const pushPrice = toFiniteNumber(item.push_price)
-  const latestPrice = toFiniteNumber(item.latest_price)
-  if (!pushPrice || pushPrice <= 0 || latestPrice === null) return null
-  return Number((((latestPrice - pushPrice) / pushPrice) * 100).toFixed(2))
+  return toFiniteNumber(item.return_pct)
 }
 
 const summary = computed(() => {
