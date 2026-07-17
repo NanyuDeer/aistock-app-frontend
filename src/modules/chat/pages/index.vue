@@ -88,6 +88,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useChatStore } from '@/shared/store/modules/chat'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
@@ -99,6 +100,17 @@ const inputText = ref('')
 const scrollTop = ref(0)
 const statusBarHeight = ref(0)
 try { statusBarHeight.value = uni.getSystemInfoSync().statusBarHeight || 0 } catch (e) {}
+
+onLoad((options: any) => {
+  const msg = options?.message
+  if (msg) {
+    const text = decodeURIComponent(msg)
+    nextTick(() => {
+      chatStore.sendMessage(text)
+      scrollToBottom()
+    })
+  }
+})
 
 function handleSend() {
   const content = inputText.value.trim()
