@@ -113,6 +113,15 @@
       }
     },
     {
+      "path": "modules/analytics/pages/hot-burst-report",
+      "style": {
+        "navigationBarTitleText": "热门股分析报告",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
       "path": "modules/market/pages/push-history",
       "style": {
         "navigationBarTitleText": "",

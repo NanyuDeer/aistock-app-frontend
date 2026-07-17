@@ -22,7 +22,6 @@
           v-for="(sig, idx) in signals"
           :key="sig.symbol || idx"
           class="signal-card"
-          :class="'level-' + (sig.resonanceLevel || 'low')"
           @tap="goStockDetail(sig.symbol)"
         >
           <!-- 卡片头部：股票名称 + 股票代码 + 板块标签 + 行情数据 -->
@@ -49,16 +48,16 @@
             </view>
           </view>
 
-          <!-- 关键词标签 + 得分 + 等级标签 -->
+          <!-- 关键词标签 -->
           <view class="signal-meta">
-            <view v-if="sig.triggerTags && sig.triggerTags.length" class="signal-tags">
+            <view v-if="visibleTriggerTags(sig).length" class="signal-tags">
               <text
-                v-for="tag in sig.triggerTags.slice(0, 4)"
+                v-for="tag in visibleTriggerTags(sig)"
                 :key="tag"
                 class="kw-tag"
               >{{ tag }}</text>
             </view>
-            <view class="signal-meta-right">
+            <!-- <view class="signal-meta-right">
               <view v-if="sig.resonanceScore != null" class="signal-score">
                 <text class="score-val">{{ sig.resonanceScore }}</text>
                 <text class="score-label">分</text>
@@ -66,7 +65,7 @@
               <text :class="['level-tag', sig.resonanceLevel || 'low']">
                 {{ levelLabel(sig.resonanceLevel) }}
               </text>
-            </view>
+            </view> -->
           </view>
         </view>
       </view>
@@ -92,83 +91,34 @@ interface HotBurstSignal {
   stockName?: string
   price?: number | null
   changePct?: number | null
-  resonanceLevel?: string
-  resonanceScore?: number
   triggerTags?: string[]
   sectorInfo?: string
   thsSectorName?: string
 }
 
+function visibleTriggerTags(signal: HotBurstSignal): string[] {
+  const sector = (signal.sectorInfo || signal.thsSectorName || '').trim()
+  return (signal.triggerTags || [])
+    .filter(tag => tag && tag.trim() !== sector)
+    .slice(0, 3)
+}
+
+interface HotBurstResponse {
+  outbreaks?: HotBurstSignal[]
+  records?: HotBurstSignal[]
+}
+
 const signals = ref<HotBurstSignal[]>([])
 const hours = ref(6)
-
-// Mock 数据（API 不可用时显示）
-const mockSignals: HotBurstSignal[] = [
-  {
-    symbol: '300760',
-    stockName: '迈瑞医疗',
-    price: 288.50,
-    changePct: 3.25,
-    resonanceLevel: 'critical',
-    resonanceScore: 95,
-    triggerTags: ['医疗器械', '海外营收', '机构调研'],
-    sectorInfo: '医疗器械',
-  },
-  {
-    symbol: '002415',
-    stockName: '海康威视',
-    price: 32.80,
-    changePct: 2.18,
-    resonanceLevel: 'high',
-    resonanceScore: 82,
-    triggerTags: ['AI视觉', '边缘计算', '创新业务'],
-    sectorInfo: '安防设备',
-  },
-  {
-    symbol: '600519',
-    stockName: '贵州茅台',
-    price: 1480.00,
-    changePct: -0.52,
-    resonanceLevel: 'medium',
-    resonanceScore: 68,
-    triggerTags: ['消费复苏', '提价预期'],
-    sectorInfo: '白酒',
-  },
-  {
-    symbol: '300124',
-    stockName: '汇川技术',
-    price: 58.20,
-    changePct: 4.15,
-    resonanceLevel: 'high',
-    resonanceScore: 78,
-    triggerTags: ['工控自动化', '新能源车', '机器人'],
-    sectorInfo: '工业自动化',
-  },
-  {
-    symbol: '002371',
-    stockName: '北方华创',
-    price: 325.60,
-    changePct: 1.85,
-    resonanceLevel: 'medium',
-    resonanceScore: 65,
-    triggerTags: ['半导体设备', '国产替代'],
-    sectorInfo: '半导体设备',
-  },
-]
-
-function levelLabel(level?: string): string {
-  const map: Record<string, string> = { critical: '极高', high: '高', medium: '中', low: '低' }
-  return map[level || 'low'] || level || '低'
-}
 
 async function loadData() {
   try {
     const res: unknown = await stockApi.getHotBursts({ hours: hours.value, min_resonance: 0 })
-    const data = (res as any)?.data ?? res
-    const list = data?.outbreaks || data?.records || []
-    signals.value = list.length ? list : mockSignals
+    const payload = res as { data?: HotBurstResponse }
+    const data: HotBurstResponse = payload.data ?? (res as HotBurstResponse)
+    signals.value = data.outbreaks ?? data.records ?? []
   } catch {
-    signals.value = mockSignals
+    signals.value = []
   }
 }
 
@@ -180,7 +130,7 @@ function goStockDetail(symbol: string) {
 function goAgentReport() {
   const today = new Date().toISOString().split('T')[0]
   uni.navigateTo({
-    url: `/modules/chat/pages/agent-report?intent=hot_burst&date=${today}`
+    url: `/modules/analytics/pages/hot-burst-report?date=${today}`
   })
 }
 
