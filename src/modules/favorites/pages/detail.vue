@@ -1,5 +1,6 @@
 <template>
-  <view class="page-detail">
+  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol">
+    <view class="page-detail">
     <view v-if="loading" class="loading">
       <text class="loading-text">加载中...</text>
     </view>
@@ -75,20 +76,13 @@
         </view>
       </view>
 
-      <!-- 涨跌停 -->
-      <view class="limit-row">
-        <view class="limit-item">
-          <text class="limit-label">涨停价</text>
-          <text class="limit-value up">{{ quote.limitUp.toFixed(2) }}</text>
-        </view>
-        <view class="limit-item">
-          <text class="limit-label">跌停价</text>
-          <text class="limit-value down">{{ quote.limitDown.toFixed(2) }}</text>
-        </view>
-        <view class="limit-item">
-          <text class="limit-label">均价</text>
-          <text class="limit-value">{{ quote.avgPrice.toFixed(2) }}</text>
-        </view>
+      <!-- 涨跌停（一行内联显示） -->
+      <view class="limit-inline">
+        <text class="limit-inline-label">涨停 <text class="up">{{ quote.limitUp.toFixed(2) }}</text></text>
+        <text class="limit-inline-sep">|</text>
+        <text class="limit-inline-label">跌停 <text class="down">{{ quote.limitDown.toFixed(2) }}</text></text>
+        <text class="limit-inline-sep">|</text>
+        <text class="limit-inline-label">均价 <text>{{ quote.avgPrice.toFixed(2) }}</text></text>
       </view>
 
       <!-- 资金流向 -->
@@ -178,6 +172,25 @@
         </view>
       </view>
 
+      <!-- 个股新闻 -->
+      <view v-if="newsList.length" class="section-card">
+        <text class="section-title">相关资讯</text>
+        <view class="news-list">
+          <view
+            v-for="(news, idx) in newsList"
+            :key="idx"
+            class="news-item"
+            @tap="openNews(news)"
+          >
+            <text class="news-title">{{ news.title }}</text>
+            <view class="news-meta">
+              <text v-if="news.source" class="news-source">{{ news.source }}</text>
+              <text v-if="news.publish_time" class="news-time">{{ news.publish_time }}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
       <!-- AI 投顾入口 -->
       <view class="ai-card" @tap="goChat">
         <view class="ai-icon-wrap">
@@ -189,12 +202,35 @@
         </view>
         <text class="ai-arrow">›</text>
       </view>
+
+      <!-- AI 资讯分析（放在页面最底部） -->
+      <view v-if="aiAnalysis" class="section-card">
+        <text class="section-title">AI 资讯分析</text>
+        <view v-if="aiLoading" class="ai-loading">
+          <text class="ai-loading-text">正在生成AI分析...</text>
+        </view>
+        <template v-else>
+          <view v-if="aiAnalysis.conclusion" class="ai-conclusion-box">
+            <text :class="['ai-conclusion-badge', aiConclusionClass]">{{ aiAnalysis.conclusion }}</text>
+            <text v-if="aiAnalysis.analysisDate" class="ai-date">{{ aiAnalysis.analysisDate }}</text>
+          </view>
+          <view v-if="aiAnalysis.coreLogic" class="ai-section">
+            <text class="ai-section-label">核心逻辑</text>
+            <text class="ai-section-text">{{ aiAnalysis.coreLogic }}</text>
+          </view>
+          <view v-if="aiAnalysis.riskWarning" class="ai-section">
+            <text class="ai-section-label risk">风险提示</text>
+            <text class="ai-section-text risk">{{ aiAnalysis.riskWarning }}</text>
+          </view>
+        </template>
+      </view>
     </template>
 
     <view v-else class="empty">
       <text class="empty-text">未找到股票数据</text>
     </view>
-  </view>
+    </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
@@ -203,6 +239,7 @@ import { onLoad, onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 
 const loading = ref(true)
 const quote = ref<any>(null)
@@ -210,6 +247,9 @@ const capitalFlow = ref<any>(null)
 const semiAnnualReport = ref<any>(null)
 const disclosureUrl = ref('')
 const symbol = ref('')
+const aiAnalysis = ref<any>(null)
+const aiLoading = ref(false)
+const newsList = ref<any[]>([])
 const favoritesStore = useFavoritesStore()
 const isFavorite = computed(() => favoritesStore.isFavorite(symbol.value))
 
@@ -227,10 +267,11 @@ onLoad((options: any) => {
 async function loadData() {
   loading.value = true
   try {
-    const [quoteData, flowData, semiData] = await Promise.allSettled([
+    const [quoteData, flowData, semiData, newsData] = await Promise.allSettled([
       stockApi.getQuote(symbol.value),
       stockApi.getCapitalFlow(symbol.value),
       stockApi.getSemiAnnualReport(symbol.value),
+      stockApi.getStockNews(symbol.value, { size: 10 }),
     ])
     if (quoteData.status === 'fulfilled') {
       quote.value = quoteData.value
@@ -245,10 +286,70 @@ async function loadData() {
       semiAnnualReport.value = semi?.data || semi
       disclosureUrl.value = semiAnnualReport.value?.disclosure_url || ''
     }
+    if (newsData.status === 'fulfilled') {
+      const news = newsData.value as any
+      newsList.value = Array.isArray(news) ? news : (news?.data || news?.news || [])
+    }
+    // 加载 AI 分析（非阻塞，失败不影响主流程）
+    loadAiAnalysis()
   } catch (err) {
     console.error('[StockDetail] load error:', err)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadAiAnalysis() {
+  aiLoading.value = true
+  aiAnalysis.value = {} // 先设为空对象让卡片显示
+  try {
+    const res: any = await stockApi.getStockAnalysis(symbol.value)
+    // API 返回中文键名，映射为前端使用的英文键名
+    const data = res?.data || res
+    aiAnalysis.value = {
+      conclusion: data?.['结论'] || data?.conclusion || '',
+      coreLogic: data?.['核心逻辑'] || data?.core_logic || '',
+      riskWarning: data?.['风险提示'] || data?.risk_warning || '',
+      analysisDate: data?.['分析时间'] || data?.analysis_time || '',
+    }
+  } catch {
+    // 404 = 无分析记录，自动触发 POST 创建
+    try {
+      const createRes: any = await stockApi.createStockAnalysis(symbol.value)
+      const data = createRes?.data || createRes
+      aiAnalysis.value = {
+        conclusion: data?.['结论'] || data?.conclusion || '',
+        coreLogic: data?.['核心逻辑'] || data?.core_logic || '',
+        riskWarning: data?.['风险提示'] || data?.risk_warning || '',
+        analysisDate: data?.['分析时间'] || data?.analysis_time || '',
+      }
+    } catch {
+      // 创建也失败，隐藏 AI 分析卡片
+      aiAnalysis.value = null
+    }
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+const aiConclusionClass = computed(() => {
+  const c = aiAnalysis.value?.conclusion || ''
+  if (c.includes('买入') || c.includes('增持') || c.includes('推荐')) return 'badge-buy'
+  if (c.includes('卖出') || c.includes('减持')) return 'badge-sell'
+  return 'badge-hold'
+})
+
+function openNews(news: any) {
+  const url = news.url || news.link || news.source_url
+  if (url) {
+    // #ifdef H5
+    window.open(url, '_blank')
+    // #endif
+    // #ifndef H5
+    uni.navigateTo({ url: `/modules/chat/pages/webview?url=${encodeURIComponent(url)}` })
+    // #endif
+  } else {
+    uni.showToast({ title: '暂无详情', icon: 'none' })
   }
 }
 
@@ -401,7 +502,7 @@ function goChat() {
 }
 
 .stock-price {
-  font-size: 56rpx;
+  font-size: 44rpx;
   font-weight: 700;
 
   &.up { color: #f43f5e; }
@@ -458,36 +559,29 @@ function goChat() {
   &.down { color: #22c55e; }
 }
 
-/* 涨跌停 */
-.limit-row {
+/* 涨跌停（一行内联） */
+.limit-inline {
   display: flex;
-  gap: 16rpx;
-  margin-bottom: 24rpx;
-}
-
-.limit-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 24rpx;
+  gap: 12rpx;
+  padding: 16rpx 24rpx;
   background: #ffffff;
-  border-radius: 16rpx;
+  border-radius: 12rpx;
+  margin-bottom: 24rpx;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-.limit-label {
-  font-size: 24rpx;
+.limit-inline-label {
+  font-size: 26rpx;
   color: #6b7280;
-  margin-bottom: 8rpx;
+
+  .up { color: #f43f5e; font-weight: 600; }
+  .down { color: #22c55e; font-weight: 600; }
 }
 
-.limit-value {
-  font-size: 30rpx;
-  font-weight: 600;
-
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+.limit-inline-sep {
+  color: #e5e7eb;
+  font-size: 24rpx;
 }
 
 /* 资金流向 */
@@ -664,5 +758,97 @@ function goChat() {
   font-size: 26rpx;
   color: #4d7cfe;
   font-weight: 500;
+}
+
+/* AI 资讯分析 */
+.ai-loading {
+  padding: 24rpx 0;
+  text-align: center;
+}
+
+.ai-loading-text {
+  font-size: 26rpx;
+  color: #9ca3af;
+}
+
+.ai-conclusion-box {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.ai-conclusion-badge {
+  font-size: 24rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 8rpx;
+  font-weight: 600;
+
+  &.badge-buy { color: #dc2626; background: #fef2f2; }
+  &.badge-sell { color: #16a34a; background: #f0fdf4; }
+  &.badge-hold { color: #d97706; background: #fffbeb; }
+}
+
+.ai-date {
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.ai-section {
+  margin-bottom: 12rpx;
+}
+
+.ai-section-label {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #2563eb;
+  margin-bottom: 6rpx;
+
+  &.risk { color: #dc2626; }
+}
+
+.ai-section-text {
+  font-size: 26rpx;
+  color: #4b5563;
+  line-height: 1.5;
+
+  &.risk { color: #991b1b; }
+}
+
+/* 个股新闻 */
+.news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.news-item {
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f0f2f5;
+
+  &:last-child { border-bottom: none; }
+  &:active { opacity: 0.7; }
+}
+
+.news-title {
+  font-size: 28rpx;
+  color: #1a1d24;
+  line-height: 1.4;
+  margin-bottom: 6rpx;
+}
+
+.news-meta {
+  display: flex;
+  gap: 12rpx;
+}
+
+.news-source {
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.news-time {
+  font-size: 22rpx;
+  color: #9ca3af;
 }
 </style>

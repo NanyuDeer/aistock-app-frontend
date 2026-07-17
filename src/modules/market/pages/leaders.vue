@@ -418,11 +418,15 @@ function formatNetInflow(val?: number | null): string {
   return Math.round(val) + '万'
 }
 
-// 持续性标签提取
+// 持续性标签提取（只显示"短期"/"中期"/"长期"）
 function persistenceText(sector: WindLeaderSector): string {
   const ai = sector.ai_analysis
   if (!ai || typeof ai === 'string') return ''
-  return (ai as WindLeaderAiAnalysis).persistence || ''
+  const raw = (ai as WindLeaderAiAnalysis).persistence || ''
+  if (raw.includes('长期')) return '长期'
+  if (raw.includes('中期')) return '中期'
+  if (raw.includes('短期')) return '短期'
+  return raw
 }
 
 function persistenceClass(sector: WindLeaderSector): string {
@@ -511,10 +515,9 @@ function goPushHistory() {
 // 跳转到板块详情子页面，传递板块名称用于数据筛选
 function goSectorDetail(sector: WindLeaderSector) {
   if (!sector?.name) return
-  const params = new URLSearchParams()
-  params.set('name', sector.name)
-  if (sector.code) params.set('code', sector.code)
-  uni.navigateTo({ url: `/modules/market/pages/sector-detail?${params.toString()}` })
+  const name = encodeURIComponent(sector.name)
+  const code = sector.code ? encodeURIComponent(sector.code) : ''
+  uni.navigateTo({ url: `/modules/market/pages/sector-detail?name=${name}${code ? '&code=' + code : ''}` })
 }
 
 onShow(() => {
@@ -713,12 +716,12 @@ onShow(() => {
 
 /* 频次 badge */
 .freq-badge {
-  font-size: 22rpx;
+  font-size: 20rpx;
   color: #4d7cfe;
   background: rgba(77, 124, 254, 0.1);
-  padding: 4rpx 16rpx;
-  border-radius: 20rpx;
-  font-weight: 500;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  font-weight: 600;
 }
 
 /* 统计行：一行四个字段 */
@@ -742,7 +745,7 @@ onShow(() => {
 }
 
 .stat-value {
-  font-size: 32rpx;
+  font-size: 26rpx;
   font-weight: 600;
   color: #1a1d24;
 
@@ -750,7 +753,7 @@ onShow(() => {
   &.down { color: #22c55e; }
 
   &.leader-stock-name {
-    font-size: 28rpx;
+    font-size: 24rpx;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

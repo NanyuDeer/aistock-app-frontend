@@ -279,6 +279,16 @@ export const stockApi = {
   /** 获取半年报关键财务数据 */
   getSemiAnnualReport(symbol: string) {
     return request.get(`/cn/stocks/${symbol}/semi-annual-report`).then((res: any) => res?.data || res)
+  },
+
+  /** 获取个股 AI 资讯分析 */
+  getStockAnalysis(symbol: string) {
+    return request.get(`/cn/stocks/${symbol}/analysis`).then((res: any) => res?.data || res)
+  },
+
+  /** 创建个股 AI 资讯分析（触发后端生成） */
+  createStockAnalysis(symbol: string) {
+    return request.post(`/cn/stocks/${symbol}/analysis`).then((res: any) => res?.data || res)
   }
 }
 

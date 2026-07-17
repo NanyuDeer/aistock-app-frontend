@@ -268,12 +268,16 @@ function formatNetInflow(value: unknown): string {
   return Math.round(num) + '万'
 }
 
-// 改动1: 持续性标签提取到统计卡片头部
+// 改动1: 持续性标签提取到统计卡片头部（只显示"短期"/"中期"/"长期"）
 const persistenceTag = computed(() => {
   if (!sector.value?.ai_analysis) return ''
   const ai = sector.value.ai_analysis
   if (typeof ai === 'string') return ''
-  return (ai as WindLeaderAiAnalysis).persistence || ''
+  const raw = (ai as WindLeaderAiAnalysis).persistence || ''
+  if (raw.includes('长期')) return '长期'
+  if (raw.includes('中期')) return '中期'
+  if (raw.includes('短期')) return '短期'
+  return raw
 })
 
 const persistenceClass = computed(() => {
