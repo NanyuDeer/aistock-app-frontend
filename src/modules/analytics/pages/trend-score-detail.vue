@@ -1,253 +1,241 @@
 <template>
-  <view class="detail-page" :style="{ paddingTop: statusBarHeight + 'px' }">
-    <view class="detail-nav">
-      <view class="nav-button" @tap="goBack">
-        <SvgIcon name="arrow-left-s-line" size="44rpx" color="#1a1d24" />
+  <SubPageCard :title="pageTitle">
+    <!-- 导航栏右侧加入监控按钮 -->
+    <template #header-right>
+      <view
+        v-if="detail"
+        :class="['nav-monitor-button', { active: isMonitored, disabled: favoritesStore.isPending(symbol) }]"
+        @tap.stop="addToMonitor"
+      >
+        <text>{{ isMonitored ? '已监控' : '加入监控' }}</text>
       </view>
-      <text class="nav-title">{{ pageTitle }}</text>
-      <view class="nav-action-slot">
-        <view
-          v-if="detail"
-          :class="['nav-monitor-button', { active: isMonitored, disabled: favoritesStore.isPending(symbol) }]"
-          @tap.stop="addToMonitor"
-        >
-          <text>{{ isMonitored ? '已监控' : '加入监控' }}</text>
-        </view>
-      </view>
-    </view>
+    </template>
 
-    <scroll-view
-      scroll-y
-      class="detail-scroll"
-      :enhanced="true"
-      :bounces="false"
-      :scroll-anchoring="false"
-    >
-      <LoadingState v-if="loading" text="正在加载评分详情" />
-      <view v-else-if="errorMessage" class="state-panel">
-        <SvgIcon name="error-warning-line" size="64rpx" color="#f59e0b" />
-        <text class="state-title">评分详情暂时无法加载</text>
-        <text class="state-desc">{{ errorMessage }}</text>
-        <button class="retry-button" @tap="loadDetail">重新加载</button>
-      </view>
-      <view v-else-if="vetoReasons.length" class="state-panel">
-        <SvgIcon name="shield-cross-line" size="64rpx" color="#f59e0b" />
-        <text class="state-title">该股票暂未进入趋势评分</text>
-        <text v-for="reason in vetoReasons" :key="reason" class="veto-reason">{{ reason }}</text>
-      </view>
-      <view v-else-if="detail" class="detail-content">
-        <view class="score-overview">
-          <view class="score-heading">
-            <view class="score-main">
-              <text class="score-label">综合评分</text>
-              <view class="score-value-row">
-                <text class="score-value">{{ detail.score }}</text>
-                <text class="score-denominator">/100</text>
-              </view>
-              <view class="stock-context">
-                <view class="stock-context-info">
-                  <text class="stock-context-symbol">{{ detail.symbol }}</text>
-                  <text v-if="detail.expectedMultiple" class="stock-context-multiple">预期 {{ detail.expectedMultiple }} 趋势</text>
-                </view>
-              </view>
+    <!-- 详情内容（SubPageCard 内部已有 scroll-view，无需自行包裹） -->
+    <LoadingState v-if="loading" text="正在加载评分详情" />
+    <view v-else-if="errorMessage" class="state-panel">
+      <SvgIcon name="error-warning-line" size="64rpx" color="#f59e0b" />
+      <text class="state-title">评分详情暂时无法加载</text>
+      <text class="state-desc">{{ errorMessage }}</text>
+      <button class="retry-button" @tap="loadDetail">重新加载</button>
+    </view>
+    <view v-else-if="vetoReasons.length" class="state-panel">
+      <SvgIcon name="shield-cross-line" size="64rpx" color="#f59e0b" />
+      <text class="state-title">该股票暂未进入趋势评分</text>
+      <text v-for="reason in vetoReasons" :key="reason" class="veto-reason">{{ reason }}</text>
+    </view>
+    <view v-else-if="detail" class="detail-content">
+      <view class="score-overview">
+        <view class="score-heading">
+          <view class="score-main">
+            <text class="score-label">综合评分</text>
+            <view class="score-value-row">
+              <text class="score-value">{{ detail.score }}</text>
+              <text class="score-denominator">/100</text>
             </view>
-            <view class="grade-block">
-              <text class="score-label">评级</text>
-              <text :class="['score-grade', `grade-${detail.label.toLowerCase()}`]">{{ detail.label }}</text>
-              <text v-if="ratingMeaning" class="rating-pill">{{ ratingMeaning }}</text>
+            <view class="stock-context">
+              <view class="stock-context-info">
+                <text class="stock-context-symbol">{{ detail.symbol }}</text>
+                <text v-if="detail.expectedMultiple" class="stock-context-multiple">预期 {{ detail.expectedMultiple }} 趋势</text>
+              </view>
             </view>
           </view>
+          <view class="grade-block">
+            <text class="score-label">评级</text>
+            <text :class="['score-grade', `grade-${detail.label.toLowerCase()}`]">{{ detail.label }}</text>
+            <text v-if="ratingMeaning" class="rating-pill">{{ ratingMeaning }}</text>
+          </view>
         </view>
+      </view>
 
-        <view class="dimension-list">
-          <view v-for="(dimension, index) in detail.dimensions" :key="dimension.name" class="dimension-card">
-            <view class="dimension-header" @tap="toggleDimension(index)">
-              <view class="dimension-name-wrap">
-                <view class="dimension-icon">
-                  <SvgIcon :name="dimensionIcon(index)" size="30rpx" color="#4d7cfe" />
-                </view>
-                <view class="dimension-copy">
-                  <view class="dimension-title-row">
-                    <text class="dimension-name">{{ dimension.name }}</text>
-                    <text class="dimension-weight">{{ dimension.weight }}%</text>
-                  </view>
-                  <text class="dimension-description">{{ dimensionDescription(index) }}</text>
-                </view>
+      <view class="dimension-list">
+        <view v-for="(dimension, index) in detail.dimensions" :key="dimension.name" class="dimension-card">
+          <view class="dimension-header" @tap="toggleDimension(index)">
+            <view class="dimension-name-wrap">
+              <view class="dimension-icon">
+                <SvgIcon :name="dimensionIcon(index)" size="30rpx" color="#4d7cfe" />
               </view>
-              <view class="dimension-result">
-                <text :class="['dimension-score', `tone-text-${index}`]">{{ dimension.score }}</text>
-                <SvgIcon
-                  :name="activeDimension === index ? 'arrow-up-s-line' : 'arrow-down-s-line'"
-                  size="32rpx"
-                  color="#4d7cfe"
-                />
+              <view class="dimension-copy">
+                <view class="dimension-title-row">
+                  <text class="dimension-name">{{ dimension.name }}</text>
+                  <text class="dimension-weight">{{ dimension.weight }}%</text>
+                </view>
+                <text class="dimension-description">{{ dimensionDescription(index) }}</text>
               </view>
             </view>
-            <view class="dimension-score-progress">
-              <view
-                :class="['dimension-score-progress-fill', `tone-fill-${index}`]"
-                :style="{ width: `${clampScore(dimension.score)}%` }"
+            <view class="dimension-result">
+              <text :class="['dimension-score', `tone-text-${index}`]">{{ dimension.score }}</text>
+              <SvgIcon
+                :name="activeDimension === index ? 'arrow-up-s-line' : 'arrow-down-s-line'"
+                size="32rpx"
+                color="#4d7cfe"
               />
             </view>
+          </view>
+          <view class="dimension-score-progress">
+            <view
+              :class="['dimension-score-progress-fill', `tone-fill-${index}`]"
+              :style="{ width: `${clampScore(dimension.score)}%` }"
+            />
+          </view>
 
-            <view v-if="activeDimension === index" class="dimension-body">
-              <template v-if="index === 0 && technicalDetail">
-                <TrendKLineChart :title="`${stockName} · 近期K线`" :data="technicalDetail.kline" />
-                <TrendKLineChart
-                  :title="`${technicalDetail.conceptKline.name || '概念指数'} · 近期K线`"
-                  :data="technicalDetail.conceptKline"
-                />
-                <view class="technical-grid">
-                  <view v-for="item in technicalIndicators" :key="item.label" class="technical-item">
-                    <text class="technical-label">{{ item.label }}</text>
-                    <text :class="['technical-value', item.tone]">{{ item.value }}</text>
-                  </view>
+          <view v-if="activeDimension === index" class="dimension-body">
+            <template v-if="index === 0 && technicalDetail">
+              <TrendKLineChart :title="`${stockName} · 近期K线`" :data="technicalDetail.kline" />
+              <TrendKLineChart
+                :title="`${technicalDetail.conceptKline.name || '概念指数'} · 近期K线`"
+                :data="technicalDetail.conceptKline"
+              />
+              <view class="technical-grid">
+                <view v-for="item in technicalIndicators" :key="item.label" class="technical-item">
+                  <text class="technical-label">{{ item.label }}</text>
+                  <text :class="['technical-value', item.tone]">{{ item.value }}</text>
                 </view>
-                <view class="conclusion technical-conclusion">
-                  <view class="conclusion-title">
-                    <view class="conclusion-icon">
-                      <SvgIcon name="information-line" size="26rpx" color="#ffffff" />
-                    </view>
-                    <text>趋势判读</text>
+              </view>
+              <view class="conclusion technical-conclusion">
+                <view class="conclusion-title">
+                  <view class="conclusion-icon">
+                    <SvgIcon name="information-line" size="26rpx" color="#ffffff" />
                   </view>
-                  <text class="conclusion-text">{{ trendAnalysis }}</text>
+                  <text>趋势判读</text>
                 </view>
-              </template>
+                <text class="conclusion-text">{{ trendAnalysis }}</text>
+              </view>
+            </template>
 
-              <template v-else-if="index === 1 && trackDetail">
-                <view class="track-hero">
-                  <text class="sector-name">{{ trackDetail.sectorName || '所属概念' }}</text>
-                  <text class="track-caption">近60日上榜</text>
-                  <view class="count-row">
-                    <text class="track-count">{{ trackDetail.sectorListCount60d }}</text>
-                    <text class="track-unit">次</text>
-                  </view>
+            <template v-else-if="index === 1 && trackDetail">
+              <view class="track-hero">
+                <text class="sector-name">{{ trackDetail.sectorName || '所属概念' }}</text>
+                <text class="track-caption">近60日上榜</text>
+                <view class="count-row">
+                  <text class="track-count">{{ trackDetail.sectorListCount60d }}</text>
+                  <text class="track-unit">次</text>
                 </view>
-                <view v-if="weeklyTrend.length" class="weekly-chart">
-                  <view v-for="(count, idx) in weeklyTrend" :key="idx" class="week-column">
-                    <text class="week-count">{{ count }}</text>
-                    <view class="bar-track">
-                      <view class="week-bar" :style="{ height: barHeight(count) }" />
-                    </view>
-                    <text class="week-label">{{ weekLabels[idx] }}</text>
+              </view>
+              <view v-if="weeklyTrend.length" class="weekly-chart">
+                <view v-for="(count, idx) in weeklyTrend" :key="idx" class="week-column">
+                  <text class="week-count">{{ count }}</text>
+                  <view class="bar-track">
+                    <view class="week-bar" :style="{ height: barHeight(count) }" />
                   </view>
+                  <text class="week-label">{{ weekLabels[idx] }}</text>
                 </view>
-                <view class="track-stats">
-                  <view class="track-stat">
-                    <text class="stat-label">板块月涨幅</text>
-                    <text :class="['stat-value', isPositive(trackDetail.sectorStrength) ? 'up' : 'down']">
-                      {{ trackDetail.sectorStrength || '--' }}
-                    </text>
-                  </view>
-                  <view class="track-stat">
-                    <text class="stat-label">市场认可度</text>
-                    <text class="stat-value brand">{{ trackDetail.marketRecognition ?? '--' }}</text>
-                  </view>
+              </view>
+              <view class="track-stats">
+                <view class="track-stat">
+                  <text class="stat-label">板块月涨幅</text>
+                  <text :class="['stat-value', isPositive(trackDetail.sectorStrength) ? 'up' : 'down']">
+                    {{ trackDetail.sectorStrength || '--' }}
+                  </text>
                 </view>
-                <view class="policy-section">
-                  <text class="section-title">板块信息与政策趋势</text>
-                  <view class="policy-list">
-                    <view class="policy-item">
-                      <view class="policy-dot policy-dot-up" />
-                      <view class="policy-content">
-                        <text class="policy-name">所属板块</text>
-                        <text class="policy-desc">{{ trackDetail.sectorName || '暂无板块信息' }}</text>
-                      </view>
-                    </view>
-                    <view
-                      v-for="(item, policyIndex) in trackDetail.policyItems || []"
-                      :key="`${item.name}-${policyIndex}`"
-                      class="policy-item"
-                    >
-                      <view :class="['policy-dot', item.color === 'gold' ? 'policy-dot-gold' : 'policy-dot-up']" />
-                      <view class="policy-content">
-                        <text class="policy-name">{{ item.name }}</text>
-                        <text class="policy-desc">{{ item.desc }}</text>
-                      </view>
-                    </view>
-                    <view v-if="!trackDetail.policyItems?.length" class="policy-item">
-                      <view class="policy-dot policy-dot-gold" />
-                      <view class="policy-content">
-                        <text class="policy-name">暂无明显政策催化</text>
-                        <text class="policy-desc">近期无重大政策或产业趋势变化</text>
-                      </view>
+                <view class="track-stat">
+                  <text class="stat-label">市场认可度</text>
+                  <text class="stat-value brand">{{ trackDetail.marketRecognition ?? '--' }}</text>
+                </view>
+              </view>
+              <view class="policy-section">
+                <text class="section-title">板块信息与政策趋势</text>
+                <view class="policy-list">
+                  <view class="policy-item">
+                    <view class="policy-dot policy-dot-up" />
+                    <view class="policy-content">
+                      <text class="policy-name">所属板块</text>
+                      <text class="policy-desc">{{ trackDetail.sectorName || '暂无板块信息' }}</text>
                     </view>
                   </view>
-                </view>
-              </template>
-
-              <template v-else-if="index === 2 && newsDetail">
-                <view class="news-heading">
-                  <text class="section-title">近期重大资讯</text>
-                  <view class="news-stats">
-                    <text class="news-stat">
-                      机构调研：<text class="news-stat-strong">{{ newsDetail.researchCount || 0 }}</text> 家
-                    </text>
-                    <text class="news-stat">硬催化：{{ newsDetail.hardCatalyst || '--' }}</text>
-                  </view>
-                </view>
-                <view v-if="newsDetail.news.length" class="news-list">
                   <view
-                    v-for="(news, newsIndex) in newsDetail.news.slice(0, 5)"
-                    :key="`${news.title}-${newsIndex}`"
-                    class="news-item"
-                    @tap="toggleNews(newsIndex)"
+                    v-for="(item, policyIndex) in trackDetail.policyItems || []"
+                    :key="`${item.name}-${policyIndex}`"
+                    class="policy-item"
                   >
-                    <view class="news-topline">
-                      <text class="news-tag">资讯</text>
-                      <text class="news-title">{{ news.title }}</text>
-                      <SvgIcon
-                        :name="expandedNews === newsIndex ? 'arrow-up-s-line' : 'arrow-down-s-line'"
-                        size="28rpx"
-                        color="#9ca3af"
-                      />
+                    <view :class="['policy-dot', item.color === 'gold' ? 'policy-dot-gold' : 'policy-dot-up']" />
+                    <view class="policy-content">
+                      <text class="policy-name">{{ item.name }}</text>
+                      <text class="policy-desc">{{ item.desc }}</text>
                     </view>
-                    <view class="news-meta">
-                      <text>{{ news.source || '财联社' }}</text>
-                      <text>{{ formatTime(news.publishTime) }}</text>
+                  </view>
+                  <view v-if="!trackDetail.policyItems?.length" class="policy-item">
+                    <view class="policy-dot policy-dot-gold" />
+                    <view class="policy-content">
+                      <text class="policy-name">暂无明显政策催化</text>
+                      <text class="policy-desc">近期无重大政策或产业趋势变化</text>
                     </view>
-                    <text v-if="expandedNews === newsIndex" class="news-summary">
-                      {{ news.summary || '暂无摘要' }}
-                    </text>
                   </view>
                 </view>
-                <EmptyState v-else icon="newspaper-line" text="近期暂无重大资讯" />
-              </template>
+              </view>
+            </template>
 
-              <template v-else-if="index === 3 && fundamentalDetail">
-                <view class="fundamental-list">
-                  <view v-for="sub in fundamentalDetail.subDimensions" :key="sub.name" class="factor-group">
-                    <view class="factor-heading">
-                      <view class="factor-title-row">
-                        <text class="factor-title">{{ sub.name }}</text>
-                        <text class="factor-weight">{{ sub.weight }}%</text>
-                      </view>
-                      <text class="factor-score">{{ sub.score }}</text>
+            <template v-else-if="index === 2 && newsDetail">
+              <view class="news-heading">
+                <text class="section-title">近期重大资讯</text>
+                <view class="news-stats">
+                  <text class="news-stat">
+                    机构调研：<text class="news-stat-strong">{{ newsDetail.researchCount || 0 }}</text> 家
+                  </text>
+                  <text class="news-stat">硬催化：{{ newsDetail.hardCatalyst || '--' }}</text>
+                </view>
+              </view>
+              <view v-if="newsDetail.news.length" class="news-list">
+                <view
+                  v-for="(news, newsIndex) in newsDetail.news.slice(0, 5)"
+                  :key="`${news.title}-${newsIndex}`"
+                  class="news-item"
+                  @tap="toggleNews(newsIndex)"
+                >
+                  <view class="news-topline">
+                    <text class="news-tag">资讯</text>
+                    <text class="news-title">{{ news.title }}</text>
+                    <SvgIcon
+                      :name="expandedNews === newsIndex ? 'arrow-up-s-line' : 'arrow-down-s-line'"
+                      size="28rpx"
+                      color="#9ca3af"
+                    />
+                  </view>
+                  <view class="news-meta">
+                    <text>{{ news.source || '财联社' }}</text>
+                    <text>{{ formatTime(news.publishTime) }}</text>
+                  </view>
+                  <text v-if="expandedNews === newsIndex" class="news-summary">
+                    {{ news.summary || '暂无摘要' }}
+                  </text>
+                </view>
+              </view>
+              <EmptyState v-else icon="newspaper-line" text="近期暂无重大资讯" />
+            </template>
+
+            <template v-else-if="index === 3 && fundamentalDetail">
+              <view class="fundamental-list">
+                <view v-for="sub in fundamentalDetail.subDimensions" :key="sub.name" class="factor-group">
+                  <view class="factor-heading">
+                    <view class="factor-title-row">
+                      <text class="factor-title">{{ sub.name }}</text>
+                      <text class="factor-weight">{{ sub.weight }}%</text>
                     </view>
-                    <view class="score-track">
-                      <view class="score-fill" :style="{ width: `${clampScore(sub.score)}%` }" />
-                    </view>
-                    <view class="indicator-list">
-                      <view v-for="indicator in sub.indicators" :key="indicator.key" class="indicator-row">
-                        <text class="indicator-name">{{ indicator.name }}</text>
-                        <text class="indicator-value">{{ indicator.value }}</text>
-                        <text class="indicator-score">{{ indicator.score }}</text>
-                      </view>
+                    <text class="factor-score">{{ sub.score }}</text>
+                  </view>
+                  <view class="score-track">
+                    <view class="score-fill" :style="{ width: `${clampScore(sub.score)}%` }" />
+                  </view>
+                  <view class="indicator-list">
+                    <view v-for="indicator in sub.indicators" :key="indicator.key" class="indicator-row">
+                      <text class="indicator-name">{{ indicator.name }}</text>
+                      <text class="indicator-value">{{ indicator.value }}</text>
+                      <text class="indicator-score">{{ indicator.score }}</text>
                     </view>
                   </view>
                 </view>
-              </template>
-            </view>
+              </view>
+            </template>
           </view>
         </view>
-
-        <view class="detail-footnote">
-          <text>更新时间：{{ formatTime(detail.updatedAt || detail.scoreDate) }}</text>
-          <text>评分基于公开数据与模型测算，仅供参考，不构成投资建议。</text>
-        </view>
       </view>
-    </scroll-view>
-  </view>
+
+      <view class="detail-footnote">
+        <text>更新时间：{{ formatTime(detail.updatedAt || detail.scoreDate) }}</text>
+        <text>评分基于公开数据与模型测算，仅供参考，不构成投资建议。</text>
+      </view>
+    </view>
+  </SubPageCard>
 </template>
 
 <script setup lang="ts">
@@ -262,6 +250,7 @@ import {
   type TrendTechnicalDetail,
   type TrendTrackDetail,
 } from '@/shared/api/modules/trend-score'
+import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
@@ -295,19 +284,6 @@ const ratingMeaning = computed(() => {
   }
   return labels[grade] || ''
 })
-
-const statusBarHeight = ref(0)
-try {
-  const raw = uni.getSystemInfoSync().statusBarHeight || 0
-  // #ifdef APP-PLUS
-  statusBarHeight.value = raw / 1.2
-  // #endif
-  // #ifndef APP-PLUS
-  statusBarHeight.value = raw
-  // #endif
-} catch {
-  statusBarHeight.value = 0
-}
 
 const pageTitle = computed(() => `${stockName.value || symbol.value} · 趋势评分`)
 const technicalDetail = computed<TrendTechnicalDetail | null>(() => {
@@ -420,6 +396,8 @@ async function loadDetail() {
   }
 }
 
+// 保留：直接 URL 访问（页面栈为空）时的返回兜底，redirectTo 路径不变。
+// 常规返回由 SubPageCard 自带返回按钮处理；此处保留 fallback 不丢失。
 function goBack() {
   const pages = getCurrentPages()
   if (pages.length > 1) uni.navigateBack()
@@ -455,38 +433,6 @@ onShow(() => {
 <style lang="scss" scoped>
 @import '@/shared/styles/variables.scss';
 
-.detail-page {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: $bg-color;
-}
-
-.detail-nav {
-  position: relative;
-  height: 88rpx;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  padding: 0 $spacing-base;
-}
-
-.nav-button { position: relative; z-index: 1; width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; }
-.nav-title {
-  position: absolute;
-  right: 176rpx;
-  left: 176rpx;
-  overflow: hidden;
-  color: $text-color-title;
-  font-size: $font-size-lg;
-  font-weight: 650;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.nav-action-slot { width: 132rpx; height: 64rpx; margin-left: auto; display: flex; align-items: center; justify-content: flex-end; }
 .nav-monitor-button {
   min-height: 44rpx;
   padding: 0 12rpx;
@@ -504,16 +450,12 @@ onShow(() => {
 .nav-monitor-button.active { color: $bg-color-grey; background: $brand-color; }
 .nav-monitor-button.disabled { opacity: 0.55; }
 .nav-monitor-button text { white-space: nowrap; }
-.detail-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-anchor: none;
-}
 
 // H5 的 scroll-view 会再生成一层真正的滚动容器；关闭滚动锚定，
 // 避免展开维度详情时浏览器为保持底部锚点而自动改变 scrollTop。
-:deep(.detail-scroll .uni-scroll-view),
-:deep(.detail-scroll .uni-scroll-view-content) {
+// 详情页内容现在由 SubPageCard 的 scroll-view（.sub-page-content）承载，故定向其内部容器。
+:deep(.sub-page-content .uni-scroll-view),
+:deep(.sub-page-content .uni-scroll-view-content) {
   overflow-anchor: none;
 }
 .detail-content { padding: 0 $spacing-base $spacing-lg; }

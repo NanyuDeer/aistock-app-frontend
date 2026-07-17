@@ -59,31 +59,41 @@
         <view
           v-for="stock in sortedStocks"
           :key="stock.symbol"
-          class="stock-row"
-          @tap="goDetail(stock.symbol)"
+          class="stock-row-wrap"
         >
-          <view class="stock-left">
-            <text class="stock-name">{{ stock.name }}</text>
-            <view class="stock-tags">
-              <text class="stock-code">{{ stock.symbol }}</text>
-              <text v-if="stock.margin" class="tag-margin">融</text>
-              <text v-if="stock.specialAlert" class="tag-alert">特别提醒</text>
-            </view>
+          <!-- 删除按钮（左滑后露出） -->
+          <view
+            class="remove-stock-btn"
+            :class="{ disabled: favoritesStore.isPending(stock.symbol) }"
+            @tap.stop="confirmRemove(stock)"
+          >
+            <text class="remove-text">删除</text>
           </view>
-          <view class="stock-right">
-            <text class="stock-price">{{ stock.price ? stock.price.toFixed(2) : '--' }}</text>
-            <text :class="['stock-change', stock.changePercent >= 0 ? 'up' : 'down']">
-              {{ stock.changePercent >= 0 ? '+' : '' }}{{ stock.changePercent.toFixed(2) }}%
-            </text>
-            <text :class="['stock-amount', stock.changeAmount >= 0 ? 'up' : 'down']">
-              {{ stock.changeAmount >= 0 ? '+' : '' }}{{ stock.changeAmount.toFixed(2) }}
-            </text>
-            <view
-              class="remove-stock-btn"
-              :class="{ disabled: favoritesStore.isPending(stock.symbol) }"
-              @tap.stop="confirmRemove(stock)"
-            >
-              <text>删除</text>
+          <!-- 可滑动内容层 -->
+          <view
+            class="stock-row"
+            :style="{ transform: openSwipeSymbol === stock.symbol ? 'translateX(-140rpx)' : 'translateX(0)' }"
+            @touchstart="onSwipeStart($event, stock.symbol)"
+            @touchmove="onSwipeMove"
+            @touchend="onSwipeEnd"
+            @tap="openSwipeSymbol === stock.symbol ? closeSwipe() : goDetail(stock.symbol)"
+          >
+            <view class="stock-left">
+              <text class="stock-name">{{ stock.name }}</text>
+              <view class="stock-tags">
+                <text class="stock-code">{{ stock.symbol }}</text>
+                <text v-if="stock.margin" class="tag-margin">融</text>
+                <text v-if="stock.specialAlert" class="tag-alert">特别提醒</text>
+              </view>
+            </view>
+            <view class="stock-right">
+              <text class="stock-price">{{ stock.price ? stock.price.toFixed(2) : '--' }}</text>
+              <text :class="['stock-change', stock.changePercent >= 0 ? 'up' : 'down']">
+                {{ stock.changePercent >= 0 ? '+' : '' }}{{ stock.changePercent.toFixed(2) }}%
+              </text>
+              <text :class="['stock-amount', stock.changeAmount >= 0 ? 'up' : 'down']">
+                {{ stock.changeAmount >= 0 ? '+' : '' }}{{ stock.changeAmount.toFixed(2) }}
+              </text>
             </view>
           </view>
         </view>
@@ -183,6 +193,59 @@ const totalChange = computed(() => {
 })
 
 onShow(() => favoritesStore.fetchFavorites({ silent: false }))
+
+/* ===== 左滑删除 ===== */
+const openSwipeSymbol = ref('')
+const swipingSymbol = ref('')
+const swipeStartX = ref(0)
+const swipeStartY = ref(0)
+const swipeDeltaX = ref(0)
+const swipeDeltaY = ref(0)
+const isSwiping = ref(false)
+
+function onSwipeStart(e: unknown, symbol: string) {
+  const touch = (e as TouchEvent).touches[0] || (e as TouchEvent).changedTouches[0]
+  swipeStartX.value = touch.clientX
+  swipeStartY.value = touch.clientY
+  swipeDeltaX.value = 0
+  swipeDeltaY.value = 0
+  isSwiping.value = false
+  swipingSymbol.value = symbol
+  // 如果触摸的是其他行，先关闭当前打开的行
+  if (openSwipeSymbol.value && openSwipeSymbol.value !== symbol) {
+    openSwipeSymbol.value = ''
+  }
+}
+
+function onSwipeMove(e: unknown) {
+  const touch = (e as TouchEvent).touches[0] || (e as TouchEvent).changedTouches[0]
+  swipeDeltaX.value = touch.clientX - swipeStartX.value
+  swipeDeltaY.value = touch.clientY - swipeStartY.value
+  // 水平滑动大于垂直滑动时标记为正在滑动
+  if (Math.abs(swipeDeltaX.value) > 10 && Math.abs(swipeDeltaX.value) > Math.abs(swipeDeltaY.value)) {
+    isSwiping.value = true
+  }
+}
+
+function onSwipeEnd() {
+  if (!isSwiping.value) {
+    swipingSymbol.value = ''
+    return
+  }
+  // 左滑超过阈值 → 打开删除按钮
+  if (swipeDeltaX.value < -50) {
+    openSwipeSymbol.value = swipingSymbol.value
+  } else if (swipeDeltaX.value > 30) {
+    // 右滑 → 关闭
+    openSwipeSymbol.value = ''
+  }
+  isSwiping.value = false
+  swipingSymbol.value = ''
+}
+
+function closeSwipe() {
+  openSwipeSymbol.value = ''
+}
 
 function retrySync() {
   void favoritesStore.fetchFavorites({ silent: false })
@@ -357,12 +420,44 @@ function goSearch() {
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
+.stock-row-wrap {
+  position: relative;
+  overflow: hidden;
+}
+
+.remove-stock-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 140rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $error-color;
+  gap: 6rpx;
+
+  &.disabled {
+    opacity: 0.5;
+  }
+}
+
+.remove-text {
+  color: #ffffff;
+  font-size: $font-size-sm;
+  font-weight: 500;
+}
+
 .stock-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 24rpx;
   border-bottom: 1rpx solid #f3f4f6;
+  background: #ffffff;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.25s ease;
 
   &:last-child {
     border-bottom: none;
@@ -436,18 +531,6 @@ function goSearch() {
   font-weight: 500;
   min-width: 80rpx;
   text-align: right;
-}
-
-.remove-stock-btn {
-  padding: 8rpx 12rpx;
-  color: $error-color;
-  font-size: $font-size-sm;
-  border: 1rpx solid rgba(244, 63, 94, 0.3);
-  border-radius: $radius-xs;
-
-  &.disabled {
-    opacity: 0.5;
-  }
 }
 
 .up { color: #f43f5e; }

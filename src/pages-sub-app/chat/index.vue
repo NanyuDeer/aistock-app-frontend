@@ -211,7 +211,7 @@ onUnmounted(() => {
   height: 100%;
 }
 
-.message-list { flex: 1; min-height: 0; padding: 20rpx; }
+.message-list { flex: 1; min-height: 0; padding: 20rpx; overflow: hidden; }
 .message-item { margin-bottom: 24rpx; }
 .message-item.user { display: flex; justify-content: flex-end; }
 .msg-content.user {
@@ -225,7 +225,12 @@ onUnmounted(() => {
   max-width: 80%; box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-/* mp-html 样式覆盖 */
+/* mp-html 样式覆盖：keep-all 必须覆盖到内部所有子元素（p/div/span 等） */
+:deep(.bubble-html),
+:deep(.bubble-html *) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
 :deep(.bubble-html) {
   font-size: 28rpx;
   color: #1a1d24;
@@ -318,7 +323,7 @@ onUnmounted(() => {
 }
 .skill-text { font-size: 26rpx; color: #6b7280; line-height: 1.5; }
 
-.quick-skills { display: flex; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; }
+.quick-skills { display: flex; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; flex-shrink: 0; }
 .skill-btn {
   display: inline-flex; align-items: center; gap: 6rpx;
   background: rgba(77, 124, 254, 0.08); color: #4d7cfe; border-radius: 20rpx;
@@ -326,7 +331,7 @@ onUnmounted(() => {
 }
 .skill-btn-text { font-size: 24rpx; color: #4d7cfe; }
 
-.input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; }
+.input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
 .input { flex: 1; background: #f5f7fa; border-radius: 12rpx; padding: 16rpx; color: #1a1d24; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
 .send-btn { background: #4d7cfe; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
 </style>

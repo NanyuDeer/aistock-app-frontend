@@ -16,7 +16,9 @@
             "delay" : 0
         },
         "modules" : {
-            "Push" : {}
+            "Push" : {},
+            "Barcode" : {},
+            "OAuth" : {}
         },
         "distribute" : {
             "android" : {
@@ -44,8 +46,8 @@
                 },
                 "oauth" : {
                     "weixin" : {
-                        "appid" : "",
-                        "appsecret" : ""
+                        "appid" : "wx539e4bb345aff2bc",
+                        "appsecret" : "98961b8246e0c9dc18d3dfa5701966ea"
                     }
                 }
             },

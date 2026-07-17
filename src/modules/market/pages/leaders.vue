@@ -168,8 +168,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { ref, computed, getCurrentInstance } from 'vue'
+import { onShow, onReady } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderAiAnalysis, WindLeaderSector } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
@@ -209,6 +209,28 @@ try {
 } catch {
   containerWidth.value = 320
 }
+
+// onReady 中测量 .bubble-wrap 的实际渲染宽度并修正 containerWidth。
+// 上面 getSystemInfoSync() 只能拿到 windowWidth，无法感知 App 端 zoom:1.2 缩放等
+// 导致的实际容器宽度差异，这里用 boundingClientRect 拿到真实渲染宽度兜底。
+onReady(() => {
+  const instance = getCurrentInstance()
+  const query = uni.createSelectorQuery()
+  if (instance?.proxy) {
+    query.in(instance.proxy)
+  }
+  query
+    .select('.bubble-wrap')
+    .boundingClientRect((rect) => {
+      // boundingClientRect 回调参数类型为 NodeInfo | NodeInfo[]，需收窄到单节点
+      const r = Array.isArray(rect) ? rect[0] : rect
+      const w = r?.width
+      if (w && w > 0) {
+        containerWidth.value = Math.round(w)
+      }
+    })
+    .exec()
+})
 
 // 根据持续性决定半径，横向椭圆布局允许稍大半径
 function calcRadius(persistence: string, score: number): number {
@@ -276,7 +298,7 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
 
     // 居中力（Y方向更强，X方向更弱，让泡泡横向展开）
     for (const n of nodes) {
-      n.vx += (cx - n.x) * 0.06 * alpha  // X: 弱居中
+      n.vx += (cx - n.x) * 0.08 * alpha  // X: 居中力增强，帮助泡泡回归中心
       n.vy += (cy - n.y) * 0.15 * alpha  // Y: 强居中
     }
 

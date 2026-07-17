@@ -1,160 +1,149 @@
 <template>
-  <view class="page-report-detail">
-    <!-- 顶部导航 -->
-    <view class="detail-nav" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-back" @tap="goBack">
-        <text class="nav-back-icon">&lt;</text>
+  <SubPageCard title="财报详情">
+    <!-- ===== 模块1：头部基础信息 ===== -->
+    <view class="section section-header">
+      <view class="header-top">
+        <view class="header-top-left">
+          <text class="header-stock-name">{{ stock.name }}</text>
+          <text class="header-stock-code">{{ stock.code }}</text>
+          <text class="header-period">{{ stock.period }}</text>
+        </view>
+        <text :class="['report-tag', tagClass(stock.tag)]">{{ stock.tag }}</text>
       </view>
-      <text class="nav-title">财报详情</text>
-      <view style="width:60rpx" />
+      <view class="header-sub">
+        <text class="header-meta">{{ stock.industry }}</text>
+        <text class="header-meta-divider">|</text>
+        <text class="header-meta">披露：{{ stock.disclosureDate }}</text>
+        <text class="header-meta-divider">|</text>
+        <text class="header-meta">更新：{{ stock.updateTime }}</text>
+      </view>
+      <view class="header-actions">
+        <view class="header-action-btn" @tap="goBackToList">
+          <SvgIcon name="list-check" size="24rpx" color="#4d7cfe" />
+          <text class="action-btn-text">返回列表</text>
+        </view>
+        <view class="header-action-btn" @tap="addToFavorites">
+          <SvgIcon :name="isFav ? 'star-fill' : 'star-line'" size="24rpx" :color="isFav ? '#f59f0b' : '#4d7cfe'" />
+          <text class="action-btn-text">{{ isFav ? '已自选' : '加入自选' }}</text>
+        </view>
+        <view class="header-action-btn" @tap="exportReport">
+          <SvgIcon name="share-line" size="24rpx" color="#4d7cfe" />
+          <text class="action-btn-text">导出摘要</text>
+        </view>
+      </view>
     </view>
 
-    <view class="detail-scroll">
-      <!-- ===== 模块1：头部基础信息 ===== -->
-      <view class="section section-header">
-        <view class="header-top">
-          <view class="header-top-left">
-            <text class="header-stock-name">{{ stock.name }}</text>
-            <text class="header-stock-code">{{ stock.code }}</text>
-            <text class="header-period">{{ stock.period }}</text>
-          </view>
-          <text :class="['report-tag', tagClass(stock.tag)]">{{ stock.tag }}</text>
-        </view>
-        <view class="header-sub">
-          <text class="header-meta">{{ stock.industry }}</text>
-          <text class="header-meta-divider">|</text>
-          <text class="header-meta">披露：{{ stock.disclosureDate }}</text>
-          <text class="header-meta-divider">|</text>
-          <text class="header-meta">更新：{{ stock.updateTime }}</text>
-        </view>
-        <view class="header-actions">
-          <view class="header-action-btn" @tap="goBack">
-            <SvgIcon name="list-check" size="24rpx" color="#4d7cfe" />
-            <text class="action-btn-text">返回列表</text>
-          </view>
-          <view class="header-action-btn" @tap="addToFavorites">
-            <SvgIcon :name="isFav ? 'star-fill' : 'star-line'" size="24rpx" :color="isFav ? '#f59f0b' : '#4d7cfe'" />
-            <text class="action-btn-text">{{ isFav ? '已自选' : '加入自选' }}</text>
-          </view>
-          <view class="header-action-btn" @tap="exportReport">
-            <SvgIcon name="share-line" size="24rpx" color="#4d7cfe" />
-            <text class="action-btn-text">导出摘要</text>
-          </view>
-        </view>
+    <!-- ===== 模块2：AI 智能研判 ===== -->
+    <view class="section section-ai">
+      <view class="section-title-row">
+        <SvgIcon name="robot-line" size="28rpx" color="#4d7cfe" />
+        <text class="section-title-text">AI 智能研判</text>
       </view>
 
-      <!-- ===== 模块2：AI 智能研判 ===== -->
-      <view class="section section-ai">
-        <view class="section-title-row">
-          <SvgIcon name="robot-line" size="28rpx" color="#4d7cfe" />
-          <text class="section-title-text">AI 智能研判</text>
-        </view>
-
-        <!-- 标签组 -->
-        <view class="ai-tags">
-          <view class="ai-tags-group">
-            <text class="ai-tags-group-label">经营亮点</text>
-            <view class="ai-tags-list">
-              <text
-                v-for="(tag, i) in aiTags.good"
-                :key="i"
-                class="ai-tag ai-tag-good"
-                @tap="scrollToSection('table')"
-              >{{ tag }}</text>
-            </view>
-          </view>
-          <view class="ai-tags-group">
-            <text class="ai-tags-group-label">潜在风险</text>
-            <view class="ai-tags-list">
-              <text
-                v-for="(tag, i) in aiTags.risk"
-                :key="i"
-                class="ai-tag ai-tag-risk"
-                @tap="scrollToSection('table')"
-              >{{ tag }}</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- AI 研判短文 -->
-        <view class="ai-summary">
-          <text class="ai-summary-text">{{ aiSummary }}</text>
-        </view>
-      </view>
-
-      <!-- ===== 模块3：核心财务指标数据表 ===== -->
-      <view id="table-section" class="section section-table">
-        <view class="section-title-row">
-          <SvgIcon name="file-list-line" size="28rpx" color="#4d7cfe" />
-          <text class="section-title-text">核心财务指标</text>
-          <view class="table-year-toggle">
+      <!-- 标签组 -->
+      <view class="ai-tags">
+        <view class="ai-tags-group">
+          <text class="ai-tags-group-label">经营亮点</text>
+          <view class="ai-tags-list">
             <text
-              :class="['year-toggle-btn', tableYearRange === 2 ? 'active' : '']"
-              @tap="tableYearRange = 2"
-            >近2年</text>
-            <text
-              :class="['year-toggle-btn', tableYearRange === 3 ? 'active' : '']"
-              @tap="tableYearRange = 3"
-            >近3年</text>
+              v-for="(tag, i) in aiTags.good"
+              :key="i"
+              class="ai-tag ai-tag-good"
+              @tap="scrollToSection('table')"
+            >{{ tag }}</text>
           </view>
         </view>
-
-        <scroll-view class="table-scroll" scroll-x>
-          <table class="finance-table">
-            <thead>
-              <tr>
-                <th class="th-category">指标分类</th>
-                <th class="th-name">指标名称</th>
-                <th v-for="p in displayPeriods" :key="p.key" class="th-value">{{ p.label }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, idx) in tableRows" :key="idx">
-                <td class="td-category">{{ row.category }}</td>
-                <td class="td-name">
-                  <text class="td-name-text">{{ row.name }}</text>
-                  <text v-if="row.tip" class="td-name-tip" @longtap="showTip(row.tip)">ⓘ</text>
-                </td>
-                <td v-for="p in displayPeriods" :key="p.key" class="td-value">
-                  <text :class="valueClass(row, p.key)">{{ getCellValue(row, p.key) }}</text>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </scroll-view>
+        <view class="ai-tags-group">
+          <text class="ai-tags-group-label">潜在风险</text>
+          <view class="ai-tags-list">
+            <text
+              v-for="(tag, i) in aiTags.risk"
+              :key="i"
+              class="ai-tag ai-tag-risk"
+              @tap="scrollToSection('table')"
+            >{{ tag }}</text>
+          </view>
+        </view>
       </view>
 
-      <!-- ===== 模块4：多维度折线图 ===== -->
-      <view class="section section-chart">
-        <view class="section-title-row">
-          <SvgIcon name="bar-chart-line" size="28rpx" color="#4d7cfe" />
-          <text class="section-title-text">走势图表</text>
-        </view>
+      <!-- AI 研判短文 -->
+      <view class="ai-summary">
+        <text class="ai-summary-text">{{ aiSummary }}</text>
+      </view>
+    </view>
 
-        <!-- Tab 切换 -->
-        <view class="chart-tabs">
+    <!-- ===== 模块3：核心财务指标数据表 ===== -->
+    <view id="table-section" class="section section-table">
+      <view class="section-title-row">
+        <SvgIcon name="file-list-line" size="28rpx" color="#4d7cfe" />
+        <text class="section-title-text">核心财务指标</text>
+        <view class="table-year-toggle">
           <text
-            v-for="tab in chartTabs"
-            :key="tab.key"
-            :class="['chart-tab', activeChartTab === tab.key ? 'active' : '']"
-            @tap="switchChartTab(tab.key)"
-          >{{ tab.label }}</text>
-        </view>
-
-        <!-- 图表 -->
-        <view class="chart-wrap">
-          <canvas
-            :id="chartCanvasId"
-            :canvas-id="chartCanvasId"
-            class="chart-canvas"
-          />
+            :class="['year-toggle-btn', tableYearRange === 2 ? 'active' : '']"
+            @tap="tableYearRange = 2"
+          >近2年</text>
+          <text
+            :class="['year-toggle-btn', tableYearRange === 3 ? 'active' : '']"
+            @tap="tableYearRange = 3"
+          >近3年</text>
         </view>
       </view>
 
-      <!-- 底部留白 -->
-      <view style="height: 60rpx" />
+      <scroll-view class="table-scroll" scroll-x>
+        <table class="finance-table">
+          <thead>
+            <tr>
+              <th class="th-category">指标分类</th>
+              <th class="th-name">指标名称</th>
+              <th v-for="p in displayPeriods" :key="p.key" class="th-value">{{ p.label }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, idx) in tableRows" :key="idx">
+              <td class="td-category">{{ row.category }}</td>
+              <td class="td-name">
+                <text class="td-name-text">{{ row.name }}</text>
+                <text v-if="row.tip" class="td-name-tip" @longtap="showTip(row.tip)">ⓘ</text>
+              </td>
+              <td v-for="p in displayPeriods" :key="p.key" class="td-value">
+                <text :class="valueClass(row, p.key)">{{ getCellValue(row, p.key) }}</text>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </scroll-view>
     </view>
-  </view>
+
+    <!-- ===== 模块4：多维度折线图 ===== -->
+    <view class="section section-chart">
+      <view class="section-title-row">
+        <SvgIcon name="bar-chart-line" size="28rpx" color="#4d7cfe" />
+        <text class="section-title-text">走势图表</text>
+      </view>
+
+      <!-- Tab 切换 -->
+      <view class="chart-tabs">
+        <text
+          v-for="tab in chartTabs"
+          :key="tab.key"
+          :class="['chart-tab', activeChartTab === tab.key ? 'active' : '']"
+          @tap="switchChartTab(tab.key)"
+        >{{ tab.label }}</text>
+      </view>
+
+      <!-- 图表 -->
+      <view class="chart-wrap">
+        <canvas
+          :id="chartCanvasId"
+          :canvas-id="chartCanvasId"
+          class="chart-canvas"
+        />
+      </view>
+    </view>
+
+    <!-- 底部留白 -->
+    <view style="height: 60rpx" />
+  </SubPageCard>
 </template>
 
 <script setup lang="ts">
@@ -162,15 +151,7 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import uCharts from '@qiun/ucharts'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-
-// ===== 状态栏 =====
-const statusBarHeight = ref(0)
-try {
-  const raw = uni.getSystemInfoSync().statusBarHeight || 0
-  statusBarHeight.value = raw
-} catch (_) {
-  statusBarHeight.value = 0
-}
+import SubPageCard from '@/shared/components/SubPageCard.vue'
 
 // ===== 参数 =====
 const symbol = ref('')
@@ -181,7 +162,7 @@ const tableYearRange = ref(2)
 const chartCanvasId = `chart_rd_${Date.now()}`
 const chartReady = ref(false)
 const activeChartTab = ref('netProfit')
-let chartInstance: any = null
+let chartInstance: InstanceType<typeof uCharts> | null = null
 
 const chartTabs = [
   { key: 'revenue', label: '营收走势' },
@@ -272,11 +253,14 @@ function buildAiSummary(item: typeof stock.value, periods: PeriodData[]) {
 }
 
 // ===== 表格数据 =====
+/** PeriodData 中数值型字段（排除 key/label 等字符串字段） */
+type NumericField = 'revenue' | 'revenueYoy' | 'netProfit' | 'netProfitYoy' | 'deductProfit' | 'grossMargin' | 'netMargin' | 'roe' | 'cashFlow' | 'debtRatio'
+
 interface TableRow {
   category: string
   name: string
   tip?: string
-  field: keyof PeriodData
+  field: NumericField
   isYoy?: boolean
 }
 
@@ -330,14 +314,16 @@ function tagClass(tag: string): string {
 // ===== 滚动 =====
 function scrollToSection(id: string) {
   uni.createSelectorQuery().select(`#${id}-section`).boundingClientRect(rect => {
-    if (rect) {
-      uni.pageScrollTo({ scrollTop: rect.top + rect.height, duration: 300 })
+    if (rect && !Array.isArray(rect)) {
+      const top = rect.top ?? 0
+      const height = rect.height ?? 0
+      uni.pageScrollTo({ scrollTop: top + height, duration: 300 })
     }
   }).exec()
 }
 
 // ===== 操作按钮 =====
-function goBack() { uni.navigateBack() }
+function goBackToList() { uni.navigateBack() }
 
 function addToFavorites() {
   isFav.value = !isFav.value
@@ -379,7 +365,7 @@ async function renderChart() {
     if (!ctx || !width) return
 
     if (chartInstance) {
-      try { chartInstance.dispose?.() } catch (_) {}
+      try { (chartInstance as unknown as { dispose?: () => void }).dispose?.() } catch (_) {}
       chartInstance = null
     }
 
@@ -390,7 +376,10 @@ async function renderChart() {
       dataPointSize: 4,
       context: ctx,
       width,
-      height: 360,
+      height: 240,
+      // #ifdef H5
+      pixelRatio: window.devicePixelRatio || 1,
+      // #endif
       categories: chartData.categories,
       series: chartData.series,
       animation: true,
@@ -432,22 +421,29 @@ async function renderChart() {
   }
 }
 
-function getChartContext(): any {
+/** 在 H5 下 uni-app <canvas> 渲染为 <uni-canvas> 包裹器，需取内部真实 canvas */
+function getRealCanvas(): HTMLCanvasElement | null {
+  const wrapper = document.getElementById(chartCanvasId)
+  if (!wrapper) return null
+  if (wrapper.tagName === 'CANVAS') return wrapper as HTMLCanvasElement
+  return wrapper.querySelector('canvas')
+}
+
+function getChartContext(): CanvasRenderingContext2D | UniApp.CanvasContext | null {
   // #ifdef H5
-  const canvas = document.getElementById(chartCanvasId) as HTMLCanvasElement
+  const canvas = getRealCanvas()
   if (canvas) {
     const dpr = window.devicePixelRatio || 1
     const parent = canvas.parentElement
     const w = parent?.offsetWidth || 300
+    // 设置 canvas 像素缓冲区大小 = CSS 大小 * dpr
+    // uCharts 通过 pixelRatio 参数在内部缩放所有绘制坐标，不需要 ctx.scale
     canvas.width = w * dpr
-    canvas.height = 360 * dpr
+    canvas.height = 240 * dpr
     canvas.style.width = w + 'px'
-    canvas.style.height = '360px'
+    canvas.style.height = '240px'
     const ctx = canvas.getContext('2d')
-    if (ctx) {
-      ctx.scale(dpr, dpr)
-      return ctx
-    }
+    return ctx
   }
   return null
   // #endif
@@ -458,7 +454,7 @@ function getChartContext(): any {
 
 function getChartWidth(): number {
   // #ifdef H5
-  const canvas = document.getElementById(chartCanvasId) as HTMLCanvasElement
+  const canvas = getRealCanvas()
   return canvas?.parentElement?.offsetWidth || 300
   // #endif
   // #ifndef H5
@@ -472,18 +468,18 @@ function switchChartTab(key: string) {
 }
 
 // ===== 初始化 =====
-onLoad((options: any) => {
+onLoad((options?: Record<string, string>) => {
   if (options?.symbol) {
     symbol.value = options.symbol
     // 从 mock 数据库取对应数据
-    const dbKey = options.symbol as string
+    const dbKey = options.symbol
     if (mockFinancialDb[dbKey]) {
       allPeriods.value = mockFinancialDb[dbKey]
     }
     // 恢复股票基础信息
     if (options?.stockInfo) {
       try {
-        const info = JSON.parse(decodeURIComponent(options.stockInfo))
+        const info = JSON.parse(decodeURIComponent(options.stockInfo)) as Partial<typeof stock.value>
         stock.value = { ...stock.value, ...info }
       } catch (_) {}
     }
@@ -502,51 +498,6 @@ watch(tableYearRange, () => {
 </script>
 
 <style lang="scss" scoped>
-.page-report-detail {
-  min-height: 100vh;
-  background: #f5f7fb;
-  padding-bottom: 40rpx;
-}
-
-/* ===== 顶部导航 ===== */
-.detail-nav {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: #ffffff;
-  padding: 0 24rpx 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.nav-back {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 60rpx;
-  height: 60rpx;
-  flex-shrink: 0;
-}
-
-.nav-back-icon {
-  font-size: 32rpx;
-  color: #374151;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.nav-title {
-  font-size: 30rpx;
-  color: #1a1d24;
-  font-weight: 600;
-}
-
-.detail-scroll {
-  min-height: calc(100vh - 88rpx);
-  padding-top: 8rpx;
-}
-
 /* ===== 通用区块 ===== */
 .section {
   margin: 0 24rpx 24rpx;
@@ -832,11 +783,11 @@ watch(tableYearRange, () => {
 
 .chart-wrap {
   width: 100%;
-  min-height: 360px;
+  min-height: 240px;
 }
 
 .chart-canvas {
   width: 100%;
-  height: 360px;
+  height: 240px;
 }
 </style>

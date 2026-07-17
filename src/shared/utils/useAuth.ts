@@ -28,7 +28,7 @@ export function useAuth() {
   /** 要求登录才能继续，未登录则跳转登录页 */
   function requireLogin(redirectBack = true): boolean {
     if (isLoggedIn.value) return true
-    const url = redirectBack ? '/pages/user/login' : '/pages/user/login'
+    const url = '/modules/user/pages/login'
     uni.navigateTo({ url })
     return false
   }

@@ -62,21 +62,7 @@
         </view>
       </view>
     </view>
-
-    <!-- 底部操作栏：1/N 买 帮我分析 -->
-    <view class="card-footer-bar">
-      <view class="footer-progress">
-        <text class="progress-text">{{ currentStockIdx + 1 }}/{{ alertStocks.length }}</text>
-      </view>
-      <view class="footer-actions">
-        <view class="action-tag buy">
-          <text class="action-tag-text">买</text>
-        </view>
-        <view class="action-btn" @tap="goAnalyze">
-          <text class="action-btn-text">帮我分析</text>
-        </view>
-      </view>
-    </view>
+    <!-- 底部操作栏已移至 MainTabs.vue 中，固定在 scroll-view 外部 -->
   </view>
 </template>
 
@@ -237,6 +223,13 @@ const alertStocks = ref<AlertStock[]>([
 function goAnalyze() {
   uni.navigateTo({ url: '/pages-sub-app/chat/index' })
 }
+
+/** 暴露给父组件，用于在 scroll-view 外部渲染底部操作栏 */
+defineExpose({
+  currentStockIdx: computed(() => currentStockIdx.value),
+  totalCount: computed(() => alertStocks.value.length),
+  goAnalyze,
+})
 </script>
 
 <style lang="scss" scoped>
@@ -429,57 +422,5 @@ function goAnalyze() {
   margin-left: 4rpx;
 }
 
-/* ===== 底部操作栏 ===== */
-.card-footer-bar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16rpx 0;
-  background: #ffffff;
-  border-top: 1rpx solid #f0f2f5;
-}
-
-.footer-progress {
-  flex-shrink: 0;
-}
-
-.progress-text {
-  font-size: 26rpx;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.footer-actions {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.action-tag {
-  padding: 8rpx 20rpx;
-  border-radius: 8rpx;
-
-  &.buy {
-    background: rgba(244, 63, 94, 0.12);
-  }
-
-  .action-tag-text {
-    font-size: 24rpx;
-    font-weight: 600;
-    color: #f43f5e;
-  }
-}
-
-.action-btn {
-  padding: 12rpx 32rpx;
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
-  border-radius: 32rpx;
-}
-
-.action-btn-text {
-  font-size: 26rpx;
-  color: #ffffff;
-  font-weight: 500;
-}
+/* ===== 底部操作栏（已移至 MainTabs.vue） ===== */
 </style>

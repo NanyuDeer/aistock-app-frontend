@@ -1,23 +1,11 @@
-﻿### Task 1: 鍒涘缓 useBriefingCard composable
-
-**Files:**
-- Create: `src/shared/utils/useBriefingCard.ts`
-
-**Interfaces:**
-- Consumes: `agentApi.getReport(intent: string, date: string)` from `@/shared/api/modules/agent`
-- Produces: `useBriefingCard(type?, date?)` returning `{ type, typeLabel, summary, report, loading, status, refresh }`
-
-- [ ] **Step 1: 鍒涘缓 composable 鏂囦欢**
-
-鍒涘缓 `src/shared/utils/useBriefingCard.ts`锛?
-```typescript
 /**
- * 鏅ㄦ姤/鏅氭姤鍗＄墖缁勫悎寮?Hook
- * 灏佽鏃堕棿鍒ゆ柇銆丄PI 璋冪敤銆佹暟鎹В鏋愬拰鐘舵€佺鐞? */
-import { ref, computed, watch } from 'vue'
+ * 晨报/晚报卡片组合式 Hook
+ * 封装时间判断、API 调用、数据解析和状态管理
+ */
+import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { agentApi } from '@/shared/api/modules/agent'
 
-/** 鍙屽眰鎶ュ憡缁撴瀯锛坰chema_version 2.0锛?*/
+/** 双层报告结构（schema_version 2.0） */
 export interface BriefingReport {
   summary: string
   details: string
@@ -31,16 +19,17 @@ export type BriefingType = 'morning' | 'review'
 export type BriefingStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
 export interface BriefingCardState {
-  type: ReturnType<typeof ref<BriefingType>>
-  typeLabel: ReturnType<typeof computed<string>>
-  summary: ReturnType<typeof ref<string>>
-  report: ReturnType<typeof ref<BriefingReport | null>>
-  loading: ReturnType<typeof ref<boolean>>
-  status: ReturnType<typeof ref<BriefingStatus>>
+  type: Ref<BriefingType>
+  date: Ref<string>
+  typeLabel: ComputedRef<string>
+  summary: Ref<string>
+  report: Ref<BriefingReport | null>
+  loading: Ref<boolean>
+  status: Ref<BriefingStatus>
   refresh: () => Promise<void>
 }
 
-/** 鏍规嵁褰撳墠鏃堕棿鍒ゆ柇鎶ュ憡绫诲瀷锛?5:30 鍓嶄负鏅ㄦ姤锛屼箣鍚庝负鏅氭姤 */
+/** 根据当前时间判断报告类型：15:30 前为晨报，之后为晚报 */
 function autoDetectType(): BriefingType {
   const now = new Date()
   const hour = now.getHours()
@@ -51,14 +40,15 @@ function autoDetectType(): BriefingType {
   return 'review'
 }
 
-/** 浠?API 鍝嶅簲涓В鏋愬弻灞傛姤鍛?*/
+/** 从 API 响应中解析双层报告 */
 function parseReport(content: unknown): BriefingReport | null {
   if (!content || typeof content !== 'object') return null
 
   const obj = content as Record<string, unknown>
   const display = obj.display_report
   if (!display || typeof display !== 'object') {
-    // 鍏煎 schema 1.0 绾枃鏈?    const text = typeof obj.text === 'string' ? obj.text : ''
+    // 兼容 schema 1.0 纯文本
+    const text = typeof obj.text === 'string' ? obj.text : ''
     if (!text) return null
     return {
       summary: '',
@@ -81,9 +71,11 @@ function parseReport(content: unknown): BriefingReport | null {
   }
 }
 
-/** 鑾峰彇浠婂ぉ鏃ユ湡瀛楃涓?YYYY-MM-DD */
+/** 获取今天日期字符串 YYYY-MM-DD（本地时区） */
 function todayStr(): string {
-  return new Date().toISOString().split('T')[0]
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 export function useBriefingCard(
@@ -97,14 +89,14 @@ export function useBriefingCard(
   const loading = ref(false)
   const status = ref<BriefingStatus>('idle')
 
-  const typeLabel = computed(() => (type.value === 'morning' ? '鏅ㄦ姤' : '鏅氭姤'))
+  const typeLabel = computed(() => (type.value === 'morning' ? '晨报' : '晚报'))
 
   async function fetchData() {
     loading.value = true
     status.value = 'loading'
     try {
       const res: unknown = await agentApi.getReport(type.value, date.value)
-      // 鍏煎涓ょ鍝嶅簲鏍煎紡锛歿 data: { content } } 鎴?{ content }
+      // 兼容两种响应格式：{ data: { content } } 或 { content }
       const data = (res as Record<string, unknown>)?.data ?? res
       if (!data) {
         status.value = 'empty'
@@ -133,12 +125,9 @@ export function useBriefingCard(
     }
   }
 
-  // 褰?date 鎴?type 鍙樺寲鏃堕噸鏂拌幏鍙栵紙璇︽儏椤垫棩鏈熷垏鎹㈢敤锛?  if (fixedDate === undefined) {
-    watch(date, fetchData)
-  }
-
   return {
     type,
+    date,
     typeLabel,
     summary,
     report,
@@ -147,19 +136,3 @@ export function useBriefingCard(
     refresh: fetchData,
   }
 }
-```
-
-- [ ] **Step 2: 绫诲瀷妫€鏌?*
-
-Run: `cd d:\ai_stock_app\aistock-app-frontend && npx vue-tsc --noEmit`
-Expected: 鏃犳柊澧為敊璇紙鍙兘鏈夊巻鍙查仐鐣欓敊璇紝纭涓嶅紩鍏ユ柊閿欒鍗冲彲锛?
-- [ ] **Step 3: Commit**
-
-```bash
-cd d:\ai_stock_app\aistock-app-frontend
-git add src/shared/utils/useBriefingCard.ts
-git commit -m "feat: add useBriefingCard composable for morning/review briefing data"
-```
-
----
-

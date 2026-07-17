@@ -446,6 +446,8 @@ onUnmounted(() => {
 .analysis-body { position: relative; }
 
 .analysis-html {
+  word-break: keep-all;
+  overflow-wrap: break-word;
   :deep(h2.md-h2) {
     font-size: 32rpx; font-weight: 600; color: #1a1d24;
     margin: 24rpx 0 16rpx; padding-bottom: 12rpx;

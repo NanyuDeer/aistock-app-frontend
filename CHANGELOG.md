@@ -2,6 +2,114 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [master] 2026-07-17 — 彻底修复提醒页"帮我分析"按钮被挤下 + mp-html符号换行
+**开发者**: Aria
+
+### 修复
+- `src/shared/components/MainTabs.vue`：移除 JS 计算 scrollHeight 方案（`footerH=rpx2px(68)` 远小于实际92rpx），`.card-content` 改为全平台 `flex:1; min-height:0`，footer 靠 `flex-shrink:0` 固定，不再被挤下
+- `src/pages-sub-app/chat/index.vue`：`:deep(.bubble-html)` → `:deep(.bubble-html), :deep(.bubble-html *)` 通配符覆盖，确保 `word-break: keep-all` 应用到 mp-html 内部所有子元素
+- `src/modules/chat/pages/agent-report.vue`：同上 `:deep(.report-html)` 通配符覆盖
+- `src/pages-sub-app\briefing-detail\index.vue`：添加 `word-break: keep-all; overflow-wrap: break-word`（之前缺失）
+- `src/modules/market/pages/alert-analysis.vue`：同上添加 keep-all
+
+---
+
+## [master] 2026-07-17 — APP端微信登录失败自动降级到扫码登录
+**开发者**: Aria
+
+### 修复
+- `src/modules/user/pages/login.vue`：统一登录模板，移除 `#ifdef H5`/`#ifdef APP-PLUS` 条件编译分割，二维码区域改为全平台通用
+- `src/modules/user/pages/login.vue`：APP端 `uni.login` 失败时（`login:fail send`）自动调用 `startScanLogin()` 降级到扫码登录，不再直接显示错误死循环
+- `src/modules/user/pages/login.vue`：新增 `handleRetry()` 函数 + "使用扫码登录"备选按钮（APP-PLUS 专属）
+
+---
+
+## [master] 2026-07-17 — 微信登录修复 + 业绩预测卡片优化 + Markdown换行/布局溢出修复 + SubPageCard2重构
+**开发者**: Aria
+
+### 修复
+- `src/manifest.json`：从后端 `.env` 获取 `WECHAT_SECRET` 填入 `appsecret`，移除空值 `UniversalLinks`（仅安卓端），修复 `login:fail 业务参数配置缺失`
+- `env/.env.development` + `env/.env.production`：新增 `VITE_WX_APPID`/`VITE_WX_APPSECRET` 配置项（文档化）
+- `src/modules/analytics/components/ForecastContent.vue`：移除"增持"评级标签（无后端逻辑）；`stock-col` 宽度 180→140rpx 防换行；`metric-value` 字体 26→22rpx 与 `growth-val` 一致；新增 `formatEpsGrowth()`/`formatNetProfitGrowth()` 为正数补 `+` 前缀
+- `src/pages-sub-app/chat/index.vue`：`.bubble-html` 改用 `word-break: keep-all`（CJK 不在标点处断行）；`.message-list` 添加 `overflow: hidden`；`.quick-skills`+`.input-bar` 添加 `flex-shrink: 0` 防止消息过多时输入栏消失
+- `src/modules/chat/pages/agent-report.vue`：`.report-html` 同上 keep-all 换行策略
+- `src/modules/chat/pages/index.vue`：`.bubble-text` 同上 keep-all 换行策略 + `.message-list` overflow hidden
+- `src/shared/components/MainTabs.vue`：`scrollHeight` 计算新增 `footerH` 扣减（alert 标签页底部 footer-bar 之前未计入导致内容被挤出）；`.card-content` 添加 `overflow: hidden`
+- `src/modules/market/pages/hot-burst.vue`：分数显示 `得分 95`→`95分`（数值在前单位在后）；`level-tag` padding `4rpx 16rpx`→`4rpx 10rpx` 减小按钮宽度
+
+### 重构
+- `src/shared/components/SubPageCard2.vue`：移除 JS 计算 scrollHeight 逻辑（`computed`/`windowHeight`/`rpx2px`/`getChatBarHeightPx`），改用 flex 布局（`.sub-page-2-body` flex 容器 + `padding-bottom` 为 GlobalChatBar 留白），参照 SubPageCard 模式，修复底部内容被 AI 对话栏遮挡
+
+---
+
+## [master] 2026-07-17 — 业绩预测卡片重构 + card-header 高度对齐
+**开发者**: Aria
+
+### 修复
+- `src/shared/components/MainTabs.vue`：`.card-header` 添加 `position: relative`，`.toggle-group` 改为绝对定位（`position: absolute; right: 24rpx; top: 50%; transform: translateY(-50%)`），使业绩 tab header 高度与无 toggle 的 tab（早点听/洞察）完全一致
+- `src/shared/components/MainTabs.vue`：`.card-content` 移除 `padding-bottom: 24rpx` 和 `box-sizing: border-box`，与 PageCard 完全对齐
+- `src/shared/components/MainTabs.vue`：`.toggle-btn` 添加 `white-space: nowrap`，修复 `<uni-text>` 文本换行导致 toggle-group 高达 85px 的问题
+
+### 重构
+- `src/modules/analytics/components/ForecastContent.vue`：业绩预测卡片模板重构 — 左侧股票信息（名称+代码+评级标签）| 右侧指标区（预测EPS+预测净利润，蓝色值+红色增长率）| 分隔线 | 更新时间+机构数
+- `src/modules/analytics/components/ForecastContent.vue`：字体按 stock-name 比例(26/28)整体缩放，对标 ReportsContent.vue；排列方式栏（搜索+排序）padding/font-size/border-radius 全面对标报告卡片
+- `src/modules/analytics/pages/forecast.vue`（新建）：从 `origin/gaojingwen` 分支恢复，作为独立业绩预测页面参照
+- `src/pages.json`：添加 `modules/analytics/pages/forecast` 路由
+- `src/manifest.json`：添加 Barcode/OAuth 模块 + 微信 OAuth appid 配置
+
+---
+
+## [master] 2026-07-17 — 布局系统性修复 + 业绩 Tab 重构 + 多项 UI 优化
+**开发者**: Aria
+
+### 修复
+- `src/shared/components/SubPageCard2.vue`：删除基于 `getSystemInfoSync().windowWidth` 的本地 `rpx2px`，改复用 `@/shared/utils/layout` 的 `rpx2px`/`getChatBarHeightPx`，修复 H5 dev 模式 scroll-view 内容未占满
+- `src/shared/utils/layout.ts`（新建）：共享布局工具，`rpx2px` 改用 `uni.upx2px`，提供 `getSafeAreaInsetBottom`/`getChatBarHeightPx`/`getTabBarBottomPx`/`getBottomFixedHeightPx`，修复 H5 dev 模式 rpx 换算严重偏大导致滚动失效
+- `src/shared/components/SubPageCard.vue`：scrollHeight 改用 `getChatBarHeightPx()`，新增 `.sub-page-body` flex 容器，修复刘海屏底部约 69rpx 重叠 + H5 滚动失效
+- `src/shared/components/PageCard.vue`：移除动态 `:style` 高度，改用 `flex:1; min-height:0`；新增 `footerHeight` prop 保证 footer 固定；`marginBottom` 改用 `getBottomFixedHeightPx()`
+- `src/shared/components/AppBottomBar.vue`：`.as-tab-bar` 的 `bottom` 改用 `:style` 绑定 `getTabBarBottomPx()`；"业绩"tab 路径改为 `/modules/home/pages/index?tab=forecast`
+- `src/modules/chat/pages/index.vue`：`.message-list` 添加 `min-height:0`，`.chat-header`/`.quick-skills`/`.input-bar` 添加 `flex-shrink:0`，修复输入框被对话内容挤没
+- `src/modules/user/pages/profile.vue`：`handleLogout()` 退出后跳转首页；`DEFAULT_SETTINGS` 改回全 `false`；`getSwitchValue()` 替换 3 处 `any`
+- `src/shared/utils/useAuth.ts`：`requireLogin()` 跳转路径修正为 `/modules/user/pages/login`
+- `src/modules/market/pages/leaders.vue`：`onReady` 测量 `.bubble-wrap` 实际宽度更新 `containerWidth`，修复 App 端 zoom:1.2 导致泡泡图偏右
+- `src/modules/market/pages/hot-burst.vue`：股票代码改垂直排列；卡片 padding 紧凑化；`.kw-tag` 字号 22rpx→20rpx
+- `src/modules/favorites/pages/favorites.vue`：删除按钮改左滑揭示，新增 touch 事件处理
+- `src/modules/favorites/components/AlertContent.vue`：移除内部 footer，通过 `defineExpose` 暴露状态
+- `src/shared/components/MainTabs.vue`：alert tab footer 移至 scroll-view 外固定；新增"业绩"tab 预测/报告切换按钮
+- `src/shared/components/GlobalChatBar.vue`：`unreadCount` 默认值 11→0，移除硬编码徽章
+- `src/modules/home/components/MorningContent.vue`：`.briefing-card` 背景改为 `#f5f7fb`
+- `src/modules/news/pages/detail.vue`：适配 SubPageCard 外壳
+- `src/modules/analytics/pages/report-detail.vue`：改用 SubPageCard；修复 H5 canvas `getContext` 错误（取 `uni-canvas` 内部真实 canvas）；走势图高度 360→240px；修复 `ctx.scale` 与 uCharts `pixelRatio` 叠加缩放问题；类型修复 `any`→具体类型
+
+### 重构
+- `src/modules/analytics/pages/trend-score.vue` + `trend-score-detail.vue`：移除自定义 position:fixed 外壳，改用 `<SubPageCard>` 统一收敛
+- `src/modules/analytics/pages/report-detail.vue`：同上，改用 SubPageCard
+- `src/modules/analytics/components/ReportsContent.vue`（新建）：从 reports.vue 提取业绩报告内容组件
+- `src/modules/analytics/components/ForecastContent.vue`：替换为原 forecast.vue 内容，保留卡片样式与真实 API
+- `src/modules/analytics/pages/forecast.vue`：删除（功能由 MainTabs 接管）
+- `src/modules/analytics/pages/reports.vue`：switchTo 路径更新
+- `src/pages.json`：移除 forecast 路由
+
+---
+
+## [changer] 2026-07-16 — 简报卡片接入真实 API 数据
+**开发者**: 37588
+
+### 改进
+- `src/modules/home/components/MorningContent.vue`：简报卡片改用真实 API 数据渲染，替换 mock 数据
+- `src/pages-sub-app/briefing-detail/index.vue`：简报详情页重构，接入后端报告 API，支持双层 display_report 结构解析
+- `src/shared/utils/useBriefingCard.ts`：适配真实数据格式
+- `src/pages.json`：路由配置更新
+
+### 新增
+- `src/shared/utils/reportSplitter.ts`：报告内容分段工具（按标题分割文本段落）
+
+### 文档
+- `docs/superpowers/plans/2026-07-16-briefing-card-real-data.md`：实施计划
+- `docs/superpowers/specs/2026-07-16-briefing-card-real-data-design.md`：设计文档
+
+---
+
 ## [master] 2026-07-15 — 自选股双向同步合并 + 事件详情页重构 + H5扫码登录修复
 **开发者**: Aria
 

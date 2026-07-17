@@ -1,179 +1,159 @@
 <template>
-  <view class="page-reports">
-    <PageCard title="业绩">
-      <!-- 标题右侧切换按钮 -->
-      <template #header-right>
-        <view class="toggle-group">
-          <text
-            :class="['toggle-btn', activeTab === 'forecast' ? 'active' : '']"
-            @tap="switchTo('forecast')"
-          >预测</text>
-          <text
-            :class="['toggle-btn', activeTab === 'reports' ? 'active' : '']"
-            @tap="switchTo('reports')"
-          >报告</text>
-        </view>
-      </template>
-
-      <!-- 搜索栏 -->
-      <view class="reports-fixed">
-        <view class="search-bar">
-          <view class="search-input-wrap">
-            <SvgIcon name="search-line" size="28rpx" color="#9ca3af" />
-            <input
-              v-model="keyword"
-              class="search-input"
-              placeholder="搜索股票代码/简称"
-              confirm-type="search"
-              @input="handleSearchInput"
-              @confirm="handleSearch"
-            />
-            <text v-if="keyword" class="search-clear" @tap="handleReset">✕</text>
-          </view>
-        </view>
-
-        <!-- 筛选 + 排序 单行 -->
-        <view class="filter-sort-bar">
-          <!-- 左侧：年份筛选 -->
-          <view class="filter-section" @tap="toggleYearPicker">
-            <SvgIcon name="filter-line" size="24rpx" color="#4d7cfe" />
-            <text class="filter-text">{{ selectedYear }}年</text>
-            <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
-          </view>
-
-          <!-- 右侧：排序下拉 + 升降序 -->
-          <view class="sort-section">
-            <picker
-              mode="selector"
-              :range="sortLabels"
-              :value="sortIndex"
-              @change="onSortChange"
-            >
-              <view class="sort-picker">
-                <text class="sort-picker-text">{{ currentSortLabel }}</text>
-                <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
-              </view>
-            </picker>
-            <view class="sort-order">
-              <text
-                :class="['order-btn', sortAsc === false ? 'active' : '']"
-                @tap="setOrder(false)"
-              >降序</text>
-              <text
-                :class="['order-btn', sortAsc === true ? 'active' : '']"
-                @tap="setOrder(true)"
-              >升序</text>
-            </view>
-          </view>
+  <view class="reports-content">
+    <!-- 搜索栏 + 筛选排序栏 -->
+    <view class="reports-fixed">
+      <view class="search-bar">
+        <view class="search-input-wrap">
+          <SvgIcon name="search-line" size="28rpx" color="#9ca3af" />
+          <input
+            v-model="keyword"
+            class="search-input"
+            placeholder="搜索股票代码/简称"
+            confirm-type="search"
+            @input="handleSearchInput"
+            @confirm="handleSearch"
+          />
+          <text v-if="keyword" class="search-clear" @tap="handleReset">✕</text>
         </view>
       </view>
 
-      <!-- 年份下拉弹窗 -->
-      <view v-if="showYearPicker" class="industry-overlay" @tap="closeYearPicker">
-        <view class="industry-popup" @tap.stop>
-          <view class="industry-popup-header">
-            <text class="industry-popup-title">选择年份</text>
-            <text class="industry-popup-close" @tap="closeYearPicker">✕</text>
-          </view>
-          <scroll-view class="industry-list" scroll-y>
-            <view
-              v-for="yr in yearList"
-              :key="yr"
-              :class="['industry-item', selectedYear === yr ? 'active' : '']"
-              @tap="selectYear(yr)"
-            >{{ yr }}年</view>
-          </scroll-view>
+      <!-- 筛选 + 排序 单行 -->
+      <view class="filter-sort-bar">
+        <!-- 左侧：年份筛选 -->
+        <view class="filter-section" @tap="toggleYearPicker">
+          <SvgIcon name="filter-line" size="24rpx" color="#4d7cfe" />
+          <text class="filter-text">{{ selectedYear }}年</text>
+          <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
         </view>
-      </view>
 
-      <!-- 加载中 -->
-      <view v-if="loading" class="loading-state">
-        <LoadingState />
-      </view>
-
-      <!-- 空数据 -->
-      <view v-else-if="!filteredList.length" class="empty-state">
-        <EmptyState :text="emptyTip" />
-      </view>
-
-      <!-- 列表 -->
-      <view v-if="filteredList.length" class="report-list">
-        <view
-          v-for="item in filteredList"
-          :key="item.code"
-          class="report-card"
-          @tap="goStockDetail(item)"
-        >
-          <!-- 顶部：股票名称 + 代码｜报告期｜标签 -->
-          <view class="report-top">
-            <view class="report-top-left">
-              <text class="stock-name">{{ item.name }}</text>
-              <text class="stock-code">{{ item.code }}</text>
+        <!-- 右侧：排序下拉 + 升降序 -->
+        <view class="sort-section">
+          <picker
+            mode="selector"
+            :range="sortLabels"
+            :value="sortIndex"
+            @change="onSortChange"
+          >
+            <view class="sort-picker">
+              <text class="sort-picker-text">{{ currentSortLabel }}</text>
+              <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
             </view>
-            <view class="report-period">{{ item.period }}</view>
-            <text :class="['report-tag', tagClass(item.tag)]">{{ item.tag }}</text>
-          </view>
-
-          <!-- 中部：AI 研判标签 -->
-          <view class="report-mid">
-            <view class="report-tags-wrap">
-              <view class="report-tags-group">
-                <text class="report-tags-label">经营亮点</text>
-                <view class="report-tags-list">
-                  <text v-for="(gt, gi) in item.goodTags" :key="gi" class="report-tag-pill good">{{ gt }}</text>
-                </view>
-              </view>
-              <view v-if="item.riskTags.length" class="report-tags-group">
-                <text class="report-tags-label">潜在风险</text>
-                <view class="report-tags-list">
-                  <text v-for="(rt, ri) in item.riskTags" :key="ri" class="report-tag-pill risk">{{ rt }}</text>
-                </view>
-              </view>
-            </view>
-          </view>
-
-          <!-- 底部：核心财务 + 更新时间 -->
-          <view class="report-bottom">
-            <view class="report-data-row">
-              <view class="data-left">
-                <text class="data-label">营业总收入</text>
-                <text class="data-value">{{ item.revenue }} 亿元</text>
-              </view>
-              <view class="data-right">
-                <text :class="['data-yoy', yoyClass(item.revenueYoy)]">同比 {{ formatYoy(item.revenueYoy) }}</text>
-                <text :class="['data-arrow', yoyClass(item.revenueYoy)]">{{ item.revenueYoy >= 0 ? '↑' : '↓' }}</text>
-              </view>
-            </view>
-            <view class="report-data-row">
-              <view class="data-left">
-                <text class="data-label">归母净利润</text>
-                <text class="data-value">{{ item.netProfit }} 亿元</text>
-              </view>
-              <view class="data-right">
-                <text :class="['data-yoy', yoyClass(item.profitYoy)]">同比 {{ formatYoy(item.profitYoy) }}</text>
-                <text :class="['data-arrow', yoyClass(item.profitYoy)]">{{ item.profitYoy >= 0 ? '↑' : '↓' }}</text>
-              </view>
-            </view>
-            <view class="report-time-row">
-              <text class="update-time">更新时间：{{ item.updateTime }}</text>
-            </view>
+          </picker>
+          <view class="sort-order">
+            <text
+              :class="['order-btn', sortAsc === false ? 'active' : '']"
+              @tap="setOrder(false)"
+            >降序</text>
+            <text
+              :class="['order-btn', sortAsc === true ? 'active' : '']"
+              @tap="setOrder(true)"
+            >升序</text>
           </view>
         </view>
       </view>
+    </view>
 
-      <view v-if="hasMore" class="load-more" @tap="loadMore">
-        <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
+    <!-- 年份下拉弹窗 -->
+    <view v-if="showYearPicker" class="industry-overlay" @tap="closeYearPicker">
+      <view class="industry-popup" @tap.stop>
+        <view class="industry-popup-header">
+          <text class="industry-popup-title">选择年份</text>
+          <text class="industry-popup-close" @tap="closeYearPicker">✕</text>
+        </view>
+        <scroll-view class="industry-list" scroll-y>
+          <view
+            v-for="yr in yearList"
+            :key="yr"
+            :class="['industry-item', selectedYear === yr ? 'active' : '']"
+            @tap="selectYear(yr)"
+          >{{ yr }}年</view>
+        </scroll-view>
       </view>
-    </PageCard>
+    </view>
 
-    <AppBottomBar current-tab="forecast" />
+    <!-- 加载中 -->
+    <view v-if="loading" class="loading-state">
+      <LoadingState />
+    </view>
+
+    <!-- 空数据 -->
+    <view v-else-if="!filteredList.length" class="empty-state">
+      <EmptyState :text="emptyTip" />
+    </view>
+
+    <!-- 列表 -->
+    <view v-if="filteredList.length" class="report-list">
+      <view
+        v-for="item in filteredList"
+        :key="item.code"
+        class="report-card"
+        @tap="goStockDetail(item)"
+      >
+        <!-- 顶部：股票名称 + 代码｜报告期｜标签 -->
+        <view class="report-top">
+          <view class="report-top-left">
+            <text class="stock-name">{{ item.name }}</text>
+            <text class="stock-code">{{ item.code }}</text>
+          </view>
+          <view class="report-period">{{ item.period }}</view>
+          <text :class="['report-tag', tagClass(item.tag)]">{{ item.tag }}</text>
+        </view>
+
+        <!-- 中部：AI 研判标签 -->
+        <view class="report-mid">
+          <view class="report-tags-wrap">
+            <view class="report-tags-group">
+              <text class="report-tags-label">经营亮点</text>
+              <view class="report-tags-list">
+                <text v-for="(gt, gi) in item.goodTags" :key="gi" class="report-tag-pill good">{{ gt }}</text>
+              </view>
+            </view>
+            <view v-if="item.riskTags.length" class="report-tags-group">
+              <text class="report-tags-label">潜在风险</text>
+              <view class="report-tags-list">
+                <text v-for="(rt, ri) in item.riskTags" :key="ri" class="report-tag-pill risk">{{ rt }}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 底部：核心财务 + 更新时间 -->
+        <view class="report-bottom">
+          <view class="report-data-row">
+            <view class="data-left">
+              <text class="data-label">营业总收入</text>
+              <text class="data-value">{{ item.revenue }} 亿元</text>
+            </view>
+            <view class="data-right">
+              <text :class="['data-yoy', yoyClass(item.revenueYoy)]">同比 {{ formatYoy(item.revenueYoy) }}</text>
+              <text :class="['data-arrow', yoyClass(item.revenueYoy)]">{{ item.revenueYoy >= 0 ? '↑' : '↓' }}</text>
+            </view>
+          </view>
+          <view class="report-data-row">
+            <view class="data-left">
+              <text class="data-label">归母净利润</text>
+              <text class="data-value">{{ item.netProfit }} 亿元</text>
+            </view>
+            <view class="data-right">
+              <text :class="['data-yoy', yoyClass(item.profitYoy)]">同比 {{ formatYoy(item.profitYoy) }}</text>
+              <text :class="['data-arrow', yoyClass(item.profitYoy)]">{{ item.profitYoy >= 0 ? '↑' : '↓' }}</text>
+            </view>
+          </view>
+          <view class="report-time-row">
+            <text class="update-time">更新时间：{{ item.updateTime }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view v-if="hasMore" class="load-more" @tap="loadMore">
+      <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import PageCard from '@/shared/components/PageCard.vue'
-import AppBottomBar from '@/shared/components/AppBottomBar.vue'
+import { ref, computed } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
@@ -213,7 +193,6 @@ const STORAGE_KEY = 'report_filter_sort'
 const yearList = ['2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017', '2016', '2015']
 
 // ===== 状态 =====
-const activeTab = ref('reports')
 const keyword = ref('')
 const loading = ref(false)
 const loadingMore = ref(false)
@@ -380,12 +359,6 @@ function fetchData(append = false) {
   }, 300)
 }
 
-function switchTo(tab: string) {
-  if (tab === 'forecast') {
-    uni.redirectTo({ url: '/modules/home/pages/index?tab=forecast' })
-  }
-}
-
 // ===== 搜索 =====
 function handleSearchInput() {
   if (searchTimer) clearTimeout(searchTimer)
@@ -422,8 +395,8 @@ function selectYear(yr: string) {
 }
 
 // ===== 排序 =====
-function onSortChange(e: any) {
-  const idx = e.detail.value
+function onSortChange(e: unknown) {
+  const idx = (e as { detail: { value: number } }).detail.value
   if (idx !== sortFieldIndex.value) {
     sortFieldIndex.value = idx
     sortAsc.value = false  // 切换维度时默认降序
@@ -475,30 +448,8 @@ fetchData(false)
 </script>
 
 <style lang="scss" scoped>
-.page-reports {
-  height: 100%;
-  background: #f5f7fb;
-}
-
-/* 切换按钮组 */
-.toggle-group {
-  display: flex;
-  background: #f0f2f5;
-  border-radius: 12rpx;
-  padding: 4rpx;
-}
-
-.toggle-btn {
-  font-size: 24rpx;
-  color: #6b7280;
-  padding: 8rpx 24rpx;
-  border-radius: 10rpx;
-  font-weight: 500;
-
-  &.active {
-    color: #ffffff;
-    background: #4d7cfe;
-  }
+.reports-content {
+  background: #ffffff;
 }
 
 /* 搜索栏 */
@@ -614,7 +565,7 @@ fetchData(false)
   }
 }
 
-/* ===== 行业下拉弹窗 ===== */
+/* ===== 年份下拉弹窗 ===== */
 .industry-overlay {
   position: fixed;
   top: 0;

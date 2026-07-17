@@ -58,12 +58,10 @@
         </view>
       </view>
 
-      <!-- 可滚动区域：列表 -->
-      <scroll-view class="forecast-scroll" scroll-y :enhanced="true" :bounces="false" :style="{ height: scrollHeight + 'px' }">
-        <!-- 加载中 -->
-        <view v-if="loading" class="loading-state">
-          <LoadingState />
-        </view>
+      <!-- 加载中 -->
+      <view v-if="loading" class="loading-state">
+        <LoadingState />
+      </view>
 
       <!-- API 请求失败 -->
       <view v-else-if="error" class="error-state">
@@ -121,7 +119,6 @@
       <view v-if="hasMore" class="load-more" @tap="loadMore">
         <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
       </view>
-      </scroll-view>
     </PageCard>
 
     <AppBottomBar current-tab="forecast" />
@@ -137,43 +134,6 @@ import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
-
-// 获取真实状态栏高度及窗口高度
-const windowHeight = ref(0)
-const statusBarHeight = ref(0)
-try {
-  const sysInfo = uni.getSystemInfoSync()
-  const raw = sysInfo.statusBarHeight || 0
-  windowHeight.value = sysInfo.windowHeight || 667
-  // #ifdef APP-PLUS
-  statusBarHeight.value = raw / 1.2
-  // #endif
-  // #ifndef APP-PLUS
-  statusBarHeight.value = raw
-  // #endif
-} catch (e) {
-  statusBarHeight.value = 0
-  windowHeight.value = 667
-}
-
-const rpx2px = (rpx: number) => {
-  try {
-    const w = uni.getSystemInfoSync().windowWidth || 375
-    return rpx * w / 750
-  } catch { return rpx / 2 }
-}
-
-const scrollHeight = computed(() => {
-  const navH = rpx2px(88)          // nav-area
-  const headerH = rpx2px(88)       // card-header
-  const fixedH = rpx2px(200)       // forecast-fixed (搜索栏+排序栏)
-  const marginH = rpx2px(207)      // page-card marginBottom
-  return windowHeight.value - statusBarHeight.value - navH - headerH - fixedH - marginH
-})
-
-function goProfile() {
-  uni.navigateTo({ url: '/modules/user/pages/profile' })
-}
 
 interface ForecastItem {
   code: string
@@ -414,14 +374,6 @@ onShow(() => {
 /* 搜索+排序区域 */
 .forecast-fixed {
   padding: 16rpx 24rpx 0;
-}
-
-/* 可滚动区域：列表 */
-.forecast-scroll {
-  padding: 0 24rpx 24rpx;
-  min-height: 0;
-  touch-action: auto;
-  overscroll-behavior: contain;
 }
 
 /* 搜索栏 */

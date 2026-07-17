@@ -35,7 +35,7 @@
             <switch
               :checked="settings.stock_push"
               color="#4d7cfe"
-              @change="(e: any) => onSettingChange('stock_push', e.detail.value)"
+              @change="(e) => onSettingChange('stock_push', getSwitchValue(e))"
             />
           </view>
           <view class="setting-divider" />
@@ -47,7 +47,7 @@
             <switch
               :checked="settings.outbreak_push"
               color="#4d7cfe"
-              @change="(e: any) => onSettingChange('outbreak_push', e.detail.value)"
+              @change="(e) => onSettingChange('outbreak_push', getSwitchValue(e))"
             />
           </view>
           <view class="setting-divider" />
@@ -59,7 +59,7 @@
             <switch
               :checked="settings.leader_push"
               color="#4d7cfe"
-              @change="(e: any) => onSettingChange('leader_push', e.detail.value)"
+              @change="(e) => onSettingChange('leader_push', getSwitchValue(e))"
             />
           </view>
         </view>
@@ -136,7 +136,13 @@ const userStore = useUserStore()
 const favoritesStore = useFavoritesStore()
 const isLoggedIn = computed(() => userStore.isLoggedIn())
 const userInfo = computed(() => userStore.userInfo)
-const settings = ref<UserSettings>({})
+// 默认全部关闭，由 API 返回值覆盖
+const DEFAULT_SETTINGS: UserSettings = {
+  stock_push: false,
+  outbreak_push: false,
+  leader_push: false,
+}
+const settings = ref<UserSettings>({ ...DEFAULT_SETTINGS })
 const favoriteStocks = computed(() => favoritesStore.stocks)
 
 onShow(async () => {
@@ -147,9 +153,11 @@ onShow(async () => {
 async function loadSettings() {
   try {
     const s = await authApi.getSettings()
-    settings.value = s || {}
+    // 合并：API 返回值覆盖默认值，确保未返回的字段仍有默认值
+    settings.value = { ...DEFAULT_SETTINGS, ...s }
   } catch (e) {
-    // 未登录或接口未实现时静默
+    // API 未实现或失败时，保持默认值（全部开启）
+    settings.value = { ...DEFAULT_SETTINGS }
   }
 }
 
@@ -164,6 +172,15 @@ async function onSettingChange(key: keyof UserSettings, enabled: boolean) {
   }
 }
 
+/** 从 switch change 事件中安全提取 checked 值 */
+function getSwitchValue(e: unknown): boolean {
+  if (e && typeof e === 'object' && 'detail' in e) {
+    const detail = (e as { detail: { value?: boolean } }).detail
+    return !!detail.value
+  }
+  return false
+}
+
 function handleLogout() {
   uni.showModal({
     title: '确认退出',
@@ -171,8 +188,12 @@ function handleLogout() {
     success: (res) => {
       if (res.confirm) {
         userStore.logout()
-        settings.value = {}
+        settings.value = { ...DEFAULT_SETTINGS }
         uni.showToast({ title: '已退出登录', icon: 'none' })
+        // 退出后返回首页，避免停留在 profile 页面造成"没退出"的错觉
+        setTimeout(() => {
+          uni.redirectTo({ url: '/modules/home/pages/index' })
+        }, 500)
       }
     }
   })

@@ -9,18 +9,21 @@
       <slot name="header-right" />
     </view>
 
-    <!-- 内容用 scroll-view 包裹，JS 动态算出精确像素高度 -->
-    <scroll-view
-      scroll-y
-      class="sub-page-content"
-      :enhanced="true"
-      :bounces="false"
-      :style="{ height: scrollHeight + 'px' }"
-    >
-      <slot />
-    </scroll-view>
-    <!-- 可选底部操作栏插槽 -->
-    <slot name="footer" />
+    <!-- 中间内容区域：flex 容器包裹 scroll-view 和 footer，类似 PageCard 的 .page-card -->
+    <view class="sub-page-body">
+      <scroll-view
+        scroll-y
+        class="sub-page-content"
+        :enhanced="true"
+        :bounces="false"
+      >
+        <slot />
+      </scroll-view>
+      <!-- 可选底部操作栏插槽（flex-shrink:0 固定在内容区底部） -->
+      <view class="sub-page-footer">
+        <slot name="footer" />
+      </view>
+    </view>
 
     <!-- 全局AI对话栏：所有子页面也有 -->
     <GlobalChatBar :active-panel="activePanel" />
@@ -28,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 
 const props = withDefaults(defineProps<{
@@ -43,42 +46,19 @@ const props = withDefaults(defineProps<{
 })
 
 // 获取真实状态栏高度
-// App 端 zoom:1.2 会放大 padding，需除以 1.2 补偿
 const statusBarHeight = ref(0)
-const windowHeight = ref(0)
 try {
   const sysInfo = uni.getSystemInfoSync()
   const raw = sysInfo.statusBarHeight || 0
-  const rawWindowHeight = sysInfo.windowHeight || 667
   // #ifdef APP-PLUS
   statusBarHeight.value = raw / 1.2
-  windowHeight.value = rawWindowHeight / 1.2
   // #endif
   // #ifndef APP-PLUS
   statusBarHeight.value = raw
-  windowHeight.value = rawWindowHeight
   // #endif
 } catch (e) {
   statusBarHeight.value = 0
-  windowHeight.value = 667
 }
-
-/**
- * 动态计算 scroll-view 像素高度
- * windowHeight - statusBar - subNav(88rpx) - globalChatBar(147rpx)
- */
-const scrollHeight = computed(() => {
-  const rpx2px = (rpx: number) => {
-    try {
-      const w = uni.getSystemInfoSync().windowWidth || 375
-      return rpx * w / 750
-    } catch { return rpx / 2 }
-  }
-  const navH = rpx2px(88)
-  const chatBarH = rpx2px(147)
-  const total = windowHeight.value - statusBarHeight.value - navH - chatBarH
-  return Math.max(total, 100)
-})
 
 function goBack() {
   const pages = getCurrentPages()
@@ -142,9 +122,27 @@ function goBack() {
   flex: 1;
 }
 
-/* 内容区域：白色背景，恢复触摸滚动 */
+/* 中间内容区域：flex:1 撑满剩余空间，类似 PageCard 的 .page-card */
+.sub-page-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* 底部留白：GlobalChatBar 高度（148rpx + 安全区） */
+  padding-bottom: calc(148rpx + env(safe-area-inset-bottom));
+}
+
+/* scroll-view 在中间容器内 flex:1 撑满，footer 固定在底部 */
 .sub-page-content {
+  flex: 1;
+  min-height: 0;
   touch-action: auto;
   overscroll-behavior: contain;
+}
+
+/* footer 插槽容器：不压缩，固定在内容区底部 */
+.sub-page-footer {
+  flex-shrink: 0;
 }
 </style>

@@ -184,19 +184,17 @@
       }
     },
     {
-      "path": "modules/analytics/pages/forecast",
-      "style": {
-        "navigationBarTitleText": "业绩",
-        "navigationStyle": "custom",
-        "enablePullDownRefresh": false,
-        "disableScroll": true,
-        "app-plus": { "bounce": "none" }
-      }
-    },
-    {
       "path": "modules/analytics/pages/reports",
       "style": {
         "navigationBarTitleText": "业绩",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "modules/analytics/pages/forecast",
+      "style": {
+        "navigationBarTitleText": "业绩预测",
         "navigationStyle": "custom",
         "enablePullDownRefresh": false
       }
@@ -249,6 +247,14 @@
             "navigationStyle": "custom",
             "disableScroll": true,
             "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
+          }
+        },
+        {
+          "path": "briefing-detail/index",
+          "style": {
+            "navigationStyle": "custom",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
           }
         },
         {
