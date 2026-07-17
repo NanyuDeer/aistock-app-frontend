@@ -6,7 +6,7 @@
     </view>
 
     <template v-else-if="quote">
-      <!-- 股票头部 -->
+      <!-- 1. 股票头部 -->
       <view class="stock-header">
         <view class="stock-name-row">
           <text class="stock-name">{{ quote.name }}</text>
@@ -32,91 +32,90 @@
         </view>
       </view>
 
-      <!-- 行情明细 -->
-      <view class="detail-grid">
-        <view class="detail-item">
-          <text class="detail-label">今开</text>
-          <text :class="['detail-value', quote.open >= quote.prevClose ? 'up' : 'down']">{{ quote.open.toFixed(2) }}</text>
+      <!-- 2. AI 资讯分析（第2个组件，含关键词标签+刷新按钮） -->
+      <view class="section-card">
+        <view class="section-header-row">
+          <text class="section-title">AI 资讯分析</text>
+          <view v-if="!aiLoading" class="ai-refresh-btn" @tap="refreshAiAnalysis">
+            <text class="refresh-icon">↻</text>
+          </view>
         </view>
-        <view class="detail-item">
-          <text class="detail-label">最高</text>
-          <text class="detail-value up">{{ quote.high.toFixed(2) }}</text>
+        <view v-if="aiLoading" class="ai-loading">
+          <text class="ai-loading-text">正在生成AI分析...</text>
         </view>
-        <view class="detail-item">
-          <text class="detail-label">最低</text>
-          <text class="detail-value down">{{ quote.low.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">昨收</text>
-          <text class="detail-value">{{ quote.prevClose.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">成交量</text>
-          <text class="detail-value">{{ formatVolume(quote.volume) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">成交额</text>
-          <text class="detail-value">{{ formatAmount(quote.amount) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">换手率</text>
-          <text class="detail-value">{{ quote.turnoverRate.toFixed(2) }}%</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">振幅</text>
-          <text class="detail-value">{{ quote.amplitude.toFixed(2) }}%</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">市盈率</text>
-          <text class="detail-value">{{ quote.peRatio.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">市净率</text>
-          <text class="detail-value">{{ quote.pbRatio.toFixed(2) }}</text>
-        </view>
+        <template v-else-if="aiAnalysis">
+          <view v-if="aiAnalysis.conclusion" class="ai-conclusion-box">
+            <text :class="['ai-conclusion-badge', aiConclusionClass]">{{ aiAnalysis.conclusion }}</text>
+            <text v-if="aiAnalysis.analysisDate" class="ai-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
+          </view>
+          <!-- 核心逻辑关键词标签 -->
+          <view v-if="logicTags.length" class="ai-tags-section">
+            <text class="ai-section-label">核心逻辑</text>
+            <view class="ai-tag-list">
+              <view
+                v-for="(tag, i) in logicTags"
+                :key="'lg'+i"
+                class="ai-tag-item"
+                @tap="toggleTagExpand('logic', i)"
+              >
+                <text class="ai-tag-label">{{ tag.tag }}</text>
+              </view>
+            </view>
+            <view v-if="expandedTag === 'logic'" class="ai-tag-detail">
+              <text class="ai-tag-detail-text">{{ logicTags[expandedTagIdx]?.full }}</text>
+            </view>
+          </view>
+          <!-- 风险提示关键词标签 -->
+          <view v-if="riskTags.length" class="ai-tags-section">
+            <text class="ai-section-label risk">风险提示</text>
+            <view class="ai-tag-list">
+              <view
+                v-for="(tag, i) in riskTags"
+                :key="'rk'+i"
+                class="ai-tag-item risk"
+                @tap="toggleTagExpand('risk', i)"
+              >
+                <text class="ai-tag-label">{{ tag.tag }}</text>
+              </view>
+            </view>
+            <view v-if="expandedTag === 'risk'" class="ai-tag-detail">
+              <text class="ai-tag-detail-text risk">{{ riskTags[expandedTagIdx]?.full }}</text>
+            </view>
+          </view>
+        </template>
       </view>
 
-      <!-- 涨跌停（一行内联显示） -->
-      <view class="limit-inline">
-        <text class="limit-inline-label">涨停 <text class="up">{{ quote.limitUp.toFixed(2) }}</text></text>
-        <text class="limit-inline-sep">|</text>
-        <text class="limit-inline-label">跌停 <text class="down">{{ quote.limitDown.toFixed(2) }}</text></text>
-        <text class="limit-inline-sep">|</text>
-        <text class="limit-inline-label">均价 <text>{{ quote.avgPrice.toFixed(2) }}</text></text>
-      </view>
-
-      <!-- 资金流向 -->
+      <!-- 3. 资金流向 -->
       <view v-if="capitalFlow" class="section-card">
         <text class="section-title">资金流向</text>
         <view class="flow-grid">
           <view class="flow-item">
             <text class="flow-label">主力净流入</text>
-            <text :class="['flow-value', capitalFlow.netAmount >= 0 ? 'up' : 'down']">
-              {{ formatAmount(capitalFlow.netAmount) }}
+            <text :class="['flow-value', (capitalFlow.mainInflow ?? 0) >= 0 ? 'up' : 'down']">
+              {{ formatFlowAmount(capitalFlow.mainInflow) }}
             </text>
           </view>
           <view class="flow-item">
-            <text class="flow-label">超大单</text>
-            <text :class="['flow-value', (capitalFlow.r0In - capitalFlow.r0Out) >= 0 ? 'up' : 'down']">
-              {{ formatAmount(capitalFlow.r0In - capitalFlow.r0Out) }}
+            <text class="flow-label">散户净流入</text>
+            <text :class="['flow-value', (capitalFlow.retailInflow ?? 0) >= 0 ? 'up' : 'down']">
+              {{ formatFlowAmount(capitalFlow.retailInflow) }}
             </text>
           </view>
-          <view class="flow-item">
-            <text class="flow-label">大单</text>
-            <text :class="['flow-value', (capitalFlow.r1In - capitalFlow.r1Out) >= 0 ? 'up' : 'down']">
-              {{ formatAmount(capitalFlow.r1In - capitalFlow.r1Out) }}
-            </text>
-          </view>
-          <view class="flow-item">
-            <text class="flow-label">中单</text>
-            <text :class="['flow-value', (capitalFlow.r2In - capitalFlow.r2Out) >= 0 ? 'up' : 'down']">
-              {{ formatAmount(capitalFlow.r2In - capitalFlow.r2Out) }}
-            </text>
-          </view>
+          <template v-if="capitalFlow.orders && capitalFlow.orders.length">
+            <view v-for="order in capitalFlow.orders" :key="order.label" class="flow-item">
+              <text class="flow-label">{{ order.label }}</text>
+              <text :class="['flow-value', (order.value ?? 0) >= 0 ? 'up' : 'down']">
+                {{ formatFlowAmount(order.value) }}
+              </text>
+            </view>
+          </template>
+        </view>
+        <view v-if="capitalFlow.narrative" class="flow-narrative">
+          <text class="flow-narrative-text">{{ capitalFlow.narrative }}</text>
         </view>
       </view>
 
-      <!-- 半年报信息 -->
+      <!-- 4. 半年报信息 -->
       <view v-if="semiAnnualReport" class="section-card">
         <view class="section-header">
           <text class="section-title">半年报财务数据</text>
@@ -172,7 +171,7 @@
         </view>
       </view>
 
-      <!-- 个股新闻 -->
+      <!-- 5. 个股新闻 -->
       <view v-if="newsList.length" class="section-card">
         <text class="section-title">相关资讯</text>
         <view class="news-list">
@@ -191,7 +190,7 @@
         </view>
       </view>
 
-      <!-- AI 投顾入口 -->
+      <!-- 6. AI 投顾入口 -->
       <view class="ai-card" @tap="goChat">
         <view class="ai-icon-wrap">
           <SvgIcon name="robot-line" size="36rpx" color="#4d7cfe" />
@@ -203,26 +202,59 @@
         <text class="ai-arrow">›</text>
       </view>
 
-      <!-- AI 资讯分析（放在页面最底部） -->
-      <view v-if="aiAnalysis" class="section-card">
-        <text class="section-title">AI 资讯分析</text>
-        <view v-if="aiLoading" class="ai-loading">
-          <text class="ai-loading-text">正在生成AI分析...</text>
+      <!-- 7. 基础行情明细 + 涨跌停（页面底部，合并为一个卡片） -->
+      <view class="section-card">
+        <text class="section-title">行情明细</text>
+        <view class="detail-grid">
+          <view class="detail-item">
+            <text class="detail-label">今开</text>
+            <text :class="['detail-value', quote.open >= quote.prevClose ? 'up' : 'down']">{{ quote.open.toFixed(2) }}</text>
+          </view>
+          <view class="detail-item">
+            <text class="detail-label">最高</text>
+            <text class="detail-value up">{{ quote.high.toFixed(2) }}</text>
+          </view>
+          <view class="detail-item">
+            <text class="detail-label">最低</text>
+            <text class="detail-value down">{{ quote.low.toFixed(2) }}</text>
+          </view>
+          <view class="detail-item">
+            <text class="detail-label">昨收</text>
+            <text class="detail-value">{{ quote.prevClose.toFixed(2) }}</text>
+          </view>
+          <view class="detail-item">
+            <text class="detail-label">成交量</text>
+            <text class="detail-value">{{ formatVolume(quote.volume) }}</text>
+          </view>
+          <view class="detail-item">
+            <text class="detail-label">成交额</text>
+            <text class="detail-value">{{ formatAmount(quote.amount) }}</text>
+          </view>
+          <view class="detail-item">
+            <text class="detail-label">换手率</text>
+            <text class="detail-value">{{ quote.turnoverRate.toFixed(2) }}%</text>
+          </view>
+          <view class="detail-item">
+            <text class="detail-label">振幅</text>
+            <text class="detail-value">{{ quote.amplitude.toFixed(2) }}%</text>
+          </view>
+          <view class="detail-item">
+            <text class="detail-label">市盈率</text>
+            <text class="detail-value">{{ quote.peRatio.toFixed(2) }}</text>
+          </view>
+          <view class="detail-item">
+            <text class="detail-label">市净率</text>
+            <text class="detail-value">{{ quote.pbRatio.toFixed(2) }}</text>
+          </view>
         </view>
-        <template v-else>
-          <view v-if="aiAnalysis.conclusion" class="ai-conclusion-box">
-            <text :class="['ai-conclusion-badge', aiConclusionClass]">{{ aiAnalysis.conclusion }}</text>
-            <text v-if="aiAnalysis.analysisDate" class="ai-date">{{ aiAnalysis.analysisDate }}</text>
-          </view>
-          <view v-if="aiAnalysis.coreLogic" class="ai-section">
-            <text class="ai-section-label">核心逻辑</text>
-            <text class="ai-section-text">{{ aiAnalysis.coreLogic }}</text>
-          </view>
-          <view v-if="aiAnalysis.riskWarning" class="ai-section">
-            <text class="ai-section-label risk">风险提示</text>
-            <text class="ai-section-text risk">{{ aiAnalysis.riskWarning }}</text>
-          </view>
-        </template>
+        <!-- 涨跌停（在行情明细卡片内，一行内联） -->
+        <view class="limit-inline">
+          <text class="limit-inline-label">涨停 <text class="up">{{ quote.limitUp.toFixed(2) }}</text></text>
+          <text class="limit-inline-sep">|</text>
+          <text class="limit-inline-label">跌停 <text class="down">{{ quote.limitDown.toFixed(2) }}</text></text>
+          <text class="limit-inline-sep">|</text>
+          <text class="limit-inline-label">均价 <text>{{ quote.avgPrice.toFixed(2) }}</text></text>
+        </view>
       </view>
     </template>
 
@@ -250,6 +282,8 @@ const symbol = ref('')
 const aiAnalysis = ref<any>(null)
 const aiLoading = ref(false)
 const newsList = ref<any[]>([])
+const expandedTag = ref<'logic' | 'risk' | null>(null)
+const expandedTagIdx = ref(0)
 const favoritesStore = useFavoritesStore()
 const isFavorite = computed(() => favoritesStore.isFavorite(symbol.value))
 
@@ -338,6 +372,84 @@ const aiConclusionClass = computed(() => {
   if (c.includes('卖出') || c.includes('减持')) return 'badge-sell'
   return 'badge-hold'
 })
+
+// 从文本中提取关键词标签（对齐 Web 前端 extractTagsFromText 逻辑）
+function extractTagsFromText(text: string): { tag: string, full: string }[] {
+  if (!text) return []
+  const str = String(text)
+  const lines = str.split(/\n+/).map(s => s.trim()).filter(s => s)
+  if (lines.length > 1) {
+    return lines.map(line => extractTagFromText(line)).filter(t => t.tag)
+  }
+  const sentences = str.split(/[。\n]/).map(s => s.trim()).filter(s => s)
+  return sentences.map(s => extractTagFromText(s)).filter(t => t.tag)
+}
+
+function extractTagFromText(text: string): { tag: string, full: string } {
+  if (!text) return { tag: '', full: '' }
+  const full = String(text).trim()
+  const tagMatch = full.match(/^([^:]{1,30})::([\s\S]+)$/)
+  if (tagMatch) {
+    let tag = tagMatch[1].trim()
+    if (tag.length > 30) tag = tag.substring(0, 30) + '…'
+    return { tag, full: tagMatch[2].trim() || full }
+  }
+  const firstClause = full.split(/[，。；！？\n]/)[0]?.trim() || full
+  const tag = firstClause.length > 30 ? firstClause.substring(0, 30) + '…' : firstClause
+  return { tag, full }
+}
+
+const logicTags = computed(() => extractTagsFromText(aiAnalysis.value?.coreLogic || ''))
+const riskTags = computed(() => extractTagsFromText(aiAnalysis.value?.riskWarning || ''))
+
+function toggleTagExpand(type: 'logic' | 'risk', idx: number) {
+  if (expandedTag.value === type && expandedTagIdx.value === idx) {
+    expandedTag.value = null
+  } else {
+    expandedTag.value = type
+    expandedTagIdx.value = idx
+  }
+}
+
+function formatAiDate(dateStr: string): string {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  } catch {
+    return dateStr
+  }
+}
+
+async function refreshAiAnalysis() {
+  if (!symbol.value) return
+  aiLoading.value = true
+  aiAnalysis.value = {}
+  try {
+    const res: any = await stockApi.createStockAnalysis(symbol.value)
+    const data = res?.data || res
+    aiAnalysis.value = {
+      conclusion: data?.['结论'] || data?.conclusion || '',
+      coreLogic: data?.['核心逻辑'] || data?.core_logic || '',
+      riskWarning: data?.['风险提示'] || data?.risk_warning || '',
+      analysisDate: data?.['分析时间'] || data?.analysis_time || '',
+    }
+    uni.showToast({ title: '已刷新', icon: 'none' })
+  } catch {
+    uni.showToast({ title: '刷新失败', icon: 'none' })
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+function formatFlowAmount(val: number): string {
+  if (val == null || isNaN(val)) return '--'
+  // API 返回的单位是亿
+  const absVal = Math.abs(val)
+  if (absVal >= 10000) return (val / 10000).toFixed(2) + '万亿'
+  if (absVal >= 1) return val.toFixed(2) + '亿'
+  return (val * 100).toFixed(0) + '万'
+}
 
 function openNews(news: any) {
   const url = news.url || news.link || news.source_url
@@ -761,6 +873,30 @@ function goChat() {
 }
 
 /* AI 资讯分析 */
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.ai-refresh-btn {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f5f7fa;
+
+  &:active { background: #e8ecf1; }
+}
+
+.refresh-icon {
+  font-size: 28rpx;
+  color: #4d7cfe;
+}
+
 .ai-loading {
   padding: 24rpx 0;
   text-align: center;
@@ -794,25 +930,67 @@ function goChat() {
   color: #9ca3af;
 }
 
-.ai-section {
-  margin-bottom: 12rpx;
+/* AI 关键词标签 */
+.ai-tags-section {
+  margin-bottom: 16rpx;
 }
 
-.ai-section-label {
-  font-size: 24rpx;
-  font-weight: 600;
+.ai-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 8rpx;
+}
+
+.ai-tag-item {
+  background: #eff6ff;
+  border-radius: 8rpx;
+  padding: 6rpx 14rpx;
+
+  &.risk { background: #fef2f2; }
+
+  &:active { opacity: 0.7; }
+}
+
+.ai-tag-label {
+  font-size: 22rpx;
   color: #2563eb;
-  margin-bottom: 6rpx;
 
-  &.risk { color: #dc2626; }
+  .risk & { color: #dc2626; }
 }
 
-.ai-section-text {
-  font-size: 26rpx;
+.ai-tag-detail {
+  margin-top: 8rpx;
+  padding: 12rpx 16rpx;
+  background: #f8fafc;
+  border-radius: 8rpx;
+  border-left: 4rpx solid #2563eb;
+}
+
+.ai-tag-detail-text {
+  font-size: 24rpx;
   color: #4b5563;
   line-height: 1.5;
 
   &.risk { color: #991b1b; }
+}
+
+.ai-tag-detail:has(.ai-tag-detail-text.risk) {
+  border-left-color: #dc2626;
+}
+
+/* 资金流向叙述 */
+.flow-narrative {
+  margin-top: 12rpx;
+  padding: 12rpx 16rpx;
+  background: #f8fafc;
+  border-radius: 8rpx;
+}
+
+.flow-narrative-text {
+  font-size: 24rpx;
+  color: #6b7280;
+  line-height: 1.5;
 }
 
 /* 个股新闻 */

@@ -28,7 +28,7 @@
     {
       "path": "modules/favorites/pages/detail",
       "style": {
-        "navigationBarTitleText": "个股详情",
+        "navigationBarTitleText": "",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
