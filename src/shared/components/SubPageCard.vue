@@ -49,12 +49,14 @@ const windowHeight = ref(0)
 try {
   const sysInfo = uni.getSystemInfoSync()
   const raw = sysInfo.statusBarHeight || 0
-  windowHeight.value = sysInfo.windowHeight || 667
+  const rawWindowHeight = sysInfo.windowHeight || 667
   // #ifdef APP-PLUS
   statusBarHeight.value = raw / 1.2
+  windowHeight.value = rawWindowHeight / 1.2
   // #endif
   // #ifndef APP-PLUS
   statusBarHeight.value = raw
+  windowHeight.value = rawWindowHeight
   // #endif
 } catch (e) {
   statusBarHeight.value = 0
