@@ -157,12 +157,14 @@ const records = computed(() => {
 })
 
 const historyDateRange = computed(() => {
-  if (selectedDate.value) return selectedDate.value
+  if (selectedDate.value) return selectedDate.value.replace(/^\d{4}-/, '')
   const dates = records.value
     .map(item => normalizeDate(item.push_date))
     .filter(Boolean)
     .sort()
-  return dates.length ? `${dates[0]}至${dates[dates.length - 1]}` : '--'
+  if (!dates.length) return '--'
+  const fmt = (d: string) => d.replace(/^\d{4}-/, '')
+  return `${fmt(dates[0])}至${fmt(dates[dates.length - 1])}`
 })
 
 const latestUpdateDate = computed(() => {
