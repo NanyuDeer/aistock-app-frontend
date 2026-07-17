@@ -197,7 +197,7 @@ export const stockApi = {
 
   /** 获取机构调研热门股（共振检测） */
   getHotBursts(params?: { hours?: number; min_resonance?: number; limit?: number }) {
-    return request.get('/cn/hot-bursts', { params }).then((res: any) => res)
+    return request.get('/cn/institution-research', { params })
   },
 
   /** 获取趋势风口事件（重磅消息） */
