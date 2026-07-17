@@ -23,31 +23,36 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Agent 报告查询和音频文件 → Node.js app-api（publicRouter，端口 56790）
+      // 为什么写死端口：Vite dev server 启动时不会把 envDir 下的 .env 变量注入
+      // process.env，process.env.VITE_API_BASE 恒为 undefined，导致 fallback 到
+      // 无服务的 56790。dev proxy 直接写死本地端口；生产走 Caddy 反代不受影响。
+      // 顺序约定：Node 路由（report/audio/event）在前，Python 路由（/api/agent）
+      // 在后，/api 放最后兜底，避免 /api/agent 被前面的 /api 匹配。
+      // Agent 报告查询和音频文件 → Node.js app-api（publicRouter，端口 3000）
       '/api/agent/report': {
-        target: process.env.VITE_API_BASE || 'http://localhost:56790',
+        target: 'http://localhost:3000',
         changeOrigin: true
       },
       '/api/agent/audio': {
-        target: process.env.VITE_API_BASE || 'http://localhost:56790',
+        target: 'http://localhost:3000',
         changeOrigin: true
       },
-      // 事件传导路由 → Node.js（端口 56790，publicRouter）
+      // 事件传导路由 → Node.js（端口 3000，publicRouter）
       '/api/agent/event': {
-        target: process.env.VITE_API_BASE || 'http://localhost:56790',
+        target: 'http://localhost:3000',
         changeOrigin: true
       },
-      // 其他 Agent 路由 → Python FastAPI（端口 8080）
+      // 其他 Agent 路由 → Python FastAPI（端口 8000）
       '/api/agent': {
-        target: process.env.VITE_AGENT_API_BASE || 'http://localhost:8080',
+        target: 'http://localhost:8000',
         changeOrigin: true
       },
       '/api': {
-        target: process.env.VITE_API_BASE || 'http://localhost:56790',
+        target: 'http://localhost:3000',
         changeOrigin: true
       },
       '/ws': {
-        target: process.env.VITE_WS_BASE || 'ws://localhost:56790',
+        target: 'ws://localhost:3000',
         ws: true,
         changeOrigin: true
       }
