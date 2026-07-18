@@ -10,7 +10,7 @@
           <!-- 有数据时：显示线索数量和简洁摘要 -->
           <template v-if="briefingStatus === 'ready'">
             <view class="briefing-clue">
-              <text class="clue-text">{{ report?.stocks?.length || 0 }}条关键线索需关注</text>
+              <text class="clue-text">{{ briefingClueCount }}条关键线索需关注</text>
             </view>
             <view class="briefing-tags">
               <view v-for="(tag, idx) in summaryTags" :key="idx" class="summary-tag">
@@ -139,6 +139,14 @@ const summaryTags = computed(() => {
     .map(s => s.trim())
     .filter(s => s.length > 0)
     .slice(0, 4)
+})
+
+/** 线索数量：晨报按 stocks，晚报按 sectors */
+const briefingClueCount = computed(() => {
+  if (!report.value) return 0
+  return briefingTypeLabel.value === '晨报'
+    ? report.value.stocks.length
+    : report.value.sectors.length
 })
 
 // 卡片描述文案（根据状态）

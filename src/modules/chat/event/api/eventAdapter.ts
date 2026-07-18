@@ -149,6 +149,31 @@ export function adaptEventList(backend: BackendEventListData): EventListResponse
   }
 }
 
+/** 已知媒体域名 → 中文显示名映射 */
+const MEDIA_NAME_BY_DOMAIN: Readonly<Record<string, string>> = {
+  'theguardian.com': '英国《卫报》',
+}
+
+/**
+ * 从后端 source 字段构建 sourceInfo（来源展示信息）。
+ *
+ * 后端 event_meta.source 由 event_conduction 从 major_events.url 传入：
+ * - 若为 URL，用标准 URL API 解析 hostname（小写并去掉 www. 前缀），
+ *   命中 MEDIA_NAME_BY_DOMAIN 则显示中文媒体名，否则显示规范化域名；url 保留原始链接。
+ * - 若非 URL，直接作为 name。
+ */
+function buildSourceInfo(source: string): { name: string; url?: string } | undefined {
+  if (!source) return undefined
+  if (!/^https?:\/\//i.test(source)) return { name: source }
+  try {
+    const url = new URL(source)
+    const domain = url.hostname.toLowerCase().replace(/^www\./, '')
+    return { name: MEDIA_NAME_BY_DOMAIN[domain] ?? domain, url: source }
+  } catch {
+    return { name: source }
+  }
+}
+
 /**
  * 单个事件适配
  * 将后端事件字段转换为前端 EventItem
@@ -156,6 +181,7 @@ export function adaptEventList(backend: BackendEventListData): EventListResponse
  * 字段映射：
  * - 直接映射：eventId, title, source, publishTime
  * - 字段名映射：summary → aiSummary
+ * - sourceInfo：从 source 构建（真实来源 URL）
  * - 降级字段：eventType, importance, affectedIndustries, isFollowed
  */
 function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventItem {
@@ -165,6 +191,9 @@ function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventI
     title: backendEvent.title,
     source: backendEvent.source,
     publishTime: backendEvent.publishTime,
+
+    // 来源信息：从后端 source 构建真实 sourceInfo
+    sourceInfo: buildSourceInfo(backendEvent.source),
 
     // 字段名映射
     aiSummary: backendEvent.summary,
@@ -207,6 +236,7 @@ export function adaptEventDetail(backend: BackendEventDetailData): EventDetailRe
       eventId: content.eventId,
       title: content.title,
       source: content.source,
+      sourceInfo: buildSourceInfo(content.source),
       publishTime: content.publishTime,
 
       // 降级字段（后端暂不返回）

@@ -4,18 +4,14 @@
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { agentApi } from '@/shared/api/modules/agent'
+import {
+  parseBriefingReport,
+  type BriefingReport,
+  type BriefingType,
+} from './briefingReport'
 
-/** 双层报告结构（schema_version 2.0） */
-export interface BriefingReport {
-  summary: string
-  details: string
-  stocks: string[]
-  risks: string[]
-  podcast_brief: string
-  schema_version: string
-}
+export type { BriefingReport, BriefingType } from './briefingReport'
 
-export type BriefingType = 'morning' | 'review'
 export type BriefingStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
 export interface BriefingCardState {
@@ -38,37 +34,6 @@ function autoDetectType(): BriefingType {
     return 'morning'
   }
   return 'review'
-}
-
-/** 从 API 响应中解析双层报告 */
-function parseReport(content: unknown): BriefingReport | null {
-  if (!content || typeof content !== 'object') return null
-
-  const obj = content as Record<string, unknown>
-  const display = obj.display_report
-  if (!display || typeof display !== 'object') {
-    // 兼容 schema 1.0 纯文本
-    const text = typeof obj.text === 'string' ? obj.text : ''
-    if (!text) return null
-    return {
-      summary: '',
-      details: text,
-      stocks: [],
-      risks: [],
-      podcast_brief: '',
-      schema_version: '1.0',
-    }
-  }
-
-  const d = display as Record<string, unknown>
-  return {
-    summary: typeof d.summary === 'string' ? d.summary : '',
-    details: typeof d.details === 'string' ? d.details : '',
-    stocks: Array.isArray(d.stocks) ? d.stocks.filter((s): s is string => typeof s === 'string') : [],
-    risks: Array.isArray(d.risks) ? d.risks.filter((r): r is string => typeof r === 'string') : [],
-    podcast_brief: typeof obj.podcast_brief === 'string' ? obj.podcast_brief : '',
-    schema_version: typeof obj.schema_version === 'string' ? obj.schema_version : '2.0',
-  }
 }
 
 /** 获取今天日期字符串 YYYY-MM-DD（本地时区） */
@@ -106,7 +71,7 @@ export function useBriefingCard(
       }
       const record = data as Record<string, unknown>
       const content = record.content
-      const parsed = parseReport(content)
+      const parsed = parseBriefingReport(content, type.value)
       if (!parsed) {
         status.value = 'empty'
         summary.value = ''

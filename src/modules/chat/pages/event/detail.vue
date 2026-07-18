@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 title="AI事件分析" back-url="/modules/chat/pages/event/list">
+  <SubPageCard2 ref="subPageRef" title="AI事件分析" back-url="/modules/chat/pages/event/list">
     <!-- ===== 加载状态 ===== -->
     <template v-if="loading">
       <view class="state-container">
@@ -20,7 +20,7 @@
 
     <!-- ===== AI 事件分析报告 ===== -->
     <template v-else-if="detail">
-      <AiEventReport :detail="detail" />
+      <AiEventReport :detail="detail" @back="handleBack" />
     </template>
   </SubPageCard2>
 </template>
@@ -42,6 +42,14 @@ const { detail, loading, error, fetchDetail } = useEventDetail()
 
 // ========== 本地状态 ==========
 const eventId = ref('')
+/** SubPageCard2 组件引用，用于复用其 goBack 回退语义 */
+const subPageRef = ref<InstanceType<typeof SubPageCard2> | null>(null)
+
+// ========== 事件处理 ==========
+/** AiEventReport back 事件 → 复用 SubPageCard2 的 goBack 回退语义 */
+function handleBack(): void {
+  subPageRef.value?.goBack()
+}
 
 // ========== 生命周期 ==========
 onMounted(() => {

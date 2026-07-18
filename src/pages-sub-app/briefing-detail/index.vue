@@ -27,73 +27,35 @@
           <text class="podcast-arrow">›</text>
         </view>
 
-        <!-- ① 今日速览 -->
-        <view v-if="blocks?.speedLook" class="detail-card">
+        <!-- ReportCard[] 统一渲染：晨报/复盘按 type 分流，未匹配正文入"补充分析" -->
+        <view
+          v-for="card in cards"
+          :key="card.key"
+          class="detail-card"
+          :class="{ 'highlight-card': isHighlightCard(card.key) }"
+        >
           <view class="card-header">
-            <text class="card-type-tag">今日速览</text>
+            <text class="card-type-tag" :class="cardTagClass(card.key)">{{ card.title }}</text>
           </view>
           <view class="markdown-content">
-            <mp-html :content="blocks.speedLook" />
-          </view>
-        </view>
-
-        <!-- ② 核心结论 -->
-        <view v-if="blocks?.coreConclusion" class="detail-card highlight-card">
-          <view class="card-header">
-            <text class="card-type-tag conclusion-tag">核心结论</text>
-          </view>
-          <view class="markdown-content">
-            <mp-html :content="blocks.coreConclusion" />
-          </view>
-        </view>
-
-        <!-- ③ 详细分析 -->
-        <view v-if="blocks?.detailAnalysis" class="detail-card">
-          <view class="card-header">
-            <text class="card-type-tag">详细分析</text>
-          </view>
-          <view class="markdown-content">
-            <mp-html :content="blocks.detailAnalysis" />
-          </view>
-          <view v-if="blocks.exclusionNote" class="exclusion-note">
-            <mp-html :content="blocks.exclusionNote" />
-          </view>
-        </view>
-
-        <!-- ④ 异常信号 -->
-        <view v-if="blocks?.anomalySignal" class="detail-card highlight-card">
-          <view class="card-header">
-            <text class="card-type-tag anomaly-tag">异常信号</text>
-          </view>
-          <view class="markdown-content">
-            <mp-html :content="blocks.anomalySignal" />
-          </view>
-        </view>
-
-        <!-- ⑤ 事件持续性追踪 -->
-        <view v-if="blocks?.eventTracking" class="detail-card">
-          <view class="card-header">
-            <text class="card-type-tag">事件追踪</text>
-          </view>
-          <view class="markdown-content">
-            <mp-html :content="blocks.eventTracking" />
+            <mp-html :content="card.html" />
           </view>
         </view>
 
         <!-- 关联板块：横向滚动标签 -->
-        <view v-if="report?.stocks?.length" class="detail-card">
+        <view v-if="relatedItems.length" class="detail-card">
           <view class="card-footer">
-            <text class="industries-label">关联板块</text>
+            <text class="industries-label">{{ relatedItemsLabel }}</text>
             <view class="industries-row">
               <scroll-view class="industries-scroll" scroll-x="true" :show-scrollbar="false">
                 <view class="industries-tags">
                   <text
-                    v-for="stock in report.stocks"
-                    :key="stock"
+                    v-for="item in relatedItems"
+                    :key="item"
                     class="industry-item item-neutral"
-                    @tap="goSectorSearch(stock)"
+                    @tap="goSectorSearch(item)"
                   >
-                    {{ stock }}
+                    {{ item }}
                     <text class="industry-arrow">›</text>
                   </text>
                 </view>
@@ -153,7 +115,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 import { useBriefingCard, type BriefingType } from '@/shared/utils/useBriefingCard'
-import { splitReviewReport } from '@/shared/utils/reportSplitter'
+import { splitReportToCards, type ReportCard } from '@/shared/utils/reportCard'
 
 const pageType = ref<BriefingType>('review')
 const currentDate = ref('')
@@ -173,10 +135,33 @@ const {
   refresh,
 } = useBriefingCard()
 
-const blocks = computed(() => {
-  if (!report.value?.details) return null
-  return splitReviewReport(report.value.details)
+const cards = computed<ReportCard[]>(() => {
+  if (!report.value?.details) return []
+  return splitReportToCards(report.value.details, pageType.value)
 })
+
+/** 关联项目：晚报展示 sectors，晨报展示 stocks */
+const relatedItems = computed(() => {
+  if (!report.value) return []
+  return pageType.value === 'review' ? report.value.sectors : report.value.stocks
+})
+
+/** 关联项目标签 */
+const relatedItemsLabel = computed(() => (
+  pageType.value === 'review' ? '关联板块' : '关联标的'
+))
+
+/** 高亮卡片：核心结论、异常信号 */
+function isHighlightCard(key: string): boolean {
+  return key === 'coreConclusion' || key === 'anomalySignal'
+}
+
+/** 卡片标签附加 class */
+function cardTagClass(key: string): string {
+  if (key === 'coreConclusion') return 'conclusion-tag'
+  if (key === 'anomalySignal') return 'anomaly-tag'
+  return ''
+}
 
 function goBriefing() {
   uni.navigateTo({ url: '/pages-sub-app/briefing/index' })
