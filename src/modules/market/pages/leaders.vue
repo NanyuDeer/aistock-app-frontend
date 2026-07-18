@@ -63,98 +63,76 @@
         </view>
       </view>
 
-      <!-- 板块列表 -->
+      <!-- 板块列表（入口卡片，点击进入板块详情子页面） -->
       <view v-if="sectors.length" class="sector-list">
       <view
         v-for="(sector, idx) in sectors"
         :key="sector.code || idx"
-        class="sector-card"
+        class="stats-card sector-entry"
+        @tap="goSectorDetail(sector)"
       >
         <!-- 板块头部 -->
-        <view class="sector-top">
-          <view class="sector-info">
+        <view class="stats-header">
+          <view class="stats-title-row">
             <text class="sector-rank">No.{{ idx + 1 }}</text>
-            <text class="sector-name">{{ sector.name }}</text>
-            <text v-if="sector.frequency" class="sector-freq">频次 {{ sector.frequency }}</text>
-          </view>
-          <view class="sector-change-wrap">
+            <text class="stats-name">{{ sector.name }}</text>
             <text
-              :class="['sector-change', (sector.today_change ?? 0) >= 0 ? 'up' : 'down']"
-            >
+              v-if="persistenceText(sector)"
+              :class="['persistence-badge', persistenceClass(sector)]"
+            >{{ persistenceText(sector) }}</text>
+          </view>
+          <text v-if="sector.frequency" class="freq-badge">上榜 {{ sector.frequency }} 次</text>
+        </view>
+        <!-- 统计行 -->
+        <view class="stats-row">
+          <view class="stat-item">
+            <text class="stat-label">今日涨幅</text>
+            <text :class="['stat-value', (sector.today_change ?? 0) >= 0 ? 'up' : 'down']">
               {{ (sector.today_change ?? 0) >= 0 ? '+' : '' }}{{ formatPct(sector.today_change) }}
             </text>
           </view>
-        </view>
-
-        <!-- 龙头股摘要 -->
-        <view v-if="sector.leading_stock || sector.leading_stock_info" class="leader-row">
-          <view class="leader-left">
-            <text class="leader-label">龙头</text>
-            <text class="leader-name">{{ sector.leading_stock_info?.name || sector.leading_stock || sector.leading_stock_info?.code }}</text>
-            <text
-              v-if="sector.leading_stock_info?.change_pct !== undefined && sector.leading_stock_info?.change_pct !== null"
-              :class="['leader-change', (sector.leading_stock_info.change_pct ?? 0) >= 0 ? 'up' : 'down']"
-            >
-              {{ (sector.leading_stock_info.change_pct ?? 0) >= 0 ? '+' : '' }}{{ formatPct(sector.leading_stock_info.change_pct) }}
+          <view class="stat-item">
+            <text class="stat-label">均涨幅</text>
+            <text :class="['stat-value', (sector.avg_change ?? 0) >= 0 ? 'up' : 'down']">
+              {{ (sector.avg_change ?? 0) >= 0 ? '+' : '' }}{{ formatPct(sector.avg_change) }}
             </text>
           </view>
-          <text v-if="sector.leading_stock_info?.price" class="leader-price">
-            {{ Number(sector.leading_stock_info.price).toFixed(2) }}
-          </text>
-        </view>
-
-        <!-- 驱动因素 -->
-        <view v-if="sector.driver" class="driver-row">
-          <text class="driver-label">驱动</text>
-          <text class="driver-text">{{ sector.driver }}</text>
-        </view>
-
-        <!-- AI 分析 -->
-        <view v-if="getAnalysisRows(sector.ai_analysis).length" class="analysis-box">
-          <view
-            v-for="(row, rIdx) in getAnalysisRows(sector.ai_analysis)"
-            :key="rIdx"
-            class="analysis-row"
-          >
-            <text class="analysis-label">{{ row.label }}</text>
-            <text :class="['analysis-value', row.risk ? 'risk' : '']">{{ row.value }}</text>
+          <view class="stat-item">
+            <text class="stat-label">净流入</text>
+            <text class="stat-value">{{ formatNetInflow(sector.net_inflow) }}</text>
+          </view>
+          <view class="stat-item">
+            <text class="stat-label">领涨股</text>
+            <text class="stat-value leader-stock-name">{{ sector.leading_stock || sector.leading_stock_info?.name || '--' }}</text>
           </view>
         </view>
-
-        <!-- 涨跌家数 -->
-        <view v-if="sector.up_count || sector.down_count" class="count-row">
-          <text class="count-up">↑ {{ sector.up_count || 0 }}</text>
-          <text class="count-down">↓ {{ sector.down_count || 0 }}</text>
-        </view>
-
-        <!-- 主线个股 -->
-        <view v-if="sector.main_stocks && sector.main_stocks.length" class="stocks-section">
-          <text class="stocks-section-title">主线个股</text>
-          <view class="stocks-list">
-            <view
-              v-for="stock in sector.main_stocks.slice(0, 6)"
-              :key="stock.code"
-              class="stock-item"
-              @tap="goStockDetail(stock.code)"
+        <!-- 单只龙头股详细行情（跨板块去重） -->
+        <view v-if="getSectorLeader(sector)" class="leader-mini-row" @tap.stop="goStockDetail(getSectorLeader(sector)!.code)">
+          <view class="leader-mini-left">
+            <text class="leader-mini-name">{{ getSectorLeader(sector)!.name }}</text>
+            <text class="leader-mini-code">{{ getSectorLeader(sector)!.code }}</text>
+          </view>
+          <view class="leader-mini-right">
+            <text v-if="getSectorLeader(sector)!.price != null" class="leader-mini-price">
+              {{ Number(getSectorLeader(sector)!.price).toFixed(2) }}
+            </text>
+            <text
+              v-if="getSectorLeader(sector)!.change_pct != null"
+              :class="['leader-mini-change', (getSectorLeader(sector)!.change_pct ?? 0) >= 0 ? 'up' : 'down']"
             >
-              <view class="stock-info">
-                <text class="stock-name">{{ stock.name }}</text>
-                <text class="stock-code">{{ stock.code }}</text>
-              </view>
-              <view class="stock-quote">
-                <text v-if="stock.price !== null && stock.price !== undefined" class="stock-price">
-                  {{ Number(stock.price).toFixed(2) }}
-                </text>
-                <text
-                  v-if="stock.change_pct !== null && stock.change_pct !== undefined"
-                  :class="['stock-change', (stock.change_pct ?? 0) >= 0 ? 'up' : 'down']"
-                >
-                  {{ (stock.change_pct ?? 0) >= 0 ? '+' : '' }}{{ formatPct(stock.change_pct) }}
-                </text>
-              </view>
+              {{ (getSectorLeader(sector)!.change_pct ?? 0) >= 0 ? '+' : '' }}{{ formatPct(getSectorLeader(sector)!.change_pct) }}
+            </text>
+            <view
+              class="leader-mini-fav"
+              :class="{ active: favoriteSet.has(getSectorLeader(sector)!.code) }"
+              @tap.stop="toggleFavorite(getSectorLeader(sector)!.code)"
+            >
+              <text class="fav-icon">{{ favoriteSet.has(getSectorLeader(sector)!.code) ? '★' : '☆' }}</text>
             </view>
           </view>
         </view>
+        <!-- 箭头 -->
+        <view class="card-arrow"><text class="sector-arrow">›</text></view>
       </view>
 
       <!-- 更新时间 -->
@@ -171,7 +149,7 @@
 import { ref, computed, getCurrentInstance } from 'vue'
 import { onShow, onReady } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
-import type { WindLeaderAiAnalysis, WindLeaderSector } from '@/shared/api/modules/stock'
+import type { WindLeaderAiAnalysis, WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
@@ -179,6 +157,7 @@ const loading = ref(false)
 const errorMessage = ref('')
 const sectors = ref<WindLeaderSector[]>([])
 const updateTime = ref('')
+const favoriteSet = ref<Set<string>>(new Set())
 
 // ===== 泡泡图数据 =====
 interface Bubble {
@@ -196,7 +175,7 @@ interface BubbleLayout extends Bubble {
   y: number
 }
 
-const bubbleHeight = 200 // 容器高度 px（横向椭圆布局，纵向更短）
+const bubbleHeight = 230 // 容器高度 px
 
 // 动态计算容器宽度：windowWidth - 两侧padding（leaders-content 24rpx×2 + bubble-card 24rpx×2）
 // 不能硬编码，否则不同设备屏幕宽度下泡泡会溢出画布
@@ -232,14 +211,14 @@ onReady(() => {
     .exec()
 })
 
-// 根据持续性决定半径，横向椭圆布局允许稍大半径
+// 根据持续性决定半径，放大泡泡尺寸
 function calcRadius(persistence: string, score: number): number {
-  let base = 20 // 短期
-  if (persistence.includes('长期')) base = 36
-  else if (persistence.includes('中期')) base = 27
+  let base = 26 // 短期
+  if (persistence.includes('长期')) base = 58
+  else if (persistence.includes('中期')) base = 42
   // score 微调
-  base += (score - 50) * 0.05
-  return Math.max(16, Math.min(40, Math.round(base)))
+  base += (score - 50) * 0.08
+  return Math.max(22, Math.min(65, Math.round(base)))
 }
 
 const bubbleData = computed<Bubble[]>(() => {
@@ -251,11 +230,14 @@ const bubbleData = computed<Bubble[]>(() => {
       ? s.ai_analysis?.persistence || '短期'
       : '短期',
   }))
-  return source.map(s => ({
-    ...s,
-    radius: calcRadius(s.persistence, s.score),
-    fontSize: calcRadius(s.persistence, s.score) > 40 ? 14 : (calcRadius(s.persistence, s.score) > 28 ? 12 : 10),
-  }))
+  return source.map(s => {
+    const r = calcRadius(s.persistence, s.score)
+    return {
+      ...s,
+      radius: r,
+      fontSize: r > 50 ? 14 : (r > 38 ? 12 : 10),
+    }
+  })
 })
 
 // force simulation：碰撞检测 + 居中 + 自适应缩放（确定性布局，同数据同结果）
@@ -267,12 +249,12 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
   const cx = W / 2
   const cy = H / 2
 
-  // 自适应缩放：如果泡泡总面积占画布面积超过45%，等比缩小半径
+  // 自适应缩放：如果泡泡总面积占画布面积超过70%，等比缩小半径
   const totalArea = items.reduce((sum, b) => sum + Math.PI * b.radius * b.radius, 0)
   const canvasArea = W * H
   let scale = 1
-  if (totalArea / canvasArea > 0.45) {
-    scale = Math.sqrt(0.45 * canvasArea / totalArea)
+  if (totalArea / canvasArea > 0.70) {
+    scale = Math.sqrt(0.70 * canvasArea / totalArea)
   }
 
   // 确定性初始位置：按 index 在横向椭圆上均匀分布
@@ -384,6 +366,7 @@ async function loadData() {
     )
     updateTime.value = typeof data?.update_time === 'string' ? data.update_time : ''
     errorMessage.value = ''
+    loadFavorites()
   } catch {
     sectors.value = []
     updateTime.value = ''
@@ -393,9 +376,109 @@ async function loadData() {
   }
 }
 
+// 加载用户自选股列表
+async function loadFavorites() {
+  try {
+    const res: any = await stockApi.getFavorites()
+    const favs = res?.favorites || res?.data?.favorites || []
+    favoriteSet.value = new Set(Array.isArray(favs) ? favs : [])
+  } catch {
+    // 静默失败，不影响主流程
+  }
+}
+
+// 切换关注状态
+async function toggleFavorite(code: string) {
+  if (!code) return
+  const isFav = favoriteSet.value.has(code)
+  try {
+    if (isFav) {
+      await stockApi.removeFavorites([code])
+      favoriteSet.value.delete(code)
+    } else {
+      await stockApi.addFavorites([code])
+      favoriteSet.value.add(code)
+    }
+    // 触发响应式更新
+    favoriteSet.value = new Set(favoriteSet.value)
+    uni.showToast({ title: isFav ? '已取消关注' : '已关注', icon: 'none' })
+  } catch {
+    uni.showToast({ title: '操作失败', icon: 'none' })
+  }
+}
+
 function formatPct(val?: number | null): string {
   if (val === undefined || val === null) return '--'
   return Number(val).toFixed(2) + '%'
+}
+
+function formatNetInflow(val?: number | null): string {
+  if (val === undefined || val === null) return '--'
+  if (Math.abs(val) >= 10000) return (val / 10000).toFixed(2) + '亿'
+  return Math.round(val) + '万'
+}
+
+// 持续性标签提取（只显示"短期"/"中期"/"长期"）
+function persistenceText(sector: WindLeaderSector): string {
+  const ai = sector.ai_analysis
+  if (!ai || typeof ai === 'string') return ''
+  const raw = (ai as WindLeaderAiAnalysis).persistence || ''
+  if (raw.includes('长期')) return '长期'
+  if (raw.includes('中期')) return '中期'
+  if (raw.includes('短期')) return '短期'
+  return raw
+}
+
+function persistenceClass(sector: WindLeaderSector): string {
+  const tag = persistenceText(sector)
+  if (tag.includes('长期')) return 'long-term'
+  if (tag.includes('中期')) return 'mid-term'
+  if (tag.includes('短期')) return 'short-term'
+  return ''
+}
+
+// 从板块中提取龙头股列表：优先合并 leading_stock_info 和 main_stocks，去重后按 score 降序
+function getTopStocks(sector: WindLeaderSector): WindLeaderStock[] {
+  const seen = new Set<string>()
+  const stocks: WindLeaderStock[] = []
+  // 优先取 leading_stock_info
+  if (sector.leading_stock_info?.code) {
+    stocks.push(sector.leading_stock_info)
+    seen.add(sector.leading_stock_info.code)
+  }
+  // 补充 main_stocks（去重）
+  if (sector.main_stocks) {
+    for (const s of sector.main_stocks) {
+      if (s?.code && !seen.has(s.code)) {
+        stocks.push(s)
+        seen.add(s.code)
+      }
+    }
+  }
+  return stocks
+}
+
+// 跨板块去重：为每个板块选出一只未被占用的龙头股（对齐 Web 前端 collectTopStocks 逻辑）
+const sectorLeaderMap = computed<Record<string, WindLeaderStock | null>>(() => {
+  const usedCodes = new Set<string>()
+  const map: Record<string, WindLeaderStock | null> = {}
+  for (const sector of sectors.value) {
+    const candidates = getTopStocks(sector)
+    let picked: WindLeaderStock | null = null
+    for (const c of candidates) {
+      if (c.code && !usedCodes.has(c.code)) {
+        usedCodes.add(c.code)
+        picked = c
+        break
+      }
+    }
+    map[sector.name] = picked
+  }
+  return map
+})
+
+function getSectorLeader(sector: WindLeaderSector): WindLeaderStock | null {
+  return sectorLeaderMap.value[sector.name] || null
 }
 
 function getAnalysisRows(a: WindLeaderAiAnalysis | string | null | undefined): Array<{ label: string; value: string; risk?: boolean }> {
@@ -427,6 +510,14 @@ function goStockDetail(symbol: string) {
 
 function goPushHistory() {
   uni.navigateTo({ url: '/modules/market/pages/push-history' })
+}
+
+// 跳转到板块详情子页面，传递板块名称用于数据筛选
+function goSectorDetail(sector: WindLeaderSector) {
+  if (!sector?.name) return
+  const name = encodeURIComponent(sector.name)
+  const code = sector.code ? encodeURIComponent(sector.code) : ''
+  uni.navigateTo({ url: `/modules/market/pages/sector-detail?name=${name}${code ? '&code=' + code : ''}` })
 }
 
 onShow(() => {
@@ -581,26 +672,102 @@ onShow(() => {
   gap: 20rpx;
 }
 
-.sector-card {
+/* stats-card 卡片（与板块详情页一致） */
+.stats-card {
+  position: relative;
   background: #ffffff;
   border-radius: 20rpx;
   padding: 28rpx;
+  margin-bottom: 20rpx;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-.sector-top {
+.stats-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20rpx;
+  margin-bottom: 24rpx;
 }
 
-.sector-info {
+.stats-title-row {
   display: flex;
   align-items: center;
   gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.stats-name {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #1a1d24;
+}
+
+/* 持续性标签 */
+.persistence-badge {
+  font-size: 20rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  font-weight: 600;
+
+  &.long-term { color: #16a34a; background: #f0fdf4; }
+  &.mid-term { color: #2563eb; background: #eff6ff; }
+  &.short-term { color: #d97706; background: #fffbeb; }
+}
+
+/* 频次 badge */
+.freq-badge {
+  font-size: 20rpx;
+  color: #4d7cfe;
+  background: rgba(77, 124, 254, 0.1);
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  font-weight: 600;
+}
+
+/* 统计行：一行四个字段 */
+.stats-row {
+  display: flex;
+  gap: 12rpx;
+}
+
+.stat-item {
   flex: 1;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.stat-label {
+  font-size: 22rpx;
+  color: #6b7280;
+  margin-bottom: 8rpx;
+}
+
+.stat-value {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #1a1d24;
+
+  &.up { color: #f43f5e; }
+  &.down { color: #22c55e; }
+
+  &.leader-stock-name {
+    font-size: 24rpx;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+}
+
+/* 入口卡片：可点击 */
+.sector-entry {
+  transition: transform 0.15s ease;
+
+  &:active {
+    transform: scale(0.98);
+  }
 }
 
 .sector-rank {
@@ -612,31 +779,97 @@ onShow(() => {
   font-weight: 500;
 }
 
-.sector-name {
-  font-size: 32rpx;
+/* 箭头容器 */
+.card-arrow {
+  position: absolute;
+  right: 16rpx;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.sector-arrow {
+  font-size: 36rpx;
+  color: #9ca3af;
+}
+
+/* 龙头股行 */
+.leader-mini-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12rpx 16rpx;
+  background: #f5f7fa;
+  border-radius: 12rpx;
+  margin-top: 16rpx;
+}
+
+.leader-mini-left {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.leader-mini-name {
+  font-size: 28rpx;
+  color: #1a1d24;
+  font-weight: 600;
+}
+
+.leader-mini-code {
+  font-size: 20rpx;
+  color: #6b7280;
+  background: #e8ecf1;
+  padding: 2rpx 8rpx;
+  border-radius: 6rpx;
+}
+
+.leader-mini-change {
+  font-size: 24rpx;
+
+  &.up { color: #f43f5e; }
+  &.down { color: #22c55e; }
+}
+
+/* 龙头股右侧区域 */
+.leader-mini-right {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.leader-mini-price {
+  font-size: 28rpx;
   font-weight: 600;
   color: #1a1d24;
 }
 
-.sector-freq {
-  font-size: 22rpx;
-  color: #6b7280;
-  padding: 2rpx 12rpx;
-  background: #f0f2f5;
-  border-radius: 8rpx;
-}
-
-.sector-change-wrap {
+/* 关注按钮 */
+.leader-mini-fav {
+  width: 44rpx;
+  height: 44rpx;
   display: flex;
   align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #ffffff;
+
+  &.active {
+    background: rgba(245, 158, 11, 0.12);
+  }
+
+  &:active {
+    transform: scale(0.9);
+  }
 }
 
-.sector-change {
-  font-size: 30rpx;
-  font-weight: 600;
+.fav-icon {
+  font-size: 28rpx;
+  color: #d1d5db;
+  line-height: 1;
+}
 
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+.leader-mini-fav.active .fav-icon {
+  color: #f59e0b;
 }
 
 /* 龙头行 */

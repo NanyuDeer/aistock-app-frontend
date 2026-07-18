@@ -67,7 +67,7 @@
 
       <!-- 错误状态 -->
       <view v-else-if="errorMsg && !loginLoading" class="error-section">
-        <text class="error-icon">⚠</text>
+        <SvgIcon name="error-warning-line" size="36rpx" color="#ef4444" />
         <text class="error-text">{{ errorMsg }}</text>
         <view class="error-retry" @tap="handleRetry">
           <text class="retry-text">重试</text>

@@ -10,7 +10,7 @@
     <!-- ===== 错误状态 ===== -->
     <template v-else-if="error">
       <view class="state-container">
-        <text class="state-icon">⚠</text>
+        <SvgIcon name="error-warning-line" size="64rpx" color="#ef4444" />
         <text class="state-text error-text">{{ error }}</text>
         <view class="retry-btn" @tap="handleRetry">
           <text class="retry-text">重试</text>
@@ -36,6 +36,7 @@ import { onMounted, ref } from 'vue'
 import { useEventDetail } from '@/modules/chat/event/composables/useEventDetail'
 import AiEventReport from '@/modules/chat/event/components/AiEventReport.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 // ========== Composable ==========
 const { detail, loading, error, fetchDetail } = useEventDetail()

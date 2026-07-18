@@ -25,6 +25,20 @@
 
 ---
 
+## [master] 2026-07-17 — 跨仓库一致性修复（代理配置/emoji清理/接口路径/环境变量模板）
+**开发者**: Aria
+
+### 修复
+- `vite.config.ts`：改用 `loadEnv` 加载 `env/` 目录变量；proxy 目标改读 `VITE_PROXY_API_TARGET`/`VITE_PROXY_AGENT_TARGET`/`VITE_PROXY_WS_TARGET`（原读 `process.env` 不自动加载 .env 文件，导致 dev 代理始终 fallback 到生产端口）
+- `src/shared/api/modules/agent.ts`：`getEventChain` 路径修正（移除多余的 `/chain/` 段，与后端 `/api/agent/event/:eventId` 对齐）；占位接口补充 TODO 标注
+
+### 改进
+- `env/.env.development`、`env/.env.production`：新增 `VITE_PROXY_*` 代理目标变量
+- `env/.env.example`：新建环境变量模板（微信密钥用占位符）
+- emoji 清理（统一替换为 SvgIcon 组件）：`AiThinkingHeader.vue`（🤖→robot-line）、`EventItemCard.vue`（🤖→robot-line）、`event/detail.vue`（⚠→error-warning-line）、`event/list.vue`（📭→inbox-line、⚠→error-warning-line）、`alert-analysis.vue`（🤖/⚠️/⚡/✓/◌→robot-line/error-warning-line/flashlight-line/check-line/loader-line）、`login.vue`（⚠→error-warning-line）
+
+---
+
 ## [master] 2026-07-17 — 彻底修复提醒页"帮我分析"按钮被挤下 + mp-html符号换行
 **开发者**: Aria
 

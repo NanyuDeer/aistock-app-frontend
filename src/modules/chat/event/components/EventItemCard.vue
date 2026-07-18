@@ -45,7 +45,7 @@
         </view>
         <view class="detail-btn" @tap.stop="$emit('view-detail', event)">
           <view class="robot-avatar">
-            <text class="robot-face">🤖</text>
+            <SvgIcon name="robot-line" size="28rpx" color="#4d7cfe" />
           </view>
           <text class="detail-text">AI解析 ›</text>
         </view>
@@ -69,6 +69,7 @@ import { computed } from 'vue'
 import type { EventItem } from '../types'
 import { EVENT_TYPE_COLORS } from '../constants'
 import ImportanceStars from './ImportanceStars.vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 // ========== Props ==========
 

@@ -91,6 +91,25 @@ export interface WindLeaderStock {
   change_pct?: number | null
 }
 
+export interface WindLeaderFlowNode {
+  id: string
+  type: 'main' | 'related' | 'upstream' | 'downstream'
+  label: string
+}
+
+export interface WindLeaderFlowLink {
+  source: string
+  target: string
+  factor: number
+  direction: 'related' | 'upstream' | 'downstream'
+}
+
+export interface WindLeaderFlowData {
+  nodes: WindLeaderFlowNode[]
+  links: WindLeaderFlowLink[]
+  transfer_direction?: string
+}
+
 export interface WindLeaderSector {
   code?: string
   name: string
@@ -111,6 +130,7 @@ export interface WindLeaderSector {
   upstream_stocks?: WindLeaderStock[]
   downstream_stocks?: WindLeaderStock[]
   leading_stock_info?: WindLeaderStock | null
+  flow_data?: WindLeaderFlowData | null
 }
 
 export interface WindLeaderResponse {
@@ -197,7 +217,7 @@ export const stockApi = {
 
   /** 获取机构调研热门股（共振检测） */
   getHotBursts(params?: { hours?: number; min_resonance?: number; limit?: number }) {
-    return request.get('/cn/hot-bursts', { params }).then((res: any) => res)
+    return request.get('/cn/institution-research', { params })
   },
 
   /** 获取趋势风口事件（重磅消息） */
@@ -259,6 +279,16 @@ export const stockApi = {
   /** 获取半年报关键财务数据 */
   getSemiAnnualReport(symbol: string) {
     return request.get(`/cn/stocks/${symbol}/semi-annual-report`).then((res: any) => res?.data || res)
+  },
+
+  /** 获取个股 AI 资讯分析 */
+  getStockAnalysis(symbol: string) {
+    return request.get(`/cn/stocks/${symbol}/analysis`).then((res: any) => res?.data || res)
+  },
+
+  /** 创建个股 AI 资讯分析（触发后端生成） */
+  createStockAnalysis(symbol: string) {
+    return request.post(`/cn/stocks/${symbol}/analysis`).then((res: any) => res?.data || res)
   }
 }
 

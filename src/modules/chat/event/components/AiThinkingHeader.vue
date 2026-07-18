@@ -5,7 +5,7 @@
       <view class="back-btn" @tap="handleBack">
         <text class="back-arrow">←</text>
       </view>
-      <text class="header-icon">🤖</text>
+      <SvgIcon name="robot-line" size="30rpx" color="#4d7cfe" />
       <text class="header-title">AI事件分析</text>
     </view>
 
@@ -46,6 +46,7 @@
  * Props 全部来自 useAiReasoning 的响应式数据。
  */
 import { computed } from 'vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 type ThinkingPhase = 'idle' | 'reading' | 'identifying' | 'analyzing' | 'done'
 

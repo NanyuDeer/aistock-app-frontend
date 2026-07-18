@@ -46,9 +46,14 @@
           </view>
           <text class="feature-sub">主力最新动向</text>
           <view class="feature-list">
-            <view v-for="(item, idx) in leaderStocks.slice(0, 3)" :key="idx" class="feature-item">
-              <text class="item-name">{{ item.name }}</text>
-              <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+            <template v-if="leaderStocks.length">
+              <view v-for="(item, idx) in leaderStocks.slice(0, 3)" :key="idx" class="feature-item">
+                <text class="item-name">{{ item.name }}</text>
+                <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+              </view>
+            </template>
+            <view v-else class="feature-item">
+              <text class="item-name placeholder">加载中...</text>
             </view>
           </view>
         </view>
@@ -121,6 +126,8 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { useBriefingCard } from '@/shared/utils/useBriefingCard'
+import { stockApi } from '@/shared/api/modules/stock'
+import type { WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
 
 const {
   typeLabel: briefingTypeLabel,
@@ -181,14 +188,61 @@ function goBriefingDetail() {
   }
 }
 
-const leaderStocks = ref([
-  { name: '成都银行', tag: '洗盘', tagType: 'wash' },
-  { name: '华润材料', tag: '洗盘', tagType: 'wash' },
-  { name: '技源集团', tag: '出货', tagType: 'sell' },
-  { name: '诺唯赞', tag: '出货', tagType: 'sell' },
-  { name: '美锦能源', tag: '吸筹', tagType: 'buy' },
-  { name: '比亚迪', tag: '吸筹', tagType: 'buy' }
-])
+// 长线风口：从后端 API 获取风口龙头数据，提取前3只龙头股在首页预览
+interface LeaderStockPreview {
+  name: string
+  tag: string
+  tagType: 'buy' | 'sell' | 'wash'
+}
+
+const leaderStocks = ref<LeaderStockPreview[]>([])
+
+function toFiniteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+// 从风口板块中提取龙头股预览列表，参考 Web 前端 extractTopStocksFromSectors 逻辑
+function extractLeaderPreview(sectors: WindLeaderSector[], maxCount: number): LeaderStockPreview[] {
+  const seen = new Set<string>()
+  const result: LeaderStockPreview[] = []
+  // 按板块 score 降序遍历，优先取高分板块的龙头
+  const sorted = sectors
+    .filter(s => s && s.name)
+    .slice()
+    .sort((a, b) => (toFiniteNumber(b.score) ?? 0) - (toFiniteNumber(a.score) ?? 0))
+  for (const sector of sorted) {
+    if (result.length >= maxCount) break
+    // 优先取 leading_stock_info，其次取 main_stocks[0]
+    const stock: WindLeaderStock | null = sector.leading_stock_info ?? sector.main_stocks?.[0] ?? null
+    if (!stock || !stock.name) continue
+    const code = stock.code || stock.name
+    if (seen.has(code)) continue
+    seen.add(code)
+    const changePct = toFiniteNumber(stock.change_pct)
+    const tag = changePct !== null
+      ? `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`
+      : '--'
+    const tagType: LeaderStockPreview['tagType'] = changePct === null
+      ? 'wash'
+      : changePct > 0 ? 'buy' : changePct < 0 ? 'sell' : 'wash'
+    result.push({ name: stock.name, tag, tagType })
+  }
+  return result
+}
+
+async function loadLeaderStocks() {
+  try {
+    const res: any = await stockApi.getWindLeaders(8)
+    const data = res?.data ?? res
+    const sectors: WindLeaderSector[] = data?.hot_sectors ?? []
+    leaderStocks.value = extractLeaderPreview(sectors, 3)
+  } catch (error) {
+    console.error('首页长线风口数据加载失败:', error)
+    leaderStocks.value = []
+  }
+}
 
 const topEvent = ref({
   sector: '创新药',
@@ -220,6 +274,7 @@ const aiReports = ref([
 
 onShow(() => {
   briefingRefresh()
+  loadLeaderStocks()
 })
 
 function goChat() {
@@ -520,6 +575,10 @@ function goLogin() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.item-name.placeholder {
+  color: #9ca3af;
 }
 
 .item-tag {
