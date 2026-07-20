@@ -50,7 +50,7 @@
 
       <view class="dimension-list">
         <view v-for="(dimension, index) in detail.dimensions" :key="dimension.name" class="dimension-card">
-          <view class="dimension-header" @tap="toggleDimension(index)">
+          <view class="dimension-header" @tap="expandDimension(index)">
             <view class="dimension-name-wrap">
               <view class="dimension-icon">
                 <SvgIcon :name="dimensionIcon(index)" size="30rpx" color="#4d7cfe" />
@@ -65,11 +65,13 @@
             </view>
             <view class="dimension-result">
               <text :class="['dimension-score', `tone-text-${index}`]">{{ dimension.score }}</text>
-              <SvgIcon
-                :name="activeDimension === index ? 'arrow-up-s-line' : 'arrow-down-s-line'"
-                size="32rpx"
-                color="#4d7cfe"
-              />
+              <view class="dimension-toggle" @tap.stop="toggleDimensionFromArrow(index)">
+                <SvgIcon
+                  :name="isDimensionExpanded(index) ? 'arrow-up-s-line' : 'arrow-down-s-line'"
+                  size="32rpx"
+                  color="#4d7cfe"
+                />
+              </view>
             </view>
           </view>
           <view class="dimension-score-progress">
@@ -79,11 +81,11 @@
             />
           </view>
 
-          <view v-if="activeDimension === index" class="dimension-body">
+          <view v-if="isDimensionExpanded(index)" class="dimension-body">
             <template v-if="index === 0 && technicalDetail">
-              <TrendKLineChart :title="`${stockName} · 近期K线`" :data="technicalDetail.kline" />
+              <TrendKLineChart :title="`个股K线 · ${stockName}`" :data="technicalDetail.kline" />
               <TrendKLineChart
-                :title="`${technicalDetail.conceptKline.name || '概念指数'} · 近期K线`"
+                :title="`概念指数 · ${technicalDetail.conceptKline.name || '所属概念'}`"
                 :data="technicalDetail.conceptKline"
               />
               <view class="technical-grid">
@@ -226,6 +228,12 @@
                 </view>
               </view>
             </template>
+            <view class="dimension-collapse-wrap">
+              <view class="dimension-collapse-button" @tap.stop="collapseDimension(index)">
+                <SvgIcon name="arrow-up-s-line" size="28rpx" color="#4d7cfe" />
+                <text>收起</text>
+              </view>
+            </view>
           </view>
         </view>
       </view>
@@ -263,7 +271,7 @@ const detail = ref<TrendScoreDetail | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
 const vetoReasons = ref<string[]>([])
-const activeDimension = ref<number | null>(null)
+const expandedDimensions = ref<Set<number>>(new Set())
 const expandedNews = ref<number | null>(null)
 const weekLabels = ['5周前', '4周前', '3周前', '2周前', '上周', '本周']
 const favoritesStore = useFavoritesStore()
@@ -350,9 +358,26 @@ function dimensionDescription(index: number): string {
   ][index] || ''
 }
 
-function toggleDimension(index: number) {
-  activeDimension.value = activeDimension.value === index ? null : index
-  expandedNews.value = null
+function isDimensionExpanded(index: number): boolean {
+  return expandedDimensions.value.has(index)
+}
+
+function expandDimension(index: number) {
+  if (expandedDimensions.value.has(index)) return
+  expandedDimensions.value = new Set([...expandedDimensions.value, index])
+}
+
+function collapseDimension(index: number) {
+  if (!expandedDimensions.value.has(index)) return
+  const next = new Set(expandedDimensions.value)
+  next.delete(index)
+  expandedDimensions.value = next
+  if (index === 2) expandedNews.value = null
+}
+
+function toggleDimensionFromArrow(index: number) {
+  if (expandedDimensions.value.has(index)) collapseDimension(index)
+  else expandDimension(index)
 }
 
 function toggleNews(index: number) {
@@ -524,6 +549,7 @@ onShow(() => {
 .dimension-header:active { background: $bg-color-muted; }
 .dimension-name-wrap { min-width: 0; flex: 1; display: flex; align-items: center; gap: $spacing-sm; }
 .dimension-result { flex-shrink: 0; display: flex; align-items: center; gap: $spacing-sm; }
+.dimension-toggle { width: 48rpx; height: 48rpx; display: flex; align-items: center; justify-content: center; }
 .dimension-icon { width: 52rpx; height: 52rpx; display: flex; align-items: center; justify-content: center; border-radius: $radius-sm; background: rgba(77, 124, 254, 0.08); }
 .dimension-copy { min-width: 0; flex: 1; }
 .dimension-title-row { display: flex; align-items: baseline; gap: $spacing-xs; }
@@ -540,6 +566,23 @@ onShow(() => {
 }
 .dimension-score-progress-fill { height: 100%; border-radius: $radius-pill; }
 .dimension-body { border-top: 1rpx solid $border-color-light; }
+.dimension-collapse-wrap { padding: $spacing-sm $spacing-base $spacing-base; display: flex; justify-content: center; }
+.dimension-collapse-button {
+  min-width: 160rpx;
+  height: 60rpx;
+  padding: 0 $spacing-base;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-xs;
+  border: 1rpx solid rgba(77, 124, 254, 0.28);
+  border-radius: $radius-base;
+  color: $brand-color;
+  background: rgba(77, 124, 254, 0.06);
+  font-size: $font-size-sm;
+  font-weight: 600;
+}
+.dimension-collapse-button:active { background: rgba(77, 124, 254, 0.12); }
 
 .technical-grid { display: grid; grid-template-columns: repeat(2, 1fr); }
 .technical-item { min-height: 80rpx; padding: $spacing-sm $spacing-base; display: flex; align-items: center; justify-content: space-between; gap: $spacing-xs; border-right: 1rpx solid $border-color-light; border-bottom: 1rpx solid $border-color-light; }
@@ -606,7 +649,18 @@ onShow(() => {
 .news-item:last-child { border-bottom: 0; }
 .news-topline { display: flex; align-items: flex-start; gap: $spacing-xs; }
 .news-tag { flex-shrink: 0; padding: 2rpx 8rpx; border-radius: $radius-xs; color: $stock-up-color; background: rgba(244, 63, 94, 0.08); font-size: $font-size-xs; }
-.news-title { flex: 1; color: $text-color-title; font-size: $font-size-base; font-weight: 600; line-height: 1.5; }
+.news-title {
+  flex: 1;
+  display: -webkit-box;
+  overflow: hidden;
+  color: $text-color-title;
+  font-size: $font-size-base;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .news-meta { margin: $spacing-xs 36rpx 0 60rpx; display: flex; gap: $spacing-sm; color: $text-color-tertiary; font-size: $font-size-xs; }
 .news-summary { display: block; margin: $spacing-sm 36rpx 0 60rpx; padding: $spacing-sm; border-radius: $radius-sm; background: $bg-color-muted; color: $text-color-secondary; font-size: $font-size-sm; line-height: 1.75; }
 

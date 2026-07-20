@@ -21,6 +21,7 @@
     "@dcloudio/uni-ui": "^1.5.12",
     "@qiun/ucharts": "2.5.0-20230101",
     "dayjs": "^1.11.13",
+    "klinecharts": "^10.0.0",
     "lodash-es": "^4.17.21",
     "luch-request": "^3.1.0",
     "mp-html": "^2.5.0",
