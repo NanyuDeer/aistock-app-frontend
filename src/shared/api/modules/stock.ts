@@ -220,9 +220,9 @@ export const stockApi = {
     return request.get('/cn/institution-research', { params })
   },
 
-  /** 获取趋势风口事件（重磅消息） */
+  /** 获取个股异动事件（重磅消息） */
   getTrendEvents(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
-    return request.get('/cn/trend-hotspots/events', { params }).then((res: any) => res)
+    return request.get('/cn/stock-monitors/events', { params }).then((res: any) => res)
   },
 
   /** 获取财联社头条新闻 */

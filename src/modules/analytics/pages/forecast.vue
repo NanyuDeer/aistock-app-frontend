@@ -1,6 +1,6 @@
 <template>
   <view class="page-forecast">
-    <PageCard title="业绩">
+    <SubPageCard title="业绩预测">
       <!-- 标题右侧切换按钮 -->
       <template #header-right>
         <view class="toggle-group">
@@ -119,9 +119,7 @@
       <view v-if="hasMore" class="load-more" @tap="loadMore">
         <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
       </view>
-    </PageCard>
-
-    <AppBottomBar current-tab="forecast" />
+    </SubPageCard>
   </view>
 </template>
 
@@ -129,8 +127,7 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
-import PageCard from '@/shared/components/PageCard.vue'
-import AppBottomBar from '@/shared/components/AppBottomBar.vue'
+import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'

@@ -58,22 +58,7 @@
           </view>
         </view>
 
-        <view class="feature-card event-card" @tap="goEvent">
-          <view class="feature-header">
-            <text class="feature-title">异动捕手</text>
-            <text class="feature-more">›</text>
-          </view>
-          <text class="feature-sub">实时异动监控</text>
-          <view class="feature-list">
-            <view v-for="(item, idx) in eventStocks.slice(0, 3)" :key="idx" class="feature-item event-item">
-              <text v-if="idx === 0" class="item-badge">最新</text>
-              <text class="item-name">{{ item.name }}</text>
-              <text class="item-change up">{{ item.change }}</text>
-            </view>
-          </view>
-        </view>
-
-        <view class="feature-card chain-card" @tap="goEventChain">
+        <view class="feature-card event-card" @tap="goEventChain">
           <view class="feature-header">
             <text class="feature-title">事件传导</text>
             <text class="feature-more">›</text>
@@ -87,12 +72,26 @@
           </view>
         </view>
 
-        <view class="feature-card ai-card" @tap="goAgentReport">
+        <view class="feature-card ai-card" @tap="goTraceability">
           <view class="feature-header">
-            <text class="feature-title">今日AI分析</text>
+            <text class="feature-title">大盘溯源</text>
             <text class="feature-more">›</text>
           </view>
-          <text class="feature-sub">Agent报告</text>
+          <text class="feature-sub">市场异动溯源分析</text>
+          <view class="feature-list">
+            <view v-for="(item, idx) in traceReports.slice(0, 3)" :key="idx" class="feature-item">
+              <text class="item-name">{{ item.name }}</text>
+              <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="feature-card overview-card" @tap="goAgentReport">
+          <view class="feature-header">
+            <text class="feature-title">今日分析概览</text>
+            <text class="feature-more">›</text>
+          </view>
+          <text class="feature-sub">Agent报告更新状态</text>
           <view class="feature-list">
             <view v-for="(item, idx) in aiReports.slice(0, 3)" :key="idx" class="feature-item">
               <text class="item-name">{{ item.name }}</text>
@@ -110,13 +109,14 @@
         </view>
         <view class="track-item">
           <text class="track-label">事件</text>
-          <text class="track-content">{{ trackEvent.title }}</text>
+          <text class="track-content">{{ topEvent.title }}</text>
         </view>
         <view class="track-footer">
           <text class="track-arrow">∧</text>
           <text class="track-tip">点击查看资讯详情</text>
         </view>
       </view>
+
     </view>
   </view>
 </template>
@@ -249,17 +249,6 @@ const topEvent = ref({
   title: '美国标普生物科技指数上周大涨'
 })
 
-const eventStocks = ref([
-  { name: '舒泰神', change: '+20.00%' },
-  { name: '广生堂', change: '+20.00%' },
-  { name: '药明康德', change: '+8.52%' },
-  { name: '恒瑞医药', change: '+5.33%' }
-])
-
-const trackEvent = ref({
-  title: '动力煤需求阶段性回落，旺季...'
-})
-
 const chainEvents = ref([
   { name: '创新药', tag: '利好', tagType: 'buy' },
   { name: '半导体', tag: '关注', tagType: 'wash' },
@@ -269,7 +258,13 @@ const chainEvents = ref([
 const aiReports = ref([
   { name: '晨报', tag: '已更新', tagType: 'buy' },
   { name: '风口龙头', tag: '已更新', tagType: 'buy' },
-  { name: '机构调研', tag: '待更新', tagType: 'wash' },
+  { name: '大盘溯源', tag: '待更新', tagType: 'wash' },
+])
+
+const traceReports = ref([
+  { name: '北向资金异动', tag: '流入', tagType: 'buy' },
+  { name: '板块轮动分析', tag: '关注', tagType: 'wash' },
+  { name: '主力资金动向', tag: '流出', tagType: 'sell' },
 ])
 
 onShow(() => {
@@ -285,16 +280,16 @@ function goBriefing() {
   uni.navigateTo({ url: '/pages-sub-app/briefing/index' })
 }
 
-function goEvent() {
-  uni.navigateTo({ url: '/modules/market/pages/event-catcher' })
-}
-
 function goSectors() {
   uni.navigateTo({ url: '/modules/market/pages/leaders' })
 }
 
 function goEventChain() {
   uni.navigateTo({ url: '/modules/chat/pages/event/list' })
+}
+
+function goTraceability() {
+  uni.navigateTo({ url: '/modules/analytics/pages/traceability' })
 }
 
 function goAgentReport() {

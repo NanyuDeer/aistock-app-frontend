@@ -1,6 +1,6 @@
 <template>
   <view class="page-reports">
-    <PageCard title="业绩">
+    <SubPageCard title="业绩报告">
       <!-- 标题右侧切换按钮 -->
       <template #header-right>
         <view class="toggle-group">
@@ -164,16 +164,13 @@
       <view v-if="hasMore" class="load-more" @tap="loadMore">
         <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
       </view>
-    </PageCard>
-
-    <AppBottomBar current-tab="forecast" />
+    </SubPageCard>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import PageCard from '@/shared/components/PageCard.vue'
-import AppBottomBar from '@/shared/components/AppBottomBar.vue'
+import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
@@ -382,7 +379,7 @@ function fetchData(append = false) {
 
 function switchTo(tab: string) {
   if (tab === 'forecast') {
-    uni.redirectTo({ url: '/modules/home/pages/index?tab=forecast' })
+    uni.redirectTo({ url: '/modules/analytics/pages/forecast' })
   }
 }
 

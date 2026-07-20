@@ -236,6 +236,12 @@ onUnmounted(() => {
   color: #1a1d24;
   line-height: 1.6;
 }
+/* 强制加粗标签为内联元素，避免 mp-html 将 <strong> 渲染为块级导致前后换行 */
+:deep(.bubble-html strong),
+:deep(.bubble-html b) {
+  display: inline;
+  font-weight: 700;
+}
 :deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
 :deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }
 :deep(.md-hr) { border: none; border-top: 1rpx solid #e5e7eb; margin: 12rpx 0; }

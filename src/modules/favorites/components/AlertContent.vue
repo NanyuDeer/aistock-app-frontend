@@ -1,426 +1,345 @@
 <template>
   <view class="alert-content">
-    <!-- 堆叠卡片容器 -->
-    <view class="stack-container" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
-      <!-- 后方堆叠卡片预览（最多显示2张） -->
-      <view
-        v-for="i in Math.min(2, alertStocks.length - currentStockIdx - 1)"
-        :key="'behind-' + i"
-        class="stack-card-behind"
-        :style="getBehindStyle(i)"
-      >
-        <view class="behind-card-inner" :style="{ opacity: 1 - i * 0.4 }"></view>
-      </view>
-
-      <!-- 当前卡片 -->
-      <view
-        class="stack-card-current"
-        :style="currentCardStyle"
-      >
-        <!-- 股票头部 -->
-        <view class="stock-header">
-          <view class="stock-info">
-            <text class="stock-name">{{ currentStock.name }}</text>
-            <text class="stock-code">{{ currentStock.symbol }}</text>
+    <view class="content-wrap">
+      <!-- 异动捕手模块（新建模块：自选股异动监控） -->
+      <view class="alert-module">
+        <view class="module-header" @tap="goAlertCatcher">
+          <text class="module-title">异动捕手</text>
+          <text class="module-more">实时监控 ›</text>
+        </view>
+        <view class="capture-list">
+          <view
+            v-for="(item, idx) in displayCaptureList"
+            :key="idx"
+            class="capture-item"
+          >
+            <view :class="['capture-badge', item.type]">
+              <text class="badge-text">{{ badgeLabel(item.type) }}</text>
+            </view>
+            <view class="capture-info">
+              <text class="capture-name">{{ item.name }}</text>
+              <text class="capture-detail">{{ item.detail }}</text>
+            </view>
+            <text class="capture-time">{{ item.time }}</text>
           </view>
-          <view class="stock-quote">
-            <text :class="['stock-price', currentStock.changePercent >= 0 ? 'up' : 'down']">
-              {{ currentStock.price.toFixed(2) }}
-            </text>
-            <text :class="['stock-change', currentStock.changePercent >= 0 ? 'up' : 'down']">
-              {{ currentStock.changePercent >= 0 ? '+' : '' }}{{ currentStock.changePercent.toFixed(2) }}%
-            </text>
+          <view v-if="!captureList.length" class="empty-hint">
+            <text class="empty-text">暂无异动数据</text>
           </view>
         </view>
+      </view>
 
-        <!-- 异动时间线 -->
-        <view class="timeline">
+      <!-- 个股情报模块（原StockMonitor，原异动捕手改名） -->
+      <view class="alert-module">
+        <view class="module-header" @tap="goStockIntel">
+          <text class="module-title">个股情报</text>
+          <!-- 全部/利好/利空 切换标签 -->
+          <view class="intel-tabs">
+            <text
+              v-for="tab in intelTabOptions"
+              :key="tab.value"
+              :class="['intel-tab', intelSubTab === tab.value ? 'intel-tab--active' : '']"
+              @tap.stop="intelSubTab = tab.value"
+            >{{ tab.label }}</text>
+          </view>
+        </view>
+        <view class="intel-list">
           <view
-            v-for="(item, itemIdx) in currentStock.alerts"
-            :key="itemIdx"
-            :class="['timeline-item', { 'has-date-badge': item.dateBadge }]"
+            v-for="(item, idx) in displayIntelList"
+            :key="idx"
+            class="intel-item"
           >
-            <!-- 日期标记 -->
-            <view v-if="item.dateBadge" class="date-badge">
-              <text class="date-badge-text">{{ item.dateBadge }}</text>
+            <view :class="['intel-source', item.sourceType]">
+              <text class="source-text">{{ sourceLabel(item.sourceType) }}</text>
             </view>
-
-            <view class="timeline-dot-wrap">
-              <view :class="['timeline-dot', item.type === 'main' ? 'main' : 'sub']"></view>
-              <view v-if="itemIdx < currentStock.alerts.length - 1" class="timeline-line"></view>
+            <view class="intel-info">
+              <text class="intel-title">{{ item.title }}</text>
+              <text class="intel-meta">{{ item.meta }}</text>
             </view>
-
-            <view class="timeline-content">
-              <view class="alert-header">
-                <text v-if="item.type === 'main'" class="alert-time">{{ item.time }}</text>
-                <view class="alert-tag">{{ item.tag }}</view>
-              </view>
-              <text class="alert-desc">{{ item.desc }}</text>
-              <text v-if="item.hasMore" class="alert-more">›</text>
-            </view>
+          </view>
+          <view v-if="!filteredIntelList.length" class="empty-hint">
+            <text class="empty-text">暂无情报数据</text>
           </view>
         </view>
       </view>
     </view>
-    <!-- 底部操作栏已移至 MainTabs.vue 中，固定在 scroll-view 外部 -->
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 
-interface AlertItem {
-  type: 'main' | 'sub'
-  time: string
-  tag: string
-  desc: string
-  dateBadge?: string
-  hasMore?: boolean
-}
+// 异动类型
+type CaptureType = 'up' | 'vol' | 'speed' | 'limit'
 
-interface AlertStock {
+interface CaptureItem {
+  type: CaptureType
   name: string
-  symbol: string
-  price: number
-  changePercent: number
-  alerts: AlertItem[]
+  detail: string
+  time: string
 }
 
-const currentStockIdx = ref(0)
-const currentStock = computed(() => alertStocks.value[currentStockIdx.value])
+// 情报来源类型
+type SourceType = 'announce' | 'research' | 'news'
 
-// 触摸状态
-const touchStartY = ref(0)
-const touchCurrentY = ref(0)
-const isLongPress = ref(false)
-const longPressTimer = ref<ReturnType<typeof setTimeout> | null>(null)
-const cardOffset = ref(0)
-const isDragging = ref(false)
-
-function onTouchStart(e: any) {
-  const touch = e.touches[0] || e.changedTouches[0]
-  touchStartY.value = touch.clientY
-  touchCurrentY.value = touch.clientY
-  cardOffset.value = 0
-  isLongPress.value = false
-  isDragging.value = false
-  // 长按检测
-  longPressTimer.value = setTimeout(() => {
-    isLongPress.value = true
-  }, 400)
+interface IntelItem {
+  sourceType: SourceType
+  title: string
+  meta: string
+  sentiment: 'positive' | 'negative' | 'neutral'
 }
 
-function onTouchMove(e: any) {
-  const touch = e.touches[0] || e.changedTouches[0]
-  touchCurrentY.value = touch.clientY
-  const deltaY = touchCurrentY.value - touchStartY.value
+const intelSubTab = ref<'all' | 'positive' | 'negative'>('all')
 
-  if (isLongPress.value) {
-    // 长按后拖动，设置卡片偏移
-    isDragging.value = true
-    cardOffset.value = deltaY * 0.5
-  }
-}
+const intelTabOptions = [
+  { label: '全部', value: 'all' as const },
+  { label: '利好', value: 'positive' as const },
+  { label: '利空', value: 'negative' as const },
+]
 
-function onTouchEnd() {
-  if (longPressTimer.value) {
-    clearTimeout(longPressTimer.value)
-    longPressTimer.value = null
-  }
-
-  if (isDragging.value && isLongPress.value) {
-    const threshold = 60
-    if (cardOffset.value > threshold && currentStockIdx.value > 0) {
-      // 向下滑 = 上一张
-      currentStockIdx.value--
-    } else if (cardOffset.value < -threshold && currentStockIdx.value < alertStocks.value.length - 1) {
-      // 向上滑 = 下一张
-      currentStockIdx.value++
-    }
-  }
-
-  // 重置
-  cardOffset.value = 0
-  isLongPress.value = false
-  isDragging.value = false
-}
-
-const currentCardStyle = computed(() => {
-  if (!isDragging.value) return {}
-  return {
-    transform: `translateY(${cardOffset.value}px)`,
-    transition: 'none',
-  }
-})
-
-function getBehindStyle(level: number) {
-  return {
-    transform: `translateY(${-level * 8}px) scale(${1 - level * 0.04})`,
-    zIndex: 10 - level,
-  }
-}
-
-const alertStocks = ref<AlertStock[]>([
-  {
-    name: '山西焦化',
-    symbol: '600740',
-    price: 6.78,
-    changePercent: 1.55,
-    alerts: [
-      { type: 'main', time: '14:22', tag: '主力资金流入', desc: '主力净流入2800万，较昨日同期增加340%，大单买入活跃度明显提升', dateBadge: '今', hasMore: true },
-      { type: 'sub', time: '13:45', tag: '成交放量', desc: '量比为2.07，属于明显放量，后续价格波动性可能加大' },
-      { type: 'sub', time: '11:20', tag: '技术突破', desc: '股价突破6.70元短期压力位，成交量配合放大' },
-      { type: 'main', time: '10:33', tag: '行业需求变化', desc: '焦炭相关行业需求有升有降，钢铁行业开工率回升带动需求预期改善', dateBadge: '昨', hasMore: true },
-      { type: 'sub', time: '10:30', tag: '成交放量', desc: '量比为2.07，属于明显放量，后续价格波动性可能加大，需要关注是否形成有效突破或跌破支撑位' },
-      { type: 'main', time: '15:00', tag: '融券比率上榜', desc: '融券比率全市场前74，做空力量压制，市场较为悲观，需关注后续动向', dateBadge: '26日' },
-      { type: 'sub', time: '10:00', tag: '龙虎榜异动', desc: '游资席位净买入1200万，机构席位净卖出800万' },
-    ]
-  },
-  {
-    name: '贵州茅台',
-    symbol: '600519',
-    price: 1698.00,
-    changePercent: -0.82,
-    alerts: [
-      { type: 'main', time: '14:00', tag: '主力资金流出', desc: '主力净流出3.8亿，北向资金净卖出2.1亿，机构持仓比例下降', dateBadge: '今', hasMore: true },
-      { type: 'sub', time: '11:30', tag: '技术破位', desc: '股价跌破20日均线支撑位1705元，短期技术形态走弱' },
-      { type: 'sub', time: '10:45', tag: '成交放量', desc: '早盘成交额超45亿，较昨日同期放大60%' },
-      { type: 'main', time: '09:30', tag: '基本面突变', desc: '主力资金净流出2.3亿，机构持仓比例下降0.15%', dateBadge: '今', hasMore: true },
-      { type: 'main', time: '14:30', tag: '主力资金流出', desc: '北向资金净卖出5.6亿，连续3日净流出', dateBadge: '昨' },
-      { type: 'sub', time: '09:00', tag: '公告解读', desc: '发布半年报业绩预告，净利润同比增长12.5%，略低于市场预期' },
-    ]
-  },
-  {
-    name: '宁德时代',
-    symbol: '300750',
-    price: 218.50,
-    changePercent: 2.35,
-    alerts: [
-      { type: 'main', time: '14:15', tag: '主力资金流入', desc: '主力净流入5.2亿，大单买入占比提升至38%，资金面明显转强', dateBadge: '今', hasMore: true },
-      { type: 'sub', time: '13:00', tag: '行业利好', desc: '新能源汽车销量超预期，产业链整体受益' },
-      { type: 'sub', time: '11:15', tag: '技术突破', desc: '股价突破215元压力位，MACD金叉信号确认' },
-      { type: 'main', time: '09:45', tag: '主力资金流入', desc: '主力净流入3.2亿，大单买入活跃度明显提升', dateBadge: '今', hasMore: true },
-      { type: 'main', time: '20:00', tag: '公告利好', desc: '发布与某海外车企战略合作公告，预计年订单额超50亿元', dateBadge: '昨' },
-      { type: 'sub', time: '10:30', tag: '龙虎榜异动', desc: '两机构席位合计净买入2.8亿' },
-    ]
-  },
-  {
-    name: '药明康德',
-    symbol: '603259',
-    price: 72.35,
-    changePercent: -1.88,
-    alerts: [
-      { type: 'main', time: '14:00', tag: '政策利空', desc: '美国拟扩大对华生物制造限制，CRO板块承压下跌', dateBadge: '今', hasMore: true },
-      { type: 'sub', time: '13:15', tag: '主力资金流出', desc: '主力净流出4.2亿，北向资金净卖出1.8亿' },
-      { type: 'sub', time: '10:45', tag: '技术破位', desc: '股价跌破75元关键支撑位，下方空间打开' },
-      { type: 'main', time: '09:30', tag: '大幅低开', desc: '开盘大跌3.5%，创近3个月新低', dateBadge: '今', hasMore: true },
-      { type: 'main', time: '16:00', tag: '机构下调评级', desc: '某头部券商下调评级至"中性"，目标价下调至78元', dateBadge: '昨' },
-      { type: 'sub', time: '11:30', tag: '成交放量', desc: '半日成交额超30亿，较昨日同期放大120%' },
-    ]
-  },
+// 异动捕手 mock 数据
+const captureList = ref<CaptureItem[]>([
+  { type: 'limit', name: '舒泰神', detail: '涨停封板 · 封单金额12.3亿', time: '10:15' },
+  { type: 'speed', name: '迈瑞医疗', detail: '急速下跌 · 3分钟跌幅4.2%', time: '13:45' },
+  { type: 'vol', name: '恒瑞医药', detail: '异常放量 · 成交额超昨日全天', time: '13:58' },
+  { type: 'up', name: '广生堂', detail: '快速拉升 · 5分钟涨幅8.5%', time: '14:32' },
 ])
 
-function goAnalyze() {
-  uni.navigateTo({ url: '/pages-sub-app/chat/index' })
+// 个股情报 mock 数据
+const intelList = ref<IntelItem[]>([
+  { sourceType: 'announce', title: '恒瑞医药：PD-1新药获FDA批准上市', meta: '利好 · 2小时前', sentiment: 'positive' },
+  { sourceType: 'research', title: '中金上调宁德时代目标价至320元', meta: '利好 · 4小时前', sentiment: 'positive' },
+  { sourceType: 'news', title: '比亚迪：上半年新能源汽车销量同比增长38%', meta: '利好 · 6小时前', sentiment: 'positive' },
+  { sourceType: 'announce', title: '药明康德：美国拟扩大对华生物制造限制', meta: '利空 · 1天前', sentiment: 'negative' },
+  { sourceType: 'research', title: '某头部券商下调贵州茅台评级至"中性"', meta: '利空 · 2天前', sentiment: 'negative' },
+])
+
+const filteredIntelList = computed(() => {
+  if (intelSubTab.value === 'all') return intelList.value
+  return intelList.value.filter(item => item.sentiment === intelSubTab.value)
+})
+
+/** 首页预览最多显示4条，其余进入详情页查看 */
+const MAX_PREVIEW = 4
+const displayCaptureList = computed(() => captureList.value.slice(0, MAX_PREVIEW))
+const displayIntelList = computed(() => filteredIntelList.value.slice(0, MAX_PREVIEW))
+
+function badgeLabel(type: CaptureType): string {
+  const map: Record<CaptureType, string> = { up: '涨', vol: '量', speed: '速', limit: '封' }
+  return map[type]
 }
 
-/** 暴露给父组件，用于在 scroll-view 外部渲染底部操作栏 */
+function sourceLabel(type: SourceType): string {
+  const map: Record<SourceType, string> = { announce: '公', research: '研', news: '新' }
+  return map[type]
+}
+
+/** 异动捕手（新模块：自选股异动监控） */
+function goAlertCatcher() {
+  uni.navigateTo({ url: '/modules/favorites/pages/alert-catcher' })
+}
+
+/** 个股情报（原异动捕手/event-catcher，已改名） */
+function goStockIntel() {
+  uni.navigateTo({ url: '/modules/market/pages/event-catcher' })
+}
+
+/** 暴露给父组件（保留接口兼容性） */
 defineExpose({
-  currentStockIdx: computed(() => currentStockIdx.value),
-  totalCount: computed(() => alertStocks.value.length),
-  goAnalyze,
+  currentStockIdx: computed(() => 0),
+  totalCount: computed(() => captureList.value.length),
 })
 </script>
 
 <style lang="scss" scoped>
+@use '@/shared/styles/variables.scss' as *;
+
 .alert-content {
-  background: #ffffff;
-  padding: 0 24rpx;
+  background: $bg-color-grey;
 }
 
-/* ===== 堆叠卡片容器 ===== */
-.stack-container {
-  position: relative;
-  padding: 0;
-  overflow: hidden;
+.content-wrap {
+  padding: $spacing-base;
 }
 
-/* 后方堆叠卡片预览 */
-.stack-card-behind {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 100%;
-  pointer-events: none;
+/* ===== 模块通用 ===== */
+.alert-module {
+  margin-bottom: $spacing-base;
 }
 
-.behind-card-inner {
-  height: 100%;
-  background: #ffffff;
-  border-radius: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-}
-
-/* 当前卡片：自然流式布局 */
-.stack-card-current {
-  position: relative;
-  background: transparent;
-  padding: 0;
-  z-index: 20;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-/* ===== 股票头部 ===== */
-.stock-header {
-  padding: 24rpx 0;
+.module-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
-  border-bottom: 1rpx solid #f0f2f5;
+  margin-bottom: $spacing-sm;
 }
 
-.stock-info {
+.module-title {
+  font-size: $font-size-lg;
+  font-weight: 600;
+  color: $text-color-title;
+}
+
+.module-more {
+  font-size: $font-size-lg;
+  color: $text-color-secondary;
+}
+
+/* ===== 异动捕手 ===== */
+.capture-list {
+  background: #ffffff;
+  border-radius: $radius-base;
+  padding: 0 $spacing-base;
+  box-shadow: $shadow-card;
+}
+
+.capture-item {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm 0;
+  border-bottom: 1rpx solid #f0f2f5;
+
+  &:last-child { border-bottom: none; }
+}
+
+.capture-badge {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &.up { background: rgba(232, 70, 58, 0.1); }
+  &.vol { background: rgba($brand-color, 0.1); }
+  &.speed { background: rgba(39, 210, 191, 0.1); }
+  &.limit { background: rgba(239, 170, 23, 0.1); }
+}
+
+.badge-text {
+  font-size: 24rpx;
+  font-weight: 700;
+
+  .up & { color: #E8463A; }
+  .vol & { color: $brand-color; }
+  .speed & { color: #27D2BF; }
+  .limit & { color: #EFAA17; }
+}
+
+.capture-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4rpx;
 }
 
-.stock-name {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #1a1d24;
-}
-
-.stock-code {
-  font-size: 20rpx;
-  color: #9ca3af;
-}
-
-.stock-quote {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2rpx;
-
-  .stock-price {
-    font-size: 32rpx;
-    font-weight: 600;
-  }
-  .stock-change {
-    font-size: 22rpx;
-    font-weight: 500;
-  }
-  .up { color: #f43f5e; }
-  .down { color: #22c55e; }
-}
-
-/* ===== 时间线 ===== */
-.timeline {
-  padding: 8rpx 0 16rpx;
-}
-
-.timeline-item {
-  display: flex;
-  gap: 16rpx;
-  position: relative;
-
-  &.has-date-badge {
-    padding-top: 8rpx;
-  }
-}
-
-.date-badge {
-  position: absolute;
-  left: 0;
-  top: -4rpx;
-  z-index: 2;
-}
-
-.date-badge-text {
-  font-size: 20rpx;
-  color: #6b7280;
-  background: #f3f4f6;
-  padding: 2rpx 10rpx;
-  border-radius: 6rpx;
-}
-
-.timeline-dot-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 16rpx;
-  padding-top: 8rpx;
-  flex-shrink: 0;
-}
-
-.timeline-dot {
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
-  background: #4d7cfe;
-  flex-shrink: 0;
-  z-index: 1;
-
-  &.main {
-    box-shadow: 0 0 0 4rpx rgba(77, 124, 254, 0.2);
-  }
-  &.sub {
-    width: 8rpx;
-    height: 8rpx;
-    background: #d1d5db;
-    margin-top: 8rpx;
-  }
-}
-
-.timeline-line {
-  width: 2rpx;
-  flex: 1;
-  background: #e5e7eb;
-  margin-top: 4rpx;
-  min-height: 32rpx;
-}
-
-.timeline-content {
-  flex: 1;
-  padding-bottom: 24rpx;
-  padding-top: 4rpx;
-}
-
-.alert-header {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  margin-bottom: 8rpx;
-}
-
-.alert-time {
-  font-size: 22rpx;
-  color: #6b7280;
-  flex-shrink: 0;
-}
-
-.alert-tag {
-  font-size: 22rpx;
-  color: #4d7cfe;
-  background: rgba(77, 124, 254, 0.1);
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
+.capture-name {
+  font-size: $font-size-base;
   font-weight: 500;
+  color: $text-color-title;
 }
 
-.alert-desc {
+.capture-detail {
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+}
+
+.capture-time {
+  font-size: $font-size-sm;
+  color: $text-color-tertiary;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 个股情报 ===== */
+.intel-tabs {
+  display: flex;
+  gap: 8rpx;
+}
+
+.intel-tab {
+  padding: 4rpx 16rpx;
+  border-radius: $radius-pill;
+  font-size: 22rpx;
+  color: $text-color-secondary;
+  background: $bg-color-grey;
+}
+
+.intel-tab--active {
+  background: $brand-color;
+  color: #ffffff;
+}
+
+.intel-list {
+  background: #ffffff;
+  border-radius: $radius-base;
+  padding: 0 $spacing-base;
+  box-shadow: $shadow-card;
+}
+
+.intel-item {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-sm;
+  padding: $spacing-xs 0;
+  border-bottom: 1rpx solid #f0f2f5;
+
+  &:last-child { border-bottom: none; }
+}
+
+.intel-source {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &.announce { background: rgba($brand-color, 0.1); }
+  &.research { background: rgba(39, 210, 191, 0.1); }
+  &.news { background: rgba(239, 170, 23, 0.1); }
+}
+
+.source-text {
   font-size: 24rpx;
-  color: #374151;
-  line-height: 1.6;
+  font-weight: 700;
+
+  .announce & { color: $brand-color; }
+  .research & { color: #27D2BF; }
+  .news & { color: #EFAA17; }
 }
 
-.alert-more {
-  font-size: 24rpx;
-  color: #9ca3af;
-  margin-left: 4rpx;
+.intel-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
 }
 
-/* ===== 底部操作栏（已移至 MainTabs.vue） ===== */
+.intel-title {
+  font-size: $font-size-base;
+  color: $text-color-title;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.intel-meta {
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+}
+
+/* ===== 空状态 ===== */
+.empty-hint {
+  padding: $spacing-lg 0;
+  text-align: center;
+}
+
+.empty-text {
+  font-size: $font-size-sm;
+  color: $text-color-tertiary;
+}
 </style>

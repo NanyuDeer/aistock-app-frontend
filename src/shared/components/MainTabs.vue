@@ -12,17 +12,6 @@
       <!-- 卡片标题（随Tab切换） -->
       <view class="card-header">
         <text class="card-title">{{ tabTitles[activeTab] }}</text>
-        <!-- 业绩 Tab 的预测/报告切换按钮 -->
-        <view v-if="activeTab === 'forecast'" class="toggle-group">
-          <text
-            :class="['toggle-btn', forecastSubTab === 'forecast' ? 'active' : '']"
-            @tap="forecastSubTab = 'forecast'"
-          >预测</text>
-          <text
-            :class="['toggle-btn', forecastSubTab === 'reports' ? 'active' : '']"
-            @tap="forecastSubTab = 'reports'"
-          >报告</text>
-        </view>
       </view>
 
       <!-- 可滚动内容区域 -->
@@ -34,26 +23,9 @@
       >
         <!-- Tab 内容（v-show 保持组件状态，切换不销毁） -->
         <MorningContent v-show="activeTab === 'morning'" />
-        <InsightContent v-show="activeTab === 'insight'" />
-        <ForecastContent v-show="activeTab === 'forecast' && forecastSubTab === 'forecast'" />
-        <ReportsContent v-show="activeTab === 'forecast' && forecastSubTab === 'reports'" />
+        <StockContent v-show="activeTab === 'stock'" />
         <AlertContent v-show="activeTab === 'alert'" ref="alertContentRef" />
       </scroll-view>
-
-      <!-- 特别提醒 Tab 的底部操作栏（固定在 scroll-view 外部） -->
-      <view v-if="activeTab === 'alert'" class="card-footer-bar">
-        <view class="footer-progress">
-          <text class="progress-text">{{ alertIdx + 1 }}/{{ alertTotal }}</text>
-        </view>
-        <view class="footer-actions">
-          <view class="action-tag buy">
-            <text class="action-tag-text">买</text>
-          </view>
-          <view class="action-btn" @tap="onAlertAnalyze">
-            <text class="action-btn-text">帮我分析</text>
-          </view>
-        </view>
-      </view>
     </view>
 
     <!-- Tab 栏（共享，不闪烁） -->
@@ -64,46 +36,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed } from 'vue'
 import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { px2rpx, getBottomFixedHeightPx } from '@/shared/utils/layout'
 import MorningContent from '@/modules/home/components/MorningContent.vue'
-import InsightContent from '@/modules/analytics/components/InsightContent.vue'
-import ForecastContent from '@/modules/analytics/components/ForecastContent.vue'
-import ReportsContent from '@/modules/analytics/components/ReportsContent.vue'
+import StockContent from '@/modules/home/components/StockContent.vue'
 import AlertContent from '@/modules/favorites/components/AlertContent.vue'
 
 const tabTitles: Record<string, string> = {
   morning: '早点听',
-  insight: '洞察',
-  forecast: '业绩',
-  alert: '特别提醒',
+  stock: '选股',
+  alert: '提醒',
 }
 
-const validTabs = ['morning', 'insight', 'forecast', 'alert']
+const validTabs = ['morning', 'stock', 'alert']
 const activeTab = ref('morning')
 
 /** 特别提醒组件 ref，用于读取当前卡片索引/总数 */
 const alertContentRef = ref<InstanceType<typeof AlertContent> | null>(null)
-const alertIdx = ref(0)
-const alertTotal = ref(0)
-
-/** 监听 alert tab 切换，从 AlertContent 读取状态 */
-function syncAlertState() {
-  const inst = alertContentRef.value
-  if (!inst) return
-  alertIdx.value = inst.currentStockIdx ?? 0
-  alertTotal.value = inst.totalCount ?? 0
-}
-
-function onAlertAnalyze() {
-  alertContentRef.value?.goAnalyze?.()
-}
-
-/** 业绩 Tab 内部的预测/报告子切换 */
-const forecastSubTab = ref<'forecast' | 'reports'>('forecast')
 
 /** 从外部设置激活的 Tab（如从 URL 参数或页面 props） */
 function setActiveTab(tab: string) {
@@ -141,9 +93,6 @@ const dynamicMarginBottom = computed(() => {
 
 function onTabChange(tab: string) {
   activeTab.value = tab
-  if (tab === 'alert') {
-    nextTick(() => syncAlertState())
-  }
 }
 
 function goProfile() {
@@ -219,33 +168,7 @@ function goProfile() {
   color: #1a1d24;
 }
 
-/* 业绩 Tab 预测/报告切换按钮（绝对定位，不影响 header 高度，与无 toggle 的 tab 一致） */
-.toggle-group {
-  position: absolute;
-  right: 24rpx;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  background: #f0f2f5;
-  border-radius: 12rpx;
-  padding: 4rpx;
-}
-
-.toggle-btn {
-  font-size: 24rpx;
-  white-space: nowrap;
-  color: #6b7280;
-  padding: 8rpx 24rpx;
-  border-radius: 10rpx;
-  font-weight: 500;
-
-  &.active {
-    color: #ffffff;
-    background: #4d7cfe;
-  }
-}
-
-/* 可滚动内容区域：全平台 flex:1 撑满，footer 用 flex-shrink:0 固定底部 */
+/* 可滚动内容区域：全平台 flex:1 撑满 */
 .card-content {
   flex: 1;
   min-height: 0;
@@ -253,59 +176,5 @@ function goProfile() {
   background: #ffffff;
   touch-action: auto;
   overscroll-behavior: contain;
-}
-
-/* 特别提醒底部操作栏（固定在 scroll-view 外部） */
-.card-footer-bar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16rpx 24rpx;
-  background: #ffffff;
-  border-top: 1rpx solid #f0f2f5;
-}
-
-.footer-progress {
-  flex-shrink: 0;
-}
-
-.progress-text {
-  font-size: 26rpx;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.footer-actions {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.action-tag {
-  padding: 8rpx 20rpx;
-  border-radius: 8rpx;
-
-  &.buy {
-    background: rgba(244, 63, 94, 0.12);
-  }
-
-  .action-tag-text {
-    font-size: 24rpx;
-    font-weight: 600;
-    color: #f43f5e;
-  }
-}
-
-.action-btn {
-  padding: 12rpx 32rpx;
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
-  border-radius: 32rpx;
-}
-
-.action-btn-text {
-  font-size: 26rpx;
-  color: #ffffff;
-  font-weight: 500;
 }
 </style>

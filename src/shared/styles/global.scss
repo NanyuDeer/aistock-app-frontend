@@ -82,36 +82,45 @@ page {
 
 /* #ifdef H5 */
 /* PC 浏览器中模拟手机预览效果（H5 端用于预览 App，真正的 PC 网页在另一个仓库） */
-/* 390px = iPhone 12/13/14/15 标准逻辑像素宽度 */
-@media screen and (min-width: 768px) {
-  html, body {
-    background-color: #e9e9e9;
-    margin: 0;
-    padding: 0;
-  }
-  #app {
-    max-width: 390px;
-    margin: 0 auto;
-    min-height: 100vh;
-    background-color: #f5f7fa;
-    box-shadow: 0 0 24px rgba(0, 0, 0, 0.12);
-    position: relative;
-    overflow-x: hidden;
-  }
-  /* 底部 tabBar 跟随容器宽度居中 */
-  uni-tabbar {
-    max-width: 390px;
-    left: 50% !important;
-    right: auto !important;
-    transform: translateX(-50%) !important;
-  }
-  /* 顶部导航栏跟随容器宽度居中 */
-  uni-page-head {
-    max-width: 390px;
-    left: 50% !important;
-    right: auto !important;
-    transform: translateX(-50%) !important;
-  }
+/* 固定手机长宽比 9:16，内部尺寸 390×693px (390 × 16 ÷ 9) */
+/* 通过 CSS scale 等比缩放适应不同浏览器视口，内部 rpx 换算基准始终保持 390px 不变 */
+html, body {
+  background-color: #e9e9e9;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* 关键：覆盖 uni-app 动态设置的 html font-size，让 rpx 基于固定宽度 390px 计算 */
+/* uni-app 默认公式：html font-size = windowWidth / 750 * 32，导致 rpx 随浏览器窗口变化 */
+/* 我们强制设为 390 / 750 * 32 = 16.64px，使 rpx 基于 #app 固定宽度 */
+html {
+  font-size: calc(390px / 750 * 32) !important;
+}
+#app {
+  width: 390px;
+  height: 693px; /* 390 × 16 ÷ 9，保持 9:16 长宽比 */
+  /* transform: translateZ(0) 创建包含块，让 position:fixed 子元素相对于 #app 定位 */
+  /* scale 由 JS 动态设置（见 h5-scale.ts），CSS min() 无法混合 number 和 length 类型 */
+  transform: translateZ(0);
+  transform-origin: center center;
+  margin: 0 auto;
+  background-color: #f5f7fa;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+/* uni-app H5 端的 page 容器也需要限制在 #app 范围内 */
+uni-page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 /* #endif */
 

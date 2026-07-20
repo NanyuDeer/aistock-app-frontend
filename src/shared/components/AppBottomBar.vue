@@ -31,8 +31,7 @@ const emit = defineEmits<{
 
 const tabs = [
   { id: 'morning', name: '早点听', icon: 'broadcast-line', path: '/modules/home/pages/index' },
-  { id: 'insight', name: '洞察', icon: 'search-eye-line', path: '/modules/analytics/pages/index' },
-  { id: 'forecast', name: '业绩', icon: 'bar-chart-line', path: '/modules/home/pages/index?tab=forecast' },
+  { id: 'stock', name: '选股', icon: 'bar-chart-line', path: '/modules/home/pages/index?tab=stock' },
   { id: 'alert', name: '提醒', icon: 'bell-line', path: '/modules/favorites/pages/index' },
 ]
 
@@ -49,16 +48,18 @@ const activeTabId = computed(() => {
     const currentPage = pages[pages.length - 1]
     const route = currentPage?.route || ''
 
-    // 首页 → 默认激活 morning tab，但如果 URL 带 tab=forecast 则激活 forecast tab
+    // 首页 → 默认激活 morning tab，如果 URL 带 tab=stock 则激活 stock tab
     if (route.includes('home/pages/index')) {
       const page = currentPage as unknown as { $page?: { options?: Record<string, string> }; options?: Record<string, string> }
       const options = page?.$page?.options || page?.options || {}
-      return options.tab === 'forecast' ? 'forecast' : 'morning'
+      return options.tab === 'stock' ? 'stock' : 'morning'
     }
-    // 洞察主页或机构调研/趋势评分 → 激活 insight tab
-    if (route.includes('analytics/pages/index')) return 'insight'
-    if (route.includes('market/pages/hot-burst')) return 'insight'
-    if (route.includes('analytics/pages/trend-score')) return 'insight'
+    // 选股相关页面 → 激活 stock tab
+    if (route.includes('analytics/pages/index')) return 'stock'
+    if (route.includes('market/pages/hot-burst')) return 'stock'
+    if (route.includes('analytics/pages/trend-score')) return 'stock'
+    if (route.includes('analytics/pages/forecast')) return 'stock'
+    if (route.includes('analytics/pages/reports')) return 'stock'
     // 提醒页 → 激活 alert tab
     if (route.includes('favorites/pages/index')) return 'alert'
 
