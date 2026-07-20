@@ -11,6 +11,17 @@
     />
 
     <view class="report-content">
+      <!-- 来源信息：真实来源 URL 或"来源暂不可验证" -->
+      <view class="source-info-bar">
+        <text class="source-label">来源：</text>
+        <text
+          v-if="detail.event.sourceInfo?.url"
+          class="source-link"
+          @tap="openSourceUrl(detail.event.sourceInfo!.url!)"
+        >{{ detail.event.sourceInfo.name }}</text>
+        <text v-else-if="detail.event.source" class="source-text">{{ detail.event.source }}</text>
+        <text v-else class="source-unverified">来源暂不可验证</text>
+      </view>
       <!-- Step 1: AI投资机会 -->
       <AiAnalysisSection
         v-for="(step, index) in mainSteps"
@@ -96,6 +107,20 @@ onMounted(() => {
   startAnalysis()
 })
 
+/** 打开来源 URL（H5 新窗口，App 用系统浏览器） */
+function openSourceUrl(url: string): void {
+  // #ifdef H5
+  window.open(url, '_blank')
+  // #endif
+  // #ifndef H5
+  // 非 H5 平台复制 URL 到剪贴板并提示
+  uni.setClipboardData({
+    data: url,
+    success: () => uni.showToast({ title: '来源链接已复制', icon: 'none' }),
+  })
+  // #endif
+}
+
 /** Step 1: AI投资机会 */
 const mainSteps = computed(() => visibleSteps.value.filter(s => s.id === 1))
 
@@ -129,6 +154,44 @@ watch(currentStep, async (stepId) => {
   --ev-text-secondary: #374151;
   --ev-text-muted: #4b5563;
   --ev-text-tertiary: #6b7280;
+}
+
+/* 来源信息栏 */
+.source-info-bar {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 24rpx;
+  margin-bottom: 8rpx;
+  background: var(--ev-bg-elevated, #f9fafb);
+  border-radius: 10rpx;
+}
+.source-label {
+  font-size: 22rpx;
+  color: var(--ev-text-muted);
+  flex-shrink: 0;
+}
+.source-link {
+  font-size: 22rpx;
+  color: var(--ev-accent);
+  text-decoration: underline;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.source-text {
+  font-size: 22rpx;
+  color: var(--ev-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.source-unverified {
+  font-size: 22rpx;
+  font-style: italic;
+  color: var(--ev-text-tertiary);
+  opacity: 0.7;
 }
 
 .report-footer { padding: 32rpx 48rpx 0; display: flex; justify-content: center; }
