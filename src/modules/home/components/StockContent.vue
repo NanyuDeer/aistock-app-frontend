@@ -35,12 +35,18 @@
           </view>
           <text class="insight-card-more">›</text>
         </view>
-        <view class="insight-preview">
-          <view v-for="(item, idx) in hotBurstPreview" :key="idx" class="preview-item">
+        <view v-if="hotBurstLoading" class="insight-preview insight-preview--state">
+          <text class="preview-state">热门股数据加载中…</text>
+        </view>
+        <view v-else-if="hotBurstPreview.length" class="insight-preview">
+          <view v-for="(item, idx) in hotBurstPreview" :key="item.symbol" class="preview-item">
             <text class="preview-rank preview-rank--burst">{{ idx + 1 }}</text>
             <text class="preview-name">{{ item.name }}</text>
-            <text class="preview-tag preview-tag--burst">{{ item.count }}家机构调研</text>
+            <text class="preview-tag preview-tag--burst">{{ item.level }}</text>
           </view>
+        </view>
+        <view v-else class="insight-preview insight-preview--state">
+          <text class="preview-state">{{ hotBurstError || '暂无机构调研热门股数据' }}</text>
         </view>
       </view>
 
@@ -69,8 +75,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { stockApi } from '@/shared/api/modules/stock'
 
 const trendScorePreview = ref([
   { name: '贵州茅台', score: 92, trend: 'up' },
@@ -78,11 +85,60 @@ const trendScorePreview = ref([
   { name: '中国平安', score: 85, trend: 'up' },
 ])
 
-const hotBurstPreview = ref([
-  { name: '恒瑞医药', count: 52 },
-  { name: '迈瑞医疗', count: 38 },
-  { name: '海光信息', count: 25 },
-])
+interface HotBurstSignal {
+  symbol: string
+  stockName?: string
+  resonanceLevel?: 'critical' | 'high' | 'medium' | 'low'
+  detectedAt?: string
+}
+
+interface HotBurstResponse {
+  outbreaks?: HotBurstSignal[]
+}
+
+const hotBurstPreview = ref<{ symbol: string; name: string; level: string }[]>([])
+const hotBurstLoading = ref(true)
+const hotBurstError = ref('')
+const HOT_BURST_CACHE_KEY = 'hot_burst_preview_cache'
+
+function levelLabel(level: HotBurstSignal['resonanceLevel']): string {
+  const labels: Record<NonNullable<HotBurstSignal['resonanceLevel']>, string> = {
+    critical: '极高',
+    high: '高',
+    medium: '中',
+    low: '低',
+  }
+  return labels[level || 'low']
+}
+
+async function loadHotBurstPreview() {
+  hotBurstLoading.value = true
+  hotBurstError.value = ''
+  try {
+    const res: unknown = await stockApi.getHotBursts({ hours: 72, min_resonance: 3 })
+    const payload = res as { data?: HotBurstResponse }
+    const data = payload.data ?? (res as HotBurstResponse)
+    const outbreaks = data.outbreaks ?? []
+    uni.setStorageSync(HOT_BURST_CACHE_KEY, {
+      cachedAt: Date.now(),
+      outbreaks,
+    })
+    hotBurstPreview.value = [...outbreaks].sort((a, b) => {
+      const aTime = a.detectedAt ? Date.parse(a.detectedAt) : 0
+      const bTime = b.detectedAt ? Date.parse(b.detectedAt) : 0
+      return bTime - aTime
+    }).map((item) => ({
+      symbol: item.symbol,
+      name: item.stockName || item.symbol,
+      level: levelLabel(item.resonanceLevel),
+    }))
+  } catch {
+    hotBurstPreview.value = []
+    hotBurstError.value = '热门股数据加载失败'
+  } finally {
+    hotBurstLoading.value = false
+  }
+}
 
 const forecastPreview = ref([
   { name: '贵州茅台', label: '净利润预测 386亿', growth: '+15.3%' },
@@ -103,6 +159,10 @@ function goForecast() {
   // 这里直接跳转到独立页面也可以
   uni.navigateTo({ url: '/modules/analytics/pages/forecast' })
 }
+
+onMounted(() => {
+  loadHotBurstPreview()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -232,6 +292,17 @@ function goForecast() {
   padding: 14rpx 16rpx;
   margin-bottom: 14rpx;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+
+.insight-preview--state {
+  align-items: center;
+  justify-content: center;
+  min-height: 104rpx;
+}
+
+.preview-state {
+  font-size: 22rpx;
+  color: $text-color-secondary;
 }
 
 .preview-item {
