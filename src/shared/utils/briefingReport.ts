@@ -1,73 +1,78 @@
-export type BriefingType = 'morning' | 'review'
+import type { BriefEvidence, BriefItem, BriefType, BriefV1 } from '@/shared/api/modules/agent'
 
-export interface BriefingReport {
+export type { BriefEvidence, BriefItem, BriefType, BriefV1 }
+export type BriefingType = BriefType
+
+export interface BriefingReport extends BriefV1 {
   summary: string
   details: string
   stocks: string[]
   sectors: string[]
   risks: string[]
   podcast_brief: string
-  schema_version: string
 }
 
-function stringList(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
 }
 
-export function parseBriefingReport(content: unknown, type: BriefingType): BriefingReport | null {
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isNonEmptyString)
+}
+
+function isEvidence(value: unknown): value is BriefEvidence {
+  if (!value || typeof value !== 'object') return false
+  const evidence = value as Record<string, unknown>
+  return ['report_type', 'id', 'data_source', 'created_at'].every(
+    (key) => isNonEmptyString(evidence[key]),
+  )
+}
+
+function isItem(value: unknown): value is BriefItem {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  return isNonEmptyString(item.title)
+    && isNonEmptyString(item.conclusion)
+    && isNonEmptyString(item.as_of)
+    && isNonEmptyString(item.confidence)
+    && (isNonEmptyString(item.uncertainty)
+      || (isStringList(item.uncertainty) && item.uncertainty.length > 0))
+    && Array.isArray(item.evidence)
+    && item.evidence.length > 0
+    && item.evidence.every(isEvidence)
+}
+
+/** 仅将结构化 Brief v1 视作当前早晚报事实层。 */
+export function parseBriefingReport(content: unknown, expectedType: BriefingType): BriefingReport | null {
   if (!content || typeof content !== 'object') return null
-  const record = content as Record<string, unknown>
-  const display = record.display_report
-  if (display && typeof display === 'object') {
-    const value = display as Record<string, unknown>
-    return {
-      summary: typeof value.summary === 'string' ? value.summary : '',
-      details: typeof value.details === 'string' ? value.details : '',
-      stocks: stringList(value.stocks), sectors: stringList(value.sectors),
-      risks: stringList(value.risks),
-      podcast_brief: typeof record.podcast_brief === 'string' ? record.podcast_brief : '',
-      schema_version: typeof record.schema_version === 'string' ? record.schema_version : '2.0',
-    }
+  const brief = content as Record<string, unknown>
+  if (brief.schema_version !== 'brief.v1'
+    || (brief.brief_type !== 'morning' && brief.brief_type !== 'evening')
+    || brief.brief_type !== expectedType
+    || !isNonEmptyString(brief.as_of)
+    || typeof brief.degraded !== 'boolean'
+    || !isStringList(brief.missing_sources)
+    || !Array.isArray(brief.items)
+    || brief.items.length > 5
+    || (brief.degraded === false && brief.items.length < 3)
+    || (brief.degraded === true && brief.missing_sources.length === 0)
+    || !brief.items.every(isItem)) {
+    return null
   }
-  const text = typeof record.text === 'string' ? record.text : ''
-  if (!text) return null
+
+  const items = brief.items
   return {
-    summary: type === 'review' ? extractReviewSummary(text) : '',
-    details: text, stocks: [], sectors: type === 'review' ? extractReviewSectors(text) : [],
-    risks: [], podcast_brief: '', schema_version: '1.0',
+    schema_version: 'brief.v1',
+    brief_type: brief.brief_type,
+    as_of: brief.as_of,
+    items,
+    degraded: brief.degraded,
+    missing_sources: brief.missing_sources,
+    summary: items[0]?.conclusion ?? '',
+    details: items.map((item) => `## ${item.title}\n${item.conclusion}`).join('\n\n'),
+    stocks: [],
+    sectors: [],
+    risks: [],
+    podcast_brief: '',
   }
-}
-
-const STEP_FOUR_HEADER_RE = /^##\s*步骤\s*4[^\n]*\n?/m
-const STEP_FIVE_HEADER_RE = /^##\s*步骤\s*5[^\n]*$/m
-const APPENDIX_B_HEADER_RE = /^#{2,3}\s*附录\s*B[^\n]*\n?/m
-const NEXT_APPENDIX_HEADER_RE = /^#{2,3}\s*附录\s*[A-Z][^\n]*$/m
-
-function firstEffectiveLine(markdown: string): string {
-  for (const line of markdown.split('\n')) {
-    const value = line.trim().replace(/^[-#>\s]+/, '').replace(/\*\*/g, '')
-    if (value && !value.startsWith('|')) return value
-  }
-  return ''
-}
-
-function extractReviewSummary(markdown: string): string {
-  const header = STEP_FOUR_HEADER_RE.exec(markdown)
-  if (!header || header.index === undefined) return ''
-  const body = markdown.slice(header.index + header[0].length)
-    .split(STEP_FIVE_HEADER_RE, 1)[0]
-  return firstEffectiveLine(body)
-}
-
-function extractReviewSectors(markdown: string): string[] {
-  const header = APPENDIX_B_HEADER_RE.exec(markdown)
-  if (!header || header.index === undefined) return []
-  const body = markdown.slice(header.index + header[0].length)
-    .split(NEXT_APPENDIX_HEADER_RE, 1)[0]
-  const sectors = body.split('\n').flatMap((line) => {
-    if (!line.trim().startsWith('|')) return []
-    const value = line.trim().replace(/^\||\|$/g, '').split('|')[0].trim()
-    return value && value !== '板块名称' && !/^[-:\s]+$/.test(value) ? [value] : []
-  })
-  return [...new Set(sectors)]
 }

@@ -65,7 +65,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { agentApi } from '@/shared/api/modules/agent'
+import { agentApi, type BriefType, type BroadcastV1 } from '@/shared/api/modules/agent'
 import { API_BASE_URL } from '@/shared/utils/constants'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
@@ -75,24 +75,19 @@ interface DialogueLine {
   content: string
 }
 
-interface BroadcastReport {
-  content: {
-    text?: string
-    audio_path?: string | null
-  }
-}
-
 const currentDate = ref('')
+const broadcastType = ref<BriefType>('morning')
 const loading = ref(true)
-const report = ref<BroadcastReport | null>(null)
+const report = ref<BroadcastV1 | null>(null)
 const isPlaying = ref(false)
 const audioContext = ref<UniApp.InnerAudioContext | null>(null)
 
 const subtitleText = computed(() => {
+  const typeLabel = broadcastType.value === 'morning' ? '晨报' : '晚报'
   if (currentDate.value) {
-    return `${currentDate.value} · AI 生成内容，仅供参考`
+    return `${currentDate.value} · ${typeLabel} · AI 生成内容，仅供参考`
   }
-  return 'AI 生成内容，仅供参考'
+  return `${typeLabel} · AI 生成内容，仅供参考`
 })
 
 const reportText = computed(() => {
@@ -195,9 +190,9 @@ async function loadReport() {
     isPlaying.value = false
   }
   try {
-    const res: unknown = await agentApi.getReport('broadcast', currentDate.value)
+    const res = await agentApi.getBroadcast(broadcastType.value, currentDate.value)
     // 响应拦截器已解包: 返回的是 {content: {text, audio_path}, ...} 或 null
-    report.value = (res as BroadcastReport) || null
+    report.value = res || null
   } catch {
     report.value = null
   } finally {
@@ -205,8 +200,10 @@ async function loadReport() {
   }
 }
 
-onLoad(() => {
-  currentDate.value = new Date().toISOString().split('T')[0]
+onLoad((options) => {
+  const opts = options as Record<string, string> || {}
+  broadcastType.value = opts.type === 'evening' ? 'evening' : 'morning'
+  currentDate.value = opts.date || new Date().toISOString().split('T')[0]
   loadReport()
 })
 

@@ -33,7 +33,7 @@ function autoDetectType(): BriefingType {
   if (hour < 15 || (hour === 15 && minute < 30)) {
     return 'morning'
   }
-  return 'review'
+  return 'evening'
 }
 
 /** 获取今天日期字符串 YYYY-MM-DD（本地时区） */
@@ -60,7 +60,7 @@ export function useBriefingCard(
     loading.value = true
     status.value = 'loading'
     try {
-      const res: unknown = await agentApi.getReport(type.value, date.value)
+      const res: unknown = await agentApi.getBrief(type.value, date.value)
       // 兼容两种响应格式：{ data: { content } } 或 { content }
       const data = (res as Record<string, unknown>)?.data ?? res
       if (!data) {
@@ -69,9 +69,7 @@ export function useBriefingCard(
         report.value = null
         return
       }
-      const record = data as Record<string, unknown>
-      const content = record.content
-      const parsed = parseBriefingReport(content, type.value)
+      const parsed = parseBriefingReport(data, type.value)
       if (!parsed) {
         status.value = 'empty'
         summary.value = ''

@@ -62,6 +62,44 @@ test('市场复盘问答请求使用独立的较长超时', async () => {
   }
 })
 
+test('Brief v1 与双人播报按早晚类型和日期请求 Node 公开接口', async () => {
+  const server = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    resolve: { alias: { '@': path.resolve(process.cwd(), 'src') } },
+    server: { middlewareMode: true },
+    appType: 'custom',
+  })
+
+  try {
+    const requestModule = await server.ssrLoadModule('/src/shared/api/request.ts')
+    const agentModule = await server.ssrLoadModule('/src/shared/api/modules/agent.ts')
+    const request = requestModule.default
+    const originalGet = request.get
+    const calls: string[] = []
+    request.get = ((url: string) => {
+      calls.push(url)
+      return Promise.resolve({})
+    }) as typeof request.get
+
+    try {
+      await agentModule.agentApi.getBrief('morning', '2026-07-24')
+      await agentModule.agentApi.getBrief('evening', '2026-07-24')
+      await agentModule.agentApi.getBroadcast('evening', '2026-07-24')
+    } finally {
+      request.get = originalGet
+    }
+
+    assert.deepEqual(calls, [
+      '/agent/brief/morning/2026-07-24',
+      '/agent/brief/evening/2026-07-24',
+      '/agent/broadcast/evening/2026-07-24',
+    ])
+  } finally {
+    await server.close()
+  }
+})
+
 test('request.post 将独立超时传给 luch-request', async () => {
   const server = await createServer({
     root: process.cwd(),

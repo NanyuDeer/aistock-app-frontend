@@ -16,9 +16,16 @@
           <text class="summary-text">{{ report.summary }}</text>
         </view>
 
+        <view v-if="report" class="brief-status" :class="{ degraded: report.degraded }">
+          <text>{{ report.degraded ? '证据不足' : '完整 Brief' }}</text>
+          <text v-if="report.degraded && report.missing_sources.length">
+            缺失来源：{{ report.missing_sources.join('、') }}
+          </text>
+        </view>
+
         <!-- 播报入口 -->
         <view
-          v-if="report?.podcast_brief"
+          v-if="report"
           class="podcast-btn"
           @tap="goBriefing"
         >
@@ -39,6 +46,26 @@
           </view>
           <view class="markdown-content">
             <mp-html :content="card.html" />
+          </view>
+        </view>
+
+        <view
+          v-for="item in report?.items"
+          :key="`${item.title}-${item.as_of}`"
+          class="detail-card"
+        >
+          <view class="card-header">
+            <text class="card-type-tag">{{ item.title }}</text>
+          </view>
+          <text class="summary-text">{{ item.conclusion }}</text>
+          <text class="item-as-of">截至 {{ item.as_of }} · 置信度 {{ item.confidence }}</text>
+          <text v-if="item.uncertainty" class="item-uncertainty">
+            不确定性：{{ Array.isArray(item.uncertainty) ? item.uncertainty.join('、') : item.uncertainty }}
+          </text>
+          <view v-if="item.evidence.length" class="evidence-list">
+            <text v-for="evidence in item.evidence" :key="evidence.id" class="evidence-item">
+              {{ evidence.report_type }} · {{ evidence.id }} · {{ evidence.data_source }}
+            </text>
           </view>
         </view>
 
@@ -117,7 +144,7 @@ import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 import { useBriefingCard, type BriefingType } from '@/shared/utils/useBriefingCard'
 import { splitReportToCards, type ReportCard } from '@/shared/utils/reportCard'
 
-const pageType = ref<BriefingType>('review')
+const pageType = ref<BriefingType>('evening')
 const currentDate = ref('')
 
 const brandColor = '#4d7cfe'
@@ -136,19 +163,18 @@ const {
 } = useBriefingCard()
 
 const cards = computed<ReportCard[]>(() => {
-  if (!report.value?.details) return []
-  return splitReportToCards(report.value.details, pageType.value)
+  return []
 })
 
 /** 关联项目：晚报展示 sectors，晨报展示 stocks */
 const relatedItems = computed(() => {
   if (!report.value) return []
-  return pageType.value === 'review' ? report.value.sectors : report.value.stocks
+  return pageType.value === 'evening' ? report.value.sectors : report.value.stocks
 })
 
 /** 关联项目标签 */
 const relatedItemsLabel = computed(() => (
-  pageType.value === 'review' ? '关联板块' : '关联标的'
+  pageType.value === 'evening' ? '关联板块' : '关联标的'
 ))
 
 /** 高亮卡片：核心结论、异常信号 */
@@ -164,7 +190,7 @@ function cardTagClass(key: string): string {
 }
 
 function goBriefing() {
-  uni.navigateTo({ url: '/pages-sub-app/briefing/index' })
+  uni.navigateTo({ url: `/pages-sub-app/briefing/index?type=${pageType.value}&date=${currentDate.value}` })
 }
 
 function goSectorSearch(keyword: string) {
@@ -186,9 +212,9 @@ function changeDate(delta: number) {
 
 onLoad((options) => {
   const opts = options as Record<string, string> || {}
-  const type = (opts.type === 'morning' || opts.type === 'review') ? opts.type : 'review'
+  const type = (opts.type === 'morning' || opts.type === 'evening') ? opts.type : 'evening'
   pageType.value = type
-  currentDate.value = formatDate(new Date())
+  currentDate.value = opts.date || formatDate(new Date())
   briefingType.value = type
   briefingDate.value = currentDate.value
   refresh()
@@ -275,6 +301,38 @@ onLoad((options) => {
   color: var(--ev-text-primary);
   line-height: 1.6;
   font-weight: 500;
+}
+
+.brief-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  padding: 18rpx 22rpx;
+  background: var(--ev-accent-soft);
+  border-radius: 8rpx;
+  color: var(--ev-accent);
+  font-size: 22rpx;
+}
+
+.brief-status.degraded {
+  background: var(--ev-warning-bg);
+  color: var(--ev-warning);
+}
+
+.item-as-of,
+.item-uncertainty,
+.evidence-item {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--ev-text-muted);
+}
+
+.evidence-list {
+  margin-top: 12rpx;
+  padding-top: 12rpx;
+  border-top: 1rpx solid var(--ev-border);
 }
 
 /* ===== 播报按钮 ===== */

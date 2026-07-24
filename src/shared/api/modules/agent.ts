@@ -63,6 +63,40 @@ export interface BriefingData {
   sectors: any[]
 }
 
+export type BriefType = 'morning' | 'evening'
+
+export interface BriefEvidence {
+  report_type: string
+  id: string
+  data_source: string
+  created_at: string
+}
+
+export interface BriefItem {
+  title: string
+  conclusion: string
+  evidence: BriefEvidence[]
+  as_of: string
+  confidence: string
+  uncertainty: string | string[]
+}
+
+export interface BriefV1 {
+  schema_version: 'brief.v1'
+  brief_type: BriefType
+  as_of: string
+  items: BriefItem[]
+  degraded: boolean
+  missing_sources: string[]
+}
+
+export interface BroadcastV1 {
+  content: {
+    text?: string
+    audio_path?: string | null
+  }
+}
+
 export const agentApi = {
   /**
    * 发送对话消息（非流式，降级方案）
@@ -96,6 +130,16 @@ export const agentApi = {
   // TODO: 后端 evening briefing 尚未实现（Python 仅有 morning/alert），待 Agent 落地后启用
   getEveningBriefing() {
     return request.get<BriefingData>('/agent/briefing/evening')
+  },
+
+  /** 读取结构化早报/晚报，事实层仅来自已持久化 Brief。 */
+  getBrief(type: BriefType, date: string) {
+    return request.get<BriefV1>(`/agent/brief/${type}/${date}`)
+  },
+
+  /** 读取由对应 Brief 生成的双人播报。 */
+  getBroadcast(type: BriefType, date: string) {
+    return request.get<BroadcastV1>(`/agent/broadcast/${type}/${date}`)
   },
 
   /** 生成双人对话音频 */

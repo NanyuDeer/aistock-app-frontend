@@ -6,6 +6,7 @@
         <view class="briefing-left">
           <view class="briefing-top">
             <text class="briefing-title">今日专属 · {{ briefingTypeLabel }}</text>
+            <text v-if="report?.degraded" class="briefing-degraded">证据不完整</text>
           </view>
           <!-- 有数据时：显示线索数量和简洁摘要 -->
           <template v-if="briefingStatus === 'ready'">
@@ -126,10 +127,13 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { useBriefingCard } from '@/shared/utils/useBriefingCard'
+import { buildBriefingUrl } from '@/shared/utils/briefingNavigation'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
 
 const {
+  type: briefingType,
+  date: briefingDate,
   typeLabel: briefingTypeLabel,
   summary: briefingSummary,
   report,
@@ -150,10 +154,7 @@ const summaryTags = computed(() => {
 
 /** 线索数量：晨报按 stocks，晚报按 sectors */
 const briefingClueCount = computed(() => {
-  if (!report.value) return 0
-  return briefingTypeLabel.value === '晨报'
-    ? report.value.stocks.length
-    : report.value.sectors.length
+  return report.value?.items.length ?? 0
 })
 
 // 卡片描述文案（根据状态）
@@ -162,7 +163,7 @@ function getBriefingDesc(): string {
     case 'empty':
       return briefingTypeLabel.value === '晨报'
         ? '晨报生成中，9:00后查看'
-        : '晚报生成中，15:30后查看'
+        : '晚报生成中，收盘后查看'
     case 'error':
       return '暂不可用，点击重试'
     case 'loading':
@@ -175,8 +176,7 @@ function getBriefingDesc(): string {
 // 卡片点击
 function goBriefingDetail() {
   if (briefingStatus.value === 'ready') {
-    const type = briefingTypeLabel.value === '晨报' ? 'morning' : 'review'
-    uni.navigateTo({ url: `/pages-sub-app/briefing-detail/index?type=${type}` })
+    uni.navigateTo({ url: `/pages-sub-app/briefing-detail/index?type=${briefingType.value}&date=${briefingDate.value}` })
   } else if (briefingStatus.value === 'error') {
     // 触发重试
     briefingRefresh()
@@ -277,7 +277,7 @@ function goChat() {
 }
 
 function goBriefing() {
-  uni.navigateTo({ url: '/pages-sub-app/briefing/index' })
+  uni.navigateTo({ url: buildBriefingUrl(briefingType.value, briefingDate.value) })
 }
 
 function goSectors() {
@@ -369,6 +369,17 @@ function goLogin() {
   font-size: $font-size-lg;
   font-weight: 600;
   color: $text-color-title;
+}
+
+.briefing-degraded {
+  margin-left: $spacing-xs;
+  padding: 2rpx $spacing-xs;
+  color: $warning-color;
+  background: rgba($warning-color, 0.1);
+  border: 1rpx solid rgba($warning-color, 0.25);
+  border-radius: $radius-xs;
+  font-size: $font-size-xs;
+  line-height: 1.4;
 }
 
 .briefing-clue {
