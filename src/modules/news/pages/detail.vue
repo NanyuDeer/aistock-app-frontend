@@ -18,6 +18,16 @@
             </view>
           </view>
 
+          <!-- AI深度解析入口 -->
+          <view v-if="relatedEventId" class="ai-analysis-entry" @tap="goToEventDetail">
+            <view class="ai-entry-icon">🤖</view>
+            <view class="ai-entry-content">
+              <text class="ai-entry-title">AI深度解析</text>
+              <text class="ai-entry-subtitle">查看事件影响链与产业机会</text>
+            </view>
+            <text class="ai-entry-arrow">›</text>
+          </view>
+
           <view v-if="detail.summary" class="news-summary">
             <text class="summary-text">{{ detail.summary }}</text>
           </view>
@@ -28,12 +38,6 @@
 
           <view v-if="detail.url" class="news-footer">
             <text class="footer-link" @tap="openOriginal">查看原文 ›</text>
-          </view>
-
-          <view v-if="relatedEventId" class="news-event-footer">
-            <view class="event-btn" @tap="goToEventDetail">
-              <text class="event-btn-text">查看关联事件详情 ›</text>
-            </view>
           </view>
         </view>
       </scroll-view>
@@ -226,24 +230,50 @@ function goToEventDetail() {
   font-weight: 500;
 }
 
-.news-event-footer {
-  margin-top: 32rpx;
-  padding-top: 24rpx;
-  border-top: 1rpx solid #f0f2f5;
+/* AI深度解析入口 */
+.ai-analysis-entry {
   display: flex;
+  align-items: center;
+  margin: 28rpx 0;
+  padding: 28rpx 32rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, #E0E7FF 0%, #FCE7F3 100%);
+  box-shadow: 0 4rpx 12rpx rgba(99, 102, 241, 0.1);
+}
+
+.ai-entry-icon {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
   justify-content: center;
+  font-size: 32rpx;
+  flex-shrink: 0;
 }
 
-.event-btn {
-  padding: 16rpx 40rpx;
-  border-radius: 9999rpx;
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
-  box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
+.ai-entry-content {
+  flex: 1;
+  margin-left: 20rpx;
 }
 
-.event-btn-text {
-  font-size: 26rpx;
-  color: #ffffff;
-  font-weight: 500;
+.ai-entry-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.ai-entry-subtitle {
+  display: block;
+  font-size: 22rpx;
+  color: #6b7280;
+  margin-top: 4rpx;
+}
+
+.ai-entry-arrow {
+  font-size: 40rpx;
+  color: #6366f1;
+  font-weight: 300;
+  flex-shrink: 0;
 }
 </style>
