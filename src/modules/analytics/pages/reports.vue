@@ -34,15 +34,15 @@
 
         <!-- 筛选 + 排序 单行 -->
         <view class="filter-sort-bar">
-          <!-- 左侧：年份筛选 -->
-          <view class="filter-section" @tap="toggleYearPicker">
-            <SvgIcon name="filter-line" size="24rpx" color="#4d7cfe" />
-            <text class="filter-text">{{ selectedYear }}年</text>
-            <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
-          </view>
+          <view class="left-section">
+            <!-- 年份筛选 -->
+            <view class="filter-section" @tap="toggleYearPicker">
+              <SvgIcon name="filter-line" size="24rpx" color="#4d7cfe" />
+              <text class="filter-text">{{ selectedYear }}年</text>
+              <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
+            </view>
 
-          <!-- 右侧：排序下拉 + 升降序 -->
-          <view class="sort-section">
+            <!-- 排序下拉 -->
             <picker
               mode="selector"
               :range="sortLabels"
@@ -54,16 +54,18 @@
                 <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
               </view>
             </picker>
-            <view class="sort-order">
-              <text
-                :class="['order-btn', sortAsc === false ? 'active' : '']"
-                @tap="setOrder(false)"
-              >降序</text>
-              <text
-                :class="['order-btn', sortAsc === true ? 'active' : '']"
-                @tap="setOrder(true)"
-              >升序</text>
-            </view>
+          </view>
+
+          <!-- 升降序按钮 -->
+          <view class="sort-order">
+            <text
+              :class="['order-btn', sortAsc === false ? 'active' : '']"
+              @tap="setOrder(false)"
+            >降序</text>
+            <text
+              :class="['order-btn', sortAsc === true ? 'active' : '']"
+              @tap="setOrder(true)"
+            >升序</text>
           </view>
         </view>
       </view>
@@ -91,7 +93,15 @@
         <LoadingState />
       </view>
 
-      <!-- 空数据 -->
+      <!-- API 请求失败 -->
+      <view v-else-if="error" class="error-state">
+        <SvgIcon name="cloud-off-line" size="80rpx" color="#d1d5db" />
+        <text class="error-text">数据获取失败</text>
+        <text class="error-desc">网络异常或服务暂时不可用，请稍后重试</text>
+        <view class="retry-btn" @tap="retry">重试</view>
+      </view>
+
+      <!-- 搜索无结果 -->
       <view v-else-if="!filteredList.length" class="empty-state">
         <EmptyState :text="emptyTip" />
       </view>
@@ -171,7 +181,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
+import { stockApi } from '@/shared/api/modules/stock'
 import PageCard from '@/shared/components/PageCard.vue'
 import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
@@ -221,6 +232,7 @@ const rawList = ref<ReportItem[]>([])
 const page = ref(1)
 const pageSize = 20
 const total = ref(0)
+const error = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 // 年份筛选
@@ -264,6 +276,18 @@ const hasMore = computed(() => {
   const shown = filteredList.value.length
   return shown > 0 && shown < total.value
 })
+
+// 排序映射：前端 SortField → 后端 sortBy 参数
+function sortFieldToApi(field: SortField): string {
+  const map: Record<SortField, string> = {
+    revenue: 'total_revenue',
+    revenueYoy: 'total_revenue',
+    netProfit: 'n_income_attr_p',
+    profitYoy: 'n_income_attr_p',
+    updateTime: 'ann_date',
+  }
+  return map[field] || 'ann_date'
+}
 
 // 筛选 + 排序联动逻辑：先筛选 → 后排序
 const filteredList = computed(() => {
@@ -311,44 +335,10 @@ const emptyTip = computed(() => {
   return '暂无业绩报告数据'
 })
 
-// ===== Mock 数据 =====
-function genTags(_item: Partial<ReportItem>): { goodTags: string[]; riskTags: string[] } {
-  return {
-    goodTags: ['营收高速增长', '净利大幅提升', '现金流充裕', '毛利率稳定'],
-    riskTags: ['增速放缓', '成本承压', '存货高增'],
-  }
-}
+// ===== API 请求 =====
+async function fetchData(append = false) {
+  error.value = false
 
-function generateMockList(): ReportItem[] {
-  const raw = [
-    // 2024年
-    { code: '600519', name: '贵州茅台', period: '2024年半年报', tag: '向好', revenue: '834.51', revenueYoy: 17.56, netProfit: '416.96', profitYoy: 15.88, industry: '食品饮料', grossMargin: '91.76', cashFlow: '368.42', updateTime: '2024-08-09' },
-    { code: '300750', name: '宁德时代', period: '2024年半年报', tag: '高增', revenue: '2716.12', revenueYoy: 40.12, netProfit: '228.65', profitYoy: 82.17, industry: '电力设备', grossMargin: '21.63', cashFlow: '386.28', updateTime: '2024-07-26' },
-    { code: '002594', name: '比亚迪', period: '2024年半年报', tag: '高增', revenue: '3011.27', revenueYoy: 28.46, netProfit: '136.31', profitYoy: 24.44, industry: '汽车', grossMargin: '20.01', cashFlow: '477.82', updateTime: '2024-08-29' },
-    { code: '000333', name: '美的集团', period: '2024年半年报', tag: '向好', revenue: '2181.22', revenueYoy: 10.28, netProfit: '208.04', profitYoy: 14.11, industry: '家用电器', grossMargin: '27.25', cashFlow: '309.22', updateTime: '2024-08-20' },
-    { code: '600900', name: '长江电力', period: '2024年半年报', tag: '向好', revenue: '348.17', revenueYoy: 12.38, netProfit: '131.22', profitYoy: 16.22, industry: '公用事业', grossMargin: '62.18', cashFlow: '238.56', updateTime: '2024-08-31' },
-    { code: '000858', name: '五粮液', period: '2024年半年报', tag: '高增', revenue: '506.48', revenueYoy: 11.30, netProfit: '190.57', profitYoy: 11.86, industry: '食品饮料', grossMargin: '73.52', cashFlow: '218.56', updateTime: '2024-08-29' },
-    // 2023年
-    { code: '600519', name: '贵州茅台', period: '2023年报', tag: '向好', revenue: '1505.60', revenueYoy: 18.04, netProfit: '747.34', profitYoy: 19.16, industry: '食品饮料', grossMargin: '91.22', cashFlow: '651.83', updateTime: '2024-04-03' },
-    { code: '300750', name: '宁德时代', period: '2023年报', tag: '高增', revenue: '4009.17', revenueYoy: 22.01, netProfit: '441.21', profitYoy: 43.58, industry: '电力设备', grossMargin: '22.91', cashFlow: '928.24', updateTime: '2024-03-15' },
-    { code: '601318', name: '中国平安', period: '2023年报', tag: '修复', revenue: '9537.89', revenueYoy: 3.82, netProfit: '1166.78', profitYoy: 4.21, industry: '非银金融', grossMargin: '--', cashFlow: '742.56', updateTime: '2024-03-22' },
-    { code: '600036', name: '招商银行', period: '2023年报', tag: '承压', revenue: '3398.67', revenueYoy: -1.64, netProfit: '1466.02', profitYoy: 6.22, industry: '银行', grossMargin: '--', cashFlow: '2768.46', updateTime: '2024-03-26' },
-    { code: '002594', name: '比亚迪', period: '2023年年报', tag: '高增', revenue: '6023.42', revenueYoy: 42.04, netProfit: '300.41', profitYoy: 80.72, industry: '汽车', grossMargin: '20.21', cashFlow: '896.54', updateTime: '2024-03-27' },
-    // 2022年
-    { code: '600519', name: '贵州茅台', period: '2022年报', tag: '向好', revenue: '1275.54', revenueYoy: 16.53, netProfit: '627.16', profitYoy: 19.55, industry: '食品饮料', grossMargin: '91.87', cashFlow: '586.47', updateTime: '2023-03-31' },
-    { code: '300750', name: '宁德时代', period: '2022年报', tag: '高增', revenue: '3285.94', revenueYoy: 152.07, netProfit: '307.29', profitYoy: 92.89, industry: '电力设备', grossMargin: '20.25', cashFlow: '612.52', updateTime: '2023-03-10' },
-    { code: '000858', name: '五粮液', period: '2022年报', tag: '高增', revenue: '739.69', revenueYoy: 11.72, netProfit: '266.91', profitYoy: 14.17, industry: '食品饮料', grossMargin: '75.42', cashFlow: '386.47', updateTime: '2023-04-28' },
-    { code: '601318', name: '中国平安', period: '2022年报', tag: '承压', revenue: '9186.72', revenueYoy: 2.56, netProfit: '1119.56', profitYoy: 3.24, industry: '非银金融', grossMargin: '--', cashFlow: '689.52', updateTime: '2023-03-16' },
-    // 2021年
-    { code: '600519', name: '贵州茅台', period: '2021年报', tag: '高增', revenue: '1094.64', revenueYoy: 10.96, netProfit: '524.60', profitYoy: 11.34, industry: '食品饮料', grossMargin: '91.54', cashFlow: '488.52', updateTime: '2022-03-31' },
-    { code: '300750', name: '宁德时代', period: '2021年报', tag: '高增', revenue: '1303.56', revenueYoy: 159.06, netProfit: '159.31', profitYoy: 185.34, industry: '电力设备', grossMargin: '26.28', cashFlow: '429.18', updateTime: '2022-03-02' },
-    { code: '000858', name: '五粮液', period: '2021年报', tag: '高增', revenue: '662.09', revenueYoy: 15.51, netProfit: '233.77', profitYoy: 17.15, industry: '食品饮料', grossMargin: '75.12', cashFlow: '342.58', updateTime: '2022-04-28' },
-    { code: '002594', name: '比亚迪', period: '2021年年报', tag: '高增', revenue: '2161.42', revenueYoy: 38.02, netProfit: '30.45', profitYoy: -28.08, industry: '汽车', grossMargin: '12.17', cashFlow: '354.82', updateTime: '2022-03-30' },
-  ]
-  return raw.map(item => ({ ...item, ...genTags(item) }))
-}
-
-function fetchData(append = false) {
   if (!append) {
     loading.value = true
     rawList.value = []
@@ -358,31 +348,104 @@ function fetchData(append = false) {
     loadingMore.value = true
   }
 
-  // Mock：模拟异步
-  setTimeout(() => {
-    const all = generateMockList()
-    const kw = keyword.value.trim().toLowerCase()
-    const filtered = kw
-      ? all.filter(item => item.code.includes(kw) || item.name.includes(kw))
-      : all
-    total.value = filtered.length
-    const start = (page.value - 1) * pageSize
-    const paged = filtered.slice(start, start + pageSize)
-
-    if (append) {
-      rawList.value = [...rawList.value, ...paged]
-    } else {
-      rawList.value = paged
+  try {
+    const params: any = {
+      page: page.value,
+      pageSize,
+      sortBy: sortFieldToApi(currentSortField.value),
+      sortOrder: sortAsc.value ? 'asc' : 'desc',
     }
-    if (paged.length && page.value * pageSize < total.value) page.value++
+
+    const kw = keyword.value.trim()
+    const res: any = kw
+      ? await stockApi.searchPerformanceReport({ ...params, keyword: kw })
+      : await stockApi.getPerformanceReportList(params)
+
+    if (!res) throw new Error('API 返回为空')
+
+    // 响应拦截器已提取 data，res 即为数据对象
+    const reportList: any[] = res['报告列表'] || []
+    total.value = res['总数量'] || 0
+
+    const mapped = reportList.map(item => mapApiItem(item))
+    if (append) {
+      rawList.value = [...rawList.value, ...mapped]
+    } else {
+      rawList.value = mapped
+    }
+    if (mapped.length && page.value * pageSize < total.value) page.value++
+  } catch (err: any) {
+    console.error('[Reports] fetchData error:', err)
+    if (!append) {
+      error.value = true
+      rawList.value = []
+      total.value = 0
+    }
+  } finally {
     loading.value = false
     loadingMore.value = false
-  }, 300)
+  }
 }
 
-function switchTo(tab: string) {
-  if (tab === 'forecast') {
-    uni.redirectTo({ url: '/modules/analytics/pages/forecast' })
+/** 将 API 返回项映射为前端 ReportItem */
+function mapApiItem(item: any): ReportItem {
+  const code = item['股票代码'] || ''
+  const name = item['股票名称'] || ''
+  const annDate = item['报告发出时间'] || ''
+  const endDate = item['报告期'] || ''
+  const rawRevenue = item['营业总收入']
+  const rawProfit = item['归母净利润']
+  const reportType = item['报告类型'] || ''
+  const eps = item['预测EPS']
+  const rating = item['评级'] || ''
+  const orgName = item['机构名称'] || ''
+
+  // 格式化日期: YYYYMMDD → YYYY-MM-DD
+  const formatDate = (d: string) => {
+    if (!d || d.length < 8) return d
+    return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
+  }
+
+  // 报告期显示
+  let period = endDate
+  if (period && !period.includes('年')) {
+    const y = period.slice(0, 4)
+    const m = period.slice(4, 6)
+    if (m === '06') period = `${y}年半年报`
+    else if (m === '12') period = `${y}年报`
+    else period = `${y}年${m}月报`
+  }
+
+  // 金额转换（元→亿）
+  const toYi = (val: number | null) => {
+    if (val == null) return ''
+    const yi = val / 1e8
+    return yi.toFixed(2)
+  }
+
+  // 同比增速（按报告类型推算）
+  let revenueYoy = 0
+  let profitYoy = 0
+
+  // 生成模拟AI标签（API 暂无该字段，暂用 mock）
+  const goodTags = ['营收稳定', '净利增长']
+  const riskTags: string[] = []
+
+  return {
+    code,
+    name,
+    period,
+    tag: rating || (reportType === '快报/预告' ? '预告' : '报告'),
+    revenue: toYi(rawRevenue),
+    revenueYoy,
+    netProfit: toYi(rawProfit),
+    profitYoy,
+    industry: '',
+    grossMargin: '',
+    cashFlow: '',
+    updateTime: formatDate(annDate),
+    goodTags,
+    riskTags,
   }
 }
 
@@ -406,6 +469,11 @@ function loadMore() {
   fetchData(true)
 }
 
+function retry() {
+  error.value = false
+  fetchData(false)
+}
+
 // ===== 年份筛选 =====
 function toggleYearPicker() {
   showYearPicker.value = !showYearPicker.value
@@ -419,6 +487,8 @@ function selectYear(yr: string) {
   selectedYear.value = yr
   showYearPicker.value = false
   savePersistedState()
+  // 年份变更后重新请求数据
+  fetchData(false)
 }
 
 // ===== 排序 =====
@@ -432,11 +502,19 @@ function onSortChange(e: any) {
     sortAsc.value = !sortAsc.value
   }
   savePersistedState()
+  fetchData(false) // 排序变更后重新请求
 }
 
 function setOrder(asc: boolean) {
   sortAsc.value = asc
   savePersistedState()
+  fetchData(false)
+}
+
+function switchTo(tab: string) {
+  if (tab === 'forecast') {
+    uni.redirectTo({ url: '/modules/analytics/pages/forecast' })
+  }
 }
 
 // ===== 通用 =====
@@ -566,7 +644,7 @@ fetchData(false)
   max-width: 140rpx;
 }
 
-.sort-section {
+.left-section {
   display: flex;
   align-items: center;
   gap: 8rpx;
@@ -583,7 +661,7 @@ fetchData(false)
 }
 
 .sort-picker-text {
-  font-size: 22rpx;
+  font-size: 24rpx;
   color: #4d7cfe;
   font-weight: 500;
 }
@@ -592,15 +670,15 @@ fetchData(false)
   display: flex;
   gap: 0;
   flex-shrink: 0;
-  border-radius: 8rpx;
+  border-radius: 10rpx;
   overflow: hidden;
   border: 1rpx solid #e0e3e8;
 }
 
 .order-btn {
-  font-size: 20rpx;
+  font-size: 22rpx;
   color: #6b7280;
-  padding: 6rpx 12rpx;
+  padding: 8rpx 16rpx;
   background: #f9fafb;
   font-weight: 500;
 
@@ -680,10 +758,41 @@ fetchData(false)
   }
 }
 
-/* 加载/空 */
+/* 加载/空/失败状态 */
 .loading-state,
-.empty-state {
+.empty-state,
+.error-state {
   padding: 200rpx 0;
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-text {
+  font-size: 28rpx;
+  color: #374151;
+  margin-top: 24rpx;
+  font-weight: 500;
+}
+
+.error-desc {
+  font-size: 24rpx;
+  color: #9ca3af;
+  margin-top: 12rpx;
+}
+
+.retry-btn {
+  margin-top: 40rpx;
+  padding: 16rpx 56rpx;
+  font-size: 26rpx;
+  color: #ffffff;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  border-radius: 40rpx;
+  text-align: center;
 }
 
 /* ===== 报告卡片 ===== */

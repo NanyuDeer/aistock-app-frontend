@@ -33,7 +33,6 @@
         </view>
 
         <view class="sort-bar">
-          <text class="sort-label">排序方式</text>
           <picker
             mode="selector"
             :range="sortFieldLabels"
@@ -408,18 +407,13 @@ onShow(() => {
 .sort-bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12rpx;
   margin-bottom: 24rpx;
   padding: 12rpx 16rpx;
   background: #ffffff;
   border-radius: 16rpx;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-}
-
-.sort-label {
-  font-size: 24rpx;
-  color: #9ca3af;
-  flex-shrink: 0;
 }
 
 .sort-picker {
