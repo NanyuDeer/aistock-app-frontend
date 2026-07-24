@@ -336,6 +336,25 @@ export const stockApi = {
   /** 创建个股 AI 资讯分析（触发后端生成） */
   createStockAnalysis(symbol: string) {
     return request.post(`/cn/stocks/${symbol}/analysis`).then((res: any) => res?.data || res)
+  },
+
+  /** 获取业绩报告列表 */
+  getPerformanceReportList(params?: {
+    page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; reportType?: string
+  }) {
+    return request.get('/cn/stocks/performance-reports', { params })
+  },
+
+  /** 搜索业绩报告 */
+  searchPerformanceReport(params?: {
+    keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; reportType?: string
+  }) {
+    return request.get('/cn/stocks/performance-reports/search', { params })
+  },
+
+  /** 手动刷新业绩报告 */
+  refreshPerformanceReports() {
+    return request.post('/cn/stocks/performance-reports/refresh')
   }
 }
 
