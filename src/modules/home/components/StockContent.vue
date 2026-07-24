@@ -77,7 +77,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { stockApi } from '@/shared/api/modules/stock'
+import { stockApi, type HotBurstSignal } from '@/shared/api/modules/stock'
 
 const trendScorePreview = ref([
   { name: '贵州茅台', score: 92, trend: 'up' },
@@ -85,21 +85,10 @@ const trendScorePreview = ref([
   { name: '中国平安', score: 85, trend: 'up' },
 ])
 
-interface HotBurstSignal {
-  symbol: string
-  stockName?: string
-  resonanceLevel?: 'critical' | 'high' | 'medium' | 'low'
-  detectedAt?: string
-}
-
-interface HotBurstResponse {
-  outbreaks?: HotBurstSignal[]
-}
-
 const hotBurstPreview = ref<{ symbol: string; name: string; level: string }[]>([])
 const hotBurstLoading = ref(true)
 const hotBurstError = ref('')
-const HOT_BURST_CACHE_KEY = 'hot_burst_preview_cache'
+const HOT_BURST_CACHE_KEY = 'hot_burst_preview_cache_v2'
 
 function levelLabel(level: HotBurstSignal['resonanceLevel']): string {
   const labels: Record<NonNullable<HotBurstSignal['resonanceLevel']>, string> = {
@@ -115,10 +104,7 @@ async function loadHotBurstPreview() {
   hotBurstLoading.value = true
   hotBurstError.value = ''
   try {
-    const res: unknown = await stockApi.getHotBursts({ hours: 72, min_resonance: 3 })
-    const payload = res as { data?: HotBurstResponse }
-    const data = payload.data ?? (res as HotBurstResponse)
-    const outbreaks = data.outbreaks ?? []
+    const outbreaks = await stockApi.getHotBurstHistory({ days: 3, min_resonance: 3 })
     uni.setStorageSync(HOT_BURST_CACHE_KEY, {
       cachedAt: Date.now(),
       outbreaks,
@@ -127,7 +113,7 @@ async function loadHotBurstPreview() {
       const aTime = a.detectedAt ? Date.parse(a.detectedAt) : 0
       const bTime = b.detectedAt ? Date.parse(b.detectedAt) : 0
       return bTime - aTime
-    }).map((item) => ({
+    }).slice(0, 3).map((item) => ({
       symbol: item.symbol,
       name: item.stockName || item.symbol,
       level: levelLabel(item.resonanceLevel),
