@@ -20,7 +20,7 @@
       <view v-if="signals.length" class="signal-list">
         <view
           v-for="(sig, idx) in signals"
-          :key="sig.symbol || idx"
+          :key="`${sig.symbol}-${sig.detectedAt || idx}`"
           class="signal-card"
           @tap="goStockDetail(sig.symbol)"
         >
@@ -76,21 +76,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { stockApi } from '@/shared/api/modules/stock'
+import { stockApi, type HotBurstSignal } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-
-interface HotBurstSignal {
-  symbol: string
-  stockName?: string
-  price?: number | null
-  changePct?: number | null
-  triggerTags?: string[]
-  sectorInfo?: string
-  thsSectorName?: string
-  resonanceLevel?: 'critical' | 'high' | 'medium' | 'low'
-  detectedAt?: string
-}
 
 function visibleTriggerTags(signal: HotBurstSignal): string[] {
   const sector = (signal.sectorInfo || signal.thsSectorName || '').trim()
@@ -109,14 +97,8 @@ function levelLabel(level: HotBurstSignal['resonanceLevel']): string {
   return labels[level || 'low']
 }
 
-interface HotBurstResponse {
-  outbreaks?: HotBurstSignal[]
-  records?: HotBurstSignal[]
-}
-
 const signals = ref<HotBurstSignal[]>([])
-const hours = ref(72)
-const HOT_BURST_CACHE_KEY = 'hot_burst_preview_cache'
+const HOT_BURST_CACHE_KEY = 'hot_burst_preview_cache_v2'
 const HOT_BURST_CACHE_TTL = 2 * 60 * 1000
 
 function readHomeCache(): HotBurstSignal[] | null {
@@ -144,11 +126,8 @@ async function loadData() {
     return
   }
   try {
-    const res: unknown = await stockApi.getHotBursts({ hours: hours.value, min_resonance: 3 })
-    const payload = res as { data?: HotBurstResponse }
-    const data: HotBurstResponse = payload.data ?? (res as HotBurstResponse)
     // 只按检测时间排序，不按共振等级排序，保证用户优先看到最新抓取结果。
-    signals.value = sortByDetectedAt(data.outbreaks ?? data.records ?? [])
+    signals.value = sortByDetectedAt(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 3 }))
   } catch {
     signals.value = []
   }
