@@ -47,6 +47,11 @@ export default defineConfig(({ mode }) => {
           target: apiTarget,
           changeOrigin: true
         },
+        // 市场复盘问答需要经 Node.js 注入内部令牌后再转发至 Python
+        '/api/agent/market-trace-qa/message': {
+          target: apiTarget,
+          changeOrigin: true
+        },
         // 其他 Agent 路由 → Python FastAPI（端口 8080）
         '/api/agent': {
           target: agentTarget,
