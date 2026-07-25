@@ -165,7 +165,7 @@ defineExpose({ goBack })
   flex-direction: column;
   overflow: hidden;
   /* 底部留白：GlobalChatBar 高度（148rpx + 安全区），noChatBar 时无需留白 */
-  padding-bottom: var(--sub2-pad-b, calc(148rpx + env(safe-area-inset-bottom)));
+  padding-bottom: var(--sub2-pad-b, calc(220rpx + env(safe-area-inset-bottom)));
 }
 
 .sub-page-2-body.no-chat-bar {
