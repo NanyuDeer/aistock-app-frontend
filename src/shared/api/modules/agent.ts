@@ -4,6 +4,8 @@
 import request from '../request'
 import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
 
+export const MARKET_TRACE_QA_TIMEOUT = 120_000
+
 export interface ProgressStep {
   label: string
   status: 'pending' | 'done'
@@ -15,6 +17,7 @@ export interface ChatMessage {
   content: string
   skillResult?: SkillResult
   progressSteps?: ProgressStep[]
+  trace?: MarketTraceQaTrace
   timestamp: number
 }
 
@@ -22,6 +25,29 @@ export interface SkillResult {
   type: 'text' | 'card' | 'chart' | 'graph'
   data: any
   narrative?: string
+}
+
+export interface MarketTraceQaSource {
+  source_id: string
+  title: string
+  kind: 'market_fact' | 'event_evidence'
+  provider: string
+}
+
+export interface MarketTraceQaTrace {
+  artifact_id: string
+  sources: MarketTraceQaSource[]
+  as_of: string
+  confidence: 'high' | 'medium' | 'low'
+  uncertainty: string[]
+  degraded: boolean
+  degraded_reason: string | null
+}
+
+export interface MarketTraceQaResponse {
+  content: string
+  session_id: string
+  trace: MarketTraceQaTrace
 }
 
 export interface BriefingData {
@@ -44,6 +70,21 @@ export const agentApi = {
    */
   sendMessage(message: string, sessionId?: string) {
     return request.post('/agent/chat/message', { message, session_id: sessionId })
+  },
+
+  /**
+   * 发送市场复盘问答消息（HTTP，非流式）
+   * 通过 Node 代理转发到 Python /api/agent/market-trace-qa/message
+   * 返回包含 trace 证据元数据的响应
+   */
+  async sendMarketTraceQaMessage(message: string, reportDate?: string, sessionId?: string): Promise<MarketTraceQaResponse> {
+    return request.post<MarketTraceQaResponse>('/agent/market-trace-qa/message', {
+      message,
+      report_date: reportDate,
+      session_id: sessionId,
+    }, {
+      timeout: MARKET_TRACE_QA_TIMEOUT,
+    })
   },
 
   /** 获取今日晨报 */

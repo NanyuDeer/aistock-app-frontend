@@ -138,6 +138,46 @@ export interface WindLeaderResponse {
   hot_sectors: WindLeaderSector[]
 }
 
+export interface HotBurstSignal {
+  symbol: string
+  stockName?: string
+  price?: number | null
+  changePct?: number | null
+  triggerTags?: string[]
+  sectorInfo?: string
+  thsSectorName?: string
+  resonanceLevel?: 'critical' | 'high' | 'medium' | 'low'
+  detectedAt?: string
+}
+
+interface HotBurstHistoryRecord {
+  symbol: string
+  stock_name?: string
+  price?: number | null
+  change_pct?: number | null
+  sector_info?: string
+  keywords?: string
+  resonance_level?: HotBurstSignal['resonanceLevel']
+  detected_at?: string
+}
+
+interface HotBurstHistoryResponse {
+  records?: HotBurstHistoryRecord[]
+}
+
+function normalizeHotBurstHistory(records: HotBurstHistoryRecord[] | undefined): HotBurstSignal[] {
+  return (records ?? []).map((record) => ({
+    symbol: record.symbol,
+    stockName: record.stock_name,
+    price: record.price,
+    changePct: record.change_pct,
+    triggerTags: record.keywords?.split(/[、，,]/).map((tag) => tag.trim()).filter(Boolean),
+    sectorInfo: record.sector_info,
+    resonanceLevel: record.resonance_level,
+    detectedAt: record.detected_at,
+  }))
+}
+
 export const stockApi = {
   /** 获取股票列表 */
   getStockList(params?: { keyword?: string; page?: number; size?: number }) {
@@ -241,9 +281,16 @@ export const stockApi = {
     return request.get('/cn/institution-research', { params })
   },
 
-  /** 获取趋势风口事件（重磅消息） */
+  /** 获取机构调研热门股历史记录，供 App 的近时段展示使用。 */
+  getHotBurstHistory(params: { days: number; min_resonance: number; limit?: number; offset?: number }) {
+    return request
+      .get<HotBurstHistoryResponse>('/cn/institution-research/history', { params })
+      .then((result) => normalizeHotBurstHistory(result.records))
+  },
+
+  /** 获取个股异动事件（重磅消息） */
   getTrendEvents(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
-    return request.get('/cn/trend-hotspots/events', { params }).then((res: any) => res)
+    return request.get('/cn/stock-monitors/events', { params }).then((res: any) => res)
   },
 
   /** 获取财联社头条新闻 */
@@ -360,6 +407,25 @@ export const stockApi = {
       const events = res?.events || res?.data?.events || []
       return Array.isArray(events) ? events : []
     })
+  },
+
+  /** 获取业绩报告列表 */
+  getPerformanceReportList(params?: {
+    page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; reportType?: string
+  }) {
+    return request.get('/cn/stocks/performance-reports', { params })
+  },
+
+  /** 搜索业绩报告 */
+  searchPerformanceReport(params?: {
+    keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; reportType?: string
+  }) {
+    return request.get('/cn/stocks/performance-reports/search', { params })
+  },
+
+  /** 手动刷新业绩报告 */
+  refreshPerformanceReports() {
+    return request.post('/cn/stocks/performance-reports/refresh')
   }
 }
 

@@ -25,20 +25,36 @@ function getSysInfo(): UniApp.GetSystemInfoResult {
  * 原因：H5 dev 模式下 getSystemInfoSync().windowWidth 返回浏览器全宽（如 1463px），
  * 而非模拟移动端宽度（375px），导致 JS 中的 rpx→px 换算严重偏大。
  * uni.upx2px() 内部使用与 CSS rpx 相同的基准宽度，保证 JS 和 CSS 换算一致。
+ *
+ * H5 端额外处理：global.scss 中 #app 固定宽度 390px，html font-size 也固定为 16.64px，
+ * 但 uni.upx2px() 仍基于浏览器窗口宽度计算（不读 CSS），导致 JS/CSS 换算不一致。
+ * 因此 H5 端直接用 390px 基准计算，与 CSS 保持一致。
  */
 export function rpx2px(rpx: number): number {
+  // #ifdef H5
+  // H5 端固定基于 390px 宽度计算（与 global.scss 中 #app 固定宽度一致）
+  return (rpx * 390) / 750
+  // #endif
+  // #ifndef H5
   try {
     return uni.upx2px(rpx)
   } catch {
     return rpx / 2
   }
+  // #endif
 }
 
 /**
  * px → rpx 转换（rpx2px 的逆运算）
  * 通过 uni.upx2px(750) 获取基准屏幕宽度，确保与 rpx2px 使用相同的换算基准。
+ *
+ * H5 端同样固定基于 390px 基准，与 rpx2px 保持一致。
  */
 export function px2rpx(px: number): number {
+  // #ifdef H5
+  return Math.round((px * 750) / 390)
+  // #endif
+  // #ifndef H5
   try {
     const basePx = uni.upx2px(750)
     if (basePx > 0) return Math.round((px * 750) / basePx)
@@ -46,6 +62,7 @@ export function px2rpx(px: number): number {
   } catch {
     return px * 2
   }
+  // #endif
 }
 
 /**

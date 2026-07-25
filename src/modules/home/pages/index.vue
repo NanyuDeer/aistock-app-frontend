@@ -10,7 +10,7 @@ import MainTabs from '@/shared/components/MainTabs.vue'
 const mainTabsRef = ref<InstanceType<typeof MainTabs> | null>(null)
 
 onLoad((query: Record<string, string> | undefined) => {
-  // 支持 URL 参数指定初始 Tab，如 ?tab=alert
+  // 支持 URL 参数指定初始 Tab，如 ?tab=stock 或 ?tab=alert
   const tab = query?.tab
   if (tab && mainTabsRef.value) {
     mainTabsRef.value.setActiveTab(tab)

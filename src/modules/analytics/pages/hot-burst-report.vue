@@ -103,6 +103,62 @@ interface StockCard {
   sustainability: string
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function asDisplayReport(value: unknown): DisplayReport | null {
+  const record = asRecord(value)
+  if (!record) return null
+  const summary = typeof record.summary === 'string' ? record.summary : ''
+  const details = typeof record.details === 'string' ? record.details : ''
+  if (!summary && !details) return null
+  return {
+    summary,
+    details,
+    stocks: asStringArray(record.stocks),
+    risks: asStringArray(record.risks),
+  }
+}
+
+function extractEmbeddedDisplayReport(details: string): DisplayReport | null {
+  const blocks = details.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)
+  for (const block of blocks) {
+    try {
+      const parsed = JSON.parse(block[1]) as unknown
+      const nested = asRecord(parsed)
+      const display = asDisplayReport(nested?.display_report)
+      if (display) return display
+    } catch {
+      // Keep checking later code blocks; malformed legacy content should not break the page.
+    }
+  }
+  return null
+}
+
+function normalizeHotBurstReport(value: unknown): HotBurstReport | null {
+  const record = asRecord(value)
+  const content = asRecord(record?.content)
+  if (!record || !content) return null
+
+  const outerDisplay = asDisplayReport(content.display_report)
+  const display = outerDisplay?.details
+    ? extractEmbeddedDisplayReport(outerDisplay.details) ?? outerDisplay
+    : outerDisplay
+  if (!display) return null
+
+  return {
+    report_date: typeof record.report_date === 'string' ? record.report_date : '',
+    content: { display_report: display },
+  }
+}
+
 const date = ref('')
 const loading = ref(true)
 const report = ref<HotBurstReport | null>(null)
@@ -315,7 +371,7 @@ async function loadReport() {
     const res: unknown = await agentApi.getReport('hot_burst', date.value)
     const data = (res as Record<string, unknown>)?.data ?? res
     const nextReport = data
-      ? data as HotBurstReport
+      ? normalizeHotBurstReport(data)
       : import.meta.env.DEV ? { report_date: date.value, content: hotBurstMockContent } : null
     report.value = nextReport
     if (nextReport) runStreamingFlow()

@@ -31,14 +31,14 @@ export const newsApi = {
     return request.get<NewsHeadline[]>('/news/headlines', { params }).then((res: any) => res)
   },
 
-  /** 获取趋势风口事件（重磅消息） */
+  /** 获取个股异动事件（重磅消息） */
   getTrendEvents(params?: {
     cycle?: string
     change_type?: string
     limit?: number
     offset?: number
   }) {
-    return request.get<TrendEvent[]>('/cn/trend-hotspots/events', { params }).then((res: any) => res)
+    return request.get<TrendEvent[]>('/cn/stock-monitors/events', { params }).then((res: any) => res)
   },
 
   /** 获取个股新闻 */

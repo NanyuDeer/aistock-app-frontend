@@ -2,6 +2,29 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [changer] 2026-07-18 — 晨报/复盘报告卡片模型重构 + 事件适配层增强
+**开发者**: 37588
+
+### 重构
+- `src/shared/utils/briefingReport.ts`（新增）：从 `useBriefingCard.ts` 抽取 `BriefingReport` 类型与 `parseBriefingReport` 解析函数，新增 `sectors` 字段
+- `src/shared/utils/reportCard.ts`（新增）：统一 `ReportCard[]` 卡片模型 + 晨报/复盘分段器；`splitMorningReport` 按 `##` 标题匹配 5 张晨报卡片；`splitReviewToCards` 复用复盘分段器；未匹配正文统一以"补充分析"卡片展示，禁止静默丢弃
+- `src/shared/utils/useBriefingCard.ts`：改为引用 `briefingReport.ts`，移除内联类型与解析逻辑（-42 行）
+
+### 改进
+- `src/modules/chat/event/api/eventAdapter.ts`：新增 `buildSourceInfo` 从后端 source 字段构建来源展示信息（URL 解析 + 媒体域名中文映射）；新增 `MEDIA_NAME_BY_DOMAIN` 映射
+- `src/modules/chat/event/components/AiEventReport.vue`：适配新数据结构
+- `src/modules/chat/event/components/EventItemCard.vue`、`EventTransmissionGraph.vue`：适配
+- `src/modules/chat/event/composables/useAiReasoning.ts`：精简
+- `src/modules/chat/pages/event/detail.vue`：适配
+- `src/modules/home/components/MorningContent.vue`、`src/pages-sub-app/briefing-detail/index.vue`、`src/shared/components/SubPageCard2.vue`：适配新卡片模型
+
+### 测试
+- `src/modules/chat/event/api/eventAdapter.spec.ts`（新增）
+- `src/shared/utils/briefingReport.spec.ts`（新增）
+- `src/shared/utils/reportCard.spec.ts`（新增）
+
+---
+
 ## [master] 2026-07-17 — 跨仓库一致性修复（代理配置/emoji清理/接口路径/环境变量模板）
 **开发者**: Aria
 

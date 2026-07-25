@@ -81,6 +81,10 @@ function goBack() {
     uni.redirectTo({ url: props.backUrl })
   }
 }
+
+// 暴露 goBack 供父组件调用，复用 SubPageCard2 的回退语义
+// （navigateBack 优先，无历史页时 redirectTo backUrl）
+defineExpose({ goBack })
 </script>
 
 <style lang="scss" scoped>

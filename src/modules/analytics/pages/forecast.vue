@@ -1,6 +1,6 @@
 <template>
   <view class="page-forecast">
-    <PageCard title="业绩">
+    <SubPageCard title="业绩预测">
       <!-- 标题右侧切换按钮 -->
       <template #header-right>
         <view class="toggle-group">
@@ -33,7 +33,6 @@
         </view>
 
         <view class="sort-bar">
-          <text class="sort-label">排序方式</text>
           <picker
             mode="selector"
             :range="sortFieldLabels"
@@ -119,9 +118,7 @@
       <view v-if="hasMore" class="load-more" @tap="loadMore">
         <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
       </view>
-    </PageCard>
-
-    <AppBottomBar current-tab="forecast" />
+    </SubPageCard>
   </view>
 </template>
 
@@ -129,8 +126,7 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
-import PageCard from '@/shared/components/PageCard.vue'
-import AppBottomBar from '@/shared/components/AppBottomBar.vue'
+import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
@@ -408,18 +404,13 @@ onShow(() => {
 .sort-bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12rpx;
   margin-bottom: 24rpx;
   padding: 12rpx 16rpx;
   background: #ffffff;
   border-radius: 16rpx;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-}
-
-.sort-label {
-  font-size: 24rpx;
-  color: #9ca3af;
-  flex-shrink: 0;
 }
 
 .sort-picker {

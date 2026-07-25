@@ -6,7 +6,9 @@
         <text class="card-type" :style="{ color: typeColor.text, background: typeColor.bg }">
           {{ event.eventType }}
         </text>
-        <text class="card-source">{{ event.source }}</text>
+        <text class="card-source" :class="{ 'source-unverified': !event.sourceInfo?.name && !event.source }">
+          {{ event.sourceInfo?.name || event.source || '来源暂不可验证' }}
+        </text>
         <text class="card-time">{{ formatTime(event.publishTime) }}</text>
       </view>
       <ImportanceStars :level="event.importance" :size="18" />
@@ -149,6 +151,12 @@ function formatTime(time: string): string {
 .card-source {
   font-size: 20rpx;
   color: var(--ev-text-muted);
+}
+
+.source-unverified {
+  font-style: italic;
+  color: var(--ev-text-tertiary);
+  opacity: 0.7;
 }
 
 /* ========== 标题（最多2行，超出省略） ========== */

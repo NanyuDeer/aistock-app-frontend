@@ -20,7 +20,7 @@
       <view v-if="signals.length" class="signal-list">
         <view
           v-for="(sig, idx) in signals"
-          :key="sig.symbol || idx"
+          :key="`${sig.symbol}-${sig.detectedAt || idx}`"
           class="signal-card"
           @tap="goStockDetail(sig.symbol)"
         >
@@ -29,6 +29,9 @@
             <view class="signal-stock">
               <view class="stock-name-row">
                 <text class="stock-name">{{ sig.stockName || sig.symbol }}</text>
+                <text :class="['level-tag', sig.resonanceLevel || 'low']">
+                  {{ levelLabel(sig.resonanceLevel) }}
+                </text>
                 <text v-if="sig.sectorInfo || sig.thsSectorName" class="sector-tag">
                   {{ sig.sectorInfo || sig.thsSectorName }}
                 </text>
@@ -57,15 +60,6 @@
                 class="kw-tag"
               >{{ tag }}</text>
             </view>
-            <!-- <view class="signal-meta-right">
-              <view v-if="sig.resonanceScore != null" class="signal-score">
-                <text class="score-val">{{ sig.resonanceScore }}</text>
-                <text class="score-label">分</text>
-              </view>
-              <text :class="['level-tag', sig.resonanceLevel || 'low']">
-                {{ levelLabel(sig.resonanceLevel) }}
-              </text>
-            </view> -->
           </view>
         </view>
       </view>
@@ -82,19 +76,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { stockApi } from '@/shared/api/modules/stock'
+import { stockApi, type HotBurstSignal } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-
-interface HotBurstSignal {
-  symbol: string
-  stockName?: string
-  price?: number | null
-  changePct?: number | null
-  triggerTags?: string[]
-  sectorInfo?: string
-  thsSectorName?: string
-}
 
 function visibleTriggerTags(signal: HotBurstSignal): string[] {
   const sector = (signal.sectorInfo || signal.thsSectorName || '').trim()
@@ -103,20 +87,47 @@ function visibleTriggerTags(signal: HotBurstSignal): string[] {
     .slice(0, 3)
 }
 
-interface HotBurstResponse {
-  outbreaks?: HotBurstSignal[]
-  records?: HotBurstSignal[]
+function levelLabel(level: HotBurstSignal['resonanceLevel']): string {
+  const labels: Record<NonNullable<HotBurstSignal['resonanceLevel']>, string> = {
+    critical: '极高',
+    high: '高',
+    medium: '中',
+    low: '低',
+  }
+  return labels[level || 'low']
 }
 
 const signals = ref<HotBurstSignal[]>([])
-const hours = ref(72)
+const HOT_BURST_CACHE_KEY = 'hot_burst_preview_cache_v2'
+const HOT_BURST_CACHE_TTL = 2 * 60 * 1000
+
+function readHomeCache(): HotBurstSignal[] | null {
+  const cached = uni.getStorageSync(HOT_BURST_CACHE_KEY) as {
+    cachedAt?: number
+    outbreaks?: HotBurstSignal[]
+  } | null
+  if (!cached?.cachedAt || !Array.isArray(cached.outbreaks)) return null
+  if (Date.now() - cached.cachedAt > HOT_BURST_CACHE_TTL) return null
+  return cached.outbreaks
+}
+
+function sortByDetectedAt(items: HotBurstSignal[]): HotBurstSignal[] {
+  return [...items].sort((a, b) => {
+    const aTime = a.detectedAt ? Date.parse(a.detectedAt) : 0
+    const bTime = b.detectedAt ? Date.parse(b.detectedAt) : 0
+    return bTime - aTime
+  })
+}
 
 async function loadData() {
+  const cached = readHomeCache()
+  if (cached) {
+    signals.value = sortByDetectedAt(cached)
+    return
+  }
   try {
-    const res: unknown = await stockApi.getHotBursts({ hours: hours.value, min_resonance: 3 })
-    const payload = res as { data?: HotBurstResponse }
-    const data: HotBurstResponse = payload.data ?? (res as HotBurstResponse)
-    signals.value = data.outbreaks ?? data.records ?? []
+    // 只按检测时间排序，不按共振等级排序，保证用户优先看到最新抓取结果。
+    signals.value = sortByDetectedAt(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 3 }))
   } catch {
     signals.value = []
   }
@@ -224,6 +235,7 @@ onShow(() => {
 .stock-name-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12rpx;
 }
 

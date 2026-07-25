@@ -63,6 +63,8 @@ export function markdownToHtml(md: string): string {
   html = html.replace(/(<li class="md-ol-li">[\s\S]*?<\/li>)/g, '<ol class="md-ol">$1</ol>')
   html = html.replace(/(<li class="md-ul-li">[\s\S]*?<\/li>)/g, '<ul class="md-ul">$1</ul>')
   html = html.replace(/\n{2,}/g, '<br />')
+  // 将剩余单个换行符替换为空格，避免 mp-html 将行内 <strong> 前后的 \n 解释为块级分隔导致换行
+  html = html.replace(/\n/g, ' ')
 
   return html
 }

@@ -84,7 +84,7 @@
  * 数据来源：TransmissionAnalysis（来自 mock-data）
  */
 import { computed } from 'vue'
-import type { TransmissionAnalysis, TransmissionChainNode } from '../../types'
+import type { TransmissionAnalysis, TransmissionChainNode } from '../types'
 
 interface Props {
   data?: TransmissionAnalysis | null

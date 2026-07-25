@@ -1,8 +1,30 @@
 <template>
   <SubPageCard title="事件传导">
     <view class="event-list-content">
-      <!-- 副标题 -->
-      <text class="page-subtitle">AI解析事件影响链，追踪产业链机会</text>
+      <!-- AI关注焦点区域 -->
+      <view class="ai-focus-section">
+        <text class="section-title">焦点事件</text>
+        <view class="headline-cards">
+          <EventHeadlineCard
+            v-if="mockHeadlineEvents.positive"
+            type="positive"
+            :title="mockHeadlineEvents.positive.title"
+            :importance="mockHeadlineEvents.positive.importance"
+            :industries="mockHeadlineEvents.positive.industries"
+            :event-id="mockHeadlineEvents.positive.eventId"
+            @click="handleHeadlineClick"
+          />
+          <EventHeadlineCard
+            v-if="mockHeadlineEvents.negative"
+            type="negative"
+            :title="mockHeadlineEvents.negative.title"
+            :importance="mockHeadlineEvents.negative.importance"
+            :industries="mockHeadlineEvents.negative.industries"
+            :event-id="mockHeadlineEvents.negative.eventId"
+            @click="handleHeadlineClick"
+          />
+        </view>
+      </view>
 
       <!-- 分类Tab -->
       <EventTabBar :active="activeType" @change="handleFilterChange" />
@@ -67,7 +89,7 @@
  * 从早点听卡片入口进入，展示 AI 事件影响链分析。
  * 支持分类筛选、分页加载、关注事件。
  */
-import { onMounted } from 'vue'
+import { onMounted, reactive } from 'vue'
 import type { EventItem } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
@@ -75,6 +97,25 @@ import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import EventTabBar from '@/modules/chat/event/components/EventTabBar.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
+import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
+
+// ========== Mock 数据（AI 关注焦点） ==========
+const mockHeadlineEvents = reactive({
+  positive: {
+    eventId: 'event-ai-computing-power',
+    newsId: 'news-ai-computing-power',
+    title: 'AI服务器需求持续增长，算力基础设施扩容确定性强',
+    importance: 'major' as const,
+    industries: ['算力', '芯片', '软件']
+  },
+  negative: {
+    eventId: 'event-real-estate',
+    newsId: 'news-real-estate',
+    title: '地产调控政策持续收紧，销售数据环比下滑',
+    importance: 'major' as const,
+    industries: ['房地产', '建材', '家居']
+  }
+})
 
 // ========== Composables ==========
 const {
@@ -99,6 +140,22 @@ onMounted(() => {
 })
 
 // ========== 事件处理 ==========
+
+/** AI 今日精选卡片点击 - 跳转到新闻详情页（事件原文） */
+function handleHeadlineClick(eventId: string) {
+  // 查找对应的 newsId
+  let newsId = ''
+  if (mockHeadlineEvents.positive?.eventId === eventId) {
+    newsId = mockHeadlineEvents.positive.newsId
+  } else if (mockHeadlineEvents.negative?.eventId === eventId) {
+    newsId = mockHeadlineEvents.negative.newsId
+  }
+
+  // 跳转到新闻详情页（事件原文）
+  uni.navigateTo({
+    url: `/modules/news/pages/detail?id=${newsId}&eventId=${eventId}`
+  })
+}
 
 /** 事件类型筛选切换 */
 function handleFilterChange(value: string) {
@@ -134,12 +191,25 @@ async function handleFollow(event: EventItem) {
   padding: 0 32rpx 40rpx;
 }
 
-.page-subtitle {
+/* ========== AI 关注焦点区域 ========== */
+.ai-focus-section {
+  margin-bottom: 20rpx;
+}
+
+.section-title {
   display: block;
-  font-size: 24rpx;
-  color: var(--ev-text-muted);
-  line-height: 1.5;
-  margin-bottom: 16rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin-bottom: 10rpx;
+  letter-spacing: 0.5rpx;
+}
+
+.headline-cards {
+  display: flex;
+  flex-direction: row;
+  gap: 12rpx;
+  align-items: stretch;
 }
 
 .event-list {

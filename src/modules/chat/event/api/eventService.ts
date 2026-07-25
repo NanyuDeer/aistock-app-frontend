@@ -27,6 +27,58 @@
 import type { EventItem } from '../types'
 import { getEventDetail } from './eventApi'
 
+// ==================== AI 今日精选相关类型 ====================
+
+/** AI 今日精选事件 */
+export interface AiHeadlineEvent {
+  /** 事件ID */
+  eventId: string
+  /** 新闻ID */
+  newsId: string
+  /** 事件标题 */
+  title: string
+  /** 重要性 */
+  importance: 'major' | 'normal'
+  /** 影响行业 */
+  industries: string[]
+}
+
+/** AI 今日精选数据 */
+export interface AiHeadlineEvents {
+  positive?: AiHeadlineEvent
+  negative?: AiHeadlineEvent
+}
+
+// ==================== AI 今日精选 Mock 函数 ====================
+
+/**
+ * 获取 AI 今日精选事件（Mock）
+ *
+ * 未来替换：调用后端 Agent API 获取真实数据
+ *
+ * @returns AI 今日精选数据（最大机会 + 最大风险）
+ */
+export function getAiHeadlineEvents(): Promise<AiHeadlineEvents> {
+  return Promise.resolve({
+    positive: {
+      eventId: 'event-ai-computing-power',
+      newsId: 'news-ai-computing-power',
+      title: 'AI服务器需求持续增长，算力基础设施扩容确定性强',
+      importance: 'major',
+      industries: ['算力', '芯片', '软件']
+    },
+    negative: {
+      eventId: 'event-real-estate',
+      newsId: 'news-real-estate',
+      title: '地产调控政策持续收紧，销售数据环比下滑',
+      importance: 'major',
+      industries: ['房地产', '建材', '家居']
+    }
+  })
+}
+
+// ==================== 原有补充数据逻辑 ====================
+
 /**
  * 为事件列表补充 Top5 受影响行业数据
  *

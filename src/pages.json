@@ -50,6 +50,15 @@
       }
     },
     {
+      "path": "modules/favorites/pages/alert-catcher",
+      "style": {
+        "navigationBarTitleText": "异动捕手",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
       "path": "modules/favorites/pages/favorites",
       "style": {
         "navigationBarTitleText": "自选",
@@ -72,7 +81,7 @@
     {
       "path": "modules/market/pages/event-catcher",
       "style": {
-        "navigationBarTitleText": "异动捕手",
+        "navigationBarTitleText": "个股情报",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
@@ -204,7 +213,7 @@
     {
       "path": "modules/analytics/pages/reports",
       "style": {
-        "navigationBarTitleText": "业绩",
+        "navigationBarTitleText": "业绩报告",
         "navigationStyle": "custom",
         "enablePullDownRefresh": false
       }
@@ -213,6 +222,14 @@
       "path": "modules/analytics/pages/forecast",
       "style": {
         "navigationBarTitleText": "业绩预测",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "modules/analytics/pages/traceability",
+      "style": {
+        "navigationBarTitleText": "大盘溯源",
         "navigationStyle": "custom",
         "enablePullDownRefresh": false
       }

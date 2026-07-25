@@ -93,6 +93,17 @@ import { useChatStore } from '@/shared/store/modules/chat'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 const chatStore = useChatStore()
+
+// 将外部问题转交给分包聊天页发送，避免入口页重复发送
+onLoad((options: Record<string, string> | undefined) => {
+  // 重定向到分包聊天页（新版含市场复盘模式）
+  const q = options?.q
+  if (q) {
+    uni.redirectTo({ url: `/pages-sub-app/chat/index?q=${encodeURIComponent(q)}` })
+    return
+  }
+  uni.redirectTo({ url: '/pages-sub-app/chat/index' })
+})
 const messages = chatStore.messages
 const streaming = chatStore.streaming
 
@@ -100,17 +111,6 @@ const inputText = ref('')
 const scrollTop = ref(0)
 const statusBarHeight = ref(0)
 try { statusBarHeight.value = uni.getSystemInfoSync().statusBarHeight || 0 } catch (e) {}
-
-onLoad((options: any) => {
-  const msg = options?.message
-  if (msg) {
-    const text = decodeURIComponent(msg)
-    nextTick(() => {
-      chatStore.sendMessage(text)
-      scrollToBottom()
-    })
-  }
-})
 
 function handleSend() {
   const content = inputText.value.trim()
