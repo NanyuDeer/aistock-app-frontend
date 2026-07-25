@@ -5,6 +5,7 @@ AI 对话模块提供智能投顾对话功能，支持行情查询、资金流�
 
 ## 页面
 - `pages/index.vue` - AI 对话主页面
+- `pages/agent-report.vue` - 今日分析概览页（双模式：无 intent 参数→概览模式显示各 Agent 简报卡片；有 intent 参数→详情模式显示单个 Agent 报告）
 
 ## 组件
 - `components/ChatBubble.vue` - 对话气泡

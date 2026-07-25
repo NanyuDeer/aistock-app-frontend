@@ -99,12 +99,6 @@
             <text class="menu-arrow">›</text>
           </view>
           <view class="setting-divider" />
-          <view class="menu-row" @tap="goAlerts">
-            <SvgIcon name="bell-line" size="36rpx" color="#6b7280" />
-            <text class="menu-label">特别提醒</text>
-            <text class="menu-arrow">›</text>
-          </view>
-          <view class="setting-divider" />
           <view class="menu-row" @tap="goAbout">
             <SvgIcon name="information-line" size="36rpx" color="#6b7280" />
             <text class="menu-label">关于</text>
@@ -152,11 +146,26 @@ onShow(async () => {
 
 async function loadSettings() {
   try {
-    const s = await authApi.getSettings()
-    // 合并：API 返回值覆盖默认值，确保未返回的字段仍有默认值
-    settings.value = { ...DEFAULT_SETTINGS, ...s }
+    const s = await authApi.getSettings() as unknown as {
+      openid?: string
+      settings?: Array<{ setting_type?: string; enabled?: boolean }>
+    }
+    // 后端返回 { openid, settings: [{ setting_type, enabled, updated_at }, ...] }
+    // 转换为前端扁平结构 { stock_push, outbreak_push, leader_push }
+    const arr = Array.isArray(s?.settings) ? s.settings : []
+    const map: Record<string, boolean> = {}
+    for (const item of arr) {
+      if (item.setting_type) {
+        map[item.setting_type] = !!item.enabled
+      }
+    }
+    settings.value = {
+      stock_push: map.stock_push ?? false,
+      outbreak_push: map.outbreak_push ?? false,
+      leader_push: map.leader_push ?? false,
+    }
   } catch (e) {
-    // API 未实现或失败时，保持默认值（全部开启）
+    // API 未实现或失败时，保持默认值
     settings.value = { ...DEFAULT_SETTINGS }
   }
 }
@@ -205,10 +214,6 @@ function goLogin() {
 
 function goFavorites() {
   uni.navigateTo({ url: '/modules/favorites/pages/favorites' })
-}
-
-function goAlerts() {
-  uni.reLaunch({ url: '/modules/home/pages/index?tab=alert' })
 }
 
 function goAbout() {

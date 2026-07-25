@@ -7,6 +7,15 @@
       </view>
     </template>
 
+    <!-- 引导卡片：点击查看今日分析报告 -->
+    <view class="report-guide-card" @tap="goAgentReport">
+      <view class="guide-left">
+        <SvgIcon name="file-line" color="#ffffff" size="40rpx" />
+        <text class="guide-title">点击查看今日分析报告</text>
+      </view>
+      <SvgIcon name="arrow-right-line" color="#ffffff" size="32rpx" />
+    </view>
+
     <!-- 搜索栏 -->
     <view class="search-wrap">
       <SvgIcon name="search-line" size="32rpx" color="#9ca3af" />
@@ -114,6 +123,13 @@ function openDetail(stock: TrendScoreListItem) {
   })
 }
 
+function goAgentReport() {
+  const today = new Date().toISOString().split('T')[0]
+  uni.navigateTo({
+    url: `/modules/analytics/pages/trend-score-report?date=${today}`
+  })
+}
+
 // 保留：直接 URL 访问（页面栈为空）时的模块级返回兜底。
 // 常规返回由 SubPageCard 自带返回按钮处理；此处保留 fallback 不丢失。
 function goBack() {
@@ -150,6 +166,30 @@ onShow(() => {
   border-radius: $radius-base;
   background: $bg-color-grey;
   box-shadow: $shadow-base;
+}
+
+/* ===== 引导卡片 ===== */
+.report-guide-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 32rpx;
+  margin: 0 $spacing-base $spacing-base;
+  background: linear-gradient(135deg, #4d7cfe 0%, #6366f1 100%);
+  border-radius: $radius-base;
+  box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
+}
+
+.guide-left {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.guide-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #ffffff;
 }
 
 .search-input {

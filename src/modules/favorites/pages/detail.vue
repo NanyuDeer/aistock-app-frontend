@@ -144,8 +144,8 @@
             <view class="info-news-divider"></view>
             <view class="news-list">
               <view
-                v-for="(news, idx) in newsList"
-                :key="idx"
+                v-for="(news, idx) in pagedNewsList"
+                :key="(newsPage - 1) * newsPageSize + idx"
                 class="news-item"
                 @tap="openNews(news)"
               >
@@ -157,6 +157,15 @@
               </view>
               <view v-if="!newsList.length" class="ai-empty">
                 <text class="ai-empty-text">暂无相关资讯</text>
+              </view>
+              <view v-if="newsTotalPages > 1" class="news-pagination">
+                <view class="news-page-btn" :class="{ 'is-disabled': newsPage <= 1 }" @tap="newsPrevPage">
+                  <text class="news-page-arrow">‹</text>
+                </view>
+                <text class="news-page-info">{{ newsPage }} / {{ newsTotalPages }}</text>
+                <view class="news-page-btn" :class="{ 'is-disabled': newsPage >= newsTotalPages }" @tap="newsNextPage">
+                  <text class="news-page-arrow">›</text>
+                </view>
               </view>
           </view>
         </view>
@@ -274,10 +283,6 @@
             <view class="detail-item">
               <text class="detail-label">市净率</text>
               <text class="detail-value">{{ quote.pbRatio.toFixed(2) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="detail-label">振幅</text>
-              <text class="detail-value">{{ quote.amplitude.toFixed(2) }}%</text>
             </view>
           </view>
         </view>
@@ -754,51 +759,7 @@
         </view>
       </view>
 
-      <!-- 6. 基础行情明细（无卡片外壳，直接展示） -->
-      <view class="detail-grid">
-        <view class="detail-item">
-          <text class="detail-label">今开</text>
-          <text :class="['detail-value', quote.open >= quote.prevClose ? 'up' : 'down']">{{ quote.open.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">最高</text>
-          <text class="detail-value up">{{ quote.high.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">最低</text>
-          <text class="detail-value down">{{ quote.low.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">昨收</text>
-          <text class="detail-value">{{ quote.prevClose.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">成交量</text>
-          <text class="detail-value">{{ formatVolume(quote.volume) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">成交额</text>
-          <text class="detail-value">{{ formatAmount(quote.amount) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">换手率</text>
-          <text class="detail-value">{{ quote.turnoverRate.toFixed(2) }}%</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">振幅</text>
-          <text class="detail-value">{{ quote.amplitude.toFixed(2) }}%</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">市盈率</text>
-          <text class="detail-value">{{ quote.peRatio.toFixed(2) }}</text>
-        </view>
-        <view class="detail-item">
-          <text class="detail-label">市净率</text>
-          <text class="detail-value">{{ quote.pbRatio.toFixed(2) }}</text>
-        </view>
-      </view>
-
-      <!-- 7. AI 投顾入口（页面最底部） -->
+      <!-- 6. AI 投顾入口（页面最底部） -->
       <view class="ai-card" @tap="goChat">
         <view class="ai-icon-wrap">
           <SvgIcon name="robot-line" size="36rpx" color="#4d7cfe" />
@@ -917,6 +878,19 @@ const symbol = ref('')
 const aiAnalysis = ref<any>(null)
 const aiLoading = ref(false)
 const newsList = ref<any[]>([])
+const newsPage = ref(1)
+const newsPageSize = 3
+const newsTotalPages = computed(() => Math.max(1, Math.ceil(newsList.value.length / newsPageSize)))
+const pagedNewsList = computed(() => {
+  const start = (newsPage.value - 1) * newsPageSize
+  return newsList.value.slice(start, start + newsPageSize)
+})
+function newsNextPage() {
+  if (newsPage.value < newsTotalPages.value) newsPage.value++
+}
+function newsPrevPage() {
+  if (newsPage.value > 1) newsPage.value--
+}
 const stockEvents = ref<any[]>([])
 const forecastData = ref<any>(null)
 const forecastLoading = ref(false)
@@ -1173,6 +1147,7 @@ async function loadData() {
         source: n['来源'] || n.source || '财联社',
         publishTime: n['时间'] || n.publish_time || n.time || '',
       }))
+      newsPage.value = 1
     }
     if (infoData.status === 'fulfilled' && infoData.value) {
       stockInfo.value = infoData.value
@@ -1486,8 +1461,6 @@ function goChat() {
 
 .page-detail {
   padding: 24rpx;
-  padding-bottom: calc(220rpx + env(safe-area-inset-bottom));
-  min-height: 100vh;
   background: #f5f7fa;
   box-sizing: border-box;
   width: 100%;
@@ -2605,11 +2578,48 @@ function goChat() {
   color: #9ca3af;
 }
 
+/* 新闻翻页 */
+.news-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20rpx;
+  padding: 16rpx 0 4rpx;
+}
+
+.news-page-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-radius: 50%;
+
+  &.is-disabled { opacity: 0.35; }
+  &:active:not(.is-disabled) { background: #e2e8f0; }
+}
+
+.news-page-arrow {
+  font-size: 36rpx;
+  color: #4d7cfe;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.news-page-info {
+  font-size: 24rpx;
+  color: #6b7280;
+  min-width: 80rpx;
+  text-align: center;
+}
+
 /* AI 投顾入口 */
 .ai-card {
   display: flex;
   align-items: center;
   gap: 20rpx;
+  margin-top: 32rpx;
   padding: 28rpx;
   background: linear-gradient(135deg, rgba(77, 124, 254, 0.1), rgba(99, 102, 241, 0.05));
   border: 1rpx solid rgba(77, 124, 254, 0.2);

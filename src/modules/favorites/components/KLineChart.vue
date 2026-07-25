@@ -21,7 +21,7 @@
         <view v-for="tick in chartModel.ticks" :key="tick.label" class="kline-axis-text">{{ tick.label }}</view>
       </view>
       <view class="kline-plot-wrap">
-        <svg class="kline-svg" viewBox="0 0 360 238" preserveAspectRatio="none">
+        <svg class="kline-svg" viewBox="0 0 360 238" preserveAspectRatio="xMidYMid meet">
           <g v-for="tick in chartModel.ticks" :key="`grid-${tick.label}`">
             <line :x1="chartModel.left" :y1="tick.y" :x2="chartModel.right" :y2="tick.y" stroke="#eef2f7" stroke-width="1" />
           </g>

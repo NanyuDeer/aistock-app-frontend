@@ -211,6 +211,14 @@
       }
     },
     {
+      "path": "modules/analytics/pages/trend-score-report",
+      "style": {
+        "navigationBarTitleText": "趋势股评分分析",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "modules/analytics/pages/reports",
       "style": {
         "navigationBarTitleText": "业绩报告",
@@ -278,7 +286,7 @@
         {
           "path": "briefing/index",
           "style": {
-            "navigationBarTitleText": "双人对话播报",
+            "navigationBarTitleText": "早点听",
             "navigationStyle": "custom",
             "disableScroll": true,
             "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }

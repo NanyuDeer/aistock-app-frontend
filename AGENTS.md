@@ -21,7 +21,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 |----|------|------|---------|
 | 共享层 | `src/shared/` | API 接口、Pinia Store、全局组件、工具 hooks、类型定义、全局样式 | 组长维护，模块只读引用 |
 | 业务模块层 | `src/modules/` | 各业务功能模块，每人负责一个 | 模块间解耦，禁止互相引用 |
-| App 分包 | `src/pages-sub-app/` | App 专属功能（双人播报、持仓、事件链、估值、复盘、晨报、AI 对话） | `#ifdef APP-PLUS` 包裹 |
+| App 分包 | `src/pages-sub-app/` | App 专属功能（早点听、持仓、事件链、估值、复盘、晨报、AI 对话） | `#ifdef APP-PLUS` 包裹 |
 | 小程序分包 | `src/pages-sub-mp/` | 小程序专属功能（微信智能体） | `#ifdef MP-WEIXIN` 包裹 |
 
 ### 业务模块
@@ -40,7 +40,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 
 | 页面 | 文件 | 说明 |
 |------|------|------|
-| 双人播报 | `briefing/index.vue` | 双人对话播报（音频播放 + 对话文本展示，已实现） |
+| 早点听 | `briefing/index.vue` | 结构化早晚报（音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页） |
 | 持仓管理 | `portfolio/index.vue` | 持仓分析 |
 | 事件传导链 | `event-chain/index.vue` | 事件传导链路可视化 |
 | 估值分析 | `valuation/index.vue` | 个股估值 |
@@ -64,7 +64,7 @@ src/
 │   │   └── modules/     # API 模块（按功能拆分）
 │   │       ├── agent.ts    # Agent 反代（/api/agent/*）
 │   │       ├── auth.ts     # 认证
-│   │       ├── briefing.ts # 晨报
+│   │       ├── briefing.ts # 早晚报结构化
 │   │       ├── event.ts    # 事件传导链
 │   │       ├── news.ts     # 新闻资讯
 │   │       ├── portfolio.ts # 持仓
@@ -213,7 +213,7 @@ src/
 |---------|------|---------|
 | `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务） | `/api/agent/*` |
 | `auth.ts` | 认证（登录、用户信息） | `/api/auth/wechat/*` |
-| `briefing.ts` | 晨报 | `/api/briefing/*` |
+| `briefing.ts` | 早晚报结构化（BriefingItem/BriefingSummary 类型 + 降级解析适配器） | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |
 | `news.ts` | 新闻资讯 | `/api/news/*` |
 | `portfolio.ts` | 持仓管理 | `/api/portfolio/*` |

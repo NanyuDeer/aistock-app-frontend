@@ -48,6 +48,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { compactNumber } from '@/shared/utils/format'
 
 interface SeriesItem {
   name: string
@@ -111,13 +112,6 @@ const lineModel = computed(() => {
 
 function switchMetric(index: number) {
   activeIndex.value = index
-}
-
-function compactNumber(value: number): string {
-  if (!Number.isFinite(value)) return '--'
-  if (Math.abs(value) >= 10) return value.toFixed(0)
-  if (Math.abs(value) >= 1) return value.toFixed(1).replace(/\.0$/, '')
-  return value.toFixed(2).replace(/\.?0+$/, '')
 }
 
 watch(() => props.series, () => {

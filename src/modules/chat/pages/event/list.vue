@@ -6,21 +6,21 @@
         <text class="section-title">焦点事件</text>
         <view class="headline-cards">
           <EventHeadlineCard
-            v-if="mockHeadlineEvents.positive"
+            v-if="headlinePositive"
             type="positive"
-            :title="mockHeadlineEvents.positive.title"
-            :importance="mockHeadlineEvents.positive.importance"
-            :industries="mockHeadlineEvents.positive.industries"
-            :event-id="mockHeadlineEvents.positive.eventId"
+            :title="headlinePositive.title"
+            :importance="headlinePositive.importance"
+            :industries="headlinePositive.industries"
+            :event-id="headlinePositive.eventId"
             @click="handleHeadlineClick"
           />
           <EventHeadlineCard
-            v-if="mockHeadlineEvents.negative"
+            v-if="headlineNegative"
             type="negative"
-            :title="mockHeadlineEvents.negative.title"
-            :importance="mockHeadlineEvents.negative.importance"
-            :industries="mockHeadlineEvents.negative.industries"
-            :event-id="mockHeadlineEvents.negative.eventId"
+            :title="headlineNegative.title"
+            :importance="headlineNegative.importance"
+            :industries="headlineNegative.industries"
+            :event-id="headlineNegative.eventId"
             @click="handleHeadlineClick"
           />
         </view>
@@ -89,33 +89,76 @@
  * 从早点听卡片入口进入，展示 AI 事件影响链分析。
  * 支持分类筛选、分页加载、关注事件。
  */
-import { onMounted, reactive } from 'vue'
+import { onMounted, ref } from 'vue'
 import type { EventItem } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
+import { getEventList, getEventDetail } from '@/modules/chat/event/api/eventApi'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import EventTabBar from '@/modules/chat/event/components/EventTabBar.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
 
-// ========== Mock 数据（AI 关注焦点） ==========
-const mockHeadlineEvents = reactive({
-  positive: {
-    eventId: 'event-ai-computing-power',
-    newsId: 'news-ai-computing-power',
-    title: 'AI服务器需求持续增长，算力基础设施扩容确定性强',
-    importance: 'major' as const,
-    industries: ['算力', '芯片', '软件']
-  },
-  negative: {
-    eventId: 'event-real-estate',
-    newsId: 'news-real-estate',
-    title: '地产调控政策持续收紧，销售数据环比下滑',
-    importance: 'major' as const,
-    industries: ['房地产', '建材', '家居']
+// ========== 焦点事件（真实数据） ==========
+interface HeadlineEvent {
+  eventId: string
+  title: string
+  importance: 'major' | 'normal'
+  industries: string[]
+}
+
+const headlinePositive = ref<HeadlineEvent | null>(null)
+const headlineNegative = ref<HeadlineEvent | null>(null)
+
+/**
+ * 加载焦点事件：从事件列表取最新几条，获取详情以确定方向（利好/利空）和影响行业
+ * 取前3条事件详情，优先找出一条利好（positive）和一条利空（negative）
+ */
+async function loadHeadlineEvents() {
+  try {
+    const res = await getEventList({ page: 1, pageSize: 6 })
+    const events = res?.events ?? []
+    if (events.length === 0) return
+
+    // 取前3条事件，获取详情确定方向
+    const candidates = events.slice(0, 3)
+    const details = await Promise.allSettled(
+      candidates.map(e => getEventDetail(e.eventId))
+    )
+
+    for (let i = 0; i < candidates.length; i++) {
+      const evt = candidates[i]
+      const r = details[i]
+      const detail = r.status === 'fulfilled' ? r.value : null
+      const rating = detail?.investmentSummary?.rating
+      const industries = (detail?.event?.affectedIndustries ?? [])
+        .slice(0, 3)
+        .map(a => a.name)
+
+      const headline: HeadlineEvent = {
+        eventId: evt.eventId,
+        title: evt.title,
+        importance: 'major',
+        industries,
+      }
+
+      // 按投资评级分配到利好/利空卡片
+      if (rating === 'positive' && !headlinePositive.value) {
+        headlinePositive.value = headline
+      } else if (rating === 'negative' && !headlineNegative.value) {
+        headlineNegative.value = headline
+      } else if (!headlinePositive.value) {
+        // 兜底：未确定方向时优先放入利好
+        headlinePositive.value = headline
+      } else if (!headlineNegative.value) {
+        headlineNegative.value = headline
+      }
+    }
+  } catch (error) {
+    console.error('加载焦点事件失败:', error)
   }
-})
+}
 
 // ========== Composables ==========
 const {
@@ -137,23 +180,15 @@ const { toggleFollow } = useEventFollow()
 // ========== 生命周期 ==========
 onMounted(() => {
   refresh()
+  loadHeadlineEvents()
 })
 
 // ========== 事件处理 ==========
 
-/** AI 今日精选卡片点击 - 跳转到新闻详情页（事件原文） */
+/** AI 今日精选卡片点击 - 跳转到事件详情页 */
 function handleHeadlineClick(eventId: string) {
-  // 查找对应的 newsId
-  let newsId = ''
-  if (mockHeadlineEvents.positive?.eventId === eventId) {
-    newsId = mockHeadlineEvents.positive.newsId
-  } else if (mockHeadlineEvents.negative?.eventId === eventId) {
-    newsId = mockHeadlineEvents.negative.newsId
-  }
-
-  // 跳转到新闻详情页（事件原文）
   uni.navigateTo({
-    url: `/modules/news/pages/detail?id=${newsId}&eventId=${eventId}`
+    url: `/modules/chat/pages/event/detail?id=${eventId}`
   })
 }
 

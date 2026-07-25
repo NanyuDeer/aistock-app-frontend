@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 :title="'双人对话播报'" :subtitle="subtitleText">
+  <SubPageCard2 :title="'早点听'" :subtitle="subtitleText">
     <view class="briefing-content">
       <!-- 加载中 -->
       <view v-if="loading" class="loading-state">
@@ -7,40 +7,92 @@
       </view>
 
       <template v-else>
-        <!-- 播放控制 -->
-        <view v-if="report" class="player-bar">
-          <view class="play-btn" @tap="togglePlay">
-            <SvgIcon :name="isPlaying ? 'pause-fill' : 'play-fill'" size="48rpx" color="#ffffff" />
+        <!-- 音频入口条（点击进入播报详情页） -->
+        <view
+          v-if="audioPath || items.length"
+          class="audio-bar"
+          @tap="goDetail"
+        >
+          <view class="play-btn" @tap.stop="togglePlay">
+            <SvgIcon :name="isPlaying ? 'pause-fill' : 'play-fill'" size="40rpx" color="#ffffff" />
           </view>
-          <view class="player-info">
-            <text class="player-status">{{ audioStatusText }}</text>
+          <view class="audio-info">
+            <text class="audio-status">{{ audioStatusText }}</text>
+            <text class="audio-meta">AI 早报音频 · 播报详情 ›</text>
+          </view>
+          <text class="audio-arrow">›</text>
+        </view>
+
+        <!-- 头条卡片：今日最重要研判 -->
+        <view v-if="headlineItem" class="headline-card">
+          <view class="headline-label">
+            <text class="headline-star">★</text>
+            <text class="headline-label-text">今日头条</text>
+          </view>
+          <text class="headline-title">{{ headlineItem.title }}</text>
+          <text class="headline-conclusion">{{ headlineItem.conclusion }}</text>
+          <view v-if="headlineItem.relatedTags.length" class="headline-tags">
+            <text
+              v-for="tag in headlineItem.relatedTags"
+              :key="tag.text"
+              class="headline-tag"
+            >{{ tag.text }}</text>
           </view>
         </view>
 
-        <!-- 对话文本 -->
-        <view v-if="dialogueLines.length" class="dialogue-list">
-          <view
-            v-for="(line, idx) in dialogueLines"
-            :key="idx"
-            :class="['dialogue-item', line.role]"
-          >
-            <view class="role-avatar">
-              <text class="avatar-text">{{ line.role === 'host' ? '主' : '析' }}</text>
+        <!-- Agent 洞见列表 -->
+        <view v-if="insightItems.length" class="section-label">
+          <text class="section-label-text">Agent 洞见</text>
+          <view class="section-line" />
+        </view>
+
+        <view
+          v-for="item in insightItems"
+          :key="item.id"
+          class="insight-row"
+        >
+          <view class="insight-icon" :class="item.source">
+            <text class="insight-icon-text">{{ sourceIcon(item.source) }}</text>
+          </view>
+          <view class="insight-body">
+            <view class="insight-top">
+              <text class="insight-source">{{ sourceLabel(item.source) }}</text>
+              <text class="sentiment-badge" :class="sentimentClass(item.sentiment)">
+                {{ sentimentLabel(item.sentiment) }}
+              </text>
             </view>
-            <view class="dialogue-bubble">
-              <text class="role-name">{{ line.role === 'host' ? '主持人' : '分析师' }}</text>
-              <text class="dialogue-text">{{ line.content }}</text>
+            <text class="insight-title">{{ item.title }}</text>
+            <text class="insight-conclusion">{{ item.conclusion }}</text>
+            <view v-if="item.relatedTags.length" class="insight-tags">
+              <text
+                v-for="tag in item.relatedTags"
+                :key="tag.text"
+                class="mini-tag"
+                :class="tag.type === 'sector' ? 'sector' : ''"
+              >{{ tag.text }}</text>
             </view>
           </view>
         </view>
 
-        <!-- 纯文本降级展示 -->
-        <view v-else-if="reportText && !dialogueLines.length" class="report-text-wrap">
-          <text class="report-text">{{ reportText }}</text>
+        <!-- 异动公告强调 -->
+        <view v-if="alertItem" class="alert-card">
+          <view class="alert-label">
+            <text class="alert-dot">●</text>
+            <text class="alert-label-text">自选股异动</text>
+          </view>
+          <text class="alert-title">{{ alertItem.title }}</text>
+          <text class="alert-conclusion">{{ alertItem.conclusion }}</text>
+          <view v-if="alertItem.relatedTags.length" class="alert-tags">
+            <text
+              v-for="tag in alertItem.relatedTags"
+              :key="tag.text"
+              class="alert-tag"
+            >{{ tag.text }}</text>
+          </view>
         </view>
 
         <!-- 无报告 -->
-        <view v-else class="empty-state">
+        <view v-if="!audioPath && !items.length" class="empty-state">
           <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
           <text class="empty-text">今日播报尚未生成</text>
           <text class="empty-hint">请在 9:10 后查看</text>
@@ -67,13 +119,18 @@ import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { agentApi } from '@/shared/api/modules/agent'
 import { API_BASE_URL } from '@/shared/utils/constants'
+import {
+  SOURCE_LABELS,
+  SOURCE_ICONS,
+  SENTIMENT_LABELS,
+  type BriefingItem,
+  type BriefingSource,
+  type Sentiment,
+} from '@/shared/api/modules/briefing'
+import { parseBriefingItemsFromContent } from '@/shared/utils/briefingAdapter'
+import type { BriefingType } from '@/shared/utils/briefingReport'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-
-interface DialogueLine {
-  role: 'host' | 'analyst'
-  content: string
-}
 
 interface BroadcastReport {
   content: {
@@ -82,9 +139,14 @@ interface BroadcastReport {
   }
 }
 
+interface BriefReportData {
+  content?: unknown
+}
+
 const currentDate = ref('')
 const loading = ref(true)
 const report = ref<BroadcastReport | null>(null)
+const items = ref<BriefingItem[]>([])
 const isPlaying = ref(false)
 const audioContext = ref<UniApp.InnerAudioContext | null>(null)
 
@@ -93,10 +155,6 @@ const subtitleText = computed(() => {
     return `${currentDate.value} · AI 生成内容，仅供参考`
   }
   return 'AI 生成内容，仅供参考'
-})
-
-const reportText = computed(() => {
-  return report.value?.content?.text || ''
 })
 
 const audioPath = computed(() => {
@@ -108,46 +166,43 @@ const audioStatusText = computed(() => {
   return isPlaying.value ? '播放中' : '点击播放'
 })
 
-// 解析对话文本为行数组
-const dialogueLines = computed<DialogueLine[]>(() => {
-  const text = reportText.value
-  if (!text) return []
-
-  // 尝试 JSON 解析（prompt 要求的格式）
-  try {
-    const parsed: unknown = JSON.parse(text)
-    if (Array.isArray(parsed)) {
-      return parsed
-        .filter((item: unknown): item is Record<string, unknown> => {
-          return typeof item === 'object' && item !== null && 'role' in item && 'content' in item
-        })
-        .map((item: Record<string, unknown>) => ({
-          role: item.role === 'host' ? 'host' as const : 'analyst' as const,
-          content: String(item.content),
-        }))
-    }
-  } catch {
-    // 非 JSON 格式，降级处理
-  }
-
-  // 降级：按行解析，根据前缀判断角色
-  const lines = text.split('\n').filter((l) => l.trim())
-  return lines.map((line) => {
-    const trimmed = line.trim()
-    let role: 'host' | 'analyst' = 'host'
-    let content = trimmed
-
-    if (trimmed.startsWith('主持人') || trimmed.startsWith('host')) {
-      role = 'host'
-      content = trimmed.replace(/^(主持人|host)[：:]\s*/, '')
-    } else if (trimmed.startsWith('分析师') || trimmed.startsWith('analyst')) {
-      role = 'analyst'
-      content = trimmed.replace(/^(分析师|analyst)[：:]\s*/, '')
-    }
-
-    return { role, content }
-  })
+/** 头条条目（isHeadline=true） */
+const headlineItem = computed(() => {
+  return items.value.find((item) => item.isHeadline) || null
 })
+
+/** 洞见列表（非头条非异动） */
+const insightItems = computed(() => {
+  return items.value.filter((item) => !item.isHeadline && !item.isAlert)
+})
+
+/** 异动公告（isAlert=true） */
+const alertItem = computed(() => {
+  return items.value.find((item) => item.isAlert) || null
+})
+
+function sourceLabel(source: BriefingSource): string {
+  return SOURCE_LABELS[source] || source
+}
+
+function sourceIcon(source: BriefingSource): string {
+  return SOURCE_ICONS[source] || '•'
+}
+
+function sentimentLabel(sentiment: Sentiment): string {
+  return SENTIMENT_LABELS[sentiment] || sentiment
+}
+
+function sentimentClass(sentiment: Sentiment): string {
+  return `sentiment-${sentiment}`
+}
+
+/** 点击音频卡片跳转播报详情页 */
+function goDetail() {
+  uni.navigateTo({
+    url: `/pages-sub-app/briefing-detail/index?date=${currentDate.value}`,
+  })
+}
 
 function togglePlay() {
   if (!audioPath.value) {
@@ -186,6 +241,18 @@ function changeDate(delta: number) {
   loadReport()
 }
 
+/** 根据当前时间判断报告类型：15:30 前=晨报，之后=复盘 */
+function detectReportType(): BriefingType {
+  const now = new Date()
+  const hour = now.getHours()
+  const minute = now.getMinutes()
+  // 15:30 后用 review（复盘），之前用 morning（晨报）
+  if (hour > 15 || (hour === 15 && minute >= 30)) {
+    return 'review'
+  }
+  return 'morning'
+}
+
 async function loadReport() {
   if (!currentDate.value) return
   loading.value = true
@@ -194,12 +261,33 @@ async function loadReport() {
     audioContext.value.stop()
     isPlaying.value = false
   }
+
+  // 并行获取广播音频和结构化报告
+  const reportType = detectReportType()
+
   try {
-    const res: unknown = await agentApi.getReport('broadcast', currentDate.value)
-    // 响应拦截器已解包: 返回的是 {content: {text, audio_path}, ...} 或 null
-    report.value = (res as BroadcastReport) || null
+    const [broadcastRes, briefRes] = await Promise.allSettled([
+      agentApi.getReport('broadcast', currentDate.value),
+      agentApi.getReport(reportType, currentDate.value),
+    ])
+
+    // 广播报告（音频来源）
+    if (broadcastRes.status === 'fulfilled') {
+      report.value = (broadcastRes.value as BroadcastReport) || null
+    } else {
+      report.value = null
+    }
+
+    // 结构化条目（降级解析：从 morning/review 报告解析为 BriefingItem[]）
+    if (briefRes.status === 'fulfilled' && briefRes.value) {
+      const briefData = briefRes.value as BriefReportData
+      items.value = parseBriefingItemsFromContent(briefData.content, reportType)
+    } else {
+      items.value = []
+    }
   } catch {
     report.value = null
+    items.value = []
   } finally {
     loading.value = false
   }
@@ -234,20 +322,22 @@ onUnmounted(() => {
   color: #6b7280;
 }
 
-.player-bar {
+/* 音频入口条 */
+.audio-bar {
   display: flex;
   align-items: center;
   gap: 24rpx;
-  padding: 32rpx;
+  padding: 28rpx 32rpx;
   background: #ffffff;
   margin-bottom: 24rpx;
   border-radius: 20rpx;
+  border: 1rpx solid #e5e7eb;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
 .play-btn {
-  width: 96rpx;
-  height: 96rpx;
+  width: 80rpx;
+  height: 80rpx;
   border-radius: 50%;
   background: #4d7cfe;
   display: flex;
@@ -256,92 +346,291 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.player-info {
+.audio-info {
   flex: 1;
+  min-width: 0;
 }
 
-.player-status {
+.audio-status {
   font-size: 28rpx;
   color: #1a1d24;
-  font-weight: 500;
-}
-
-.dialogue-list {
-  display: flex;
-  flex-direction: column;
-  gap: 24rpx;
-  margin-bottom: 24rpx;
-}
-
-.dialogue-item {
-  display: flex;
-  gap: 16rpx;
-}
-
-.dialogue-item.analyst {
-  flex-direction: row-reverse;
-}
-
-.role-avatar {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  background: #4d7cfe;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.dialogue-item.analyst .role-avatar {
-  background: #22c55e;
-}
-
-.avatar-text {
-  font-size: 24rpx;
   font-weight: 600;
-  color: #ffffff;
-}
-
-.dialogue-bubble {
-  flex: 1;
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 20rpx 24rpx;
-  box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.04);
-}
-
-.dialogue-item.analyst .dialogue-bubble {
-  background: #e8f5e9;
-}
-
-.role-name {
-  font-size: 22rpx;
-  color: #6b7280;
-  margin-bottom: 8rpx;
   display: block;
 }
 
-.dialogue-text {
-  font-size: 28rpx;
-  line-height: 1.6;
-  color: #1a1d24;
+.audio-meta {
+  font-size: 22rpx;
+  color: #9ca3af;
+  margin-top: 4rpx;
+  display: block;
 }
 
-.report-text-wrap {
+.audio-arrow {
+  font-size: 36rpx;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* 头条卡片 */
+.headline-card {
+  background: linear-gradient(135deg, rgba(77, 124, 254, 0.04), rgba(99, 102, 241, 0.06));
+  border-radius: 20rpx;
   padding: 32rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid rgba(77, 124, 254, 0.20);
+  border-left: 8rpx solid #4d7cfe;
+}
+
+.headline-label {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 16rpx;
+}
+
+.headline-star {
+  font-size: 24rpx;
+  color: #4d7cfe;
+}
+
+.headline-label-text {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #4d7cfe;
+  letter-spacing: 2rpx;
+}
+
+.headline-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1a1d24;
+  line-height: 1.4;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.headline-conclusion {
+  font-size: 26rpx;
+  color: #4b5563;
+  line-height: 1.6;
+  display: block;
+  margin-bottom: 20rpx;
+}
+
+.headline-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.headline-tag {
+  font-size: 22rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  background: #ffffff;
+  color: #4d7cfe;
+  border: 1rpx solid rgba(77, 124, 254, 0.20);
+  font-weight: 500;
+}
+
+/* 分区标签 */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+  margin-top: 8rpx;
+}
+
+.section-label-text {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.section-line {
+  flex: 1;
+  height: 1rpx;
+  background: #e5e7eb;
+}
+
+/* 洞见列表 */
+.insight-row {
+  display: flex;
+  gap: 24rpx;
+  align-items: flex-start;
   background: #ffffff;
   border-radius: 20rpx;
-  margin-bottom: 24rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 16rpx;
+  border: 1rpx solid #e5e7eb;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
 }
 
-.report-text {
+.insight-icon {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #4d7cfe;
+
+  &.event { background: #d97706; }
+  &.trend { background: #7c3aed; }
+  &.alert { background: #e04545; }
+  &.review { background: #64748b; }
+  &.hot_burst { background: #0891b2; }
+  &.wind_leader { background: #4d7cfe; }
+}
+
+.insight-icon-text {
   font-size: 28rpx;
-  line-height: 1.8;
-  color: #1a1d24;
-  white-space: pre-wrap;
+  font-weight: 700;
+  color: #ffffff;
 }
 
+.insight-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.insight-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+}
+
+.insight-source {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.sentiment-badge {
+  font-size: 22rpx;
+  font-weight: 600;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+
+  &.sentiment-bull {
+    background: rgba(224, 69, 69, 0.08);
+    color: #e04545;
+  }
+
+  &.sentiment-bear {
+    background: rgba(43, 168, 74, 0.08);
+    color: #2ba84a;
+  }
+
+  &.sentiment-mixed {
+    background: rgba(148, 163, 184, 0.10);
+    color: #64748b;
+  }
+}
+
+.insight-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a1d24;
+  line-height: 1.4;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.insight-conclusion {
+  font-size: 24rpx;
+  color: #4b5563;
+  line-height: 1.5;
+  display: block;
+  margin-bottom: 12rpx;
+}
+
+.insight-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.mini-tag {
+  font-size: 20rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(77, 124, 254, 0.04);
+  color: #4d7cfe;
+
+  &.sector {
+    background: rgba(148, 163, 184, 0.10);
+    color: #64748b;
+  }
+}
+
+/* 异动公告强调 */
+.alert-card {
+  background: rgba(224, 69, 69, 0.08);
+  border-radius: 20rpx;
+  padding: 28rpx 32rpx;
+  margin-top: 8rpx;
+  border: 1rpx solid rgba(224, 69, 69, 0.20);
+  border-left: 8rpx solid #e04545;
+}
+
+.alert-label {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 16rpx;
+}
+
+.alert-dot {
+  font-size: 20rpx;
+  color: #e04545;
+}
+
+.alert-label-text {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #e04545;
+  letter-spacing: 2rpx;
+}
+
+.alert-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1a1d24;
+  line-height: 1.4;
+  display: block;
+  margin-bottom: 12rpx;
+}
+
+.alert-conclusion {
+  font-size: 26rpx;
+  color: #4b5563;
+  line-height: 1.6;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.alert-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.alert-tag {
+  font-size: 22rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  background: #ffffff;
+  color: #e04545;
+  border: 1rpx solid rgba(224, 69, 69, 0.20);
+  font-weight: 500;
+}
+
+/* 空状态 */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -361,25 +650,30 @@ onUnmounted(() => {
   color: #9ca3af;
 }
 
+/* 日期切换 */
 .date-nav {
   display: flex;
   justify-content: space-between;
   gap: 24rpx;
-  margin-bottom: 32rpx;
+  margin-top: 32rpx;
 }
 
 .date-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8rpx;
-  padding: 16rpx 32rpx;
+  flex: 1;
+  padding: 24rpx 0;
   background: #ffffff;
-  border-radius: 12rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #e5e7eb;
   box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.04);
 }
 
 .date-btn-text {
   font-size: 26rpx;
   color: #4d7cfe;
+  font-weight: 500;
 }
 </style>

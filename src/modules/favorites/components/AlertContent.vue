@@ -229,6 +229,7 @@ defineExpose({
 
 .capture-info {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4rpx;
@@ -243,6 +244,9 @@ defineExpose({
 .capture-detail {
   font-size: $font-size-sm;
   color: $text-color-secondary;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .capture-time {
@@ -313,6 +317,7 @@ defineExpose({
 
 .intel-info {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4rpx;

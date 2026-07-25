@@ -95,7 +95,7 @@
         <view class="divider" />
 
         <view class="meta-row">
-          <text class="update-time">更新时间：{{ item.updateTime }}</text>
+          <text class="update-time">更新时间：{{ formatShanghaiClock(item.updateTime) }}</text>
           <view class="institution-info">
             <text class="info-label">机构</text>
             <text class="institution-value">{{ item.institutionCount }}家</text>
@@ -114,6 +114,7 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
+import { formatShanghaiClock } from '@/shared/utils/datetime'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'

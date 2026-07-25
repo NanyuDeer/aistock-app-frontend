@@ -67,6 +67,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { compactNumber } from '@/shared/utils/format'
 
 interface FlowOrder {
   label: string
@@ -158,14 +159,6 @@ const trendModel = computed(() => {
 function formatSigned(value: number): string {
   const sign = value > 0 ? '+' : ''
   return `${sign}${compactNumber(value)}`
-}
-
-function compactNumber(value: number): string {
-  if (!Number.isFinite(value)) return '--'
-  const abs = Math.abs(value)
-  if (abs >= 10) return value.toFixed(0)
-  if (abs >= 1) return value.toFixed(2).replace(/\.?0+$/, '')
-  return value.toFixed(2).replace(/\.?0+$/, '')
 }
 
 function formatDateLabel(value: string): string {

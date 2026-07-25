@@ -37,6 +37,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { compactNumber } from '@/shared/utils/format'
 
 interface ProfitPoint {
   year: string
@@ -82,13 +83,6 @@ const chartModel = computed(() => {
   }))
   return { bars, ticks, left: axisLeft, right, plotLeft: axisLeft, plotRight: right, top, baseY }
 })
-
-function compactNumber(value: number): string {
-  if (!Number.isFinite(value)) return '--'
-  if (Math.abs(value) >= 10) return value.toFixed(0)
-  if (Math.abs(value) >= 1) return value.toFixed(1).replace(/\.0$/, '')
-  return value.toFixed(2).replace(/\.?0+$/, '')
-}
 </script>
 
 <style lang="scss" scoped>
