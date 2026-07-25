@@ -168,6 +168,7 @@ export const stockApi = {
         avgPrice: quote['均价'] || 0,
         limitUp: quote['涨停价'] || 0,
         limitDown: quote['跌停价'] || 0,
+        volumeRatio: quote['量比'] || 0,
       }
     })
   },
@@ -186,13 +187,33 @@ export const stockApi = {
   },
 
   /** 获取 K 线数据 */
-  getKLine(symbol: string, params?: { period?: string; count?: number }) {
-    return request.get<KLineItem[]>('/cn/stock/quotes/kline', { params: { symbol, ...params } })
+  getKLine(symbol: string, params?: { period?: 'daily' | 'weekly' | 'yearly' | string; count?: number }) {
+    const kltMap: Record<string, number> = {
+      daily: 101,
+      weekly: 102,
+      yearly: 103,
+    }
+    const klt = kltMap[params?.period || 'daily'] || 101
+    return request.get<KLineItem[]>('/cn/stock/quotes/kline', {
+      params: { symbol, klt, fqt: 1, limit: params?.count || 120 }
+    }).then((res: any) => {
+      const klines = res?.['K线'] || res?.klines || res?.data?.['K线'] || []
+      if (!Array.isArray(klines)) return []
+      const mapped = klines.map((k: any) => ({
+        date: k['时间'] || k.date || '',
+        open: Number(k['开盘价'] ?? k.open ?? 0),
+        close: Number(k['收盘价'] ?? k.close ?? 0),
+        high: Number(k['最高价'] ?? k.high ?? 0),
+        low: Number(k['最低价'] ?? k.low ?? 0),
+        volume: Number(k['成交量'] ?? k.volume ?? 0),
+      }))
+      return params?.period === 'yearly' ? aggregateYearlyKLines(mapped) : mapped
+    })
   },
 
-  /** 获取资金流向 */
+  /** 获取资金流向（已归一化） */
   getCapitalFlow(symbol: string) {
-    return request.get(`/cn/stocks/${symbol}/capital-flow`)
+    return request.get(`/cn/stocks/${symbol}/capital-flow`).then((res: any) => res || null)
   },
 
   /** 获取个股新闻 */
@@ -200,9 +221,9 @@ export const stockApi = {
     return request.get(`/cn/stocks/${symbol}/news`, { params })
   },
 
-  /** 获取十倍股评分 */
-  getTenxScore(symbol: string) {
-    return request.get(`/cn/stocks/${symbol}/tenx-score`)
+  /** 获取趋势股评分（四维：技术面/行业赛道景气/消息面催化/基本面，含一票否决检查） */
+  getTrendScore(symbol: string) {
+    return request.get(`/cn/stocks/${symbol}/trend-score`).then((res: any) => normalizeTrendScore(res))
   },
 
   /** 获取板块龙头（指定板块 code） */
@@ -289,7 +310,191 @@ export const stockApi = {
   /** 创建个股 AI 资讯分析（触发后端生成） */
   createStockAnalysis(symbol: string) {
     return request.post(`/cn/stocks/${symbol}/analysis`).then((res: any) => res?.data || res)
+  },
+
+  /** 获取个股 AI 分析历史 */
+  getStockAnalysisHistory(symbol: string, params?: { page?: number; pageSize?: number }) {
+    return request.get(`/cn/stocks/${symbol}/analysis/history`, { params }).then((res: any) => res?.data || res)
+  },
+
+  /** 获取股票基础信息（行业、地域板块、上市时间、股本、市值等） */
+  getStockInfos(symbol: string) {
+    return request.get('/cn/stock/infos', { params: { symbols: symbol } }).then((res: any) => {
+      const info = res?.['股票信息']?.[0] || res?.data?.['股票信息']?.[0] || null
+      if (!info) return null
+      return {
+        name: info['股票简称'] || '',
+        symbol: info['股票代码'] || symbol,
+        market: info['市场代码'] || '',
+        industry: info['所属行业'] || info['行业板块'] || '',
+        regionBoard: info['地域板块'] || '',
+        industryTagId: info['行业板块ID'] || null,
+        regionBoardTagId: info['地域板块ID'] || null,
+        listingDate: info['上市时间'] || '',
+        totalShares: info['总股本'] || null,
+        floatShares: info['流通股'] || null,
+        marketCap: info['总市值'] || null,
+        floatMarketCap: info['流通市值'] || null,
+      }
+    })
+  },
+
+  /** 获取业绩预测（GET 只读） */
+  getForecast(symbol: string) {
+    return request.get(`/cn/stock/${symbol}/profit-forecast`).then((res: any) => normalizeForecast(res))
+  },
+
+  /** 触发更新业绩预测 */
+  createForecast(symbol: string) {
+    return request.post(`/cn/stock/${symbol}/profit-forecast`).then((res: any) => normalizeForecast(res))
+  },
+
+  /** 强制刷新趋势股评分 */
+  refreshTrendScore(symbol: string) {
+    return request.post(`/cn/stocks/${symbol}/trend-score/refresh`).then((res: any) => normalizeTrendScore(res))
+  },
+
+  /** 获取个股异动事件（趋势风口） */
+  getStockEvents(symbol: string, params?: { cycle?: string; limit?: number }) {
+    return request.get(`/cn/trend-hotspots/events/${symbol}`, { params }).then((res: any) => {
+      const events = res?.events || res?.data?.events || []
+      return Array.isArray(events) ? events : []
+    })
   }
+}
+
+function normalizeForecast(res: any): any {
+  if (!res) return null
+  const epsList = res['预测年报每股收益'] || res.epsList || []
+  const profitList = res['预测年报净利润'] || res.profitList || []
+  const detailIndicators = res['业绩预测详表_详细指标预测'] || res.predictions || []
+  // 提取按年份的净利润预测和增长率
+  const predictions = profitList.map((p: any) => {
+    const year = String(p['年度'] || p.year || '')
+    const netProfit = p['均值'] || p.mean || '--'
+    // 从详表中查找对应年份的净利润增长率
+    let growth: number | string = '--'
+    const growthRow = detailIndicators.find((r: any) =>
+      String(r['预测指标'] || r.indicator || '').includes('净利润增长率')
+    )
+    if (growthRow) {
+      const key = `预测${year}-平均`
+      const raw = growthRow[key] || growthRow[`预测${year}`]
+      if (raw && raw !== '--') {
+        const num = parseFloat(String(raw).replace('%', '').replace(/,/g, ''))
+        if (!isNaN(num)) growth = num
+      }
+    }
+    return { year, netProfit, growth }
+  })
+  // 生成摘要文本（若无后端摘要）
+  let summary = res['摘要'] || res.summary || ''
+  if (!summary && epsList.length > 0 && profitList.length > 0) {
+    const first = epsList[0]
+    const year = first['年度'] || first.year || ''
+    const orgCount = first['预测机构数'] || first.orgCount || 0
+    const meanEPS = first['均值'] || first.mean || '--'
+    const profitItem = profitList.find((x: any) => String(x['年度'] || x.year) === String(year))
+    const profitMean = profitItem ? (profitItem['均值'] || profitItem.mean || '--') : '--'
+    summary = `截至${new Date().toISOString().split('T')[0]}，6个月以内共有 ${orgCount} 家机构作出预测；预测每股收益 ${meanEPS} 元，净利润 ${profitMean} 亿元。`
+  }
+  return {
+    symbol: res['股票代码'] || res.symbol || '',
+    summary,
+    updateTime: res['更新时间'] || res.update_time || '',
+    netProfitYoy: res['净利润同比(%)'] ?? res.netProfitYoy ?? null,
+    predictions,
+    detailIndicators,
+    epsList,
+    profitList,
+    rawData: res,
+  }
+}
+
+/** 趋势股评分归一化：处理四维结构（技术面/行业赛道景气/消息面催化/基本面），基本面维度含 subDimensions */
+function normalizeTrendScore(res: any): any {
+  if (!res) return null
+  // 一票否决
+  if (res.vetoed === true) {
+    return { vetoed: true, reasons: res.reasons || [], symbol: res.symbol || '' }
+  }
+  const dimensions = res.dimensions || []
+  const dimScores = res.dimScores || res.dim_scores || dimensions.map((d: any) => d.score || 0)
+  // 清洗指标无效值
+  const cleanIndicators = (inds: any[]) => (inds || []).map((ind: any) => ({
+    name: ind.name || '',
+    key: ind.key || '',
+    value: isInvalidValue(ind.value) ? '--' : (ind.value || '--'),
+    score: ind.score || 0,
+  }))
+  return {
+    vetoed: false,
+    score: Number(res.score) || 0,
+    label: res.label || '',
+    expectedMultiple: res.expectedMultiple || res.expected_multiple || '',
+    description: res.description || '',
+    aiConclusion: res.aiConclusion || res.ai_conclusion || '',
+    dimScores,
+    dimensions: dimensions.map((d: any) => {
+      const dim: any = {
+        name: d.name || '',
+        weight: d.weight || 0,
+        score: d.score || 0,
+        indicators: cleanIndicators(d.indicators),
+      }
+      // 基本面维度：提取 detail.subDimensions 作为子维度展示
+      const subDims = d.detail?.subDimensions || d.subDimensions
+      if (Array.isArray(subDims) && subDims.length) {
+        dim.subDimensions = subDims.map((sub: any) => ({
+          name: sub.name || '',
+          weight: sub.weight || 0,
+          score: sub.score || 0,
+          indicators: cleanIndicators(sub.indicators),
+        }))
+      }
+      // 提取 detail 中的展示字段（技术面 kline、行业赛道 sectorName 等）
+      if (d.detail) {
+        dim.detail = d.detail
+      }
+      return dim
+    }),
+    updatedAt: res.updatedAt || res.updated_at || '',
+    scoreDate: res.scoreDate || res.score_date || '',
+    rawData: res,
+  }
+}
+
+function isInvalidValue(val: unknown): boolean {
+  if (val == null) return true
+  const str = String(val).trim()
+  return str === '' || str === '-' || str === '0' || str === '0.0' || str === '0.00' || str === '0%' || str === '0.0%' || str === '0.00%' || str === 'NaN' || str === 'null' || str === 'undefined'
+}
+
+function aggregateYearlyKLines(items: KLineItem[]): KLineItem[] {
+  const byYear = new Map<string, KLineItem[]>()
+  items.forEach(item => {
+    const year = String(item.date || '').slice(0, 4)
+    if (!/^\d{4}$/.test(year)) return
+    const list = byYear.get(year) || []
+    list.push(item)
+    byYear.set(year, list)
+  })
+  return Array.from(byYear.entries())
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([year, list]) => {
+      const sorted = [...list].sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      const first = sorted[0]
+      const last = sorted[sorted.length - 1]
+      const lows = sorted.map(item => item.low || 0).filter(value => value > 0)
+      return {
+        date: year,
+        open: first?.open ?? 0,
+        close: last?.close ?? 0,
+        high: Math.max(...sorted.map(item => item.high || 0)),
+        low: lows.length ? Math.min(...lows) : 0,
+        volume: sorted.reduce((sum, item) => sum + (item.volume || 0), 0),
+      }
+    })
 }
 
 export interface PushHistoryItem {
