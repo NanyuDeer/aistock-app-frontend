@@ -66,8 +66,8 @@ const request = {
   get<T = any>(url: string, config: { params?: any; headers?: any } = {}): Promise<T> {
     return http.get(url, { params: config.params, header: config.headers }) as unknown as Promise<T>
   },
-  post<T = any>(url: string, data?: any, config: { headers?: any } = {}): Promise<T> {
-    return http.post(url, data, { header: config.headers }) as unknown as Promise<T>
+  post<T = any>(url: string, data?: any, config: { headers?: any; timeout?: number } = {}): Promise<T> {
+    return http.post(url, data, { header: config.headers, timeout: config.timeout }) as unknown as Promise<T>
   },
   put<T = any>(url: string, data?: any, config: { headers?: any } = {}): Promise<T> {
     return http.put(url, data, { header: config.headers }) as unknown as Promise<T>

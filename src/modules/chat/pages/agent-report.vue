@@ -60,7 +60,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { agentApi } from '@/shared/api/modules/agent'
+import { agentApi, isPublicReportIntent } from '@/shared/api/modules/agent'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
@@ -132,7 +132,7 @@ const reportText = computed(() => {
 })
 
 async function loadReport() {
-  if (!intent.value || !date.value) return
+  if (!isPublicReportIntent(intent.value) || !date.value) return
   loading.value = true
   try {
     const res: unknown = await agentApi.getReport(intent.value, date.value)
@@ -146,7 +146,8 @@ async function loadReport() {
 }
 
 onLoad((options) => {
-  intent.value = options?.intent || ''
+  const requestedIntent = options?.intent || ''
+  intent.value = isPublicReportIntent(requestedIntent) ? requestedIntent : ''
   date.value = options?.date || new Date().toISOString().split('T')[0]
   loadReport()
 })

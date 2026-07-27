@@ -9,6 +9,7 @@ import {
   type BriefingReport,
   type BriefingType,
 } from './briefingReport'
+import { shanghaiDateString, shanghaiDateTimeParts } from './tradingTime'
 
 export type { BriefingReport, BriefingType } from './briefingReport'
 
@@ -25,30 +26,21 @@ export interface BriefingCardState {
   refresh: () => Promise<void>
 }
 
-/** 根据当前时间判断报告类型：15:30 前为晨报，之后为晚报 */
-function autoDetectType(): BriefingType {
-  const now = new Date()
-  const hour = now.getHours()
-  const minute = now.getMinutes()
+/** 根据上海当前时间判断报告类型：15:30 前为晨报，之后为晚报 */
+export function briefingTypeAtShanghaiTime(date: Date = new Date()): BriefingType {
+  const { hour, minute } = shanghaiDateTimeParts(date)
   if (hour < 15 || (hour === 15 && minute < 30)) {
     return 'morning'
   }
-  return 'review'
-}
-
-/** 获取今天日期字符串 YYYY-MM-DD（本地时区） */
-function todayStr(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return 'evening'
 }
 
 export function useBriefingCard(
   fixedType?: BriefingType,
   fixedDate?: string,
 ): BriefingCardState {
-  const type = ref<BriefingType>(fixedType ?? autoDetectType())
-  const date = ref<string>(fixedDate ?? todayStr())
+  const type = ref<BriefingType>(fixedType ?? briefingTypeAtShanghaiTime())
+  const date = ref<string>(fixedDate ?? shanghaiDateString())
   const summary = ref('')
   const report = ref<BriefingReport | null>(null)
   const loading = ref(false)
@@ -60,7 +52,7 @@ export function useBriefingCard(
     loading.value = true
     status.value = 'loading'
     try {
-      const res: unknown = await agentApi.getReport(type.value, date.value)
+      const res: unknown = await agentApi.getBrief(type.value, date.value)
       // 兼容两种响应格式：{ data: { content } } 或 { content }
       const data = (res as Record<string, unknown>)?.data ?? res
       if (!data) {
@@ -69,9 +61,7 @@ export function useBriefingCard(
         report.value = null
         return
       }
-      const record = data as Record<string, unknown>
-      const content = record.content
-      const parsed = parseBriefingReport(content, type.value)
+      const parsed = parseBriefingReport(data, type.value)
       if (!parsed) {
         status.value = 'empty'
         summary.value = ''
