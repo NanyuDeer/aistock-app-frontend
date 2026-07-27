@@ -46,6 +46,19 @@ export function useStreamingChat() {
         })
         break
       case 'done':
+        if (chunk.advisor_trace) {
+          const lastMessage = chatStore.messages[chatStore.messages.length - 1]
+          if (lastMessage?.role === 'assistant') {
+            chatStore.setLastAssistantAdvisorTrace(chunk.advisor_trace)
+          } else {
+            chatStore.appendMessage({
+              role: 'assistant',
+              content: chunk.content || '',
+              advisorTrace: chunk.advisor_trace,
+              timestamp: Date.now(),
+            })
+          }
+        }
         chatStore.streaming = false
         break
     }

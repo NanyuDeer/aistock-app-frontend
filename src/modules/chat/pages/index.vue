@@ -94,15 +94,15 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 const chatStore = useChatStore()
 
-// 接收外部跳转传入的自动发送消息
-onLoad((options: any) => {
+// 将外部问题转交给分包聊天页发送，避免入口页重复发送
+onLoad((options: Record<string, string> | undefined) => {
+  // 重定向到分包聊天页（新版含市场复盘模式）
   const q = options?.q
   if (q) {
-    nextTick(() => {
-      chatStore.sendMessage(q)
-      scrollToBottom()
-    })
+    uni.redirectTo({ url: `/pages-sub-app/chat/index?q=${encodeURIComponent(q)}` })
+    return
   }
+  uni.redirectTo({ url: '/pages-sub-app/chat/index' })
 })
 const messages = chatStore.messages
 const streaming = chatStore.streaming

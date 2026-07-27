@@ -34,11 +34,6 @@
           </view>
         </view>
 
-        <!-- 纯文本降级展示 -->
-        <view v-else-if="reportText && !dialogueLines.length" class="report-text-wrap">
-          <text class="report-text">{{ reportText }}</text>
-        </view>
-
         <!-- 无报告 -->
         <view v-else class="empty-state">
           <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
@@ -65,8 +60,10 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { agentApi } from '@/shared/api/modules/agent'
+import { agentApi, type BriefType } from '@/shared/api/modules/agent'
 import { API_BASE_URL } from '@/shared/utils/constants'
+import { parseBroadcastReport, type BroadcastV1 } from '@/shared/utils/broadcastReport'
+import { addCalendarDays, shanghaiDateString } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
@@ -75,32 +72,23 @@ interface DialogueLine {
   content: string
 }
 
-interface BroadcastReport {
-  content: {
-    text?: string
-    audio_path?: string | null
-  }
-}
-
 const currentDate = ref('')
+const broadcastType = ref<BriefType>('morning')
 const loading = ref(true)
-const report = ref<BroadcastReport | null>(null)
+const report = ref<BroadcastV1 | null>(null)
 const isPlaying = ref(false)
 const audioContext = ref<UniApp.InnerAudioContext | null>(null)
 
 const subtitleText = computed(() => {
+  const typeLabel = broadcastType.value === 'morning' ? '晨报' : '晚报'
   if (currentDate.value) {
-    return `${currentDate.value} · AI 生成内容，仅供参考`
+    return `${currentDate.value} · ${typeLabel} · AI 生成内容，仅供参考`
   }
-  return 'AI 生成内容，仅供参考'
-})
-
-const reportText = computed(() => {
-  return report.value?.content?.text || ''
+  return `${typeLabel} · AI 生成内容，仅供参考`
 })
 
 const audioPath = computed(() => {
-  return report.value?.content?.audio_path || null
+  return report.value?.audio_path || null
 })
 
 const audioStatusText = computed(() => {
@@ -108,45 +96,8 @@ const audioStatusText = computed(() => {
   return isPlaying.value ? '播放中' : '点击播放'
 })
 
-// 解析对话文本为行数组
 const dialogueLines = computed<DialogueLine[]>(() => {
-  const text = reportText.value
-  if (!text) return []
-
-  // 尝试 JSON 解析（prompt 要求的格式）
-  try {
-    const parsed: unknown = JSON.parse(text)
-    if (Array.isArray(parsed)) {
-      return parsed
-        .filter((item: unknown): item is Record<string, unknown> => {
-          return typeof item === 'object' && item !== null && 'role' in item && 'content' in item
-        })
-        .map((item: Record<string, unknown>) => ({
-          role: item.role === 'host' ? 'host' as const : 'analyst' as const,
-          content: String(item.content),
-        }))
-    }
-  } catch {
-    // 非 JSON 格式，降级处理
-  }
-
-  // 降级：按行解析，根据前缀判断角色
-  const lines = text.split('\n').filter((l) => l.trim())
-  return lines.map((line) => {
-    const trimmed = line.trim()
-    let role: 'host' | 'analyst' = 'host'
-    let content = trimmed
-
-    if (trimmed.startsWith('主持人') || trimmed.startsWith('host')) {
-      role = 'host'
-      content = trimmed.replace(/^(主持人|host)[：:]\s*/, '')
-    } else if (trimmed.startsWith('分析师') || trimmed.startsWith('analyst')) {
-      role = 'analyst'
-      content = trimmed.replace(/^(分析师|analyst)[：:]\s*/, '')
-    }
-
-    return { role, content }
-  })
+  return report.value?.dialogue ?? []
 })
 
 function togglePlay() {
@@ -180,9 +131,7 @@ function togglePlay() {
 }
 
 function changeDate(delta: number) {
-  const d = new Date(currentDate.value)
-  d.setDate(d.getDate() + delta)
-  currentDate.value = d.toISOString().split('T')[0]
+  currentDate.value = addCalendarDays(currentDate.value, delta)
   loadReport()
 }
 
@@ -195,9 +144,9 @@ async function loadReport() {
     isPlaying.value = false
   }
   try {
-    const res: unknown = await agentApi.getReport('broadcast', currentDate.value)
-    // 响应拦截器已解包: 返回的是 {content: {text, audio_path}, ...} 或 null
-    report.value = (res as BroadcastReport) || null
+    const res = await agentApi.getBroadcast(broadcastType.value, currentDate.value)
+    const data: unknown = res
+    report.value = parseBroadcastReport(data, broadcastType.value, currentDate.value)
   } catch {
     report.value = null
   } finally {
@@ -205,8 +154,12 @@ async function loadReport() {
   }
 }
 
-onLoad(() => {
-  currentDate.value = new Date().toISOString().split('T')[0]
+onLoad((options) => {
+  const opts = options as Record<string, string> || {}
+  broadcastType.value = opts.type === 'evening' ? 'evening' : 'morning'
+  // 未传日期时用上海交易日：toISOString 返回 UTC 日期，凌晨 0:00-8:00
+  // （上海时间）期间 UTC 仍是前一天，会取到错误的播报。
+  currentDate.value = opts.date || shanghaiDateString()
   loadReport()
 })
 
@@ -326,20 +279,6 @@ onUnmounted(() => {
   font-size: 28rpx;
   line-height: 1.6;
   color: #1a1d24;
-}
-
-.report-text-wrap {
-  padding: 32rpx;
-  background: #ffffff;
-  border-radius: 20rpx;
-  margin-bottom: 24rpx;
-}
-
-.report-text {
-  font-size: 28rpx;
-  line-height: 1.8;
-  color: #1a1d24;
-  white-space: pre-wrap;
 }
 
 .empty-state {
