@@ -117,7 +117,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { agentApi } from '@/shared/api/modules/agent'
+import { agentApi, type BriefType } from '@/shared/api/modules/agent'
 import { API_BASE_URL } from '@/shared/utils/constants'
 import {
   SOURCE_LABELS,
@@ -144,6 +144,7 @@ interface BriefReportData {
 }
 
 const currentDate = ref('')
+const broadcastType = ref<BriefType>('morning')
 const loading = ref(true)
 const report = ref<BroadcastReport | null>(null)
 const items = ref<BriefingItem[]>([])
@@ -151,14 +152,15 @@ const isPlaying = ref(false)
 const audioContext = ref<UniApp.InnerAudioContext | null>(null)
 
 const subtitleText = computed(() => {
+  const typeLabel = broadcastType.value === 'morning' ? '晨报' : '晚报'
   if (currentDate.value) {
-    return `${currentDate.value} · AI 生成内容，仅供参考`
+    return `${currentDate.value} · ${typeLabel} · AI 生成内容，仅供参考`
   }
   return 'AI 生成内容，仅供参考'
 })
 
 const audioPath = computed(() => {
-  return report.value?.content?.audio_path || null
+  return report.value?.audio_path || null
 })
 
 const audioStatusText = computed(() => {
@@ -235,9 +237,7 @@ function togglePlay() {
 }
 
 function changeDate(delta: number) {
-  const d = new Date(currentDate.value)
-  d.setDate(d.getDate() + delta)
-  currentDate.value = d.toISOString().split('T')[0]
+  currentDate.value = addCalendarDays(currentDate.value, delta)
   loadReport()
 }
 
@@ -293,8 +293,12 @@ async function loadReport() {
   }
 }
 
-onLoad(() => {
-  currentDate.value = new Date().toISOString().split('T')[0]
+onLoad((options) => {
+  const opts = options as Record<string, string> || {}
+  broadcastType.value = opts.type === 'evening' ? 'evening' : 'morning'
+  // 未传日期时用上海交易日：toISOString 返回 UTC 日期，凌晨 0:00-8:00
+  // （上海时间）期间 UTC 仍是前一天，会取到错误的播报。
+  currentDate.value = opts.date || shanghaiDateString()
   loadReport()
 })
 

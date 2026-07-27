@@ -39,6 +39,7 @@
 
               <!-- Markdown 渲染的回复内容 -->
               <mp-html v-if="msg.content" :content="markdownToHtml(msg.content)" class="bubble-html" />
+              <AdvisorTraceStatus v-if="chatMode === 'general'" :trace="msg.advisorTrace" />
 
               <!-- General 模式：Skill 结果卡片 -->
               <template v-if="chatMode === 'general'">
@@ -248,6 +249,8 @@ import type { MarketTraceQaSource } from '@/shared/api/modules/agent'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import MarketTraceEvidence from './MarketTraceEvidence.vue'
+import AdvisorTraceStatus from './AdvisorTraceStatus.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 const chatStream = useChatStream()

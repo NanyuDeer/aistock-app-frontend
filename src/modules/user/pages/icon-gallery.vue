@@ -186,7 +186,7 @@ import {
   categoryLabels,
   colorPresets,
   type IconItem,
-} from '@/static/assets/icons/icons-lxy/icon-manifest.js'
+} from '@/static/assets/icons/icons-lxy/icon-manifest'
 
 const searchText = ref('')
 const activeCategory = ref('all')

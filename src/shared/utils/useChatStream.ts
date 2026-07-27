@@ -108,6 +108,7 @@ export function useChatStream() {
           chatStore.appendMessage({
             role: 'assistant',
             content: finalText,
+            advisorTrace: data.advisor_trace,
             progressSteps: savedSteps.length > 0 ? savedSteps : undefined,
             timestamp: Date.now()
           })
@@ -187,6 +188,7 @@ export function useChatStream() {
           role: 'assistant',
           content: result.content || result.message || '',
           skillResult: result.skill_result,
+          advisorTrace: result.advisor_trace,
           progressSteps: savedSteps,
           timestamp: Date.now()
         })

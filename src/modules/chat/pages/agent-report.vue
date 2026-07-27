@@ -386,7 +386,8 @@ function backToOverview() {
 }
 
 onLoad((options) => {
-  intent.value = options?.intent || ''
+  const requestedIntent = options?.intent || ''
+  intent.value = isPublicReportIntent(requestedIntent) ? requestedIntent : ''
   date.value = options?.date || new Date().toISOString().split('T')[0]
 
   if (intent.value) {
