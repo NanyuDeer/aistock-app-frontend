@@ -127,8 +127,7 @@ import {
   type BriefingSource,
   type Sentiment,
 } from '@/shared/api/modules/briefing'
-import { parseBriefingItemsFromContent } from '@/shared/utils/briefingAdapter'
-import type { BriefingType } from '@/shared/utils/briefingReport'
+import { parseBriefingItemsFromContent, type ReportType } from '@/shared/utils/briefingAdapter'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
@@ -160,7 +159,7 @@ const subtitleText = computed(() => {
 })
 
 const audioPath = computed(() => {
-  return report.value?.audio_path || null
+  return report.value?.content?.audio_path || null
 })
 
 const audioStatusText = computed(() => {
@@ -242,7 +241,7 @@ function changeDate(delta: number) {
 }
 
 /** 根据当前时间判断报告类型：15:30 前=晨报，之后=复盘 */
-function detectReportType(): BriefingType {
+function detectReportType(): ReportType {
   const now = new Date()
   const hour = now.getHours()
   const minute = now.getMinutes()

@@ -18,6 +18,7 @@ export interface ChatMessage {
   skillResult?: SkillResult
   progressSteps?: ProgressStep[]
   trace?: MarketTraceQaTrace
+  advisorTrace?: AdvisorTrace
   timestamp: number
 }
 
@@ -55,22 +56,6 @@ export interface BriefingData {
   title: string
   kind: 'market_fact' | 'event_evidence'
   provider: string
-}
-
-export interface MarketTraceQaTrace {
-  artifact_id: string
-  sources: MarketTraceQaSource[]
-  as_of: string
-  confidence: 'high' | 'medium' | 'low'
-  uncertainty: string[]
-  degraded: boolean
-  degraded_reason: string | null
-}
-
-export interface MarketTraceQaResponse {
-  content: string
-  session_id: string
-  trace: MarketTraceQaTrace
 }
 
 export type BriefType = 'morning' | 'evening'
@@ -224,11 +209,8 @@ export const agentApi = {
     return request.post('/agent/push/token', { token, provider })
   },
 
-  /** 读取允许公开的非 Brief 分析报告。 */
-  getReport(intent: PublicReportIntent, date: string) {
-    if (!isPublicReportIntent(intent)) {
-      throw new Error(`不支持公开读取的报告类型: ${intent}`)
-    }
+  /** 读取分析报告（broadcast/morning/review/wind_leader/hot_burst 等）。 */
+  getReport(intent: string, date: string) {
     return request.get(`/agent/report/${intent}/${date}`)
   },
 

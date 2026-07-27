@@ -2,6 +2,26 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [master] 2026-07-28 — PR #29 合并后类型修复 + mock 清理 + 组件化
+**开发者**: Aria
+
+### 修复
+- chat/index.vue: 用 MarketTraceEvidence 组件替换 94-137 行内联证据溯源代码，移除重复的 confidenceLabel/sourceKindLabel 函数和 110 行证据溯源样式
+- index.spec.ts: 测试改为验证组件使用而非内联 HTML 匹配
+- agent-report.vue: 移除 agentOverviewMock 导入和两处 DEV 环境降级 fallback，统一使用真实 API
+- briefing/index.vue: 修复 audioPath 访问路径（report.value?.audio_path → report.value?.content?.audio_path）
+- agent.ts: ChatMessage 接口添加 advisorTrace 字段，清理重复的 MarketTraceQaTrace/MarketTraceQaResponse 接口定义
+- briefingAdapter.ts: 新增 ReportType 类型，通过 toBriefType() 映射到 BriefingType，解决 splitReportToCards 参数类型冲突
+- vite.config.ts: 补齐 PR #29 新增的 brief/broadcast 代理路由
+
+### 重构
+- event-chain/index.vue: 移除硬编码 mockHeadlineEvents，改为从真实事件列表派生焦点事件（按 importance >= 4 和 affectedIndustries 情绪方向筛选）
+
+### 删除
+- src/modules/chat/mock/agent-overview.json（PR #29 已删除但被后续合并重新引入）
+
+---
+
 ## [master] 2026-07-25 — PR review修复 + 个股详情页UI优化 + Agent报告页 + 趋势股评分报告页
 **开发者**: Aria
 

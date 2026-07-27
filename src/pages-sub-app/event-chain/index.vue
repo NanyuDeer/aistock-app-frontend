@@ -6,21 +6,21 @@
         <text class="section-title">焦点事件</text>
         <view class="headline-cards">
           <EventHeadlineCard
-            v-if="mockHeadlineEvents.positive"
+            v-if="headlinePositive"
             type="positive"
-            :title="mockHeadlineEvents.positive.title"
-            :importance="mockHeadlineEvents.positive.importance"
-            :industries="mockHeadlineEvents.positive.industries"
-            :event-id="mockHeadlineEvents.positive.eventId"
+            :title="headlinePositive.title"
+            :importance="headlinePositive.importance >= 4 ? 'major' : 'normal'"
+            :industries="headlinePositive.affectedIndustries.map((i) => i.name)"
+            :event-id="headlinePositive.eventId"
             @click="handleHeadlineClick"
           />
           <EventHeadlineCard
-            v-if="mockHeadlineEvents.negative"
+            v-if="headlineNegative"
             type="negative"
-            :title="mockHeadlineEvents.negative.title"
-            :importance="mockHeadlineEvents.negative.importance"
-            :industries="mockHeadlineEvents.negative.industries"
-            :event-id="mockHeadlineEvents.negative.eventId"
+            :title="headlineNegative.title"
+            :importance="headlineNegative.importance >= 4 ? 'major' : 'normal'"
+            :industries="headlineNegative.affectedIndustries.map((i) => i.name)"
+            :event-id="headlineNegative.eventId"
             @click="handleHeadlineClick"
           />
         </view>
@@ -98,7 +98,7 @@
  * - AI 关注焦点区域（顶部高亮卡片）
  * - 全部事件列表（真实事件数据）
  */
-import { onMounted, reactive } from 'vue'
+import { onMounted, computed } from 'vue'
 import type { EventItem } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
@@ -107,24 +107,6 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import EventTabBar from '@/modules/chat/event/components/EventTabBar.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
-
-// ========== Mock 数据（AI 关注焦点） ==========
-const mockHeadlineEvents = reactive({
-  positive: {
-    eventId: 'event-ai-computing-power',
-    newsId: 'news-ai-computing-power',
-    title: 'AI服务器需求持续增长，算力基础设施扩容确定性强',
-    importance: 'major' as const,
-    industries: ['算力', '芯片', '软件']
-  },
-  negative: {
-    eventId: 'event-real-estate',
-    newsId: 'news-real-estate',
-    title: '地产调控政策持续收紧，销售数据环比下滑',
-    importance: 'major' as const,
-    industries: ['房地产', '建材', '家居']
-  }
-})
 
 // ========== Composables ==========
 const {
@@ -143,6 +125,36 @@ const {
 
 const { toggleFollow } = useEventFollow()
 
+// ========== 焦点事件（从真实事件列表派生） ==========
+
+/** 判断事件整体方向：利好行业占比高 → positive，利空占比高 → negative */
+function eventDirection(event: EventItem): 'positive' | 'negative' | null {
+  const industries = event.affectedIndustries
+  if (!industries.length) return null
+  const bullish = industries.filter((i) => i.sentiment === 'bullish').length
+  const bearish = industries.filter((i) => i.sentiment === 'bearish').length
+  if (bullish > bearish) return 'positive'
+  if (bearish > bullish) return 'negative'
+  return null
+}
+
+/** 从事件列表派生焦点事件：取 importance >= 4 的事件，按方向分组取第一条 */
+const headlinePositive = computed<EventItem | null>(() => {
+  return (
+    events.value
+      .filter((e) => e.importance >= 4 && eventDirection(e) === 'positive')
+      .sort((a, b) => b.importance - a.importance)[0] ?? null
+  )
+})
+
+const headlineNegative = computed<EventItem | null>(() => {
+  return (
+    events.value
+      .filter((e) => e.importance >= 4 && eventDirection(e) === 'negative')
+      .sort((a, b) => b.importance - a.importance)[0] ?? null
+  )
+})
+
 // ========== 生命周期 ==========
 onMounted(() => {
   refresh()
@@ -150,15 +162,11 @@ onMounted(() => {
 
 // ========== 事件处理 ==========
 
-/** AI 今日精选卡片点击 - 跳转到新闻详情页（事件原文） */
+/** 焦点事件卡片点击 - 跳转到新闻详情页（事件原文） */
 function handleHeadlineClick(eventId: string) {
-  // 查找对应的 newsId
-  let newsId = ''
-  if (mockHeadlineEvents.positive?.eventId === eventId) {
-    newsId = mockHeadlineEvents.positive.newsId
-  } else if (mockHeadlineEvents.negative?.eventId === eventId) {
-    newsId = mockHeadlineEvents.negative.newsId
-  }
+  // 从真实事件列表中查找对应的 newsId
+  const event = events.value.find((e) => e.eventId === eventId)
+  const newsId = event?.newsId || ''
 
   // 跳转到新闻详情页（事件原文）
   uni.navigateTo({

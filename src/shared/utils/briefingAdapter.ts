@@ -21,6 +21,14 @@ import type {
   Sentiment,
 } from '@/shared/api/modules/briefing'
 
+/** 报告分析类型：晨报 or 复盘（与 splitReportToCards 一致，区别于 Brief v1 的 BriefType） */
+export type ReportType = 'morning' | 'review'
+
+/** ReportType → BriefingType 映射：review 复盘对应 evening 晚报 */
+function toBriefType(type: ReportType): BriefingType {
+  return type === 'review' ? 'evening' : 'morning'
+}
+
 /** 从 HTML 字符串提取纯文本 */
 function htmlToText(html: string): string {
   return html
@@ -96,7 +104,7 @@ function detectSentiment(text: string, cardKey: string): Sentiment {
  */
 function cardsToItems(
   cards: ReportCard[],
-  type: BriefingType,
+  type: ReportType,
   report: BriefingReport | null,
 ): BriefingItem[] {
   const sourceMap = type === 'morning' ? MORNING_SOURCE_MAP : REVIEW_SOURCE_MAP
@@ -132,7 +140,7 @@ function cardsToItems(
  */
 export function parseBriefingItemsFromReport(
   report: BriefingReport | null,
-  type: BriefingType,
+  type: ReportType,
 ): BriefingItem[] {
   if (!report || !report.details) return []
   const cards = splitReportToCards(report.details, type)
@@ -147,8 +155,8 @@ export function parseBriefingItemsFromReport(
  */
 export function parseBriefingItemsFromContent(
   content: unknown,
-  type: BriefingType,
+  type: ReportType,
 ): BriefingItem[] {
-  const report = parseBriefingReport(content, type)
+  const report = parseBriefingReport(content, toBriefType(type))
   return parseBriefingItemsFromReport(report, type)
 }

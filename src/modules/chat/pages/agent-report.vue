@@ -132,7 +132,6 @@ import { formatDate, formatDateTime } from '@/shared/utils/datetime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
-import agentOverviewMock from '../mock/agent-overview.json'
 
 interface DisplayReport {
   risks?: string[]
@@ -321,13 +320,6 @@ async function loadAllReports() {
         summary = extractSummary(data)
         available = true
       }
-    } else if (import.meta.env.DEV) {
-      // DEV 环境降级到 mock 数据
-      const mockData = (agentOverviewMock as Record<string, AgentReport>)[agentIntent]
-      if (mockData?.content) {
-        summary = extractSummary(mockData)
-        available = true
-      }
     }
 
     return {
@@ -356,13 +348,7 @@ async function loadReport() {
     const res: unknown = await agentApi.getReport(currentIntent, date.value)
     report.value = (res as AgentReport) || null
   } catch {
-    // DEV 环境降级到 mock 数据
-    if (import.meta.env.DEV) {
-      const mockData = (agentOverviewMock as Record<string, AgentReport>)[currentIntent]
-      report.value = mockData || null
-    } else {
-      report.value = null
-    }
+    report.value = null
   } finally {
     loading.value = false
   }
