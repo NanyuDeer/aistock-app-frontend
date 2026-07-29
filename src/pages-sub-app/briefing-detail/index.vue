@@ -17,10 +17,12 @@
         </view>
 
         <view v-if="report" class="brief-status" :class="{ degraded: report.degraded }">
-          <text>{{ report.degraded ? '证据不足' : '完整 Brief' }}</text>
-          <text v-if="report.degraded && report.missing_sources.length">
-            缺失来源：{{ report.missing_sources.join('、') }}
-          </text>
+          <template v-if="report.degraded && report.missing_sources.length">
+            <text>部分数据源暂不可用（{{ report.missing_sources.join('、') }}），以下为可用内容</text>
+          </template>
+          <template v-else>
+            <text>{{ report.degraded ? '证据不足' : '完整 Brief' }}</text>
+          </template>
         </view>
 
         <!-- 播报入口 -->
