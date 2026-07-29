@@ -2,6 +2,19 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [changer] 2026-07-29 — 早报降级路径：brief 接口优先 + 降级文案优化
+
+**开发者**: 37588
+
+### 新增
+- `briefingReport.spec.ts`：4 个回归测试覆盖 parseBriefingReport 降级路径（degraded=true 单条目、degraded=false 多条目、missing_sources 为空拒绝、brief_type 不匹配拒绝）
+
+### 修复
+- `briefing/index.vue`：`loadReport` 优先调 `agentApi.getBrief()` 获取 brief.v1 结构化数据，失败回退 `agentApi.getReport()` 兼容旧 schema 1.0/2.0 历史数据
+- `briefing-detail/index.vue`：降级提示文案从"缺失来源：X"改为"部分数据源暂不可用（X），以下为可用内容"，不阻塞内容显示
+
+---
+
 ## [master] 2026-07-28 — PR #29 合并后类型修复 + mock 清理 + 组件化
 **开发者**: Aria
 
