@@ -1,26 +1,19 @@
 <template>
   <SubPageCard title="事件传导">
     <view class="event-list-content">
-      <!-- AI关注焦点区域 -->
+      <!-- AI关注焦点区域 — Global Importance 双榜单 -->
       <view class="ai-focus-section">
-        <text class="section-title">焦点事件</text>
+        <text class="section-title">AI 关注焦点</text>
         <view class="headline-cards">
           <EventHeadlineCard
-            v-if="headlinePositive"
-            type="positive"
-            :title="headlinePositive.title"
-            :importance="headlinePositive.importance"
-            :industries="headlinePositive.industries"
-            :event-id="headlinePositive.eventId"
-            @click="handleHeadlineClick"
-          />
-          <EventHeadlineCard
-            v-if="headlineNegative"
-            type="negative"
-            :title="headlineNegative.title"
-            :importance="headlineNegative.importance"
-            :industries="headlineNegative.industries"
-            :event-id="headlineNegative.eventId"
+            v-for="evt in focusEvents"
+            :key="evt.eventId"
+            :type="evt.direction"
+            :card-title="evt.type === 'current_focus' ? '当前焦点事件' : '重大持续事件'"
+            :title="evt.title"
+            :importance="evt.importance"
+            :industries="evt.industries"
+            :event-id="evt.eventId"
             @click="handleHeadlineClick"
           />
         </view>
@@ -90,74 +83,34 @@
  * 支持分类筛选、分页加载、关注事件。
  */
 import { onMounted, ref } from 'vue'
-import type { EventItem } from '@/modules/chat/event/types'
+import type { EventItem, FocusEventViewModel } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
-import { getEventList, getEventDetail } from '@/modules/chat/event/api/eventApi'
+import { getFocusEvents } from '@/modules/chat/event/api/eventService'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import EventTabBar from '@/modules/chat/event/components/EventTabBar.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
 
-// ========== 焦点事件（真实数据） ==========
-interface HeadlineEvent {
-  eventId: string
-  title: string
-  importance: 'major' | 'normal'
-  industries: string[]
-}
+// ========== Global Importance 双榜单（焦点事件） ==========
 
-const headlinePositive = ref<HeadlineEvent | null>(null)
-const headlineNegative = ref<HeadlineEvent | null>(null)
+const focusEvents = ref<FocusEventViewModel[]>([])
 
 /**
- * 加载焦点事件：从事件列表取最新几条，获取详情以确定方向（利好/利空）和影响行业
- * 取前3条事件详情，优先找出一条利好（positive）和一条利空（negative）
+ * 加载 Global Importance 双榜单
+ *
+ * 数据流：
+ *   getFocusEvents() → FocusEventViewModel[]
+ *   → v-for 渲染两个 EventHeadlineCard
+ *
+ * 异常处理：
+ *   - GI 无数据 → 返回 []，不展示任何卡片
+ *   - 详情查询失败 → 保留 GI 基础字段（eventId/direction/importance）
+ *   - 网络异常 → catch 返回 []，不影响下方事件列表
  */
 async function loadHeadlineEvents() {
-  try {
-    const res = await getEventList({ page: 1, pageSize: 6 })
-    const events = res?.events ?? []
-    if (events.length === 0) return
-
-    // 取前3条事件，获取详情确定方向
-    const candidates = events.slice(0, 3)
-    const details = await Promise.allSettled(
-      candidates.map(e => getEventDetail(e.eventId))
-    )
-
-    for (let i = 0; i < candidates.length; i++) {
-      const evt = candidates[i]
-      const r = details[i]
-      const detail = r.status === 'fulfilled' ? r.value : null
-      const rating = detail?.investmentSummary?.rating
-      const industries = (detail?.event?.affectedIndustries ?? [])
-        .slice(0, 3)
-        .map(a => a.name)
-
-      const headline: HeadlineEvent = {
-        eventId: evt.eventId,
-        title: evt.title,
-        importance: 'major',
-        industries,
-      }
-
-      // 按投资评级分配到利好/利空卡片
-      if (rating === 'positive' && !headlinePositive.value) {
-        headlinePositive.value = headline
-      } else if (rating === 'negative' && !headlineNegative.value) {
-        headlineNegative.value = headline
-      } else if (!headlinePositive.value) {
-        // 兜底：未确定方向时优先放入利好
-        headlinePositive.value = headline
-      } else if (!headlineNegative.value) {
-        headlineNegative.value = headline
-      }
-    }
-  } catch (error) {
-    console.error('加载焦点事件失败:', error)
-  }
+  focusEvents.value = await getFocusEvents()
 }
 
 // ========== Composables ==========

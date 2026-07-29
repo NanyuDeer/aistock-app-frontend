@@ -295,3 +295,46 @@ export interface AgentAnalysisReport {
     risk: string
   }
 }
+
+// ==================== Global Importance ====================
+
+/** Global Importance 方向（后端原始枚举） */
+export type GiDirection = 'bullish' | 'bearish' | 'mixed'
+
+/** Global Importance 重要性等级（后端原始枚举） */
+export type GiImportanceLevel = 'critical' | 'important' | 'notable'
+
+/** Global Importance 单个事件（后端原始结构） */
+export interface GiEvent {
+  event_id: string
+  direction: GiDirection
+  importance_level: GiImportanceLevel
+  reason: string
+  rank: number
+}
+
+/** Global Importance API 原始响应 */
+export interface HighlightsResponse {
+  events: GiEvent[]
+}
+
+/** 前端展示方向 */
+export type FocusDirection = 'positive' | 'negative' | 'mixed'
+
+/** 前端展示重要性 */
+export type FocusImportance = 'major' | 'normal'
+
+/** 榜单类型 */
+export type FocusEventType = 'current_focus' | 'ongoing_significant'
+
+/** Global Importance 前端展示模型 */
+export interface FocusEventViewModel {
+  type: FocusEventType
+  eventId: string
+  title: string
+  summary: string
+  direction: FocusDirection
+  importance: FocusImportance
+  selectionReason: string
+  industries: string[]
+}
