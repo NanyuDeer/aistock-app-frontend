@@ -37,7 +37,7 @@
         </view>
         <view class="briefing-right">
           <view class="ai-avatar-wrap" :class="{ 'ai-avatar-loading': briefingLoading }">
-            <SvgIcon name="headphone-line" size="40rpx" color="#4d7cfe" />
+            <SvgIcon name="headphone-line" size="40rpx" color="#0b5fff" />
           </view>
           <view class="ai-avatar-ring ring-1"></view>
           <view class="ai-avatar-ring ring-2"></view>
@@ -46,7 +46,7 @@
 
       <!-- 功能入口 2x2 网格 -->
       <view class="feature-grid">
-        <view class="feature-card leader-card" @tap="goSectors">
+        <Card class="feature-card" clickable @click="goSectors">
           <view class="feature-header">
             <text class="feature-title">长线风口</text>
             <text class="feature-more">›</text>
@@ -56,16 +56,16 @@
             <template v-if="leaderSectors.length">
               <view v-for="(item, idx) in leaderSectors.slice(0, 3)" :key="idx" class="feature-item">
                 <text class="item-name">No.{{ idx + 1 }} {{ item.name }}</text>
-                <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+                <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
               </view>
             </template>
             <view v-else class="feature-item">
               <text class="item-name placeholder">加载中...</text>
             </view>
           </view>
-        </view>
+        </Card>
 
-        <view class="feature-card event-card" @tap="goEventChain">
+        <Card class="feature-card" clickable @click="goEventChain">
           <view class="feature-header">
             <text class="feature-title">事件传导</text>
             <text class="feature-more">›</text>
@@ -74,12 +74,12 @@
           <view class="feature-list">
             <view v-for="(item, idx) in chainEvents.slice(0, 3)" :key="idx" class="feature-item">
               <text class="item-name">{{ item.name }}</text>
-              <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
             </view>
           </view>
-        </view>
+        </Card>
 
-        <view class="feature-card ai-card" @tap="goTraceability">
+        <Card class="feature-card" clickable @click="goTraceability">
           <view class="feature-header">
             <text class="feature-title">大盘溯源</text>
             <text class="feature-more">›</text>
@@ -88,12 +88,12 @@
           <view class="feature-list">
             <view v-for="(item, idx) in traceReports.slice(0, 3)" :key="idx" class="feature-item">
               <text class="item-name">{{ item.name }}</text>
-              <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
             </view>
           </view>
-        </view>
+        </Card>
 
-        <view class="feature-card overview-card" @tap="goAgentReport">
+        <Card class="feature-card" clickable @click="goAgentReport">
           <view class="feature-header">
             <text class="feature-title">今日分析概览</text>
             <text class="feature-more">›</text>
@@ -102,14 +102,14 @@
           <view class="feature-list">
             <view v-for="(item, idx) in aiReports.slice(0, 3)" :key="idx" class="feature-item">
               <text class="item-name">{{ item.name }}</text>
-              <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
             </view>
           </view>
-        </view>
+        </Card>
       </view>
 
       <!-- 重磅事件跟踪 -->
-      <view class="event-track-card" @tap="goTrackDetail">
+      <Card class="track-card" clickable @click="goTrackDetail">
         <view class="track-header">
           <text class="track-title">重磅事件跟踪</text>
           <text class="track-more">›</text>
@@ -122,7 +122,7 @@
           <text class="track-arrow">∧</text>
           <text class="track-tip">点击查看 AI 事件分析</text>
         </view>
-      </view>
+      </Card>
 
     </view>
   </view>
@@ -132,6 +132,8 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import Card from '@/shared/components/Card.vue'
+import Tag from '@/shared/components/Tag.vue'
 import { useBriefingCard } from '@/shared/utils/useBriefingCard'
 import { buildBriefingUrl } from '@/shared/utils/briefingNavigation'
 import { stockApi } from '@/shared/api/modules/stock'
@@ -307,11 +309,26 @@ async function loadAiReports() {
   aiReports.value = display
 }
 
-const traceReports = ref([
+const traceReports = ref<LeaderStockPreview[]>([
   { name: '北向资金异动', tag: '流入', tagType: 'buy' },
   { name: '板块轮动分析', tag: '关注', tagType: 'wash' },
   { name: '主力资金动向', tag: '流出', tagType: 'sell' },
 ])
+
+/**
+ * 业务 tagType → 组件库 Tag type 映射
+ * up→up(红)，down/date/sell→down(绿)，wash→warning(橙)，buy→neutral(蓝)
+ */
+function itemTagType(tagType: LeaderStockPreview['tagType']): 'up' | 'down' | 'neutral' | 'warning' {
+  switch (tagType) {
+    case 'up': return 'up'
+    case 'down': return 'down'
+    case 'date': return 'down'
+    case 'sell': return 'down'
+    case 'wash': return 'warning'
+    case 'buy': return 'neutral'
+  }
+}
 
 onShow(() => {
   briefingRefresh()
@@ -367,24 +384,22 @@ function goLogin() {
 </script>
 
 <style lang="scss" scoped>
-@use '@/shared/styles/variables.scss' as *;
-
 .morning-content {
-  background: $bg-color-grey;
+  background: $bg-card;
 }
 
 .content-wrap {
-  padding: $spacing-base;
+  padding: $s-3;
 }
 
 /* ===== 晨报卡片 ===== */
 .briefing-card {
   display: flex;
   align-items: stretch;
-  padding: $spacing-base;
-  background: #f5f7fb;
-  border-radius: $radius-base;
-  margin-bottom: $spacing-sm;
+  padding: $s-3;
+  background: $bg-soft;
+  border-radius: $r-md;
+  margin-bottom: $s-2;
   position: relative;
   overflow: hidden;
   box-shadow: $shadow-card;
@@ -392,7 +407,7 @@ function goLogin() {
 
   &:active {
     transform: scale(0.98);
-    box-shadow: $shadow-base;
+    box-shadow: $shadow-sm;
   }
 }
 
@@ -410,7 +425,7 @@ function goLogin() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: $spacing-xs;
+  gap: $s-1;
 }
 
 .briefing-top {
@@ -421,23 +436,23 @@ function goLogin() {
 .briefing-title {
   font-size: $font-size-lg;
   font-weight: 600;
-  color: $text-color-title;
+  color: $ink;
 }
 
 .briefing-degraded {
-  margin-left: $spacing-xs;
-  padding: 2rpx $spacing-xs;
-  color: $warning-color;
-  background: rgba($warning-color, 0.1);
-  border: 1rpx solid rgba($warning-color, 0.25);
-  border-radius: $radius-xs;
+  margin-left: $s-1;
+  padding: 2rpx $s-1;
+  color: $warning;
+  background: $warning-soft;
+  border: 1rpx solid rgba($warning, 0.25);
+  border-radius: $r-xs;
   font-size: $font-size-xs;
   line-height: 1.4;
 }
 
 .briefing-missing {
   font-size: 20rpx;
-  color: $warning-color;
+  color: $warning;
 }
 
 .briefing-clue {
@@ -446,7 +461,7 @@ function goLogin() {
 
 .clue-text {
   font-size: $font-size-sm;
-  color: $text-color-secondary;
+  color: $ink-soft;
 }
 
 .briefing-tags {
@@ -459,21 +474,21 @@ function goLogin() {
 
 .summary-tag {
   padding: 6rpx 14rpx;
-  background: rgba($brand-color, 0.08);
-  border: 1rpx solid rgba($brand-color, 0.15);
-  border-radius: 6rpx;
+  background: rgba($primary, 0.08);
+  border: 1rpx solid rgba($primary, 0.15);
+  border-radius: $r-xs;
 }
 
 .tag-text {
   font-size: $font-size-xs;
-  color: $brand-color;
+  color: $primary;
   font-weight: 500;
   line-height: 1.4;
 }
 
 .tags-arrow {
   font-size: $font-size-lg;
-  color: $text-color-tertiary;
+  color: $ink-mute;
   margin-left: 2rpx;
   line-height: 1.4;
 }
@@ -484,7 +499,7 @@ function goLogin() {
   gap: 6rpx;
   padding: 8rpx 18rpx;
   background: $brand-gradient;
-  border-radius: $radius-pill;
+  border-radius: $r-full;
   align-self: flex-start;
   margin-top: 6rpx;
   transition: opacity 0.2s ease;
@@ -496,12 +511,12 @@ function goLogin() {
 
 .btn-icon {
   font-size: 18rpx;
-  color: #ffffff;
+  color: $white;
 }
 
 .btn-text {
   font-size: $font-size-sm;
-  color: #ffffff;
+  color: $white;
   font-weight: 500;
 }
 
@@ -518,23 +533,19 @@ function goLogin() {
   width: 100rpx;
   height: 100rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  background: linear-gradient(135deg, $gold-light, $gold);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   z-index: 2;
-  box-shadow: 0 4rpx 12rpx rgba(251, 191, 36, 0.3);
-}
-
-.ai-avatar-emoji {
-  font-size: 44rpx;
+  box-shadow: 0 4rpx 12rpx rgba($gold, 0.3);
 }
 
 .ai-avatar-ring {
   position: absolute;
   border-radius: 50%;
-  border: 2rpx solid rgba($brand-color, 0.15);
+  border: 2rpx solid rgba($primary, 0.15);
   pointer-events: none;
 }
 
@@ -586,15 +597,9 @@ function goLogin() {
   margin-bottom: 20rpx;
 }
 
-.feature-card {
-  background: #f5f7fb;
-  border-radius: 14rpx;
-  padding: 20rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-  min-width: 0;
-  overflow: hidden;
+/* Card 作为 feature-card 容器；覆写内边距使 2x2 网格更紧凑（复合选择器提升优先级） */
+.feature-card.as-card {
+  padding: $s-2;
 }
 
 .feature-header {
@@ -604,20 +609,20 @@ function goLogin() {
 }
 
 .feature-title {
-  font-size: 28rpx;
+  font-size: $font-size-md;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .feature-more {
-  font-size: 28rpx;
-  color: #9ca3af;
+  font-size: $font-size-md;
+  color: $ink-mute;
   font-weight: 300;
 }
 
 .feature-sub {
-  font-size: 22rpx;
-  color: #6b7280;
+  font-size: $font-size-xs;
+  color: $ink-soft;
 }
 
 .feature-list {
@@ -637,8 +642,8 @@ function goLogin() {
 }
 
 .item-name {
-  font-size: 24rpx;
-  color: #374151;
+  font-size: $font-size-sm;
+  color: $ink-soft;
   flex: 1;
   min-width: 0;
   display: block;
@@ -648,103 +653,12 @@ function goLogin() {
 }
 
 .item-name.placeholder {
-  color: #9ca3af;
-}
-
-.item-tag {
-  font-size: 18rpx;
-  padding: 2rpx 8rpx;
-  border-radius: 4rpx;
-  flex-shrink: 0;
-
-  &.up {
-    background: rgba(244, 63, 94, 0.1);
-    color: #f43f5e;
-    font-weight: 600;
-  }
-  &.down {
-    background: rgba(34, 197, 94, 0.1);
-    color: #22c55e;
-  }
-  &.date {
-    background: rgba(34, 197, 94, 0.1);
-    color: #22c55e;
-  }
-  &.wash {
-    background: rgba(251, 146, 60, 0.1);
-    color: #fb923c;
-  }
-  &.sell {
-    background: rgba(34, 197, 94, 0.1);
-    color: #22c55e;
-  }
-  &.buy {
-    background: rgba(77, 124, 254, 0.1);
-    color: #4d7cfe;
-  }
-}
-
-/* 异动捕手卡片特有 */
-.event-top-badge {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-top: 2rpx;
-}
-
-.badge-hot {
-  font-size: 18rpx;
-  background: rgba(244, 63, 94, 0.1);
-  color: #f43f5e;
-  padding: 2rpx 8rpx;
-  border-radius: 4rpx;
-  font-weight: 600;
-}
-
-.badge-sector {
-  font-size: 22rpx;
-  color: #1a1d24;
-  font-weight: 500;
-}
-
-.event-top-title {
-  font-size: 22rpx;
-  color: #6b7280;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.event-item {
-  .item-badge {
-    font-size: 18rpx;
-    background: rgba(244, 63, 94, 0.1);
-    color: #f43f5e;
-    padding: 1rpx 6rpx;
-    border-radius: 4rpx;
-    flex-shrink: 0;
-    margin-right: 4rpx;
-  }
-  .item-name {
-    flex: 1;
-  }
-}
-
-.item-change {
-  font-size: 22rpx;
-  flex-shrink: 0;
-  font-weight: 500;
-
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  color: $ink-mute;
 }
 
 /* ===== 重磅事件跟踪 ===== */
-.event-track-card {
-  background: #f5f7fb;
-  border-radius: 14rpx;
-  padding: 20rpx;
-  margin-bottom: 20rpx;
+.track-card.as-card {
+  padding: $s-2;
 }
 
 .track-header {
@@ -757,12 +671,12 @@ function goLogin() {
 .track-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .track-more {
-  font-size: 28rpx;
-  color: #9ca3af;
+  font-size: $font-size-md;
+  color: $ink-mute;
   font-weight: 300;
 }
 
@@ -775,18 +689,18 @@ function goLogin() {
 .track-label {
   flex-shrink: 0;
   font-size: 20rpx;
-  color: #f43f5e;
-  background: rgba(244, 63, 94, 0.1);
+  color: $up;
+  background: $up-soft;
   padding: 2rpx 8rpx;
-  border-radius: 4rpx;
+  border-radius: $r-xs;
   font-weight: 500;
   margin-top: 2rpx;
 }
 
 .track-content {
   flex: 1;
-  font-size: 24rpx;
-  color: #374151;
+  font-size: $font-size-sm;
+  color: $ink-soft;
   line-height: 1.5;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -801,16 +715,16 @@ function goLogin() {
   gap: 6rpx;
   margin-top: 14rpx;
   padding-top: 12rpx;
-  border-top: 1rpx solid #f3f4f6;
+  border-top: 1rpx solid $line-soft;
 }
 
 .track-arrow {
   font-size: 20rpx;
-  color: #9ca3af;
+  color: $ink-mute;
 }
 
 .track-tip {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 </style>

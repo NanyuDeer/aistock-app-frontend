@@ -8,8 +8,7 @@
       </view>
       <text class="section-title">{{ title }}</text>
       <view class="section-status" v-if="status === 'processing' || status === 'generating'">
-        <view class="status-spinner" />
-        <text class="status-label">{{ status === 'processing' ? 'AI开始分析...' : 'AI正在生成...' }}</text>
+        <LoadingState size="sm" layout="horizontal" :text="status === 'processing' ? 'AI开始分析...' : 'AI正在生成...'" />
       </view>
       <view class="section-status" v-else-if="status === 'completed'">
         <text class="status-label done">分析完成</text>
@@ -19,7 +18,7 @@
 
     <!-- 流式生成文本 -->
     <view class="section-stream" v-if="(status === 'processing' || status === 'generating') && streamingText">
-      <text class="stream-text">{{ streamingText }}<text class="stream-cursor">|</text></text>
+      <StreamingText :text="streamingText" />
     </view>
 
     <!-- completed 后：折叠式思考过程 -->
@@ -57,6 +56,8 @@
  * Slot: default — completed 后的业务组件
  */
 import { computed, ref, watch } from 'vue'
+import LoadingState from '@/shared/components/LoadingState.vue'
+import StreamingText from '@/shared/components/StreamingText.vue'
 
 type StepStatus = 'pending' | 'processing' | 'generating' | 'completed'
 
@@ -160,15 +161,6 @@ const numStatusClass = computed(() => {
   gap: 6rpx;
 }
 
-.status-spinner {
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
-  border: 2px solid rgba(99, 102, 241, 0.25);
-  border-top-color: var(--ev-accent);
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 .status-label { font-size: 20rpx; color: var(--ev-accent); font-weight: 500; }
 .status-label.done { color: var(--ev-positive); }
 .pending-label { font-size: 20rpx; color: var(--ev-text-muted); }
@@ -178,18 +170,6 @@ const numStatusClass = computed(() => {
   min-height: 48rpx;
   margin-bottom: 14rpx;
 }
-
-.stream-text {
-  font-size: 24rpx;
-  color: var(--ev-text-secondary);
-  line-height: 1.7;
-}
-.stream-cursor {
-  color: var(--ev-accent);
-  animation: blink 0.6s step-end infinite;
-}
-
-@keyframes blink { 50% { opacity: 0; } }
 
 /* ===== 思考过程折叠 ===== */
 .thinking-toggle {
