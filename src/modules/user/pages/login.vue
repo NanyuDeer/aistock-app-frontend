@@ -10,7 +10,7 @@
     <!-- 顶部区域 -->
     <view class="login-top">
       <view class="logo-wrap">
-        <SvgIcon name="bear-smile-line" size="56rpx" color="#4d7cfe" />
+        <SvgIcon name="bear-smile-line" size="56rpx" color="#0b5fff" />
         <text class="logo-text">AI Stock</text>
       </view>
       <text class="logo-desc">AI 智能体驱动的中长线投资助手</text>
@@ -311,7 +311,7 @@ function goBack() {
 
 .back-icon {
   font-size: 48rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 300;
   line-height: 1;
 }
@@ -339,12 +339,12 @@ function goBack() {
 .logo-text {
   font-size: 48rpx;
   font-weight: 700;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .logo-desc {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 /* ===== 登录区域 ===== */
@@ -404,7 +404,7 @@ function goBack() {
 
   .skip-text {
     font-size: 28rpx;
-    color: #6b7280;
+    color: $ink-soft;
   }
 }
 
@@ -419,7 +419,7 @@ function goBack() {
 .qr-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 32rpx;
 }
 
@@ -428,16 +428,16 @@ function goBack() {
   height: 400rpx;
   background: #ffffff;
   border-radius: 16rpx;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
 }
 
 .qr-status {
   margin-top: 24rpx;
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
 
   &.scanned {
-    color: #4d7cfe;
+    color: $primary;
     font-weight: 500;
   }
   &.expired {
@@ -448,7 +448,7 @@ function goBack() {
 .qr-refresh {
   margin-top: 24rpx;
   padding: 16rpx 48rpx;
-  background: #4d7cfe;
+  background: $primary;
   border-radius: 32rpx;
 
   .refresh-text {
@@ -476,7 +476,7 @@ function goBack() {
 
   .loading-text {
     font-size: 32rpx;
-    color: #4d7cfe;
+    color: $primary;
   }
 }
 
@@ -497,7 +497,7 @@ function goBack() {
 
 .error-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
   text-align: center;
   line-height: 1.6;
   padding: 0 48rpx;
@@ -506,7 +506,7 @@ function goBack() {
 
 .error-retry {
   padding: 16rpx 64rpx;
-  background: #4d7cfe;
+  background: $primary;
   border-radius: 32rpx;
   margin-bottom: 24rpx;
 
@@ -523,7 +523,7 @@ function goBack() {
 
   .scan-fallback-text {
     font-size: 26rpx;
-    color: #4d7cfe;
+    color: $primary;
   }
 }
 

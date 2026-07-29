@@ -53,7 +53,7 @@
           <view class="dimension-header" @tap="expandDimension(index)">
             <view class="dimension-name-wrap">
               <view class="dimension-icon">
-                <SvgIcon :name="dimensionIcon(index)" size="30rpx" color="#4d7cfe" />
+                <SvgIcon :name="dimensionIcon(index)" size="30rpx" color="#0b5fff" />
               </view>
               <view class="dimension-copy">
                 <view class="dimension-title-row">
@@ -69,7 +69,7 @@
                 <SvgIcon
                   :name="isDimensionExpanded(index) ? 'arrow-up-s-line' : 'arrow-down-s-line'"
                   size="32rpx"
-                  color="#4d7cfe"
+                  color="#0b5fff"
                 />
               </view>
             </view>
@@ -230,7 +230,7 @@
             </template>
             <view class="dimension-collapse-wrap">
               <view class="dimension-collapse-button" @tap.stop="collapseDimension(index)">
-                <SvgIcon name="arrow-up-s-line" size="28rpx" color="#4d7cfe" />
+                <SvgIcon name="arrow-up-s-line" size="28rpx" color="#0b5fff" />
                 <text>收起</text>
               </view>
             </view>

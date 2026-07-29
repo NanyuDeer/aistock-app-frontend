@@ -1,73 +1,144 @@
+/**
+ * Card 组件 — 同步自 aistock-component-lib/src/components/Card.vue
+ * 同步时间：2026-07-28
+ * 向后兼容：保留 flat prop 和 action slot 别名
+ */
 <template>
-  <view :class="['as-card', { 'as-card--flat': flat }]">
-    <view v-if="title || $slots.header" class="as-card-header">
-      <slot name="header">
-        <text class="as-card-title">{{ title }}</text>
-        <text v-if="subtitle" class="as-card-subtitle">{{ subtitle }}</text>
-      </slot>
-      <view v-if="$slots.action" class="as-card-action">
+  <view
+    class="as-card"
+    :class="{
+      'is-hoverable': hoverable,
+      'is-clickable': clickable,
+      'as-card--flat': flat
+    }"
+    @click="handleClick"
+  >
+    <view v-if="title || $slots.header" class="as-card__header">
+      <view class="as-card__header-content">
+        <text v-if="title" class="as-card__title">{{ title }}</text>
+        <text v-if="subtitle" class="as-card__subtitle">{{ subtitle }}</text>
+      </view>
+      <view class="as-card__header-extra">
+        <!-- 兼容旧 action slot -->
+        <slot name="extra" />
         <slot name="action" />
       </view>
     </view>
-    <view class="as-card-body">
+    <view class="as-card__body">
       <slot />
     </view>
-    <view v-if="$slots.footer" class="as-card-footer">
+    <view v-if="$slots.footer" class="as-card__footer">
       <slot name="footer" />
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{
+interface Props {
   title?: string
   subtitle?: string
+  hoverable?: boolean
+  clickable?: boolean
+  /** 向后兼容：flat 模式无阴影，仅边框 */
   flat?: boolean
-}>(), {
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  title: '',
+  subtitle: '',
+  hoverable: false,
+  clickable: false,
   flat: false
 })
+
+const emit = defineEmits<{
+  click: [event: MouseEvent]
+}>()
+
+const handleClick = (event: MouseEvent) => {
+  if (props.clickable) {
+    emit('click', event)
+  }
+}
 </script>
 
 <style lang="scss" scoped>
 .as-card {
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-
-  &--flat {
-    box-shadow: none;
-    border: 1rpx solid #e5e7eb;
-  }
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-xl;
+  padding: $s-5;
+  box-shadow: $shadow-xs;
+  transition: all $t-base;
 }
 
-.as-card-header {
+/* 向后兼容：flat 模式 */
+.as-card--flat {
+  box-shadow: none;
+  border: 2rpx solid $line;
+}
+
+/* ===== Header ===== */
+.as-card__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 16rpx;
+  margin-bottom: $s-4;
+  padding-bottom: $s-3;
+  border-bottom: 2rpx solid $line-soft;
 }
 
-.as-card-title {
-  font-size: 30rpx;
+.as-card__header-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.as-card__header-extra {
+  flex-shrink: 0;
+  margin-left: $s-4;
+}
+
+.as-card__title {
+  display: block;
+  font-size: $font-size-lg;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
+  line-height: $lh-tight;
 }
 
-.as-card-subtitle {
-  font-size: 24rpx;
-  color: #6b7280;
-  margin-left: 12rpx;
+.as-card__subtitle {
+  display: block;
+  font-size: $font-size-sm;
+  color: $ink-soft;
+  margin-top: $s-1;
 }
 
-.as-card-action {
-  display: flex;
-  align-items: center;
+/* ===== Body ===== */
+.as-card__body {
+  color: $ink;
+  font-size: $font-size-base;
+  line-height: $lh-base;
 }
 
-.as-card-footer {
-  margin-top: 16rpx;
-  padding-top: 16rpx;
-  border-top: 1rpx solid #f0f1f3;
+/* ===== Footer ===== */
+.as-card__footer {
+  margin-top: $s-4;
+  padding-top: $s-3;
+  border-top: 2rpx solid $line-soft;
+}
+
+/* ===== States ===== */
+.is-hoverable:hover {
+  box-shadow: $shadow-card;
+  transform: translateY(-2rpx);
+}
+
+.is-clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.is-clickable:active {
+  transform: scale(0.995);
 }
 </style>

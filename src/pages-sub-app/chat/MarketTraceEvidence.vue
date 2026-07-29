@@ -74,7 +74,7 @@ function sourceKindLabel(kind: MarketTraceQaSource['kind']): string {
 .evidence-area {
   margin-top: 16rpx;
   padding: 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
   border: 1rpx solid #e8eaed;
 }

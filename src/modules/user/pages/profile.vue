@@ -34,7 +34,7 @@
             </view>
             <switch
               :checked="settings.stock_push"
-              color="#4d7cfe"
+              color="#0b5fff"
               @change="(e) => onSettingChange('stock_push', getSwitchValue(e))"
             />
           </view>
@@ -46,7 +46,7 @@
             </view>
             <switch
               :checked="settings.outbreak_push"
-              color="#4d7cfe"
+              color="#0b5fff"
               @change="(e) => onSettingChange('outbreak_push', getSwitchValue(e))"
             />
           </view>
@@ -58,7 +58,7 @@
             </view>
             <switch
               :checked="settings.leader_push"
-              color="#4d7cfe"
+              color="#0b5fff"
               @change="(e) => onSettingChange('leader_push', getSwitchValue(e))"
             />
           </view>
@@ -94,13 +94,13 @@
       <view class="section">
         <view class="menu-card">
           <view class="menu-row" @tap="goFavorites">
-            <SvgIcon name="bar-chart-line" size="36rpx" color="#6b7280" />
+            <SvgIcon name="bar-chart-line" size="36rpx" color="#4b5a7a" />
             <text class="menu-label">自选股</text>
             <text class="menu-arrow">›</text>
           </view>
           <view class="setting-divider" />
           <view class="menu-row" @tap="goAbout">
-            <SvgIcon name="information-line" size="36rpx" color="#6b7280" />
+            <SvgIcon name="information-line" size="36rpx" color="#4b5a7a" />
             <text class="menu-label">关于</text>
             <text class="menu-arrow">›</text>
           </view>
@@ -245,7 +245,7 @@ function formatDate(dateStr: string): string {
 
 /* ===== 用户卡片 ===== */
 .user-card {
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
+  background: linear-gradient(135deg, $primary, $primary-600);
   border-radius: 20rpx;
   padding: 32rpx 24rpx;
   margin-bottom: 32rpx;
@@ -313,7 +313,7 @@ function formatDate(dateStr: string): string {
 
 .section-title {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 600;
 }
 
@@ -347,7 +347,7 @@ function formatDate(dateStr: string): string {
 
 .setting-label {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .setting-desc {
@@ -382,7 +382,7 @@ function formatDate(dateStr: string): string {
 
 .fav-name {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
@@ -399,7 +399,7 @@ function formatDate(dateStr: string): string {
 
 .fav-market {
   font-size: 20rpx;
-  color: #4d7cfe;
+  color: $primary;
   background: rgba(77, 124, 254, 0.1);
   padding: 2rpx 8rpx;
   border-radius: 4rpx;
@@ -425,7 +425,7 @@ function formatDate(dateStr: string): string {
 .menu-label {
   flex: 1;
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .menu-arrow {

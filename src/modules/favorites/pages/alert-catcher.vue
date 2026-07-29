@@ -4,7 +4,7 @@
       <!-- 说明卡片 -->
       <view class="intro-card">
         <view class="intro-header">
-          <SvgIcon name="bell-line" size="32rpx" color="#4d7cfe" />
+          <SvgIcon name="bell-line" size="32rpx" color="#0b5fff" />
           <text class="intro-title">自选股异动监控</text>
         </view>
         <text class="intro-desc">实时监控自选股涨跌幅异动（超5%触发），AI反推三层级原因</text>

@@ -159,7 +159,7 @@ async function toggleFavorite(stock: StockSearchItem) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #f5f7fa;
+  background: $bg-soft;
   overscroll-behavior: none;
   touch-action: none;
   padding: 24rpx;
@@ -191,7 +191,7 @@ async function toggleFavorite(stock: StockSearchItem) {
 .search-input {
   flex: 1;
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .clear-btn {
@@ -202,7 +202,7 @@ async function toggleFavorite(stock: StockSearchItem) {
 
 .search-btn {
   font-size: 28rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
   padding: 8rpx 16rpx;
 }
@@ -218,7 +218,7 @@ async function toggleFavorite(stock: StockSearchItem) {
 .hot-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 20rpx;
   display: block;
 }
@@ -234,19 +234,19 @@ async function toggleFavorite(stock: StockSearchItem) {
   flex-direction: column;
   align-items: center;
   padding: 16rpx 24rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
 .hot-tag-name {
   font-size: 26rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
 .hot-tag-code {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-top: 4rpx;
 }
 
@@ -275,13 +275,13 @@ async function toggleFavorite(stock: StockSearchItem) {
 
 .result-name {
   font-size: 30rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
 .result-code {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 2rpx 12rpx;
   background: #f0f2f5;
   border-radius: 8rpx;
@@ -327,6 +327,6 @@ async function toggleFavorite(stock: StockSearchItem) {
 
 .loading-text, .empty-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 </style>

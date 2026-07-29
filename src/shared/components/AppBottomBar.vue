@@ -1,14 +1,31 @@
+/**
+ * AppBottomBar 底部标签栏
+ * 视觉层同步自 aistock-component-lib/src/components/TabBar.vue（同步时间：2026-07-28）
+ * 保留 app 前端业务逻辑：固定 Tab 列表 + 路由检测 + getTabBarBottomPx 动态偏移
+ */
 <template>
   <view class="as-tab-bar" :style="{ bottom: tabBarBottomPx + 'px' }">
     <view
       v-for="tab in tabs"
       :key="tab.id"
-      class="as-tab-item"
-      :class="{ active: activeTabId === tab.id }"
+      class="as-tab-bar__item"
+      :class="{ 'as-tab-bar__item--active': activeTabId === tab.id }"
       @tap="handleTabTap(tab)"
     >
-      <text v-if="activeTabId === tab.id" class="as-tab-active-text">{{ tab.name }}</text>
-      <SvgIcon v-else :name="tab.icon" size="28rpx" color="#9ca3af" />
+      <view class="as-tab-bar__icon-wrap">
+        <SvgIcon
+          :name="tab.icon"
+          size="28rpx"
+          :color="activeTabId === tab.id ? activeColor : inactiveColor"
+        />
+        <!-- 红点徽章 -->
+        <view v-if="tab.badge === 'dot'" class="as-tab-bar__badge-dot"></view>
+        <!-- 数字徽章 -->
+        <view v-else-if="tab.badge" class="as-tab-bar__badge-num">
+          <text class="as-tab-bar__badge-num-text">{{ tab.badge }}</text>
+        </view>
+      </view>
+      <text v-if="activeTabId === tab.id" class="as-tab-bar__text">{{ tab.name }}</text>
     </view>
   </view>
 </template>
@@ -29,7 +46,16 @@ const emit = defineEmits<{
   (e: 'change', tab: string): void
 }>()
 
-const tabs = [
+interface TabItem {
+  id: string
+  name: string
+  icon: string
+  path: string
+  /** 徽章：'dot' 为红点，数字字符串为数字徽章 */
+  badge?: string
+}
+
+const tabs: TabItem[] = [
   { id: 'morning', name: '早点听', icon: 'broadcast-line', path: '/modules/home/pages/index' },
   { id: 'stock', name: '选股', icon: 'bar-chart-line', path: '/modules/home/pages/index?tab=stock' },
   { id: 'alert', name: '提醒', icon: 'bell-line', path: '/modules/favorites/pages/index' },
@@ -68,13 +94,17 @@ const activeTabId = computed(() => {
   return 'morning'
 })
 
-const handleTabTap = (tab: typeof tabs[0]) => {
+const handleTabTap = (tab: TabItem) => {
   // 如果当前已在该Tab，不重复触发
   if (activeTabId.value === tab.id) return
   // 仅触发 change 事件，由父组件（MainTabs）决定如何切换
   // 不再使用 reLaunch，避免销毁整个页面导致闪烁
   emit('change', tab.id)
 }
+
+/* 选中/未选中图标色（对应 $primary / $ink-mute，SVG 需传字面色值） */
+const activeColor = '#0b5fff'
+const inactiveColor = '#8a96b0'
 </script>
 
 <style lang="scss" scoped>
@@ -83,42 +113,77 @@ const handleTabTap = (tab: typeof tabs[0]) => {
   position: fixed;
   left: 0;
   right: 0;
-  z-index: 9998;
+  z-index: $z-fixed;
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding: 0 32rpx 4rpx;
-  gap: 12rpx;
-  background: #f5f7fb;
+  padding: $s-2 $s-4 0;
+  background: $bg-page;
 }
 
-.as-tab-item {
+.as-tab-bar__item {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 54rpx;
-  height: 40rpx;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 56rpx;
+  padding: 0 $s-1;
+  border-radius: $r-full;
+  transition: all $t-base;
 
-  &.active {
-    width: auto;
-    padding: 0 20rpx;
-    height: 42rpx;
-    border-radius: 21rpx;
-    background: rgba(77, 124, 254, 0.15);
+  /* 选中项：淡蓝胶囊背景 + 文字 */
+  &.as-tab-bar__item--active {
+    background: rgba($primary, 0.15);
+    padding: 0 $s-3;
+    gap: $s-1;
   }
 }
 
-.as-tab-active-text {
-  font-size: 20rpx;
+.as-tab-bar__icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 红点徽章 */
+.as-tab-bar__badge-dot {
+  position: absolute;
+  top: -2rpx;
+  right: -2rpx;
+  width: 14rpx;
+  height: 14rpx;
+  background: $up;
+  border-radius: $r-full;
+  border: 2rpx solid $bg-page;
+}
+
+/* 数字徽章 */
+.as-tab-bar__badge-num {
+  position: absolute;
+  top: -10rpx;
+  right: -16rpx;
+  min-width: 28rpx;
+  height: 28rpx;
+  padding: 0 6rpx;
+  background: $up;
+  border-radius: $r-full;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid $bg-page;
+}
+
+.as-tab-bar__badge-num-text {
+  font-size: 18rpx;
+  color: $white;
+  line-height: 1;
+}
+
+.as-tab-bar__text {
+  font-size: $font-size-xs;
   font-weight: 600;
-  color: #4d7cfe;
-  animation: tab-fade-in 0.2s ease;
+  color: $primary;
+  line-height: 1;
+  white-space: nowrap;
 }
-
-@keyframes tab-fade-in {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
-}
-
 </style>

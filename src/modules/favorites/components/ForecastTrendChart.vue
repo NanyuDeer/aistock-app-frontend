@@ -176,7 +176,7 @@ watch(() => props.series, () => {
   min-height: 52rpx;
   padding: 8rpx 16rpx;
   background: #f8fafc;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
   border-radius: 10rpx;
 
   &.is-active {

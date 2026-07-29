@@ -164,7 +164,7 @@ watch(currentStep, async (stepId) => {
   padding-top: 16rpx;
   --ev-text-secondary: #374151;
   --ev-text-muted: #4b5563;
-  --ev-text-tertiary: #6b7280;
+  --ev-text-tertiary: $ink-soft;
 }
 
 /* 来源信息栏 */

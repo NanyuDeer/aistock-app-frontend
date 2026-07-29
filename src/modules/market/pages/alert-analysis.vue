@@ -215,7 +215,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #f5f7fa;
+  background: $bg-soft;
   overscroll-behavior: none;
   touch-action: none;
 }
@@ -230,7 +230,7 @@ onUnmounted(() => {
 .analysis-header-bg {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(135deg, #4d7cfe 0%, #6c5ce7 100%);
+  background: linear-gradient(135deg, $primary 0%, #6c5ce7 100%);
   &::after {
     content: '';
     position: absolute;
@@ -322,7 +322,7 @@ onUnmounted(() => {
 .analysis-error-text { font-size: 28rpx; color: #ef4444; text-align: center; }
 .analysis-retry-btn {
   padding: 12rpx 40rpx;
-  background: linear-gradient(135deg, #4d7cfe, #6c5ce7);
+  background: linear-gradient(135deg, $primary, #6c5ce7);
   border-radius: 24rpx;
   margin-top: 8rpx;
 }
@@ -342,7 +342,7 @@ onUnmounted(() => {
   border-radius: 20rpx;
   font-weight: 500;
 
-  &.keyword-0 { background: rgba(77,124,254,0.1); color: #4d7cfe; }
+  &.keyword-0 { background: rgba(77,124,254,0.1); color: $primary; }
   &.keyword-1 { background: rgba(245,158,11,0.1); color: #f59f0b; }
   &.keyword-2 { background: rgba(239,68,68,0.08); color: #ef4444; }
   &.keyword-3 { background: rgba(16,185,129,0.1); color: #10b981; }
@@ -369,7 +369,7 @@ onUnmounted(() => {
 
 .summary-text {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.6;
   font-weight: 500;
 }
@@ -435,7 +435,7 @@ onUnmounted(() => {
 .analysis-loading-dots { display: flex; gap: 10rpx; }
 .analysis-loading-dot {
   width: 12rpx; height: 12rpx;
-  background: #4d7cfe;
+  background: $primary;
   border-radius: 50%;
   animation: pulse 1.4s ease-in-out infinite;
   &:nth-child(2) { animation-delay: 0.2s; }
@@ -454,21 +454,21 @@ onUnmounted(() => {
   word-break: keep-all;
   overflow-wrap: break-word;
   :deep(h2.md-h2) {
-    font-size: 32rpx; font-weight: 600; color: #1a1d24;
+    font-size: 32rpx; font-weight: 600; color: $ink;
     margin: 24rpx 0 16rpx; padding-bottom: 12rpx;
     border-bottom: 2rpx solid #f0f2f5;
   }
   :deep(h3.md-h3) { font-size: 28rpx; font-weight: 600; color: #374151; margin: 20rpx 0 10rpx; }
   :deep(hr.md-hr) {
     border: none; height: 1rpx;
-    background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+    background: linear-gradient(90deg, transparent, $line, transparent);
     margin: 20rpx 0;
   }
-  :deep(strong) { color: #1a1d24; font-weight: 600; }
+  :deep(strong) { color: $ink; font-weight: 600; }
   :deep(table.md-table) {
     width: 100%; border-collapse: collapse; margin: 12rpx 0;
     font-size: 24rpx; border-radius: 12rpx; overflow: hidden;
-    th { background: #f0f4ff; padding: 12rpx 16rpx; text-align: left; font-weight: 600; color: #4d7cfe; }
+    th { background: #f0f4ff; padding: 12rpx 16rpx; text-align: left; font-weight: 600; color: $primary; }
     td { padding: 10rpx 16rpx; border-bottom: 1rpx solid #f0f2f5; color: #374151; }
     tr:last-child td { border-bottom: none; }
   }
@@ -477,7 +477,7 @@ onUnmounted(() => {
 }
 
 .analysis-cursor {
-  display: inline; color: #4d7cfe; font-weight: 700;
+  display: inline; color: $primary; font-weight: 700;
   font-size: 26rpx; animation: blink 0.8s infinite;
 }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }

@@ -162,7 +162,7 @@ onShow(() => {
   align-items: center;
   padding: 24rpx 32rpx;
   margin-bottom: 24rpx;
-  background: linear-gradient(135deg, #4d7cfe 0%, #667eea 100%);
+  background: linear-gradient(135deg, $primary 0%, #667eea 100%);
   border-radius: 16rpx;
   box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
 }
@@ -189,7 +189,7 @@ onShow(() => {
 
 .stats-text {
   font-size: 26rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
@@ -242,12 +242,12 @@ onShow(() => {
 .stock-name {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .stock-code {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 /* 板块标签（紧跟股票代码右侧） */
@@ -258,7 +258,7 @@ onShow(() => {
   border-radius: 8rpx;
   font-size: 20rpx;
   font-weight: 500;
-  background: #4d7cfe;
+  background: $primary;
   color: #ffffff;
 }
 
@@ -286,7 +286,7 @@ onShow(() => {
 .price-val {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .change-val {
@@ -351,7 +351,7 @@ onShow(() => {
   font-size: 20rpx;
   font-weight: 500;
   background: rgba(77, 124, 254, 0.08);
-  color: #4d7cfe;
+  color: $primary;
   border: 1rpx solid rgba(77, 124, 254, 0.2);
   white-space: nowrap;
 }
@@ -366,7 +366,7 @@ onShow(() => {
 
 .empty-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-bottom: 12rpx;
 }
 

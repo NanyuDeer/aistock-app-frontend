@@ -153,7 +153,7 @@ function goToEventDetail() {
   align-items: center;
   padding: 300rpx 0;
 }
-.state-text { font-size: 28rpx; color: #6b7280; }
+.state-text { font-size: 28rpx; color: $ink-soft; }
 
 /* Scroll */
 .news-scroll {
@@ -173,7 +173,7 @@ function goToEventDetail() {
 .news-title {
   font-size: 36rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.5;
   display: block;
   margin-bottom: 16rpx;
@@ -187,7 +187,7 @@ function goToEventDetail() {
 
 .news-source {
   font-size: 22rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
   background: rgba(77, 124, 254, 0.08);
   padding: 2rpx 12rpx;
@@ -201,7 +201,7 @@ function goToEventDetail() {
 
 .news-summary {
   background: #f8fafc;
-  border-left: 6rpx solid #4d7cfe;
+  border-left: 6rpx solid $primary;
   padding: 20rpx 24rpx;
   border-radius: 0 12rpx 12rpx 0;
   margin-bottom: 28rpx;
@@ -226,7 +226,7 @@ function goToEventDetail() {
 
 .footer-link {
   font-size: 28rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 
@@ -266,13 +266,13 @@ function goToEventDetail() {
 .ai-entry-subtitle {
   display: block;
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-top: 4rpx;
 }
 
 .ai-entry-arrow {
   font-size: 40rpx;
-  color: #6366f1;
+  color: $primary-600;
   font-weight: 300;
   flex-shrink: 0;
 }

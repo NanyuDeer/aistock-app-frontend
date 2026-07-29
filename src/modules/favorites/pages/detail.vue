@@ -762,7 +762,7 @@
       <!-- 6. AI 投顾入口（页面最底部） -->
       <view class="ai-card" @tap="goChat">
         <view class="ai-icon-wrap">
-          <SvgIcon name="robot-line" size="36rpx" color="#4d7cfe" />
+          <SvgIcon name="robot-line" size="36rpx" color="#0b5fff" />
         </view>
         <view class="ai-content">
           <text class="ai-title">AI 智能投顾</text>
@@ -1461,7 +1461,7 @@ function goChat() {
 
 .page-detail {
   padding: 24rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   box-sizing: border-box;
   width: 100%;
   max-width: 430px;
@@ -1477,7 +1477,7 @@ function goChat() {
 
 .loading-text, .empty-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 /* 股票头部 */
@@ -1499,12 +1499,12 @@ function goChat() {
 .stock-name {
   font-size: 36rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .stock-code {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 4rpx 16rpx;
   background: #f0f2f5;
   border-radius: 8rpx;
@@ -1573,7 +1573,7 @@ function goChat() {
   align-items: center;
   gap: 6rpx;
   padding: 6rpx 14rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 8rpx;
 
   .tag-label {
@@ -1600,14 +1600,14 @@ function goChat() {
 
 .limit-inline-label {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-soft;
 
   .up { color: #f43f5e; font-weight: 600; }
   .down { color: #22c55e; font-weight: 600; }
 }
 
 .limit-inline-sep {
-  color: #e5e7eb;
+  color: $line;
   font-size: 24rpx;
 }
 
@@ -1696,7 +1696,7 @@ function goChat() {
 .card-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .ai-refresh-btn {
@@ -1706,7 +1706,7 @@ function goChat() {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #f5f7fa;
+  background: $bg-soft;
 
   &:active { background: #e8ecf1; }
 }
@@ -1870,7 +1870,7 @@ function goChat() {
 .section-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 20rpx;
   display: block;
 }
@@ -1884,7 +1884,7 @@ function goChat() {
 
 .section-sub {
   font-size: 24rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 
@@ -1905,7 +1905,7 @@ function goChat() {
   width: 16rpx;
   height: 16rpx;
   border-radius: 50%;
-  background: #4d7cfe;
+  background: $primary;
   margin-top: 8rpx;
   flex-shrink: 0;
 
@@ -1921,7 +1921,7 @@ function goChat() {
 
 .event-title {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.4;
 }
 
@@ -1935,7 +1935,7 @@ function goChat() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rpx;
-  background: #e5e7eb;
+  background: $line;
   border-radius: 12rpx;
   overflow: hidden;
 }
@@ -1950,12 +1950,12 @@ function goChat() {
 
 .detail-label {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .detail-value {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 
   &.up { color: #f43f5e; }
@@ -1973,13 +1973,13 @@ function goChat() {
   display: flex;
   flex-direction: column;
   padding: 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
 .flow-label {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-bottom: 8rpx;
 }
 
@@ -2000,7 +2000,7 @@ function goChat() {
 
 .flow-narrative-text {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   line-height: 1.5;
 }
 
@@ -2015,20 +2015,20 @@ function goChat() {
   display: flex;
   flex-direction: column;
   padding: 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
 .finance-label {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-bottom: 8rpx;
 }
 
 .finance-value {
   font-size: 32rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 4rpx;
 }
 
@@ -2049,7 +2049,7 @@ function goChat() {
 
 .forecast-summary {
   padding: 16rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
@@ -2070,14 +2070,14 @@ function goChat() {
   align-items: center;
   gap: 16rpx;
   padding: 16rpx 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
 .forecast-year {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   min-width: 80rpx;
 }
 
@@ -2116,7 +2116,7 @@ function goChat() {
 
   text {
     font-size: 22rpx;
-    color: #4d7cfe;
+    color: $primary;
   }
 }
 
@@ -2126,7 +2126,7 @@ function goChat() {
 
   &.is-hot { color: #f43f5e; }
   &.is-warm { color: #f59e0b; }
-  &.is-normal { color: #4d7cfe; }
+  &.is-normal { color: $primary; }
   &.is-cold { color: #22c55e; }
 }
 
@@ -2151,7 +2151,7 @@ function goChat() {
 
 .trend-bar {
   width: 32rpx;
-  background: linear-gradient(180deg, #4d7cfe, #6366f1);
+  background: linear-gradient(180deg, $primary, $primary-600);
   border-radius: 6rpx 6rpx 0 0;
 }
 
@@ -2171,7 +2171,7 @@ function goChat() {
   flex-direction: column;
   align-items: center;
   padding: 16rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
@@ -2179,7 +2179,7 @@ function goChat() {
   width: 48rpx;
   height: 48rpx;
   border-radius: 50%;
-  background: #4d7cfe;
+  background: $primary;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2194,13 +2194,13 @@ function goChat() {
 
 .industry-detail-title {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-bottom: 4rpx;
 }
 
 .industry-detail-desc {
   font-size: 24rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
@@ -2226,19 +2226,19 @@ function goChat() {
   .tenx-score {
     font-size: 64rpx;
     font-weight: 700;
-    color: #4d7cfe;
+    color: $primary;
     line-height: 1;
   }
 
   .tenx-score-label {
     font-size: 22rpx;
-    color: #6b7280;
+    color: $ink-soft;
     margin-top: 4rpx;
   }
 
   .tenx-multiple {
     font-size: 24rpx;
-    color: #4d7cfe;
+    color: $primary;
     font-weight: 500;
     margin-top: 8rpx;
   }
@@ -2250,7 +2250,7 @@ function goChat() {
   .verdict-tag {
     display: inline-block;
     padding: 8rpx 20rpx;
-    background: #4d7cfe;
+    background: $primary;
     color: #ffffff;
     border-radius: 28rpx;
     font-size: 26rpx;
@@ -2275,7 +2275,7 @@ function goChat() {
 }
 
 .tenx-dim-item {
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
   border-radius: 12rpx;
   overflow: hidden;
   background: #ffffff;
@@ -2292,14 +2292,14 @@ function goChat() {
 .tenx-dim-label {
   font-size: 26rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   flex: 1;
 }
 
 .tenx-dim-score {
   font-size: 28rpx;
   font-weight: 700;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .tenx-dim-weight {
@@ -2319,14 +2319,14 @@ function goChat() {
 
 .tenx-dim-question {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   line-height: 1.5;
   margin-bottom: 12rpx;
 }
 
 .tenx-dim-bar-wrap {
   height: 10rpx;
-  background: #e5e7eb;
+  background: $line;
   border-radius: 999rpx;
   overflow: hidden;
   margin: 0 20rpx 14rpx;
@@ -2334,7 +2334,7 @@ function goChat() {
 
 .tenx-dim-bar {
   height: 100%;
-  background: linear-gradient(90deg, #4d7cfe, #6366f1);
+  background: linear-gradient(90deg, $primary, $primary-600);
   border-radius: 999rpx;
 }
 
@@ -2400,7 +2400,7 @@ function goChat() {
   flex-direction: column;
   align-items: center;
   padding: 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
   text-align: center;
 }
@@ -2409,7 +2409,7 @@ function goChat() {
   width: 56rpx;
   height: 56rpx;
   border-radius: 50%;
-  background: #4d7cfe;
+  background: $primary;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2425,13 +2425,13 @@ function goChat() {
 .moat-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 8rpx;
 }
 
 .moat-desc {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   line-height: 1.5;
 }
 
@@ -2446,20 +2446,20 @@ function goChat() {
   display: flex;
   flex-direction: column;
   padding: 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
 .annual-label {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-bottom: 8rpx;
 }
 
 .annual-value {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 4rpx;
 }
 
@@ -2479,7 +2479,7 @@ function goChat() {
 .semi-table {
   border-radius: 12rpx;
   overflow: hidden;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
 }
 
 .semi-row {
@@ -2492,7 +2492,7 @@ function goChat() {
   }
 
   &.semi-header {
-    background: #f5f7fa;
+    background: $bg-soft;
     font-weight: 600;
   }
 }
@@ -2508,7 +2508,7 @@ function goChat() {
     flex: 1.2;
     text-align: left;
     padding-left: 16rpx;
-    color: #6b7280;
+    color: $ink-soft;
   }
 
   &.semi-cell-value {
@@ -2537,7 +2537,7 @@ function goChat() {
 
 .semi-link {
   font-size: 26rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 
@@ -2558,7 +2558,7 @@ function goChat() {
 
 .news-title {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.4;
   margin-bottom: 6rpx;
 }
@@ -2570,7 +2570,7 @@ function goChat() {
 
 .news-source {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .news-time {
@@ -2602,14 +2602,14 @@ function goChat() {
 
 .news-page-arrow {
   font-size: 36rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 600;
   line-height: 1;
 }
 
 .news-page-info {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   min-width: 80rpx;
   text-align: center;
 }
@@ -2630,7 +2630,7 @@ function goChat() {
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
-  background: #4d7cfe;
+  background: $primary;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2645,18 +2645,18 @@ function goChat() {
 .ai-title {
   font-size: 28rpx;
   font-weight: 500;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .ai-desc {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-top: 4rpx;
 }
 
 .ai-arrow {
   font-size: 36rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 /* 卡片头部操作�?*/
@@ -2677,7 +2677,7 @@ function goChat() {
 
 .history-icon {
   font-size: 22rpx;
-  color: #6366f1;
+  color: $primary-600;
   font-weight: 500;
 }
 
@@ -2708,10 +2708,10 @@ function goChat() {
 
 .cf-tag-mini {
   padding: 4rpx 12rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 6rpx;
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .cf-hero-card {
@@ -2726,7 +2726,7 @@ function goChat() {
 
 .cf-hero-label {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .cf-hero-card-value {
@@ -2743,7 +2743,7 @@ function goChat() {
 
 .cf-orders-title {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-bottom: 12rpx;
   display: block;
 }
@@ -2800,7 +2800,7 @@ function goChat() {
 
 .cf-trend-title {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .cf-trend-badge {
@@ -2808,7 +2808,7 @@ function goChat() {
   background: rgba(77, 124, 254, 0.1);
   border-radius: 6rpx;
   font-size: 20rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .cf-trend-bars {
@@ -2865,7 +2865,7 @@ function goChat() {
 
 .forecast-update-value {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .forecast-yoy {
@@ -2873,7 +2873,7 @@ function goChat() {
   align-items: center;
   justify-content: space-between;
   padding: 16rpx 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
   margin-bottom: 16rpx;
 }
@@ -2950,7 +2950,7 @@ function goChat() {
   font-size: 21rpx;
   color: #64748b;
 
-  &.is-actual { color: #4d7cfe; }
+  &.is-actual { color: $primary; }
   &.is-forecast { color: #d97706; }
 }
 
@@ -2962,7 +2962,7 @@ function goChat() {
 
 .forecast-progress-track {
   height: 16rpx;
-  background: #e5e7eb;
+  background: $line;
   border-radius: 999rpx;
   overflow: hidden;
 }
@@ -2973,7 +2973,7 @@ function goChat() {
   border-radius: 999rpx;
 
   &.is-actual {
-    background: linear-gradient(90deg, #4d7cfe, #7c9cff);
+    background: linear-gradient(90deg, $primary, #7c9cff);
   }
 
   &.is-forecast {
@@ -2989,9 +2989,9 @@ function goChat() {
   margin-bottom: 4rpx;
 }
 
-.forecast-col-year { flex: 1; font-size: 22rpx; color: #6b7280; font-weight: 600; }
-.forecast-col-profit { flex: 1; font-size: 22rpx; color: #6b7280; font-weight: 600; text-align: center; }
-.forecast-col-growth { flex: 1; font-size: 22rpx; color: #6b7280; font-weight: 600; text-align: right; }
+.forecast-col-year { flex: 1; font-size: 22rpx; color: $ink-soft; font-weight: 600; }
+.forecast-col-profit { flex: 1; font-size: 22rpx; color: $ink-soft; font-weight: 600; text-align: center; }
+.forecast-col-growth { flex: 1; font-size: 22rpx; color: $ink-soft; font-weight: 600; text-align: right; }
 
 .forecast-detail-table {
   margin-top: 16rpx;
@@ -3007,7 +3007,7 @@ function goChat() {
 
 .forecast-detail-scroll {
   overflow-x: auto;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
   border-radius: 12rpx;
 }
 
@@ -3018,7 +3018,7 @@ function goChat() {
   &:last-child { border-bottom: none; }
 
   &.forecast-detail-head {
-    background: #f5f7fa;
+    background: $bg-soft;
     font-weight: 600;
   }
 }
@@ -3036,7 +3036,7 @@ function goChat() {
     min-width: 160rpx;
     text-align: left;
     padding-left: 16rpx;
-    color: #6b7280;
+    color: $ink-soft;
     font-weight: 500;
   }
 }
@@ -3091,7 +3091,7 @@ function goChat() {
   padding: 16rpx 20rpx;
   background: linear-gradient(135deg, rgba(77, 124, 254, 0.06), rgba(99, 102, 241, 0.03));
   border-radius: 12rpx;
-  border-left: 4rpx solid #4d7cfe;
+  border-left: 4rpx solid $primary;
 }
 
 .tenx-ai-conclusion-header {
@@ -3105,7 +3105,7 @@ function goChat() {
   width: 36rpx;
   height: 36rpx;
   border-radius: 8rpx;
-  background: #4d7cfe;
+  background: $primary;
   color: #ffffff;
   font-size: 20rpx;
   font-weight: 700;
@@ -3135,7 +3135,7 @@ function goChat() {
   align-items: center;
   gap: 8rpx;
   padding: 8rpx 0;
-  border-bottom: 1rpx solid #f5f7fa;
+  border-bottom: 1rpx solid $bg-soft;
 
   &:last-child { border-bottom: none; }
 }
@@ -3143,7 +3143,7 @@ function goChat() {
 .tenx-ind-name {
   flex: 1;
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .tenx-ind-right {
@@ -3155,7 +3155,7 @@ function goChat() {
 
 .tenx-ind-value {
   font-size: 22rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
   min-width: 80rpx;
   text-align: right;
@@ -3206,7 +3206,7 @@ function goChat() {
   padding: 16rpx;
   background: #f8fafc;
   border-radius: 12rpx;
-  border-left: 4rpx solid #6366f1;
+  border-left: 4rpx solid $primary-600;
 }
 
 .tenx-sub-dims-title {
@@ -3290,7 +3290,7 @@ function goChat() {
 
 .tenx-vetoed-desc {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-soft;
   line-height: 1.5;
   margin-bottom: 16rpx;
 }
@@ -3346,7 +3346,7 @@ function goChat() {
 .history-dialog-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .history-dialog-close {
@@ -3356,14 +3356,14 @@ function goChat() {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #f5f7fa;
+  background: $bg-soft;
 
   &:active { background: #e8ecf1; }
 }
 
 .close-icon {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .history-dialog-body {
@@ -3380,7 +3380,7 @@ function goChat() {
 
 .history-item {
   padding: 16rpx 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 
   &:active { background: #eef0f3; }
@@ -3425,10 +3425,10 @@ function goChat() {
 
 .history-page-btn {
   padding: 8rpx 24rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 8rpx;
 
-  text { font-size: 24rpx; color: #4d7cfe; }
+  text { font-size: 24rpx; color: $primary; }
 
   &.disabled {
     opacity: 0.4;
@@ -3441,7 +3441,7 @@ function goChat() {
 
 .history-page-info {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .history-detail-back {
@@ -3453,12 +3453,12 @@ function goChat() {
 
 .back-icon {
   font-size: 32rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .back-text {
   font-size: 24rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .history-detail-meta {

@@ -293,7 +293,7 @@ onUnmounted(stopAll)
 
 <style lang="scss" scoped>
 .page-content { padding: 24rpx; }
-.loading-state, .empty-state { display: flex; flex-direction: column; align-items: center; padding: 120rpx 0; font-size: 28rpx; color: #6b7280; }
+.loading-state, .empty-state { display: flex; flex-direction: column; align-items: center; padding: 120rpx 0; font-size: 28rpx; color: $ink-soft; }
 .empty-text { margin-top: 24rpx; }
 .empty-hint, .report-date { margin-top: 12rpx; font-size: 22rpx; color: #9ca3af; }
 .report-date { display: block; margin: 0 0 16rpx; }
@@ -301,16 +301,16 @@ onUnmounted(stopAll)
 .conclusion-card, .section-card { padding: 24rpx; border-radius: 16rpx; background: #ffffff; }
 .conclusion-card { background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 1rpx solid #bfdbfe; }
 .section-kicker { display: block; margin-bottom: 10rpx; font-size: 22rpx; font-weight: 600; color: #1d4ed8; }
-.conclusion-text { display: block; font-size: 32rpx; font-weight: 600; line-height: 1.5; color: #1a1d24; }
-.stream-cursor { margin-left: 4rpx; color: #4d7cfe; animation: cursor-blink 0.8s infinite; }
+.conclusion-text { display: block; font-size: 32rpx; font-weight: 600; line-height: 1.5; color: $ink; }
+.stream-cursor { margin-left: 4rpx; color: $primary; animation: cursor-blink 0.8s infinite; }
 .stream-section { animation: section-in 0.28s ease-out both; }
 @keyframes section-in { from { opacity: 0; transform: translateY(12rpx); } to { opacity: 1; transform: translateY(0); } }
 @keyframes cursor-blink { 50% { opacity: 0; } }
-.section-title { display: block; margin-bottom: 16rpx; font-size: 28rpx; font-weight: 600; color: #1a1d24; }
+.section-title { display: block; margin-bottom: 16rpx; font-size: 28rpx; font-weight: 600; color: $ink; }
 .bullet-list { display: flex; flex-direction: column; gap: 14rpx; }
 .bullet-item, .section-text { display: block; font-size: 25rpx; line-height: 1.65; color: #4b5563; }
-.bullet-item::before { content: '•'; margin-right: 10rpx; color: #4d7cfe; }
-.judgment-card { border-left: 6rpx solid #4d7cfe; }
+.bullet-item::before { content: '•'; margin-right: 10rpx; color: $primary; }
+.judgment-card { border-left: 6rpx solid $primary; }
 .risk-card { background: #fff7f7; }
 .risk-item { display: block; font-size: 25rpx; line-height: 1.65; color: #4b5563; }
 .risk-item::before { content: '•'; margin-right: 8rpx; font-weight: 600; color: #dc2626; }

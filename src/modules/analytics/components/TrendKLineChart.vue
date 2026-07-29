@@ -156,7 +156,7 @@ function renderMpChart() {
               show: points.value.length >= 60,
               name: ['MA60'],
               day: [60],
-              color: ['#4d7cfe'],
+              color: ['#0b5fff'],
             },
           },
         },
@@ -220,7 +220,7 @@ registerLocale('zh-CN', {
 const COLORS = {
   up: '#f43f5e',
   down: '#22c55e',
-  brand: '#4d7cfe',
+  brand: '#0b5fff',
   grid: '#eef1f5',
   axis: '#8b95a5',
   text: '#1f2937',

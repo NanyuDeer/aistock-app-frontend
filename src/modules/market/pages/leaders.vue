@@ -557,7 +557,7 @@ onShow(() => {
   align-items: center;
   padding: 24rpx 32rpx;
   margin-bottom: 24rpx;
-  background: linear-gradient(135deg, #4d7cfe 0%, #667eea 100%);
+  background: linear-gradient(135deg, $primary 0%, #667eea 100%);
   border-radius: 16rpx;
   box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
 }
@@ -607,7 +607,7 @@ onShow(() => {
   color: #ffffff;
   font-size: 26rpx;
   line-height: 72rpx;
-  background: #4d7cfe;
+  background: $primary;
   border: 0;
   border-radius: 36rpx;
 
@@ -639,7 +639,7 @@ onShow(() => {
 .bubble-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .bubble-hint {
@@ -719,7 +719,7 @@ onShow(() => {
 .stats-name {
   font-size: 36rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 /* 持续性标签 */
@@ -737,7 +737,7 @@ onShow(() => {
 /* 频次 badge */
 .freq-badge {
   font-size: 20rpx;
-  color: #4d7cfe;
+  color: $primary;
   background: rgba(77, 124, 254, 0.1);
   padding: 4rpx 12rpx;
   border-radius: 6rpx;
@@ -760,14 +760,14 @@ onShow(() => {
 
 .stat-label {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-bottom: 8rpx;
 }
 
 .stat-value {
   font-size: 26rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 
   &.up { color: #f43f5e; }
   &.down { color: #22c55e; }
@@ -793,7 +793,7 @@ onShow(() => {
 .sector-rank {
   font-size: 22rpx;
   color: #ffffff;
-  background: #4d7cfe;
+  background: $primary;
   padding: 4rpx 12rpx;
   border-radius: 8rpx;
   font-weight: 500;
@@ -818,7 +818,7 @@ onShow(() => {
   justify-content: space-between;
   align-items: center;
   padding: 12rpx 16rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
   margin-top: 16rpx;
 }
@@ -831,13 +831,13 @@ onShow(() => {
 
 .leader-mini-name {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 600;
 }
 
 .leader-mini-code {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   background: #e8ecf1;
   padding: 2rpx 8rpx;
   border-radius: 6rpx;
@@ -860,7 +860,7 @@ onShow(() => {
 .leader-mini-price {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 /* 关注按钮 */
@@ -912,13 +912,13 @@ onShow(() => {
 
 .leader-label {
   font-size: 22rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 
 .leader-name {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
@@ -932,7 +932,7 @@ onShow(() => {
 
 .leader-price {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 600;
 }
 
@@ -945,20 +945,20 @@ onShow(() => {
 
 .driver-label {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   flex-shrink: 0;
 }
 
 .driver-text {
   font-size: 24rpx;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.5;
   flex: 1;
 }
 
 /* AI 分析 */
 .analysis-box {
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
   padding: 20rpx;
   margin-bottom: 16rpx;
@@ -983,7 +983,7 @@ onShow(() => {
 
 .analysis-value {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   line-height: 1.5;
   flex: 1;
 
@@ -1020,7 +1020,7 @@ onShow(() => {
 .stocks-section-title {
   font-size: 26rpx;
   font-weight: 500;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 16rpx;
   display: block;
 }
@@ -1036,7 +1036,7 @@ onShow(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16rpx 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
@@ -1048,13 +1048,13 @@ onShow(() => {
 
 .stock-name {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
 .stock-code {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .stock-quote {
@@ -1065,7 +1065,7 @@ onShow(() => {
 
 .stock-price {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 600;
 }
 
@@ -1095,7 +1095,7 @@ onShow(() => {
 
 .history-btn-text {
   font-size: 24rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 </style>

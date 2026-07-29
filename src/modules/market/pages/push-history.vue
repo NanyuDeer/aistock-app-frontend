@@ -342,7 +342,7 @@ onLoad(() => {
 
 .summary-card {
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid $line;
   border-radius: 16rpx;
   padding: 18rpx 24rpx;
   box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
@@ -354,7 +354,7 @@ onLoad(() => {
 }
 
 .summary-label {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 24rpx;
   margin-bottom: 6rpx;
 }
@@ -394,7 +394,7 @@ onLoad(() => {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid $line;
 }
 
 .filter-section {
@@ -416,7 +416,7 @@ onLoad(() => {
 }
 
 .date-picker-value {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 24rpx;
   white-space: nowrap;
 }
@@ -425,7 +425,7 @@ onLoad(() => {
   width: 36rpx;
   height: 36rpx;
   border-radius: 50%;
-  background: #e5e7eb;
+  background: $line;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -433,7 +433,7 @@ onLoad(() => {
 }
 
 .clear-icon {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 28rpx;
   line-height: 1;
 }
@@ -445,7 +445,7 @@ onLoad(() => {
 .history-tab {
   position: relative;
   padding: 20rpx 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 28rpx;
 }
 
@@ -471,7 +471,7 @@ onLoad(() => {
 
 .record-item {
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid $line;
   border-radius: 16rpx;
   padding: 24rpx;
   margin-bottom: 24rpx;
@@ -489,7 +489,7 @@ onLoad(() => {
 }
 
 .item-date {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 26rpx;
 }
 
@@ -514,7 +514,7 @@ onLoad(() => {
 
 .item-code {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   background: #f0f2f5;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
@@ -540,7 +540,7 @@ onLoad(() => {
 }
 
 .item-note {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 24rpx;
 }
 
@@ -556,7 +556,7 @@ onLoad(() => {
 .ranking-card {
   margin-bottom: 24rpx;
   padding: 28rpx 24rpx;
-  border: 1px solid #e5e7eb;
+  border: 1px solid $line;
   border-radius: 16rpx;
   background: #fff;
   box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);

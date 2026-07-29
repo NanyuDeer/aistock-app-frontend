@@ -1,29 +1,38 @@
+/**
+ * SubPageCard2 白色导航栏子页面容器
+ * 视觉层同步自 aistock-component-lib/src/components/SubPageCard2.vue（同步时间：2026-07-28）
+ * 保留 app 前端业务逻辑：GlobalChatBar + statusBarHeight + goBack(backUrl) + noChatBar
+ */
 <template>
-  <view class="sub-page-2-wrapper" :style="{ paddingTop: statusBarHeight + 'px' }">
+  <view class="as-sub2" :style="{ paddingTop: statusBarHeight + 'px' }">
     <!-- 白色导航栏：返回按钮 + 标题/副标题 + 右侧按钮 -->
-    <view class="sub-nav-2" :class="{ 'with-subtitle': subtitle }">
-      <view class="nav-back-2" @tap="goBack">
-        <text class="back-icon-2">‹</text>
+    <view class="as-sub2__nav" :class="{ 'as-sub2__nav--subtitle': subtitle }">
+      <view class="as-sub2__nav-left">
+        <view class="as-sub2__back" @tap="goBack">
+          <view class="as-sub2__back-icon"></view>
+        </view>
+        <view class="as-sub2__title-wrap">
+          <text v-if="title" class="as-sub2__title">{{ title }}</text>
+          <text v-if="subtitle" class="as-sub2__subtitle">{{ subtitle }}</text>
+        </view>
       </view>
-      <view class="nav-title-area-2">
-        <text class="sub-nav-2-title">{{ title }}</text>
-        <text v-if="subtitle" class="sub-nav-2-subtitle">{{ subtitle }}</text>
+      <view v-if="$slots['header-right']" class="as-sub2__nav-right">
+        <slot name="header-right" />
       </view>
-      <slot name="header-right" />
     </view>
 
-    <!-- 中间内容区域：flex 容器包裹 scroll-view 和 footer，参照 SubPageCard -->
-    <view class="sub-page-2-body" :class="{ 'no-chat-bar': noChatBar }" :style="bodyStyle">
+    <!-- 中间内容区域 -->
+    <view class="as-sub2__body" :style="bodyStyle">
       <scroll-view
         scroll-y
-        class="sub-page-2-content"
+        class="as-sub2__scroll"
         :enhanced="true"
         :bounces="false"
       >
         <slot />
       </scroll-view>
-      <!-- 可选底部操作栏插槽（flex-shrink:0 固定在内容区底部） -->
-      <view v-if="$slots.footer" class="sub-page-2-footer">
+      <!-- 可选底部操作栏插槽 -->
+      <view v-if="$slots.footer" class="as-sub2__footer">
         <slot name="footer" />
       </view>
     </view>
@@ -38,10 +47,10 @@ import { ref, computed } from 'vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 
 const props = withDefaults(defineProps<{
+  /** 主标题 */
   title?: string
   /** 副标题或备注，显示在标题下方 */
   subtitle?: string
-  cardMarginBottom?: string
   /** 内容区域底部 padding（用于给 GlobalChatBar 留空间），noChatBar 时自动为 0 */
   contentPaddingBottom?: string
   /** 当前激活的面板页：'favorites' | 'trade' | '' */
@@ -53,7 +62,6 @@ const props = withDefaults(defineProps<{
 }>(), {
   title: '',
   subtitle: '',
-  cardMarginBottom: '40rpx',
   contentPaddingBottom: 'calc(148rpx + env(safe-area-inset-bottom))',
   activePanel: '',
   backUrl: '/modules/home/pages/index',
@@ -66,7 +74,6 @@ const bodyStyle = computed(() =>
 )
 
 // 获取真实状态栏高度
-// App 端 zoom:1.2 会放大 padding，需除以 1.2 补偿
 const statusBarHeight = ref(0)
 try {
   const sysInfo = uni.getSystemInfoSync()
@@ -90,14 +97,11 @@ function goBack() {
   }
 }
 
-// 暴露 goBack 供父组件调用，复用 SubPageCard2 的回退语义
-// （navigateBack 优先，无历史页时 redirectTo backUrl）
 defineExpose({ goBack })
 </script>
 
 <style lang="scss" scoped>
-/* 白色顶栏子页面：状态栏区域 + 导航栏均为白色背景 */
-.sub-page-2-wrapper {
+.as-sub2 {
   position: fixed;
   top: 0;
   left: 0;
@@ -106,68 +110,98 @@ defineExpose({ goBack })
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #ffffff; /* 状态栏区域为白色 */
+  background: $bg-card;
   overscroll-behavior: none;
   touch-action: none;
 }
 
-/* 白色导航栏 */
-.sub-nav-2 {
+/* ===== 白色导航栏 ===== */
+.as-sub2__nav {
   flex-shrink: 0;
-  height: 88rpx;
   display: flex;
   align-items: center;
-  padding: 0 24rpx;
-  background: #ffffff;
-  border-bottom: 1rpx solid #e5e7eb;
+  justify-content: space-between;
+  height: 88rpx;
+  padding: 0 $s-3;
+  background: $bg-card;
+  border-bottom: 2rpx solid $line-soft;
 }
 
-/* 有副标题时导航栏更高 */
-.sub-nav-2.with-subtitle {
+.as-sub2__nav--subtitle {
   height: 120rpx;
 }
 
-.nav-back-2 {
-  width: 64rpx;
-  height: 64rpx;
+.as-sub2__nav-left {
+  display: flex;
+  align-items: center;
+  gap: $s-1;
+  flex: 1;
+  min-width: 0;
+}
+
+.as-sub2__back {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: $r-full;
   flex-shrink: 0;
 }
 
-.back-icon-2 {
-  font-size: 48rpx;
-  color: #1a1d24;
-  font-weight: 300;
-  line-height: 1;
+.as-sub2__back:active {
+  background: $bg-soft;
 }
 
-/* 标题 + 副标题区域 */
-.nav-title-area-2 {
+/* CSS 绘制返回箭头 */
+.as-sub2__back-icon {
+  position: relative;
+  width: 20rpx;
+  height: 20rpx;
+}
+
+.as-sub2__back-icon::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20rpx;
+  height: 20rpx;
+  border-left: 4rpx solid $ink;
+  border-bottom: 4rpx solid $ink;
+  transform: rotate(45deg);
+}
+
+.as-sub2__title-wrap {
   display: flex;
   flex-direction: column;
-  margin-left: 8rpx;
   flex: 1;
+  min-width: 0;
 }
 
-.sub-nav-2-title {
-  font-size: 36rpx;
+.as-sub2__title {
+  font-size: $font-size-lg;
   font-weight: 600;
-  color: #1a1d24;
-  line-height: 1.3;
+  color: $ink;
+  line-height: $lh-tight;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sub-nav-2-subtitle {
-  font-size: 24rpx;
-  color: #6b7280;
-  line-height: 1.3;
+.as-sub2__subtitle {
+  font-size: $font-size-xs;
+  color: $ink-soft;
   margin-top: 4rpx;
+  line-height: $lh-tight;
 }
 
-/* 中间内容区域：flex:1 撑满剩余空间，参照 SubPageCard 的 .sub-page-body */
-/* padding-bottom 由 contentPaddingBottom prop 通过 inline style 控制 */
-.sub-page-2-body {
+.as-sub2__nav-right {
+  flex-shrink: 0;
+}
+
+/* ===== 内容区 ===== */
+.as-sub2__body {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -175,17 +209,15 @@ defineExpose({ goBack })
   overflow: hidden;
 }
 
-/* scroll-view 在 body 容器内 flex:1 撑满，footer 固定在底部 */
-.sub-page-2-content {
+.as-sub2__scroll {
   flex: 1;
   min-height: 0;
+  background: $bg-page;
   touch-action: auto;
   overscroll-behavior: contain;
-  background: #f5f7fb;
 }
 
-/* footer 插槽容器：不压缩，固定在内容区底部 */
-.sub-page-2-footer {
+.as-sub2__footer {
   flex-shrink: 0;
 }
 </style>

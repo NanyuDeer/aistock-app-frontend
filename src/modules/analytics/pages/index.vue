@@ -140,7 +140,7 @@ onShow(loadTrendScorePreview)
     left: 0;
     right: 0;
     height: 4rpx;
-    background: linear-gradient(90deg, #4d7cfe, #6366f1);
+    background: linear-gradient(90deg, $primary, $primary-600);
   }
 }
 
@@ -168,7 +168,7 @@ onShow(loadTrendScorePreview)
 }
 
 .insight-card-icon--trend {
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
+  background: linear-gradient(135deg, $primary, $primary-600);
   box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
 }
 
@@ -182,12 +182,12 @@ onShow(loadTrendScorePreview)
 .insight-card-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .insight-card-desc {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .insight-card-more {
@@ -216,7 +216,7 @@ onShow(loadTrendScorePreview)
 
 .preview-name {
   font-size: 26rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
   flex: 1;
 }
@@ -237,7 +237,7 @@ onShow(loadTrendScorePreview)
 }
 
 .preview-rank--trend {
-  color: #4d7cfe;
+  color: $primary;
   background: rgba(77, 124, 254, 0.1);
 }
 
@@ -254,13 +254,13 @@ onShow(loadTrendScorePreview)
 
 .preview-score {
   font-size: 26rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 600;
 }
 
 .preview-grade {
   min-width: 32rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-size: 24rpx;
   font-weight: 700;
   text-align: center;
@@ -285,7 +285,7 @@ onShow(loadTrendScorePreview)
 }
 
 .insight-card-action--trend {
-  color: #4d7cfe;
+  color: $primary;
   background: rgba(77, 124, 254, 0.1);
 }
 </style>

@@ -1,31 +1,56 @@
+/**
+ * GlobalChatBar 全局 AI 对话栏
+ * 视觉层同步自 aistock-component-lib/src/components/GlobalChatBar.vue（同步时间：2026-07-28）
+ * 保留 app 前端业务逻辑：交易/自选按钮 + activePanel 面板状态 + uni 导航
+ */
 <template>
-  <!-- 全局AI对话栏：交易 | 搜索框 | 自选 + 免责声明 -->
-  <!-- 固定在屏幕底部最高层级，背景色与页面背景一致 -->
-  <view class="global-chat-bar">
-    <view class="gcb-chat-row">
+  <view class="as-gcb">
+    <view class="as-gcb__row">
       <!-- 交易按钮：在交易面板页时变为下拉箭头，点击返回 -->
-      <view class="gcb-side-btn" :class="{ 'gcb-side-active': activePanel === 'trade' }" @tap="handleTrade">
-        <view v-if="activePanel === 'trade'" class="gcb-side-arrow"><text class="gcb-side-arrow-icon">‹</text></view>
-        <text v-else class="gcb-side-text">交易</text>
+      <view
+        class="as-gcb__side-btn"
+        :class="{ 'as-gcb__side-btn--active': activePanel === 'trade' }"
+        @tap="handleTrade"
+      >
+        <view v-if="activePanel === 'trade'" class="as-gcb__side-arrow"></view>
+        <text v-else class="as-gcb__side-text">交易</text>
       </view>
 
-      <view class="gcb-chat-input" @tap="handleChatTap">
-        <text class="gcb-chat-placeholder">搜问或按住说</text>
-        <view class="gcb-chat-right">
-          <text class="gcb-unread-badge" v-if="unreadCount > 0">未读{{ unreadCount }}</text>
-          <SvgIcon name="mic-line" size="36rpx" color="#9ca3af" />
+      <!-- AI 对话入口胶囊 -->
+      <view class="as-gcb__capsule" @tap="handleChatTap">
+        <!-- AI 头像 -->
+        <view class="as-gcb__avatar">
+          <text class="as-gcb__avatar-text">AI</text>
+        </view>
+
+        <!-- 输入提示 -->
+        <text class="as-gcb__placeholder">{{ placeholder }}</text>
+
+        <!-- 未读数 -->
+        <view v-if="unreadCount > 0" class="as-gcb__unread">
+          <text class="as-gcb__unread-text">{{ unreadCount }}</text>
+        </view>
+
+        <!-- 麦克风图标 -->
+        <view class="as-gcb__mic">
+          <SvgIcon name="mic-line" size="32rpx" color="#9ca3af" />
         </view>
       </view>
 
       <!-- 自选按钮：在自选面板页时变为下拉箭头，点击返回 -->
-      <view class="gcb-side-btn" :class="{ 'gcb-side-active': activePanel === 'favorites' }" @tap="handleFavorites">
-        <view v-if="activePanel === 'favorites'" class="gcb-side-arrow"><text class="gcb-side-arrow-icon">‹</text></view>
-        <text v-else class="gcb-side-text">自选</text>
+      <view
+        class="as-gcb__side-btn"
+        :class="{ 'as-gcb__side-btn--active': activePanel === 'favorites' }"
+        @tap="handleFavorites"
+      >
+        <view v-if="activePanel === 'favorites'" class="as-gcb__side-arrow"></view>
+        <text v-else class="as-gcb__side-text">自选</text>
       </view>
     </view>
 
-    <view class="gcb-disclaimer">
-      <text class="gcb-disclaimer-text">内容由AI生成，不构成投资建议</text>
+    <!-- 底部免责声明 -->
+    <view class="as-gcb__disclaimer">
+      <text class="as-gcb__disclaimer-text">内容由AI生成，不构成投资建议</text>
     </view>
   </view>
 </template>
@@ -34,10 +59,14 @@
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 const props = withDefaults(defineProps<{
+  /** 输入提示文案 */
+  placeholder?: string
+  /** 未读消息数，>0 时显示徽章 */
   unreadCount?: number
   /** 当前激活的面板页：'favorites' | 'trade' | '' */
   activePanel?: string
 }>(), {
+  placeholder: '搜问或按住说',
   unreadCount: 0,
   activePanel: ''
 })
@@ -64,116 +93,161 @@ const handleFavorites = () => {
 </script>
 
 <style lang="scss" scoped>
-/* 全局对话栏：固定底部，最高层级，背景色与页面背景一致 */
-.global-chat-bar {
+/* 全局对话栏：固定底部，最高层级 */
+.as-gcb {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 9999;
-  background: #f5f7fb;
-  padding-top: 8rpx;
-  /* 安全区背景填充，防止 App 端底部黑色 */
+  z-index: $z-fixed + 1;
+  padding-top: $s-1;
   padding-bottom: calc(env(safe-area-inset-bottom) + 8rpx);
+  background: $bg-page;
 }
 
-/* AI对话行：交易 | 搜索框 | 自选 */
-.gcb-chat-row {
+/* AI 对话行：交易 | 胶囊 | 自选 */
+.as-gcb__row {
   display: flex;
   align-items: center;
-  padding: 0 24rpx;
-  gap: 20rpx;
+  padding: 0 $s-3;
+  gap: $s-2;
 }
 
 /* 左右圆形按钮 */
-.gcb-side-btn {
+.as-gcb__side-btn {
   flex-shrink: 0;
   width: 88rpx;
   height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ffffff;
-  border-radius: 44rpx;
-  box-shadow: 0 2rpx 12rpx rgba(77, 124, 254, 0.08);
-  border: 2rpx solid rgba(77, 124, 254, 0.15);
-
-  &.gcb-side-active {
-    background: rgba(77, 124, 254, 0.1);
-    border-color: rgba(77, 124, 254, 0.3);
-  }
+  background: $bg-card;
+  border-radius: $r-full;
+  border: 2rpx solid rgba($primary, 0.15);
+  box-shadow: $shadow-sm;
 }
 
-.gcb-side-text {
-  font-size: 28rpx;
+.as-gcb__side-btn--active {
+  background: rgba($primary, 0.1);
+  border-color: rgba($primary, 0.3);
+}
+
+.as-gcb__side-btn:active {
+  opacity: $op-active;
+}
+
+.as-gcb__side-text {
+  font-size: $font-size-sm;
   font-weight: 600;
-  color: #6b7280;
+  color: $ink-soft;
   letter-spacing: 1rpx;
 }
 
-.gcb-side-arrow {
-  width: 48rpx;
-  height: 48rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* 下拉箭头（面板激活时显示，CSS 绘制） */
+.as-gcb__side-arrow {
+  position: relative;
+  width: 20rpx;
+  height: 20rpx;
   transform: rotate(-90deg);
 }
 
-.gcb-side-arrow-icon {
-  font-size: 48rpx;
-  font-weight: 300;
-  color: #4d7cfe;
+.as-gcb__side-arrow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20rpx;
+  height: 20rpx;
+  border-left: 4rpx solid $primary;
+  border-bottom: 4rpx solid $primary;
+  transform: rotate(45deg);
+}
+
+/* AI 对话胶囊 */
+.as-gcb__capsule {
+  flex: 1;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  padding: 0 $s-2 0 $s-1;
+  gap: $s-2;
+  background: $bg-card;
+  border: 2rpx solid rgba($primary, 0.15);
+  border-radius: $r-full;
+  box-shadow: $shadow-hover;
+}
+
+.as-gcb__capsule:active {
+  opacity: $op-active;
+}
+
+/* AI 头像：渐变圆 */
+.as-gcb__avatar {
+  flex-shrink: 0;
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $r-full;
+  background: linear-gradient(135deg, $primary, $accent);
+}
+
+.as-gcb__avatar-text {
+  font-size: $font-size-xs;
+  font-weight: 600;
+  color: $white;
   line-height: 1;
 }
 
-/* 搜索/对话输入框 */
-.gcb-chat-input {
+/* 输入提示 */
+.as-gcb__placeholder {
   flex: 1;
-  height: 80rpx;
-  background: #ffffff;
-  border-radius: 40rpx;
+  font-size: $font-size-sm;
+  color: $ink-mute;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 未读徽章 */
+.as-gcb__unread {
+  flex-shrink: 0;
+  min-width: 32rpx;
+  height: 32rpx;
+  padding: 0 8rpx;
   display: flex;
   align-items: center;
-  padding: 0 28rpx;
-  box-shadow: 0 2rpx 12rpx rgba(77, 124, 254, 0.08);
-  border: 2rpx solid rgba(77, 124, 254, 0.15);
+  justify-content: center;
+  background: $primary-50;
+  border-radius: $r-full;
 }
 
-.gcb-chat-placeholder {
-  flex: 1;
-  font-size: 24rpx;
-  color: #9ca3af;
+.as-gcb__unread-text {
+  font-size: $font-size-xs;
+  color: $primary;
+  font-weight: 600;
+  line-height: 1;
 }
 
-.gcb-chat-right {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.gcb-unread-badge {
-  font-size: 22rpx;
-  color: #4d7cfe;
-  background: rgba(77, 124, 254, 0.12);
-  padding: 4rpx 14rpx;
-  border-radius: 20rpx;
-}
-
-.gcb-voice-icon {
-  font-size: 36rpx;
-}
-
-/* 免责声明：固定高度，文字纵向居中 */
-.gcb-disclaimer {
-  height: 44rpx;
+/* 麦克风图标容器 */
+.as-gcb__mic {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.gcb-disclaimer-text {
-  font-size: 20rpx;
-  color: #c0c4cc;
+/* 免责声明 */
+.as-gcb__disclaimer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44rpx;
+}
+
+.as-gcb__disclaimer-text {
+  font-size: $font-size-xs;
+  color: $ink-faint;
 }
 </style>

@@ -27,7 +27,7 @@
         >
           <view class="sort-picker">
             <text class="sort-picker-text">{{ currentSortLabel }}</text>
-            <SvgIcon name="arrow-down-s" size="24rpx" color="#6b7280" />
+            <SvgIcon name="arrow-down-s" size="24rpx" color="#4b5a7a" />
           </view>
         </picker>
         <view class="sort-order">
@@ -354,7 +354,7 @@ onShow(() => {
 .search-input {
   flex: 1;
   font-size: 26rpx;
-  color: #1a1d24;
+  color: $ink;
   height: 40rpx;
 }
 
@@ -393,7 +393,7 @@ onShow(() => {
 
 .sort-picker-text {
   font-size: 22rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -409,7 +409,7 @@ onShow(() => {
 
 .order-btn {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 6rpx 12rpx;
   background: #f9fafb;
   font-weight: 500;
@@ -417,7 +417,7 @@ onShow(() => {
 
   &.active {
     color: #fff;
-    background: #4d7cfe;
+    background: $primary;
   }
 
   &:first-child {
@@ -474,7 +474,7 @@ onShow(() => {
   background: #ffffff;
   border-radius: 20rpx;
   padding: 28rpx;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
@@ -524,18 +524,18 @@ onShow(() => {
 .metric-value {
   font-size: 22rpx;
   font-weight: 600;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .stock-name {
   font-size: 26rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .stock-code {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   background: #f0f2f5;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
@@ -579,7 +579,7 @@ onShow(() => {
 .institution-value {
   font-size: 22rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .update-time {
@@ -595,6 +595,6 @@ onShow(() => {
 
 .load-more-text {
   font-size: 26rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 </style>

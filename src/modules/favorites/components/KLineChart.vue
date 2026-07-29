@@ -191,10 +191,10 @@ watch(() => props.period, value => {
 
 .as-kline-period {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 4rpx 12rpx;
   border-radius: 12rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
 }
 
 .as-kline-period.active {
@@ -223,7 +223,7 @@ watch(() => props.period, value => {
   display: block;
   font-size: 22rpx;
   line-height: 1;
-  color: #6b7280;
+  color: $ink-soft;
   white-space: nowrap;
 }
 

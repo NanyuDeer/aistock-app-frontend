@@ -60,7 +60,7 @@ defineEmits<{ (e: 'node-click', node: ChainNode): void }>()
 .as-event-chain { background: #ffffff; border-radius: 12rpx; padding: 24rpx; }
 
 .as-chain-header { margin-bottom: 16rpx; }
-.as-chain-title { font-size: 28rpx; font-weight: 600; color: #1a1d24; }
+.as-chain-title { font-size: 28rpx; font-weight: 600; color: $ink; }
 
 .as-chain-scroll { width: 100%; }
 .as-chain-flow { display: flex; align-items: center; padding: 16rpx 0; min-width: max-content; }
@@ -77,12 +77,12 @@ defineEmits<{ (e: 'node-click', node: ChainNode): void }>()
   max-width: 200rpx;
 }
 
-.as-chain-main { background: linear-gradient(135deg, #4d7cfe, #6366f1); }
+.as-chain-main { background: linear-gradient(135deg, $primary, $primary-600); }
 .as-chain-upstream { background: rgba(77, 124, 254, 0.1); border: 1rpx solid rgba(77, 124, 254, 0.3); }
 .as-chain-downstream { background: rgba(244, 63, 94, 0.1); border: 1rpx solid rgba(244, 63, 94, 0.3); }
-.as-chain-related { background: #f5f7fa; border: 1rpx solid #e5e7eb; }
+.as-chain-related { background: $bg-soft; border: 1rpx solid $line; }
 
-.as-chain-node-label { font-size: 22rpx; color: #1a1d24; text-align: center; }
+.as-chain-node-label { font-size: 22rpx; color: $ink; text-align: center; }
 .as-chain-main .as-chain-node-label { color: #ffffff; font-weight: 600; }
 
 .as-chain-change { font-size: 20rpx; margin-top: 4rpx; }
@@ -94,10 +94,10 @@ defineEmits<{ (e: 'node-click', node: ChainNode): void }>()
 
 .as-chain-arrow { display: flex; flex-direction: column; align-items: center; padding: 0 8rpx; }
 .as-chain-arrow-icon { font-size: 28rpx; color: #9ca3af; }
-.as-chain-factor { font-size: 18rpx; color: #6b7280; }
+.as-chain-factor { font-size: 18rpx; color: $ink-soft; }
 
-.as-chain-narrative { margin-top: 16rpx; padding: 16rpx; background: #f5f7fa; border-radius: 8rpx; }
-.as-chain-narrative-text { font-size: 24rpx; color: #6b7280; line-height: 1.5; }
+.as-chain-narrative { margin-top: 16rpx; padding: 16rpx; background: $bg-soft; border-radius: 8rpx; }
+.as-chain-narrative-text { font-size: 24rpx; color: $ink-soft; line-height: 1.5; }
 
 .as-chain-empty { height: 200rpx; display: flex; align-items: center; justify-content: center; }
 .as-chain-empty-text { font-size: 26rpx; color: #9ca3af; }

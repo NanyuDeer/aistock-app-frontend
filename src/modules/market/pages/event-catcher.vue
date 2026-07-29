@@ -355,7 +355,7 @@ onShow(() => {
   text-align: center;
 
   &.active {
-    background: #4d7cfe;
+    background: $primary;
 
     .filter-tab-text {
       color: #ffffff;
@@ -365,7 +365,7 @@ onShow(() => {
 
 .filter-tab-text {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 /* 加载/空状态 */
@@ -380,7 +380,7 @@ onShow(() => {
 
 .loading-text, .empty-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .empty-icon {
@@ -419,12 +419,12 @@ onShow(() => {
 .stock-name {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .stock-code {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 2rpx 12rpx;
   background: #f0f2f5;
   border-radius: 8rpx;
@@ -432,7 +432,7 @@ onShow(() => {
 
 .stock-industry {
   font-size: 22rpx;
-  color: #4d7cfe;
+  color: $primary;
   padding: 2rpx 12rpx;
   background: rgba(77, 124, 254, 0.08);
   border-radius: 8rpx;
@@ -452,19 +452,19 @@ onShow(() => {
 .impact-tag-text {
   font-size: 22rpx;
   font-weight: 500;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .impact-tag.major-up .impact-tag-text { color: #f43f5e; }
 .impact-tag.up .impact-tag-text { color: #f43f5e; }
 .impact-tag.major-down .impact-tag-text { color: #22c55e; }
 .impact-tag.down .impact-tag-text { color: #22c55e; }
-.impact-tag.neutral .impact-tag-text { color: #6b7280; }
+.impact-tag.neutral .impact-tag-text { color: $ink-soft; }
 
 .event-title {
   font-size: 28rpx;
   font-weight: 500;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.5;
   display: block;
   margin-bottom: 12rpx;
@@ -472,7 +472,7 @@ onShow(() => {
 
 .event-summary {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-soft;
   line-height: 1.6;
   display: block;
   margin-bottom: 16rpx;
@@ -487,7 +487,7 @@ onShow(() => {
 
 .keyword-tag {
   font-size: 22rpx;
-  color: #4d7cfe;
+  color: $primary;
   padding: 4rpx 12rpx;
   background: rgba(77, 124, 254, 0.08);
   border-radius: 8rpx;
@@ -515,7 +515,7 @@ onShow(() => {
   &.cycle-short { background: rgba(244, 63, 94, 0.1); color: #f43f5e; }
   &.cycle-mid { background: rgba(245, 158, 11, 0.1); color: #f59f0b; }
   &.cycle-long { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
-  &.cycle-all { background: #f0f2f5; color: #6b7280; }
+  &.cycle-all { background: #f0f2f5; color: $ink-soft; }
 }
 
 .meta-text {
@@ -536,7 +536,7 @@ onShow(() => {
 
 .ai-btn {
   padding: 6rpx 20rpx;
-  background: linear-gradient(135deg, #4d7cfe, #6c5ce7);
+  background: linear-gradient(135deg, $primary, #6c5ce7);
   border-radius: 20rpx;
 }
 
@@ -553,6 +553,6 @@ onShow(() => {
 
 .load-more-text {
   font-size: 26rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 </style>

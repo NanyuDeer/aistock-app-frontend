@@ -419,7 +419,7 @@ onBackPress(() => {
 
 .loading-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 /* 概览模式 */
@@ -473,7 +473,7 @@ onBackPress(() => {
 .brief-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .brief-status {
@@ -557,7 +557,7 @@ onBackPress(() => {
 .section-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 16rpx;
   display: block;
 }
@@ -592,21 +592,21 @@ onBackPress(() => {
 }
 :deep(.report-html) {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.8;
 }
 :deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
 :deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }
-:deep(.md-hr) { border: none; border-top: 1rpx solid #e5e7eb; margin: 12rpx 0; }
+:deep(.md-hr) { border: none; border-top: 1rpx solid $line; margin: 12rpx 0; }
 :deep(.md-ul) { padding-left: 20rpx; margin: 8rpx 0; }
 :deep(.md-ol) { padding-left: 20rpx; margin: 8rpx 0; }
-:deep(.md-ul-li) { font-size: 28rpx; color: #1a1d24; line-height: 1.8; }
-:deep(.md-ol-li) { font-size: 28rpx; color: #1a1d24; line-height: 1.8; }
+:deep(.md-ul-li) { font-size: 28rpx; color: $ink; line-height: 1.8; }
+:deep(.md-ol-li) { font-size: 28rpx; color: $ink; line-height: 1.8; }
 
 .report-text {
   font-size: 28rpx;
   line-height: 1.8;
-  color: #1a1d24;
+  color: $ink;
   white-space: pre-wrap;
 }
 
@@ -617,7 +617,7 @@ onBackPress(() => {
 .risk-text {
   font-size: 26rpx;
   line-height: 1.6;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 /* 空状态 */
@@ -630,7 +630,7 @@ onBackPress(() => {
 
 .empty-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-top: 24rpx;
   margin-bottom: 12rpx;
 }

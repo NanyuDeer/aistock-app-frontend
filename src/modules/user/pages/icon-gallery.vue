@@ -191,7 +191,7 @@ import {
 const searchText = ref('')
 const activeCategory = ref('all')
 const iconSize = ref(48)
-const activeColor = ref('#4d7cfe')
+const activeColor = ref('#0b5fff')
 const viewMode = ref<'grid' | 'list'>('grid')
 const showToast = ref(false)
 const copiedName = ref('')
@@ -349,13 +349,13 @@ function copyIconName(name: string) {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #e5e7eb;
+    background: $line;
     border-radius: 50%;
   }
 
   .clear-icon {
     font-size: 24rpx;
-    color: #6b7280;
+    color: $ink-soft;
   }
 }
 
@@ -380,8 +380,8 @@ function copyIconName(name: string) {
     transition: all 0.2s;
 
     &.active {
-      background: #4d7cfe;
-      border-color: #4d7cfe;
+      background: $primary;
+      border-color: $primary;
 
       .tab-text,
       .tab-count {
@@ -422,7 +422,7 @@ function copyIconName(name: string) {
 
   .tool-label {
     font-size: 28rpx;
-    color: #6b7280;
+    color: $ink-soft;
     flex-shrink: 0;
   }
 
@@ -440,14 +440,14 @@ function copyIconName(name: string) {
     justify-content: center;
     background: #fff;
     border-radius: 12rpx;
-    border: 2rpx solid #e5e7eb;
+    border: 2rpx solid $line;
 
     &.active {
-      border-color: #4d7cfe;
+      border-color: $primary;
       background: #eff6ff;
 
       .size-text {
-        color: #4d7cfe;
+        color: $primary;
         font-weight: 600;
       }
     }
@@ -455,7 +455,7 @@ function copyIconName(name: string) {
 
   .size-text {
     font-size: 24rpx;
-    color: #6b7280;
+    color: $ink-soft;
   }
 }
 
@@ -467,7 +467,7 @@ function copyIconName(name: string) {
 
   .color-bar-label {
     font-size: 28rpx;
-    color: #6b7280;
+    color: $ink-soft;
     flex-shrink: 0;
   }
 
@@ -490,7 +490,7 @@ function copyIconName(name: string) {
 
     &.active {
       transform: scale(1.15);
-      box-shadow: 0 0 0 4rpx #4d7cfe;
+      box-shadow: 0 0 0 4rpx $primary;
     }
   }
 
@@ -513,15 +513,15 @@ function copyIconName(name: string) {
     padding: 10rpx 20rpx;
     background: #fff;
     border-radius: 8rpx;
-    border: 2rpx solid #e5e7eb;
+    border: 2rpx solid $line;
 
     &.active {
       background: #eff6ff;
-      border-color: #4d7cfe;
+      border-color: $primary;
 
       .toggle-icon,
       .toggle-text {
-        color: #4d7cfe;
+        color: $primary;
       }
     }
 
@@ -542,7 +542,7 @@ function copyIconName(name: string) {
 
   .toggle-text {
     font-size: 26rpx;
-    color: #6b7280;
+    color: $ink-soft;
   }
 }
 

@@ -148,7 +148,7 @@ import { addCalendarDays, shanghaiDateString } from '@/shared/utils/tradingTime'
 const pageType = ref<BriefingType>('evening')
 const currentDate = ref('')
 
-const brandColor = '#4d7cfe'
+const brandColor = '#0b5fff'
 const errorColor = '#f43f5e'
 
 const pageTitle = computed(() => pageType.value === 'morning' ? '晨报详情' : '晚报详情')

@@ -37,7 +37,7 @@ defineEmits<{ (e: 'item-click', item: any): void }>()
 .as-news-tag {
   flex-shrink: 0;
   font-size: 20rpx;
-  color: #4d7cfe;
+  color: $primary;
   background: rgba(77, 124, 254, 0.1);
   padding: 2rpx 12rpx;
   border-radius: 6rpx;
@@ -45,7 +45,7 @@ defineEmits<{ (e: 'item-click', item: any): void }>()
 
 .as-news-title {
   font-size: 26rpx;
-  color: #1a1d24;
+  color: $ink;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;

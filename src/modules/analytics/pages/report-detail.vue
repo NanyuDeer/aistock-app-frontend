@@ -19,15 +19,15 @@
       </view>
       <view class="header-actions">
         <view class="header-action-btn" @tap="goBackToList">
-          <SvgIcon name="list-check" size="24rpx" color="#4d7cfe" />
+          <SvgIcon name="list-check" size="24rpx" color="#0b5fff" />
           <text class="action-btn-text">返回列表</text>
         </view>
         <view class="header-action-btn" @tap="addToFavorites">
-          <SvgIcon :name="isFav ? 'star-fill' : 'star-line'" size="24rpx" :color="isFav ? '#f59f0b' : '#4d7cfe'" />
+          <SvgIcon :name="isFav ? 'star-fill' : 'star-line'" size="24rpx" :color="isFav ? '#f59f0b' : '#0b5fff'" />
           <text class="action-btn-text">{{ isFav ? '已自选' : '加入自选' }}</text>
         </view>
         <view class="header-action-btn" @tap="exportReport">
-          <SvgIcon name="share-line" size="24rpx" color="#4d7cfe" />
+          <SvgIcon name="share-line" size="24rpx" color="#0b5fff" />
           <text class="action-btn-text">导出摘要</text>
         </view>
       </view>
@@ -36,7 +36,7 @@
     <!-- ===== 模块2：AI 智能研判 ===== -->
     <view class="section section-ai">
       <view class="section-title-row">
-        <SvgIcon name="robot-line" size="28rpx" color="#4d7cfe" />
+        <SvgIcon name="robot-line" size="28rpx" color="#0b5fff" />
         <text class="section-title-text">AI 智能研判</text>
       </view>
 
@@ -75,7 +75,7 @@
     <!-- ===== 模块3：核心财务指标数据表 ===== -->
     <view id="table-section" class="section section-table">
       <view class="section-title-row">
-        <SvgIcon name="file-list-line" size="28rpx" color="#4d7cfe" />
+        <SvgIcon name="file-list-line" size="28rpx" color="#0b5fff" />
         <text class="section-title-text">核心财务指标</text>
         <view class="table-year-toggle">
           <text
@@ -117,7 +117,7 @@
     <!-- ===== 模块4：多维度折线图 ===== -->
     <view class="section section-chart">
       <view class="section-title-row">
-        <SvgIcon name="bar-chart-line" size="28rpx" color="#4d7cfe" />
+        <SvgIcon name="bar-chart-line" size="28rpx" color="#0b5fff" />
         <text class="section-title-text">走势图表</text>
       </view>
 
@@ -385,7 +385,7 @@ async function renderChart() {
       animation: true,
       background: '#ffffff',
       padding: [30, 20, 30, 45],
-      color: ['#4d7cfe', '#9ca3af'],
+      color: ['#0b5fff', '#9ca3af'],
       xAxis: {
         disableGrid: false,
         gridColor: '#f0f2f5',
@@ -403,7 +403,7 @@ async function renderChart() {
       legend: {
         show: chartData.series.length > 1,
         position: 'top',
-        fontColor: '#6b7280',
+        fontColor: '#4b5a7a',
         fontSize: 10,
       },
       extra: {
@@ -517,7 +517,7 @@ watch(tableYearRange, () => {
 .section-title-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 /* ===== 头部信息 ===== */
@@ -538,12 +538,12 @@ watch(tableYearRange, () => {
 .header-stock-name {
   font-size: 32rpx;
   font-weight: 700;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .header-stock-code {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   background: #f0f2f5;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
@@ -551,7 +551,7 @@ watch(tableYearRange, () => {
 
 .header-period {
   font-size: 24rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 
@@ -602,7 +602,7 @@ watch(tableYearRange, () => {
 
 .action-btn-text {
   font-size: 22rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 
@@ -629,7 +629,7 @@ watch(tableYearRange, () => {
 
 .ai-tags-group-label {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   font-weight: 500;
 }
 
@@ -676,14 +676,14 @@ watch(tableYearRange, () => {
 
 .year-toggle-btn {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 4rpx 14rpx;
   border-radius: 6rpx;
   font-weight: 500;
 
   &.active {
     color: #fff;
-    background: #4d7cfe;
+    background: $primary;
   }
 }
 
@@ -702,7 +702,7 @@ watch(tableYearRange, () => {
 .finance-table td {
   text-align: center;
   padding: 16rpx 12rpx;
-  border-bottom: 1rpx solid #f5f7fa;
+  border-bottom: 1rpx solid $bg-soft;
   white-space: nowrap;
 }
 
@@ -769,7 +769,7 @@ watch(tableYearRange, () => {
 
 .chart-tab {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 8rpx 20rpx;
   border-radius: 12rpx;
   background: #f0f2f5;
@@ -777,7 +777,7 @@ watch(tableYearRange, () => {
 
   &.active {
     color: #ffffff;
-    background: #4d7cfe;
+    background: $primary;
   }
 }
 

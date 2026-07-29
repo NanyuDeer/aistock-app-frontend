@@ -593,7 +593,7 @@ onLoad((options) => {
   color: #ffffff;
   font-size: 26rpx;
   line-height: 72rpx;
-  background: #4d7cfe;
+  background: $primary;
   border: 0;
   border-radius: 36rpx;
 
@@ -628,7 +628,7 @@ onLoad((options) => {
 .stats-name {
   font-size: 36rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 /* 持续性标签（对齐 Web 前端 hs-persistence-tag） */
@@ -657,7 +657,7 @@ onLoad((options) => {
 /* 频次 badge */
 .freq-badge {
   font-size: 22rpx;
-  color: #4d7cfe;
+  color: $primary;
   background: rgba(77, 124, 254, 0.1);
   padding: 4rpx 16rpx;
   border-radius: 20rpx;
@@ -680,14 +680,14 @@ onLoad((options) => {
 
 .stat-label {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-bottom: 8rpx;
 }
 
 .stat-value {
   font-size: 32rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 
   &.up { color: #f43f5e; }
   &.down { color: #22c55e; }
@@ -732,12 +732,12 @@ onLoad((options) => {
 .count-num {
   font-size: 32rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .count-label {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 /* ===== 龙头股 ===== */
@@ -773,12 +773,12 @@ onLoad((options) => {
 .leader-detail-name {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .leader-detail-code {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   background: #f0f2f5;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
@@ -793,7 +793,7 @@ onLoad((options) => {
 .leader-detail-price {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .leader-detail-change {
@@ -830,7 +830,7 @@ onLoad((options) => {
 .section-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 16rpx;
   display: block;
 }
@@ -846,7 +846,7 @@ onLoad((options) => {
 
 .flow-chart-title {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-bottom: 12rpx;
   display: block;
   text-align: center;
@@ -870,7 +870,7 @@ onLoad((options) => {
 
 .flow-chart-fallback-text {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   line-height: 1.6;
 }
 
@@ -900,7 +900,7 @@ onLoad((options) => {
 
 .ai-value {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   flex: 1;
 
   &.risk {
@@ -990,7 +990,7 @@ onLoad((options) => {
 }
 
 .td-price {
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
@@ -1007,7 +1007,7 @@ onLoad((options) => {
 }
 
 .td-reason {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 20rpx;
   overflow: hidden;
   text-overflow: ellipsis;

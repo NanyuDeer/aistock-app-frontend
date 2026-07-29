@@ -398,7 +398,7 @@ onUnmounted(stopAll)
 
 <style lang="scss" scoped>
 .page-content { padding: 24rpx; }
-.loading-state, .empty-state { display: flex; flex-direction: column; align-items: center; padding: 120rpx 0; font-size: 28rpx; color: #6b7280; }
+.loading-state, .empty-state { display: flex; flex-direction: column; align-items: center; padding: 120rpx 0; font-size: 28rpx; color: $ink-soft; }
 .empty-text { margin-top: 24rpx; }
 .empty-hint, .report-date { margin-top: 12rpx; font-size: 22rpx; color: #9ca3af; }
 .report-date { display: block; margin: 0 0 16rpx; }
@@ -406,27 +406,27 @@ onUnmounted(stopAll)
 .conclusion-card, .section-card { padding: 24rpx; border-radius: 16rpx; background: #ffffff; }
 .conclusion-card { background: linear-gradient(135deg, #fff7ed, #ffedd5); border: 1rpx solid #fed7aa; }
 .section-kicker { display: block; margin-bottom: 10rpx; font-size: 22rpx; font-weight: 600; color: #c2410c; }
-.conclusion-text { display: block; font-size: 32rpx; font-weight: 600; line-height: 1.5; color: #1a1d24; }
+.conclusion-text { display: block; font-size: 32rpx; font-weight: 600; line-height: 1.5; color: $ink; }
 .stream-cursor { margin-left: 4rpx; color: #ea580c; animation: cursor-blink 0.8s infinite; }
 .stream-section { animation: section-in 0.28s ease-out both; }
 @keyframes section-in { from { opacity: 0; transform: translateY(12rpx); } to { opacity: 1; transform: translateY(0); } }
 @keyframes cursor-blink { 50% { opacity: 0; } }
-.section-title { display: block; margin-bottom: 16rpx; font-size: 28rpx; font-weight: 600; color: #1a1d24; }
+.section-title { display: block; margin-bottom: 16rpx; font-size: 28rpx; font-weight: 600; color: $ink; }
 .bullet-list, .stock-list { display: flex; flex-direction: column; gap: 14rpx; }
 .bullet-item, .risk-item, .section-text { display: block; font-size: 25rpx; line-height: 1.65; color: #4b5563; }
 .bullet-item::before { content: '•'; margin-right: 10rpx; color: #f97316; }
 .stock-card { padding: 24rpx; border-radius: 16rpx; background: #f8fafc; box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.04); }
 .stock-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; }
 .stock-name-wrap { flex: 1; min-width: 0; }
-.stock-name { font-size: 30rpx; font-weight: 600; color: #1a1d24; }
+.stock-name { font-size: 30rpx; font-weight: 600; color: $ink; }
 .stock-code { display: inline-block; margin-left: 12rpx; padding: 2rpx 10rpx; border-radius: 8rpx; font-size: 21rpx; color: #64748b; background: #e2e8f0; }
 .popularity-tag { flex-shrink: 0; padding: 6rpx 12rpx; border-radius: 8rpx; font-size: 21rpx; color: #ea580c; background: #fff7ed; }
 .stock-headline { display: block; margin-top: 20rpx; font-size: 27rpx; line-height: 1.6; color: #1f2937; }
 .stock-description { display: block; margin-top: 12rpx; font-size: 24rpx; line-height: 1.65; color: #64748b; }
 .stock-footer { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 20rpx; padding-top: 18rpx; border-top: 1rpx solid #e2e8f0; }
-.stock-footer-tag { padding: 4rpx 12rpx; border-radius: 8rpx; font-size: 21rpx; color: #4d7cfe; background: #eff6ff; }
+.stock-footer-tag { padding: 4rpx 12rpx; border-radius: 8rpx; font-size: 21rpx; color: $primary; background: #eff6ff; }
 .stock-footer-tag.neutral { color: #64748b; background: #e2e8f0; }
-.judgment-card { border-left: 6rpx solid #4d7cfe; }
+.judgment-card { border-left: 6rpx solid $primary; }
 .risk-card { background: #fff7f7; }
 .risk-item::before { margin-right: 8rpx; font-weight: 600; color: #dc2626; }
 </style>
