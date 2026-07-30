@@ -1,26 +1,20 @@
 <template>
   <SubPageCard title="事件传导">
     <view class="event-list-content">
-      <!-- Global Importance 双榜单 -->
-      <view v-if="focusEvents.length > 0" class="focus-section">
-        <view class="focus-cards">
-          <view
-            v-for="evt in focusEvents"
-            :key="evt.eventId"
-            class="focus-card-wrapper"
-          >
-            <text class="card-title">
-              {{ evt.type === 'current_focus' ? '当前焦点事件' : '重大持续事件' }}
-            </text>
-            <EventHeadlineCard
-              :type="evt.direction"
-              :title="evt.title"
-              :importance="evt.importance"
-              :industries="evt.industries"
-              :event-id="evt.eventId"
-              @click="handleHeadlineClick"
-            />
-          </view>
+      <!-- AI关注焦点区域 -->
+      <view v-if="focusEvents.length > 0" class="ai-focus-section">
+        <text class="section-title">焦点事件</text>
+        <view class="headline-cards">
+          <EventHeadlineCard
+            v-for="event in focusEvents"
+            :key="event.eventId"
+            :type="event.direction"
+            :title="event.title"
+            :importance="event.importance"
+            :industries="event.industries"
+            :event-id="event.eventId"
+            @click="handleHeadlineClick"
+          />
         </view>
       </view>
 
@@ -90,7 +84,8 @@
  * 支持分类筛选、分页加载、关注事件。
  */
 import { onMounted, ref } from 'vue'
-import type { EventItem, FocusEventViewModel } from '@/modules/chat/event/types'
+import type { EventItem } from '@/modules/chat/event/types'
+import type { FocusEventViewModel } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
 import { getFocusEvents } from '@/modules/chat/event/api/eventService'
@@ -203,35 +198,25 @@ async function handleFollow(event: EventItem) {
   white-space: nowrap;
 }
 
-/* ========== Global Importance 双榜单 ========== */
-.focus-section {
+/* ========== AI 关注焦点区域 ========== */
+.ai-focus-section {
   margin-bottom: 20rpx;
 }
 
-.focus-cards {
+.section-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin-bottom: 10rpx;
+  letter-spacing: 0.5rpx;
+}
+
+.headline-cards {
   display: flex;
   flex-direction: row;
-  gap: 20rpx;
+  gap: 12rpx;
   align-items: stretch;
-  width: 100%;
-}
-
-.focus-card-wrapper {
-  flex: 1;
-  width: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-}
-
-.card-title {
-  font-size: 22rpx;
-  font-weight: 700;
-  color: #6B7280;
-  line-height: 1.3;
-  white-space: nowrap;
-  text-align: center;
 }
 
 .event-list {

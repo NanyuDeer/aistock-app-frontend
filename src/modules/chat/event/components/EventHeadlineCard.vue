@@ -18,7 +18,7 @@
           <text class="direction-text">{{ directionText }}</text>
         </Tag>
 
-        <!-- 重大标签（第二视觉）：Badge gold/info -->
+        <!-- 重大标签（第二视觉）：Badge gold/info，emoji 🔥 替换为 SvgIcon -->
         <Badge v-if="importance === 'major'" type="gold" size="sm">
           <SvgIcon name="fire-line" size="20rpx" :color="fireColor" />
           <text class="importance-text">重大</text>
@@ -33,7 +33,7 @@
 
       <!-- 影响行业 -->
       <view class="industries-container">
-        <!-- 股票趋势图标 -->
+        <!-- 股票趋势图标（自定义迷你图表，组件库无对应组件，保留） -->
         <view class="trend-icon" :class="`trend-icon--${type}`">
           <!-- 上升趋势图 -->
           <svg v-if="type === 'positive'" width="48" height="28" viewBox="0 0 48 28" fill="none">
