@@ -24,8 +24,8 @@
  * - 异常处理：详情接口失败时返回原对象
  */
 
-import type { EventItem, FocusEventViewModel, GiDirection, GiImportanceLevel } from '../types'
-import { getEventDetail, getEventHighlights } from './eventApi'
+import type { EventItem, FocusEventViewModel, AffectedIndustry } from '../types'
+import { getEventList, getEventDetail } from './eventApi'
 
 // ==================== AI 今日精选相关类型 ====================
 
@@ -80,126 +80,83 @@ export function getAiHeadlineEvents(): Promise<AiHeadlineEvents> {
 // ==================== Global Importance 双榜单 ====================
 
 /**
- * 方向映射：GI 后端枚举 → 前端展示
- *
- * bullsh → positive: 利好
- * bearish → negative: 利空
- * mixed → mixed: 多方向影响，保留不转换
- */
-function mapDirection(direction: GiDirection): 'positive' | 'negative' | 'mixed' {
-  switch (direction) {
-    case 'bullish': return 'positive'
-    case 'bearish': return 'negative'
-    case 'mixed': return 'mixed'
-  }
-}
-
-/**
- * 重要性映射：GI 后端枚举 → 前端展示
- *
- * critical → major: 最关键事件
- * important → major: 重要事件（投资者需重点关注，不能降级）
- * notable → normal: 值得关注但不紧急
- */
-function mapImportance(level: GiImportanceLevel): 'major' | 'normal' {
-  switch (level) {
-    case 'critical':
-    case 'important':
-      return 'major'
-    case 'notable':
-      return 'normal'
-  }
-}
-
-/**
  * 获取 Global Importance 双榜单事件
  *
- * 聚合 GI 排序结果与 event_conduction 详情数据。
+ * 基于 event/list 返回的 globalImportanceRank 筛选焦点事件。
  *
  * 数据流：
- *   Step 1: 调用 getEventHighlights() → 获取 GI 原始数据（events[] 数组）
- *   Step 2: 按 rank 区分榜单类型（rank=1 → current_focus, rank=2 → ongoing_significant）
- *   Step 3: 提取 event_id，调用 getEventDetail() 补充 title/summary/industries
- *   Step 4: 字段映射 + 合并，生成 FocusEventViewModel[]
+ *   Step 1: 调用 getEventList() 获取事件列表（已包含 globalImportanceRank）
+ *   Step 2: 筛选 rank=1（当前焦点）和 rank=2（持续影响）的事件
+ *   Step 3: 转换为 FocusEventViewModel 格式
  *
  * 异常处理：
- *   - GI 无数据 → 返回 []
- *   - 详情查询失败 → 保留 GI 基础字段，展示内容置空
- *   - 网络异常 → 返回 []，不影响原有事件列表
+ *   - 接口失败 → 返回 []，不影响原有事件列表
+ *   - 无 GI 数据 → 返回 []
  *
  * @returns FocusEventViewModel[]
  */
 export async function getFocusEvents(): Promise<FocusEventViewModel[]> {
   try {
-    // Step 1: 获取 GI 原始数据（后端返回 events[] 数组）
-    const giResponse = await getEventHighlights()
-    const rawEvents = giResponse.events ?? []
+    // Step 1: 获取事件列表（已包含 globalImportanceRank）
+    const response = await getEventList({ page: 1, pageSize: 100 })
+    const events = response.events ?? []
 
-    if (rawEvents.length === 0) {
+    if (events.length === 0) {
       return []
     }
 
-    // Step 2: 按 rank 区分榜单类型，最多取前2个
-    // rank=1 → current_focus_event, rank=2 → ongoing_significant_event
-    const ranked = [...rawEvents]
-      .sort((a, b) => a.rank - b.rank)
-      .slice(0, 2)
+    // Step 2: 筛选 rank=1 和 rank=2 的事件
+    const focusEvents = events.filter(e =>
+      e.globalImportanceRank === 1 || e.globalImportanceRank === 2
+    )
 
-    const giEvents: Array<{
-      event_id: string
-      direction: GiDirection
-      importance_level: GiImportanceLevel
-      reason: string
-      type: 'current_focus' | 'ongoing_significant'
-    }> = ranked.map((ev, idx) => ({
-      event_id: ev.event_id,
-      direction: ev.direction,
-      importance_level: ev.importance_level,
-      reason: ev.reason,
-      type: idx === 0 ? 'current_focus' as const : 'ongoing_significant' as const,
-    }))
+    if (focusEvents.length === 0) {
+      return []
+    }
 
-    // Step 3: 并发补充 event_conduction 详情数据
-    const results = await Promise.allSettled(
-      giEvents.map(async (event) => {
-        let title = ''
-        let summary = ''
-        let industries: string[] = []
-
+    // Step 3: 为焦点事件获取详情（补充 industries 数据）
+    const enrichedResults = await Promise.allSettled(
+      focusEvents.map(async (event) => {
         try {
-          const detail = await getEventDetail(event.event_id)
-          title = detail.event?.title || ''
-          summary = detail.event?.aiSummary || ''
-          industries = detail.event?.affectedIndustries?.map(i => i.name) || []
-        } catch (err) {
-          // 详情查询失败时保留 GI 基础字段，展示内容置空
-          console.warn(
-            `[eventService] 获取事件详情失败，保留 GI 基础字段: ${event.event_id}`,
-            err
-          )
-        }
-
-        // Step 4: 字段映射 + 合并
-        return {
-          type: event.type,
-          eventId: event.event_id,
-          title,
-          summary,
-          direction: mapDirection(event.direction),
-          importance: mapImportance(event.importance_level),
-          selectionReason: event.reason,
-          industries,
+          const detail = await getEventDetail(event.eventId)
+          return { event, industries: detail.event?.affectedIndustries ?? [] }
+        } catch {
+          return { event, industries: [] }
         }
       })
     )
 
-    // 收集所有已 settled 的结果（Promise.allSettled 不会 reject）
-    return results
-      .filter(r => r.status === 'fulfilled')
-      .map(r => (r as PromiseFulfilledResult<FocusEventViewModel>).value)
+    // Step 4: 转换为 FocusEventViewModel 格式
+    return enrichedResults
+      .filter((r) => r.status === 'fulfilled')
+      .map((r) => {
+        const { event, industries } = (r as PromiseFulfilledResult<{ event: EventItem; industries: AffectedIndustry[] }>).value
+
+        const giDir = event.globalImportanceDirection
+        const direction: 'positive' | 'negative' | 'mixed' =
+          giDir === 'bullish' ? 'positive' :
+          giDir === 'bearish' ? 'negative' :
+          'mixed'
+
+        const giLevel = event.globalImportanceLevel
+        const importance: 'major' | 'normal' =
+          giLevel === 'critical' || giLevel === 'important' ? 'major' : 'normal'
+
+        return {
+          type: event.globalImportanceRank === 1
+            ? 'current_focus' as const
+            : 'ongoing_significant' as const,
+          eventId: event.eventId,
+          title: event.title,
+          summary: event.aiSummary || '',
+          direction,
+          importance,
+          selectionReason: '基于 Global Importance 排序结果',
+          industries: industries.map((i) => i.name),
+        }
+      })
   } catch (err) {
-    // 网络异常等整体失败，不影响原有功能
-    console.error('[eventService] getFocusEvents 整体失败', err)
+    console.error('[eventService] getFocusEvents 失败', err)
     return []
   }
 }

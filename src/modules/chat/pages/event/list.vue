@@ -1,21 +1,26 @@
 <template>
   <SubPageCard title="事件传导">
     <view class="event-list-content">
-      <!-- AI关注焦点区域 — Global Importance 双榜单 -->
-      <view class="ai-focus-section">
-        <text class="section-title">AI 关注焦点</text>
-        <view class="headline-cards">
-          <EventHeadlineCard
+      <!-- Global Importance 双榜单 -->
+      <view v-if="focusEvents.length > 0" class="focus-section">
+        <view class="focus-cards">
+          <view
             v-for="evt in focusEvents"
             :key="evt.eventId"
-            :type="evt.direction"
-            :card-title="evt.type === 'current_focus' ? '当前焦点事件' : '重大持续事件'"
-            :title="evt.title"
-            :importance="evt.importance"
-            :industries="evt.industries"
-            :event-id="evt.eventId"
-            @click="handleHeadlineClick"
-          />
+            class="focus-card-wrapper"
+          >
+            <text class="card-title">
+              {{ evt.type === 'current_focus' ? '当前焦点事件' : '重大持续事件' }}
+            </text>
+            <EventHeadlineCard
+              :type="evt.direction"
+              :title="evt.title"
+              :importance="evt.importance"
+              :industries="evt.industries"
+              :event-id="evt.eventId"
+              @click="handleHeadlineClick"
+            />
+          </view>
         </view>
       </view>
 
@@ -179,25 +184,35 @@ async function handleFollow(event: EventItem) {
   padding: 0 32rpx 40rpx;
 }
 
-/* ========== AI 关注焦点区域 ========== */
-.ai-focus-section {
+/* ========== Global Importance 双榜单 ========== */
+.focus-section {
   margin-bottom: 20rpx;
 }
 
-.section-title {
-  display: block;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #1A1A1A;
-  margin-bottom: 10rpx;
-  letter-spacing: 0.5rpx;
-}
-
-.headline-cards {
+.focus-cards {
   display: flex;
   flex-direction: row;
-  gap: 12rpx;
+  gap: 20rpx;
   align-items: stretch;
+  width: 100%;
+}
+
+.focus-card-wrapper {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.card-title {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #6B7280;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .event-list {

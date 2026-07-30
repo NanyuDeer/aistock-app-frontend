@@ -5,7 +5,7 @@
  * 通过 eventAdapter 处理数据映射和降级逻辑。
  */
 
-import type { EventListResponse, EventListParams, EventDetailResponse, EventGraph, NewsArticle, HighlightsResponse } from '../types'
+import type { EventListResponse, EventListParams, EventDetailResponse, EventGraph, NewsArticle } from '../types'
 import type { BackendEventListData, BackendEventDetailData } from './eventAdapter'
 import { adaptEventList, adaptEventDetail } from './eventAdapter'
 import request from '@/shared/api/request'
@@ -52,17 +52,6 @@ export async function getEventGraph(eventId: string): Promise<EventGraph> {
   const response = await request.get<BackendEventDetailData>(`/agent/event/${eventId}`)
   const adapted = adaptEventDetail(response)
   return adapted.graph
-}
-
-/**
- * 获取 Global Importance 双榜单
- *
- * 只负责调用后端接口，不包含任何业务逻辑，返回原始 GI 数据结构。
- *
- * @returns HighlightsResponse - 原始 GI 数据（current_focus_event / ongoing_significant_event）
- */
-export async function getEventHighlights(): Promise<HighlightsResponse> {
-  return request.get('/agent/event/highlights')
 }
 
 /**

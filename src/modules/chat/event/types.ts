@@ -72,6 +72,12 @@ export interface EventItem {
   aiSummary: string
   /** 是否已关注 */
   isFollowed: boolean
+  /** Global Importance 排名（1=当前焦点，2=持续影响，无则 null） */
+  globalImportanceRank?: number | null
+  /** Global Importance 方向（bullish/bearish/mixed，无则 null） */
+  globalImportanceDirection?: string | null
+  /** Global Importance 级别（critical/important/notable，无则 null） */
+  globalImportanceLevel?: string | null
 }
 
 /** 事件列表 API 响应 */
@@ -311,11 +317,6 @@ export interface GiEvent {
   importance_level: GiImportanceLevel
   reason: string
   rank: number
-}
-
-/** Global Importance API 原始响应 */
-export interface HighlightsResponse {
-  events: GiEvent[]
 }
 
 /** 前端展示方向 */

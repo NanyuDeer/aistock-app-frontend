@@ -7,9 +7,6 @@
     <!-- AI装饰光斑 -->
     <view class="ai-glow-decoration" :class="`ai-glow-decoration--${type}`"></view>
 
-    <!-- 卡片榜单标题（如：当前焦点事件 / 重大持续事件） -->
-    <text v-if="cardTitle" class="card-title">{{ cardTitle }}</text>
-
     <!-- 标签行 -->
     <view class="card-header">
       <!-- 方向标签（第一视觉） -->
@@ -108,8 +105,6 @@ interface Props {
   type: 'positive' | 'negative' | 'mixed'
   /** 事件标题 */
   title: string
-  /** 卡片榜单标题（如：当前焦点事件） */
-  cardTitle?: string
   /** 重要性：重大/重要 */
   importance?: 'major' | 'normal'
   /** 影响行业（最多展示3个，超过显示 +N） */
@@ -120,7 +115,6 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   importance: 'normal',
-  cardTitle: '',
   industries: () => [],
   eventId: ''
 })
@@ -175,21 +169,15 @@ const remainingCount = computed(() => {
   padding: 12rpx 12rpx;
   border-radius: $radius-base;
   border-left: 8rpx solid;
-  overflow: hidden;
-  min-height: 140rpx;
-  max-height: 160rpx;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: 4rpx;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.event-headline-card:active {
-  transform: scale(0.98);
-}
-
-// ========== AI装饰光斑 ==========
 .ai-glow-decoration {
   position: absolute;
   top: -20rpx;
@@ -199,7 +187,19 @@ const remainingCount = computed(() => {
   border-radius: 50%;
   opacity: 0.4;
   pointer-events: none;
+  z-index: 0;
 }
+
+.event-headline-card > *:not(.ai-glow-decoration) {
+  position: relative;
+  z-index: 1;
+}
+
+.event-headline-card:active {
+  transform: scale(0.98);
+}
+
+// ========== AI装饰光斑颜色变体 ==========
 
 .ai-glow-decoration--positive {
   background: radial-gradient(circle, rgba(239, 68, 68, 0.35) 0%, rgba(239, 68, 68, 0.1) 50%, transparent 70%);
