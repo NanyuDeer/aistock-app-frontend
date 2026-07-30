@@ -1,72 +1,66 @@
 <template>
   <SubPageCard title="机构调研热门股分析">
     <view class="page-content">
-      <view v-if="loading" class="loading-state">
-        <text>报告加载中...</text>
-      </view>
+      <LoadingState v-if="loading" text="报告加载中..." />
 
       <view v-else-if="report" class="report-content">
         <text class="report-date">{{ report.created_at ? formatDateTime(report.created_at) : report.report_date }} · 仅供参考</text>
 
-        <view class="conclusion-card">
+        <Card class="conclusion-card">
           <text class="section-kicker">今日结论</text>
           <text class="conclusion-text">{{ streamedConclusion }}<text v-if="isStreaming" class="stream-cursor">|</text></text>
-        </view>
+        </Card>
 
-        <view v-if="streamedOverview.length" class="section-card stream-section">
+        <Card v-if="streamedOverview.length" class="stream-section">
           <text class="section-title">热门方向</text>
           <view class="bullet-list">
             <text v-for="item in streamedOverview" :key="item" class="bullet-item">{{ item }}</text>
           </view>
-        </view>
+        </Card>
 
-        <view v-if="visibleStockSection" class="section-card stream-section">
+        <Card v-if="visibleStockSection" class="stream-section">
           <text class="section-title">重点个股分析</text>
           <view class="stock-list">
-            <view v-for="(stock, index) in stocks.slice(0, visibleStockCount)" :key="stock.key" class="stock-card stream-section">
+            <Card v-for="(stock, index) in stocks.slice(0, visibleStockCount)" :key="stock.key" flat class="stock-card stream-section">
               <view class="stock-card-head">
                 <view class="stock-name-wrap">
                   <text class="stock-name">{{ stock.name }}</text>
                   <text v-if="stock.code" class="stock-code">{{ stock.code }}</text>
                 </view>
-                <text class="popularity-tag">热门程度：{{ stock.popularity }}</text>
+                <Tag type="warning">热门程度：{{ stock.popularity }}</Tag>
               </view>
               <text v-if="stockFactStreams[index] && stockPhase(index) >= 1" class="stock-headline stream-section">{{ stockFactStreams[index] }}</text>
               <text v-if="stockLogicStreams[index] && stockPhase(index) >= 2" class="stock-description stream-section">{{ stockLogicStreams[index] }}</text>
-            </view>
+            </Card>
           </view>
-        </view>
+        </Card>
 
-        <view v-if="streamedSectorLogic.length" class="section-card stream-section">
+        <Card v-if="streamedSectorLogic.length" class="stream-section">
           <text class="section-title">板块逻辑</text>
           <view class="bullet-list">
             <text v-for="item in streamedSectorLogic" :key="item" class="bullet-item">{{ item }}</text>
           </view>
-        </view>
+        </Card>
 
-        <view v-if="streamedSustainability" class="section-card judgment-card stream-section">
+        <Card v-if="streamedSustainability" class="judgment-card stream-section">
           <text class="section-title">持续性判断</text>
           <text class="section-text">{{ streamedSustainability }}</text>
-        </view>
+        </Card>
 
-        <view v-if="streamedRisks.length" class="section-card risk-card stream-section">
+        <Card v-if="streamedRisks.length" class="risk-card stream-section">
           <text class="section-title">风险提示</text>
           <view class="bullet-list">
             <text v-for="risk in streamedRisks" :key="risk" class="risk-item">{{ risk }}</text>
           </view>
-        </view>
+        </Card>
 
-        <view v-if="streamedAdvice" class="section-card stream-section">
+        <Card v-if="streamedAdvice" class="stream-section">
           <text class="section-title">关注建议</text>
           <text class="section-text">{{ streamedAdvice }}</text>
-        </view>
+        </Card>
       </view>
 
-      <view v-else class="empty-state">
-        <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
-        <text class="empty-text">今日热门股报告尚未生成</text>
-        <text class="empty-hint">报告生成后将自动显示</text>
-      </view>
+      <EmptyState v-else title="今日热门股报告尚未生成" description="报告生成后将自动显示" icon="file-line" />
     </view>
   </SubPageCard>
 </template>
@@ -78,6 +72,7 @@ import { agentApi } from '@/shared/api/modules/agent'
 import { formatDateTime } from '@/shared/utils/datetime'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { LoadingState, EmptyState, Tag, Card } from '@/shared/components'
 import hotBurstMockContent from '../mock/hot-burst-report.json'
 
 interface DisplayReport {
@@ -398,35 +393,27 @@ onUnmounted(stopAll)
 
 <style lang="scss" scoped>
 .page-content { padding: 24rpx; }
-.loading-state, .empty-state { display: flex; flex-direction: column; align-items: center; padding: 120rpx 0; font-size: 28rpx; color: #6b7280; }
-.empty-text { margin-top: 24rpx; }
-.empty-hint, .report-date { margin-top: 12rpx; font-size: 22rpx; color: #9ca3af; }
-.report-date { display: block; margin: 0 0 16rpx; }
+.report-date { display: block; margin: 0 0 16rpx; font-size: 22rpx; color: $ink-mute; }
 .report-content { display: flex; flex-direction: column; gap: 20rpx; }
-.conclusion-card, .section-card { padding: 24rpx; border-radius: 16rpx; background: #ffffff; }
-.conclusion-card { background: linear-gradient(135deg, #fff7ed, #ffedd5); border: 1rpx solid #fed7aa; }
-.section-kicker { display: block; margin-bottom: 10rpx; font-size: 22rpx; font-weight: 600; color: #c2410c; }
-.conclusion-text { display: block; font-size: 32rpx; font-weight: 600; line-height: 1.5; color: #1a1d24; }
-.stream-cursor { margin-left: 4rpx; color: #ea580c; animation: cursor-blink 0.8s infinite; }
+.section-kicker { display: block; margin-bottom: 10rpx; font-size: 22rpx; font-weight: 600; color: $warning; }
+.conclusion-text { display: block; font-size: 32rpx; font-weight: 600; line-height: 1.5; color: $ink; }
+.stream-cursor { margin-left: 4rpx; color: $warning; animation: cursor-blink 0.8s infinite; }
 .stream-section { animation: section-in 0.28s ease-out both; }
 @keyframes section-in { from { opacity: 0; transform: translateY(12rpx); } to { opacity: 1; transform: translateY(0); } }
 @keyframes cursor-blink { 50% { opacity: 0; } }
-.section-title { display: block; margin-bottom: 16rpx; font-size: 28rpx; font-weight: 600; color: #1a1d24; }
+.section-title { display: block; margin-bottom: 16rpx; font-size: 28rpx; font-weight: 600; color: $ink; }
 .bullet-list, .stock-list { display: flex; flex-direction: column; gap: 14rpx; }
-.bullet-item, .risk-item, .section-text { display: block; font-size: 25rpx; line-height: 1.65; color: #4b5563; }
-.bullet-item::before { content: '•'; margin-right: 10rpx; color: #f97316; }
-.stock-card { padding: 24rpx; border-radius: 16rpx; background: #f8fafc; box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.04); }
+.bullet-item, .risk-item, .section-text { display: block; font-size: 25rpx; line-height: 1.65; color: $ink-soft; }
+.bullet-item::before { content: '•'; margin-right: 10rpx; color: $warning; }
 .stock-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; }
 .stock-name-wrap { flex: 1; min-width: 0; }
-.stock-name { font-size: 30rpx; font-weight: 600; color: #1a1d24; }
-.stock-code { display: inline-block; margin-left: 12rpx; padding: 2rpx 10rpx; border-radius: 8rpx; font-size: 21rpx; color: #64748b; background: #e2e8f0; }
-.popularity-tag { flex-shrink: 0; padding: 6rpx 12rpx; border-radius: 8rpx; font-size: 21rpx; color: #ea580c; background: #fff7ed; }
-.stock-headline { display: block; margin-top: 20rpx; font-size: 27rpx; line-height: 1.6; color: #1f2937; }
-.stock-description { display: block; margin-top: 12rpx; font-size: 24rpx; line-height: 1.65; color: #64748b; }
-.stock-footer { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 20rpx; padding-top: 18rpx; border-top: 1rpx solid #e2e8f0; }
-.stock-footer-tag { padding: 4rpx 12rpx; border-radius: 8rpx; font-size: 21rpx; color: #4d7cfe; background: #eff6ff; }
-.stock-footer-tag.neutral { color: #64748b; background: #e2e8f0; }
-.judgment-card { border-left: 6rpx solid #4d7cfe; }
-.risk-card { background: #fff7f7; }
-.risk-item::before { margin-right: 8rpx; font-weight: 600; color: #dc2626; }
+.stock-name { font-size: 30rpx; font-weight: 600; color: $ink; }
+.stock-code { display: inline-block; margin-left: 12rpx; padding: 2rpx 10rpx; border-radius: $r-xs; font-size: 21rpx; color: $ink-soft; background: $bg-deep; }
+.stock-headline { display: block; margin-top: 20rpx; font-size: 27rpx; line-height: 1.6; color: $ink; }
+.stock-description { display: block; margin-top: 12rpx; font-size: 24rpx; line-height: 1.65; color: $ink-soft; }
+.stock-footer { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 20rpx; padding-top: 18rpx; border-top: 1rpx solid $line-soft; }
+.stock-footer-tag { padding: 4rpx 12rpx; border-radius: $r-xs; font-size: 21rpx; color: $primary; background: $primary-50; }
+.stock-footer-tag.neutral { color: $ink-soft; background: $bg-deep; }
+.judgment-card { border-left: 6rpx solid $primary; }
+.risk-item::before { margin-right: 8rpx; font-weight: 600; color: $up; }
 </style>

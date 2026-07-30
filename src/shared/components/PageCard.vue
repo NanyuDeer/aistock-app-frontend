@@ -1,22 +1,30 @@
+/**
+ * PageCard 主页面卡片容器
+ * 视觉层同步自 aistock-component-lib/src/components/PageCard.vue（同步时间：2026-07-28）
+ * 保留 app 前端业务逻辑：小熊头像入口 + GlobalChatBar + 动态底部高度 + statusBarHeight
+ */
 <template>
-  <view class="page-wrapper" :style="{ paddingTop: statusBarHeight + 'px' }">
+  <view class="as-page-wrapper" :style="{ paddingTop: statusBarHeight + 'px' }">
     <!-- 透明导航区域：小熊头像在右侧，作为"我的"页面入口 -->
-    <view class="nav-area">
-      <view class="nav-avatar" @tap="goProfile">
+    <view class="as-page-wrapper__nav">
+      <view class="as-page-wrapper__avatar" @tap="goProfile">
         <SvgIcon name="bear-smile-line" size="30rpx" color="#ffffff" />
       </view>
     </view>
 
     <!-- 白色圆角卡片：标题固定 + 内容可滚动 -->
-    <view class="page-card" :style="{ marginBottom: dynamicMarginBottom }">
-      <view class="card-header">
-        <text class="card-title">{{ title }}</text>
+    <view class="as-page-wrapper__card" :style="{ marginBottom: dynamicMarginBottom }">
+      <view class="as-page-wrapper__header">
+        <view class="as-page-wrapper__title-wrap">
+          <text v-if="title" class="as-page-wrapper__title">{{ title }}</text>
+          <text v-if="subtitle" class="as-page-wrapper__subtitle">{{ subtitle }}</text>
+        </view>
         <slot name="header-right" />
       </view>
       <!-- 用 flex:1 撑满剩余空间，footer 自然固定在底部 -->
       <scroll-view
         scroll-y
-        class="card-content"
+        class="as-page-wrapper__body"
         :enhanced="true"
         :bounces="false"
       >
@@ -35,10 +43,14 @@
 import { ref, computed } from 'vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { rpx2px, getBottomFixedHeightPx, px2rpx } from '@/shared/utils/layout'
+import { getBottomFixedHeightPx, px2rpx } from '@/shared/utils/layout'
 
 const props = withDefaults(defineProps<{
+  /** 主标题 */
   title?: string
+  /** 副标题 */
+  subtitle?: string
+  /** 卡片底部留白 */
   cardMarginBottom?: string
   /** 当前激活的面板页：'favorites' | 'trade' | '' */
   activePanel?: string
@@ -46,7 +58,8 @@ const props = withDefaults(defineProps<{
   footerHeight?: number
 }>(), {
   title: '',
-  cardMarginBottom: '207rpx', /* 底部留白：Tab栏 + 间距 + GlobalChatBar */
+  subtitle: '',
+  cardMarginBottom: '207rpx',
   activePanel: '',
   footerHeight: 0,
 })
@@ -54,35 +67,27 @@ const props = withDefaults(defineProps<{
 // 获取真实状态栏高度（px），真机/H5 均可用
 // App 端 zoom:1.2 会放大 padding，需除以 1.2 补偿
 const statusBarHeight = ref(0)
-const windowHeight = ref(0)
 try {
   const sysInfo = uni.getSystemInfoSync()
   const raw = sysInfo.statusBarHeight || 0
-  windowHeight.value = sysInfo.windowHeight || 667
   // #ifdef APP-PLUS
   statusBarHeight.value = raw / 1.2
   // #endif
   // #ifndef APP-PLUS
   statusBarHeight.value = raw
   // #endif
-} catch (e) {
+} catch {
   statusBarHeight.value = 0
-  windowHeight.value = 667
 }
 
 /**
- * 动态计算 scroll-view 像素高度
- * windowHeight - statusBar - navArea(88rpx) - cardHeader(88rpx) - 底部固定栏(动态高度含安全区)
- *
- * 使用共享布局工具计算底部高度，解决刘海屏设备底部内容被遮挡的问题。
- * 如果外部传入了自定义 cardMarginBottom，则使用传入值（向后兼容）。
+ * 动态计算底部留白高度
+ * 如果外部传入了自定义 cardMarginBottom，则使用传入值（向后兼容）
  */
 const dynamicMarginBottom = computed(() => {
-  // 外部传入了非默认值时，沿用传入值
   if (props.cardMarginBottom && props.cardMarginBottom !== '207rpx') {
     return props.cardMarginBottom
   }
-  // 默认：动态计算底部固定栏总高度并转为 rpx
   return px2rpx(getBottomFixedHeightPx()) + 'rpx'
 })
 
@@ -93,7 +98,7 @@ function goProfile() {
 
 <style lang="scss" scoped>
 /* 用 fixed 撑满屏幕，避免 100vh 在拖动时重算导致拉伸 */
-.page-wrapper {
+.as-page-wrapper {
   position: fixed;
   top: 0;
   left: 0;
@@ -102,71 +107,81 @@ function goProfile() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #f5f7fb;
+  background: $bg-page;
   overscroll-behavior: none;
-  touch-action: none; /* 禁止整体页面的橡皮筋效果 */
+  touch-action: none;
 }
 
 /* 透明导航区域 */
-.nav-area {
+.as-page-wrapper__nav {
   flex-shrink: 0;
   height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 0 24rpx;
+  padding: 0 $s-3;
   background: transparent;
 }
 
-.nav-avatar {
+.as-page-wrapper__avatar {
   width: 64rpx;
   height: 64rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
+  border-radius: $r-full;
+  background: linear-gradient(135deg, $primary, $accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
-}
-
-.avatar-emoji {
-  font-size: 30rpx;
+  box-shadow: $shadow-primary;
 }
 
 /* 白色圆角卡片 */
-.page-card {
+.as-page-wrapper__card {
   flex: 1;
   display: flex;
   flex-direction: column;
-  margin: 0 24rpx;
-  background: #ffffff;
-  border-radius: 24rpx;
+  margin: 0 $s-3;
+  background: $bg-card;
+  border-radius: $r-lg;
   overflow: hidden;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+  box-shadow: $shadow-sm;
   min-height: 0;
 }
 
 /* 卡片标题（固定位置） */
-.card-header {
+.as-page-wrapper__header {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24rpx;
-  border-bottom: 1rpx solid #f0f2f5;
+  padding: $s-3;
+  border-bottom: 2rpx solid $line-soft;
 }
 
-.card-title {
-  font-size: 30rpx;
+.as-page-wrapper__title-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.as-page-wrapper__title {
+  font-size: $font-size-lg;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
+  line-height: $lh-tight;
 }
 
-/* 可滚动内容区域：flex:1 撑满剩余空间，footer 固定在底部 */
-.card-content {
+.as-page-wrapper__subtitle {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+  margin-top: 2rpx;
+}
+
+/* 可滚动内容区域 */
+.as-page-wrapper__body {
   flex: 1;
   min-height: 0;
-  background: #ffffff;
+  background: $bg-card;
   touch-action: auto;
   overscroll-behavior: contain;
 }

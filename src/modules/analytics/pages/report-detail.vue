@@ -8,7 +8,7 @@
           <text class="header-stock-code">{{ stock.code }}</text>
           <text class="header-period">{{ stock.period }}</text>
         </view>
-        <text :class="['report-tag', tagClass(stock.tag)]">{{ stock.tag }}</text>
+        <Tag :type="tagType(stock.tag)">{{ stock.tag }}</Tag>
       </view>
       <view class="header-sub">
         <text class="header-meta">{{ stock.industry }}</text>
@@ -18,25 +18,16 @@
         <text class="header-meta">更新：{{ stock.updateTime }}</text>
       </view>
       <view class="header-actions">
-        <view class="header-action-btn" @tap="goBackToList">
-          <SvgIcon name="list-check" size="24rpx" color="#4d7cfe" />
-          <text class="action-btn-text">返回列表</text>
-        </view>
-        <view class="header-action-btn" @tap="addToFavorites">
-          <SvgIcon :name="isFav ? 'star-fill' : 'star-line'" size="24rpx" :color="isFav ? '#f59f0b' : '#4d7cfe'" />
-          <text class="action-btn-text">{{ isFav ? '已自选' : '加入自选' }}</text>
-        </view>
-        <view class="header-action-btn" @tap="exportReport">
-          <SvgIcon name="share-line" size="24rpx" color="#4d7cfe" />
-          <text class="action-btn-text">导出摘要</text>
-        </view>
+        <Button type="ghost" size="sm" @click="goBackToList">返回列表</Button>
+        <Button type="ghost" size="sm" @click="addToFavorites">{{ isFav ? '已自选' : '加入自选' }}</Button>
+        <Button type="ghost" size="sm" @click="exportReport">导出摘要</Button>
       </view>
     </view>
 
     <!-- ===== 模块2：AI 智能研判 ===== -->
     <view class="section section-ai">
       <view class="section-title-row">
-        <SvgIcon name="robot-line" size="28rpx" color="#4d7cfe" />
+        <SvgIcon name="robot-line" size="28rpx" color="#0b5fff" />
         <text class="section-title-text">AI 智能研判</text>
       </view>
 
@@ -45,23 +36,25 @@
         <view class="ai-tags-group">
           <text class="ai-tags-group-label">经营亮点</text>
           <view class="ai-tags-list">
-            <text
+            <Tag
               v-for="(tag, i) in aiTags.good"
               :key="i"
-              class="ai-tag ai-tag-good"
-              @tap="scrollToSection('table')"
-            >{{ tag }}</text>
+              type="down"
+              size="sm"
+              @click="scrollToSection('table')"
+            >{{ tag }}</Tag>
           </view>
         </view>
         <view class="ai-tags-group">
           <text class="ai-tags-group-label">潜在风险</text>
           <view class="ai-tags-list">
-            <text
+            <Tag
               v-for="(tag, i) in aiTags.risk"
               :key="i"
-              class="ai-tag ai-tag-risk"
-              @tap="scrollToSection('table')"
-            >{{ tag }}</text>
+              type="up"
+              size="sm"
+              @click="scrollToSection('table')"
+            >{{ tag }}</Tag>
           </view>
         </view>
       </view>
@@ -75,7 +68,7 @@
     <!-- ===== 模块3：核心财务指标数据表 ===== -->
     <view id="table-section" class="section section-table">
       <view class="section-title-row">
-        <SvgIcon name="file-list-line" size="28rpx" color="#4d7cfe" />
+        <SvgIcon name="file-list-line" size="28rpx" color="#0b5fff" />
         <text class="section-title-text">核心财务指标</text>
         <view class="table-year-toggle">
           <text
@@ -117,7 +110,7 @@
     <!-- ===== 模块4：多维度折线图 ===== -->
     <view class="section section-chart">
       <view class="section-title-row">
-        <SvgIcon name="bar-chart-line" size="28rpx" color="#4d7cfe" />
+        <SvgIcon name="bar-chart-line" size="28rpx" color="#0b5fff" />
         <text class="section-title-text">走势图表</text>
       </view>
 
@@ -152,6 +145,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import uCharts from '@qiun/ucharts'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import { Tag, Button } from '@/shared/components'
 
 // ===== 参数 =====
 const symbol = ref('')
@@ -305,10 +299,10 @@ function showTip(tip: string) {
   uni.showToast({ title: tip, icon: 'none', duration: 2000 })
 }
 
-// ===== AI 标签样式 =====
-function tagClass(tag: string): string {
+// ===== 报告标签类型（A股红涨绿跌：利好=up红色，利空=down绿色） =====
+function tagType(tag: string): 'up' | 'down' {
   const goodTags = ['向好', '高增', '修复', '扭盈']
-  return goodTags.includes(tag) ? 'tag-good' : 'tag-bad'
+  return goodTags.includes(tag) ? 'up' : 'down'
 }
 
 // ===== 滚动 =====
@@ -385,7 +379,7 @@ async function renderChart() {
       animation: true,
       background: '#ffffff',
       padding: [30, 20, 30, 45],
-      color: ['#4d7cfe', '#9ca3af'],
+      color: ['#0b5fff', '#9ca3af'],
       xAxis: {
         disableGrid: false,
         gridColor: '#f0f2f5',
@@ -403,7 +397,7 @@ async function renderChart() {
       legend: {
         show: chartData.series.length > 1,
         position: 'top',
-        fontColor: '#6b7280',
+        fontColor: '#4b5a7a',
         fontSize: 10,
       },
       extra: {
@@ -517,7 +511,7 @@ watch(tableYearRange, () => {
 .section-title-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 /* ===== 头部信息 ===== */
@@ -538,12 +532,12 @@ watch(tableYearRange, () => {
 .header-stock-name {
   font-size: 32rpx;
   font-weight: 700;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .header-stock-code {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   background: #f0f2f5;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
@@ -551,19 +545,8 @@ watch(tableYearRange, () => {
 
 .header-period {
   font-size: 24rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
-}
-
-.report-tag {
-  font-size: 24rpx;
-  font-weight: 600;
-  padding: 6rpx 20rpx;
-  border-radius: 8rpx;
-  flex-shrink: 0;
-
-  &.tag-good { color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
-  &.tag-bad { color: #22c55e; background: rgba(34, 197, 94, 0.1); }
 }
 
 .header-sub {
@@ -588,22 +571,7 @@ watch(tableYearRange, () => {
   display: flex;
   gap: 16rpx;
   padding-top: 16rpx;
-  border-top: 1rpx solid #f0f2f5;
-}
-
-.header-action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-  padding: 10rpx 20rpx;
-  background: #f0f4ff;
-  border-radius: 12rpx;
-}
-
-.action-btn-text {
-  font-size: 22rpx;
-  color: #4d7cfe;
-  font-weight: 500;
+  border-top: 1rpx solid $line-soft;
 }
 
 /* ===== AI 研判 ===== */
@@ -629,7 +597,7 @@ watch(tableYearRange, () => {
 
 .ai-tags-group-label {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   font-weight: 500;
 }
 
@@ -637,16 +605,6 @@ watch(tableYearRange, () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8rpx;
-}
-
-.ai-tag {
-  font-size: 22rpx;
-  padding: 6rpx 16rpx;
-  border-radius: 20rpx;
-  font-weight: 500;
-
-  &.ai-tag-good { color: #059669; background: rgba(5, 150, 105, 0.1); }
-  &.ai-tag-risk { color: #dc2626; background: rgba(220, 38, 38, 0.1); }
 }
 
 .ai-summary {
@@ -676,14 +634,14 @@ watch(tableYearRange, () => {
 
 .year-toggle-btn {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 4rpx 14rpx;
   border-radius: 6rpx;
   font-weight: 500;
 
   &.active {
     color: #fff;
-    background: #4d7cfe;
+    background: $primary;
   }
 }
 
@@ -702,7 +660,7 @@ watch(tableYearRange, () => {
 .finance-table td {
   text-align: center;
   padding: 16rpx 12rpx;
-  border-bottom: 1rpx solid #f5f7fa;
+  border-bottom: 1rpx solid $bg-soft;
   white-space: nowrap;
 }
 
@@ -769,7 +727,7 @@ watch(tableYearRange, () => {
 
 .chart-tab {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 8rpx 20rpx;
   border-radius: 12rpx;
   background: #f0f2f5;
@@ -777,7 +735,7 @@ watch(tableYearRange, () => {
 
   &.active {
     color: #ffffff;
-    background: #4d7cfe;
+    background: $primary;
   }
 }
 

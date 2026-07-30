@@ -181,8 +181,8 @@ onUnmounted(() => disconnectWs())
 }
 
 .monitor-header { padding: 20rpx 0; }
-.monitor-title { font-size: 40rpx; font-weight: 600; color: #1a1d24; display: block; }
-.monitor-subtitle { font-size: 24rpx; color: #6b7280; margin-top: 4rpx; display: block; }
+.monitor-title { font-size: 40rpx; font-weight: 600; color: $ink; display: block; }
+.monitor-subtitle { font-size: 24rpx; color: $ink-soft; margin-top: 4rpx; display: block; }
 
 .subscribe-card {
   display: flex; align-items: center; justify-content: space-between;
@@ -190,19 +190,19 @@ onUnmounted(() => disconnectWs())
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 .subscribe-info { display: flex; flex-direction: column; gap: 4rpx; }
-.subscribe-label { font-size: 24rpx; color: #6b7280; }
-.subscribe-value { font-size: 28rpx; font-weight: 600; color: #1a1d24; }
+.subscribe-label { font-size: 24rpx; color: $ink-soft; }
+.subscribe-value { font-size: 28rpx; font-weight: 600; color: $ink; }
 
 .subscribe-switch { padding: 12rpx 24rpx; border-radius: 20rpx; }
-.subscribe-switch.on { background: #4d7cfe; }
-.subscribe-switch.off { background: #e5e7eb; }
+.subscribe-switch.on { background: $primary; }
+.subscribe-switch.off { background: $line; }
 .switch-text { font-size: 24rpx; color: #ffffff; }
-.subscribe-switch.off .switch-text { color: #6b7280; }
+.subscribe-switch.off .switch-text { color: $ink-soft; }
 
 .section { margin-bottom: 24rpx; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16rpx; }
-.section-title { font-size: 30rpx; font-weight: 600; color: #1a1d24; }
-.section-tip { font-size: 22rpx; color: #6b7280; }
+.section-title { font-size: 30rpx; font-weight: 600; color: $ink; }
+.section-tip { font-size: 22rpx; color: $ink-soft; }
 
 .loading-wrap { padding: 40rpx; text-align: center; }
 .loading-text { font-size: 26rpx; color: #9ca3af; }
@@ -215,14 +215,14 @@ onUnmounted(() => disconnectWs())
 .alert-left { display: flex; gap: 16rpx; align-items: flex-start; flex: 1; }
 .alert-icon { font-size: 36rpx; }
 .alert-info { display: flex; flex-direction: column; gap: 4rpx; flex: 1; }
-.alert-name { font-size: 28rpx; font-weight: 600; color: #1a1d24; }
-.alert-desc { font-size: 24rpx; color: #6b7280; line-height: 1.4; }
+.alert-name { font-size: 28rpx; font-weight: 600; color: $ink; }
+.alert-desc { font-size: 24rpx; color: $ink-soft; line-height: 1.4; }
 .alert-time { font-size: 20rpx; color: #9ca3af; }
 .alert-arrow { font-size: 32rpx; color: #d1d5db; }
 
 .empty-wrap { padding: 80rpx 40rpx; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12rpx; }
 .empty-icon { font-size: 80rpx; }
-.empty-text { font-size: 28rpx; color: #6b7280; }
+.empty-text { font-size: 28rpx; color: $ink-soft; }
 .empty-desc { font-size: 22rpx; color: #9ca3af; }
 
 .ws-status { display: flex; align-items: center; gap: 8rpx; padding: 16rpx; justify-content: center; }

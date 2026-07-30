@@ -2,11 +2,11 @@
   <view class="morning-content">
     <view class="content-wrap">
       <!-- 今日专属晨报卡片 -->
-      <view class="briefing-card" @tap="goBriefingDetail">
+      <Card clickable class="briefing-card" @click="goBriefingDetail">
         <view class="briefing-left">
           <view class="briefing-top">
             <text class="briefing-title">今日专属 · {{ briefingTypeLabel }}</text>
-            <text v-if="report?.degraded" class="briefing-degraded">证据不完整</text>
+            <Badge v-if="report?.degraded" type="warning" size="sm" class="briefing-degraded">证据不完整</Badge>
             <text v-if="report?.degraded && report.missing_sources.length" class="briefing-missing">
               缺失来源：{{ report?.missing_sources.join('、') }}
             </text>
@@ -17,9 +17,7 @@
               <text class="clue-text">{{ briefingClueCount }}条关键线索需关注</text>
             </view>
             <view v-if="briefingClueCount > 0" class="briefing-tags">
-              <view v-for="(tag, idx) in summaryTags" :key="idx" class="summary-tag">
-                <text class="tag-text">{{ tag }}</text>
-              </view>
+              <Tag v-for="(tag, idx) in summaryTags" :key="idx" type="neutral" size="sm">{{ tag }}</Tag>
               <text class="tags-arrow">›</text>
             </view>
             <view v-else class="briefing-clue">
@@ -30,23 +28,20 @@
           <view v-else class="briefing-clue">
             <text class="clue-text">{{ getBriefingDesc() }}</text>
           </view>
-          <view class="briefing-btn" @tap.stop="goBriefing">
-            <text class="btn-icon">◉</text>
-            <text class="btn-text">专属播报</text>
-          </view>
+          <Button type="primary" size="sm" class="briefing-btn" @click.stop="goBriefing">专属播报</Button>
         </view>
         <view class="briefing-right">
           <view class="ai-avatar-wrap" :class="{ 'ai-avatar-loading': briefingLoading }">
-            <SvgIcon name="headphone-line" size="40rpx" color="#4d7cfe" />
+            <SvgIcon name="headphone-line" size="40rpx" :color="iconPrimary" />
           </view>
           <view class="ai-avatar-ring ring-1"></view>
           <view class="ai-avatar-ring ring-2"></view>
         </view>
-      </view>
+      </Card>
 
       <!-- 功能入口 2x2 网格 -->
       <view class="feature-grid">
-        <view class="feature-card leader-card" @tap="goSectors">
+        <Card class="feature-card" clickable @click="goSectors">
           <view class="feature-header">
             <text class="feature-title">长线风口</text>
             <text class="feature-more">›</text>
@@ -56,16 +51,16 @@
             <template v-if="leaderSectors.length">
               <view v-for="(item, idx) in leaderSectors.slice(0, 3)" :key="idx" class="feature-item">
                 <text class="item-name">No.{{ idx + 1 }} {{ item.name }}</text>
-                <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+                <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
               </view>
             </template>
             <view v-else class="feature-item">
               <text class="item-name placeholder">加载中...</text>
             </view>
           </view>
-        </view>
+        </Card>
 
-        <view class="feature-card event-card" @tap="goEventChain">
+        <Card class="feature-card" clickable @click="goEventChain">
           <view class="feature-header">
             <text class="feature-title">事件传导</text>
             <text class="feature-more">›</text>
@@ -74,12 +69,12 @@
           <view class="feature-list">
             <view v-for="(item, idx) in chainEvents.slice(0, 3)" :key="idx" class="feature-item">
               <text class="item-name">{{ item.name }}</text>
-              <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
             </view>
           </view>
-        </view>
+        </Card>
 
-        <view class="feature-card ai-card" @tap="goTraceability">
+        <Card class="feature-card" clickable @click="goTraceability">
           <view class="feature-header">
             <text class="feature-title">大盘溯源</text>
             <text class="feature-more">›</text>
@@ -88,12 +83,12 @@
           <view class="feature-list">
             <view v-for="(item, idx) in traceReports.slice(0, 3)" :key="idx" class="feature-item">
               <text class="item-name">{{ item.name }}</text>
-              <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
             </view>
           </view>
-        </view>
+        </Card>
 
-        <view class="feature-card overview-card" @tap="goAgentReport">
+        <Card class="feature-card" clickable @click="goAgentReport">
           <view class="feature-header">
             <text class="feature-title">今日分析概览</text>
             <text class="feature-more">›</text>
@@ -102,27 +97,26 @@
           <view class="feature-list">
             <view v-for="(item, idx) in aiReports.slice(0, 3)" :key="idx" class="feature-item">
               <text class="item-name">{{ item.name }}</text>
-              <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
+              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
             </view>
           </view>
-        </view>
+        </Card>
       </view>
 
       <!-- 重磅事件跟踪 -->
-      <view class="event-track-card" @tap="goTrackDetail">
+      <Card class="track-card" clickable @click="goTrackDetail">
         <view class="track-header">
           <text class="track-title">重磅事件跟踪</text>
           <text class="track-more">›</text>
         </view>
         <view class="track-item">
-          <text class="track-label">事件</text>
+          <Tag type="up" size="sm" class="track-label">事件</Tag>
           <text class="track-content">{{ topEvent.title }}</text>
         </view>
         <view class="track-footer">
-          <text class="track-arrow">∧</text>
-          <text class="track-tip">点击查看 AI 事件分析</text>
+          <text class="track-tip">点击查看事件详情 ›</text>
         </view>
-      </view>
+      </Card>
 
     </view>
   </view>
@@ -132,12 +126,16 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { Card, Button, Tag, Badge } from '@/shared/components'
 import { useBriefingCard } from '@/shared/utils/useBriefingCard'
 import { buildBriefingUrl } from '@/shared/utils/briefingNavigation'
 import { stockApi } from '@/shared/api/modules/stock'
 import { agentApi } from '@/shared/api/modules/agent'
 import { getEventList } from '@/modules/chat/event/api/eventApi'
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
+
+/** SvgIcon 图标颜色：AI 头像背景改为蓝色渐变后，图标用白色 */
+const iconPrimary = '#ffffff'
 
 const {
   type: briefingType,
@@ -307,11 +305,26 @@ async function loadAiReports() {
   aiReports.value = display
 }
 
-const traceReports = ref([
+const traceReports = ref<LeaderStockPreview[]>([
   { name: '北向资金异动', tag: '流入', tagType: 'buy' },
   { name: '板块轮动分析', tag: '关注', tagType: 'wash' },
   { name: '主力资金动向', tag: '流出', tagType: 'sell' },
 ])
+
+/**
+ * 业务 tagType → 组件库 Tag type 映射
+ * up→up(红)，down/date/sell→down(绿)，wash→warning(橙)，buy→neutral(蓝)
+ */
+function itemTagType(tagType: LeaderStockPreview['tagType']): 'up' | 'down' | 'neutral' | 'warning' {
+  switch (tagType) {
+    case 'up': return 'up'
+    case 'down': return 'down'
+    case 'date': return 'down'
+    case 'sell': return 'down'
+    case 'wash': return 'warning'
+    case 'buy': return 'neutral'
+  }
+}
 
 onShow(() => {
   briefingRefresh()
@@ -367,33 +380,37 @@ function goLogin() {
 </script>
 
 <style lang="scss" scoped>
-@use '@/shared/styles/variables.scss' as *;
-
 .morning-content {
-  background: $bg-color-grey;
+  background: $bg-card;
 }
 
 .content-wrap {
-  padding: $spacing-base;
+  padding: $s-3;
 }
 
-/* ===== 晨报卡片 ===== */
-.briefing-card {
-  display: flex;
-  align-items: stretch;
-  padding: $spacing-base;
-  background: #f5f7fb;
-  border-radius: $radius-base;
-  margin-bottom: $spacing-sm;
+/* ===== 晨报卡片（Card 容器覆写） ===== */
+.briefing-card.as-card {
+  padding: $s-3;
+  background: $bg-soft;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+  margin-bottom: $s-2;
   position: relative;
   overflow: hidden;
   box-shadow: $shadow-card;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
 
-  &:active {
-    transform: scale(0.98);
-    box-shadow: $shadow-base;
-  }
+/* 内容区 flex 布局（briefing-left + briefing-right） */
+/* :deep() 穿透 scoped 样式到 Card 子组件内部的 .as-card__body */
+.briefing-card :deep(.as-card__body) {
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+}
+
+/* clickable 的 :active 缩放由 Card 组件提供，此处仅补充阴影变化 */
+.briefing-card.as-card:active {
+  box-shadow: $shadow-sm;
 }
 
 .briefing-card::before {
@@ -410,34 +427,30 @@ function goLogin() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: $spacing-xs;
+  gap: $s-1;
 }
 
 .briefing-top {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 4rpx;
 }
 
 .briefing-title {
   font-size: $font-size-lg;
   font-weight: 600;
-  color: $text-color-title;
+  color: $ink;
 }
 
+/* 降级徽标：外观由 Badge 组件管理，仅保留间距 */
 .briefing-degraded {
-  margin-left: $spacing-xs;
-  padding: 2rpx $spacing-xs;
-  color: $warning-color;
-  background: rgba($warning-color, 0.1);
-  border: 1rpx solid rgba($warning-color, 0.25);
-  border-radius: $radius-xs;
-  font-size: $font-size-xs;
-  line-height: 1.4;
+  margin-left: $s-1;
 }
 
 .briefing-missing {
   font-size: 20rpx;
-  color: $warning-color;
+  color: $warning;
 }
 
 .briefing-clue {
@@ -446,7 +459,7 @@ function goLogin() {
 
 .clue-text {
   font-size: $font-size-sm;
-  color: $text-color-secondary;
+  color: $ink-soft;
 }
 
 .briefing-tags {
@@ -457,52 +470,21 @@ function goLogin() {
   margin-top: 8rpx;
 }
 
-.summary-tag {
-  padding: 6rpx 14rpx;
-  background: rgba($brand-color, 0.08);
-  border: 1rpx solid rgba($brand-color, 0.15);
-  border-radius: 6rpx;
-}
-
-.tag-text {
-  font-size: $font-size-xs;
-  color: $brand-color;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
 .tags-arrow {
   font-size: $font-size-lg;
-  color: $text-color-tertiary;
+  color: $ink-mute;
   margin-left: 2rpx;
   line-height: 1.4;
 }
 
-.briefing-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6rpx;
-  padding: 8rpx 18rpx;
-  background: $brand-gradient;
-  border-radius: $radius-pill;
+/* 播报按钮：primary 类型，覆写为紧凑圆角胶囊，靠左对齐 */
+.briefing-btn.as-btn {
   align-self: flex-start;
+  height: auto;
+  padding: 8rpx 18rpx;
+  border-radius: $r-full;
   margin-top: 6rpx;
-  transition: opacity 0.2s ease;
-
-  &:active {
-    opacity: 0.85;
-  }
-}
-
-.btn-icon {
-  font-size: 18rpx;
-  color: #ffffff;
-}
-
-.btn-text {
-  font-size: $font-size-sm;
-  color: #ffffff;
-  font-weight: 500;
+  margin-left: 0;
 }
 
 /* AI 头像右侧 */
@@ -518,23 +500,19 @@ function goLogin() {
   width: 100rpx;
   height: 100rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  background: linear-gradient(135deg, $primary-light, $primary);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   z-index: 2;
-  box-shadow: 0 4rpx 12rpx rgba(251, 191, 36, 0.3);
-}
-
-.ai-avatar-emoji {
-  font-size: 44rpx;
+  box-shadow: 0 4rpx 12rpx rgba($primary, 0.25);
 }
 
 .ai-avatar-ring {
   position: absolute;
   border-radius: 50%;
-  border: 2rpx solid rgba($brand-color, 0.15);
+  border: 2rpx solid rgba($primary-light, 0.3);
   pointer-events: none;
 }
 
@@ -586,15 +564,14 @@ function goLogin() {
   margin-bottom: 20rpx;
 }
 
-.feature-card {
-  background: #f5f7fb;
-  border-radius: 14rpx;
-  padding: 20rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
+/* Card 作为 feature-card 容器；覆写内边距使 2x2 网格更紧凑（复合选择器提升优先级） */
+/* min-width:0 修复 CSS Grid 项默认 min-width:auto 导致文字无法截断、卡片被撑宽的问题 */
+.feature-card.as-card {
+  padding: $s-2;
   min-width: 0;
   overflow: hidden;
+  border: 2rpx solid $line;
+  box-shadow: $shadow-card;
 }
 
 .feature-header {
@@ -604,20 +581,23 @@ function goLogin() {
 }
 
 .feature-title {
-  font-size: 28rpx;
+  font-size: $font-size-md;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .feature-more {
-  font-size: 28rpx;
-  color: #9ca3af;
+  font-size: $font-size-md;
+  color: $ink-mute;
   font-weight: 300;
 }
 
 .feature-sub {
-  font-size: 22rpx;
-  color: #6b7280;
+  font-size: $font-size-xs;
+  color: $ink-soft;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .feature-list {
@@ -626,6 +606,7 @@ function goLogin() {
   gap: 8rpx;
   margin-top: 6rpx;
   min-width: 0;
+  overflow: hidden;
 }
 
 .feature-item {
@@ -637,8 +618,8 @@ function goLogin() {
 }
 
 .item-name {
-  font-size: 24rpx;
-  color: #374151;
+  font-size: $font-size-sm;
+  color: $ink-soft;
   flex: 1;
   min-width: 0;
   display: block;
@@ -648,103 +629,14 @@ function goLogin() {
 }
 
 .item-name.placeholder {
-  color: #9ca3af;
-}
-
-.item-tag {
-  font-size: 18rpx;
-  padding: 2rpx 8rpx;
-  border-radius: 4rpx;
-  flex-shrink: 0;
-
-  &.up {
-    background: rgba(244, 63, 94, 0.1);
-    color: #f43f5e;
-    font-weight: 600;
-  }
-  &.down {
-    background: rgba(34, 197, 94, 0.1);
-    color: #22c55e;
-  }
-  &.date {
-    background: rgba(34, 197, 94, 0.1);
-    color: #22c55e;
-  }
-  &.wash {
-    background: rgba(251, 146, 60, 0.1);
-    color: #fb923c;
-  }
-  &.sell {
-    background: rgba(34, 197, 94, 0.1);
-    color: #22c55e;
-  }
-  &.buy {
-    background: rgba(77, 124, 254, 0.1);
-    color: #4d7cfe;
-  }
-}
-
-/* 异动捕手卡片特有 */
-.event-top-badge {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-top: 2rpx;
-}
-
-.badge-hot {
-  font-size: 18rpx;
-  background: rgba(244, 63, 94, 0.1);
-  color: #f43f5e;
-  padding: 2rpx 8rpx;
-  border-radius: 4rpx;
-  font-weight: 600;
-}
-
-.badge-sector {
-  font-size: 22rpx;
-  color: #1a1d24;
-  font-weight: 500;
-}
-
-.event-top-title {
-  font-size: 22rpx;
-  color: #6b7280;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.event-item {
-  .item-badge {
-    font-size: 18rpx;
-    background: rgba(244, 63, 94, 0.1);
-    color: #f43f5e;
-    padding: 1rpx 6rpx;
-    border-radius: 4rpx;
-    flex-shrink: 0;
-    margin-right: 4rpx;
-  }
-  .item-name {
-    flex: 1;
-  }
-}
-
-.item-change {
-  font-size: 22rpx;
-  flex-shrink: 0;
-  font-weight: 500;
-
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  color: $ink-mute;
 }
 
 /* ===== 重磅事件跟踪 ===== */
-.event-track-card {
-  background: #f5f7fb;
-  border-radius: 14rpx;
-  padding: 20rpx;
-  margin-bottom: 20rpx;
+.track-card.as-card {
+  padding: $s-2;
+  border: 2rpx solid $line;
+  box-shadow: $shadow-card;
 }
 
 .track-header {
@@ -757,12 +649,12 @@ function goLogin() {
 .track-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .track-more {
-  font-size: 28rpx;
-  color: #9ca3af;
+  font-size: $font-size-md;
+  color: $ink-mute;
   font-weight: 300;
 }
 
@@ -772,22 +664,17 @@ function goLogin() {
   gap: 12rpx;
 }
 
+/* 追踪标签：外观由 Tag 组件管理，仅保留定位 */
 .track-label {
   flex-shrink: 0;
-  font-size: 20rpx;
-  color: #f43f5e;
-  background: rgba(244, 63, 94, 0.1);
-  padding: 2rpx 8rpx;
-  border-radius: 4rpx;
-  font-weight: 500;
   margin-top: 2rpx;
 }
 
 .track-content {
   flex: 1;
-  font-size: 24rpx;
-  color: #374151;
-  line-height: 1.5;
+  font-size: $font-size-sm;
+  color: $ink-soft;
+  line-height: 1.4;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -797,20 +684,12 @@ function goLogin() {
 .track-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6rpx;
-  margin-top: 14rpx;
-  padding-top: 12rpx;
-  border-top: 1rpx solid #f3f4f6;
-}
-
-.track-arrow {
-  font-size: 20rpx;
-  color: #9ca3af;
+  justify-content: flex-end;
+  margin-top: 8rpx;
 }
 
 .track-tip {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 </style>

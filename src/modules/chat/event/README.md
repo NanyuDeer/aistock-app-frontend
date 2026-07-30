@@ -10,9 +10,18 @@
 event/
 ├── components/          # UI 组件（纯展示+交互）
 │   ├── EventHeader.vue         # 页面顶部导航
-│   ├── EventItemCard.vue       # 事件卡片
-│   ├── EventTabBar.vue         # 分类Tab栏
-│   ├── ImportanceStars.vue     # 重要性星级
+│   ├── EventItemCard.vue       # 事件卡片（Card + Rate + Tag + SvgIcon）
+│   ├── EventHeadlineCard.vue   # 焦点事件高亮卡（Card + Tag + Badge + SvgIcon）
+│   ├── AiAnalysisSection.vue   # AI 推理步骤容器（LoadingState + StreamingText）
+│   ├── AiThinkingHeader.vue    # AI 思考状态头部（SvgIcon + Steps）
+│   ├── AiEventReport.vue       # AI 事件分析报告容器
+│   ├── AiEventUnderstanding.vue # 事件理解
+│   ├── InvestmentSummaryCard.vue # 投资总结卡
+│   ├── InvestmentLogicHeader.vue # 投资逻辑头部
+│   ├── EventTransmissionGraph.vue # 传导关系图谱容器
+│   ├── HistoryTimeline.vue     # 历史事件时间线（适配 shared Timeline）
+│   ├── transmission/
+│   │   └── AiTransmissionAnalysis.vue # AI 影响传导推理（Steps + Rate + Progress）
 │   ├── IndustryImpactList.vue  # 行业影响列表（已废弃，由 transmission/ 替代）
 │   ├── AiSummaryCard.vue       # AI总结卡片
 │   ├── AiImpactCards.vue       # AI推演横向滚动卡片
@@ -23,7 +32,6 @@ event/
 │   ├── GraphStrength.vue       # 传导强度标签
 │   ├── AiChatBubble.vue        # AI对话气泡
 │   ├── ImpactVariableGrid.vue  # 影响变量网格（已废弃，由 transmission/ 替代）
-│   ├── HistoryTimeline.vue     # 历史事件时间线
 │   ├── TimelineItem.vue        # 单条历史事件
 │   ├── WatchButton.vue         # 盯盘按钮
 │   ├── FollowButton.vue        # 关注按钮

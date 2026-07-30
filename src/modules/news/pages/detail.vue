@@ -1,9 +1,7 @@
 <template>
   <view class="news-detail-page">
     <!-- 加载中 -->
-    <view v-if="loading" class="state-container">
-      <text class="state-text">加载中...</text>
-    </view>
+    <LoadingState v-if="loading" />
 
     <!-- 新闻内容 -->
     <template v-else-if="detail">
@@ -12,25 +10,27 @@
           <view class="news-header">
             <text class="news-title">{{ detail.title }}</text>
             <view class="news-meta">
-              <text class="news-source">{{ detail.source }}</text>
+              <Tag size="sm">{{ detail.source }}</Tag>
               <text class="meta-dot">·</text>
               <text class="news-time">{{ detail.publishTime }}</text>
             </view>
           </view>
 
           <!-- AI深度解析入口 -->
-          <view v-if="relatedEventId" class="ai-analysis-entry" @tap="goToEventDetail">
-            <view class="ai-entry-icon">🤖</view>
+          <Card v-if="relatedEventId" clickable class="ai-analysis-entry" @click="goToEventDetail">
+            <view class="ai-entry-icon">
+              <SvgIcon name="robot-line" size="32rpx" />
+            </view>
             <view class="ai-entry-content">
               <text class="ai-entry-title">AI深度解析</text>
               <text class="ai-entry-subtitle">查看事件影响链与产业机会</text>
             </view>
             <text class="ai-entry-arrow">›</text>
-          </view>
+          </Card>
 
-          <view v-if="detail.summary" class="news-summary">
+          <Card v-if="detail.summary" class="news-summary">
             <text class="summary-text">{{ detail.summary }}</text>
-          </view>
+          </Card>
 
           <view class="news-body">
             <rich-text :nodes="formattedContent" />
@@ -44,9 +44,7 @@
     </template>
 
     <!-- 加载失败 / 空状态 -->
-    <view v-else class="state-container">
-      <text class="state-text">暂无资讯详情</text>
-    </view>
+    <EmptyState v-else title="暂无资讯详情" />
 
     <!-- 全局AI对话栏 -->
     <GlobalChatBar />
@@ -58,6 +56,8 @@ import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { LoadingState, EmptyState, Tag, Card } from '@/shared/components'
 
 const loading = ref(false)
 const detail = ref<{
@@ -140,20 +140,12 @@ function goToEventDetail() {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 /* 系统导航栏页面：不需要 position:fixed，disableScroll 已在 pages.json 中配置 */
 .news-detail-page {
   min-height: 100vh;
-  background: #ffffff;
+  background: $bg-card;
 }
-
-.state-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 300rpx 0;
-}
-.state-text { font-size: 28rpx; color: #6b7280; }
 
 /* Scroll */
 .news-scroll {
@@ -173,7 +165,7 @@ function goToEventDetail() {
 .news-title {
   font-size: 36rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.5;
   display: block;
   margin-bottom: 16rpx;
@@ -185,31 +177,21 @@ function goToEventDetail() {
   gap: 10rpx;
 }
 
-.news-source {
-  font-size: 22rpx;
-  color: #4d7cfe;
-  font-weight: 500;
-  background: rgba(77, 124, 254, 0.08);
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
-}
-.meta-dot { font-size: 22rpx; color: #9ca3af; }
+.meta-dot { font-size: 22rpx; color: $ink-mute; }
 .news-time {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-mute;
 }
 
 .news-summary {
-  background: #f8fafc;
-  border-left: 6rpx solid #4d7cfe;
-  padding: 20rpx 24rpx;
-  border-radius: 0 12rpx 12rpx 0;
+  background: $bg-soft;
+  border-left: 6rpx solid $primary;
   margin-bottom: 28rpx;
 }
 
 .summary-text {
   font-size: 26rpx;
-  color: #374151;
+  color: $ink-soft;
   line-height: 1.7;
 }
 
@@ -220,25 +202,24 @@ function goToEventDetail() {
 .news-footer {
   margin-top: 40rpx;
   padding-top: 24rpx;
-  border-top: 1rpx solid #f0f2f5;
+  border-top: 1rpx solid $line-soft;
   text-align: center;
 }
 
 .footer-link {
   font-size: 28rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 
-/* AI深度解析入口 */
+/* AI深度解析入口（Card 已处理容器，保留渐变背景） */
 .ai-analysis-entry {
+  margin: 28rpx 0;
+  background: linear-gradient(135deg, #E0E7FF 0%, #FCE7F3 100%);
+}
+.ai-analysis-entry :deep(.as-card__body) {
   display: flex;
   align-items: center;
-  margin: 28rpx 0;
-  padding: 28rpx 32rpx;
-  border-radius: 24rpx;
-  background: linear-gradient(135deg, #E0E7FF 0%, #FCE7F3 100%);
-  box-shadow: 0 4rpx 12rpx rgba(99, 102, 241, 0.1);
 }
 
 .ai-entry-icon {
@@ -247,7 +228,6 @@ function goToEventDetail() {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32rpx;
   flex-shrink: 0;
 }
 
@@ -260,19 +240,19 @@ function goToEventDetail() {
   display: block;
   font-size: 28rpx;
   font-weight: 600;
-  color: #1f2937;
+  color: $ink;
 }
 
 .ai-entry-subtitle {
   display: block;
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-top: 4rpx;
 }
 
 .ai-entry-arrow {
   font-size: 40rpx;
-  color: #6366f1;
+  color: $primary-600;
   font-weight: 300;
   flex-shrink: 0;
 }

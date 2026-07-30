@@ -3,54 +3,12 @@
     <view class="push-history-content">
       <!-- 统计信息区域 -->
       <view v-if="!loading && allRecords.length" class="summary-section">
-        <view class="summary-grid">
-          <view class="summary-card">
-            <text class="summary-label">推送股票数量</text>
-            <text class="summary-value">{{ summary.total || 0 }}</text>
-            <text class="summary-sub">{{ historyDateRange }}</text>
-          </view>
-          <view class="summary-card">
-            <text class="summary-label">上涨股票数量</text>
-            <text class="summary-value">{{ summary.winners || 0 }}</text>
-            <text class="summary-sub summary-metrics">
-              盈亏比 {{ formatRatio(profitLossRatio) }} | 胜率 {{ formatWinRate(summary.win_rate) }}
-            </text>
-          </view>
-          <view class="summary-card">
-            <text class="summary-label">平均收益</text>
-            <text class="summary-value" :class="returnClass(summary.average_return_pct)">
-              {{ formatPercent(summary.average_return_pct) }}
-            </text>
-            <text class="summary-sub">更新 {{ latestUpdateDate }}</text>
-          </view>
-          <view class="summary-card">
-            <text class="summary-label">最高收益</text>
-            <text class="summary-value" :class="returnClass(summary.best ? displayReturn(summary.best) : null)">
-              {{ summary.best ? formatPercent(displayReturn(summary.best)) : '--' }}
-            </text>
-            <text class="summary-sub">{{ summary.best?.stock_name || '--' }}</text>
-          </view>
-        </view>
+        <StatGrid :items="summaryStatItems" :columns="2" labelFirst />
       </view>
 
       <!-- 标签栏 + 日期筛选合并行 -->
       <view class="tabs-filter-row">
-        <view class="history-tabs">
-          <view
-            class="history-tab"
-            :class="{ active: activeTab === 'history' }"
-            @tap="activeTab = 'history'"
-          >
-            <text>历史表现</text>
-          </view>
-          <view
-            class="history-tab"
-            :class="{ active: activeTab === 'ranking' }"
-            @tap="activeTab = 'ranking'"
-          >
-            <text>收益榜单</text>
-          </view>
-        </view>
+        <Segmented :items="tabItems" v-model="activeTab" />
         <view class="filter-section">
           <picker mode="date" :value="selectedDate" fields="day" @change="onDateChange">
             <view class="date-picker-trigger">
@@ -65,7 +23,7 @@
 
       <!-- 推送记录列表 -->
       <view v-if="!loading && records.length && activeTab === 'history'" class="record-list">
-        <view
+        <Card
           v-for="item in records"
           :key="item.stock_code + item.push_date"
           class="record-item"
@@ -87,11 +45,11 @@
             <text class="item-note">{{ formatNote(item) }}</text>
             <text class="item-time">更新 {{ formatUpdateDate(item) }}</text>
           </view>
-        </view>
+        </Card>
       </view>
 
       <view v-if="!loading && records.length && activeTab === 'ranking'" class="ranking-section">
-        <view class="ranking-card">
+        <Card class="ranking-card">
           <text class="ranking-title">累计涨幅榜</text>
           <view
             v-for="(item, index) in closeRanking.top_gainers"
@@ -106,9 +64,9 @@
             <text class="ranking-return" :class="getReturnClass(item)">{{ formatReturn(item) }}</text>
           </view>
           <view v-if="!closeRanking.top_gainers.length" class="ranking-empty">暂无可计算样本</view>
-        </view>
+        </Card>
 
-        <view class="ranking-card">
+        <Card class="ranking-card">
           <text class="ranking-title">累计跌幅榜</text>
           <view
             v-for="(item, index) in closeRanking.top_losers"
@@ -123,18 +81,14 @@
             <text class="ranking-return" :class="getReturnClass(item)">{{ formatReturn(item) }}</text>
           </view>
           <view v-if="!closeRanking.top_losers.length" class="ranking-empty">暂无可计算样本</view>
-        </view>
+        </Card>
       </view>
 
       <!-- 加载状态 -->
-      <view v-if="loading" class="loading-state">
-        <text>加载中...</text>
-      </view>
+      <LoadingState v-if="loading" />
 
       <!-- 空状态 -->
-      <view v-if="!loading && !records.length" class="empty-state">
-        <text>暂无推送记录</text>
-      </view>
+      <EmptyState v-if="!loading && !records.length" title="暂无推送记录" />
     </view>
   </SubPageCard>
 </template>
@@ -145,6 +99,8 @@ import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { PushHistoryItem } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import { LoadingState, EmptyState, Segmented, Card, StatGrid } from '@/shared/components'
+import type { StatGridItem } from '@/shared/components'
 
 const selectedDate = ref('')
 const loading = ref(false)
@@ -225,6 +181,22 @@ const closeRanking = computed(() => {
     top_gainers: evaluated.slice().sort((a, b) => Number(displayReturn(b)) - Number(displayReturn(a))).slice(0, 10),
     top_losers: evaluated.slice().sort((a, b) => Number(displayReturn(a)) - Number(displayReturn(b))).slice(0, 10)
   }
+})
+
+const tabItems = [
+  { label: '历史表现', value: 'history' as const },
+  { label: '收益榜单', value: 'ranking' as const },
+]
+
+const summaryStatItems = computed<StatGridItem[]>(() => {
+  const avgReturn = summary.value.average_return_pct
+  const bestReturn = summary.value.best ? displayReturn(summary.value.best) : null
+  return [
+    { label: '推送股票数量', value: String(summary.value.total || 0), subtitle: historyDateRange.value },
+    { label: '上涨股票数量', value: String(summary.value.winners || 0), subtitle: `盈亏比 ${formatRatio(profitLossRatio.value)} | 胜率 ${formatWinRate(summary.value.win_rate)}` },
+    { label: '平均收益', value: formatPercent(avgReturn), color: avgReturn >= 0 ? 'up' : 'down', subtitle: `更新 ${latestUpdateDate.value}` },
+    { label: '最高收益', value: summary.value.best ? formatPercent(bestReturn) : '--', color: (bestReturn ?? 0) >= 0 ? 'up' : 'down', subtitle: summary.value.best?.stock_name || '' },
+  ]
 })
 
 async function loadData() {
@@ -334,67 +306,11 @@ onLoad(() => {
   margin-bottom: 24rpx;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16rpx;
-}
-
-.summary-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16rpx;
-  padding: 18rpx 24rpx;
-  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 96rpx;
-}
-
-.summary-label {
-  color: #6b7280;
-  font-size: 24rpx;
-  margin-bottom: 6rpx;
-}
-
-.summary-value {
-  color: #111827;
-  font-size: 36rpx;
-  font-weight: bold;
-  line-height: 1.2;
-}
-
-.summary-value.up {
-  color: #ef4444;
-}
-
-.summary-value.down {
-  color: #16a34a;
-}
-
-.summary-note {
-  display: none;
-}
-
-.summary-sub {
-  color: #9ca3af;
-  font-size: 22rpx;
-  margin-top: 4rpx;
-}
-
-.summary-metrics {
-  width: 100%;
-  text-align: center;
-  white-space: nowrap;
-}
-
 .tabs-filter-row {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid $line;
 }
 
 .filter-section {
@@ -416,7 +332,7 @@ onLoad(() => {
 }
 
 .date-picker-value {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 24rpx;
   white-space: nowrap;
 }
@@ -425,7 +341,7 @@ onLoad(() => {
   width: 36rpx;
   height: 36rpx;
   border-radius: 50%;
-  background: #e5e7eb;
+  background: $line;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -433,49 +349,18 @@ onLoad(() => {
 }
 
 .clear-icon {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 28rpx;
   line-height: 1;
-}
-
-.history-tabs {
-  display: flex;
-}
-
-.history-tab {
-  position: relative;
-  padding: 20rpx 28rpx;
-  color: #6b7280;
-  font-size: 28rpx;
-}
-
-.history-tab.active {
-  color: #3b82f6;
-  font-weight: 600;
-}
-
-.history-tab.active::after {
-  content: '';
-  position: absolute;
-  right: 20rpx;
-  bottom: -1px;
-  left: 20rpx;
-  height: 4rpx;
-  border-radius: 4rpx;
-  background: #3b82f6;
 }
 
 .record-list {
   margin-top: 32rpx;
 }
 
+/* Card 提供 bg/border/shadow，仅保留间距 */
 .record-item {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16rpx;
-  padding: 24rpx;
   margin-bottom: 24rpx;
-  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
 }
 
 .item-date-row {
@@ -489,7 +374,7 @@ onLoad(() => {
 }
 
 .item-date {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 26rpx;
 }
 
@@ -508,20 +393,20 @@ onLoad(() => {
 
 .item-name {
   color: #111827;
-  font-size: 32rpx;
+  font-size: 30rpx;
   font-weight: bold;
 }
 
 .item-code {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   background: #f0f2f5;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
 }
 
 .item-return {
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: bold;
 }
 
@@ -540,7 +425,7 @@ onLoad(() => {
 }
 
 .item-note {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 24rpx;
 }
 
@@ -553,13 +438,9 @@ onLoad(() => {
   margin-top: 32rpx;
 }
 
+/* Card 提供 bg/border/shadow，仅保留间距 */
 .ranking-card {
   margin-bottom: 24rpx;
-  padding: 28rpx 24rpx;
-  border: 1px solid #e5e7eb;
-  border-radius: 16rpx;
-  background: #fff;
-  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
 }
 
 .ranking-title {
@@ -597,7 +478,7 @@ onLoad(() => {
 .ranking-name {
   overflow: hidden;
   color: #111827;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -611,7 +492,7 @@ onLoad(() => {
 
 .ranking-return {
   margin-left: 20rpx;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 700;
 }
 
@@ -628,13 +509,5 @@ onLoad(() => {
   color: #9ca3af;
   font-size: 26rpx;
   text-align: center;
-}
-
-.loading-state,
-.empty-state {
-  text-align: center;
-  padding: 80rpx 0;
-  color: #9ca3af;
-  font-size: 28rpx;
 }
 </style>
