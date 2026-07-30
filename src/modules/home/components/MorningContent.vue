@@ -6,17 +6,24 @@
         <view class="briefing-left">
           <view class="briefing-top">
             <text class="briefing-title">今日专属 · {{ briefingTypeLabel }}</text>
+            <text v-if="report?.degraded" class="briefing-degraded">证据不完整</text>
+            <text v-if="report?.degraded && report.missing_sources.length" class="briefing-missing">
+              缺失来源：{{ report?.missing_sources.join('、') }}
+            </text>
           </view>
           <!-- 有数据时：显示线索数量和简洁摘要 -->
           <template v-if="briefingStatus === 'ready'">
-            <view class="briefing-clue">
+            <view v-if="briefingClueCount > 0" class="briefing-clue">
               <text class="clue-text">{{ briefingClueCount }}条关键线索需关注</text>
             </view>
-            <view class="briefing-tags">
+            <view v-if="briefingClueCount > 0" class="briefing-tags">
               <view v-for="(tag, idx) in summaryTags" :key="idx" class="summary-tag">
                 <text class="tag-text">{{ tag }}</text>
               </view>
               <text class="tags-arrow">›</text>
+            </view>
+            <view v-else class="briefing-clue">
+              <text class="clue-text">暂无关键线索</text>
             </view>
           </template>
           <!-- 空状态/错误/加载时：显示提示 -->
@@ -44,11 +51,11 @@
             <text class="feature-title">长线风口</text>
             <text class="feature-more">›</text>
           </view>
-          <text class="feature-sub">主力最新动向</text>
+          <text class="feature-sub">排行前三板块</text>
           <view class="feature-list">
-            <template v-if="leaderStocks.length">
-              <view v-for="(item, idx) in leaderStocks.slice(0, 3)" :key="idx" class="feature-item">
-                <text class="item-name">{{ item.name }}</text>
+            <template v-if="leaderSectors.length">
+              <view v-for="(item, idx) in leaderSectors.slice(0, 3)" :key="idx" class="feature-item">
+                <text class="item-name">No.{{ idx + 1 }} {{ item.name }}</text>
                 <text :class="['item-tag', item.tagType]">{{ item.tag }}</text>
               </view>
             </template>
@@ -113,7 +120,7 @@
         </view>
         <view class="track-footer">
           <text class="track-arrow">∧</text>
-          <text class="track-tip">点击查看资讯详情</text>
+          <text class="track-tip">点击查看 AI 事件分析</text>
         </view>
       </view>
 
@@ -126,10 +133,15 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { useBriefingCard } from '@/shared/utils/useBriefingCard'
+import { buildBriefingUrl } from '@/shared/utils/briefingNavigation'
 import { stockApi } from '@/shared/api/modules/stock'
-import type { WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
+import { agentApi } from '@/shared/api/modules/agent'
+import { getEventList } from '@/modules/chat/event/api/eventApi'
+import type { WindLeaderSector } from '@/shared/api/modules/stock'
 
 const {
+  type: briefingType,
+  date: briefingDate,
   typeLabel: briefingTypeLabel,
   summary: briefingSummary,
   report,
@@ -138,22 +150,20 @@ const {
   refresh: briefingRefresh,
 } = useBriefingCard()
 
-/** 摘要拆分为标签：按标点切割，去掉标点，最多4个 */
+/** 摘要拆分为标签：按标点切割，过滤过长片段（整句），最多3个，每个限12字 */
 const summaryTags = computed(() => {
   const text = briefingSummary.value || ''
   return text
-    .split(/[，,、+]/)
+    .split(/[，,、+。！!？?]/)
     .map(s => s.trim())
-    .filter(s => s.length > 0)
-    .slice(0, 4)
+    .filter(s => s.length > 0 && s.length <= 15)
+    .slice(0, 3)
+    .map(s => s.length > 12 ? s.slice(0, 12) + '…' : s)
 })
 
 /** 线索数量：晨报按 stocks，晚报按 sectors */
 const briefingClueCount = computed(() => {
-  if (!report.value) return 0
-  return briefingTypeLabel.value === '晨报'
-    ? report.value.stocks.length
-    : report.value.sectors.length
+  return report.value?.items.length ?? 0
 })
 
 // 卡片描述文案（根据状态）
@@ -162,9 +172,9 @@ function getBriefingDesc(): string {
     case 'empty':
       return briefingTypeLabel.value === '晨报'
         ? '晨报生成中，9:00后查看'
-        : '晚报生成中，15:30后查看'
+        : '晚报生成中，收盘后查看'
     case 'error':
-      return '暂不可用，点击重试'
+      return '暂不可用，点击查看'
     case 'loading':
       return '加载中...'
     default:
@@ -172,30 +182,20 @@ function getBriefingDesc(): string {
   }
 }
 
-// 卡片点击
+// 卡片点击：统一进入播报汇总页（briefing/index），由该页面处理数据加载与空状态
+// 链路：首页卡片 → 播报汇总页（方案四：音频条+结构化早晚报）→ 音频条点击 → 详情页
 function goBriefingDetail() {
-  if (briefingStatus.value === 'ready') {
-    const type = briefingTypeLabel.value === '晨报' ? 'morning' : 'review'
-    uni.navigateTo({ url: `/pages-sub-app/briefing-detail/index?type=${type}` })
-  } else if (briefingStatus.value === 'error') {
-    // 触发重试
-    briefingRefresh()
-  } else {
-    uni.showToast({
-      title: getBriefingDesc(),
-      icon: 'none',
-    })
-  }
+  uni.navigateTo({ url: '/pages-sub-app/briefing/index' })
 }
 
-// 长线风口：从后端 API 获取风口龙头数据，提取前3只龙头股在首页预览
+// 长线风口：从后端 API 获取风口板块数据，提取排行前3的板块在首页预览
 interface LeaderStockPreview {
   name: string
   tag: string
-  tagType: 'buy' | 'sell' | 'wash'
+  tagType: 'buy' | 'sell' | 'wash' | 'up' | 'down' | 'date'
 }
 
-const leaderStocks = ref<LeaderStockPreview[]>([])
+const leaderSectors = ref<LeaderStockPreview[]>([])
 
 function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
@@ -203,63 +203,109 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(num) ? num : null
 }
 
-// 从风口板块中提取龙头股预览列表，参考 Web 前端 extractTopStocksFromSectors 逻辑
-function extractLeaderPreview(sectors: WindLeaderSector[], maxCount: number): LeaderStockPreview[] {
-  const seen = new Set<string>()
-  const result: LeaderStockPreview[] = []
-  // 按板块 score 降序遍历，优先取高分板块的龙头
-  const sorted = sectors
+// 从风口板块中提取排行前 N 的板块预览（按 score 降序）
+function extractSectorPreview(sectors: WindLeaderSector[], maxCount: number): LeaderStockPreview[] {
+  return sectors
     .filter(s => s && s.name)
     .slice()
     .sort((a, b) => (toFiniteNumber(b.score) ?? 0) - (toFiniteNumber(a.score) ?? 0))
-  for (const sector of sorted) {
-    if (result.length >= maxCount) break
-    // 优先取 leading_stock_info，其次取 main_stocks[0]
-    const stock: WindLeaderStock | null = sector.leading_stock_info ?? sector.main_stocks?.[0] ?? null
-    if (!stock || !stock.name) continue
-    const code = stock.code || stock.name
-    if (seen.has(code)) continue
-    seen.add(code)
-    const changePct = toFiniteNumber(stock.change_pct)
-    const tag = changePct !== null
-      ? `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`
-      : '--'
-    const tagType: LeaderStockPreview['tagType'] = changePct === null
-      ? 'wash'
-      : changePct > 0 ? 'buy' : changePct < 0 ? 'sell' : 'wash'
-    result.push({ name: stock.name, tag, tagType })
-  }
-  return result
+    .slice(0, maxCount)
+    .map(sector => {
+      const changePct = toFiniteNumber(sector.today_change)
+      const tag = changePct !== null
+        ? `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`
+        : '--'
+      const tagType: LeaderStockPreview['tagType'] = changePct === null
+        ? 'wash'
+        : changePct > 0 ? 'up' : changePct < 0 ? 'down' : 'wash'
+      return { name: sector.name, tag, tagType }
+    })
 }
 
-async function loadLeaderStocks() {
+async function loadLeaderSectors() {
   try {
     const res: any = await stockApi.getWindLeaders(8)
     const data = res?.data ?? res
     const sectors: WindLeaderSector[] = data?.hot_sectors ?? []
-    leaderStocks.value = extractLeaderPreview(sectors, 3)
+    leaderSectors.value = extractSectorPreview(sectors, 3)
   } catch (error) {
     console.error('首页长线风口数据加载失败:', error)
-    leaderStocks.value = []
+    leaderSectors.value = []
   }
 }
 
 const topEvent = ref({
-  sector: '创新药',
-  title: '美国标普生物科技指数上周大涨'
+  eventId: '',
+  sector: '',
+  title: '暂无重磅事件',
 })
 
-const chainEvents = ref([
-  { name: '创新药', tag: '利好', tagType: 'buy' },
-  { name: '半导体', tag: '关注', tagType: 'wash' },
-  { name: '新能源', tag: '利空', tagType: 'sell' },
-])
+const chainEvents = ref<LeaderStockPreview[]>([])
 
-const aiReports = ref([
-  { name: '晨报', tag: '已更新', tagType: 'buy' },
-  { name: '风口龙头', tag: '已更新', tagType: 'buy' },
-  { name: '大盘溯源', tag: '待更新', tagType: 'wash' },
-])
+/** 事件传导卡片：从事件列表 API 获取最新3条事件作为预览 */
+async function loadChainEvents() {
+  try {
+    const res = await getEventList({ page: 1, pageSize: 5 })
+    const events = res?.events ?? []
+
+    // 事件传导卡片：取最新3条事件
+    chainEvents.value = events.slice(0, 3).map(e => {
+      // 标签：优先用 publishTime 的日期，否则标"新"
+      const tag = e.publishTime ? e.publishTime.slice(5, 10) : '新'
+      return { name: e.title, tag, tagType: 'date' as const }
+    })
+
+    // 重磅事件跟踪：取第1条事件
+    if (events.length > 0) {
+      topEvent.value = {
+        eventId: events[0].eventId || '',
+        sector: events[0].source || '',
+        title: events[0].title,
+      }
+    }
+  } catch (error) {
+    console.error('首页事件传导数据加载失败:', error)
+    // 失败时保持空状态，不显示假数据
+  }
+}
+
+const aiReports = ref<LeaderStockPreview[]>([])
+
+/** Agent 报告状态预览：检查 4 个 agent（晨报/风口龙头/机构调研/趋势股评分），最多显示3个已更新，不足则补"待更新" */
+const AGENT_REPORT_LABELS: Array<{ intent: string; name: string }> = [
+  { intent: 'morning', name: '晨报' },
+  { intent: 'wind_leader', name: '风口龙头' },
+  { intent: 'hot_burst', name: '机构调研' },
+  { intent: 'trend_score', name: '趋势股评分' },
+]
+
+async function loadAiReports() {
+  const today = new Date().toISOString().split('T')[0]
+  const results = await Promise.allSettled(
+    AGENT_REPORT_LABELS.map(item => agentApi.getReport(item.intent, today))
+  )
+
+  const updated: LeaderStockPreview[] = []
+  AGENT_REPORT_LABELS.forEach((item, idx) => {
+    const r = results[idx]
+    const hasReport = r.status === 'fulfilled' && r.value &&
+      !!(r.value as { content?: unknown })?.content
+    if (hasReport) {
+      updated.push({ name: item.name, tag: '已更新', tagType: 'buy' })
+    }
+  })
+
+  // 最多显示3个：已更新优先，不足补"待更新"
+  const display: LeaderStockPreview[] = updated.slice(0, 3)
+  for (const item of AGENT_REPORT_LABELS) {
+    if (display.length >= 3) break
+    if (!updated.some(u => u.name === item.name)) {
+      display.push({ name: item.name, tag: '待更新', tagType: 'wash' })
+    }
+  }
+
+  aiReports.value = display
+}
 
 const traceReports = ref([
   { name: '北向资金异动', tag: '流入', tagType: 'buy' },
@@ -269,7 +315,9 @@ const traceReports = ref([
 
 onShow(() => {
   briefingRefresh()
-  loadLeaderStocks()
+  loadLeaderSectors()
+  loadAiReports()
+  loadChainEvents()
 })
 
 function goChat() {
@@ -277,7 +325,7 @@ function goChat() {
 }
 
 function goBriefing() {
-  uni.navigateTo({ url: '/pages-sub-app/briefing/index' })
+  uni.navigateTo({ url: buildBriefingUrl(briefingType.value, briefingDate.value) })
 }
 
 function goSectors() {
@@ -297,7 +345,12 @@ function goAgentReport() {
 }
 
 function goTrackDetail() {
-  uni.navigateTo({ url: '/modules/news/pages/detail' })
+  // 跳转到 AI 事件分析详情页；无 eventId 时降级到事件列表
+  if (topEvent.value.eventId) {
+    uni.navigateTo({ url: `/modules/chat/pages/event/detail?id=${topEvent.value.eventId}` })
+  } else {
+    uni.navigateTo({ url: '/modules/chat/pages/event/list' })
+  }
 }
 
 function goSearch() {
@@ -369,6 +422,22 @@ function goLogin() {
   font-size: $font-size-lg;
   font-weight: 600;
   color: $text-color-title;
+}
+
+.briefing-degraded {
+  margin-left: $spacing-xs;
+  padding: 2rpx $spacing-xs;
+  color: $warning-color;
+  background: rgba($warning-color, 0.1);
+  border: 1rpx solid rgba($warning-color, 0.25);
+  border-radius: $radius-xs;
+  font-size: $font-size-xs;
+  line-height: 1.4;
+}
+
+.briefing-missing {
+  font-size: 20rpx;
+  color: $warning-color;
 }
 
 .briefing-clue {
@@ -524,6 +593,8 @@ function goLogin() {
   display: flex;
   flex-direction: column;
   gap: 10rpx;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .feature-header {
@@ -554,6 +625,7 @@ function goLogin() {
   flex-direction: column;
   gap: 8rpx;
   margin-top: 6rpx;
+  min-width: 0;
 }
 
 .feature-item {
@@ -561,12 +633,15 @@ function goLogin() {
   align-items: center;
   justify-content: space-between;
   gap: 8rpx;
+  min-width: 0;
 }
 
 .item-name {
   font-size: 24rpx;
   color: #374151;
   flex: 1;
+  min-width: 0;
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -582,6 +657,19 @@ function goLogin() {
   border-radius: 4rpx;
   flex-shrink: 0;
 
+  &.up {
+    background: rgba(244, 63, 94, 0.1);
+    color: #f43f5e;
+    font-weight: 600;
+  }
+  &.down {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+  }
+  &.date {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+  }
   &.wash {
     background: rgba(251, 146, 60, 0.1);
     color: #fb923c;
@@ -700,6 +788,10 @@ function goLogin() {
   font-size: 24rpx;
   color: #374151;
   line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .track-footer {

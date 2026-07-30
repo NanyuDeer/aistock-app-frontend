@@ -18,6 +18,7 @@ export interface ChatMessage {
   skillResult?: SkillResult
   progressSteps?: ProgressStep[]
   trace?: MarketTraceQaTrace
+  advisorTrace?: AdvisorTrace
   timestamp: number
 }
 
@@ -53,14 +54,79 @@ export interface MarketTraceQaResponse {
 export interface BriefingData {
   date: string
   title: string
-  audioUrl?: string
-  segments: Array<{
-    host: 'A' | 'B'
-    text: string
-    audioUrl?: string
-  }>
-  events: any[]
-  sectors: any[]
+  kind: 'market_fact' | 'event_evidence'
+  provider: string
+}
+
+export type BriefType = 'morning' | 'evening'
+export const PUBLIC_REPORT_INTENTS = ['wind_leader', 'hot_burst'] as const
+export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
+
+export function isPublicReportIntent(intent: string): intent is PublicReportIntent {
+  return (PUBLIC_REPORT_INTENTS as readonly string[]).includes(intent)
+}
+
+export interface AdvisorSubquestionTrace {
+  intent: string
+  reports: Record<string, unknown>[]
+  sources: Record<string, unknown>[]
+  as_of: string | null
+  missing_sources: string[]
+  degraded: boolean
+}
+
+export interface AdvisorTrace {
+  schema_version: string
+  subquestions: AdvisorSubquestionTrace[]
+  missing_sources: string[]
+  degraded: boolean
+}
+
+export interface BriefEvidence {
+  report_type: string
+  id: string
+  data_source: string
+  created_at: string
+}
+
+export interface BriefItem {
+  title: string
+  conclusion: string
+  evidence: BriefEvidence[]
+  as_of: string
+  confidence: string
+  uncertainty: string | string[]
+}
+
+export interface BriefV1 {
+  schema_version: 'brief.v1'
+  brief_type: BriefType
+  as_of: string
+  items: BriefItem[]
+  degraded: boolean
+  missing_sources: string[]
+}
+
+export interface BroadcastSourceBrief {
+  id: string
+  report_type: `brief_${BriefType}`
+  report_date: string
+  as_of: string
+}
+
+export interface BroadcastDialogueLine {
+  role: 'host' | 'analyst'
+  content: string
+}
+
+export interface BroadcastV1 {
+  schema_version: 'broadcast.v1'
+  brief_type: BriefType
+  source_brief: BroadcastSourceBrief
+  degraded: boolean
+  missing_sources: string[]
+  dialogue: BroadcastDialogueLine[]
+  audio_path: string | null
 }
 
 export const agentApi = {
@@ -92,10 +158,14 @@ export const agentApi = {
     return request.get<BriefingData>('/agent/briefing/morning')
   },
 
-  /** 获取今日晚报 */
-  // TODO: 后端 evening briefing 尚未实现（Python 仅有 morning/alert），待 Agent 落地后启用
-  getEveningBriefing() {
-    return request.get<BriefingData>('/agent/briefing/evening')
+  /** 读取结构化早报/晚报，事实层仅来自已持久化 Brief。 */
+  getBrief(type: BriefType, date: string) {
+    return request.get<BriefV1>(`/agent/brief/${type}/${date}`)
+  },
+
+  /** 读取由对应 Brief 生成的双人播报。 */
+  getBroadcast(type: BriefType, date: string) {
+    return request.get<BroadcastV1>(`/agent/broadcast/${type}/${date}`)
   },
 
   /** 生成双人对话音频 */
@@ -139,7 +209,7 @@ export const agentApi = {
     return request.post('/agent/push/token', { token, provider })
   },
 
-  /** 获取 Agent 分析报告 */
+  /** 读取分析报告（broadcast/morning/review/wind_leader/hot_burst 等）。 */
   getReport(intent: string, date: string) {
     return request.get(`/agent/report/${intent}/${date}`)
   },

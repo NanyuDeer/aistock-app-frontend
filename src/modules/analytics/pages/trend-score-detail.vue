@@ -239,7 +239,7 @@
       </view>
 
       <view class="detail-footnote">
-        <text>更新时间：{{ formatTime(detail.updatedAt || detail.scoreDate) }}</text>
+        <text>更新时间：{{ detail.updatedAt ? formatDateTime(detail.updatedAt) : (detail.scoreDate ? formatDate(detail.scoreDate) : '--') }}</text>
         <text>评分基于公开数据与模型测算，仅供参考，不构成投资建议。</text>
       </view>
     </view>
@@ -262,6 +262,7 @@ import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
+import { formatDateTime, formatDate } from '@/shared/utils/datetime'
 import TrendKLineChart from '@/modules/analytics/components/TrendKLineChart.vue'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 

@@ -52,6 +52,15 @@ export default defineConfig(({ mode }) => {
           target: apiTarget,
           changeOrigin: true
         },
+        // 公共 Brief 与 Broadcast 路由 → Node.js（publicRouter）
+        '^/api/agent/brief(?:/|$)': {
+          target: apiTarget,
+          changeOrigin: true
+        },
+        '^/api/agent/broadcast(?:/|$)': {
+          target: apiTarget,
+          changeOrigin: true
+        },
         // 其他 Agent 路由 → Python FastAPI（端口 8080）
         '/api/agent': {
           target: agentTarget,

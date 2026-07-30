@@ -6,7 +6,7 @@
       </view>
 
       <view v-else-if="report" class="report-content">
-        <text class="report-date">{{ report.report_date }} · 仅供参考</text>
+        <text class="report-date">{{ report.created_at ? formatDateTime(report.created_at) : report.report_date }} · 仅供参考</text>
 
         <view class="conclusion-card">
           <text class="section-kicker">今日结论</text>
@@ -75,6 +75,7 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { agentApi } from '@/shared/api/modules/agent'
+import { formatDateTime } from '@/shared/utils/datetime'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import hotBurstMockContent from '../mock/hot-burst-report.json'
@@ -88,6 +89,7 @@ interface DisplayReport {
 
 interface HotBurstReport {
   report_date: string
+  created_at?: string
   content: {
     display_report?: DisplayReport
   }
@@ -155,6 +157,7 @@ function normalizeHotBurstReport(value: unknown): HotBurstReport | null {
 
   return {
     report_date: typeof record.report_date === 'string' ? record.report_date : '',
+    created_at: typeof record.created_at === 'string' ? record.created_at : undefined,
     content: { display_report: display },
   }
 }
@@ -372,12 +375,12 @@ async function loadReport() {
     const data = (res as Record<string, unknown>)?.data ?? res
     const nextReport = data
       ? normalizeHotBurstReport(data)
-      : import.meta.env.DEV ? { report_date: date.value, content: hotBurstMockContent } : null
+      : import.meta.env.DEV ? { report_date: date.value, created_at: new Date().toISOString(), content: hotBurstMockContent } : null
     report.value = nextReport
     if (nextReport) runStreamingFlow()
   } catch {
     report.value = import.meta.env.DEV
-      ? { report_date: date.value, content: hotBurstMockContent }
+      ? { report_date: date.value, created_at: new Date().toISOString(), content: hotBurstMockContent }
       : null
     if (report.value) runStreamingFlow()
   } finally {

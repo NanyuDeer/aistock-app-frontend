@@ -241,6 +241,7 @@ const bubbleData = computed<Bubble[]>(() => {
 })
 
 // force simulation：碰撞检测 + 居中 + 自适应缩放（确定性布局，同数据同结果）
+// 核心改进：迭代后增加"质心居中"步骤，确保泡泡群整体居中于画布
 const bubbleLayout = computed<BubbleLayout[]>(() => {
   const items = bubbleData.value
   if (!items.length) return []
@@ -257,31 +258,30 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
     scale = Math.sqrt(0.70 * canvasArea / totalArea)
   }
 
-  // 确定性初始位置：按 index 在横向椭圆上均匀分布
-  const ellipseA = W * 0.4  // 横向半轴（更宽）
-  const ellipseB = H * 0.3  // 纵向半轴（更窄）
+  // 确定性初始位置：按 index 在圆形上均匀分布（用较小半径，让泡泡更聚拢）
+  const initRadius = Math.min(W, H) * 0.22
   const nodes = items.map((b, idx) => {
     const r = b.radius * scale
     const angle = (idx / items.length) * Math.PI * 2 - Math.PI / 2
     return {
       ...b,
       radius: r,
-      x: cx + Math.cos(angle) * ellipseA,
-      y: cy + Math.sin(angle) * ellipseB,
+      x: cx + Math.cos(angle) * initRadius,
+      y: cy + Math.sin(angle) * initRadius,
       vx: 0,
       vy: 0,
     }
   })
 
   // 迭代模拟
-  const iterations = 300
+  const iterations = 400
   for (let i = 0; i < iterations; i++) {
     const alpha = 1 - i / iterations
 
-    // 居中力（Y方向更强，X方向更弱，让泡泡横向展开）
+    // 居中力（X/Y 均等，确保整体居中而非偏移）
     for (const n of nodes) {
-      n.vx += (cx - n.x) * 0.08 * alpha  // X: 居中力增强，帮助泡泡回归中心
-      n.vy += (cy - n.y) * 0.15 * alpha  // Y: 强居中
+      n.vx += (cx - n.x) * 0.12 * alpha
+      n.vy += (cy - n.y) * 0.12 * alpha
     }
 
     // 碰撞检测
@@ -313,8 +313,28 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
       n.vy *= 0.6
     }
 
-    // 边界约束（更强：确保泡泡完全在画布内，留2px安全边距）
+    // 边界约束（确保泡泡完全在画布内，留2px安全边距）
     for (const n of nodes) {
+      const safeR = n.radius + 2
+      n.x = Math.max(safeR, Math.min(W - safeR, n.x))
+      n.y = Math.max(safeR, Math.min(H - safeR, n.y))
+    }
+  }
+
+  // 最终质心居中：计算所有泡泡的质心，整体平移到画布中心
+  // 这是保证泡泡群"永远居中"的关键步骤——即使碰撞检测导致了偏移，也会被修正
+  if (nodes.length > 0) {
+    const sumX = nodes.reduce((sum, n) => sum + n.x, 0)
+    const sumY = nodes.reduce((sum, n) => sum + n.y, 0)
+    const centroidX = sumX / nodes.length
+    const centroidY = sumY / nodes.length
+    const dx = cx - centroidX
+    const dy = cy - centroidY
+
+    for (const n of nodes) {
+      n.x += dx
+      n.y += dy
+      // 平移后再次约束边界
       const safeR = n.radius + 2
       n.x = Math.max(safeR, Math.min(W - safeR, n.x))
       n.y = Math.max(safeR, Math.min(H - safeR, n.y))

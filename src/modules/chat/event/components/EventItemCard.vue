@@ -1,5 +1,5 @@
 <template>
-  <view class="event-card">
+  <view class="event-card" @tap="$emit('view-detail', event)">
     <!-- 第一行：事件类型 + 来源 + 时间 + 重要程度 -->
     <view class="card-header">
       <view class="header-left">

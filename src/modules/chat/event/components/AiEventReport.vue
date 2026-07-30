@@ -1,15 +1,5 @@
 <template>
   <view class="ai-event-report" v-if="detail">
-    <!-- ===== 固定顶部 AI 思考状态头部 ===== -->
-    <AiThinkingHeader
-      :phase="thinkingStatus.phase"
-      :thinking-logs="thinkingLogs"
-      :current-step-title="currentStepTitle"
-      :current-step-text="currentTask.text"
-      :is-complete="isAllCompleted"
-      @back="$emit('back')"
-    />
-
     <view class="report-content">
       <!-- 来源信息：真实来源 URL 或"来源暂不可验证" -->
       <view class="source-info-bar">
@@ -78,7 +68,6 @@
 import { onMounted, watch, nextTick, computed } from 'vue'
 import type { EventDetailResponse } from '../types'
 import { useAiReasoning } from '../composables/useAiReasoning'
-import AiThinkingHeader from './AiThinkingHeader.vue'
 import AiAnalysisSection from './AiAnalysisSection.vue'
 import AiEventUnderstanding from './AiEventUnderstanding.vue'
 import AiTransmissionAnalysis from './transmission/AiTransmissionAnalysis.vue'
@@ -88,11 +77,13 @@ import HistoryTimeline from './HistoryTimeline.vue'
 
 interface Props { detail?: EventDetailResponse | null }
 const props = defineProps<Props>()
-defineEmits<{ back: [] }>()
+const emit = defineEmits<{ 
+  back: []
+  'update:subtitle': [text: string]
+}>()
 
 const {
-  visibleSteps, isRunning, thinkingStatus, isThinking,
-  currentTask, isAllCompleted, currentStep, thinkingLogs, currentStepTitle,
+  visibleSteps, isAllCompleted, currentStep, currentStepTitle,
   startAnalysis,
 } = useAiReasoning([
   { title: 'AI投资机会' },
@@ -101,6 +92,16 @@ const {
   { title: 'AI影响传导推理' },
   { title: '历史验证' },
 ])
+
+/** 思考状态副标题，传递给 SubPageCard2 展示 */
+const thinkingSubtitle = computed(() => {
+  if (isAllCompleted.value) return '✓ 分析完成'
+  return currentStepTitle.value || ''
+})
+
+watch(thinkingSubtitle, (text) => {
+  emit('update:subtitle', text)
+}, { immediate: true })
 
 onMounted(() => {
   if (!props.detail) return
@@ -130,12 +131,22 @@ const logicStep = computed(() => visibleSteps.value.find(s => s.id === 2))
 /** Step 3~5: 深度分析 */
 const analysisSteps = computed(() => visibleSteps.value.filter(s => s.id >= 3))
 
-// ===== 自动滚动到当前步骤 =====
+// ===== 自动滚动到当前步骤（仅滚动 scroll-view 容器，避免触发外层页面滚动导致 fixed 导航栏移位） =====
 watch(currentStep, async (stepId) => {
   await nextTick()
+  if (!stepId) return
   // #ifdef H5
   const el = document.getElementById('step-' + stepId)
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // 找到 SubPageCard2 的 scroll-view 容器，只滚动它
+  const scrollContainer = document.querySelector('.sub-page-2-content .uni-scroll-view-content')
+    || document.querySelector('.sub-page-2-content')
+  if (el && scrollContainer) {
+    const elRect = el.getBoundingClientRect()
+    const containerRect = scrollContainer.getBoundingClientRect()
+    // 计算元素相对于滚动容器的偏移量，留 8px 间距
+    const offset = elRect.top - containerRect.top + scrollContainer.scrollTop - 8
+    scrollContainer.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' })
+  }
   // #endif
   // #ifdef APP-PLUS
   uni.createSelectorQuery().select('#step-' + stepId).boundingClientRect((rect: any) => {
@@ -147,7 +158,7 @@ watch(currentStep, async (stepId) => {
 </script>
 
 <style scoped>
-.ai-event-report { padding: 120rpx 0 48rpx; }
+.ai-event-report { padding: 0 0 48rpx; }
 
 .report-content {
   padding-top: 16rpx;

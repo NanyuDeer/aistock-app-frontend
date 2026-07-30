@@ -39,6 +39,7 @@
 
               <!-- Markdown 渲染的回复内容 -->
               <mp-html v-if="msg.content" :content="markdownToHtml(msg.content)" class="bubble-html" />
+              <AdvisorTraceStatus v-if="chatMode === 'general'" :trace="msg.advisorTrace" />
 
               <!-- General 模式：Skill 结果卡片 -->
               <template v-if="chatMode === 'general'">
@@ -89,51 +90,8 @@
                 </view>
               </template>
 
-              <!-- Market review 模式：证据溯源区域 -->
-              <view v-if="chatMode === 'market_review' && msg.trace" class="evidence-area">
-                <view class="evidence-header">
-                  <text class="evidence-title">证据溯源</text>
-                  <text :class="['confidence-badge', `confidence-${msg.trace.confidence}`]">
-                    {{ confidenceLabel(msg.trace.confidence) }}
-                  </text>
-                </view>
-                <view class="evidence-row">
-                  <text class="evidence-label">数据截至</text>
-                  <text class="evidence-value">{{ msg.trace.as_of || '截至时间未验证' }}</text>
-                </view>
-                <view class="evidence-section">
-                  <text class="evidence-label">来源</text>
-                  <template v-if="msg.trace.sources.length > 0">
-                    <view v-for="(src, sIdx) in msg.trace.sources" :key="sIdx" class="source-item">
-                      <text class="source-kind-tag">{{ sourceKindLabel(src.kind) }}</text>
-                      <text class="source-title">{{ src.title }}</text>
-                      <text class="source-provider">{{ src.provider }}</text>
-                      <text class="source-id">{{ src.source_id }}</text>
-                    </view>
-                  </template>
-                  <text v-else class="evidence-value">无可用来源</text>
-                </view>
-                <view class="evidence-section">
-                  <text class="evidence-label">不确定性</text>
-                  <template v-if="msg.trace.uncertainty.length > 0">
-                    <text v-for="(u, uIdx) in msg.trace.uncertainty" :key="uIdx" class="uncertainty-item">{{ u }}</text>
-                  </template>
-                  <text v-else-if="msg.trace.degraded" class="uncertainty-item">
-                    无法验证：{{ msg.trace.degraded_reason || '降级原因未提供' }}
-                  </text>
-                  <text v-else class="evidence-value">无已知未解决问题</text>
-                </view>
-                <view :class="['evidence-row', { 'degraded-banner': msg.trace.degraded }]">
-                  <text class="evidence-label">降级状态</text>
-                  <text :class="msg.trace.degraded ? 'degraded-text' : 'evidence-value'">
-                    {{ msg.trace.degraded ? (msg.trace.degraded_reason || '数据降级') : '未降级' }}
-                  </text>
-                </view>
-                <view class="evidence-row evidence-audit">
-                  <text class="evidence-label">工件 ID</text>
-                  <text class="evidence-value evidence-mono">{{ msg.trace.artifact_id || '未提供' }}</text>
-                </view>
-              </view>
+              <!-- Market review 模式：证据溯源区域（组件化，逻辑在 MarketTraceEvidence.vue） -->
+              <MarketTraceEvidence v-if="chatMode === 'market_review' && msg.trace" :trace="msg.trace" />
             </view>
           </view>
         </view>
@@ -243,11 +201,11 @@ import { ref, reactive, computed, nextTick, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useChatStream } from '@/shared/utils/useChatStream'
 import { useMarketTraceQa } from '@/shared/utils/useMarketTraceQa'
-import type { MarketTraceQaTrace } from '@/shared/utils/useMarketTraceQa'
-import type { MarketTraceQaSource } from '@/shared/api/modules/agent'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import MarketTraceEvidence from './MarketTraceEvidence.vue'
+import AdvisorTraceStatus from './AdvisorTraceStatus.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 const chatStream = useChatStream()
@@ -311,16 +269,6 @@ function quickAsk(text: string) {
     chatStream.send(text)
   }
   scrollToBottom()
-}
-
-function confidenceLabel(confidence: MarketTraceQaTrace['confidence']): string {
-  const map: Record<string, string> = { high: '高置信度', medium: '中置信度', low: '低置信度' }
-  return map[confidence] || confidence
-}
-
-function sourceKindLabel(kind: MarketTraceQaSource['kind']): string {
-  const map: Record<string, string> = { market_fact: '市场事实', event_evidence: '事件证据' }
-  return map[kind] || kind
 }
 
 function goStockDetail(symbol: string) {
@@ -506,118 +454,6 @@ onUnmounted(() => {
 .mode-btn.active .mode-btn-text {
   color: #ffffff;
   font-weight: 600;
-}
-
-/* 证据溯源区域 */
-.evidence-area {
-  margin-top: 16rpx;
-  padding: 16rpx;
-  background: $bg-color-muted;
-  border-radius: $radius-sm;
-  border: 1rpx solid $border-color;
-}
-.evidence-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8rpx;
-}
-.evidence-title {
-  font-size: $font-size-sm;
-  font-weight: 600;
-  color: $text-color-secondary;
-}
-.confidence-badge {
-  font-size: $font-size-xs;
-  padding: 2rpx 12rpx;
-  border-radius: $radius-pill;
-  font-weight: 500;
-}
-.confidence-high {
-  color: $success-color;
-  background: rgba(34, 197, 94, 0.1);
-}
-.confidence-medium {
-  color: $warning-color;
-  background: rgba(245, 158, 11, 0.1);
-}
-.confidence-low {
-  color: $error-color;
-  background: rgba(244, 63, 94, 0.1);
-}
-.evidence-row {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 4rpx 0;
-}
-.evidence-label {
-  font-size: $font-size-xs;
-  color: $text-color-tertiary;
-  flex-shrink: 0;
-}
-.evidence-value {
-  font-size: $font-size-xs;
-  color: $text-color;
-}
-.evidence-section {
-  padding: 4rpx 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-}
-.source-item {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8rpx;
-  padding: 2rpx 0;
-}
-.source-title {
-  font-size: $font-size-xs;
-  color: $text-color;
-}
-.source-provider {
-  font-size: $font-size-xs;
-  color: $text-color-tertiary;
-}
-.source-kind-tag {
-  font-size: $font-size-xs;
-  color: $brand-color;
-  background: rgba(77, 124, 254, 0.1);
-  padding: 2rpx 12rpx;
-  border-radius: $radius-pill;
-  flex-shrink: 0;
-}
-.source-id {
-  font-size: $font-size-xs;
-  color: $text-color-tertiary;
-  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-  word-break: break-all;
-}
-.uncertainty-item {
-  font-size: $font-size-xs;
-  color: $text-color-secondary;
-  line-height: 1.5;
-}
-.degraded-banner {
-  margin-top: 8rpx;
-  padding: 8rpx 12rpx;
-  background: rgba(245, 158, 11, 0.1);
-  border-radius: $radius-xs;
-}
-.degraded-text {
-  font-size: $font-size-xs;
-  color: $warning-color;
-}
-.evidence-audit {
-  margin-top: 4rpx;
-  padding-top: 8rpx;
-  border-top: 1rpx solid $border-color-light;
-}
-.evidence-mono {
-  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-  word-break: break-all;
 }
 
 /* 加载指示器 */

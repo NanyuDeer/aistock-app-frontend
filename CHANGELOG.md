@@ -2,6 +2,53 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [master] 2026-07-28 — PR #29 合并后类型修复 + mock 清理 + 组件化
+**开发者**: Aria
+
+### 修复
+- chat/index.vue: 用 MarketTraceEvidence 组件替换 94-137 行内联证据溯源代码，移除重复的 confidenceLabel/sourceKindLabel 函数和 110 行证据溯源样式
+- index.spec.ts: 测试改为验证组件使用而非内联 HTML 匹配
+- agent-report.vue: 移除 agentOverviewMock 导入和两处 DEV 环境降级 fallback，统一使用真实 API
+- briefing/index.vue: 修复 audioPath 访问路径（report.value?.audio_path → report.value?.content?.audio_path）
+- agent.ts: ChatMessage 接口添加 advisorTrace 字段，清理重复的 MarketTraceQaTrace/MarketTraceQaResponse 接口定义
+- briefingAdapter.ts: 新增 ReportType 类型，通过 toBriefType() 映射到 BriefingType，解决 splitReportToCards 参数类型冲突
+- vite.config.ts: 补齐 PR #29 新增的 brief/broadcast 代理路由
+
+### 重构
+- event-chain/index.vue: 移除硬编码 mockHeadlineEvents，改为从真实事件列表派生焦点事件（按 importance >= 4 和 affectedIndustries 情绪方向筛选）
+
+### 删除
+- src/modules/chat/mock/agent-overview.json（PR #29 已删除但被后续合并重新引入）
+
+---
+
+## [master] 2026-07-25 — PR review修复 + 个股详情页UI优化 + Agent报告页 + 趋势股评分报告页
+**开发者**: Aria
+
+### 修复
+- PR #28 review 问题修复：any 类型消除（stock.ts 20处 + useStockAiAnalysis.ts）、代码去重（format.ts 提取 compactNumber/isInvalidValue/cleanValue）、KLineChart SVG 宽高比（preserveAspectRatio xMidYMid meet）、SubPageCard2 prop 化（contentPaddingBottom）
+- SubPageCard2 底部留白统一：默认 contentPaddingBottom 从 220rpx 改为 148rpx（与 v1 一致）
+- 个股详情页双重 padding 消除：去掉 .page-detail 重复 padding-bottom 和 min-height
+- 个股详情页删除振幅字段、移除底部重复行情明细（与短线交易数据重复）
+- 新闻列表分页：每页3条 + 翻页控件（‹ 当前页/总页数 ›）
+- AI 投顾卡片与行情数据间距：添加 margin-top: 32rpx
+- 首页重磅事件跟踪跳转改为 AI 事件分析页 + profile 删除特别提醒 + 推送设置显示真实状态
+- 报告页日期时间统一用 created_at(真UTC) + formatDateTime
+- 趋势股评分和业绩预测卡片替换 mock 为真实 API 数据
+- uni-text 样式区分（行情红/日期绿/已更新蓝）+ 事件文本两行省略
+- agent-report 概览进详情后返回键直接回首页的问题修复
+
+### 新增
+- Agent 报告概览页：双模式设计（概览模式显示4张Agent简报卡片，详情模式显示单报告）
+- 趋势股评分 AI 分析报告页（trend-score-report.vue）+ 列表页入口
+- 早点听播报页重构为结构化早晚报（方案四：分段式布局）
+- 底部 Tab 从 4Tab 重构为 3Tab（早点听/选股/提醒）
+- 异动捕手新模块页面 + 个股情报路由改名
+- 长线风口接入后端 API + 板块详情子页面拆分
+- H5 页面固定 9:16 长宽比
+
+---
+
 ## [changer] 2026-07-18 — 晨报/复盘报告卡片模型重构 + 事件适配层增强
 **开发者**: 37588
 

@@ -1,4 +1,5 @@
 import { computed, type Ref } from 'vue'
+import type { TrendScoreData } from '@/shared/api/modules/stock'
 
 interface CuratedProfile {
   code: string
@@ -263,7 +264,7 @@ export function extractTagsFromArray(arr: (string | TagItem | { tag?: string; de
 export function useStockAiAnalysis(
   symbolRef: Ref<string>,
   quoteRef: Ref<{ name?: string; industry?: string } | null>,
-  trendScoreDataRef?: Ref<any | null>
+  trendScoreDataRef?: Ref<TrendScoreData | null>
 ) {
   const curatedProfile = computed(() => getCuratedStockProfile(symbolRef.value))
   const profileScore = computed(() => Number(curatedProfile.value?.aiScore || 78))

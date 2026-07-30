@@ -165,13 +165,13 @@ const MEDIA_NAME_BY_DOMAIN: Readonly<Record<string, string>> = {
 function buildSourceInfo(source: string): { name: string; url?: string } | undefined {
   if (!source) return undefined
   if (!/^https?:\/\//i.test(source)) return { name: source }
-  try {
-    const url = new URL(source)
-    const domain = url.hostname.toLowerCase().replace(/^www\./, '')
+  // 使用正则替代 new URL()，兼容 App/小程序环境（无 URL 全局对象）
+  const match = source.match(/^https?:\/\/([^/?#]+)/i)
+  if (match) {
+    const domain = match[1].toLowerCase().replace(/^www\./, '')
     return { name: MEDIA_NAME_BY_DOMAIN[domain] ?? domain, url: source }
-  } catch {
-    return { name: source }
   }
+  return { name: source }
 }
 
 /**

@@ -13,13 +13,19 @@
           </view>
           <text class="insight-card-more">›</text>
         </view>
-        <view class="insight-preview">
+        <view v-if="trendScoreLoading" class="insight-preview insight-preview--state">
+          <text class="preview-state">评分数据加载中…</text>
+        </view>
+        <view v-else-if="trendScorePreview.length" class="insight-preview">
           <view v-for="(item, idx) in trendScorePreview" :key="idx" class="preview-item">
             <text class="preview-rank preview-rank--trend">{{ idx + 1 }}</text>
             <text class="preview-name">{{ item.name }}</text>
             <text class="preview-score">{{ item.score }}分</text>
             <text :class="['preview-trend', item.trend === 'up' ? 'up' : 'down']">{{ item.trend === 'up' ? '↑' : '↓' }}</text>
           </view>
+        </view>
+        <view v-else class="insight-preview insight-preview--state">
+          <text class="preview-state">{{ trendScoreError || '暂无趋势股评分数据' }}</text>
         </view>
       </view>
 
@@ -62,12 +68,18 @@
           </view>
           <text class="insight-card-more">›</text>
         </view>
-        <view class="insight-preview">
+        <view v-if="forecastLoading" class="insight-preview insight-preview--state">
+          <text class="preview-state">预测数据加载中…</text>
+        </view>
+        <view v-else-if="forecastPreview.length" class="insight-preview">
           <view v-for="(item, idx) in forecastPreview" :key="idx" class="preview-item">
             <text class="preview-name">{{ item.name }}</text>
             <text class="preview-tag preview-tag--forecast">{{ item.label }}</text>
             <text :class="['preview-trend', item.growth.startsWith('+') || item.growth.startsWith('0') ? 'up' : 'down']">{{ item.growth }}</text>
           </view>
+        </view>
+        <view v-else class="insight-preview insight-preview--state">
+          <text class="preview-state">{{ forecastError || '暂无业绩预测数据' }}</text>
         </view>
       </view>
     </view>
@@ -78,12 +90,41 @@
 import { onMounted, ref } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi, type HotBurstSignal } from '@/shared/api/modules/stock'
+import { trendScoreApi, type TrendScoreListItem } from '@/shared/api/modules/trend-score'
 
-const trendScorePreview = ref([
-  { name: '贵州茅台', score: 92, trend: 'up' },
-  { name: '宁德时代', score: 88, trend: 'down' },
-  { name: '中国平安', score: 85, trend: 'up' },
-])
+// ===== 趋势股评分预览 =====
+interface TrendScorePreviewItem {
+  name: string
+  score: number
+  trend: 'up' | 'down'
+}
+
+const trendScorePreview = ref<TrendScorePreviewItem[]>([])
+const trendScoreLoading = ref(true)
+const trendScoreError = ref('')
+
+/**
+ * 加载趋势股评分预览：取评分最高的前3只股票
+ * trend 字段通过对比前后两条评分的变化方向确定（简化处理：score >= 80 视为上升）
+ */
+async function loadTrendScorePreview() {
+  trendScoreLoading.value = true
+  trendScoreError.value = ''
+  try {
+    const items = await trendScoreApi.getTop(10)
+    const list: TrendScoreListItem[] = Array.isArray(items) ? items : (items as any)?.list ?? []
+    trendScorePreview.value = list.slice(0, 3).map(item => ({
+      name: item.name || item.symbol,
+      score: Math.round(item.score),
+      trend: (item.score >= 80 ? 'up' : 'down') as 'up' | 'down',
+    }))
+  } catch {
+    trendScorePreview.value = []
+    trendScoreError.value = '评分数据加载失败'
+  } finally {
+    trendScoreLoading.value = false
+  }
+}
 
 const hotBurstPreview = ref<{ symbol: string; name: string; level: string }[]>([])
 const hotBurstLoading = ref(true)
@@ -126,11 +167,105 @@ async function loadHotBurstPreview() {
   }
 }
 
-const forecastPreview = ref([
-  { name: '贵州茅台', label: '净利润预测 386亿', growth: '+15.3%' },
-  { name: '宁德时代', label: '净利润预测 128亿', growth: '+22.1%' },
-  { name: '比亚迪', label: '营收预测 4200亿', growth: '-2.4%' },
-])
+// ===== 业绩预测预览 =====
+interface ForecastPreviewItem {
+  name: string
+  label: string
+  growth: string
+}
+
+const forecastPreview = ref<ForecastPreviewItem[]>([])
+const forecastLoading = ref(true)
+const forecastError = ref('')
+
+interface RawForecastItem {
+  ['股票代码']?: string
+  ['股票简称']?: string
+  ['净利润预测']?: string
+  ['净利润同比(%)']?: number | string
+  ['EPS预测']?: string
+  ['更新时间']?: string
+  update_time?: string
+  updateTime?: string
+}
+
+function formatGrowth(val: number | string | undefined): string {
+  if (val === null || val === undefined || val === '') return '--'
+  const num = typeof val === 'number' ? val : Number(val)
+  if (!Number.isFinite(num)) return '--'
+  const prefix = num > 0 ? '+' : ''
+  return `${prefix}${num.toFixed(2)}%`
+}
+
+function getDateFromUpdateTime(timeStr: string | undefined): string {
+  if (!timeStr) return ''
+  // ISO 字符串如 "2026-07-16T19:23:26.259Z" 或 "2026-07-16"
+  return timeStr.split('T')[0]
+}
+
+/**
+ * 加载业绩预测预览：
+ * 1. 优先取当天更新的股票，按净利润增长降序取前3
+ * 2. 如果当天不足3条，从最近更新的一天补充
+ * 3. 如果仍不足3条，从更前一天补充，直到满3条或无数据
+ */
+async function loadForecastPreview() {
+  forecastLoading.value = true
+  forecastError.value = ''
+  try {
+    const res: any = await stockApi.getProfitForecastList({
+      page: 1,
+      pageSize: 200,
+      sortBy: 'net_profit_growth',
+      sortOrder: 'desc',
+    })
+    const items: RawForecastItem[] = res?.['盈利预测列表'] || res?.list || res?.items || []
+    if (!items.length) {
+      forecastPreview.value = []
+      return
+    }
+
+    // 按更新日期分组（日期降序排列）
+    const grouped = new Map<string, RawForecastItem[]>()
+    for (const item of items) {
+      const date = getDateFromUpdateTime(item['更新时间'] || item.update_time || item.updateTime)
+      if (!date) continue
+      if (!grouped.has(date)) grouped.set(date, [])
+      grouped.get(date)!.push(item)
+    }
+
+    // 日期降序排列
+    const sortedDates = [...grouped.keys()].sort((a, b) => b.localeCompare(a))
+
+    // 按日期顺序取数据：每组内按净利润增长降序，直到满3条
+    const selected: RawForecastItem[] = []
+    for (const date of sortedDates) {
+      if (selected.length >= 3) break
+      const dayItems = grouped.get(date)!
+        .slice()
+        .sort((a, b) => {
+          const av = a['净利润同比(%)'] as number | undefined
+          const bv = b['净利润同比(%)'] as number | undefined
+          return (bv ?? -Infinity) - (av ?? -Infinity)
+        })
+      for (const item of dayItems) {
+        if (selected.length >= 3) break
+        selected.push(item)
+      }
+    }
+
+    forecastPreview.value = selected.map(item => ({
+      name: item['股票简称'] || item['股票代码'] || '--',
+      label: `净利润预测 ${item['净利润预测'] || '--'}`,
+      growth: formatGrowth(item['净利润同比(%)']),
+    }))
+  } catch {
+    forecastPreview.value = []
+    forecastError.value = '预测数据加载失败'
+  } finally {
+    forecastLoading.value = false
+  }
+}
 
 function goTrendScore() {
   uni.navigateTo({ url: '/modules/analytics/pages/trend-score' })
@@ -148,6 +283,8 @@ function goForecast() {
 
 onMounted(() => {
   loadHotBurstPreview()
+  loadTrendScorePreview()
+  loadForecastPreview()
 })
 </script>
 
@@ -304,6 +441,7 @@ onMounted(() => {
   font-weight: 500;
   flex: 1;
   min-width: 0;
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

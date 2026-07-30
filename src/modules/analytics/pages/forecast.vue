@@ -88,7 +88,6 @@
               <text class="stock-name">{{ item.name }}</text>
               <view class="code-rating-row">
                 <text class="stock-code">{{ item.code }}</text>
-                <text :class="['rating-tag', ratingClass(item.rating)]">{{ item.rating }}</text>
               </view>
             </view>
             <view class="data-cols">
@@ -106,7 +105,7 @@
           <view class="divider" />
 
           <view class="meta-row">
-            <text class="update-time">更新时间：{{ item.updateTime }}</text>
+            <text class="update-time">更新时间：{{ formatShanghaiClock(item.updateTime) }}</text>
             <view class="institution-info">
               <text class="info-label">机构</text>
               <text class="institution-value">{{ item.institutionCount }}家</text>
@@ -126,6 +125,7 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
+import { formatShanghaiClock } from '@/shared/utils/datetime'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
@@ -138,7 +138,6 @@ interface ForecastItem {
   netProfitGrowth: string
   eps: string
   epsGrowth: string
-  rating: string
   institutionCount: number
   updateTime: string
 }
@@ -162,7 +161,7 @@ interface RawForecastItem {
 }
 
 const keyword = ref('')
-const activeSort = ref('net_profit_forecast')
+const activeSort = ref('update_time')
 const sortOrder = ref('desc')
 const loading = ref(false)
 const loadingMore = ref(false)
@@ -256,7 +255,6 @@ async function fetchData(append = false) {
       netProfitGrowth: formatNetProfitGrowth(item['净利润同比(%)']),
       eps: item['EPS预测'] || '--',
       epsGrowth: item['EPS同比'] || '--',
-      rating: '--',
       institutionCount: item['机构数量'] || 0,
       updateTime: item['更新时间'] || item.update_time || item.updateTime || '--',
     }))
@@ -305,14 +303,6 @@ function loadMore() {
 function retry() {
   error.value = false
   fetchData(false)
-}
-
-function ratingClass(rating?: string): string {
-  if (!rating) return ''
-  if (rating.includes('买入') || rating.includes('增持') || rating.includes('推荐')) return 'rating-buy'
-  if (rating.includes('持有') || rating.includes('中性')) return 'rating-hold'
-  if (rating.includes('卖出') || rating.includes('减持')) return 'rating-sell'
-  return ''
 }
 
 function formatNetProfitGrowth(val: any): string {
@@ -497,6 +487,7 @@ onShow(() => {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
+  padding: 0 24rpx 24rpx;
 }
 
 .forecast-card {
@@ -564,17 +555,6 @@ onShow(() => {
   align-items: center;
   gap: 8rpx;
   margin-top: 2rpx;
-}
-
-.rating-tag {
-  font-size: 18rpx;
-  font-weight: 500;
-  padding: 2rpx 10rpx;
-  border-radius: 6rpx;
-
-  &.rating-buy { color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
-  &.rating-hold { color: #f59f0b; background: rgba(245, 158, 11, 0.1); }
-  &.rating-sell { color: #22c55e; background: rgba(34, 197, 94, 0.1); }
 }
 
 .col-main {

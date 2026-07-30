@@ -1711,8 +1711,6 @@ function goChat() {
 
 .page-detail {
   padding: 24rpx;
-  padding-bottom: calc(220rpx + env(safe-area-inset-bottom));
-  min-height: 100vh;
   background: #f5f7fa;
   box-sizing: border-box;
   width: 100%;
@@ -3180,6 +3178,7 @@ function goChat() {
   display: flex;
   align-items: center;
   gap: 20rpx;
+  margin-top: 32rpx;
   padding: 28rpx;
   background: linear-gradient(135deg, rgba(77, 124, 254, 0.1), rgba(99, 102, 241, 0.05));
   border: 1rpx solid rgba(77, 124, 254, 0.2);

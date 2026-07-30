@@ -3,6 +3,7 @@
  * 复用现有 aistock-api 接口定义，仅调整路径前缀
  */
 import request from '../request'
+import { isInvalidValue } from '@/shared/utils/format'
 
 export interface StockQuote {
   symbol: string
@@ -25,6 +26,92 @@ export interface KLineItem {
   high: number
   low: number
   volume: number
+}
+
+// ---- 趋势股评分接口类型 ----
+export interface TrendIndicator {
+  name: string
+  key: string
+  value: string
+  score: number
+}
+
+export interface TrendSubDimension {
+  name: string
+  weight: number
+  score: number
+  indicators: TrendIndicator[]
+}
+
+export interface TrendDimension {
+  name: string
+  weight: number
+  score: number
+  indicators: TrendIndicator[]
+  subDimensions?: TrendSubDimension[]
+  detail?: Record<string, unknown>
+}
+
+export interface TrendScoreData {
+  vetoed: boolean
+  reasons?: string[]
+  symbol?: string
+  score: number
+  label: string
+  expectedMultiple: string
+  description: string
+  aiConclusion: string
+  dimScores: number[]
+  dimensions: TrendDimension[]
+  updatedAt: string
+  scoreDate: string
+  rawData: unknown
+}
+
+// ---- 业绩预测接口类型 ----
+export interface ForecastPrediction {
+  year: string
+  netProfit: string | number
+  growth: number | string
+}
+
+export interface ForecastData {
+  symbol: string
+  summary: string
+  updateTime: string
+  netProfitYoy: number | null
+  predictions: ForecastPrediction[]
+  detailIndicators: Record<string, unknown>[]
+  epsList: Record<string, unknown>[]
+  profitList: Record<string, unknown>[]
+  rawData: unknown
+}
+
+// ---- 股票基础信息接口类型 ----
+export interface StockInfo {
+  name: string
+  symbol: string
+  market: string
+  industry: string
+  regionBoard: string
+  industryTagId: string | null
+  regionBoardTagId: string | null
+  listingDate: string
+  totalShares: number | null
+  floatShares: number | null
+  marketCap: number | null
+  floatMarketCap: number | null
+}
+
+// ---- 个股新闻接口类型 ----
+export interface StockNewsItem {
+  id: string
+  title: string
+  summary: string
+  content: string
+  url: string
+  source: string
+  publishTime: string
 }
 
 export interface FavoriteStock {
@@ -186,42 +273,45 @@ export const stockApi = {
 
   /** 获取个股实时行情（activity 级别，含完整数据） */
   getQuote(symbol: string) {
-    return request.get('/cn/stock/quotes/activity', { params: { symbols: symbol } }).then((res: any) => {
-      const quote = res?.行情?.[0] || res?.data?.行情?.[0] || null
+    return request.get('/cn/stock/quotes/activity', { params: { symbols: symbol } }).then((res: Record<string, unknown>) => {
+      const data = (res.data as Record<string, unknown>) || res
+      const quotes = (data['行情'] as Record<string, unknown>[]) || []
+      const quote = quotes[0]
       if (!quote) return null
       return {
-        symbol: quote['股票代码'] || symbol,
-        name: quote['股票简称'] || '',
-        price: quote['最新价'] || 0,
-        change: quote['涨跌额'] || 0,
-        changePercent: quote['涨跌幅'] || 0,
-        open: quote['今开价'] || 0,
-        high: quote['最高价'] || 0,
-        low: quote['最低价'] || 0,
-        prevClose: quote['昨收价'] || 0,
-        volume: quote['成交量'] || 0,
-        amount: quote['成交额'] || 0,
-        turnoverRate: quote['换手率'] || 0,
-        peRatio: quote['市盈率'] || 0,
-        pbRatio: quote['市净率'] || 0,
-        amplitude: quote['振幅'] || 0,
-        avgPrice: quote['均价'] || 0,
-        limitUp: quote['涨停价'] || 0,
-        limitDown: quote['跌停价'] || 0,
-        volumeRatio: quote['量比'] || 0,
+        symbol: String(quote['股票代码'] || symbol),
+        name: String(quote['股票简称'] || ''),
+        price: Number(quote['最新价']) || 0,
+        change: Number(quote['涨跌额']) || 0,
+        changePercent: Number(quote['涨跌幅']) || 0,
+        open: Number(quote['今开价']) || 0,
+        high: Number(quote['最高价']) || 0,
+        low: Number(quote['最低价']) || 0,
+        prevClose: Number(quote['昨收价']) || 0,
+        volume: Number(quote['成交量']) || 0,
+        amount: Number(quote['成交额']) || 0,
+        turnoverRate: Number(quote['换手率']) || 0,
+        peRatio: Number(quote['市盈率']) || 0,
+        pbRatio: Number(quote['市净率']) || 0,
+        amplitude: Number(quote['振幅']) || 0,
+        avgPrice: Number(quote['均价']) || 0,
+        limitUp: Number(quote['涨停价']) || 0,
+        limitDown: Number(quote['跌停价']) || 0,
+        volumeRatio: Number(quote['量比']) || 0,
       }
     })
   },
 
   /** 批量获取核心行情（返回适配后的数组） */
   getCoreQuotes(symbols: string[]) {
-    return request.get('/cn/stock/quotes/core', { params: { symbols: symbols.join(',') } }).then((res: any) => {
-      const list = res?.行情 || res?.data?.行情 || []
-      return list.map((q: any) => ({
-        symbol: q['股票代码'] || '',
-        name: q['股票简称'] || '',
-        price: q['最新价'] || 0,
-        changePercent: q['涨跌幅'] || 0,
+    return request.get('/cn/stock/quotes/core', { params: { symbols: symbols.join(',') } }).then((res: Record<string, unknown>) => {
+      const data = (res.data as Record<string, unknown>) || res
+      const list = (data['行情'] as Record<string, unknown>[]) || []
+      return list.map((q: Record<string, unknown>) => ({
+        symbol: String(q['股票代码'] || ''),
+        name: String(q['股票简称'] || ''),
+        price: Number(q['最新价']) || 0,
+        changePercent: Number(q['涨跌幅']) || 0,
       }))
     })
   },
@@ -234,19 +324,24 @@ export const stockApi = {
       yearly: 103,
     }
     const klt = kltMap[params?.period || 'daily'] || 101
-    return request.get<KLineItem[]>('/cn/stock/quotes/kline', {
+    return request.get<Record<string, unknown>>('/cn/stock/quotes/kline', {
       params: { symbol, klt, fqt: 1, limit: params?.count || 120 }
-    }).then((res: any) => {
-      const payload = res?.data || res
-      const klines = payload?.['K线'] || payload?.klines || res?.['K线'] || res?.klines || []
+    }).then((res: Record<string, unknown>) => {
+      const data = (res.data as Record<string, unknown>) || res
+      const payload = (data.data as Record<string, unknown>) || data
+      const klines = (payload['K线'] as Record<string, unknown>[])
+        || (payload.klines as Record<string, unknown>[])
+        || (data['K线'] as Record<string, unknown>[])
+        || (data.klines as Record<string, unknown>[])
+        || []
       if (!Array.isArray(klines)) return []
-      const mapped = klines.map((k: any) => ({
-        date: k['时间'] || k.date || '',
-        open: Number(k['开盘价'] ?? k.open ?? 0),
-        close: Number(k['收盘价'] ?? k.close ?? 0),
-        high: Number(k['最高价'] ?? k.high ?? 0),
-        low: Number(k['最低价'] ?? k.low ?? 0),
-        volume: Number(k['成交量'] ?? k.volume ?? 0),
+      const mapped = klines.map((k: Record<string, unknown>) => ({
+        date: String(k['时间'] ?? k['date'] ?? ''),
+        open: Number(k['开盘价'] ?? k['open'] ?? 0),
+        close: Number(k['收盘价'] ?? k['close'] ?? 0),
+        high: Number(k['最高价'] ?? k['high'] ?? 0),
+        low: Number(k['最低价'] ?? k['low'] ?? 0),
+        volume: Number(k['成交量'] ?? k['volume'] ?? 0),
       }))
       return mapped
     })
@@ -254,7 +349,7 @@ export const stockApi = {
 
   /** 获取资金流向（已归一化） */
   getCapitalFlow(symbol: string) {
-    return request.get(`/cn/stocks/${symbol}/capital-flow`).then((res: any) => res || null)
+    return request.get(`/cn/stocks/${symbol}/capital-flow`).then((res: Record<string, unknown>) => res || null)
   },
 
   /** 获取个股新闻 */
@@ -264,7 +359,7 @@ export const stockApi = {
 
   /** 获取趋势股评分（四维：技术面/行业赛道景气/消息面催化/基本面，含一票否决检查） */
   getTrendScore(symbol: string) {
-    return request.get(`/cn/stocks/${symbol}/trend-score`).then((res: any) => normalizeTrendScore(res))
+    return request.get(`/cn/stocks/${symbol}/trend-score`).then((res: Record<string, unknown>) => normalizeTrendScore(res))
   },
 
   /** 获取板块龙头（指定板块 code） */
@@ -291,26 +386,26 @@ export const stockApi = {
 
   /** 获取个股异动事件（重磅消息） */
   getTrendEvents(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
-    return request.get('/cn/stock-monitors/events', { params }).then((res: any) => res)
+    return request.get('/cn/stock-monitors/events', { params }).then((res: Record<string, unknown>) => res)
   },
 
   /** 获取财联社头条新闻 */
   getNewsHeadlines() {
-    return request.get('/news/headlines').then((res: any) => res)
+    return request.get('/news/headlines').then((res: Record<string, unknown>) => res)
   },
 
   /** 获取新闻详情 */
   getNewsDetail(newsId: string) {
-    return request.get(`/news/${newsId}`).then((res: any) => {
-      const item = res?.data || res
+    return request.get(`/news/${newsId}`).then((res: Record<string, unknown>) => {
+      const item = (res.data as Record<string, unknown>) || res
       return {
         id: newsId,
-        title: item['标题'] || item.title || '',
-        content: item['正文'] || item.content || '',
-        summary: item['摘要'] || item.summary || '',
-        publishTime: item['发布时间'] || item.publish_time || '',
-        url: item['原文链接'] || item.url || '',
-        source: item['来源'] || item.source || '财联社',
+        title: String(item['标题'] || item['title'] || ''),
+        content: String(item['正文'] || item['content'] || ''),
+        summary: String(item['摘要'] || item['summary'] || ''),
+        publishTime: String(item['发布时间'] || item['publish_time'] || ''),
+        url: String(item['原文链接'] || item['url'] || ''),
+        source: String(item['来源'] || item['source'] || '财联社'),
       }
     })
   },
@@ -342,70 +437,73 @@ export const stockApi = {
 
   /** 获取推送历史 */
   getPushHistory(params?: { date?: string }) {
-    return request.get<{ items: PushHistoryItem[] }>('/potential-stocks/push-history', { params }).then((res: any) => res)
+    return request.get<Record<string, unknown>>('/potential-stocks/push-history', { params }).then((res: Record<string, unknown>) => res)
   },
 
   /** 获取半年报关键财务数据 */
   getSemiAnnualReport(symbol: string) {
-    return request.get(`/cn/stocks/${symbol}/semi-annual-report`).then((res: any) => res?.data || res)
+    return request.get(`/cn/stocks/${symbol}/semi-annual-report`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 获取个股 AI 资讯分析 */
   getStockAnalysis(symbol: string) {
-    return request.get(`/cn/stocks/${symbol}/analysis`).then((res: any) => res?.data || res)
+    return request.get(`/cn/stocks/${symbol}/analysis`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 创建个股 AI 资讯分析（触发后端生成） */
   createStockAnalysis(symbol: string) {
-    return request.post(`/cn/stocks/${symbol}/analysis`).then((res: any) => res?.data || res)
+    return request.post(`/cn/stocks/${symbol}/analysis`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 获取个股 AI 分析历史 */
   getStockAnalysisHistory(symbol: string, params?: { page?: number; pageSize?: number }) {
-    return request.get(`/cn/stocks/${symbol}/analysis/history`, { params }).then((res: any) => res?.data || res)
+    return request.get(`/cn/stocks/${symbol}/analysis/history`, { params }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 获取股票基础信息（行业、地域板块、上市时间、股本、市值等） */
   getStockInfos(symbol: string) {
-    return request.get('/cn/stock/infos', { params: { symbols: symbol } }).then((res: any) => {
-      const info = res?.['股票信息']?.[0] || res?.data?.['股票信息']?.[0] || null
+    return request.get('/cn/stock/infos', { params: { symbols: symbol } }).then((res: Record<string, unknown>) => {
+      const data = (res.data as Record<string, unknown>) || res
+      const infos = (data['股票信息'] as Record<string, unknown>[]) || []
+      const info = infos[0]
       if (!info) return null
       return {
-        name: info['股票简称'] || '',
-        symbol: info['股票代码'] || symbol,
-        market: info['市场代码'] || '',
-        industry: info['所属行业'] || info['行业板块'] || '',
-        regionBoard: info['地域板块'] || '',
-        industryTagId: info['行业板块ID'] || null,
-        regionBoardTagId: info['地域板块ID'] || null,
-        listingDate: info['上市时间'] || '',
-        totalShares: info['总股本'] || null,
-        floatShares: info['流通股'] || null,
-        marketCap: info['总市值'] || null,
-        floatMarketCap: info['流通市值'] || null,
+        name: String(info['股票简称'] || ''),
+        symbol: String(info['股票代码'] || symbol),
+        market: String(info['市场代码'] || ''),
+        industry: String(info['所属行业'] || info['行业板块'] || ''),
+        regionBoard: String(info['地域板块'] || ''),
+        industryTagId: (info['行业板块ID'] as string | null) || null,
+        regionBoardTagId: (info['地域板块ID'] as string | null) || null,
+        listingDate: String(info['上市时间'] || ''),
+        totalShares: (info['总股本'] as number | null) || null,
+        floatShares: (info['流通股'] as number | null) || null,
+        marketCap: (info['总市值'] as number | null) || null,
+        floatMarketCap: (info['流通市值'] as number | null) || null,
       }
     })
   },
 
   /** 获取业绩预测（GET 只读） */
   getForecast(symbol: string) {
-    return request.get(`/cn/stock/${symbol}/profit-forecast`).then((res: any) => normalizeForecast(res))
+    return request.get(`/cn/stock/${symbol}/profit-forecast`).then((res: Record<string, unknown>) => normalizeForecast(res))
   },
 
   /** 触发更新业绩预测 */
   createForecast(symbol: string) {
-    return request.post(`/cn/stock/${symbol}/profit-forecast`).then((res: any) => normalizeForecast(res))
+    return request.post(`/cn/stock/${symbol}/profit-forecast`).then((res: Record<string, unknown>) => normalizeForecast(res))
   },
 
   /** 强制刷新趋势股评分 */
   refreshTrendScore(symbol: string) {
-    return request.post(`/cn/stocks/${symbol}/trend-score/refresh`).then((res: any) => normalizeTrendScore(res))
+    return request.post(`/cn/stocks/${symbol}/trend-score/refresh`).then((res: Record<string, unknown>) => normalizeTrendScore(res))
   },
 
   /** 获取个股异动事件（趋势风口） */
   getStockEvents(symbol: string, params?: { cycle?: string; limit?: number }) {
-    return request.get(`/cn/trend-hotspots/events/${symbol}`, { params }).then((res: any) => {
-      const events = res?.events || res?.data?.events || []
+    return request.get(`/cn/trend-hotspots/events/${symbol}`, { params }).then((res: Record<string, unknown>) => {
+      const data = (res.data as Record<string, unknown>) || res
+      const events = (data['events'] as unknown[]) || []
       return Array.isArray(events) ? events : []
     })
   },
@@ -430,18 +528,18 @@ export const stockApi = {
   }
 }
 
-function normalizeForecast(res: any): any {
+function normalizeForecast(res: Record<string, unknown> | null): ForecastData | null {
   if (!res) return null
-  const epsList = res['预测年报每股收益'] || res.epsList || []
-  const profitList = res['预测年报净利润'] || res.profitList || []
-  const detailIndicators = res['业绩预测详表_详细指标预测'] || res.predictions || []
+  const epsList = (res['预测年报每股收益'] || res.epsList || []) as Record<string, unknown>[]
+  const profitList = (res['预测年报净利润'] || res.profitList || []) as Record<string, unknown>[]
+  const detailIndicators = (res['业绩预测详表_详细指标预测'] || res.predictions || []) as Record<string, unknown>[]
   // 提取按年份的净利润预测和增长率
-  const predictions = profitList.map((p: any) => {
+  const predictions = profitList.map((p) => {
     const year = String(p['年度'] || p.year || '')
-    const netProfit = p['均值'] || p.mean || '--'
+    const netProfit = (p['均值'] as string | number) || (p.mean as string | number) || '--'
     // 从详表中查找对应年份的净利润增长率
     let growth: number | string = '--'
-    const growthRow = detailIndicators.find((r: any) =>
+    const growthRow = detailIndicators.find((r) =>
       String(r['预测指标'] || r.indicator || '').includes('净利润增长率')
     )
     if (growthRow) {
@@ -455,21 +553,21 @@ function normalizeForecast(res: any): any {
     return { year, netProfit, growth }
   })
   // 生成摘要文本（若无后端摘要）
-  let summary = res['摘要'] || res.summary || ''
+  let summary = (res['摘要'] as string) || (res.summary as string) || ''
   if (!summary && epsList.length > 0 && profitList.length > 0) {
     const first = epsList[0]
-    const year = first['年度'] || first.year || ''
-    const orgCount = first['预测机构数'] || first.orgCount || 0
-    const meanEPS = first['均值'] || first.mean || '--'
-    const profitItem = profitList.find((x: any) => String(x['年度'] || x.year) === String(year))
-    const profitMean = profitItem ? (profitItem['均值'] || profitItem.mean || '--') : '--'
+    const year = String(first['年度'] || first.year || '')
+    const orgCount = (first['预测机构数'] as number) || (first.orgCount as number) || 0
+    const meanEPS = (first['均值'] as string) || (first.mean as string) || '--'
+    const profitItem = profitList.find((x) => String(x['年度'] || x.year) === String(year))
+    const profitMean = profitItem ? ((profitItem['均值'] as string) || (profitItem.mean as string) || '--') : '--'
     summary = `截至${new Date().toISOString().split('T')[0]}，6个月以内共有 ${orgCount} 家机构作出预测；预测每股收益 ${meanEPS} 元，净利润 ${profitMean} 亿元。`
   }
   return {
-    symbol: res['股票代码'] || res.symbol || '',
+    symbol: (res['股票代码'] as string) || (res.symbol as string) || '',
     summary,
-    updateTime: res['更新时间'] || res.update_time || '',
-    netProfitYoy: res['净利润同比(%)'] ?? res.netProfitYoy ?? null,
+    updateTime: (res['更新时间'] as string) || (res.update_time as string) || '',
+    netProfitYoy: (res['净利润同比(%)'] as number) ?? (res.netProfitYoy as number) ?? null,
     predictions,
     detailIndicators,
     epsList,
@@ -479,62 +577,71 @@ function normalizeForecast(res: any): any {
 }
 
 /** 趋势股评分归一化：处理四维结构（技术面/行业赛道景气/消息面催化/基本面），基本面维度含 subDimensions */
-function normalizeTrendScore(res: any): any {
+function normalizeTrendScore(res: Record<string, unknown> | null): TrendScoreData | null {
   if (!res) return null
   // 一票否决
   if (res.vetoed === true) {
-    return { vetoed: true, reasons: res.reasons || [], symbol: res.symbol || '' }
+    return {
+      vetoed: true,
+      reasons: (res.reasons as string[]) || [],
+      symbol: (res.symbol as string) || '',
+      score: 0,
+      label: '',
+      expectedMultiple: '',
+      description: '',
+      aiConclusion: '',
+      dimScores: [],
+      dimensions: [],
+      updatedAt: '',
+      scoreDate: '',
+      rawData: res,
+    }
   }
-  const dimensions = res.dimensions || []
-  const dimScores = res.dimScores || res.dim_scores || dimensions.map((d: any) => d.score || 0)
+  const dimensions = (res.dimensions || []) as Record<string, unknown>[]
+  const dimScores = (res.dimScores as number[]) || (res.dim_scores as number[]) || dimensions.map((d) => (d.score as number) || 0)
   // 清洗指标无效值
-  const cleanIndicators = (inds: any[]) => (inds || []).map((ind: any) => ({
-    name: ind.name || '',
-    key: ind.key || '',
-    value: isInvalidValue(ind.value) ? '--' : (ind.value || '--'),
-    score: ind.score || 0,
+  const cleanIndicators = (inds: Record<string, unknown>[] | undefined): TrendIndicator[] => (inds || []).map((ind) => ({
+    name: (ind.name as string) || '',
+    key: (ind.key as string) || '',
+    value: isInvalidValue(ind.value) ? '--' : (String(ind.value) || '--'),
+    score: (ind.score as number) || 0,
   }))
   return {
     vetoed: false,
     score: Number(res.score) || 0,
-    label: res.label || '',
-    expectedMultiple: res.expectedMultiple || res.expected_multiple || '',
-    description: res.description || '',
-    aiConclusion: res.aiConclusion || res.ai_conclusion || '',
+    label: (res.label as string) || '',
+    expectedMultiple: (res.expectedMultiple as string) || (res.expected_multiple as string) || '',
+    description: (res.description as string) || '',
+    aiConclusion: (res.aiConclusion as string) || (res.ai_conclusion as string) || '',
     dimScores,
-    dimensions: dimensions.map((d: any) => {
-      const dim: any = {
-        name: d.name || '',
-        weight: d.weight || 0,
-        score: d.score || 0,
-        indicators: cleanIndicators(d.indicators),
+    dimensions: dimensions.map((d): TrendDimension => {
+      const dim: TrendDimension = {
+        name: (d.name as string) || '',
+        weight: (d.weight as number) || 0,
+        score: (d.score as number) || 0,
+        indicators: cleanIndicators(d.indicators as Record<string, unknown>[] | undefined),
       }
       // 基本面维度：提取 detail.subDimensions 作为子维度展示
-      const subDims = d.detail?.subDimensions || d.subDimensions
+      const detail = d.detail as Record<string, unknown> | undefined
+      const subDims = (detail?.subDimensions || d.subDimensions) as Record<string, unknown>[] | undefined
       if (Array.isArray(subDims) && subDims.length) {
-        dim.subDimensions = subDims.map((sub: any) => ({
-          name: sub.name || '',
-          weight: sub.weight || 0,
-          score: sub.score || 0,
-          indicators: cleanIndicators(sub.indicators),
+        dim.subDimensions = subDims.map((sub): TrendSubDimension => ({
+          name: (sub.name as string) || '',
+          weight: (sub.weight as number) || 0,
+          score: (sub.score as number) || 0,
+          indicators: cleanIndicators(sub.indicators as Record<string, unknown>[] | undefined),
         }))
       }
       // 提取 detail 中的展示字段（技术面 kline、行业赛道 sectorName 等）
-      if (d.detail) {
-        dim.detail = d.detail
+      if (detail) {
+        dim.detail = detail
       }
       return dim
     }),
-    updatedAt: res.updatedAt || res.updated_at || '',
-    scoreDate: res.scoreDate || res.score_date || '',
+    updatedAt: (res.updatedAt as string) || (res.updated_at as string) || '',
+    scoreDate: (res.scoreDate as string) || (res.score_date as string) || '',
     rawData: res,
   }
-}
-
-function isInvalidValue(val: unknown): boolean {
-  if (val == null) return true
-  const str = String(val).trim()
-  return str === '' || str === '-' || str === '0' || str === '0.0' || str === '0.00' || str === '0%' || str === '0.0%' || str === '0.00%' || str === 'NaN' || str === 'null' || str === 'undefined'
 }
 
 function aggregateYearlyKLines(items: KLineItem[]): KLineItem[] {

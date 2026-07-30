@@ -13,7 +13,7 @@
     </view>
 
     <!-- 中间内容区域：flex 容器包裹 scroll-view 和 footer，参照 SubPageCard -->
-    <view class="sub-page-2-body" :class="{ 'no-chat-bar': noChatBar }">
+    <view class="sub-page-2-body" :class="{ 'no-chat-bar': noChatBar }" :style="bodyStyle">
       <scroll-view
         scroll-y
         class="sub-page-2-content"
@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 
 const props = withDefaults(defineProps<{
@@ -42,6 +42,8 @@ const props = withDefaults(defineProps<{
   /** 副标题或备注，显示在标题下方 */
   subtitle?: string
   cardMarginBottom?: string
+  /** 内容区域底部 padding（用于给 GlobalChatBar 留空间），noChatBar 时自动为 0 */
+  contentPaddingBottom?: string
   /** 当前激活的面板页：'favorites' | 'trade' | '' */
   activePanel?: string
   /** 无历史记录时的回退页面 URL */
@@ -52,10 +54,16 @@ const props = withDefaults(defineProps<{
   title: '',
   subtitle: '',
   cardMarginBottom: '40rpx',
+  contentPaddingBottom: 'calc(148rpx + env(safe-area-inset-bottom))',
   activePanel: '',
   backUrl: '/modules/home/pages/index',
   noChatBar: false,
 })
+
+/** noChatBar 时 padding 为 0，否则使用传入的 contentPaddingBottom */
+const bodyStyle = computed(() =>
+  props.noChatBar ? {} : { paddingBottom: props.contentPaddingBottom }
+)
 
 // 获取真实状态栏高度
 // App 端 zoom:1.2 会放大 padding，需除以 1.2 补偿
@@ -158,18 +166,13 @@ defineExpose({ goBack })
 }
 
 /* 中间内容区域：flex:1 撑满剩余空间，参照 SubPageCard 的 .sub-page-body */
+/* padding-bottom 由 contentPaddingBottom prop 通过 inline style 控制 */
 .sub-page-2-body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* 底部留白：GlobalChatBar 高度（148rpx + 安全区），noChatBar 时无需留白 */
-  padding-bottom: var(--sub2-pad-b, calc(220rpx + env(safe-area-inset-bottom)));
-}
-
-.sub-page-2-body.no-chat-bar {
-  padding-bottom: 0;
 }
 
 /* scroll-view 在 body 容器内 flex:1 撑满，footer 固定在底部 */
