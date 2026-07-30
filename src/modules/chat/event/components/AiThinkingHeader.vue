@@ -3,23 +3,15 @@
     <!-- 第一行：返回 + 标题 -->
     <view class="header-row title-row">
       <view class="back-btn" @tap="handleBack">
-        <text class="back-arrow">←</text>
+        <SvgIcon name="arrow-left-line" size="28rpx" :color="iconArrow" />
       </view>
-      <SvgIcon name="robot-line" size="30rpx" color="#4d7cfe" />
+      <SvgIcon name="robot-line" size="30rpx" :color="iconPrimary" />
       <text class="header-title">AI事件分析</text>
     </view>
 
-    <!-- 第二行：思考日志 bullets -->
-    <view class="header-row logs-row" v-if="!isComplete && thinkingLogs.length">
-      <view v-for="(log, idx) in thinkingLogs" :key="idx" class="log-item" :class="{ active: idx === activeLogIdx, done: idx < activeLogIdx }">
-        <text class="log-dot">{{ idx < activeLogIdx ? '✓' : idx === activeLogIdx ? '●' : '○' }}</text>
-        <text class="log-text">{{ log }}</text>
-      </view>
-      <!-- 额外步骤日志：当前分析步骤名 -->
-      <view class="log-item active" v-if="currentStepText && activeLogIdx >= thinkingLogs.length">
-        <text class="log-dot">●</text>
-        <text class="log-text">{{ currentStepText }}</text>
-      </view>
+    <!-- 第二行：思考日志（Steps 步骤指示器） -->
+    <view class="header-row logs-row" v-if="!isComplete && steps.length">
+      <Steps :steps="steps" :current="activeLogIdx" direction="horizontal" status="process" />
     </view>
 
     <!-- 完成态：简短完成提示 -->
@@ -39,14 +31,16 @@
  * AiThinkingHeader — AI 思考状态头部（sticky）
  *
  * 三行布局：
- * 1. 标题（🤖 AI事件分析）
- * 2. 思考日志（● reading / ✓ done）
+ * 1. 标题（SvgIcon robot-line + AI事件分析）
+ * 2. 思考日志（Steps 步骤指示器：已完成=对勾，当前=进行中，未到=等待）
  * 3. 当前阶段（正在分析：事件理解）
  *
  * Props 全部来自 useAiReasoning 的响应式数据。
+ * 视觉层对齐组件库：SvgIcon 替代字符箭头，Steps 替代手写日志 bullets，颜色用设计令牌。
  */
 import { computed } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import Steps from '@/shared/components/Steps.vue'
 
 type ThinkingPhase = 'idle' | 'reading' | 'identifying' | 'analyzing' | 'done'
 
@@ -70,10 +64,23 @@ const emit = defineEmits<{ back: [] }>()
 
 function handleBack() { emit('back') }
 
+// 设计令牌（SvgIcon 的 color 需具体色值，故用常量映射 $primary / $ink-mute）
+const iconPrimary = '#0b5fff' // $primary
+const iconArrow = '#8a96b0'   // $ink-mute
+
 const phaseMap: Record<string, number> = { reading: 0, identifying: 1, analyzing: 2, done: 99 }
 const activeLogIdx = computed(() => {
   if (props.isComplete) return props.thinkingLogs.length
   return phaseMap[props.phase] ?? -1
+})
+
+/** Steps 步骤项：思考日志 + 当前分析步骤（当游标越过日志末项时追加） */
+const steps = computed(() => {
+  const base = props.thinkingLogs.map(log => ({ title: log }))
+  if (props.currentStepText && activeLogIdx.value >= props.thinkingLogs.length) {
+    base.push({ title: props.currentStepText })
+  }
+  return base
 })
 </script>
 
@@ -104,23 +111,10 @@ const activeLogIdx = computed(() => {
   flex-shrink: 0;
 }
 .back-btn:active { background: rgba(0, 0, 0, 0.08); }
-.back-arrow { font-size: 28rpx; color: var(--ev-text-tertiary); line-height: 1; }
-.header-icon { font-size: 30rpx; line-height: 1; }
 .header-title { font-size: 30rpx; font-weight: 700; color: var(--ev-text-primary); }
 
-/* 第二行：日志 */
-.logs-row { gap: 20rpx; flex-wrap: wrap; margin-bottom: 8rpx; }
-
-.log-item { display: flex; align-items: center; gap: 6rpx; transition: all 0.4s; }
-.log-dot { font-size: 18rpx; color: var(--ev-text-muted); flex-shrink: 0; width: 20rpx; text-align: center; }
-.log-text { font-size: 20rpx; color: var(--ev-text-muted); }
-
-.log-item.active .log-dot { color: var(--ev-accent); animation: pulse 1s ease-in-out infinite; }
-.log-item.active .log-text { color: var(--ev-text-secondary); }
-.log-item.done .log-dot { color: var(--ev-positive); }
-.log-item.done .log-text { color: var(--ev-text-muted); }
-
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+/* 第二行：Steps 日志 */
+.logs-row { margin-bottom: 8rpx; }
 
 /* 完成行 */
 .done-row { margin-bottom: 4rpx; }

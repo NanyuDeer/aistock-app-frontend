@@ -3,7 +3,7 @@
     <!-- 导航栏右侧刷新按钮 -->
     <template #header-right>
       <view class="nav-refresh" @tap="loadTopStocks">
-        <SvgIcon name="refresh-line" size="34rpx" color="#4d7cfe" />
+        <SvgIcon name="refresh-line" size="34rpx" color="#0b5fff" />
       </view>
     </template>
 
@@ -175,7 +175,7 @@ onShow(() => {
   align-items: center;
   padding: 24rpx 32rpx;
   margin: 0 $spacing-base $spacing-base;
-  background: linear-gradient(135deg, #4d7cfe 0%, #6366f1 100%);
+  background: linear-gradient(135deg, $primary 0%, $primary-600 100%);
   border-radius: $radius-base;
   box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
 }

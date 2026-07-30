@@ -1,10 +1,14 @@
 <template>
   <view class="transmission-analysis" v-if="data">
+    <!-- 顶部步骤指示器（Steps） -->
+    <view class="steps-wrap">
+      <Steps :steps="stepItems" :current="stepItems.length - 1" direction="horizontal" status="finish" />
+    </view>
+
     <!-- 步骤1: 影响机制 -->
     <view class="inner-step">
       <view class="inner-step-head">
-        <text class="inner-step-num">步骤1</text>
-        <text class="inner-step-title">分析事件机制</text>
+        <text class="inner-step-title">{{ stepItems[0].title }}</text>
       </view>
       <view class="mechanism-text">{{ data.mechanism }}</view>
       <view class="core-industry" v-if="data.coreIndustry">
@@ -18,8 +22,7 @@
     <!-- 步骤2: 关键变量 -->
     <view class="inner-step">
       <view class="inner-step-head">
-        <text class="inner-step-num">步骤2</text>
-        <text class="inner-step-title">识别关键变量</text>
+        <text class="inner-step-title">{{ stepItems[1].title }}</text>
       </view>
       <view class="variable-list" v-if="data.variables.length">
         <view v-for="(v, idx) in data.variables" :key="idx" class="var-row" :class="'var-' + v.direction">
@@ -28,7 +31,7 @@
             <text class="var-direction">{{ v.direction === 'bullish' ? '↑ 正向' : v.direction === 'bearish' ? '↓ 负向' : '→ 中性' }}</text>
           </view>
           <view class="var-strength">
-            <text v-for="s in 5" :key="s" class="var-star" :class="{ filled: s <= Math.round(v.strength * 5) }">★</text>
+            <Rate :modelValue="Math.round(v.strength * 5)" :readonly="true" type="gold" size="18rpx" :gap="2" />
           </view>
           <text class="var-reason">{{ v.explanation }}</text>
         </view>
@@ -38,8 +41,7 @@
     <!-- 步骤3: 产业链传导 -->
     <view class="inner-step">
       <view class="inner-step-head">
-        <text class="inner-step-num">步骤3</text>
-        <text class="inner-step-title">推演产业链影响</text>
+        <text class="inner-step-title">{{ stepItems[2].title }}</text>
       </view>
       <view class="chain-view" v-if="data.chain.length">
         <view v-for="(c, ci) in data.chain" :key="ci" class="chain-node">
@@ -54,9 +56,7 @@
             </view>
             <text class="chain-reason">{{ c.reason }}</text>
             <view class="chain-bar-wrap">
-              <view class="chain-bar-bg">
-                <view class="chain-bar-fill" :class="'fill-' + c.direction" :style="{ width: (c.impactStrength * 100) + '%' }" />
-              </view>
+              <Progress class="chain-progress" :value="Math.round(c.impactStrength * 100)" :status="chainProgressStatus(c.direction)" />
               <text class="chain-pct">{{ Math.round(c.impactStrength * 100) }}%</text>
             </view>
           </view>
@@ -66,8 +66,7 @@
     <!-- 步骤4: 产业链关系图谱 -->
     <view class="inner-step">
       <view class="inner-step-head">
-        <text class="inner-step-num">步骤4</text>
-        <text class="inner-step-title">事件传导产业链关系图谱</text>
+        <text class="inner-step-title">{{ stepItems[3].title }}</text>
       </view>
       <EventTransmissionGraph :data="data" :event-title="eventTitle" />
     </view>
@@ -81,9 +80,14 @@
  * 步骤1 分析事件机制 → 步骤2 识别关键变量 → 步骤3 推演产业链影响 → 步骤4 产业链图谱
  *
  * Props: data — TransmissionAnalysis, eventTitle — 事件标题
+ *
+ * 视觉层对齐组件库：Steps 步骤指示器 + Rate 强度星级 + Progress 传导强度进度条。
  */
-import type { TransmissionAnalysis } from '../../types'
+import type { TransmissionAnalysis, TransmissionChainNode } from '../../types'
 import EventTransmissionGraph from '../EventTransmissionGraph.vue'
+import Steps from '@/shared/components/Steps.vue'
+import Rate from '@/shared/components/Rate.vue'
+import Progress from '@/shared/components/Progress.vue'
 
 interface Props {
   data?: TransmissionAnalysis | null
@@ -91,12 +95,34 @@ interface Props {
 }
 
 defineProps<Props>()
+
+/** 步骤标题（Steps 与各分区块共用，避免重复） */
+const stepItems = [
+  { title: '分析事件机制' },
+  { title: '识别关键变量' },
+  { title: '推演产业链影响' },
+  { title: '事件传导产业链关系图谱' },
+]
+
+/** 传导链方向 → Progress status（A 股红涨绿跌：bullish=利好=红 danger，bearish=利空=绿 success） */
+function chainProgressStatus(direction: TransmissionChainNode['direction']): 'primary' | 'success' | 'danger' {
+  if (direction === 'bullish') return 'danger'
+  if (direction === 'bearish') return 'success'
+  return 'primary'
+}
 </script>
 
 <style scoped>
 .transmission-analysis {
   display: flex;
   flex-direction: column;
+}
+
+/* ===== 顶部步骤指示器 ===== */
+.steps-wrap {
+  padding: 8rpx 0 20rpx;
+  border-bottom: 1px solid var(--ev-border-light);
+  margin-bottom: 8rpx;
 }
 
 /* ===== 内部步骤 ===== */
@@ -111,15 +137,6 @@ defineProps<Props>()
   align-items: center;
   gap: 10rpx;
   margin-bottom: 14rpx;
-}
-
-.inner-step-num {
-  font-size: 20rpx;
-  font-weight: 700;
-  padding: 2rpx 12rpx;
-  border-radius: 9999rpx;
-  background: var(--ev-accent-soft);
-  color: var(--ev-accent);
 }
 
 .inner-step-title {
@@ -170,10 +187,7 @@ defineProps<Props>()
 .var-bearish .var-direction { color: var(--ev-positive); }
 .var-neutral .var-direction { color: var(--ev-text-tertiary); }
 
-.var-strength { display: flex; gap: 2rpx; }
-.var-star { font-size: 18rpx; color: var(--ev-border); }
-.var-star.filled { color: var(--ev-warning); }
-
+.var-strength { display: flex; align-items: center; }
 .var-reason { font-size: 20rpx; color: var(--ev-text-muted); line-height: 1.5; }
 
 /* ===== 步骤3: 传导链 ===== */
@@ -200,10 +214,7 @@ defineProps<Props>()
 .chain-reason { font-size: 20rpx; color: var(--ev-text-muted); line-height: 1.45; display: block; margin-bottom: 6rpx; }
 
 .chain-bar-wrap { display: flex; align-items: center; gap: 8rpx; }
-.chain-bar-bg { flex: 1; height: 4rpx; border-radius: 2rpx; background: var(--ev-border); overflow: hidden; }
-.chain-bar-fill { height: 100%; border-radius: 2rpx; }
-.fill-bullish { background: var(--ev-negative); }
-.fill-bearish { background: var(--ev-positive); }
-.fill-neutral { background: var(--ev-text-muted); }
-.chain-pct { font-size: 18rpx; color: var(--ev-text-muted); }
+/* Progress 组件在 flex 容器中占满剩余宽度 */
+.chain-bar-wrap :deep(.as-progress) { flex: 1; }
+.chain-pct { font-size: 18rpx; color: var(--ev-text-muted); flex-shrink: 0; }
 </style>

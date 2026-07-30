@@ -1,31 +1,27 @@
 <template>
   <SubPageCard title="事件传导">
     <view class="event-list-content">
-      <!-- Global Importance 双榜单 -->
-      <view v-if="focusEvents.length > 0" class="focus-section">
-        <view class="focus-cards">
-          <view
-            v-for="evt in focusEvents"
-            :key="evt.eventId"
-            class="focus-card-wrapper"
-          >
-            <text class="card-title">
-              {{ evt.type === 'current_focus' ? '当前焦点事件' : '重大持续事件' }}
-            </text>
-            <EventHeadlineCard
-              :type="evt.direction"
-              :title="evt.title"
-              :importance="evt.importance"
-              :industries="evt.industries"
-              :event-id="evt.eventId"
-              @click="handleHeadlineClick"
-            />
-          </view>
+      <!-- AI关注焦点区域 -->
+      <view v-if="focusEvents.length > 0" class="ai-focus-section">
+        <text class="section-title">焦点事件</text>
+        <view class="headline-cards">
+          <EventHeadlineCard
+            v-for="event in focusEvents"
+            :key="event.eventId"
+            :type="event.direction"
+            :title="event.title"
+            :importance="event.importance"
+            :industries="event.industries"
+            :event-id="event.eventId"
+            @click="handleHeadlineClick"
+          />
         </view>
       </view>
 
       <!-- 分类Tab -->
-      <EventTabBar :active="activeType" @change="handleFilterChange" />
+      <scroll-view scroll-x class="tab-scroll" :show-scrollbar="false">
+        <Segmented :modelValue="activeType" :items="tabItems" @change="(v: string | number) => handleFilterChange(String(v))" />
+      </scroll-view>
 
       <!-- 加载中 -->
       <view v-if="loading && events.length === 0" class="state-container">
@@ -88,34 +84,34 @@
  * 支持分类筛选、分页加载、关注事件。
  */
 import { onMounted, ref } from 'vue'
-import type { EventItem, FocusEventViewModel } from '@/modules/chat/event/types'
+import type { EventItem } from '@/modules/chat/event/types'
+import type { FocusEventViewModel } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
 import { getFocusEvents } from '@/modules/chat/event/api/eventService'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import EventTabBar from '@/modules/chat/event/components/EventTabBar.vue'
+import Segmented from '@/shared/components/Segmented.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
+import { EVENT_TYPES } from '@/modules/chat/event/constants'
 
-// ========== Global Importance 双榜单（焦点事件） ==========
+// ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
+const tabItems = [{ label: '全部', value: '全部' }, ...EVENT_TYPES.map(v => ({ label: v, value: v }))]
 
+// ========== 焦点事件（基于 Global Importance 排序，由 eventService 提供） ==========
 const focusEvents = ref<FocusEventViewModel[]>([])
 
 /**
- * 加载 Global Importance 双榜单
- *
- * 数据流：
- *   getFocusEvents() → FocusEventViewModel[]
- *   → v-for 渲染两个 EventHeadlineCard
- *
- * 异常处理：
- *   - GI 无数据 → 返回 []，不展示任何卡片
- *   - 详情查询失败 → 保留 GI 基础字段（eventId/direction/importance）
- *   - 网络异常 → catch 返回 []，不影响下方事件列表
+ * 加载焦点事件：调用 getFocusEvents() 获取 rank=1（当前焦点）和 rank=2（持续影响）的事件
+ * 数据流：getEventList → 筛选 globalImportanceRank → 获取详情 → 转换为 FocusEventViewModel
  */
-async function loadHeadlineEvents() {
-  focusEvents.value = await getFocusEvents()
+async function loadFocusEvents() {
+  try {
+    focusEvents.value = await getFocusEvents()
+  } catch (error) {
+    console.error('加载焦点事件失败:', error)
+  }
 }
 
 // ========== Composables ==========
@@ -138,7 +134,7 @@ const { toggleFollow } = useEventFollow()
 // ========== 生命周期 ==========
 onMounted(() => {
   refresh()
-  loadHeadlineEvents()
+  loadFocusEvents()
 })
 
 // ========== 事件处理 ==========
@@ -184,35 +180,43 @@ async function handleFollow(event: EventItem) {
   padding: 0 32rpx 40rpx;
 }
 
-/* ========== Global Importance 双榜单 ========== */
-.focus-section {
+/* 分类 Tab 滚动容器（Segmented 不自带横向滚动，7 个分类需滚动） */
+.tab-scroll {
+  width: 100%;
+  white-space: nowrap;
+  padding: 16rpx 0 8rpx;
+}
+
+.tab-scroll :deep(.as-segmented) {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+.tab-scroll :deep(.as-segmented__item) {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ========== AI 关注焦点区域 ========== */
+.ai-focus-section {
   margin-bottom: 20rpx;
 }
 
-.focus-cards {
+.section-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin-bottom: 10rpx;
+  letter-spacing: 0.5rpx;
+}
+
+.headline-cards {
   display: flex;
   flex-direction: row;
-  gap: 20rpx;
+  gap: 12rpx;
   align-items: stretch;
-  width: 100%;
-}
-
-.focus-card-wrapper {
-  flex: 1;
-  width: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-}
-
-.card-title {
-  font-size: 22rpx;
-  font-weight: 700;
-  color: #6B7280;
-  line-height: 1.3;
-  white-space: nowrap;
-  text-align: center;
 }
 
 .event-list {

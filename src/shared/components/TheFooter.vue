@@ -1,11 +1,19 @@
+/**
+ * TheFooter 组件 — 同步自 aistock-component-lib/src/components/Footer.vue
+ * 同步时间：2026-07-28
+ * 向后兼容：保留 text prop，新增 default slot 支持自定义内容
+ */
 <template>
   <view class="as-footer">
-    <text class="as-footer-text">{{ text }}</text>
+    <slot>
+      <text class="as-footer__text">{{ text }}</text>
+    </slot>
   </view>
 </template>
 
 <script setup lang="ts">
 withDefaults(defineProps<{
+  /** 页脚文案 */
   text?: string
 }>(), {
   text: 'AI Stock · 智能投顾'
@@ -14,13 +22,14 @@ withDefaults(defineProps<{
 
 <style lang="scss" scoped>
 .as-footer {
-  padding: 32rpx 24rpx;
+  padding: $s-4 $s-3;
+  margin-top: $s-5;
   text-align: center;
-  margin-top: 40rpx;
 }
 
-.as-footer-text {
-  font-size: 22rpx;
-  color: #9ca3af;
+.as-footer__text {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+  line-height: $lh-base;
 }
 </style>

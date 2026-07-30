@@ -52,7 +52,7 @@ src/
 │   ├── api/             # API 接口层（按功能模块拆分）
 │   ├── store/           # Pinia 全局状态
 │   ├── styles/          # 全局样式变量和主题
-│   ├── components/      # 全局组件（PageCard, GlobalChatBar, SvgIcon 等）
+│   ├── components/      # 全局组件（40+ 组件库同步组件，含 Card/Button/Tag/Toast 等，via index.ts barrel export）
 │   ├── utils/           # 工具函数和 hooks
 │   └── types/           # 全局类型定义
 ├── modules/             # 业务模块层（每人负责一个模块）
@@ -64,7 +64,7 @@ src/
 │   │   └── components/  # 股票卡片、K线图等
 │   ├── chat/            # AI 对话模块
 │   │   ├── pages/       # AI 对话页面
-│   │   └── components/  # 对话气泡、Skill 组件等
+│   │   └── event/       # 事件分析子模块（组件、composables、API）
 │   ├── market/          # 行情模块
 │   │   ├── pages/       # 异动捕手、长线风口
 │   │   └── components/  # 大盘概览、事件卡片等

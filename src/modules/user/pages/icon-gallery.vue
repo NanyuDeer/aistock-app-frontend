@@ -3,7 +3,7 @@
     <!-- 顶部栏 -->
     <view class="header">
       <view class="header-left">
-        <text class="logo-text">🎨</text>
+        <SvgIcon name="palette-line" size="32rpx" color="#ffffff" />
         <view class="header-titles">
           <text class="header-title">图标素材库</text>
           <text class="header-subtitle">icons-lxy · 林晓妍</text>
@@ -20,7 +20,7 @@
     <!-- 搜索栏 -->
     <view class="search-bar">
       <view class="search-input-wrap">
-        <text class="search-icon">🔍</text>
+        <SvgIcon name="search-line" size="32rpx" class="search-icon" />
         <input
           class="search-input"
           placeholder="搜索图标名称..."
@@ -28,7 +28,7 @@
           placeholder-class="search-placeholder"
         />
         <view v-if="searchText" class="search-clear" @tap="clearSearch">
-          <text class="clear-icon">✕</text>
+          <SvgIcon name="close-line" size="24rpx" color="#4b5a7a" />
         </view>
       </view>
     </view>
@@ -54,15 +54,7 @@
       <view class="tool-group">
         <text class="tool-label">图标大小</text>
         <view class="size-options">
-          <view
-            v-for="size in sizeOptions"
-            :key="size"
-            class="size-btn"
-            :class="{ active: iconSize === size }"
-            @tap="iconSize = size"
-          >
-            <text class="size-text">{{ size }}rpx</text>
-          </view>
+          <Segmented :items="sizeItems" v-model="iconSize" fullWidth />
         </view>
       </view>
     </view>
@@ -80,38 +72,22 @@
           @tap="activeColor = color.value"
           :title="color.name"
         >
-          <text v-if="activeColor === color.value" class="color-check">✓</text>
+          <SvgIcon v-if="activeColor === color.value" name="check-line" size="28rpx" color="#ffffff" />
         </view>
       </view>
     </view>
 
     <!-- 视图切换 -->
     <view class="view-toggle">
-      <view
-        class="toggle-btn"
-        :class="{ active: viewMode === 'grid' }"
-        @tap="viewMode = 'grid'"
-      >
-        <text class="toggle-icon">▦</text>
-        <text class="toggle-text">网格</text>
-      </view>
-      <view
-        class="toggle-btn"
-        :class="{ active: viewMode === 'list' }"
-        @tap="viewMode = 'list'"
-      >
-        <text class="toggle-icon">☰</text>
-        <text class="toggle-text">列表</text>
-      </view>
+      <Segmented
+        :items="[{ label: '网格', value: 'grid' }, { label: '列表', value: 'list' }]"
+        v-model="viewMode"
+      />
     </view>
 
     <!-- 图标展示区 - 网格模式 -->
     <scroll-view v-if="viewMode === 'grid'" class="icon-grid" scroll-y="true">
-      <view v-if="filteredIcons.length === 0" class="empty-state">
-        <text class="empty-icon">📭</text>
-        <text class="empty-text">没有找到匹配的图标</text>
-        <text class="empty-hint">试试其他关键词吧</text>
-      </view>
+      <EmptyState v-if="filteredIcons.length === 0" title="暂无匹配图标" description="试试其他关键词吧" icon="inbox-line" />
       
       <view v-else class="grid-inner">
         <view
@@ -135,11 +111,7 @@
 
     <!-- 图标展示区 - 列表模式 -->
     <scroll-view v-else class="icon-list" scroll-y="true">
-      <view v-if="filteredIcons.length === 0" class="empty-state">
-        <text class="empty-icon">📭</text>
-        <text class="empty-text">没有找到匹配的图标</text>
-        <text class="empty-hint">试试其他关键词吧</text>
-      </view>
+      <EmptyState v-if="filteredIcons.length === 0" title="暂无匹配图标" description="试试其他关键词吧" icon="inbox-line" />
       
       <view v-else class="list-inner">
         <view
@@ -168,12 +140,14 @@
 
     <!-- 底部提示 -->
     <view class="footer-tip">
-      <text class="tip-text">💡 点击图标可复制名称</text>
+      <SvgIcon name="lightbulb-line" size="28rpx" color="#ffffff" />
+      <text class="tip-text">点击图标可复制名称</text>
     </view>
 
     <!-- 复制成功提示 -->
     <view v-if="showToast" class="toast">
-      <text class="toast-text">✅ 已复制: {{ copiedName }}</text>
+      <SvgIcon name="check-line" size="28rpx" color="#ffffff" />
+      <text class="toast-text">已复制: {{ copiedName }}</text>
     </view>
   </view>
 </template>
@@ -181,6 +155,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { EmptyState, Segmented } from '@/shared/components'
 import {
   iconsLxyList,
   categoryLabels,
@@ -191,12 +166,14 @@ import {
 const searchText = ref('')
 const activeCategory = ref('all')
 const iconSize = ref(48)
-const activeColor = ref('#4d7cfe')
+const activeColor = ref('#0b5fff')
 const viewMode = ref<'grid' | 'list'>('grid')
 const showToast = ref(false)
 const copiedName = ref('')
 
 const sizeOptions = [32, 48, 64, 80, 96]
+
+const sizeItems = sizeOptions.map((size) => ({ label: `${size}rpx`, value: size }))
 
 const cardBg = computed(() => {
   return activeColor.value === '#ffffff' ? '#374151' : '#f9fafb'
@@ -266,10 +243,6 @@ function copyIconName(name: string) {
     display: flex;
     align-items: center;
     gap: 20rpx;
-  }
-
-  .logo-text {
-    font-size: 56rpx;
   }
 
   .header-titles {
@@ -349,13 +322,8 @@ function copyIconName(name: string) {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #e5e7eb;
+    background: $line;
     border-radius: 50%;
-  }
-
-  .clear-icon {
-    font-size: 24rpx;
-    color: #6b7280;
   }
 }
 
@@ -380,8 +348,8 @@ function copyIconName(name: string) {
     transition: all 0.2s;
 
     &.active {
-      background: #4d7cfe;
-      border-color: #4d7cfe;
+      background: $primary;
+      border-color: $primary;
 
       .tab-text,
       .tab-count {
@@ -422,40 +390,12 @@ function copyIconName(name: string) {
 
   .tool-label {
     font-size: 28rpx;
-    color: #6b7280;
+    color: $ink-soft;
     flex-shrink: 0;
   }
 
   .size-options {
-    display: flex;
-    gap: 12rpx;
     flex: 1;
-  }
-
-  .size-btn {
-    flex: 1;
-    height: 64rpx;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #fff;
-    border-radius: 12rpx;
-    border: 2rpx solid #e5e7eb;
-
-    &.active {
-      border-color: #4d7cfe;
-      background: #eff6ff;
-
-      .size-text {
-        color: #4d7cfe;
-        font-weight: 600;
-      }
-    }
-  }
-
-  .size-text {
-    font-size: 24rpx;
-    color: #6b7280;
   }
 }
 
@@ -467,7 +407,7 @@ function copyIconName(name: string) {
 
   .color-bar-label {
     font-size: 28rpx;
-    color: #6b7280;
+    color: $ink-soft;
     flex-shrink: 0;
   }
 
@@ -490,14 +430,8 @@ function copyIconName(name: string) {
 
     &.active {
       transform: scale(1.15);
-      box-shadow: 0 0 0 4rpx #4d7cfe;
+      box-shadow: 0 0 0 4rpx $primary;
     }
-  }
-
-  .color-check {
-    font-size: 28rpx;
-    color: #fff;
-    font-weight: bold;
   }
 }
 
@@ -505,45 +439,6 @@ function copyIconName(name: string) {
   padding: 0 32rpx 20rpx;
   display: flex;
   justify-content: flex-end;
-
-  .toggle-btn {
-    display: flex;
-    align-items: center;
-    gap: 8rpx;
-    padding: 10rpx 20rpx;
-    background: #fff;
-    border-radius: 8rpx;
-    border: 2rpx solid #e5e7eb;
-
-    &.active {
-      background: #eff6ff;
-      border-color: #4d7cfe;
-
-      .toggle-icon,
-      .toggle-text {
-        color: #4d7cfe;
-      }
-    }
-
-    &:first-child {
-      border-radius: 8rpx 0 0 8rpx;
-      border-right: none;
-    }
-
-    &:last-child {
-      border-radius: 0 8rpx 8rpx 0;
-    }
-  }
-
-  .toggle-icon {
-    font-size: 28rpx;
-    color: #9ca3af;
-  }
-
-  .toggle-text {
-    font-size: 26rpx;
-    color: #6b7280;
-  }
 }
 
 .icon-grid {
@@ -681,36 +576,14 @@ function copyIconName(name: string) {
   }
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 120rpx 0;
-
-  .empty-icon {
-    font-size: 80rpx;
-    margin-bottom: 24rpx;
-  }
-
-  .empty-text {
-    font-size: 32rpx;
-    color: #374151;
-    font-weight: 500;
-    margin-bottom: 12rpx;
-  }
-
-  .empty-hint {
-    font-size: 26rpx;
-    color: #9ca3af;
-  }
-}
-
 .footer-tip {
   position: fixed;
   bottom: 40rpx;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
   background: rgba(0, 0, 0, 0.7);
   padding: 16rpx 32rpx;
   border-radius: 40rpx;
@@ -726,6 +599,9 @@ function copyIconName(name: string) {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
   background: rgba(0, 0, 0, 0.8);
   padding: 24rpx 40rpx;
   border-radius: 16rpx;

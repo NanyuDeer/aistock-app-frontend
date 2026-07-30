@@ -13,7 +13,9 @@
     "type-check": "vue-tsc --noEmit",
     "test": "vitest run",
     "test:node": "node --import tsx --test \"src/**/*.spec.ts\"",
-    "test:vite-config": "node --import tsx --test vite.config.spec.ts"
+    "test:vite-config": "node --import tsx --test vite.config.spec.ts",
+    "sync": "cd ../aistock-component-lib && pnpm run sync",
+    "sync:dry-run": "cd ../aistock-component-lib && pnpm run sync:dry-run"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4030620241128001",

@@ -2,16 +2,12 @@
   <SubPageCard2 :title="pageTitle" :subtitle="pageSubtitle">
     <!-- 从概览进入详情时，右上角显示"概览"按钮 -->
     <template v-if="canBackToOverview" #header-right>
-      <view class="back-overview-btn" @tap="backToOverview">
-        <text class="back-overview-text">概览</text>
-      </view>
+      <Button type="ghost" size="sm" @click="backToOverview">概览</Button>
     </template>
 
     <view class="report-content-wrap">
       <!-- 加载中 -->
-      <view v-if="loading" class="loading-state">
-        <text class="loading-text">{{ loadingText }}</text>
-      </view>
+      <LoadingState v-if="loading" :text="loadingText" />
 
       <!-- 概览模式：Agent 简报卡片列表 -->
       <template v-else-if="isOverview">
@@ -20,11 +16,12 @@
         </view>
 
         <view v-if="agentBriefs.length" class="brief-card-list">
-          <view
+          <Card
             v-for="brief in agentBriefs"
             :key="brief.intent"
+            clickable
             class="brief-card"
-            @tap="selectAgent(brief.intent)"
+            @click="selectAgent(brief.intent)"
           >
             <view class="brief-icon-wrap" :style="{ background: brief.bgColor }">
               <SvgIcon :name="brief.icon" size="36rpx" color="#ffffff" />
@@ -32,34 +29,30 @@
             <view class="brief-body">
               <view class="brief-top">
                 <text class="brief-title">{{ brief.title }}</text>
-                <text :class="['brief-status', brief.available ? 'ready' : 'pending']">
+                <Tag :type="brief.available ? 'down' : 'neutral'" size="sm">
                   {{ brief.available ? '已更新' : '待生成' }}
-                </text>
+                </Tag>
               </view>
               <text class="brief-desc">{{ brief.desc }}</text>
               <text v-if="brief.summary" class="brief-summary">{{ brief.summary }}</text>
               <text v-else class="brief-summary brief-summary-empty">报告生成后将显示摘要</text>
             </view>
             <SvgIcon v-if="brief.available" name="arrow-right-s-line" size="32rpx" color="#c0c4cc" />
-          </view>
+          </Card>
         </view>
 
-        <view v-else class="empty-state">
-          <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
-          <text class="empty-text">今日报告尚未生成</text>
-          <text class="empty-hint">请在 9:10 后查看</text>
-        </view>
+        <EmptyState v-else title="今日报告尚未生成" description="请在 9:10 后查看" icon="file-line" />
       </template>
 
       <!-- 详情模式：单个 Agent 报告 -->
-      <view v-else-if="report" class="report-body">
+      <Card v-else-if="report" class="report-body">
         <text class="report-date">{{ reportDateText }}</text>
 
         <!-- morning 晨报：摘要 + 详情 + 风险（不显示龙头股票，避免与长线风口混淆） -->
         <template v-if="isMorningIntent && displayReport">
-          <view v-if="reportSummary" class="summary-box">
+          <Card v-if="reportSummary" class="summary-box">
             <text class="summary-text">{{ reportSummary }}</text>
-          </view>
+          </Card>
 
           <view v-if="detailsText" class="section">
             <text class="section-title">详细分析</text>
@@ -82,9 +75,7 @@
           <view v-if="leaderStocks.length" class="section">
             <text class="section-title">龙头股票</text>
             <view class="stock-tags">
-              <view v-for="code in leaderStocks" :key="code" class="stock-tag">
-                <text class="stock-tag-text">{{ code }}</text>
-              </view>
+              <Tag v-for="code in leaderStocks" :key="code" size="sm">{{ code }}</Tag>
             </view>
           </view>
 
@@ -111,14 +102,10 @@
             <text class="report-text">{{ reportText }}</text>
           </view>
         </template>
-      </view>
+      </Card>
 
       <!-- 无报告 -->
-      <view v-else class="empty-state">
-        <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
-        <text class="empty-text">今日报告尚未生成</text>
-        <text class="empty-hint">请在 9:10 后查看</text>
-      </view>
+      <EmptyState v-else title="今日报告尚未生成" description="请在 9:10 后查看" icon="file-line" />
     </view>
   </SubPageCard2>
 </template>
@@ -131,6 +118,7 @@ import { markdownToHtml } from '@/shared/utils/markdown'
 import { formatDate, formatDateTime } from '@/shared/utils/datetime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { LoadingState, EmptyState, Card, Tag, Button } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 interface DisplayReport {
@@ -400,28 +388,6 @@ onBackPress(() => {
   padding: 32rpx;
 }
 
-/* 返回概览按钮 */
-.back-overview-btn {
-  padding: 8rpx 20rpx;
-}
-
-.back-overview-text {
-  font-size: 26rpx;
-  color: #2563eb;
-}
-
-/* 加载中 */
-.loading-state {
-  display: flex;
-  justify-content: center;
-  padding: 120rpx 0;
-}
-
-.loading-text {
-  font-size: 28rpx;
-  color: #6b7280;
-}
-
 /* 概览模式 */
 .overview-header {
   margin-bottom: 24rpx;
@@ -429,7 +395,7 @@ onBackPress(() => {
 
 .overview-date {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: $ink-mute;
 }
 
 .brief-card-list {
@@ -438,14 +404,10 @@ onBackPress(() => {
   gap: 20rpx;
 }
 
-.brief-card {
+.brief-card :deep(.as-card__body) {
   display: flex;
   align-items: flex-start;
   gap: 20rpx;
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 28rpx 24rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
 }
 
 .brief-icon-wrap {
@@ -473,35 +435,19 @@ onBackPress(() => {
 .brief-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
-}
-
-.brief-status {
-  font-size: 22rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 8rpx;
-
-  &.ready {
-    background: #ecfdf5;
-    color: #10b981;
-  }
-
-  &.pending {
-    background: #f3f4f6;
-    color: #9ca3af;
-  }
+  color: $ink;
 }
 
 .brief-desc {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   display: block;
   margin-bottom: 8rpx;
 }
 
 .brief-summary {
   font-size: 26rpx;
-  color: #4b5563;
+  color: $ink-soft;
   line-height: 1.6;
   display: block;
   overflow: hidden;
@@ -512,36 +458,27 @@ onBackPress(() => {
 }
 
 .brief-summary-empty {
-  color: #d1d5db;
+  color: $ink-mute;
   font-style: italic;
 }
 
-/* 详情模式 */
-.report-body {
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 32rpx;
-}
-
-/* 晨报摘要盒 */
+/* 晨报摘要盒（Card 已处理容器，保留渐变背景和左边框强调） */
 .summary-box {
-  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-  border-left: 6rpx solid #f59e0b;
-  border-radius: 12rpx;
-  padding: 24rpx;
+  background: linear-gradient(135deg, $warning-soft 0%, $gold-soft 100%);
+  border-left: 6rpx solid $warning;
   margin-bottom: 28rpx;
 }
 
 .summary-text {
   font-size: 28rpx;
   line-height: 1.6;
-  color: #92400e;
+  color: $warning;
   font-weight: 500;
 }
 
 .report-date {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   margin-bottom: 24rpx;
   display: block;
 }
@@ -557,7 +494,7 @@ onBackPress(() => {
 .section-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 16rpx;
   display: block;
 }
@@ -566,18 +503,6 @@ onBackPress(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 16rpx;
-}
-
-.stock-tag {
-  background: #eff6ff;
-  border-radius: 12rpx;
-  padding: 8rpx 20rpx;
-}
-
-.stock-tag-text {
-  font-size: 26rpx;
-  color: #2563eb;
-  font-weight: 500;
 }
 
 .report-text-wrap {
@@ -592,21 +517,21 @@ onBackPress(() => {
 }
 :deep(.report-html) {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.8;
 }
 :deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
 :deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }
-:deep(.md-hr) { border: none; border-top: 1rpx solid #e5e7eb; margin: 12rpx 0; }
+:deep(.md-hr) { border: none; border-top: 1rpx solid $line; margin: 12rpx 0; }
 :deep(.md-ul) { padding-left: 20rpx; margin: 8rpx 0; }
 :deep(.md-ol) { padding-left: 20rpx; margin: 8rpx 0; }
-:deep(.md-ul-li) { font-size: 28rpx; color: #1a1d24; line-height: 1.8; }
-:deep(.md-ol-li) { font-size: 28rpx; color: #1a1d24; line-height: 1.8; }
+:deep(.md-ul-li) { font-size: 28rpx; color: $ink; line-height: 1.8; }
+:deep(.md-ol-li) { font-size: 28rpx; color: $ink; line-height: 1.8; }
 
 .report-text {
   font-size: 28rpx;
   line-height: 1.8;
-  color: #1a1d24;
+  color: $ink;
   white-space: pre-wrap;
 }
 
@@ -617,26 +542,6 @@ onBackPress(() => {
 .risk-text {
   font-size: 26rpx;
   line-height: 1.6;
-  color: #6b7280;
-}
-
-/* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 120rpx 0;
-}
-
-.empty-text {
-  font-size: 28rpx;
-  color: #6b7280;
-  margin-top: 24rpx;
-  margin-bottom: 12rpx;
-}
-
-.empty-hint {
-  font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-soft;
 }
 </style>

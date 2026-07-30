@@ -1,51 +1,63 @@
 @import './variables.scss';
 @import './reset.scss';
 
-/* ===== Event 模块主题 CSS 变量（浅色系，与其他页面统一） ===== */
+/* ===== Event 模块主题 CSS 变量（对齐设计系统令牌，同步时间：2026-07-28） ===== */
+/* --ev-* 变量值来自 shared/styles/variables.scss 设计令牌，确保视觉一致 */
+/* A 股红涨绿跌：--ev-negative(红/up) = 涨，--ev-positive(绿/down) = 跌 */
 page {
   /* 背景 */
-  --ev-bg-page: #f5f7fb;
-  --ev-bg-card: #ffffff;
-  --ev-bg-card-muted: #f5f7fa;
-  --ev-bg-elevated: #ffffff;
+  --ev-bg-page: #{$bg-page};
+  --ev-bg-card: #{$bg-card};
+  --ev-bg-card-muted: #{$bg-soft};
+  --ev-bg-elevated: #{$bg-card};
 
   /* 文字 */
-  --ev-text-primary: #1a1d24;
-  --ev-text-secondary: #6b7280;
-  --ev-text-tertiary: #9ca3af;
-  --ev-text-muted: #9ca3af;
+  --ev-text-primary: #{$ink};
+  --ev-text-secondary: #{$ink-soft};
+  --ev-text-tertiary: #{$ink-mute};
+  --ev-text-muted: #{$ink-mute};
 
   /* 强调色 */
-  --ev-accent: #4d7cfe;
-  --ev-accent-soft: rgba(77, 124, 254, 0.12);
-  --ev-accent-bg: rgba(77, 124, 254, 0.06);
+  --ev-accent: #{$primary};
+  --ev-accent-soft: rgba(#{$primary}, 0.12);
+  --ev-accent-bg: rgba(#{$primary}, 0.06);
 
-  /* 正向 / 负向 */
-  --ev-positive: #22c55e;
-  --ev-positive-soft: rgba(34, 197, 94, 0.1);
-  --ev-positive-bg: rgba(34, 197, 94, 0.06);
-  --ev-negative: #f43f5e;
-  --ev-negative-soft: rgba(244, 63, 94, 0.1);
-  --ev-negative-bg: rgba(244, 63, 94, 0.06);
+  /* 正向 / 负向（A 股：positive=绿/跌，negative=红/涨） */
+  --ev-positive: #{$down};
+  --ev-positive-soft: #{$down-soft};
+  --ev-positive-bg: rgba(#{$down}, 0.06);
+  --ev-negative: #{$up};
+  --ev-negative-soft: #{$up-soft};
+  --ev-negative-bg: rgba(#{$up}, 0.06);
 
   /* 边框 */
-  --ev-border: #e5e7eb;
-  --ev-border-light: #f0f2f5;
+  --ev-border: #{$line};
+  --ev-border-light: #{$line-soft};
 
   /* 特殊 */
-  --ev-blue-gradient: linear-gradient(135deg, #4d7cfe, #6366f1);
-  --ev-blue-shadow: rgba(77, 124, 254, 0.3);
-  --ev-warning: #f59e0b;
+  --ev-blue-gradient: #{$brand-gradient};
+  --ev-blue-shadow: rgba(#{$primary}, 0.3);
+  --ev-warning: #{$warning};
 
   /* 页面基础 */
   background-color: $bg-color;
   color: $text-color;
   font-size: $font-size-base;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* 使用设计令牌 $font-sans（Noto Sans SC 优先），避免硬编码字体列表在部分系统回退到衬线字体 */
+  font-family: $font-sans;
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: auto;
 }
+
+/* uni-app H5 端 uni-page 内置 font-family: "Noto Sans SC"（无回退链） */
+/* 当系统未安装 Noto Sans SC 时，浏览器回退到默认衬线字体（Times New Roman） */
+/* 此处覆写，确保 uni-page 也携带完整 sans-serif 回退链 */
+/* #ifdef H5 */
+uni-page {
+  font-family: $font-sans;
+}
+/* #endif */
 
 /* #ifdef APP-PLUS */
 /* App 端整体放大 20%（rpx 换算基准不变，用 zoom 缩放整个页面） */

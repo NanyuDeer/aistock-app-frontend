@@ -1,72 +1,34 @@
+/**
+ * MarketOverview 大盘概览
+ * 视觉层：基于组件库 IndexCard + EmptyState（同步时间：2026-07-28）
+ * 保留业务逻辑：indices 数据透传 + 空状态兜底
+ *
+ * 字段映射：indices 直接透传给 IndexCard（name/code/price/changePercent 完全一致）
+ */
 <template>
   <view class="as-market-overview">
-    <view class="as-market-header">
-      <text class="as-market-title">大盘概览</text>
-      <text class="as-market-status">{{ status }}</text>
-    </view>
-    <view v-if="indices.length" class="as-market-list">
-      <view v-for="item in indices" :key="item.code" class="as-market-item">
-        <text class="as-market-name">{{ item.name }}</text>
-        <text class="as-market-price">{{ formatPrice(item.price) }}</text>
-        <text :class="['as-market-change', item.changePercent >= 0 ? 'up' : 'down']">
-          {{ formatSignedPct(item.changePercent) }}
-        </text>
-      </view>
-    </view>
-    <view v-else class="as-market-empty">
-      <text class="as-market-empty-text">暂无行情</text>
-    </view>
+    <IndexCard
+      v-if="indices.length"
+      :indices="indices"
+      title="大盘概览"
+      :status="status"
+    />
+    <EmptyState v-else title="暂无行情" description="开盘后查看大盘数据" />
   </view>
 </template>
 
 <script setup lang="ts">
-import { formatSignedPct } from '@/shared/utils/stock'
+import IndexCard from '@/shared/components/IndexCard.vue'
+import EmptyState from '@/shared/components/EmptyState.vue'
 
 defineProps<{
   indices: Array<{ name: string; code: string; price: number; changePercent: number }>
   status?: string
 }>()
-
-function formatPrice(price: number): string {
-  return Number(price || 0).toFixed(2)
-}
 </script>
 
 <style lang="scss" scoped>
 .as-market-overview {
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  width: 100%;
 }
-
-.as-market-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16rpx;
-}
-
-.as-market-title { font-size: 30rpx; font-weight: 600; color: #1a1d24; }
-.as-market-status { font-size: 22rpx; color: #6b7280; }
-
-.as-market-list { display: flex; gap: 24rpx; }
-
-.as-market-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6rpx;
-}
-
-.as-market-name { font-size: 22rpx; color: #6b7280; }
-.as-market-price { font-size: 30rpx; font-weight: 600; color: #1a1d24; }
-.as-market-change { font-size: 22rpx; }
-
-.up { color: #f43f5e; }
-.down { color: #22c55e; }
-
-.as-market-empty { padding: 24rpx 0; text-align: center; }
-.as-market-empty-text { font-size: 24rpx; color: #9ca3af; }
 </style>

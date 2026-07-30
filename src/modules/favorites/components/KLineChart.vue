@@ -1,20 +1,13 @@
 <template>
   <view class="as-kline">
     <view class="as-kline-header">
-      <view class="as-kline-periods">
-        <text
-          v-for="p in periods"
-          :key="p.value"
-          :class="['as-kline-period', currentPeriod === p.value ? 'active' : '']"
-          @tap="switchPeriod(p.value)"
-        >{{ p.label }}</text>
-      </view>
+      <Segmented :model-value="currentPeriod" :items="periodItems" @change="onPeriodChange" />
     </view>
-    <view v-if="loading" class="as-kline-loading">
-      <text class="as-kline-loading-text">加载中...</text>
+    <view v-if="loading" class="as-kline-state">
+      <LoadingState />
     </view>
-    <view v-else-if="!chartModel.items.length" class="as-kline-empty">
-      <text class="as-kline-empty-text">暂无K线数据</text>
+    <view v-else-if="!chartModel.items.length" class="as-kline-state">
+      <EmptyState text="暂无K线数据" />
     </view>
     <view v-else class="kline-chart">
       <view class="kline-axis-col">
@@ -50,6 +43,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { Segmented, LoadingState, EmptyState } from '@/shared/components'
 
 interface KLineItem {
   date: string
@@ -75,7 +69,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ (e: 'period-change', p: Period): void }>()
 
-const periods = [
+const periodItems = [
   { label: '日K', value: 'daily' as Period },
   { label: '周K', value: 'weekly' as Period },
   { label: '年K', value: 'yearly' as Period }
@@ -143,10 +137,11 @@ const chartModel = computed(() => {
   }
 })
 
-function switchPeriod(p: Period) {
-  if (currentPeriod.value === p) return
-  currentPeriod.value = p
-  emit('period-change', p)
+function onPeriodChange(value: string | number) {
+  const next = value as Period
+  if (currentPeriod.value === next) return
+  currentPeriod.value = next
+  emit('period-change', next)
 }
 
 function getVisibleCandleCount(): number {
@@ -172,8 +167,8 @@ watch(() => props.period, value => {
 
 <style lang="scss" scoped>
 .as-kline {
-  background: #ffffff;
-  border-radius: 12rpx;
+  background: $bg-card;
+  border-radius: $r-sm;
   padding: 0;
 }
 
@@ -182,24 +177,6 @@ watch(() => props.period, value => {
   justify-content: flex-end;
   align-items: center;
   margin-bottom: 12rpx;
-}
-
-.as-kline-periods {
-  display: flex;
-  gap: 6rpx;
-}
-
-.as-kline-period {
-  font-size: 22rpx;
-  color: #6b7280;
-  padding: 4rpx 12rpx;
-  border-radius: 12rpx;
-  background: #f5f7fa;
-}
-
-.as-kline-period.active {
-  color: #3b82f6;
-  background: rgba(59, 130, 246, 0.1);
 }
 
 .kline-chart {
@@ -223,7 +200,7 @@ watch(() => props.period, value => {
   display: block;
   font-size: 22rpx;
   line-height: 1;
-  color: #6b7280;
+  color: $ink-soft;
   white-space: nowrap;
 }
 
@@ -249,20 +226,13 @@ watch(() => props.period, value => {
   display: block;
   font-size: 22rpx;
   line-height: 1;
-  color: #94a3b8;
+  color: $ink-mute;
 }
 
-.as-kline-loading,
-.as-kline-empty {
+.as-kline-state {
   height: 240px;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.as-kline-loading-text,
-.as-kline-empty-text {
-  font-size: 26rpx;
-  color: #9ca3af;
 }
 </style>

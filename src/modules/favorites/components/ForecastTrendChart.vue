@@ -1,25 +1,22 @@
 <template>
   <view class="forecast-trend-chart">
     <view class="chart-head">
-      <view>
+      <view class="chart-title-wrap">
         <text class="chart-title">趋势指标</text>
-        <text class="chart-subtitle">{{ activeSeries?.name || '实际 + 预测' }}</text>
-      </view>
-      <text class="chart-unit">实际 + 预测</text>
-    </view>
-    <view class="metric-tabs">
-      <view class="metric-tab-row">
-        <view
-          v-for="(item, index) in visibleSeries"
-          :key="item.name"
-          :class="['metric-tab', activeIndex === index ? 'is-active' : '']"
-          @tap="switchMetric(index)"
-        >
-          <view class="metric-tab-dot" :style="{ background: chartColors[index % chartColors.length] }"></view>
-          <text class="metric-tab-text">{{ item.name }}</text>
+        <view class="chart-subtitle">
+          <view class="metric-dot" :style="{ background: activeColor }"></view>
+          <text>{{ activeSeries?.name || '实际 + 预测' }}</text>
         </view>
       </view>
+      <Tag type="neutral" size="sm">实际 + 预测</Tag>
     </view>
+    <Segmented
+      :model-value="activeIndex"
+      :items="metricItems"
+      full-width
+      class="metric-segmented"
+      @change="onMetricChange"
+    />
     <view class="trend-chart-body">
       <view class="trend-axis-col">
         <text v-for="tick in lineModel.ticks" :key="`axis-${tick.label}`" class="trend-axis-text">{{ tick.label }}</text>
@@ -48,6 +45,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { Segmented, Tag } from '@/shared/components'
 import { compactNumber } from '@/shared/utils/format'
 
 interface SeriesItem {
@@ -68,6 +66,10 @@ const categories = computed(() => props.categories || [])
 const visibleSeries = computed(() => (props.series || []).filter(item => item.data?.some(v => Number.isFinite(Number(v)))))
 const activeSeries = computed(() => visibleSeries.value[activeIndex.value] || visibleSeries.value[0])
 const activeColor = computed(() => chartColors[activeIndex.value % chartColors.length])
+const metricItems = computed(() => visibleSeries.value.map((item, index) => ({
+  label: item.name,
+  value: index,
+})))
 
 const lineModel = computed(() => {
   const values = (activeSeries.value?.data || []).map(value => Number(value) || 0)
@@ -110,8 +112,8 @@ const lineModel = computed(() => {
   return { points, ticks, zeroY, linePoints: points.map(point => `${point.x},${point.y}`).join(' '), left, right, plotLeft: left, plotRight: right, top, bottom }
 })
 
-function switchMetric(index: number) {
-  activeIndex.value = index
+function onMetricChange(value: string | number) {
+  activeIndex.value = Number(value)
 }
 
 watch(() => props.series, () => {
@@ -134,67 +136,36 @@ watch(() => props.series, () => {
   padding: 0 4rpx;
 }
 
+.chart-title-wrap {
+  min-width: 0;
+}
+
 .chart-title {
   display: block;
   font-size: 28rpx;
   font-weight: 700;
-  color: #172033;
+  color: $ink;
 }
 
 .chart-subtitle {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 22rpx;
-  color: #8aa0bd;
-}
-
-.chart-unit {
-  flex-shrink: 0;
-  padding: 6rpx 12rpx;
-  border-radius: 999rpx;
-  background: #f1f5f9;
-  font-size: 21rpx;
-  color: #64748b;
-}
-
-.metric-tabs {
-  width: 100%;
-  margin-bottom: 12rpx;
-}
-
-.metric-tab-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10rpx;
-  padding: 0 4rpx 2rpx;
-}
-
-.metric-tab {
   display: flex;
   align-items: center;
-  gap: 8rpx;
-  min-height: 52rpx;
-  padding: 8rpx 16rpx;
-  background: #f8fafc;
-  border: 1rpx solid #e5e7eb;
-  border-radius: 10rpx;
-
-  &.is-active {
-    background: #eff6ff;
-    border-color: #3b82f6;
-  }
+  gap: $s-1;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: $ink-mute;
 }
 
-.metric-tab-dot {
+.metric-dot {
   width: 14rpx;
   height: 14rpx;
-  border-radius: 999rpx;
+  border-radius: $r-full;
+  flex-shrink: 0;
 }
 
-.metric-tab-text {
-  font-size: 23rpx;
-  color: #334155;
-  white-space: nowrap;
+.metric-segmented {
+  width: 100%;
+  margin-bottom: 12rpx;
 }
 
 .trend-chart-body {
@@ -220,7 +191,7 @@ watch(() => props.series, () => {
 .trend-axis-text {
   font-size: 21rpx;
   line-height: 1;
-  color: #94a3b8;
+  color: $ink-mute;
 }
 
 .trend-svg {
@@ -241,7 +212,7 @@ watch(() => props.series, () => {
   min-width: 0;
   padding: 8rpx 4rpx;
   border-radius: 8rpx;
-  background: #f8fafc;
+  background: $bg-soft;
   text-align: center;
 }
 
@@ -249,7 +220,7 @@ watch(() => props.series, () => {
   display: block;
   font-size: 19rpx;
   line-height: 1.2;
-  color: #94a3b8;
+  color: $ink-mute;
 }
 
 .trend-value-number {
@@ -259,7 +230,7 @@ watch(() => props.series, () => {
   line-height: 1.2;
   font-weight: 700;
 
-  &.is-up { color: #ef4444; }
-  &.is-down { color: #22c55e; }
+  &.is-up { color: $up; }
+  &.is-down { color: $down; }
 }
 </style>
