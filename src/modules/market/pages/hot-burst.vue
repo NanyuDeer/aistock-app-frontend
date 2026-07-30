@@ -1,14 +1,8 @@
 <template>
   <SubPageCard title="机构调研热门股">
     <view class="hot-burst-content">
-      <!-- 【新增】引导卡片：点击查看今日分析报告 -->
-      <view class="report-guide-card" @tap="goAgentReport">
-        <view class="guide-left">
-          <SvgIcon name="file-line" color="#ffffff" size="40rpx" />
-          <text class="guide-title">点击查看今日分析报告</text>
-        </view>
-        <SvgIcon name="arrow-right-line" color="#ffffff" size="32rpx" />
-      </view>
+      <!-- 引导卡片：点击查看今日分析报告 -->
+      <GuideCard title="点击查看今日分析报告" icon-name="file-line" theme="warning" @click="goAgentReport" />
 
       <!-- 统计概览 -->
       <view v-if="signals.length" class="stats-bar">
@@ -29,12 +23,8 @@
             <view class="signal-stock">
               <view class="stock-name-row">
                 <text class="stock-name">{{ sig.stockName || sig.symbol }}</text>
-                <text :class="['level-tag', sig.resonanceLevel || 'low']">
-                  {{ levelLabel(sig.resonanceLevel) }}
-                </text>
-                <text v-if="sig.sectorInfo || sig.thsSectorName" class="sector-tag">
-                  {{ sig.sectorInfo || sig.thsSectorName }}
-                </text>
+                <Tag :type="levelTagType(sig.resonanceLevel)">{{ levelLabel(sig.resonanceLevel) }}</Tag>
+                <Tag v-if="sig.sectorInfo || sig.thsSectorName">{{ sig.sectorInfo || sig.thsSectorName }}</Tag>
               </view>
               <text class="stock-code">{{ sig.symbol }}</text>
             </view>
@@ -54,21 +44,18 @@
           <!-- 关键词标签 -->
           <view class="signal-meta">
             <view v-if="visibleTriggerTags(sig).length" class="signal-tags">
-              <text
+              <Tag
                 v-for="tag in visibleTriggerTags(sig)"
                 :key="tag"
-                class="kw-tag"
-              >{{ tag }}</text>
+                size="sm"
+              >{{ tag }}</Tag>
             </view>
           </view>
         </view>
       </view>
 
       <!-- 无数据 -->
-      <view v-else class="empty-state">
-        <text class="empty-text">暂无机构调研热门股数据</text>
-        <text class="empty-hint">数据更新后将自动显示</text>
-      </view>
+      <EmptyState v-else title="暂无机构调研热门股数据" description="数据更新后将自动显示" />
     </view>
   </SubPageCard>
 </template>
@@ -79,6 +66,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { stockApi, type HotBurstSignal } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { EmptyState, Tag, GuideCard } from '@/shared/components'
 
 function visibleTriggerTags(signal: HotBurstSignal): string[] {
   const sector = (signal.sectorInfo || signal.thsSectorName || '').trim()
@@ -95,6 +83,16 @@ function levelLabel(level: HotBurstSignal['resonanceLevel']): string {
     low: '低',
   }
   return labels[level || 'low']
+}
+
+function levelTagType(level: HotBurstSignal['resonanceLevel']): 'warning' | 'up' | 'neutral' | 'down' {
+  switch (level) {
+    case 'critical': return 'warning'
+    case 'high': return 'up'
+    case 'medium': return 'neutral'
+    case 'low': return 'down'
+    default: return 'down'
+  }
 }
 
 const signals = ref<HotBurstSignal[]>([])
@@ -155,30 +153,6 @@ onShow(() => {
   padding: 24rpx;
 }
 
-/* ===== 引导卡片 ===== */
-.report-guide-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24rpx 32rpx;
-  margin-bottom: 24rpx;
-  background: linear-gradient(135deg, #4d7cfe 0%, #667eea 100%);
-  border-radius: 16rpx;
-  box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
-}
-
-.guide-left {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.guide-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #ffffff;
-}
-
 /* ===== 统计栏 ===== */
 .stats-bar {
   display: flex;
@@ -189,7 +163,7 @@ onShow(() => {
 
 .stats-text {
   font-size: 26rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
@@ -206,11 +180,12 @@ onShow(() => {
 }
 
 .signal-card {
-  background: #ffffff;
-  border-radius: 20rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-lg;
   padding: 24rpx 28rpx 20rpx;
-  border-left: 6rpx solid #e2e8f0;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  border-left: 6rpx solid $line-strong;
+  box-shadow: $shadow-sm;
 
   &.level-critical { border-left-color: #ef4444; }
   &.level-high { border-left-color: #f97316; }
@@ -242,38 +217,12 @@ onShow(() => {
 .stock-name {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .stock-code {
   font-size: 22rpx;
-  color: #6b7280;
-}
-
-/* 板块标签（紧跟股票代码右侧） */
-.sector-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2rpx 14rpx;
-  border-radius: 8rpx;
-  font-size: 20rpx;
-  font-weight: 500;
-  background: #4d7cfe;
-  color: #ffffff;
-}
-
-.level-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 4rpx 10rpx;
-  border-radius: 8rpx;
-  font-size: 22rpx;
-  font-weight: 600;
-
-  &.critical { background: #ef4444; color: #ffffff; }
-  &.high { background: #f97316; color: #ffffff; }
-  &.medium { background: #f59e0b; color: #ffffff; }
-  &.low { background: #e2e8f0; color: #64748b; }
+  color: $ink-soft;
 }
 
 /* ===== 行情（顶部右侧） ===== */
@@ -286,7 +235,7 @@ onShow(() => {
 .price-val {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .change-val {
@@ -342,36 +291,5 @@ onShow(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8rpx;
-}
-
-.kw-tag {
-  display: inline-block;
-  padding: 4rpx 16rpx;
-  border-radius: 20rpx;
-  font-size: 20rpx;
-  font-weight: 500;
-  background: rgba(77, 124, 254, 0.08);
-  color: #4d7cfe;
-  border: 1rpx solid rgba(77, 124, 254, 0.2);
-  white-space: nowrap;
-}
-
-/* ===== 空状态 ===== */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 120rpx 0;
-}
-
-.empty-text {
-  font-size: 28rpx;
-  color: #6b7280;
-  margin-bottom: 12rpx;
-}
-
-.empty-hint {
-  font-size: 22rpx;
-  color: #9ca3af;
 }
 </style>

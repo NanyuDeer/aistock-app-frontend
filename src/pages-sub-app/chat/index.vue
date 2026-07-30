@@ -9,7 +9,7 @@
 
           <!-- AI 消息 -->
           <view v-else class="msg-content assistant">
-            <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#4d7cfe" />
+            <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
             <view class="bubble">
               <!-- 折叠的进度步骤（完成后保留，仅 general 模式） -->
               <view
@@ -98,7 +98,7 @@
 
         <!-- 流式进度卡片（general 模式，当前正在生成） -->
         <view v-if="isStreaming && chatMode === 'general'" class="message-item assistant">
-          <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#4d7cfe" />
+          <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
           <view class="bubble">
             <!-- 进度步骤 -->
             <view v-if="progressSteps.length > 0" class="progress-card">
@@ -126,7 +126,7 @@
 
         <!-- 加载指示器（market_review 模式） -->
         <view v-if="isStreaming && chatMode === 'market_review'" class="message-item assistant">
-          <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#4d7cfe" />
+          <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
           <view class="bubble">
             <view class="loading-dots">
               <view class="loading-dot" />
@@ -158,30 +158,30 @@
         <!-- General 模式快捷技能 -->
         <template v-if="chatMode === 'general'">
           <view class="skill-btn" @tap="quickAsk('查一下 600519 的行情')">
-            <SvgIcon name="line-chart-line" size="28rpx" color="#4d7cfe" />
+            <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
             <text class="skill-btn-text">行情</text>
           </view>
           <view class="skill-btn" @tap="quickAsk('查一下 600519 的资金流向')">
-            <SvgIcon name="money-cny-circle-line" size="28rpx" color="#4d7cfe" />
+            <SvgIcon name="money-cny-circle-line" size="28rpx" color="#0b5fff" />
             <text class="skill-btn-text">资金</text>
           </view>
           <view class="skill-btn" @tap="quickAsk('今天的龙头股有哪些')">
-            <SvgIcon name="trophy-line" size="28rpx" color="#4d7cfe" />
+            <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
             <text class="skill-btn-text">龙头</text>
           </view>
         </template>
         <!-- Market review 模式快捷问题 -->
         <template v-else>
           <view class="skill-btn" @tap="quickAsk('大盘为何涨跌')">
-            <SvgIcon name="line-chart-line" size="28rpx" color="#4d7cfe" />
+            <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
             <text class="skill-btn-text">大盘为何涨跌</text>
           </view>
           <view class="skill-btn" @tap="quickAsk('主导板块是什么')">
-            <SvgIcon name="trophy-line" size="28rpx" color="#4d7cfe" />
+            <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
             <text class="skill-btn-text">主导板块</text>
           </view>
           <view class="skill-btn" @tap="quickAsk('海外因素有何影响')">
-            <SvgIcon name="global-line" size="28rpx" color="#4d7cfe" />
+            <SvgIcon name="global-line" size="28rpx" color="#0b5fff" />
             <text class="skill-btn-text">海外影响</text>
           </view>
         </template>
@@ -313,7 +313,7 @@ onUnmounted(() => {
 .message-item { margin-bottom: 24rpx; }
 .message-item.user { display: flex; justify-content: flex-end; }
 .msg-content.user {
-  background: #4d7cfe; color: #fff; border-radius: 16rpx 16rpx 4rpx 16rpx; padding: 16rpx 24rpx;
+  background: $primary; color: #fff; border-radius: 16rpx 16rpx 4rpx 16rpx; padding: 16rpx 24rpx;
   max-width: 70%; font-size: 28rpx; line-height: 1.5;
 }
 .msg-content.assistant { display: flex; gap: 12rpx; }
@@ -331,7 +331,7 @@ onUnmounted(() => {
 }
 :deep(.bubble-html) {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.6;
 }
 /* 强制加粗标签为内联元素，避免 mp-html 将 <strong> 渲染为块级导致前后换行 */
@@ -342,14 +342,14 @@ onUnmounted(() => {
 }
 :deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
 :deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }
-:deep(.md-hr) { border: none; border-top: 1rpx solid #e5e7eb; margin: 12rpx 0; }
+:deep(.md-hr) { border: none; border-top: 1rpx solid $line; margin: 12rpx 0; }
 :deep(.md-ul) { padding-left: 20rpx; margin: 8rpx 0; }
 :deep(.md-ol) { padding-left: 20rpx; margin: 8rpx 0; }
-:deep(.md-ul-li) { font-size: 28rpx; color: #1a1d24; line-height: 1.8; }
-:deep(.md-ol-li) { font-size: 28rpx; color: #1a1d24; line-height: 1.8; }
+:deep(.md-ul-li) { font-size: 28rpx; color: $ink; line-height: 1.8; }
+:deep(.md-ol-li) { font-size: 28rpx; color: $ink; line-height: 1.8; }
 :deep(.md-table) { width: 100%; border-collapse: collapse; margin: 8rpx 0; }
-:deep(.md-table th) { background: #f5f7fa; font-size: 24rpx; padding: 8rpx; border: 1rpx solid #e5e7eb; }
-:deep(.md-table td) { font-size: 24rpx; padding: 8rpx; border: 1rpx solid #e5e7eb; }
+:deep(.md-table th) { background: $bg-soft; font-size: 24rpx; padding: 8rpx; border: 1rpx solid $line; }
+:deep(.md-table td) { font-size: 24rpx; padding: 8rpx; border: 1rpx solid $line; }
 
 /* 流式光标动画（mp-html 内嵌 ▊ 字符的闪烁效果） */
 :deep(.streaming-blink) {
@@ -387,45 +387,45 @@ onUnmounted(() => {
 }
 .step-check { font-size: 24rpx; color: #22c55e; font-weight: 700; }
 .step-spinner {
-  width: 24rpx; height: 24rpx; border: 3rpx solid #e5e7eb; border-top-color: #4d7cfe;
+  width: 24rpx; height: 24rpx; border: 3rpx solid $line; border-top-color: $primary;
   border-radius: 50%; animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.step-label { font-size: 24rpx; color: #6b7280; }
+.step-label { font-size: 24rpx; color: $ink-soft; }
 .progress-step.done .step-label { color: #9ca3af; }
 
 /* 行情卡片 */
 .quote-card {
-  margin-top: 16rpx; padding: 20rpx; background: #f5f7fa; border-radius: 12rpx;
+  margin-top: 16rpx; padding: 20rpx; background: $bg-soft; border-radius: 12rpx;
 }
 .quote-card-top {
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 12rpx;
 }
 .quote-card-info { display: flex; align-items: center; gap: 12rpx; }
-.quote-card-name { font-size: 28rpx; font-weight: 600; color: #1a1d24; }
-.quote-card-code { font-size: 22rpx; color: #6b7280; padding: 2rpx 10rpx; background: #e5e7eb; border-radius: 6rpx; }
+.quote-card-name { font-size: 28rpx; font-weight: 600; color: $ink; }
+.quote-card-code { font-size: 22rpx; color: $ink-soft; padding: 2rpx 10rpx; background: $line; border-radius: 6rpx; }
 .quote-card-price-wrap { display: flex; flex-direction: column; align-items: flex-end; }
 .quote-card-price { font-size: 32rpx; font-weight: 700; }
 .quote-card-change { font-size: 24rpx; margin-top: 2rpx; }
 .quote-card-detail {
-  display: flex; gap: 24rpx; padding-top: 12rpx; border-top: 1rpx solid #e5e7eb;
+  display: flex; gap: 24rpx; padding-top: 12rpx; border-top: 1rpx solid $line;
 }
-.detail-item { font-size: 22rpx; color: #6b7280; }
+.detail-item { font-size: 22rpx; color: $ink-soft; }
 
 /* 资金流向卡片 */
 .flow-card {
-  margin-top: 16rpx; padding: 20rpx; background: #f5f7fa; border-radius: 12rpx;
+  margin-top: 16rpx; padding: 20rpx; background: $bg-soft; border-radius: 12rpx;
 }
-.flow-card-title { font-size: 26rpx; font-weight: 500; color: #1a1d24; display: block; margin-bottom: 12rpx; }
+.flow-card-title { font-size: 26rpx; font-weight: 500; color: $ink; display: block; margin-bottom: 12rpx; }
 .flow-card-row { display: flex; justify-content: space-between; align-items: center; }
-.flow-label { font-size: 24rpx; color: #6b7280; }
+.flow-label { font-size: 24rpx; color: $ink-soft; }
 .flow-value { font-size: 28rpx; font-weight: 600; }
 
 /* 纯文本 Skill 结果 */
 .skill-text-card {
   margin-top: 16rpx; padding: 20rpx; background: rgba(77, 124, 254, 0.06); border-radius: 12rpx;
 }
-.skill-text { font-size: 26rpx; color: #6b7280; line-height: 1.5; }
+.skill-text { font-size: 26rpx; color: $ink-soft; line-height: 1.5; }
 
 /* 模式切换 */
 .mode-toggle {
@@ -479,12 +479,12 @@ onUnmounted(() => {
 .quick-skills { display: flex; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; flex-shrink: 0; }
 .skill-btn {
   display: inline-flex; align-items: center; gap: 6rpx;
-  background: rgba(77, 124, 254, 0.08); color: #4d7cfe; border-radius: 20rpx;
+  background: rgba(77, 124, 254, 0.08); color: $primary; border-radius: 20rpx;
   padding: 8rpx 20rpx; font-size: 24rpx;
 }
-.skill-btn-text { font-size: 24rpx; color: #4d7cfe; }
+.skill-btn-text { font-size: 24rpx; color: $primary; }
 
 .input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
-.input { flex: 1; background: #f5f7fa; border-radius: 12rpx; padding: 16rpx; color: #1a1d24; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
-.send-btn { background: #4d7cfe; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
+.input { flex: 1; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
+.send-btn { background: $primary; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
 </style>

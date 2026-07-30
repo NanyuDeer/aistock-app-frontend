@@ -2,56 +2,31 @@
   <SubPageCard :title="sectorName || '风口详情'">
     <view class="sector-detail-content">
       <!-- 加载状态 -->
-      <view v-if="loading" class="state-card">
-        <text class="state-text">正在加载板块数据...</text>
-      </view>
+      <LoadingState v-if="loading" text="正在加载板块数据..." />
 
       <!-- 错误状态 -->
-      <view v-else-if="errorMessage" class="state-card">
-        <text class="state-text">{{ errorMessage }}</text>
-        <text class="state-hint">请检查网络连接后重新加载</text>
-        <button class="retry-button" @tap="loadData">重新加载</button>
-      </view>
+      <Card v-else-if="errorMessage">
+        <EmptyState :title="errorMessage" description="请检查网络连接后重新加载">
+          <Button size="sm" @click="loadData">重新加载</Button>
+        </EmptyState>
+      </Card>
 
       <!-- 空状态 -->
-      <view v-else-if="!sector" class="state-card">
-        <text class="state-text">未找到该板块数据</text>
-      </view>
+      <EmptyState v-else-if="!sector" title="未找到该板块数据" />
 
       <!-- 板块详情 -->
       <template v-else>
         <!-- 改动1: 统计卡片 - 头部持续性标签+频次badge，4项统计含领涨股 -->
-        <view class="stats-card">
+        <Card class="stats-card">
           <view class="stats-header">
             <view class="stats-title-row">
               <text class="stats-name">{{ sector.name }}</text>
-              <text v-if="persistenceTag" class="persistence-badge" :class="persistenceClass">{{ persistenceTag }}</text>
+              <Tag v-if="persistenceTag" :type="persistenceTagType" size="sm">{{ persistenceTag }}</Tag>
             </view>
-            <text v-if="sector.frequency" class="freq-badge">上榜 {{ sector.frequency }} 次</text>
+            <Badge v-if="sector.frequency" size="sm">上榜 {{ sector.frequency }} 次</Badge>
           </view>
-          <view class="stats-row">
-            <view class="stat-item">
-              <text class="stat-label">今日涨幅</text>
-              <text :class="['stat-value', (sector.today_change ?? 0) >= 0 ? 'up' : 'down']">
-                {{ (sector.today_change ?? 0) >= 0 ? '+' : '' }}{{ formatPct(sector.today_change) }}
-              </text>
-            </view>
-            <view class="stat-item">
-              <text class="stat-label">均涨幅</text>
-              <text :class="['stat-value', (sector.avg_change ?? 0) >= 0 ? 'up' : 'down']">
-                {{ (sector.avg_change ?? 0) >= 0 ? '+' : '' }}{{ formatPct(sector.avg_change) }}
-              </text>
-            </view>
-            <view class="stat-item">
-              <text class="stat-label">净流入</text>
-              <text class="stat-value">{{ formatNetInflow(sector.net_inflow) }}</text>
-            </view>
-            <view class="stat-item">
-              <text class="stat-label">领涨股</text>
-              <text class="stat-value leader-stock-name">{{ sector.leading_stock || sector.leading_stock_info?.name || '--' }}</text>
-            </view>
-          </view>
-        </view>
+          <StatGrid :items="sectorStatItems" :columns="4" />
+        </Card>
 
         <!-- 涨跌家数 -->
         <view v-if="sector.up_count || sector.down_count" class="count-bar">
@@ -94,7 +69,7 @@
         </view>
 
         <!-- 龙头股（前3只），改动3: 删除 leader-reason -->
-        <view v-if="topStocks.length" class="leader-detail-card">
+        <Card v-if="topStocks.length" class="leader-detail-card">
           <text class="section-title">龙头股</text>
           <view
             v-for="(stock, idx) in topStocks.slice(0, 3)"
@@ -106,10 +81,7 @@
               <text class="leader-detail-name">{{ stock.name }}</text>
               <text class="leader-detail-code">{{ stock.code }}</text>
               <!-- 改动4: in_concept 时行业标签红色 -->
-              <text
-                v-if="stock.industry"
-                :class="['stock-industry-tag', stock.in_concept ? 'concept' : '']"
-              >{{ stock.industry }}</text>
+              <Tag v-if="stock.industry" :type="stock.in_concept ? 'up' : 'neutral'" size="sm">{{ stock.industry }}</Tag>
             </view>
             <view class="leader-detail-right">
               <text v-if="stock.price !== null && stock.price !== undefined" class="leader-detail-price">
@@ -123,10 +95,10 @@
               </text>
             </view>
           </view>
-        </view>
+        </Card>
 
         <!-- 主线个股（风口精选）— Web表格样式 -->
-        <view v-if="sector.main_stocks && sector.main_stocks.length" class="stocks-card">
+        <Card v-if="sector.main_stocks && sector.main_stocks.length" class="stocks-card">
           <view class="stock-group-label">
             <view class="group-dot dot-main"></view>
             <text class="section-title">风口精选 ({{ sector.main_stocks.length }})</text>
@@ -147,10 +119,7 @@
             >
               <text class="td-name">{{ stock.name }}</text>
               <view class="td-industry">
-                <text
-                  v-if="stock.industry"
-                  :class="['stock-industry-tag', stock.in_concept ? 'concept' : '']"
-                >{{ stock.industry }}</text>
+                <Tag v-if="stock.industry" :type="stock.in_concept ? 'up' : 'neutral'" size="sm">{{ stock.industry }}</Tag>
               </view>
               <text class="td-price">{{ stock.price != null ? toFiniteNumber(stock.price)?.toFixed(2) : '--' }}</text>
               <text :class="['td-pnl', (stock.change_pct ?? 0) > 0 ? 'pnl-up' : (stock.change_pct ?? 0) < 0 ? 'pnl-down' : 'pnl-flat']">
@@ -159,10 +128,10 @@
               <text class="td-reason">{{ stock.reason || '' }}</text>
             </view>
           </view>
-        </view>
+        </Card>
 
         <!-- 上游带动 — Web表格样式 -->
-        <view v-if="sector.upstream_stocks && sector.upstream_stocks.length" class="stocks-card">
+        <Card v-if="sector.upstream_stocks && sector.upstream_stocks.length" class="stocks-card">
           <view class="stock-group-label">
             <view class="group-dot dot-up"></view>
             <text class="section-title">上游带动 ({{ sector.upstream_stocks.length }})</text>
@@ -183,10 +152,7 @@
             >
               <text class="td-name">{{ stock.name }}</text>
               <view class="td-industry">
-                <text
-                  v-if="stock.industry"
-                  :class="['stock-industry-tag', stock.in_concept ? 'concept' : '']"
-                >{{ stock.industry }}</text>
+                <Tag v-if="stock.industry" :type="stock.in_concept ? 'up' : 'neutral'" size="sm">{{ stock.industry }}</Tag>
               </view>
               <text class="td-price">{{ stock.price != null ? toFiniteNumber(stock.price)?.toFixed(2) : '--' }}</text>
               <text :class="['td-pnl', (stock.change_pct ?? 0) > 0 ? 'pnl-up' : (stock.change_pct ?? 0) < 0 ? 'pnl-down' : 'pnl-flat']">
@@ -195,10 +161,10 @@
               <text class="td-reason">{{ stock.reason || '' }}</text>
             </view>
           </view>
-        </view>
+        </Card>
 
         <!-- 下游传导 — Web表格样式 -->
-        <view v-if="sector.downstream_stocks && sector.downstream_stocks.length" class="stocks-card">
+        <Card v-if="sector.downstream_stocks && sector.downstream_stocks.length" class="stocks-card">
           <view class="stock-group-label">
             <view class="group-dot dot-down"></view>
             <text class="section-title">下游传导 ({{ sector.downstream_stocks.length }})</text>
@@ -219,10 +185,7 @@
             >
               <text class="td-name">{{ stock.name }}</text>
               <view class="td-industry">
-                <text
-                  v-if="stock.industry"
-                  :class="['stock-industry-tag', stock.in_concept ? 'concept' : '']"
-                >{{ stock.industry }}</text>
+                <Tag v-if="stock.industry" :type="stock.in_concept ? 'up' : 'neutral'" size="sm">{{ stock.industry }}</Tag>
               </view>
               <text class="td-price">{{ stock.price != null ? toFiniteNumber(stock.price)?.toFixed(2) : '--' }}</text>
               <text :class="['td-pnl', (stock.change_pct ?? 0) > 0 ? 'pnl-up' : (stock.change_pct ?? 0) < 0 ? 'pnl-down' : 'pnl-flat']">
@@ -231,7 +194,7 @@
               <text class="td-reason">{{ stock.reason || '' }}</text>
             </view>
           </view>
-        </view>
+        </Card>
       </template>
     </view>
   </SubPageCard>
@@ -243,6 +206,8 @@ import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderSector, WindLeaderAiAnalysis, WindLeaderFlowData, WindLeaderStock } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import { LoadingState, EmptyState, Tag, Badge, Button, Card, StatGrid } from '@/shared/components'
+import type { StatGridItem } from '@/shared/components'
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -286,6 +251,27 @@ const persistenceClass = computed(() => {
   if (tag.includes('中期')) return 'mid-term'
   if (tag.includes('短期')) return 'short-term'
   return ''
+})
+
+const persistenceTagType = computed<'down' | 'neutral' | 'warning'>(() => {
+  const tag = persistenceTag.value
+  if (tag.includes('长期')) return 'down'
+  if (tag.includes('中期')) return 'neutral'
+  if (tag.includes('短期')) return 'warning'
+  return 'neutral'
+})
+
+const sectorStatItems = computed<StatGridItem[]>(() => {
+  if (!sector.value) return []
+  const s = sector.value
+  const todayChange = s.today_change ?? 0
+  const avgChange = s.avg_change ?? 0
+  return [
+    { label: '今日涨幅', value: (todayChange >= 0 ? '+' : '') + formatPct(s.today_change), color: todayChange >= 0 ? 'up' : 'down' },
+    { label: '均涨幅', value: (avgChange >= 0 ? '+' : '') + formatPct(s.avg_change), color: avgChange >= 0 ? 'up' : 'down' },
+    { label: '净流入', value: formatNetInflow(s.net_inflow) },
+    { label: '领涨股', value: s.leading_stock || s.leading_stock_info?.name || '--' },
+  ]
 })
 
 interface AnalysisRow {
@@ -561,54 +547,9 @@ onLoad((options) => {
   padding: 24rpx;
 }
 
-/* ===== 状态卡片 ===== */
-.state-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 260rpx;
-  padding: 40rpx 32rpx;
-  background: #ffffff;
-  border-radius: 20rpx;
-  text-align: center;
-}
-
-.state-text {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #374151;
-}
-
-.state-hint {
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  color: #9ca3af;
-}
-
-.retry-button {
-  min-width: 200rpx;
-  margin-top: 28rpx;
-  padding: 0 32rpx;
-  color: #ffffff;
-  font-size: 26rpx;
-  line-height: 72rpx;
-  background: #4d7cfe;
-  border: 0;
-  border-radius: 36rpx;
-
-  &::after {
-    border: 0;
-  }
-}
-
-/* ===== 改动1: 统计卡片 ===== */
+/* ===== 统计卡片（Card 提供 bg/border/shadow，仅保留间距） ===== */
 .stats-card {
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 28rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
 .stats-header {
@@ -628,77 +569,7 @@ onLoad((options) => {
 .stats-name {
   font-size: 36rpx;
   font-weight: 600;
-  color: #1a1d24;
-}
-
-/* 持续性标签（对齐 Web 前端 hs-persistence-tag） */
-.persistence-badge {
-  font-size: 20rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 6rpx;
-  font-weight: 600;
-
-  &.long-term {
-    color: #16a34a;
-    background: #f0fdf4;
-  }
-
-  &.mid-term {
-    color: #2563eb;
-    background: #eff6ff;
-  }
-
-  &.short-term {
-    color: #d97706;
-    background: #fffbeb;
-  }
-}
-
-/* 频次 badge */
-.freq-badge {
-  font-size: 22rpx;
-  color: #4d7cfe;
-  background: rgba(77, 124, 254, 0.1);
-  padding: 4rpx 16rpx;
-  border-radius: 20rpx;
-  font-weight: 500;
-}
-
-/* 统计行：一行四个字段 */
-.stats-row {
-  display: flex;
-  gap: 12rpx;
-}
-
-.stat-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-}
-
-.stat-label {
-  font-size: 22rpx;
-  color: #6b7280;
-  margin-bottom: 8rpx;
-}
-
-.stat-value {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #1a1d24;
-
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
-
-  &.leader-stock-name {
-    font-size: 28rpx;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
-  }
+  color: $ink;
 }
 
 /* ===== 涨跌家数 ===== */
@@ -732,21 +603,17 @@ onLoad((options) => {
 .count-num {
   font-size: 32rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .count-label {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
-/* ===== 龙头股 ===== */
+/* ===== 龙头股（Card 提供 bg/border/shadow，仅保留间距） ===== */
 .leader-detail-card {
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 24rpx 28rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
 .leader-detail-row {
@@ -773,12 +640,12 @@ onLoad((options) => {
 .leader-detail-name {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .leader-detail-code {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   background: #f0f2f5;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
@@ -793,7 +660,7 @@ onLoad((options) => {
 .leader-detail-price {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .leader-detail-change {
@@ -804,33 +671,20 @@ onLoad((options) => {
   &.down { color: #22c55e; }
 }
 
-/* ===== 改动4: 行业标签 — 概念红色, 非概念蓝色 (与Web前端一致, 无前缀标签) ===== */
-.stock-industry-tag {
-  font-size: 20rpx;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 2rpx 10rpx;
-  border-radius: 6rpx;
-
-  &.concept {
-    color: #dc2626;
-    background: #fef2f2;
-  }
-}
-
 /* ===== AI 分析卡片 ===== */
 .ai-card {
-  background: #ffffff;
-  border-radius: 20rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-lg;
   padding: 24rpx 28rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  box-shadow: $shadow-sm;
 }
 
 .section-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 16rpx;
   display: block;
 }
@@ -846,7 +700,7 @@ onLoad((options) => {
 
 .flow-chart-title {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-bottom: 12rpx;
   display: block;
   text-align: center;
@@ -870,7 +724,7 @@ onLoad((options) => {
 
 .flow-chart-fallback-text {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   line-height: 1.6;
 }
 
@@ -900,7 +754,7 @@ onLoad((options) => {
 
 .ai-value {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   flex: 1;
 
   &.risk {
@@ -912,13 +766,9 @@ onLoad((options) => {
   }
 }
 
-/* ===== 个股列表 ===== */
+/* ===== 个股列表（Card 提供 bg/border/shadow，仅保留间距） ===== */
 .stocks-card {
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 24rpx 20rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
 /* 分组标题（带圆点） */
@@ -990,7 +840,7 @@ onLoad((options) => {
 }
 
 .td-price {
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
@@ -1007,7 +857,7 @@ onLoad((options) => {
 }
 
 .td-reason {
-  color: #6b7280;
+  color: $ink-soft;
   font-size: 20rpx;
   overflow: hidden;
   text-overflow: ellipsis;

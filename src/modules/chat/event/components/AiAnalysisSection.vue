@@ -8,8 +8,7 @@
       </view>
       <text class="section-title">{{ title }}</text>
       <view class="section-status" v-if="status === 'processing' || status === 'generating'">
-        <view class="status-spinner" />
-        <text class="status-label">{{ status === 'processing' ? 'AI开始分析...' : 'AI正在生成...' }}</text>
+        <LoadingState size="sm" layout="horizontal" :text="status === 'processing' ? 'AI开始分析...' : 'AI正在生成...'" />
       </view>
       <view class="section-status" v-else-if="status === 'completed'">
         <text class="status-label done">分析完成</text>
@@ -19,18 +18,21 @@
 
     <!-- 流式生成文本 -->
     <view class="section-stream" v-if="(status === 'processing' || status === 'generating') && streamingText">
-      <text class="stream-text">{{ streamingText }}<text class="stream-cursor">|</text></text>
+      <StreamingText :text="streamingText" />
     </view>
 
-    <!-- completed 后：折叠式思考过程 -->
-    <template v-if="status === 'completed' && (streamingText || explanation)">
-      <view class="thinking-toggle" @tap="thinkingExpanded = !thinkingExpanded">
-        <text class="toggle-text">{{ thinkingExpanded ? '收起思考过程 ▴' : '查看思考过程 ▾' }}</text>
-      </view>
-      <view class="section-thinking" v-if="thinkingExpanded">
+    <!-- completed 后：折叠式思考过程（Collapse 组件） -->
+    <Collapse
+      v-if="status === 'completed' && (streamingText || explanation)"
+      :items="thinkingItems"
+      v-model="thinkingKeys"
+      accordion
+      class="thinking-collapse"
+    >
+      <template #thinking>
         <text class="thinking-body">{{ streamingText || explanation }}</text>
-      </view>
-    </template>
+      </template>
+    </Collapse>
 
     <!-- 分析内容（仅 completed 时展示业务组件） -->
     <view class="section-body" v-if="status === 'completed' && $slots.default">
@@ -57,6 +59,9 @@
  * Slot: default — completed 后的业务组件
  */
 import { computed, ref, watch } from 'vue'
+import LoadingState from '@/shared/components/LoadingState.vue'
+import StreamingText from '@/shared/components/StreamingText.vue'
+import { Collapse } from '@/shared/components'
 
 type StepStatus = 'pending' | 'processing' | 'generating' | 'completed'
 
@@ -78,14 +83,17 @@ const props = withDefaults(defineProps<Props>(), {
 
 const padNumber = computed(() => String(props.stepNumber).padStart(2, '0'))
 
-const thinkingExpanded = ref(false)
+/** 思考过程折叠面板配置（单条目，手风琴模式） */
+const thinkingItems = [{ key: 'thinking', title: '查看思考过程' }]
+/** 当前展开的折叠面板 key 列表（v-model 绑定 Collapse） */
+const thinkingKeys = ref<string[]>([])
 
 // 每次开始新的 processing/generating 时重置折叠状态
 watch(() => props.status, (val) => {
   if (val === 'processing' || val === 'generating' || val === 'pending') {
-    thinkingExpanded.value = true // 流式输出时展开
+    thinkingKeys.value = ['thinking'] // 流式输出时展开
   } else if (val === 'completed') {
-    thinkingExpanded.value = false // 完成后折叠
+    thinkingKeys.value = [] // 完成后折叠
   }
 })
 
@@ -160,15 +168,6 @@ const numStatusClass = computed(() => {
   gap: 6rpx;
 }
 
-.status-spinner {
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
-  border: 2px solid rgba(99, 102, 241, 0.25);
-  border-top-color: var(--ev-accent);
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 .status-label { font-size: 20rpx; color: var(--ev-accent); font-weight: 500; }
 .status-label.done { color: var(--ev-positive); }
 .pending-label { font-size: 20rpx; color: var(--ev-text-muted); }
@@ -179,34 +178,8 @@ const numStatusClass = computed(() => {
   margin-bottom: 14rpx;
 }
 
-.stream-text {
-  font-size: 24rpx;
-  color: var(--ev-text-secondary);
-  line-height: 1.7;
-}
-.stream-cursor {
-  color: var(--ev-accent);
-  animation: blink 0.6s step-end infinite;
-}
-
-@keyframes blink { 50% { opacity: 0; } }
-
-/* ===== 思考过程折叠 ===== */
-.thinking-toggle {
-  padding: 10rpx 0;
-  margin-bottom: 8rpx;
-}
-
-.thinking-toggle:active { opacity: 0.7; }
-
-.toggle-text {
-  font-size: 20rpx;
-  color: var(--ev-text-muted);
-}
-.section-thinking {
-  padding: 14rpx 18rpx;
-  border-radius: 8rpx;
-  background: var(--ev-accent-bg);
+/* ===== 思考过程折叠（Collapse 组件） ===== */
+.thinking-collapse {
   margin-bottom: 14rpx;
 }
 .thinking-body {

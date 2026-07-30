@@ -1,75 +1,119 @@
+/** RelationGraph 组件 — 同步自 aistock-component-lib/src/components/RelationGraph.vue | 同步时间：2026-07-28 */
 <template>
   <view class="as-relation-graph">
-    <view v-if="title" class="as-graph-header">
-      <text class="as-graph-title">{{ title }}</text>
+    <view v-if="title" class="as-relation-graph__title">
+      <text class="as-relation-graph__title-text">{{ title }}</text>
     </view>
-    <view v-if="!nodes.length" class="as-graph-empty">
-      <text class="as-graph-empty-text">暂无关系数据</text>
+
+    <!-- 空态 -->
+    <view v-if="!nodes.length" class="as-relation-graph__empty">
+      <view class="as-relation-graph__empty-icon"></view>
+      <text class="as-relation-graph__empty-text">暂无关联数据</text>
     </view>
-    <view v-else class="as-graph-canvas">
-      <!-- 中心节点 -->
-      <view
-        class="as-node as-node-center"
-        :style="centerNodeStyle"
-        @tap="$emit('node-click', centerNode)"
-      >
-        <text class="as-node-label">{{ centerNode?.label }}</text>
-        <text v-if="centerNode?.subLabel" class="as-node-sub">{{ centerNode.subLabel }}</text>
+
+    <template v-else>
+      <view class="as-relation-graph__canvas">
+        <svg class="as-relation-graph__svg" viewBox="0 0 360 280">
+          <defs>
+            <linearGradient :id="centerGradId" x1="0" y1="0" x2="0" y2="1">
+              <stop class="as-relation-graph__center-stop-top" offset="0%" />
+              <stop class="as-relation-graph__center-stop-bottom" offset="100%" />
+            </linearGradient>
+          </defs>
+
+          <!-- 连线（先画，被节点圆覆盖端点） -->
+          <line
+            v-for="(l, i) in links"
+            :key="'link-' + i"
+            class="as-relation-graph__link"
+            :class="'is-' + l.relType"
+            :x1="l.x1"
+            :y1="l.y1"
+            :x2="l.x2"
+            :y2="l.y2"
+          />
+
+          <!-- 节点 -->
+          <g
+            v-for="(p, i) in layout"
+            :key="'node-' + i"
+            class="as-relation-graph__node"
+            :class="p.isMain ? 'is-main' : 'is-' + p.relType"
+            @click="onNodeClick(p)"
+          >
+            <circle
+              class="as-relation-graph__circle"
+              :class="p.isMain ? 'is-main' : 'is-' + p.relType"
+              :cx="p.x"
+              :cy="p.y"
+              :r="p.isMain ? 36 : 24"
+              :fill="p.isMain ? `url(#${centerGradId})` : undefined"
+            />
+            <!-- 中心节点：文字在圆内，白色 -->
+            <text
+              v-if="p.isMain"
+              class="as-relation-graph__main-label"
+              :x="p.x"
+              :y="p.y"
+              text-anchor="middle"
+              dominant-baseline="central"
+              font-size="12"
+              font-weight="700"
+            >{{ truncateLabel(p.node.label, 4) }}</text>
+            <!-- 外围节点：文字在圆下方，按关系类型着色 -->
+            <template v-else>
+              <text
+                class="as-relation-graph__node-label"
+                :class="'is-' + p.relType"
+                :x="p.x"
+                :y="p.y + 33"
+                text-anchor="middle"
+                dominant-baseline="central"
+                font-size="10"
+                font-weight="600"
+              >{{ truncateLabel(p.node.label, 6) }}</text>
+              <text
+                v-if="p.node.subLabel"
+                class="as-relation-graph__node-sub"
+                :x="p.x"
+                :y="p.y + 44"
+                text-anchor="middle"
+                dominant-baseline="central"
+                font-size="8"
+              >{{ p.node.subLabel }}</text>
+            </template>
+          </g>
+        </svg>
       </view>
-      <!-- 周边节点（径向布局） -->
-      <view
-        v-for="(node, idx) in peripheralNodes"
-        :key="idx"
-        :class="['as-node', `as-node-${node.type || 'related'}`]"
-        :style="getNodeStyle(idx)"
-        @tap="$emit('node-click', node)"
-      >
-        <text class="as-node-label">{{ node.label }}</text>
-        <text v-if="node.factor" class="as-node-factor">{{ (node.factor * 100).toFixed(0) }}%</text>
+
+      <!-- 图例 -->
+      <view class="as-relation-graph__legend">
+        <view class="as-relation-graph__legend-item">
+          <view class="as-relation-graph__legend-dot is-upstream"></view>
+          <text class="as-relation-graph__legend-text">上游</text>
+        </view>
+        <view class="as-relation-graph__legend-item">
+          <view class="as-relation-graph__legend-dot is-downstream"></view>
+          <text class="as-relation-graph__legend-text">下游</text>
+        </view>
+        <view class="as-relation-graph__legend-item">
+          <view class="as-relation-graph__legend-dot is-related"></view>
+          <text class="as-relation-graph__legend-text">关联</text>
+        </view>
       </view>
-      <!-- 连接线（SVG 仅 H5，其他端用伪元素简化） -->
-      <!-- #ifdef H5 -->
-      <svg class="as-graph-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <line
-          v-for="(node, idx) in peripheralNodes"
-          :key="idx"
-          x1="50" y1="50"
-          :x2="50 + 40 * Math.cos(getAngle(idx))"
-          :y2="50 + 40 * Math.sin(getAngle(idx))"
-          :stroke="getLineColor(node.type)"
-          stroke-width="0.3"
-          opacity="0.4"
-        />
-      </svg>
-      <!-- #endif -->
-    </view>
-    <!-- 图例 -->
-    <view class="as-graph-legend">
-      <view class="as-legend-item">
-        <view class="as-legend-dot upstream" />
-        <text class="as-legend-text">上游</text>
-      </view>
-      <view class="as-legend-item">
-        <view class="as-legend-dot downstream" />
-        <text class="as-legend-text">下游</text>
-      </view>
-      <view class="as-legend-item">
-        <view class="as-legend-dot related" />
-        <text class="as-legend-text">关联</text>
-      </view>
-    </view>
+    </template>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 
-export interface GraphNode {
+interface GraphNode {
   id: string
   label: string
   subLabel?: string
   type?: 'main' | 'upstream' | 'downstream' | 'related'
-  factor?: number
+  factor?: number // 0-1，影响因子
 }
 
 const props = withDefaults(defineProps<{
@@ -79,98 +123,294 @@ const props = withDefaults(defineProps<{
   title: ''
 })
 
-const emit = defineEmits<{ (e: 'node-click', node: GraphNode): void }>()
+const emit = defineEmits<{
+  (e: 'node-click', node: GraphNode): void
+}>()
 
-const centerNode = computed(() => props.nodes.find(n => n.type === 'main') || props.nodes[0])
-const peripheralNodes = computed(() => props.nodes.filter(n => n.type !== 'main' && n.id !== centerNode.value?.id))
+// 画布中心与外围节点分布半径
+const CENTER = { x: 180, y: 120 }
+const R = 105
 
-const centerNodeStyle = computed(() => ({
-  left: '50%',
-  top: '50%',
-  transform: 'translate(-50%, -50%)'
-}))
+// 每个实例独立的渐变 id，避免多图共用导致引用错乱
+const centerGradId = 'as-rel-center-' + Math.random().toString(36).slice(2, 9)
 
-function getAngle(idx: number): number {
-  const count = peripheralNodes.value.length || 1
-  return (idx / count) * 2 * Math.PI - Math.PI / 2
+type RelType = 'upstream' | 'downstream' | 'related'
+
+interface PositionedNode {
+  node: GraphNode
+  x: number
+  y: number
+  isMain: boolean
+  relType: RelType
 }
 
-function getNodeStyle(idx: number): Record<string, string> {
-  const angle = getAngle(idx)
-  const radius = 38 // 百分比半径
-  const x = 50 + radius * Math.cos(angle)
-  const y = 50 + radius * Math.sin(angle)
-  return {
-    left: `${x}%`,
-    top: `${y}%`,
-    transform: 'translate(-50%, -50%)'
+const mainNode = computed(() => props.nodes.find(n => n.type === 'main') ?? null)
+
+// 按关系类型分组（type 缺省归为 related）
+const peripheralByType = computed<{ up: GraphNode[]; down: GraphNode[]; rel: GraphNode[] }>(() => {
+  const up: GraphNode[] = []
+  const down: GraphNode[] = []
+  const rel: GraphNode[] = []
+  for (const n of props.nodes) {
+    if (n.type === 'main') continue
+    const t = n.type ?? 'related'
+    if (t === 'upstream') up.push(n)
+    else if (t === 'downstream') down.push(n)
+    else rel.push(n)
   }
+  return { up, down, rel }
+})
+
+// 将一组节点均匀分布在以 centerAngle 为中心的弧段上
+function distribute(centerAngleDeg: number, k: number): number[] {
+  if (k <= 0) return []
+  if (k === 1) return [centerAngleDeg]
+  // 单位间距 36°，节点多时自动收紧，最大展开 110°
+  const step = Math.min(36, 110 / (k - 1))
+  const half = (k - 1) / 2
+  return Array.from({ length: k }, (_, i) => centerAngleDeg + (i - half) * step)
 }
 
-function getLineColor(type?: string): string {
-  if (type === 'upstream') return '#4d7cfe'
-  if (type === 'downstream') return '#f43f5e'
-  return '#9ca3af'
+const layout = computed<PositionedNode[]>(() => {
+  const result: PositionedNode[] = []
+  if (mainNode.value) {
+    result.push({
+      node: mainNode.value,
+      x: CENTER.x,
+      y: CENTER.y,
+      isMain: true,
+      relType: 'related'
+    })
+  }
+  const place = (list: GraphNode[], centerAngle: number, relType: RelType) => {
+    const angles = distribute(centerAngle, list.length)
+    list.forEach((n, i) => {
+      const a = (angles[i] * Math.PI) / 180
+      result.push({
+        node: n,
+        x: CENTER.x + R * Math.cos(a),
+        y: CENTER.y + R * Math.sin(a),
+        isMain: false,
+        relType
+      })
+    })
+  }
+  // 上游居左、下游居右、关联居下
+  place(peripheralByType.value.up, 180, 'upstream')
+  place(peripheralByType.value.down, 0, 'downstream')
+  place(peripheralByType.value.rel, 90, 'related')
+  return result
+})
+
+// 连线：从中心指向各外围节点
+const links = computed(() => {
+  return layout.value
+    .filter(p => !p.isMain)
+    .map(p => ({
+      x1: CENTER.x,
+      y1: CENTER.y,
+      x2: p.x,
+      y2: p.y,
+      relType: p.relType
+    }))
+})
+
+function truncateLabel(s: string, max = 6): string {
+  return s.length > max ? s.slice(0, max) + '…' : s
+}
+
+function onNodeClick(p: PositionedNode) {
+  emit('node-click', p.node)
 }
 </script>
 
 <style lang="scss" scoped>
-.as-relation-graph { background: #ffffff; border-radius: 12rpx; padding: 24rpx; }
-
-.as-graph-header { margin-bottom: 16rpx; }
-.as-graph-title { font-size: 28rpx; font-weight: 600; color: #1a1d24; }
-
-.as-graph-canvas {
-  position: relative;
+.as-relation-graph {
   width: 100%;
-  height: 500rpx;
-  background: #fafbfc;
-  border-radius: 8rpx;
 }
 
-.as-graph-lines {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  pointer-events: none;
+.as-relation-graph__title {
+  margin-bottom: $s-3;
 }
 
-.as-node {
-  position: absolute;
+.as-relation-graph__title-text {
+  font-size: $font-size-md;
+  font-weight: 700;
+  color: $ink;
+}
+
+/* ===== 空态 ===== */
+.as-relation-graph__empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 12rpx 16rpx;
-  border-radius: 8rpx;
-  min-width: 100rpx;
-  max-width: 160rpx;
-  z-index: 2;
+  padding: $s-10 $s-6;
 }
 
-.as-node-center {
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
-  box-shadow: 0 4rpx 16rpx rgba(77, 124, 254, 0.3);
-  min-width: 140rpx;
+.as-relation-graph__empty-icon {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: $bg-deep;
+  margin-bottom: $s-3;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40rpx;
+    height: 40rpx;
+    border: 4rpx solid $line-strong;
+    border-radius: 50%;
+  }
 }
 
-.as-node-upstream { background: rgba(77, 124, 254, 0.1); border: 1rpx solid rgba(77, 124, 254, 0.3); }
-.as-node-downstream { background: rgba(244, 63, 94, 0.1); border: 1rpx solid rgba(244, 63, 94, 0.3); }
-.as-node-related { background: #f5f7fa; border: 1rpx solid #e5e7eb; }
+.as-relation-graph__empty-text {
+  font-size: $font-size-sm;
+  color: $ink-mute;
+}
 
-.as-node-label { font-size: 22rpx; color: #1a1d24; text-align: center; }
-.as-node-center .as-node-label { color: #ffffff; font-weight: 600; font-size: 24rpx; }
-.as-node-sub { font-size: 18rpx; color: rgba(255, 255, 255, 0.8); margin-top: 2rpx; }
-.as-node-factor { font-size: 18rpx; color: #6b7280; margin-top: 2rpx; }
+/* ===== 画布 ===== */
+.as-relation-graph__canvas {
+  width: 100%;
+  max-width: 690rpx;
+  margin: 0 auto;
+}
 
-.as-graph-empty { height: 300rpx; display: flex; align-items: center; justify-content: center; }
-.as-graph-empty-text { font-size: 26rpx; color: #9ca3af; }
+.as-relation-graph__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
 
-.as-graph-legend { display: flex; gap: 24rpx; justify-content: center; margin-top: 16rpx; }
-.as-legend-item { display: flex; align-items: center; gap: 6rpx; }
-.as-legend-dot { width: 16rpx; height: 16rpx; border-radius: 50%; }
-.as-legend-dot.upstream { background: #4d7cfe; }
-.as-legend-dot.downstream { background: #f43f5e; }
-.as-legend-dot.related { background: #9ca3af; }
-.as-legend-text { font-size: 20rpx; color: #6b7280; }
+/* ===== 连线 ===== */
+.as-relation-graph__link {
+  fill: none;
+  stroke-width: 1.5;
+
+  &.is-upstream {
+    stroke: $primary;
+  }
+
+  &.is-downstream {
+    stroke: $up;
+  }
+
+  &.is-related {
+    stroke: $ink-mute;
+    stroke-dasharray: 4 3;
+  }
+}
+
+/* ===== 节点 ===== */
+.as-relation-graph__node {
+  cursor: pointer;
+}
+
+.as-relation-graph__node:active .as-relation-graph__circle {
+  opacity: $op-active;
+}
+
+.as-relation-graph__circle {
+  &.is-main {
+    stroke: $primary-deep;
+    stroke-width: 2;
+  }
+
+  &.is-upstream {
+    fill: $bg-soft;
+    stroke: $primary;
+    stroke-width: 2;
+  }
+
+  &.is-downstream {
+    fill: $up-bg;
+    stroke: $up;
+    stroke-width: 2;
+  }
+
+  &.is-related {
+    fill: $bg-soft;
+    stroke: $ink-mute;
+    stroke-width: 2;
+  }
+}
+
+.as-relation-graph__main-label {
+  font-family: $font-sans;
+  fill: $white;
+}
+
+.as-relation-graph__node-label {
+  font-family: $font-sans;
+
+  &.is-upstream {
+    fill: $primary;
+  }
+
+  &.is-downstream {
+    fill: $up;
+  }
+
+  &.is-related {
+    fill: $ink-soft;
+  }
+}
+
+.as-relation-graph__node-sub {
+  font-family: $font-sans;
+  fill: $ink-mute;
+}
+
+/* 中心节点渐变：主色 -> 深主色 */
+.as-relation-graph__center-stop-top {
+  stop-color: $primary;
+}
+
+.as-relation-graph__center-stop-bottom {
+  stop-color: $primary-deep;
+}
+
+/* ===== 图例 ===== */
+.as-relation-graph__legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $s-4;
+  margin-top: $s-2;
+}
+
+.as-relation-graph__legend-item {
+  display: flex;
+  align-items: center;
+  gap: $s-1;
+}
+
+.as-relation-graph__legend-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+
+  &.is-upstream {
+    background: $primary;
+  }
+
+  &.is-downstream {
+    background: $up;
+  }
+
+  &.is-related {
+    background: $ink-mute;
+  }
+}
+
+.as-relation-graph__legend-text {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
 </style>

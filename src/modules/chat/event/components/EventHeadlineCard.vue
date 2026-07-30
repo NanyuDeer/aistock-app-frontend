@@ -1,81 +1,75 @@
 <template>
-  <view
-    class="event-headline-card"
-    :class="[`event-headline-card--${type}`]"
-    @tap="handleClick"
+  <Card
+    class="headline-card"
+    :class="`headline-card--${type}`"
+    flat
+    clickable
+    @click="handleClick"
   >
-    <!-- AI装饰光斑 -->
-    <view class="ai-glow-decoration" :class="`ai-glow-decoration--${type}`"></view>
+    <view class="card-inner">
+      <!-- AI装饰光斑 -->
+      <view class="ai-glow-decoration" :class="`ai-glow-decoration--${type}`" />
 
-    <!-- 标签行 -->
-    <view class="card-header">
-      <!-- 方向标签（第一视觉） -->
-      <view class="direction-badge" :class="`direction-badge--${type}`">
-        <text class="direction-icon">{{ directionIcon }}</text>
-        <text class="direction-text">{{ directionText }}</text>
+      <!-- 标签行 -->
+      <view class="card-header">
+        <!-- 方向标签（第一视觉）：Tag up/down/neutral -->
+        <Tag :type="type === 'positive' ? 'up' : type === 'negative' ? 'down' : 'neutral'" size="sm">
+          <SvgIcon :name="type === 'positive' ? 'arrow-up-line' : type === 'negative' ? 'arrow-down-line' : 'arrow-up-down-line'" size="20rpx" :color="dirIconColor" />
+          <text class="direction-text">{{ directionText }}</text>
+        </Tag>
+
+        <!-- 重大标签（第二视觉）：Badge gold/info，emoji 🔥 替换为 SvgIcon -->
+        <Badge v-if="importance === 'major'" type="gold" size="sm">
+          <SvgIcon name="fire-line" size="20rpx" :color="fireColor" />
+          <text class="importance-text">重大</text>
+        </Badge>
+        <Badge v-else type="info" size="sm">
+          <text class="importance-text">重要</text>
+        </Badge>
       </view>
 
-      <!-- 重大标签（第二视觉） -->
-      <view v-if="importance === 'major'" class="importance-badge importance-badge--major">
-        <text class="importance-icon">🔥</text>
-        <text class="importance-text">重大</text>
-      </view>
-      <view v-else class="importance-badge">
-        <text class="importance-text">重要</text>
+      <!-- 事件标题 -->
+      <text class="event-title">{{ title }}</text>
+
+      <!-- 影响行业 -->
+      <view class="industries-container">
+        <!-- 股票趋势图标（自定义迷你图表，组件库无对应组件，保留） -->
+        <view class="trend-icon" :class="`trend-icon--${type}`">
+          <!-- 上升趋势图 -->
+          <svg v-if="type === 'positive'" width="48" height="28" viewBox="0 0 48 28" fill="none">
+            <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
+            <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
+            <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 22L18 18L24 20L30 12L36 14L42 6" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M40 6L42 6L42 8" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <!-- 下降趋势图 -->
+          <svg v-else-if="type === 'negative'" width="48" height="28" viewBox="0 0 48 28" fill="none">
+            <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
+            <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
+            <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 6L18 10L24 8L30 16L36 14L42 22" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M40 22L42 22L42 20" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <!-- 综合趋势图（紫色波浪） -->
+          <svg v-else width="48" height="28" viewBox="0 0 48 28" fill="none">
+            <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
+            <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
+            <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 14L18 8L24 20L30 10L36 18L42 12" stroke="#7C3AED" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </view>
+
+        <Badge v-for="(industry, index) in displayIndustries" :key="index" type="info" size="sm">
+          {{ industry }}
+        </Badge>
+        <Badge v-if="remainingCount > 0" type="info" size="sm">+{{ remainingCount }}</Badge>
       </view>
     </view>
-
-    <!-- 事件标题 -->
-    <text class="event-title">{{ title }}</text>
-
-    <!-- 影响行业 -->
-    <view class="industries-container">
-      <!-- 股票趋势图标 -->
-      <view class="trend-icon" :class="`trend-icon--${type}`">
-        <!-- 上升趋势图 -->
-        <svg v-if="type === 'positive'" width="48" height="28" viewBox="0 0 48 28" fill="none">
-          <!-- Y轴 -->
-          <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
-          <!-- X轴 -->
-          <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
-          <!-- Y轴箭头 -->
-          <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- X轴箭头 -->
-          <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- 上升趋势线 -->
-          <path d="M12 22L18 18L24 20L30 12L36 14L42 6" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- 趋势线箭头 -->
-          <path d="M40 6L42 6L42 8" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <!-- 下降趋势图 -->
-        <svg v-else width="48" height="28" viewBox="0 0 48 28" fill="none">
-          <!-- Y轴 -->
-          <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
-          <!-- X轴 -->
-          <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
-          <!-- Y轴箭头 -->
-          <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- X轴箭头 -->
-          <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- 下降趋势线 -->
-          <path d="M12 6L18 10L24 8L30 16L36 14L42 22" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- 趋势线箭头 -->
-          <path d="M40 22L42 22L42 20" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </view>
-
-      <view
-        v-for="(industry, index) in displayIndustries"
-        :key="index"
-        class="industry-tag"
-      >
-        <text class="industry-text">{{ industry }}</text>
-      </view>
-      <view v-if="remainingCount > 0" class="industry-tag industry-tag--more">
-        <text class="industry-text">+{{ remainingCount }}</text>
-      </view>
-    </view>
-  </view>
+  </Card>
 </template>
 
 <script setup lang="ts">
@@ -84,12 +78,19 @@
  *
  * 展示重大利好或重大利空事件的紧凑型卡片。
  * 用途：事件传导页面顶部的 AI 关注焦点区域。
+ *
+ * 视觉层对齐组件库：Card 容器 + Tag 方向 + Badge 重要性/行业 + SvgIcon 替代 emoji。
+ * 渐变/光斑为焦点卡刻意设计，通过覆盖 Card 默认样式保留。
  */
 import { computed } from 'vue'
+import Card from '@/shared/components/Card.vue'
+import Tag from '@/shared/components/Tag.vue'
+import Badge from '@/shared/components/Badge.vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 interface Props {
-  /** 事件方向：利好/利空 */
-  type: 'positive' | 'negative'
+  /** 事件方向：利好/利空/综合 */
+  type: 'positive' | 'negative' | 'mixed'
   /** 事件标题 */
   title: string
   /** 重要性：重大/重要 */
@@ -111,6 +112,14 @@ const emit = defineEmits<{
   click: [eventId: string]
 }>()
 
+// 设计令牌（SvgIcon color 需具体色值）
+const dirIconColor = computed(() => {
+  if (props.type === 'positive') return '#e54d5e' // $up
+  if (props.type === 'negative') return '#18a058' // $down
+  return '#7c3aed' // purple for mixed
+})
+const fireColor = '#a67c1f' // $gold-deep
+
 // 点击处理
 function handleClick() {
   if (props.eventId) {
@@ -118,14 +127,11 @@ function handleClick() {
   }
 }
 
-// 计算方向图标
-const directionIcon = computed(() => {
-  return props.type === 'positive' ? '▲' : '▼'
-})
-
 // 计算方向文本（更符合投资用户理解）
 const directionText = computed(() => {
-  return props.type === 'positive' ? '机会' : '风险'
+  if (props.type === 'positive') return '机会'
+  if (props.type === 'negative') return '风险'
+  return '综合'
 })
 
 // 展示的行业（最多3个）
@@ -142,27 +148,61 @@ const remainingCount = computed(() => {
 <style lang="scss" scoped>
 @import '@/shared/styles/variables.scss';
 
-// ========== 基础卡片样式（横向紧凑卡片） ==========
-.event-headline-card {
-  position: relative;
-  padding: 12rpx 12rpx;
-  border-radius: $radius-base;
+/* Card 容器覆盖：恢复焦点卡的渐变 + 左侧色条 + 紧凑尺寸 */
+.headline-card.as-card {
+  padding: 0;
+  border: none;
   border-left: 8rpx solid;
+  border-radius: $r-md;
   overflow: hidden;
-  min-height: 140rpx;
-  max-height: 160rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
+  position: relative;
+  box-shadow: $shadow-xs;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   flex: 1;
+  width: 100%;
 }
 
-.event-headline-card:active {
+.headline-card.as-card:active {
   transform: scale(0.98);
 }
 
-// ========== AI装饰光斑 ==========
+.headline-card :deep(.as-card__body) {
+  padding: 0;
+}
+
+/* 利好卡片样式（机会） */
+.headline-card--positive.as-card {
+  background: linear-gradient(135deg, #FFF1F2 0%, #FFE4E6 55%, #FECDD3 100%);
+  border-left-color: $up;
+  box-shadow: 0 12rpx 40rpx rgba($up, 0.25);
+}
+
+/* 利空卡片样式（风险） */
+.headline-card--negative.as-card {
+  background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 55%, #A7F3D0 100%);
+  border-left-color: $down;
+  box-shadow: 0 12rpx 40rpx rgba($down, 0.18);
+}
+
+/* 综合卡片样式（mixed） */
+.headline-card--mixed.as-card {
+  background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 55%, #DDD6FE 100%);
+  border-left-color: #7c3aed;
+  box-shadow: 0 12rpx 40rpx rgba(124, 58, 237, 0.18);
+}
+
+/* 内层容器：保留原焦点卡的紧凑布局 */
+.card-inner {
+  position: relative;
+  padding: 12rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  min-height: 140rpx;
+  max-height: 160rpx;
+}
+
+/* ========== AI装饰光斑 ========== */
 .ai-glow-decoration {
   position: absolute;
   top: -20rpx;
@@ -175,28 +215,18 @@ const remainingCount = computed(() => {
 }
 
 .ai-glow-decoration--positive {
-  background: radial-gradient(circle, rgba(239, 68, 68, 0.35) 0%, rgba(239, 68, 68, 0.1) 50%, transparent 70%);
+  background: radial-gradient(circle, rgba($up, 0.35) 0%, rgba($up, 0.1) 50%, transparent 70%);
 }
 
 .ai-glow-decoration--negative {
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.08) 50%, transparent 70%);
+  background: radial-gradient(circle, rgba($down, 0.25) 0%, rgba($down, 0.08) 50%, transparent 70%);
 }
 
-// ========== 利好卡片样式（机会） - 视觉权重55% ==========
-.event-headline-card--positive {
-  background: linear-gradient(135deg, #FFF1F2 0%, #FFE4E6 55%, #FECDD3 100%);
-  border-left-color: #EF4444;
-  box-shadow: 0 12rpx 40rpx rgba(239, 68, 68, 0.25);
+.ai-glow-decoration--mixed {
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.25) 0%, rgba(124, 58, 237, 0.08) 50%, transparent 70%);
 }
 
-// ========== 利空卡片样式（风险） - 视觉权重45% ==========
-.event-headline-card--negative {
-  background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 55%, #A7F3D0 100%);
-  border-left-color: #10B981;
-  box-shadow: 0 12rpx 40rpx rgba(16, 185, 129, 0.18);
-}
-
-// ========== 标签行 ==========
+/* ========== 标签行 ========== */
 .card-header {
   display: flex;
   align-items: center;
@@ -206,79 +236,22 @@ const remainingCount = computed(() => {
   z-index: 1;
 }
 
-// ========== 方向标签（第一视觉） ==========
-.direction-badge {
-  display: flex;
-  align-items: center;
-  gap: 2rpx;
-  padding: 3rpx 10rpx;
-  border-radius: $radius-pill;
-  font-weight: 700;
-}
-
-.direction-badge--positive {
-  background: rgba(239, 68, 68, 0.20);
-}
-
-.direction-badge--negative {
-  background: rgba(16, 185, 129, 0.16);
-}
-
-.direction-icon {
-  font-size: 20rpx;
-}
-
-.direction-badge--positive .direction-icon {
-  color: #DC2626;
-}
-
-.direction-badge--negative .direction-icon {
-  color: #059669;
-}
-
 .direction-text {
   font-size: 22rpx;
   font-weight: 700;
-}
-
-.direction-badge--positive .direction-text {
-  color: #DC2626;
-}
-
-.direction-badge--negative .direction-text {
-  color: #059669;
-}
-
-// ========== 重大标签（第二视觉） ==========
-.importance-badge {
-  display: flex;
-  align-items: center;
-  gap: 2rpx;
-  padding: 3rpx 10rpx;
-  border-radius: $radius-pill;
-  background: rgba(0, 0, 0, 0.05);
-  font-weight: 700;
-}
-
-.importance-badge--major {
-  background: rgba(245, 158, 11, 0.15);
-}
-
-.importance-icon {
-  font-size: 20rpx;
+  margin-left: 2rpx;
 }
 
 .importance-text {
   font-size: 22rpx;
   font-weight: 700;
-  color: $text-color;
 }
 
-// ========== 事件标题 ==========
+/* ========== 事件标题 ========== */
 .event-title {
   font-size: 24rpx;
   font-weight: 600;
-  color: $text-color;
+  color: $ink;
   line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
@@ -287,7 +260,7 @@ const remainingCount = computed(() => {
   z-index: 1;
 }
 
-// ========== 影响行业 ==========
+/* ========== 影响行业 ========== */
 .industries-container {
   display: flex;
   align-items: center;
@@ -298,7 +271,7 @@ const remainingCount = computed(() => {
   z-index: 1;
 }
 
-// ========== 股票趋势图标 ==========
+/* ========== 股票趋势图标 ========== */
 .trend-icon {
   display: flex;
   align-items: center;
@@ -307,21 +280,5 @@ const remainingCount = computed(() => {
   height: 28rpx;
   margin-right: 4rpx;
   flex-shrink: 0;
-}
-
-.industry-tag {
-  padding: 2rpx 6rpx;
-  border-radius: 4rpx;
-  background: rgba(0, 0, 0, 0.04);
-  flex-shrink: 0;
-}
-
-.industry-tag--more {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.industry-text {
-  font-size: 20rpx;
-  color: $text-color-secondary;
 }
 </style>

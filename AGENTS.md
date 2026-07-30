@@ -175,6 +175,95 @@ src/
 - 分包页面在 `subPackages` 数组中
 - 页面路径对应 `src/modules/<模块>/pages/<页面>.vue`
 
+### 4.8 组件库优先原则（重要）
+
+> **组件库位置**：`../aistock-component-lib/`（与本项目同级目录，仅开发时参考）
+>
+> **组件库定位**：设计系统参考 + 组件开发沙盒 + 预览环境。**App 前端不依赖组件库目录，可独立编译和部署。**
+>
+> **组件清单**：见 `aistock-component-lib/README.md`，当前 41 个组件，涵盖基础、反馈、交互、导航布局、金融业务、数据可视化、金融数据展示、AI 对话与媒体 8 大类。
+>
+> **设计系统**：`aistock-component-lib/design/FinDesign System · 蓝白金融设计系统.html`
+>
+> **Design Token**：以组件库 `src/tokens/tokens.json` 为设计真源，`pnpm sync` 会自动同步 `variables.scss` 到 app 前端 `shared/styles/variables.scss`
+
+#### 开发新页面或新组件时的强制流程
+
+```
+1. 先查组件库 → 2. 有则复制使用 → 3. 无则先建组件库组件 → 4. 复制到前端使用
+```
+
+**Step 1 — 查组件库**：开发任何新页面前，先查看 `aistock-component-lib/README.md` 的组件清单，确认所需 UI 组件是否已存在于组件库中。
+
+**Step 2 — 有则复制使用**：如果组件库中有对应组件，将 `.vue` 文件从组件库**复制**到 app 前端 `shared/components/`（或模块 `components/`），然后通过 `@/shared/components` 引入使用。**禁止在 app 前端重复造轮子。**
+
+```vue
+<script setup lang="ts">
+// ✅ 正确：从 app 前端 shared/components 引入（组件已从组件库复制过来）
+import Button from '@/shared/components/Button.vue'
+import Card from '@/shared/components/Card.vue'
+// 或从统一入口引入（index.ts 导出后可用）
+// import { Button, Card } from '@/shared/components'
+</script>
+```
+
+> **注意**：复制组件时需处理 SCSS 变量引用。推荐在 `vite.config.ts` 中配置 `css.preprocessorOptions.scss.additionalData` 全局注入 `variables.scss`，这样复制过来的组件无需逐个修改 `@import` 路径。
+
+**Step 3 — 无则先建组件库组件**：如果组件库中没有所需组件，**必须先在组件库中创建**，按设计系统规范设计，在组件库预览环境中验证通过后，再复制到 app 前端使用。**禁止跳过组件库直接在 app 前端创建通用组件。**
+
+创建组件库组件的规范（见 `aistock-component-lib/AGENTS.md`）：
+- 标签用 `view`/`text`/`image`/`scroll-view`，禁用 `div`/`span`/`img`
+- 单位用 `rpx`，禁用 `px`
+- 事件用 `@tap`，禁用 `@click`
+- 类名统一 `as-` 前缀
+- Props 用 `withDefaults(defineProps<{}>(), {})` 写法
+- 样式用 `<style lang="scss" scoped>`，首行 `@import '@/styles/variables.scss';`
+- 颜色必须用 variables.scss 变量，禁用硬编码
+- 图标用 SvgIcon 组件，禁用 emoji
+- 组件必须是**纯 UI 组件**（props/events/slots），不含业务逻辑
+
+**Step 4 — 复制到前端使用**：组件库组件验证通过后，通过同步脚本自动复制到 app 前端 `shared/components/`。同步脚本会自动处理文件重命名、import 路径改写和 variables.scss 同步。
+
+#### 组件同步流程（自动化）
+
+```
+1. 在组件库中设计/修改组件
+2. 运行 `pnpm sync:dry-run` 预览变更（不实际写入）
+3. 运行 `pnpm sync` 执行同步（自动重命名 + 路径改写 + variables.scss 同步）
+4. 在 App 前端运行 `npx tsc --noEmit` 验证类型
+```
+
+- 同步方式为「复制」而非「引用」，同步后 App 前端可独立编译部署，不依赖组件库目录
+- 同步配置由组件库 `scripts/sync.config.json` 统一管理（重命名映射、排除列表、路径改写）
+- Wrapper 组件（AppBottomBar/MainTabs/PageCard/SubPageCard/SubPageCard2/GlobalChatBar）和 SvgIcon 不参与自动同步，需手动维护
+- 设计令牌变更时，`sync` 会自动同步 `variables.scss` 到 `shared/styles/variables.scss`
+- 也可在 App 前端直接运行 `pnpm sync` / `pnpm sync:dry-run`（内部 cd 到组件库执行）
+
+#### 组件库 vs App 前端组件的职责划分
+
+| 层级 | 位置 | 职责 | 可含业务逻辑 |
+|------|------|------|------------|
+| 组件库组件 | `aistock-component-lib/src/components/` | 纯 UI 组件，可跨项目复用 | ❌ 禁止 |
+| App wrapper 组件 | `shared/components/` | 包裹组件库组件 + 注入业务逻辑 | ✅ 允许 |
+| 模块业务组件 | `modules/*/components/` | 模块专属业务组件 | ✅ 允许 |
+
+#### 何时在组件库建组件 vs 在 App 前端建组件
+
+| 场景 | 建在哪里 | 示例 |
+|------|---------|------|
+| 可跨项目复用的纯 UI 组件 | 组件库 | Button、Card、Modal、Tag |
+| 需要跨模块复用但含 app 业务逻辑 | App shared wrapper | PageCard、GlobalChatBar |
+| 仅单个模块使用的业务组件 | 模块 components | MorningCard、StockCardList |
+| 特定页面的布局片段 | 页面内联 | 无需独立组件 |
+
+#### 现有组件迁移说明
+
+本项目正在将自定义组件逐步对齐组件库设计系统（迁移计划见 `aistock-component-lib/docs/app-frontend-migration-plan.md`）。迁移期间：
+- 旧组件保持可用，不做破坏性删除
+- 新页面/新功能必须使用从组件库复制过来的组件
+- 修改旧页面时，顺手将引用的旧组件替换为组件库对应组件（复制到 `shared/components/` 后引用）
+- **App 前端独立性**：组件库仅作为设计参考和开发沙盒，app 前端通过复制组件（非引用）保持完全独立，可脱离组件库目录独立编译和部署
+
 ## 5. 关键约束（硬约束）
 
 | 约束 | 说明 |
@@ -193,6 +282,7 @@ src/
 | App 端状态栏 | 自定义导航栏的页面必须设置 `paddingTop: statusBarHeight + 'px'`，否则顶部内容被状态栏遮挡 |
 | 类型安全 | 所有 .ts 文件需有类型注解，禁止 any（用 unknown） |
 | 模块解耦 | 模块间零直接依赖，组件解耦可插拔 |
+| 组件库优先 | 新页面/新组件必须先查组件库，有则复制到 `shared/components/` 使用，无则先在组件库建好再复制过来。禁止在 app 前端重复造通用组件。App 前端不依赖组件库目录，可独立编译部署 |
 | 登录非必须 | 未登录用户可看核心功能，仅自选股需登录 |
 | 未登录 Mock | 未登录用户展示 Mock 股票数据（贵州茅台、宁德时代、平安银行、中国平安、五粮液） |
 | App 打包 | 需要 HBuilderX App 开发版 + DCloud 账号云打包 |
@@ -229,18 +319,35 @@ src/
 
 ## 7. 共享组件速查
 
-| 组件 | 说明 |
-|------|------|
-| `SvgIcon.vue` | SVG 图标组件（统一图标方案，从 `assets/icons/` 加载） |
-| `PageCard.vue` | 页面卡片容器（主 tab 页用，含动态底部高度计算） |
-| `SubPageCard.vue` | 子页面卡片容器（子页用，含返回按钮 + scroll-view + GlobalChatBar） |
-| `GlobalChatBar.vue` | 全局聊天栏（悬浮入口） |
-| `AppBottomBar.vue` | 底部导航栏（bottom 动态绑定 ChatBar 高度） |
-| `Card.vue` / `Button.vue` / `Avatar.vue` | 基础 UI 组件 |
-| `RadarChart.vue` | 雷达图 |
-| `RelationGraph.vue` | 关系图谱 |
-| `LoadingState.vue` | 加载状态 |
-| `EmptyState.vue` | 空状态 |
+> **组件库优先**：以下组件中标注 `[组件库]` 的已从 `aistock-component-lib` 复制到 `shared/components/`，通过 `@/shared/components` 引入。标注 `[App 专属]` 的含业务逻辑，保留在 `shared/components/` 作为 wrapper。完整组件清单见 `aistock-component-lib/README.md`（41 个组件）。
+
+| 组件 | 来源 | 说明 |
+|------|------|------|
+| `SvgIcon.vue` | App 专属 | SVG 图标组件（从 `assets/icons/` 文件加载，支持大量预置图标） |
+| `PageCard.vue` | App 专属 | 页面卡片容器（主 tab 页用，含小熊头像 + GlobalChatBar + 动态底部高度） |
+| `SubPageCard.vue` | App 专属 | 子页面卡片容器 v1（含返回 + scroll + ChatBar），逐步迁移到 SubPageCard2 |
+| `SubPageCard2.vue` | App 专属 | 子页面卡片容器 v2（白色导航栏 + 副标题 + 可选 ChatBar） |
+| `GlobalChatBar.vue` | App 专属 | 全局聊天栏（交易/自选按钮 + 语音输入） |
+| `AppBottomBar.vue` | App 专属 | 底部导航栏（3 Tab + 动态 bottom 偏移） |
+| `MainTabs.vue` | App 专属 | 首页三 Tab 容器（MorningContent / StockContent / AlertContent） |
+| `Card.vue` | [组件库] | 基础卡片（标题 + 副标题 + 内容区，支持 clickable/flat） |
+| `Button.vue` | [组件库] | 按钮（primary/secondary/ghost/accent/gold/danger 6 种类型） |
+| `Tag.vue` | [组件库] | 标签（up/down/neutral/warning 4 种语义 + sm/md 尺寸） |
+| `Badge.vue` | [组件库] | 徽标（primary/warning 2 种类型 + 可选圆点） |
+| `Collapse.vue` | [组件库] | 折叠面板（支持 accordion + 具名插槽） |
+| `Input.vue` | [组件库] | 输入框（支持 search-icon / clearable / model-value） |
+| `Segmented.vue` | [组件库] | 分段选择器（items + v-model + @change） |
+| `BottomSheet.vue` | [组件库] | 底部弹窗（v-model:visible + title + 具名插槽） |
+| `Avatar.vue` | [组件库] | 头像（文字头像，4 种尺寸 + 4 种配色） |
+| `LoadingState.vue` | [组件库] | 加载状态（3 种尺寸 + 水平/垂直布局） |
+| `EmptyState.vue` | [组件库] | 空状态（对应组件库 `Empty.vue`） |
+| `RadarChart.vue` | [组件库] | 雷达图（多维度评分可视化） |
+| `RelationGraph.vue` | [组件库] | 关系图谱（径向布局 + 上下游/关联节点） |
+| `TheNavbar.vue` | [组件库] | 导航栏（对应组件库 `NavBar.vue`） |
+| `TheFooter.vue` | [组件库] | 页脚（对应组件库 `Footer.vue`） |
+
+**已引入但尚未在生产页面使用的组件**（已存在于 `shared/components/` 并通过 barrel export 导出，需要时直接 `import { ... } from '@/shared/components'`）：
+`Switch` `Rate` `Progress` `Skeleton` `Toast` `ActionSheet` `Modal` `Steps` `StatCard` `ListCell` `QuoteHeader` `Gauge` `Sparkline` `DataTable` `IndexCard` `Timeline` `ChatBubble` `StreamingText` `AudioPlayer` `InsightListCard` `StockItem`
 
 > **布局约束**: 所有需要预留底部空间的组件必须使用 `@/shared/utils/layout.ts` 中的函数（`getChatBarHeightPx` / `getBottomFixedHeightPx` / `getTabBarBottomPx`），禁止硬编码 rpx 值，以避免刘海屏设备底部内容被遮挡。
 
@@ -267,6 +374,8 @@ pnpm build:h5             # H5 构建
 pnpm build:app            # App 构建（需 HBuilderX 云打包）
 pnpm build:mp-weixin      # 小程序构建
 pnpm type-check           # TypeScript 类型检查（vue-tsc --noEmit）
+pnpm sync                 # 从组件库同步组件到 shared/components（复制方式）
+pnpm sync:dry-run         # 预览同步变更，不实际写入文件
 ```
 
 ## 10. 相关项目

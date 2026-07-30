@@ -3,7 +3,7 @@
     <PageCard title="洞察">
       <view class="content-wrap">
         <!-- 机构调研热门股卡片 -->
-        <view class="insight-card insight-card--burst" @tap="goHotBurst">
+        <Card clickable class="insight-card--burst" @click="goHotBurst">
           <view class="insight-card-header">
             <view class="insight-card-icon insight-card-icon--burst">
               <SvgIcon name="search-eye-line" size="32rpx" color="#ffffff" />
@@ -16,18 +16,18 @@
           </view>
           <view class="insight-preview">
             <view v-for="(item, idx) in hotBurstPreview" :key="idx" class="preview-item">
-              <text class="preview-rank preview-rank--burst">{{ idx + 1 }}</text>
+              <Badge size="sm" type="warning">{{ idx + 1 }}</Badge>
               <text class="preview-name">{{ item.name }}</text>
-              <text class="preview-tag preview-tag--burst">{{ item.count }}家机构调研</text>
+              <Tag size="sm" type="warning">{{ item.count }}家机构调研</Tag>
             </view>
           </view>
           <view class="insight-card-footer">
             <text class="insight-card-action insight-card-action--burst">查看详情 ›</text>
           </view>
-        </view>
+        </Card>
 
         <!-- 趋势股评分卡片 -->
-        <view class="insight-card insight-card--trend" @tap="goTrendScore">
+        <Card clickable class="insight-card--trend" @click="goTrendScore">
           <view class="insight-card-header">
             <view class="insight-card-icon insight-card-icon--trend">
               <SvgIcon name="bar-chart-line" size="32rpx" color="#ffffff" />
@@ -40,16 +40,16 @@
           </view>
           <view class="insight-preview">
             <view v-for="(item, idx) in trendScorePreview" :key="idx" class="preview-item">
-              <text class="preview-rank preview-rank--trend">{{ idx + 1 }}</text>
+              <Badge size="sm">{{ idx + 1 }}</Badge>
               <text class="preview-name">{{ item.name }}</text>
-              <text class="preview-score">{{ item.score }}分</text>
-              <text class="preview-grade">{{ item.label }}</text>
+              <Badge type="primary">{{ item.score }}分</Badge>
+              <Tag size="sm" type="neutral">{{ item.label }}</Tag>
             </view>
           </view>
           <view class="insight-card-footer">
             <text class="insight-card-action insight-card-action--trend">查看详情 ›</text>
           </view>
-        </view>
+        </Card>
       </view>
     </PageCard>
 
@@ -63,6 +63,7 @@ import { onShow } from '@dcloudio/uni-app'
 import PageCard from '@/shared/components/PageCard.vue'
 import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { Card, Badge, Tag } from '@/shared/components'
 import { trendScoreApi } from '@/shared/api/modules/trend-score'
 
 const hotBurstPreview = ref([
@@ -100,26 +101,19 @@ onShow(loadTrendScorePreview)
 <style lang="scss" scoped>
 .page-insight {
   height: 100%;
-  background: #f5f7fb;
+  background: $bg-soft;
 }
 
 .content-wrap {
   padding: 24rpx;
 }
 
-/* ===== 卡片基础 ===== */
-.insight-card {
-  background: #f5f7fb;
-  border-radius: 20rpx;
-  padding: 28rpx;
-  margin-bottom: 24rpx;
+/* ===== 卡片装饰条（Card 组件已处理容器样式） ===== */
+.insight-card--burst {
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
-}
+  margin-bottom: 24rpx;
 
-/* 机构调研热门股 — 顶部橙色装饰条 */
-.insight-card--burst {
   &::before {
     content: '';
     position: absolute;
@@ -127,12 +121,16 @@ onShow(loadTrendScorePreview)
     left: 0;
     right: 0;
     height: 4rpx;
-    background: linear-gradient(90deg, #f97316, #fb923c);
+    background: $warning;
   }
 }
 
 /* 趋势股评分 — 顶部蓝色装饰条 */
 .insight-card--trend {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 24rpx;
+
   &::before {
     content: '';
     position: absolute;
@@ -140,7 +138,7 @@ onShow(loadTrendScorePreview)
     left: 0;
     right: 0;
     height: 4rpx;
-    background: linear-gradient(90deg, #4d7cfe, #6366f1);
+    background: linear-gradient(90deg, $primary, $primary-600);
   }
 }
 
@@ -163,12 +161,12 @@ onShow(loadTrendScorePreview)
 }
 
 .insight-card-icon--burst {
-  background: linear-gradient(135deg, #f97316, #fb923c);
+  background: linear-gradient(135deg, $warning, $gold);
   box-shadow: 0 4rpx 12rpx rgba(249, 115, 22, 0.3);
 }
 
 .insight-card-icon--trend {
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
+  background: linear-gradient(135deg, $primary, $primary-600);
   box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
 }
 
@@ -182,17 +180,17 @@ onShow(loadTrendScorePreview)
 .insight-card-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .insight-card-desc {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .insight-card-more {
   font-size: 32rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   font-weight: 300;
 }
 
@@ -201,11 +199,11 @@ onShow(loadTrendScorePreview)
   display: flex;
   flex-direction: column;
   gap: 14rpx;
-  background: #ffffff;
+  background: $bg-card;
   border-radius: 14rpx;
   padding: 20rpx 24rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  box-shadow: $shadow-xs;
 }
 
 .preview-item {
@@ -216,54 +214,9 @@ onShow(loadTrendScorePreview)
 
 .preview-name {
   font-size: 26rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
   flex: 1;
-}
-
-.preview-rank {
-  font-size: 22rpx;
-  font-weight: 700;
-  width: 36rpx;
-  height: 36rpx;
-  text-align: center;
-  line-height: 36rpx;
-  border-radius: 8rpx;
-}
-
-.preview-rank--burst {
-  color: #f97316;
-  background: rgba(249, 115, 22, 0.1);
-}
-
-.preview-rank--trend {
-  color: #4d7cfe;
-  background: rgba(77, 124, 254, 0.1);
-}
-
-.preview-tag {
-  font-size: 22rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 8rpx;
-}
-
-.preview-tag--burst {
-  color: #f97316;
-  background: rgba(249, 115, 22, 0.1);
-}
-
-.preview-score {
-  font-size: 26rpx;
-  color: #1a1d24;
-  font-weight: 600;
-}
-
-.preview-grade {
-  min-width: 32rpx;
-  color: #4d7cfe;
-  font-size: 24rpx;
-  font-weight: 700;
-  text-align: center;
 }
 
 /* ===== 底部操作 ===== */
@@ -280,12 +233,12 @@ onShow(loadTrendScorePreview)
 }
 
 .insight-card-action--burst {
-  color: #f97316;
-  background: rgba(249, 115, 22, 0.1);
+  color: $warning;
+  background: $warning-soft;
 }
 
 .insight-card-action--trend {
-  color: #4d7cfe;
-  background: rgba(77, 124, 254, 0.1);
+  color: $primary;
+  background: $primary-50;
 }
 </style>

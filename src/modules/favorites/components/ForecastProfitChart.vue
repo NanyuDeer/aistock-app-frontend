@@ -5,7 +5,7 @@
         <text class="chart-title">净利润预测趋势</text>
         <text class="chart-subtitle">实际 + 预测</text>
       </view>
-      <text class="chart-unit">亿元</text>
+      <Tag type="neutral" size="sm">亿元</Tag>
     </view>
     <view class="chart-legend">
       <view class="legend-item"><view class="legend-line is-actual"></view><text>实际</text></view>
@@ -56,6 +56,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Tag } from '@/shared/components'
 import { compactNumber } from '@/shared/utils/format'
 
 interface ProfitPoint {
@@ -135,23 +136,14 @@ const chartModel = computed(() => {
   display: block;
   font-size: 28rpx;
   font-weight: 700;
-  color: #172033;
+  color: $ink;
 }
 
 .chart-subtitle {
   display: block;
   margin-top: 6rpx;
   font-size: 22rpx;
-  color: #8aa0bd;
-}
-
-.chart-unit {
-  flex-shrink: 0;
-  padding: 6rpx 12rpx;
-  border-radius: 999rpx;
-  background: #f1f5f9;
-  font-size: 21rpx;
-  color: #64748b;
+  color: $ink-mute;
 }
 
 .chart-legend {
@@ -166,10 +158,10 @@ const chartModel = computed(() => {
   align-items: center;
   gap: 8rpx;
   padding: 8rpx 14rpx;
-  background: #f8fafc;
+  background: $bg-soft;
   border-radius: 999rpx;
   font-size: 22rpx;
-  color: #52657f;
+  color: $ink-soft;
 }
 
 .legend-line {
@@ -177,8 +169,8 @@ const chartModel = computed(() => {
   height: 8rpx;
   border-radius: 999rpx;
 
-  &.is-actual { background: #409eff; }
-  &.is-forecast { background: #e6a23c; }
+  &.is-actual { background: $primary; }
+  &.is-forecast { background: $warning; }
 }
 
 .profit-chart-body {
@@ -203,7 +195,7 @@ const chartModel = computed(() => {
 .profit-axis-text {
   font-size: 21rpx;
   line-height: 1;
-  color: #94a3b8;
+  color: $ink-mute;
 }
 
 .profit-svg {
@@ -230,7 +222,7 @@ const chartModel = computed(() => {
   min-width: 0;
   padding: 8rpx 2rpx;
   border-radius: 8rpx;
-  background: #f8fafc;
+  background: $bg-soft;
   text-align: center;
 }
 
@@ -238,7 +230,7 @@ const chartModel = computed(() => {
   display: block;
   font-size: 19rpx;
   line-height: 1.2;
-  color: #94a3b8;
+  color: $ink-mute;
 }
 
 .profit-value-number {
@@ -248,7 +240,7 @@ const chartModel = computed(() => {
   line-height: 1.2;
   font-weight: 700;
 
-  &.is-actual { color: #409eff; }
-  &.is-forecast { color: #e6a23c; }
+  &.is-actual { color: $primary; }
+  &.is-forecast { color: $warning; }
 }
 </style>

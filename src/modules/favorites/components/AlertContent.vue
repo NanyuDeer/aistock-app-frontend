@@ -3,61 +3,64 @@
     <view class="content-wrap">
       <!-- 异动捕手模块（新建模块：自选股异动监控） -->
       <view class="alert-module">
-        <view class="module-header" @tap="goAlertCatcher">
-          <text class="module-title">异动捕手</text>
-          <text class="module-more">实时监控 ›</text>
-        </view>
-        <view class="capture-list">
-          <view
-            v-for="(item, idx) in displayCaptureList"
-            :key="idx"
-            class="capture-item"
-          >
-            <view :class="['capture-badge', item.type]">
-              <text class="badge-text">{{ badgeLabel(item.type) }}</text>
+        <view class="module-card">
+          <view class="module-decor"></view>
+          <view class="module-header" @tap="goAlertCatcher">
+            <view class="module-icon">
+              <SvgIcon name="radar-line" size="32rpx" color="#0b5fff" />
             </view>
-            <view class="capture-info">
-              <text class="capture-name">{{ item.name }}</text>
-              <text class="capture-detail">{{ item.detail }}</text>
+            <view class="module-header-text">
+              <text class="module-title">异动捕手</text>
             </view>
-            <text class="capture-time">{{ item.time }}</text>
+            <text class="module-arrow">›</text>
           </view>
-          <view v-if="!captureList.length" class="empty-hint">
-            <text class="empty-text">暂无异动数据</text>
+          <view class="capture-list">
+            <ListCell
+              v-for="(item, idx) in displayCaptureList"
+              :key="idx"
+              :title="item.name"
+              :description="item.detail"
+            >
+              <template #prefix>
+                <Tag :type="captureTagType(item.type)" size="sm">{{ badgeLabel(item.type) }}</Tag>
+              </template>
+              <template #value>
+                <text class="capture-time">{{ item.time }}</text>
+              </template>
+            </ListCell>
+            <EmptyState v-if="!captureList.length" title="暂无异动数据" />
           </view>
         </view>
       </view>
 
       <!-- 个股情报模块（原StockMonitor，原异动捕手改名） -->
       <view class="alert-module">
-        <view class="module-header" @tap="goStockIntel">
-          <text class="module-title">个股情报</text>
-          <!-- 全部/利好/利空 切换标签 -->
-          <view class="intel-tabs">
-            <text
-              v-for="tab in intelTabOptions"
-              :key="tab.value"
-              :class="['intel-tab', intelSubTab === tab.value ? 'intel-tab--active' : '']"
-              @tap.stop="intelSubTab = tab.value"
-            >{{ tab.label }}</text>
-          </view>
-        </view>
-        <view class="intel-list">
-          <view
-            v-for="(item, idx) in displayIntelList"
-            :key="idx"
-            class="intel-item"
-          >
-            <view :class="['intel-source', item.sourceType]">
-              <text class="source-text">{{ sourceLabel(item.sourceType) }}</text>
+        <view class="module-card">
+          <view class="module-decor module-decor--intel"></view>
+          <view class="module-header" @tap="goStockIntel">
+            <view class="module-icon">
+              <SvgIcon name="search-eye-line" size="32rpx" color="#f0a020" />
             </view>
-            <view class="intel-info">
-              <text class="intel-title">{{ item.title }}</text>
-              <text class="intel-meta">{{ item.meta }}</text>
+            <view class="module-header-text">
+              <text class="module-title">个股情报</text>
+            </view>
+            <!-- 全部/利好/利空 切换标签 -->
+            <view class="intel-tabs" @tap.stop>
+              <Segmented :model-value="intelSubTab" :items="intelTabItems" @change="onIntelTabChange" />
             </view>
           </view>
-          <view v-if="!filteredIntelList.length" class="empty-hint">
-            <text class="empty-text">暂无情报数据</text>
+          <view class="intel-list">
+            <ListCell
+              v-for="(item, idx) in displayIntelList"
+              :key="idx"
+              :title="item.title"
+              :description="item.meta"
+            >
+              <template #prefix>
+                <Tag :type="sourceTagType(item.sourceType)" size="sm">{{ sourceLabel(item.sourceType) }}</Tag>
+              </template>
+            </ListCell>
+            <EmptyState v-if="!filteredIntelList.length" title="暂无情报数据" />
           </view>
         </view>
       </view>
@@ -67,6 +70,11 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import Segmented from '@/shared/components/Segmented.vue'
+import ListCell from '@/shared/components/ListCell.vue'
+import Tag from '@/shared/components/Tag.vue'
+import EmptyState from '@/shared/components/EmptyState.vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 // 异动类型
 type CaptureType = 'up' | 'vol' | 'speed' | 'limit'
@@ -90,7 +98,7 @@ interface IntelItem {
 
 const intelSubTab = ref<'all' | 'positive' | 'negative'>('all')
 
-const intelTabOptions = [
+const intelTabItems = [
   { label: '全部', value: 'all' as const },
   { label: '利好', value: 'positive' as const },
   { label: '利空', value: 'negative' as const },
@@ -133,6 +141,30 @@ function sourceLabel(type: SourceType): string {
   return map[type]
 }
 
+/** 异动类型 → Tag type：涨→up(红)，量→neutral(蓝)，速→gold，封→warning(橙) */
+function captureTagType(type: CaptureType): 'up' | 'neutral' | 'gold' | 'warning' {
+  switch (type) {
+    case 'up': return 'up'
+    case 'vol': return 'neutral'
+    case 'speed': return 'gold'
+    case 'limit': return 'warning'
+  }
+}
+
+/** 情报来源 → Tag type：公告→neutral(蓝)，研报→gold，新闻→warning(橙) */
+function sourceTagType(type: SourceType): 'neutral' | 'gold' | 'warning' {
+  switch (type) {
+    case 'announce': return 'neutral'
+    case 'research': return 'gold'
+    case 'news': return 'warning'
+  }
+}
+
+/** Segmented 的 change 回调（emit string|number），收敛回窄联合类型 */
+function onIntelTabChange(val: string | number) {
+  intelSubTab.value = val as 'all' | 'positive' | 'negative'
+}
+
 /** 异动捕手（新模块：自选股异动监控） */
 function goAlertCatcher() {
   uni.navigateTo({ url: '/modules/favorites/pages/alert-catcher' })
@@ -151,200 +183,144 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-@use '@/shared/styles/variables.scss' as *;
-
 .alert-content {
-  background: $bg-color-grey;
+  background: $bg-card;
 }
 
 .content-wrap {
-  padding: $spacing-base;
+  padding: $s-3;
 }
 
 /* ===== 模块通用 ===== */
 .alert-module {
-  margin-bottom: $spacing-base;
+  margin-bottom: $s-3;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 }
 
-.module-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: $spacing-sm;
-}
-
-.module-title {
-  font-size: $font-size-lg;
-  font-weight: 600;
-  color: $text-color-title;
-}
-
-.module-more {
-  font-size: $font-size-lg;
-  color: $text-color-secondary;
-}
-
-/* ===== 异动捕手 ===== */
-.capture-list {
-  background: #ffffff;
-  border-radius: $radius-base;
-  padding: 0 $spacing-base;
+/* 灰色卡片容器：参考 InsightListCard 设计 */
+.module-card {
+  background: $bg-soft;
+  border: 2rpx solid $line;
+  border-radius: $r-lg;
+  padding: $s-3;
+  position: relative;
+  overflow: hidden;
   box-shadow: $shadow-card;
 }
 
-.capture-item {
-  display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm 0;
-  border-bottom: 1rpx solid #f0f2f5;
-
-  &:last-child { border-bottom: none; }
+/* 顶部装饰条 */
+.module-decor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4rpx;
+  background: $brand-gradient;
 }
 
-.capture-badge {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 12rpx;
+.module-decor--intel {
+  background: linear-gradient(90deg, $warning, $warning-light);
+}
+
+/* 头部：标题/描述 + 箭头 */
+.module-header {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+  margin-bottom: $s-2;
+}
+
+.module-icon {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-
-  &.up { background: rgba(232, 70, 58, 0.1); }
-  &.vol { background: rgba($brand-color, 0.1); }
-  &.speed { background: rgba(39, 210, 191, 0.1); }
-  &.limit { background: rgba(239, 170, 23, 0.1); }
 }
 
-.badge-text {
-  font-size: 24rpx;
-  font-weight: 700;
-
-  .up & { color: #E8463A; }
-  .vol & { color: $brand-color; }
-  .speed & { color: #27D2BF; }
-  .limit & { color: #EFAA17; }
-}
-
-.capture-info {
+.module-header-text {
   flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4rpx;
+  min-width: 0;
 }
 
-.capture-name {
-  font-size: $font-size-base;
-  font-weight: 500;
-  color: $text-color-title;
+.module-title {
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: $ink;
 }
 
-.capture-detail {
+.module-arrow {
+  font-size: $font-size-lg;
+  color: $ink-mute;
+  font-weight: 300;
+  flex-shrink: 0;
+}
+
+/* ===== 异动捕手 / 个股情报 列表区域（参考 InsightListCard body） ===== */
+.capture-list,
+.intel-list {
+  background: $bg-card;
+  border-radius: $r-sm;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 覆写 ListCell 内边距和字体：使卡片更紧凑 */
+.capture-list :deep(.as-list-cell),
+.intel-list :deep(.as-list-cell) {
+  padding: $s-1 $s-2;
+}
+
+.capture-list :deep(.as-list-cell__title),
+.intel-list :deep(.as-list-cell__title) {
   font-size: $font-size-sm;
-  color: $text-color-secondary;
-  white-space: nowrap;
+}
+
+.capture-list :deep(.as-list-cell__desc),
+.intel-list :deep(.as-list-cell__desc) {
+  font-size: $font-size-xs;
+}
+
+.capture-list :deep(.as-list-cell__prefix),
+.intel-list :deep(.as-list-cell__prefix) {
+  margin-right: $s-2;
+}
+
+.capture-list :deep(.as-list-cell__right),
+.intel-list :deep(.as-list-cell__right) {
+  margin-left: $s-2;
+}
+
+/* 标题和描述单行截断，防止文字撑宽卡片 */
+.capture-list :deep(.as-list-cell__title),
+.intel-list :deep(.as-list-cell__title) {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capture-list :deep(.as-list-cell__desc),
+.intel-list :deep(.as-list-cell__desc) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .capture-time {
   font-size: $font-size-sm;
-  color: $text-color-tertiary;
+  color: $ink-mute;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
 
-/* ===== 个股情报 ===== */
 .intel-tabs {
   display: flex;
-  gap: 8rpx;
-}
-
-.intel-tab {
-  padding: 4rpx 16rpx;
-  border-radius: $radius-pill;
-  font-size: 22rpx;
-  color: $text-color-secondary;
-  background: $bg-color-grey;
-}
-
-.intel-tab--active {
-  background: $brand-color;
-  color: #ffffff;
-}
-
-.intel-list {
-  background: #ffffff;
-  border-radius: $radius-base;
-  padding: 0 $spacing-base;
-  box-shadow: $shadow-card;
-}
-
-.intel-item {
-  display: flex;
-  align-items: flex-start;
-  gap: $spacing-sm;
-  padding: $spacing-xs 0;
-  border-bottom: 1rpx solid #f0f2f5;
-
-  &:last-child { border-bottom: none; }
-}
-
-.intel-source {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 12rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-
-  &.announce { background: rgba($brand-color, 0.1); }
-  &.research { background: rgba(39, 210, 191, 0.1); }
-  &.news { background: rgba(239, 170, 23, 0.1); }
-}
-
-.source-text {
-  font-size: 24rpx;
-  font-weight: 700;
-
-  .announce & { color: $brand-color; }
-  .research & { color: #27D2BF; }
-  .news & { color: #EFAA17; }
-}
-
-.intel-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-}
-
-.intel-title {
-  font-size: $font-size-base;
-  color: $text-color-title;
-  line-height: 1.5;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.intel-meta {
-  font-size: $font-size-sm;
-  color: $text-color-secondary;
-}
-
-/* ===== 空状态 ===== */
-.empty-hint {
-  padding: $spacing-lg 0;
-  text-align: center;
-}
-
-.empty-text {
-  font-size: $font-size-sm;
-  color: $text-color-tertiary;
+  transform: scale(0.85);
+  transform-origin: right center;
 }
 </style>
