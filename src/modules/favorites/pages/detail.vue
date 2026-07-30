@@ -982,6 +982,12 @@ function selectActiveView(key: ViewKey) {
 const symbolRef = computed(() => symbol.value)
 const quoteRef = computed(() => ({ name: quote.value?.name, industry: stockInfo.value?.industry || quote.value?.industry }))
 const trendScoreDataRef = computed(() => trendScoreData.value)
+const stockAiContextRef = computed(() => ({
+  quote: quote.value,
+  stockInfo: stockInfo.value,
+  semiAnnualReport: semiAnnualReport.value,
+  forecastData: forecastData.value,
+}))
 const {
   midAiAnalysis,
   longAiAnalysis,
@@ -990,7 +996,7 @@ const {
   trendModel,
   trendVetoed,
   trendVetoReasons,
-} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef)
+} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef)
 
 const visibleNewsList = computed(() => newsExpanded.value ? newsList.value : newsList.value.slice(0, 3))
 
@@ -1039,13 +1045,13 @@ const forecastChartItems = computed(() => {
         year: String(item.year || ''),
         value,
         label: value == null ? '--' : value.toFixed(2),
-        kind: item.kind,
+        kind: item.kind === 'actual' || item.kind === 'forecast' ? item.kind : undefined,
       }
     })
-    .filter(item => item.year && item.value != null) as Array<{ year: string; value: number; label: string; kind?: string }>
+    .filter(item => item.year && item.value != null) as Array<{ year: string; value: number; label: string; kind?: 'actual' | 'forecast' }>
   if (!parsed.length) return []
-  const max = Math.max(...parsed.map(item => Math.abs(item.value)), 0.01)
-  return parsed.map(item => ({
+  const max = Math.max(...parsed.map((item: any) => Math.abs(item.value)), 0.01)
+  return parsed.map((item: any) => ({
     ...item,
     height: Math.max(14, Math.round((Math.abs(item.value) / max) * 100)),
   }))
@@ -1069,8 +1075,8 @@ const forecastYearRows = computed(() => {
         growthClass: item.growth === '--' || item.growth == null ? '' : item.growth >= 0 ? 'up' : 'down',
       }
     })
-  const max = Math.max(...parsed.map(item => Math.abs(item.value)), 0.01)
-  return parsed.map(item => ({
+  const max = Math.max(...parsed.map((item: any) => Math.abs(item.value)), 0.01)
+  return parsed.map((item: any) => ({
     ...item,
     progress: Math.max(18, Math.round((Math.abs(item.value) / max) * 100)),
   }))
@@ -1092,7 +1098,7 @@ const forecastYearKeys = computed(() => {
     .sort((a: any, b: any) => Number(a.year) - Number(b.year)) as Array<{ key: string; year: string; kind: 'actual' | 'forecast' }>
 })
 
-function buildForecastChartSource(): Array<{ year: string; netProfit: any; kind?: string }> {
+function buildForecastChartSource(): Array<{ year: string; netProfit: any; kind?: 'actual' | 'forecast' }> {
   const predictions = forecastData.value?.predictions
   if (Array.isArray(predictions) && predictions.length > 0) {
     return predictions.map((item: any) => ({ year: String(item.year || ''), netProfit: item.netProfit }))
