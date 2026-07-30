@@ -305,7 +305,7 @@ function goAnalyze() {
 .stock-name {
   font-size: 32rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .stock-code {
@@ -355,7 +355,7 @@ function goAnalyze() {
 
 .date-badge-text {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   background: #f3f4f6;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
@@ -374,7 +374,7 @@ function goAnalyze() {
   width: 12rpx;
   height: 12rpx;
   border-radius: 50%;
-  background: #4d7cfe;
+  background: $primary;
   flex-shrink: 0;
   z-index: 1;
 
@@ -392,7 +392,7 @@ function goAnalyze() {
 .timeline-line {
   width: 2rpx;
   flex: 1;
-  background: #e5e7eb;
+  background: $line;
   margin-top: 4rpx;
   min-height: 32rpx;
 }
@@ -412,13 +412,13 @@ function goAnalyze() {
 
 .alert-time {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   flex-shrink: 0;
 }
 
 .alert-tag {
   font-size: 22rpx;
-  color: #4d7cfe;
+  color: $primary;
   background: rgba(77, 124, 254, 0.1);
   padding: 2rpx 12rpx;
   border-radius: 6rpx;
@@ -454,7 +454,7 @@ function goAnalyze() {
 
 .progress-text {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-soft;
   font-weight: 500;
 }
 
@@ -481,7 +481,7 @@ function goAnalyze() {
 
 .action-btn {
   padding: 12rpx 32rpx;
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
+  background: linear-gradient(135deg, $primary, $primary-600);
   border-radius: 32rpx;
 }
 

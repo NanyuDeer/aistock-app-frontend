@@ -2,32 +2,26 @@
   <SubPageCard title="事件传导">
     <view class="event-list-content">
       <!-- AI关注焦点区域 -->
-      <view class="ai-focus-section">
+      <view v-if="focusEvents.length > 0" class="ai-focus-section">
         <text class="section-title">焦点事件</text>
         <view class="headline-cards">
           <EventHeadlineCard
-            v-if="headlinePositive"
-            type="positive"
-            :title="headlinePositive.title"
-            :importance="headlinePositive.importance"
-            :industries="headlinePositive.industries"
-            :event-id="headlinePositive.eventId"
-            @click="handleHeadlineClick"
-          />
-          <EventHeadlineCard
-            v-if="headlineNegative"
-            type="negative"
-            :title="headlineNegative.title"
-            :importance="headlineNegative.importance"
-            :industries="headlineNegative.industries"
-            :event-id="headlineNegative.eventId"
+            v-for="event in focusEvents"
+            :key="event.eventId"
+            :type="event.direction"
+            :title="event.title"
+            :importance="event.importance"
+            :industries="event.industries"
+            :event-id="event.eventId"
             @click="handleHeadlineClick"
           />
         </view>
       </view>
 
       <!-- 分类Tab -->
-      <EventTabBar :active="activeType" @change="handleFilterChange" />
+      <scroll-view scroll-x class="tab-scroll" :show-scrollbar="false">
+        <Segmented :modelValue="activeType" :items="tabItems" @change="(v: string | number) => handleFilterChange(String(v))" />
+      </scroll-view>
 
       <!-- 加载中 -->
       <view v-if="loading && events.length === 0" class="state-container">
@@ -91,70 +85,30 @@
  */
 import { onMounted, ref } from 'vue'
 import type { EventItem } from '@/modules/chat/event/types'
+import type { FocusEventViewModel } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
-import { getEventList, getEventDetail } from '@/modules/chat/event/api/eventApi'
+import { getFocusEvents } from '@/modules/chat/event/api/eventService'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import EventTabBar from '@/modules/chat/event/components/EventTabBar.vue'
+import Segmented from '@/shared/components/Segmented.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
+import { EVENT_TYPES } from '@/modules/chat/event/constants'
 
-// ========== 焦点事件（真实数据） ==========
-interface HeadlineEvent {
-  eventId: string
-  title: string
-  importance: 'major' | 'normal'
-  industries: string[]
-}
+// ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
+const tabItems = [{ label: '全部', value: '全部' }, ...EVENT_TYPES.map(v => ({ label: v, value: v }))]
 
-const headlinePositive = ref<HeadlineEvent | null>(null)
-const headlineNegative = ref<HeadlineEvent | null>(null)
+// ========== 焦点事件（基于 Global Importance 排序，由 eventService 提供） ==========
+const focusEvents = ref<FocusEventViewModel[]>([])
 
 /**
- * 加载焦点事件：从事件列表取最新几条，获取详情以确定方向（利好/利空）和影响行业
- * 取前3条事件详情，优先找出一条利好（positive）和一条利空（negative）
+ * 加载焦点事件：调用 getFocusEvents() 获取 rank=1（当前焦点）和 rank=2（持续影响）的事件
+ * 数据流：getEventList → 筛选 globalImportanceRank → 获取详情 → 转换为 FocusEventViewModel
  */
-async function loadHeadlineEvents() {
+async function loadFocusEvents() {
   try {
-    const res = await getEventList({ page: 1, pageSize: 6 })
-    const events = res?.events ?? []
-    if (events.length === 0) return
-
-    // 取前3条事件，获取详情确定方向
-    const candidates = events.slice(0, 3)
-    const details = await Promise.allSettled(
-      candidates.map(e => getEventDetail(e.eventId))
-    )
-
-    for (let i = 0; i < candidates.length; i++) {
-      const evt = candidates[i]
-      const r = details[i]
-      const detail = r.status === 'fulfilled' ? r.value : null
-      const rating = detail?.investmentSummary?.rating
-      const industries = (detail?.event?.affectedIndustries ?? [])
-        .slice(0, 3)
-        .map(a => a.name)
-
-      const headline: HeadlineEvent = {
-        eventId: evt.eventId,
-        title: evt.title,
-        importance: 'major',
-        industries,
-      }
-
-      // 按投资评级分配到利好/利空卡片
-      if (rating === 'positive' && !headlinePositive.value) {
-        headlinePositive.value = headline
-      } else if (rating === 'negative' && !headlineNegative.value) {
-        headlineNegative.value = headline
-      } else if (!headlinePositive.value) {
-        // 兜底：未确定方向时优先放入利好
-        headlinePositive.value = headline
-      } else if (!headlineNegative.value) {
-        headlineNegative.value = headline
-      }
-    }
+    focusEvents.value = await getFocusEvents()
   } catch (error) {
     console.error('加载焦点事件失败:', error)
   }
@@ -180,7 +134,7 @@ const { toggleFollow } = useEventFollow()
 // ========== 生命周期 ==========
 onMounted(() => {
   refresh()
-  loadHeadlineEvents()
+  loadFocusEvents()
 })
 
 // ========== 事件处理 ==========
@@ -224,6 +178,24 @@ async function handleFollow(event: EventItem) {
 <style scoped>
 .event-list-content {
   padding: 0 32rpx 40rpx;
+}
+
+/* 分类 Tab 滚动容器（Segmented 不自带横向滚动，7 个分类需滚动） */
+.tab-scroll {
+  width: 100%;
+  white-space: nowrap;
+  padding: 16rpx 0 8rpx;
+}
+
+.tab-scroll :deep(.as-segmented) {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+.tab-scroll :deep(.as-segmented__item) {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* ========== AI 关注焦点区域 ========== */

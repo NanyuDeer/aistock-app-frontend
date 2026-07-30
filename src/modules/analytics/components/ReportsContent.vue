@@ -3,27 +3,23 @@
     <!-- 搜索栏 + 筛选排序栏 -->
     <view class="reports-fixed">
       <view class="search-bar">
-        <view class="search-input-wrap">
-          <SvgIcon name="search-line" size="28rpx" color="#9ca3af" />
-          <input
-            v-model="keyword"
-            class="search-input"
-            placeholder="搜索股票代码/简称"
-            confirm-type="search"
-            @input="handleSearchInput"
-            @confirm="handleSearch"
-          />
-          <text v-if="keyword" class="search-clear" @tap="handleReset">✕</text>
-        </view>
+        <Input
+          :model-value="keyword"
+          search-icon
+          clearable
+          placeholder="搜索股票代码/简称"
+          @update:model-value="handleSearchInput"
+          @clear="handleReset"
+        />
       </view>
 
       <!-- 筛选 + 排序 单行 -->
       <view class="filter-sort-bar">
         <!-- 左侧：年份筛选 -->
         <view class="filter-section" @tap="toggleYearPicker">
-          <SvgIcon name="filter-line" size="24rpx" color="#4d7cfe" />
+          <SvgIcon name="filter-line" size="24rpx" color="#0b5fff" />
           <text class="filter-text">{{ selectedYear }}年</text>
-          <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
+          <SvgIcon name="arrow-down-s" size="20rpx" color="#4b5a7a" />
         </view>
 
         <!-- 右侧：排序下拉 + 升降序 -->
@@ -36,40 +32,27 @@
           >
             <view class="sort-picker">
               <text class="sort-picker-text">{{ currentSortLabel }}</text>
-              <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
+              <SvgIcon name="arrow-down-s" size="20rpx" color="#4b5a7a" />
             </view>
           </picker>
-          <view class="sort-order">
-            <text
-              :class="['order-btn', sortAsc === false ? 'active' : '']"
-              @tap="setOrder(false)"
-            >降序</text>
-            <text
-              :class="['order-btn', sortAsc === true ? 'active' : '']"
-              @tap="setOrder(true)"
-            >升序</text>
-          </view>
+          <Segmented
+            :items="[{ label: '降序', value: 'desc' }, { label: '升序', value: 'asc' }]"
+            :model-value="sortAsc ? 'asc' : 'desc'"
+            @change="onOrderChange"
+          />
         </view>
       </view>
     </view>
 
-    <!-- 年份下拉弹窗 -->
-    <view v-if="showYearPicker" class="industry-overlay" @tap="closeYearPicker">
-      <view class="industry-popup" @tap.stop>
-        <view class="industry-popup-header">
-          <text class="industry-popup-title">选择年份</text>
-          <text class="industry-popup-close" @tap="closeYearPicker">✕</text>
-        </view>
-        <scroll-view class="industry-list" scroll-y>
-          <view
-            v-for="yr in yearList"
-            :key="yr"
-            :class="['industry-item', selectedYear === yr ? 'active' : '']"
-            @tap="selectYear(yr)"
-          >{{ yr }}年</view>
-        </scroll-view>
-      </view>
-    </view>
+    <!-- 年份选择弹窗 -->
+    <BottomSheet v-model:visible="showYearPicker" title="选择年份">
+      <view
+        v-for="yr in yearList"
+        :key="yr"
+        :class="['year-item', selectedYear === yr ? 'active' : '']"
+        @tap="selectYear(yr)"
+      >{{ yr }}年</view>
+    </BottomSheet>
 
     <!-- 加载中 -->
     <view v-if="loading" class="loading-state">
@@ -77,26 +60,25 @@
     </view>
 
     <!-- 空数据 -->
-    <view v-else-if="!filteredList.length" class="empty-state">
-      <EmptyState :text="emptyTip" />
-    </view>
+    <EmptyState v-else-if="!filteredList.length" :text="emptyTip" />
 
     <!-- 列表 -->
     <view v-if="filteredList.length" class="report-list">
-      <view
+      <Card
         v-for="item in filteredList"
         :key="item.code"
+        clickable
         class="report-card"
-        @tap="goStockDetail(item)"
+        @click="goStockDetail(item)"
       >
         <!-- 顶部：股票名称 + 代码｜报告期｜标签 -->
         <view class="report-top">
           <view class="report-top-left">
             <text class="stock-name">{{ item.name }}</text>
-            <text class="stock-code">{{ item.code }}</text>
+            <Tag type="neutral" size="sm">{{ item.code }}</Tag>
           </view>
           <view class="report-period">{{ item.period }}</view>
-          <text :class="['report-tag', tagClass(item.tag)]">{{ item.tag }}</text>
+          <Tag :type="tagType(item.tag)" size="sm">{{ item.tag }}</Tag>
         </view>
 
         <!-- 中部：AI 研判标签 -->
@@ -105,13 +87,13 @@
             <view class="report-tags-group">
               <text class="report-tags-label">经营亮点</text>
               <view class="report-tags-list">
-                <text v-for="(gt, gi) in item.goodTags" :key="gi" class="report-tag-pill good">{{ gt }}</text>
+                <Tag v-for="(gt, gi) in item.goodTags" :key="gi" type="down" size="sm">{{ gt }}</Tag>
               </view>
             </view>
             <view v-if="item.riskTags.length" class="report-tags-group">
               <text class="report-tags-label">潜在风险</text>
               <view class="report-tags-list">
-                <text v-for="(rt, ri) in item.riskTags" :key="ri" class="report-tag-pill risk">{{ rt }}</text>
+                <Tag v-for="(rt, ri) in item.riskTags" :key="ri" type="up" size="sm">{{ rt }}</Tag>
               </view>
             </view>
           </view>
@@ -143,7 +125,7 @@
             <text class="update-time">更新时间：{{ item.updateTime }}</text>
           </view>
         </view>
-      </view>
+      </Card>
     </view>
 
     <view v-if="hasMore" class="load-more" @tap="loadMore">
@@ -155,8 +137,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import LoadingState from '@/shared/components/LoadingState.vue'
-import EmptyState from '@/shared/components/EmptyState.vue'
+import { Input, Segmented, Card, Tag, BottomSheet, EmptyState, LoadingState } from '@/shared/components'
 
 interface ReportItem {
   code: string
@@ -360,17 +341,15 @@ function fetchData(append = false) {
 }
 
 // ===== 搜索 =====
-function handleSearchInput() {
+function handleSearchInput(val: string) {
+  keyword.value = val
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => { fetchData(false) }, 300)
 }
 
-function handleSearch() {
-  fetchData(false)
-}
-
 function handleReset() {
   keyword.value = ''
+  if (searchTimer) clearTimeout(searchTimer)
   fetchData(false)
 }
 
@@ -382,10 +361,6 @@ function loadMore() {
 // ===== 年份筛选 =====
 function toggleYearPicker() {
   showYearPicker.value = !showYearPicker.value
-}
-
-function closeYearPicker() {
-  showYearPicker.value = false
 }
 
 function selectYear(yr: string) {
@@ -412,10 +387,14 @@ function setOrder(asc: boolean) {
   savePersistedState()
 }
 
+function onOrderChange(val: string | number) {
+  setOrder(val === 'asc')
+}
+
 // ===== 通用 =====
-function tagClass(tag: string): string {
+function tagType(tag: string): 'up' | 'down' {
   const goodTags = ['向好', '高增', '修复', '扭盈']
-  return goodTags.includes(tag) ? 'tag-good' : 'tag-bad'
+  return goodTags.includes(tag) ? 'up' : 'down'
 }
 
 function yoyClass(val: number): string {
@@ -449,39 +428,16 @@ fetchData(false)
 
 <style lang="scss" scoped>
 .reports-content {
-  background: #ffffff;
+  background: $bg-card;
 }
 
 /* 搜索栏 */
 .reports-fixed {
-  padding: 16rpx 24rpx 0;
+  padding: $s-2 $s-3 0;
 }
 
 .search-bar {
-  margin-bottom: 16rpx;
-}
-
-.search-input-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 16rpx 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-}
-
-.search-input {
-  flex: 1;
-  font-size: 26rpx;
-  color: #1a1d24;
-  height: 40rpx;
-}
-
-.search-clear {
-  font-size: 28rpx;
-  color: #9ca3af;
-  padding: 8rpx;
+  margin-bottom: $s-2;
 }
 
 /* ===== 筛选+排序单行 ===== */
@@ -489,11 +445,11 @@ fetchData(false)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16rpx;
-  padding: 12rpx 16rpx;
-  background: #ffffff;
-  border-radius: 16rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  margin-bottom: $s-2;
+  padding: $s-1 $s-2;
+  background: $bg-card;
+  border-radius: $r-md;
+  box-shadow: $shadow-sm;
 }
 
 .filter-section {
@@ -501,15 +457,15 @@ fetchData(false)
   align-items: center;
   gap: 6rpx;
   padding: 6rpx 12rpx;
-  background: #f0f4ff;
+  background: $primary-50;
   border-radius: 10rpx;
   flex-shrink: 0;
   max-width: 240rpx;
 }
 
 .filter-text {
-  font-size: 24rpx;
-  color: #4d7cfe;
+  font-size: $font-size-sm;
+  color: $primary;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -520,7 +476,7 @@ fetchData(false)
 .sort-section {
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: $s-1;
   flex-shrink: 0;
 }
 
@@ -529,100 +485,25 @@ fetchData(false)
   align-items: center;
   gap: 4rpx;
   padding: 6rpx 12rpx;
-  border-radius: 8rpx;
-  background: #f0f2f5;
+  border-radius: $r-xs;
+  background: $bg-deep;
 }
 
 .sort-picker-text {
-  font-size: 22rpx;
-  color: #4d7cfe;
+  font-size: $font-size-xs;
+  color: $primary;
   font-weight: 500;
 }
 
-.sort-order {
-  display: flex;
-  gap: 0;
-  flex-shrink: 0;
-  border-radius: 8rpx;
-  overflow: hidden;
-  border: 1rpx solid #e0e3e8;
-}
-
-.order-btn {
-  font-size: 20rpx;
-  color: #6b7280;
-  padding: 6rpx 12rpx;
-  background: #f9fafb;
-  font-weight: 500;
+/* ===== 年份选择弹窗（BottomSheet 内容） ===== */
+.year-item {
+  font-size: $font-size-base;
+  color: $ink-soft;
+  padding: $s-3 $s-3;
 
   &.active {
-    color: #fff;
-    background: #4d7cfe;
-  }
-
-  &:first-child {
-    border-right: 1rpx solid #e0e3e8;
-  }
-}
-
-/* ===== 年份下拉弹窗 ===== */
-.industry-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 1000;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 200rpx;
-}
-
-.industry-popup {
-  width: 560rpx;
-  max-height: 70vh;
-  background: #ffffff;
-  border-radius: 24rpx;
-  overflow: hidden;
-  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.15);
-}
-
-.industry-popup-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24rpx 28rpx;
-  border-bottom: 1rpx solid #f0f2f5;
-}
-
-.industry-popup-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #1a1d24;
-}
-
-.industry-popup-close {
-  font-size: 28rpx;
-  color: #9ca3af;
-  padding: 8rpx;
-}
-
-.industry-list {
-  max-height: 50vh;
-  padding: 12rpx 0;
-}
-
-.industry-item {
-  font-size: 26rpx;
-  color: #374151;
-  padding: 20rpx 28rpx;
-  border-bottom: 1rpx solid #f5f5f5;
-
-  &.active {
-    color: #ffffff;
-    background: #4d7cfe;
+    color: $primary;
+    background: $primary-50;
     font-weight: 600;
   }
 
@@ -631,9 +512,8 @@ fetchData(false)
   }
 }
 
-/* 加载/空 */
-.loading-state,
-.empty-state {
+/* 加载状态 */
+.loading-state {
   padding: 200rpx 0;
 }
 
@@ -641,95 +521,60 @@ fetchData(false)
 .report-list {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
-  padding: 0 24rpx 24rpx;
-}
-
-.report-card {
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 28rpx;
-  border: 1rpx solid #e5e7eb;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  gap: $s-2;
+  padding: 0 $s-3 $s-3;
 }
 
 /* 顶部：股票 + 报告期 + 标签 */
 .report-top {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  margin-bottom: 24rpx;
+  gap: $s-1;
+  margin-bottom: $s-3;
 }
 
 .report-top-left {
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: $s-1;
   flex-shrink: 0;
 }
 
 .stock-name {
-  font-size: 26rpx;
+  font-size: $font-size-base;
   font-weight: 600;
-  color: #1a1d24;
-}
-
-.stock-code {
-  font-size: 22rpx;
-  color: #6b7280;
-  background: #f0f2f5;
-  padding: 2rpx 10rpx;
-  border-radius: 6rpx;
+  color: $ink;
 }
 
 .report-period {
-  font-size: 22rpx;
-  color: #9ca3af;
+  font-size: $font-size-xs;
+  color: $ink-mute;
   flex-shrink: 0;
-}
-
-.report-tag {
-  font-size: 22rpx;
-  font-weight: 600;
-  padding: 4rpx 16rpx;
-  border-radius: 8rpx;
-  margin-left: auto;
-  flex-shrink: 0;
-
-  &.tag-good {
-    color: #f43f5e;
-    background: rgba(244, 63, 94, 0.1);
-  }
-
-  &.tag-bad {
-    color: #22c55e;
-    background: rgba(34, 197, 94, 0.1);
-  }
 }
 
 /* 中部：AI 研判标签 */
 .report-mid {
-  background: #f9fafb;
+  background: $bg-soft;
   border-radius: 14rpx;
-  padding: 16rpx 20rpx;
-  margin-bottom: 20rpx;
+  padding: $s-2 $s-3;
+  margin-bottom: $s-3;
 }
 
 .report-tags-wrap {
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: $s-1;
 }
 
 .report-tags-group {
   display: flex;
   align-items: flex-start;
-  gap: 8rpx;
+  gap: $s-1;
 }
 
 .report-tags-label {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   flex-shrink: 0;
   margin-top: 4rpx;
   min-width: 64rpx;
@@ -739,22 +584,6 @@ fetchData(false)
   display: flex;
   flex-wrap: wrap;
   gap: 6rpx;
-}
-
-.report-tag-pill {
-  font-size: 22rpx;
-  padding: 4rpx 14rpx;
-  border-radius: 14rpx;
-  font-weight: 400;
-
-  &.good {
-    color: #059669;
-    background: rgba(5, 150, 105, 0.1);
-  }
-  &.risk {
-    color: #dc2626;
-    background: rgba(220, 38, 38, 0.1);
-  }
 }
 
 .report-data-row {
@@ -781,15 +610,15 @@ fetchData(false)
 }
 
 .data-label {
-  font-size: 22rpx;
-  color: #9ca3af;
+  font-size: $font-size-xs;
+  color: $ink-mute;
   flex-shrink: 0;
 }
 
 .data-value {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   font-weight: 600;
-  color: #374151;
+  color: $ink-soft;
   flex-shrink: 0;
   min-width: 100rpx;
 }
@@ -797,15 +626,15 @@ fetchData(false)
 .data-yoy {
   font-size: 20rpx;
   font-weight: 500;
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 .data-arrow {
   font-size: 20rpx;
   font-weight: 700;
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 /* 底部：辅助信息 */
@@ -815,48 +644,24 @@ fetchData(false)
   gap: 12rpx;
 }
 
-.report-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  flex-wrap: wrap;
-}
-
-.meta-label {
-  font-size: 22rpx;
-  color: #9ca3af;
-}
-
-.meta-value {
-  font-size: 22rpx;
-  color: #374151;
-  font-weight: 500;
-}
-
-.meta-divider {
-  font-size: 22rpx;
-  color: #e0e3e8;
-  margin: 0 4rpx;
-}
-
 .report-time-row {
   display: flex;
   justify-content: flex-start;
 }
 
 .update-time {
-  font-size: 22rpx;
-  color: #9ca3af;
+  font-size: $font-size-xs;
+  color: $ink-mute;
 }
 
 /* 加载更多 */
 .load-more {
   text-align: center;
-  padding: 32rpx 0;
+  padding: $s-4 0;
 }
 
 .load-more-text {
-  font-size: 26rpx;
-  color: #4d7cfe;
+  font-size: $font-size-base;
+  color: $primary;
 }
 </style>

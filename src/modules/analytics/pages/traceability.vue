@@ -2,7 +2,7 @@
   <view class="page-traceability">
     <SubPageCard title="大盘溯源">
       <!-- 顶部摘要卡片 -->
-      <view class="summary-card">
+      <Card class="summary-card">
         <view class="summary-header">
           <view class="summary-icon">
             <SvgIcon name="bar-chart-line" size="32rpx" color="#ffffff" />
@@ -11,9 +11,7 @@
             <text class="summary-title">今日大盘溯源</text>
             <text class="summary-desc">追溯市场异动的源头与传导路径</text>
           </view>
-          <view class="summary-status" :class="statusClass">
-            <text class="status-text">{{ statusText }}</text>
-          </view>
+          <Badge :type="statusBadgeType">{{ statusText }}</Badge>
         </view>
         <view class="summary-body">
           <view class="summary-row">
@@ -29,7 +27,7 @@
             <text class="row-value">{{ affectedSectors || '--' }}</text>
           </view>
         </view>
-      </view>
+      </Card>
 
       <!-- 溯源分析内容 -->
       <view class="section-title">
@@ -37,34 +35,27 @@
       </view>
 
       <!-- 加载中 -->
-      <view v-if="loading" class="loading-state">
-        <LoadingState />
-      </view>
+      <LoadingState v-if="loading" />
 
       <!-- 错误状态 -->
-      <view v-else-if="error" class="error-state">
-        <SvgIcon name="cloud-off-line" size="80rpx" color="#d1d5db" />
-        <text class="error-text">分析数据获取失败</text>
-        <text class="error-desc">网络异常或服务暂时不可用，请稍后重试</text>
-        <view class="retry-btn" @tap="retry">重试</view>
-      </view>
+      <Card v-else-if="error" class="error-state">
+        <EmptyState title="分析数据获取失败" description="网络异常或服务暂时不可用，请稍后重试" icon="cloud-off-line">
+          <Button size="sm" @click="retry">重试</Button>
+        </EmptyState>
+      </Card>
 
       <!-- 空状态 -->
-      <view v-else-if="!analysisList.length" class="empty-state">
-        <EmptyState text="暂无溯源分析数据" />
-      </view>
+      <EmptyState v-else-if="!analysisList.length" text="暂无溯源分析数据" />
 
       <!-- 溯源分析列表 -->
       <view v-else class="analysis-list">
-        <view
+        <Card
           v-for="(item, idx) in analysisList"
           :key="idx"
           class="analysis-card"
         >
           <view class="card-header">
-            <view class="card-badge" :class="item.tagType">
-              <text class="badge-text">{{ item.tagName }}</text>
-            </view>
+            <Tag :type="badgeTagType(item.tagType)">{{ item.tagName }}</Tag>
             <text class="card-title">{{ item.title }}</text>
           </view>
           <view class="card-content">
@@ -77,7 +68,7 @@
             </view>
             <text class="time-text">{{ item.time }}</text>
           </view>
-        </view>
+        </Card>
       </view>
 
       <!-- 历史溯源记录 -->
@@ -112,8 +103,7 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import LoadingState from '@/shared/components/LoadingState.vue'
-import EmptyState from '@/shared/components/EmptyState.vue'
+import { LoadingState, EmptyState, Tag, Badge, Button, Card } from '@/shared/components'
 
 interface AnalysisItem {
   tagType: 'buy' | 'sell' | 'wash'
@@ -139,11 +129,12 @@ const affectedSectors = ref('')
 const analysisList = ref<AnalysisItem[]>([])
 const historyList = ref<HistoryItem[]>([])
 
-const statusClass = computed(() => {
-  if (loading.value) return 'status-loading'
-  if (error.value) return 'status-error'
-  if (analysisList.value.length) return 'status-ready'
-  return 'status-empty'
+// 状态徽章类型：loading→warning, error→danger, ready→success, empty→info
+const statusBadgeType = computed<'warning' | 'danger' | 'success' | 'info'>(() => {
+  if (loading.value) return 'warning'
+  if (error.value) return 'danger'
+  if (analysisList.value.length) return 'success'
+  return 'info'
 })
 
 const statusText = computed(() => {
@@ -158,6 +149,16 @@ const directionClass = computed(() => {
   if (direction.value.includes('下跌') || direction.value.includes('流出')) return 'text-down'
   return ''
 })
+
+// A股红涨绿跌：buy(利好)→up(红), sell(利空)→down(绿), wash(关注)→warning(黄)
+function badgeTagType(tagType: 'buy' | 'sell' | 'wash'): 'up' | 'down' | 'warning' {
+  const map: Record<string, 'up' | 'down' | 'warning'> = {
+    buy: 'up',
+    sell: 'down',
+    wash: 'warning'
+  }
+  return map[tagType] || 'warning'
+}
 
 async function fetchData() {
   loading.value = true
@@ -237,10 +238,6 @@ onShow(() => {
 /* ===== 摘要卡片 ===== */
 .summary-card {
   margin: $spacing-base;
-  background: $bg-color-grey;
-  border-radius: 20rpx;
-  padding: $spacing-base;
-  box-shadow: $shadow-card;
 }
 
 .summary-header {
@@ -280,37 +277,6 @@ onShow(() => {
   display: block;
 }
 
-.summary-status {
-  padding: 4rpx 14rpx;
-  border-radius: $radius-pill;
-  flex-shrink: 0;
-}
-
-.status-text {
-  font-size: 22rpx;
-  font-weight: 500;
-}
-
-.status-loading {
-  background: rgba(239, 170, 23, 0.1);
-  .status-text { color: #EFAA17; }
-}
-
-.status-error {
-  background: rgba(232, 70, 58, 0.1);
-  .status-text { color: #E8463A; }
-}
-
-.status-ready {
-  background: rgba(29, 201, 129, 0.1);
-  .status-text { color: #1DC981; }
-}
-
-.status-empty {
-  background: $bg-color-grey;
-  .status-text { color: $text-color-tertiary; }
-}
-
 .summary-body {
   display: flex;
   flex-direction: column;
@@ -322,7 +288,7 @@ onShow(() => {
   align-items: center;
   justify-content: space-between;
   padding: 12rpx 0;
-  border-bottom: 1rpx solid rgba(0, 0, 0, 0.04);
+  border-bottom: 1rpx solid $line-soft;
 
   &:last-child { border-bottom: none; }
 }
@@ -338,8 +304,8 @@ onShow(() => {
   font-weight: 500;
 }
 
-.text-up { color: #f43f5e !important; }
-.text-down { color: #22c55e !important; }
+.text-up { color: $up !important; }
+.text-down { color: $down !important; }
 
 /* ===== 区块标题 ===== */
 .section-title {
@@ -361,41 +327,6 @@ onShow(() => {
   color: $text-color-secondary;
 }
 
-/* ===== 状态 ===== */
-.loading-state,
-.empty-state,
-.error-state {
-  padding: 120rpx 0;
-}
-
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.error-text {
-  font-size: 28rpx;
-  color: #374151;
-  margin-top: 24rpx;
-  font-weight: 500;
-}
-
-.error-desc {
-  font-size: 24rpx;
-  color: #9ca3af;
-  margin-top: 12rpx;
-}
-
-.retry-btn {
-  margin-top: 40rpx;
-  padding: 16rpx 56rpx;
-  font-size: 26rpx;
-  color: #ffffff;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  border-radius: 40rpx;
-}
-
 /* ===== 分析列表 ===== */
 .analysis-list {
   display: flex;
@@ -404,33 +335,11 @@ onShow(() => {
   padding: 0 $spacing-base;
 }
 
-.analysis-card {
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: $spacing-base;
-  box-shadow: $shadow-card;
-}
-
 .card-header {
   display: flex;
   align-items: center;
   gap: $spacing-sm;
   margin-bottom: $spacing-sm;
-}
-
-.card-badge {
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
-  flex-shrink: 0;
-
-  &.buy { background: rgba(244, 63, 94, 0.1); .badge-text { color: #f43f5e; } }
-  &.sell { background: rgba(34, 197, 94, 0.1); .badge-text { color: #22c55e; } }
-  &.wash { background: rgba(239, 170, 23, 0.1); .badge-text { color: #EFAA17; } }
-}
-
-.badge-text {
-  font-size: 22rpx;
-  font-weight: 600;
 }
 
 .card-title {
@@ -455,7 +364,7 @@ onShow(() => {
   align-items: center;
   justify-content: space-between;
   padding-top: $spacing-sm;
-  border-top: 1rpx solid rgba(0, 0, 0, 0.04);
+  border-top: 1rpx solid $line-soft;
 }
 
 .source-info {
@@ -482,7 +391,7 @@ onShow(() => {
 /* ===== 历史记录 ===== */
 .history-list {
   margin: 0 $spacing-base;
-  background: #ffffff;
+  background: $bg-card;
   border-radius: 16rpx;
   padding: 0 $spacing-base;
   box-shadow: $shadow-card;
@@ -493,7 +402,7 @@ onShow(() => {
   align-items: center;
   justify-content: space-between;
   padding: $spacing-sm 0;
-  border-bottom: 1rpx solid rgba(0, 0, 0, 0.04);
+  border-bottom: 1rpx solid $line-soft;
 
   &:last-child { border-bottom: none; }
 }
@@ -512,9 +421,9 @@ onShow(() => {
   border-radius: 50%;
   flex-shrink: 0;
 
-  &.buy { background: #f43f5e; }
-  &.sell { background: #22c55e; }
-  &.wash { background: #EFAA17; }
+  &.buy { background: $up; }
+  &.sell { background: $down; }
+  &.wash { background: $warning; }
 }
 
 .history-info {

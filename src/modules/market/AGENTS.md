@@ -5,6 +5,8 @@
 
 ## 页面
 - `pages/event-catcher.vue` - 异动捕手
+- `pages/alert-analysis.vue` - AI 异动解读
+- `pages/hot-burst.vue` - 机构调研热门股
 - `pages/leaders.vue` - 长线风口（概览入口页：泡泡图 + 板块入口卡片列表，点击板块跳转详情）
 - `pages/sector-detail.vue` - 板块详情子页面（板块统计、龙头股、AI 分析、主线/上游/下游个股列表）
 - `pages/push-history.vue` - 历史推送
@@ -27,6 +29,7 @@
 - `@/shared/utils/datetime` - 日期时间格式化
 - `@/shared/components/SubPageCard.vue` - 子页面容器
 - `@/shared/components/SvgIcon.vue` - 图标组件
+- `@/shared/components` - 共享 UI 组件（LoadingState, EmptyState, Tag, Badge, Button, Card, Segmented, StatGrid, GuideCard）
 
 ## 开发注意事项
 - 长线风口数据通过 `stockApi.getWindLeaders(limit)` 获取，API 不可用时显示错误状态

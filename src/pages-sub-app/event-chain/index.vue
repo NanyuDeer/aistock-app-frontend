@@ -34,7 +34,9 @@
         <text class="section-title">全部事件</text>
 
         <!-- 分类Tab -->
-        <EventTabBar :active="activeType" @change="handleFilterChange" />
+        <scroll-view scroll-x class="tab-scroll" :show-scrollbar="false">
+          <Segmented :modelValue="activeType" :items="tabItems" @change="(v: string | number) => handleFilterChange(String(v))" />
+        </scroll-view>
 
         <!-- 加载中 -->
         <view v-if="loading && events.length === 0" class="state-container">
@@ -104,9 +106,13 @@ import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import EventTabBar from '@/modules/chat/event/components/EventTabBar.vue'
+import Segmented from '@/shared/components/Segmented.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
+import { EVENT_TYPES } from '@/modules/chat/event/constants'
+
+// ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
+const tabItems = [{ label: '全部', value: '全部' }, ...EVENT_TYPES.map(v => ({ label: v, value: v }))]
 
 // ========== Composables ==========
 const {
@@ -208,6 +214,17 @@ async function handleFollow(event: EventItem) {
 
 .event-chain-page {
   padding: 0 $spacing-lg $spacing-lg;
+}
+
+// ========== 分类 Tab 滚动容器（Segmented 不自带横向滚动，7 个分类需滚动） ==========
+.tab-scroll {
+  width: 100%;
+  white-space: nowrap;
+  padding: 16rpx 0 8rpx;
+}
+
+.tab-scroll :deep(.as-segmented) {
+  display: inline-flex;
 }
 
 // ========== AI 关注焦点区域 ==========

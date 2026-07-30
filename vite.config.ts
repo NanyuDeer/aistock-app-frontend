@@ -26,7 +26,10 @@ export default defineConfig(({ mode }) => {
       preprocessorOptions: {
         scss: {
           api: 'modern',
-          silenceDeprecations: ['legacy-js-api', 'import']
+          silenceDeprecations: ['legacy-js-api', 'import'],
+          // 全局注入设计变量，组件库组件复制过来后无需逐个修改 @import 路径
+          // 用 @use 而非 @import，避免与组件内 @use 冲突（Sass 规定 @use 必须在其他语句前）
+          additionalData: `@use "@/shared/styles/variables.scss" as *;`
         }
       }
     },

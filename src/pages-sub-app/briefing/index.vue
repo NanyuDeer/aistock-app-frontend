@@ -101,12 +101,12 @@
         <!-- 日期切换 -->
         <view class="date-nav">
           <view class="date-btn" @tap="changeDate(-1)">
-            <SvgIcon name="arrow-left-line" size="32rpx" color="#4d7cfe" />
+            <SvgIcon name="arrow-left-line" size="32rpx" color="#0b5fff" />
             <text class="date-btn-text">前一天</text>
           </view>
           <view class="date-btn" @tap="changeDate(1)">
             <text class="date-btn-text">后一天</text>
-            <SvgIcon name="arrow-right-line" size="32rpx" color="#4d7cfe" />
+            <SvgIcon name="arrow-right-line" size="32rpx" color="#0b5fff" />
           </view>
         </view>
       </template>
@@ -350,7 +350,7 @@ onUnmounted(() => {
 
 .loading-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 /* 音频入口条 */
@@ -362,7 +362,7 @@ onUnmounted(() => {
   background: #ffffff;
   margin-bottom: 24rpx;
   border-radius: 20rpx;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
@@ -370,7 +370,7 @@ onUnmounted(() => {
   width: 80rpx;
   height: 80rpx;
   border-radius: 50%;
-  background: #4d7cfe;
+  background: $primary;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -384,7 +384,7 @@ onUnmounted(() => {
 
 .audio-status {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 600;
   display: block;
 }
@@ -409,7 +409,7 @@ onUnmounted(() => {
   padding: 32rpx;
   margin-bottom: 24rpx;
   border: 1rpx solid rgba(77, 124, 254, 0.20);
-  border-left: 8rpx solid #4d7cfe;
+  border-left: 8rpx solid $primary;
 }
 
 .headline-label {
@@ -421,20 +421,20 @@ onUnmounted(() => {
 
 .headline-star {
   font-size: 24rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .headline-label-text {
   font-size: 22rpx;
   font-weight: 700;
-  color: #4d7cfe;
+  color: $primary;
   letter-spacing: 2rpx;
 }
 
 .headline-title {
   font-size: 34rpx;
   font-weight: 700;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.4;
   display: block;
   margin-bottom: 16rpx;
@@ -459,7 +459,7 @@ onUnmounted(() => {
   padding: 8rpx 20rpx;
   border-radius: 999rpx;
   background: #ffffff;
-  color: #4d7cfe;
+  color: $primary;
   border: 1rpx solid rgba(77, 124, 254, 0.20);
   font-weight: 500;
 }
@@ -483,7 +483,7 @@ onUnmounted(() => {
 .section-line {
   flex: 1;
   height: 1rpx;
-  background: #e5e7eb;
+  background: $line;
 }
 
 /* 洞见列表 */
@@ -495,7 +495,7 @@ onUnmounted(() => {
   border-radius: 20rpx;
   padding: 24rpx 28rpx;
   margin-bottom: 16rpx;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
   box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
 }
 
@@ -507,14 +507,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: #4d7cfe;
+  background: $primary;
 
   &.event { background: #d97706; }
   &.trend { background: #7c3aed; }
   &.alert { background: #e04545; }
   &.review { background: #64748b; }
   &.hot_burst { background: #0891b2; }
-  &.wind_leader { background: #4d7cfe; }
+  &.wind_leader { background: $primary; }
 }
 
 .insight-icon-text {
@@ -538,7 +538,7 @@ onUnmounted(() => {
 .insight-source {
   font-size: 24rpx;
   font-weight: 600;
-  color: #6b7280;
+  color: $ink-soft;
 }
 
 .sentiment-badge {
@@ -566,7 +566,7 @@ onUnmounted(() => {
 .insight-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.4;
   display: block;
   margin-bottom: 8rpx;
@@ -591,7 +591,7 @@ onUnmounted(() => {
   padding: 4rpx 16rpx;
   border-radius: 999rpx;
   background: rgba(77, 124, 254, 0.04);
-  color: #4d7cfe;
+  color: $primary;
 
   &.sector {
     background: rgba(148, 163, 184, 0.10);
@@ -631,7 +631,7 @@ onUnmounted(() => {
 .alert-title {
   font-size: 32rpx;
   font-weight: 700;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.4;
   display: block;
   margin-bottom: 12rpx;
@@ -671,7 +671,7 @@ onUnmounted(() => {
 
 .empty-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
   margin-top: 24rpx;
   margin-bottom: 12rpx;
 }
@@ -698,13 +698,13 @@ onUnmounted(() => {
   padding: 24rpx 0;
   background: #ffffff;
   border-radius: 999rpx;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
   box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.04);
 }
 
 .date-btn-text {
   font-size: 26rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 </style>

@@ -37,9 +37,9 @@
           <view class="left-section">
             <!-- 年份筛选 -->
             <view class="filter-section" @tap="toggleYearPicker">
-              <SvgIcon name="filter-line" size="24rpx" color="#4d7cfe" />
+              <SvgIcon name="filter-line" size="24rpx" color="#0b5fff" />
               <text class="filter-text">{{ selectedYear }}年</text>
-              <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
+              <SvgIcon name="arrow-down-s" size="20rpx" color="#4b5a7a" />
             </view>
 
             <!-- 排序下拉 -->
@@ -51,7 +51,7 @@
             >
               <view class="sort-picker">
                 <text class="sort-picker-text">{{ currentSortLabel }}</text>
-                <SvgIcon name="arrow-down-s" size="20rpx" color="#6b7280" />
+                <SvgIcon name="arrow-down-s" size="20rpx" color="#4b5a7a" />
               </view>
             </picker>
           </view>
@@ -565,14 +565,14 @@ fetchData(false)
 
 .toggle-btn {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 8rpx 24rpx;
   border-radius: 10rpx;
   font-weight: 500;
 
   &.active {
     color: #ffffff;
-    background: #4d7cfe;
+    background: $primary;
   }
 }
 
@@ -598,7 +598,7 @@ fetchData(false)
 .search-input {
   flex: 1;
   font-size: 26rpx;
-  color: #1a1d24;
+  color: $ink;
   height: 40rpx;
 }
 
@@ -633,7 +633,7 @@ fetchData(false)
 
 .filter-text {
   font-size: 24rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -659,7 +659,7 @@ fetchData(false)
 
 .sort-picker-text {
   font-size: 24rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 
@@ -674,14 +674,14 @@ fetchData(false)
 
 .order-btn {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   padding: 8rpx 16rpx;
   background: #f9fafb;
   font-weight: 500;
 
   &.active {
     color: #fff;
-    background: #4d7cfe;
+    background: $primary;
   }
 
   &:first-child {
@@ -724,7 +724,7 @@ fetchData(false)
 .industry-popup-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .industry-popup-close {
@@ -746,7 +746,7 @@ fetchData(false)
 
   &.active {
     color: #ffffff;
-    background: #4d7cfe;
+    background: $primary;
     font-weight: 600;
   }
 
@@ -804,7 +804,7 @@ fetchData(false)
   background: #ffffff;
   border-radius: 20rpx;
   padding: 28rpx;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
@@ -826,12 +826,12 @@ fetchData(false)
 .stock-name {
   font-size: 26rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .stock-code {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-soft;
   background: #f0f2f5;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
@@ -884,7 +884,7 @@ fetchData(false)
 
 .report-tags-label {
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-soft;
   flex-shrink: 0;
   margin-top: 4rpx;
   min-width: 64rpx;
@@ -1012,6 +1012,6 @@ fetchData(false)
 
 .load-more-text {
   font-size: 26rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 </style>

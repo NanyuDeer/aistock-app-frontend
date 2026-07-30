@@ -333,13 +333,13 @@ function goSearch() {
 .stat-divider {
   width: 1rpx;
   height: 48rpx;
-  background: #e5e7eb;
+  background: $line;
 }
 
 .stat-add-btn {
   margin-left: auto;
   padding: 10rpx 24rpx;
-  background: linear-gradient(135deg, #4d7cfe, #6366f1);
+  background: linear-gradient(135deg, $primary, $primary-600);
   border-radius: 24rpx;
 }
 
@@ -397,11 +397,11 @@ function goSearch() {
 
   &.active {
     .col-label {
-      color: #4d7cfe;
+      color: $primary;
       font-weight: 600;
     }
     .col-arrow {
-      color: #4d7cfe;
+      color: $primary;
     }
   }
 }
@@ -473,7 +473,7 @@ function goSearch() {
 
 .stock-name {
   font-size: 30rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 }
 
@@ -513,7 +513,7 @@ function goSearch() {
 
 .stock-price {
   font-size: 30rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 600;
   min-width: 100rpx;
   text-align: right;
@@ -549,7 +549,7 @@ function goSearch() {
   .empty-text {
     display: block;
     font-size: 28rpx;
-    color: #1a1d24;
+    color: $ink;
     margin-bottom: 10rpx;
   }
   .empty-tip {
@@ -561,7 +561,7 @@ function goSearch() {
   .empty-btn {
     display: inline-block;
     padding: 16rpx 48rpx;
-    background: linear-gradient(135deg, #4d7cfe, #6366f1);
+    background: linear-gradient(135deg, $primary, $primary-600);
     border-radius: 40rpx;
   }
   .empty-btn-text {
@@ -582,7 +582,7 @@ function goSearch() {
 
 .add-stock-text {
   font-size: 26rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 

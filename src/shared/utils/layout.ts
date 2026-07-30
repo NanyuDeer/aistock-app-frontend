@@ -112,10 +112,10 @@ export function getTabBarBottomPx(): number {
 
 /**
  * AppBottomBar 自身高度（px）
- * = tab-item(40rpx) + padding-bottom(4rpx)
+ * = padding-top($s-2=16rpx) + tab-item(56rpx) + padding-bottom(0)
  */
 export function getTabBarHeightPx(): number {
-  return rpx2px(44)
+  return rpx2px(72)
 }
 
 /**

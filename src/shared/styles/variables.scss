@@ -1,65 +1,240 @@
 /**
- * 样式变量 - 参照网页风格，浅色主题
- * 统一 design token：所有页面必须使用这些变量，禁止硬编码颜色值
- * 历史遗留的 #4d7cfe / #1a1d24 / #9ca3af 等硬编码值逐步替换为以下变量
+ * Design Token - 蓝白金融设计系统
+ * 同步自 aistock-component-lib/src/styles/variables.scss
+ * 同步时间：2026-07-28
+ * 规范：所有组件必须使用这些变量，禁止硬编码颜色值
+ * 单位：统一使用 rpx（uni-app 规范）
+ *
+ * 注意：本文件直接定义所有变量（非 @import 跨项目引用），确保 app 前端可独立编译
  */
 
-/* ===== 品牌色（实际使用的主色，与 SubPageCard/PageCard 渐变一致） ===== */
-$brand-color: #4d7cfe;                    // 品牌主色（顶栏渐变、按钮、链接）
-$brand-color-secondary: #6366f1;          // 品牌辅助色（渐变终点）
-$brand-gradient: linear-gradient(135deg, #4d7cfe 0%, #6366f1 100%);  // 品牌渐变
+/* ===== Brand - Primary Blue ===== */
+$primary: #0b5fff;
+$primary-deep: #0a2e6f;
+$primary-light: #4d8bff;
+$primary-50: #eaf2ff;
+$primary-100: #d6e6ff;
+$primary-200: #adc8ff;
+$primary-300: #7da6ff;
+$primary-400: #4d8bff;
+$primary-500: #0b5fff;
+$primary-600: #0948cc;
+$primary-700: #0a2e6f;
 
-/* 兼容旧变量（保持向后兼容，新代码请用 $brand-color） */
-$primary-color: #4d7cfe;
-$success-color: #22c55e;                  // 与页面中使用的 #22c55e 统一
-$warning-color: #f59e0b;                  // 与页面中使用的 #f59e0b 统一
-$error-color: #f43f5e;                     // 与页面中使用的 #f43f5e 统一
-$info-color: #6b7280;
+/* 兼容旧变量 */
+$brand-color: $primary;
+$brand-color-secondary: $primary-600;
+$brand-gradient: linear-gradient(135deg, $primary 0%, $primary-600 100%);
+$primary-color: $primary;
 
-/* ===== 背景色 ===== */
-$bg-color: #f5f7fb;                       // 页面背景（与 SubPageCard/PageCard 统一）
-$bg-color-grey: #ffffff;                  // 卡片背景
-$bg-color-hover: #f0f2f5;                 // 悬停背景
-$bg-color-muted: #f5f7fa;                 // 次要背景（分析框等）
+/* ===== Accent - Cyan ===== */
+$accent: #00b8ff;
+$accent-light: #5ad4ff;
+$accent-deep: #0088c4;
+$accent-50: #e6f8ff;
+$accent-100: #b3ecff;
 
-/* ===== 文字色 ===== */
-$text-color-title: #1a1d24;               // 标题文字（最深）
-$text-color: #1a1d24;                     // 主文字（与标题一致，保持兼容）
-$text-color-secondary: #6b7280;           // 次要文字（描述、副标题）
-$text-color-tertiary: #9ca3af;            // 辅助文字（时间、提示）
-$text-color-placeholder: #c0c4cc;         // 占位文字
+/* ===== Gold - Premium ===== */
+$gold: #d4a843;
+$gold-light: #e8c878;
+$gold-deep: #a67c1f;
+$gold-soft: rgba(212, 168, 67, 0.12);
 
-/* ===== 边框 ===== */
-$border-color: #e5e7eb;                   // 主边框
-$border-color-light: #f0f2f5;             // 浅边框（卡片分隔线）
+/* ===== Background ===== */
+$bg-page: #eef3fb;
+$bg-card: #ffffff;
+$bg-soft: #f5f8fd;
+$bg-deep: #e6eef9;
 
-/* ===== 涨跌色（A 股：红涨绿跌，与页面硬编码统一） ===== */
-$stock-up-color: #f43f5e;
-$stock-down-color: #22c55e;
-$stock-flat-color: #9ca3af;
+/* 兼容旧变量 */
+$bg-color: $bg-page;
+$bg-color-grey: $bg-card;
+$bg-color-hover: $bg-deep;
+$bg-color-muted: $bg-soft;
 
-/* ===== 字号（统一档位：20/22/26/30/34/48） ===== */
-$font-size-xs: 20rpx;                     // 标签、辅助文字
-$font-size-sm: 22rpx;                     // 次要文字
-$font-size-base: 26rpx;                   // 正文
-$font-size-lg: 30rpx;                     // 卡片标题
-$font-size-xl: 34rpx;                     // 页面标题
-$font-size-xxl: 48rpx;                    // 大标题
+/* ===== Ink - Text ===== */
+$ink: #0a1733;
+$ink-soft: #4b5a7a;
+$ink-mute: #8a96b0;
+$ink-faint: #b8c3d6;
 
-/* ===== 圆角（统一档位：8/12/16/20） ===== */
-$radius-xs: 8rpx;                         // 小标签
-$radius-sm: 12rpx;                        // 小卡片
-$radius-base: 16rpx;                      // 标准卡片
-$radius-lg: 20rpx;                        // 大卡片
-$radius-pill: 9999rpx;                    // 胶囊按钮
+/* 兼容旧变量 */
+$text-color-title: $ink;
+$text-color: $ink;
+$text-color-secondary: $ink-soft;
+$text-color-tertiary: $ink-mute;
+$text-color-placeholder: $ink-faint;
 
-/* ===== 间距（统一档位：8/16/24/32） ===== */
-$spacing-xs: 8rpx;
-$spacing-sm: 16rpx;
-$spacing-base: 24rpx;                     // 标准内边距
-$spacing-lg: 32rpx;                       // 大间距
+/* ===== Lines ===== */
+$line: #e1e9f5;
+$line-soft: #eef3fb;
+$line-strong: #c5d3e8;
 
-/* ===== 阴影 ===== */
-$shadow-base: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-$shadow-card: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
-$shadow-strong: 0 4rpx 16rpx rgba(77, 124, 254, 0.3);  // 品牌色阴影
+/* 兼容旧变量 */
+$border-color: $line;
+$border-color-light: $line-soft;
+
+/* ===== Semantic - Stock Market (A股: 红涨绿跌) ===== */
+$up: #e54d5e;
+$up-soft: rgba(229, 77, 94, 0.1);
+$up-bg: rgba(229, 77, 94, 0.06);
+$down: #18a058;
+$down-soft: rgba(24, 160, 88, 0.1);
+$down-bg: rgba(24, 160, 88, 0.06);
+$flat: #909399;
+$warning: #f0a020;
+$warning-soft: rgba(240, 160, 32, 0.1);
+$warning-bg: rgba(240, 160, 32, 0.08);
+
+/* 兼容旧变量 */
+$stock-up-color: $up;
+$stock-down-color: $down;
+$stock-flat-color: $flat;
+$success-color: $down;
+$error-color: $up;
+$info-color: $primary;
+$warning-color: $warning;
+
+/* ===== Shadows ===== */
+$shadow-xs: 0 1px 2px rgba(11, 95, 255, 0.04);
+$shadow-sm: 0 2px 6px -2px rgba(11, 95, 255, 0.06);
+$shadow-card: 0 4px 20px -8px rgba(11, 95, 255, 0.12), 0 2px 6px -2px rgba(11, 95, 255, 0.06);
+$shadow-hover: 0 12px 32px -8px rgba(11, 95, 255, 0.22), 0 4px 12px -2px rgba(11, 95, 255, 0.10);
+$shadow-glow: 0 0 0 4px rgba(11, 95, 255, 0.12);
+$shadow-primary: 0 4px 14px -2px rgba(11, 95, 255, 0.4);
+
+/* 兼容旧变量 */
+$shadow-base: $shadow-sm;
+$shadow-strong: $shadow-primary;
+
+/* ===== Radius (rpx) ===== */
+$r-xs: 8rpx;
+$r-sm: 12rpx;
+$r-md: 16rpx;
+$r-lg: 20rpx;
+$r-xl: 24rpx;
+$r-2xl: 32rpx;
+$r-3xl: 40rpx;
+$r-full: 9999rpx;
+
+/* 兼容旧变量 */
+$radius-xs: $r-xs;
+$radius-sm: $r-sm;
+$radius-base: $r-md;
+$radius-lg: $r-lg;
+$radius-pill: $r-full;
+
+/* ===== Spacing Scale (rpx) ===== */
+$s-1: 8rpx;
+$s-2: 16rpx;
+$s-3: 24rpx;
+$s-4: 32rpx;
+$s-5: 40rpx;
+$s-6: 48rpx;
+$s-8: 64rpx;
+$s-10: 80rpx;
+$s-12: 96rpx;
+$s-16: 128rpx;
+
+/* 兼容旧变量 */
+$spacing-xs: $s-1;
+$spacing-sm: $s-2;
+$spacing-base: $s-3;
+$spacing-lg: $s-4;
+
+/* ===== Font Size Scale (rpx) ===== */
+$font-size-xs: 22rpx;
+$font-size-sm: 24rpx;
+$font-size-base: 26rpx;
+$font-size-md: 28rpx;
+$font-size-lg: 32rpx;
+$font-size-xl: 36rpx;
+$font-size-2xl: 44rpx;
+$font-size-3xl: 56rpx;
+$font-size-4xl: 72rpx;
+
+/* 兼容旧变量（app 前端历史使用，保留以避免破坏现有代码） */
+$font-size-xxl: 48rpx;
+
+/* Line Height */
+$lh-tight: 1.25;
+$lh-base: 1.5;
+$lh-loose: 1.75;
+
+/* ===== Font Families ===== */
+/* 注意：'Noto Sans SC' 未通过 @font-face 加载，依赖系统安装 */
+/* $font-mono 统一使用 $font-sans，避免等宽字体显示为"艺术字" */
+$font-sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, sans-serif;
+$font-mono: $font-sans;
+$font-display: 'Orbitron', sans-serif;
+
+/* Letter Spacing */
+$ls-tight: -0.01em;
+$ls-normal: 0;
+$ls-wide: 0.02em;
+$ls-wider: 0.05em;
+
+/* ===== Z-index ===== */
+$z-base: 0;
+$z-dropdown: 1000;
+$z-sticky: 1100;
+$z-fixed: 1200;
+$z-drawer: 1300;
+$z-modal: 1400;
+$z-popover: 1500;
+$z-toast: 1600;
+$z-tooltip: 1700;
+
+/* ===== Overlay ===== */
+$overlay-base: rgba(10, 23, 51, 0.45);
+$overlay-light: rgba(10, 23, 51, 0.25);
+$overlay-deep: rgba(10, 23, 51, 0.65);
+$overlay-blur: blur(16rpx);
+$overlay-blur-strong: blur(32rpx);
+
+/* ===== Focus Ring ===== */
+$focus-ring: 0 0 0 6rpx rgba(11, 95, 255, 0.20);
+$focus-ring-error: 0 0 0 6rpx rgba(229, 77, 94, 0.20);
+$focus-ring-warn: 0 0 0 6rpx rgba(240, 160, 32, 0.20);
+
+/* ===== Opacity ===== */
+$op-disabled: 0.45;
+$op-active: 0.85;
+$op-hover: 0.92;
+$op-readonly: 0.7;
+
+/* ===== Transitions ===== */
+$ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+$ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+$t-fast: 0.15s $ease-out;
+$t-base: 0.25s $ease-out;
+$t-slow: 0.4s $ease-out;
+$t-spring: 0.4s $ease-spring;
+
+/* ===== Grid & Breakpoints (参考，不强制使用) ===== */
+$grid-cols: 12;
+$grid-gutter: 48rpx;
+$grid-margin: 48rpx;
+$bp-sm: 1280rpx;
+$bp-md: 1536rpx;
+$bp-lg: 2048rpx;
+$bp-xl: 2560rpx;
+$bp-2xl: 3072rpx;
+
+/* ===== Pure Colors ===== */
+$white: #ffffff;
+$black: #000000;
+
+/* ===== Semantic Gradients (渐变中间色) ===== */
+$up-deep: #c43a48;
+$up-light: #f06a78;
+$down-deep: #36b37e;
+$down-light: #4dc878;
+$warning-light: #f5b840;
+
+/* ===== Active / Hover Backgrounds ===== */
+$primary-active-bg: linear-gradient(135deg, #f5f9ff, #eef3ff);
+
+/* ===== Safe Area (移动端适配) ===== */
+$safe-top: env(safe-area-inset-top, 0px);
+$safe-bottom: env(safe-area-inset-bottom, 0px);

@@ -24,8 +24,8 @@
  * - 异常处理：详情接口失败时返回原对象
  */
 
-import type { EventItem } from '../types'
-import { getEventDetail } from './eventApi'
+import type { EventItem, FocusEventViewModel, AffectedIndustry } from '../types'
+import { getEventList, getEventDetail } from './eventApi'
 
 // ==================== AI 今日精选相关类型 ====================
 
@@ -75,6 +75,90 @@ export function getAiHeadlineEvents(): Promise<AiHeadlineEvents> {
       industries: ['房地产', '建材', '家居']
     }
   })
+}
+
+// ==================== Global Importance 双榜单 ====================
+
+/**
+ * 获取 Global Importance 双榜单事件
+ *
+ * 基于 event/list 返回的 globalImportanceRank 筛选焦点事件。
+ *
+ * 数据流：
+ *   Step 1: 调用 getEventList() 获取事件列表（已包含 globalImportanceRank）
+ *   Step 2: 筛选 rank=1（当前焦点）和 rank=2（持续影响）的事件
+ *   Step 3: 转换为 FocusEventViewModel 格式
+ *
+ * 异常处理：
+ *   - 接口失败 → 返回 []，不影响原有事件列表
+ *   - 无 GI 数据 → 返回 []
+ *
+ * @returns FocusEventViewModel[]
+ */
+export async function getFocusEvents(): Promise<FocusEventViewModel[]> {
+  try {
+    // Step 1: 获取事件列表（已包含 globalImportanceRank）
+    const response = await getEventList({ page: 1, pageSize: 100 })
+    const events = response.events ?? []
+
+    if (events.length === 0) {
+      return []
+    }
+
+    // Step 2: 筛选 rank=1 和 rank=2 的事件
+    const focusEvents = events.filter(e =>
+      e.globalImportanceRank === 1 || e.globalImportanceRank === 2
+    )
+
+    if (focusEvents.length === 0) {
+      return []
+    }
+
+    // Step 3: 为焦点事件获取详情（补充 industries 数据）
+    const enrichedResults = await Promise.allSettled(
+      focusEvents.map(async (event) => {
+        try {
+          const detail = await getEventDetail(event.eventId)
+          return { event, industries: detail.event?.affectedIndustries ?? [] }
+        } catch {
+          return { event, industries: [] }
+        }
+      })
+    )
+
+    // Step 4: 转换为 FocusEventViewModel 格式
+    return enrichedResults
+      .filter((r) => r.status === 'fulfilled')
+      .map((r) => {
+        const { event, industries } = (r as PromiseFulfilledResult<{ event: EventItem; industries: AffectedIndustry[] }>).value
+
+        const giDir = event.globalImportanceDirection
+        const direction: 'positive' | 'negative' | 'mixed' =
+          giDir === 'bullish' ? 'positive' :
+          giDir === 'bearish' ? 'negative' :
+          'mixed'
+
+        const giLevel = event.globalImportanceLevel
+        const importance: 'major' | 'normal' =
+          giLevel === 'critical' || giLevel === 'important' ? 'major' : 'normal'
+
+        return {
+          type: event.globalImportanceRank === 1
+            ? 'current_focus' as const
+            : 'ongoing_significant' as const,
+          eventId: event.eventId,
+          title: event.title,
+          summary: event.aiSummary || '',
+          direction,
+          importance,
+          selectionReason: '基于 Global Importance 排序结果',
+          industries: industries.map((i) => i.name),
+        }
+      })
+  } catch (err) {
+    console.error('[eventService] getFocusEvents 失败', err)
+    return []
+  }
 }
 
 // ==================== 原有补充数据逻辑 ====================

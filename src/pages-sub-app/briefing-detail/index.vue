@@ -17,12 +17,10 @@
         </view>
 
         <view v-if="report" class="brief-status" :class="{ degraded: report.degraded }">
-          <template v-if="report.degraded && report.missing_sources.length">
-            <text>部分数据源暂不可用（{{ report.missing_sources.join('、') }}），以下为可用内容</text>
-          </template>
-          <template v-else>
-            <text>{{ report.degraded ? '证据不足' : '完整 Brief' }}</text>
-          </template>
+          <text>{{ report.degraded ? '证据不足' : '完整 Brief' }}</text>
+          <text v-if="report.degraded && report.missing_sources.length">
+            缺失来源：{{ report.missing_sources.join('、') }}
+          </text>
         </view>
 
         <!-- 播报入口 -->
@@ -150,7 +148,7 @@ import { addCalendarDays, shanghaiDateString } from '@/shared/utils/tradingTime'
 const pageType = ref<BriefingType>('evening')
 const currentDate = ref('')
 
-const brandColor = '#4d7cfe'
+const brandColor = '#0b5fff'
 const errorColor = '#f43f5e'
 
 const pageTitle = computed(() => pageType.value === 'morning' ? '晨报详情' : '晚报详情')
