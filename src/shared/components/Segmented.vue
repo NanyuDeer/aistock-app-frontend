@@ -72,6 +72,8 @@ const handleSelect = (item: SegmentedItem) => {
   transition: all $t-fast;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .as-segmented--full .as-segmented__item {

@@ -3,18 +3,14 @@
     <!-- 搜索栏 + 排序栏 -->
     <view class="forecast-fixed">
       <view class="search-bar">
-        <view class="search-input-wrap">
-          <SvgIcon name="search-line" size="28rpx" color="#9ca3af" />
-          <input
-            v-model="keyword"
-            class="search-input"
-            placeholder="搜索股票代码/简称"
-            confirm-type="search"
-            @input="handleSearchInput"
-            @confirm="handleSearch"
-          />
-          <text v-if="keyword" class="search-clear" @tap="handleReset">✕</text>
-        </view>
+        <Input
+          :model-value="keyword"
+          search-icon
+          clearable
+          placeholder="搜索股票代码/简称"
+          @update:model-value="handleSearchInput"
+          @clear="handleReset"
+        />
       </view>
 
       <view class="sort-bar">
@@ -30,16 +26,11 @@
             <SvgIcon name="arrow-down-s" size="24rpx" color="#4b5a7a" />
           </view>
         </picker>
-        <view class="sort-order">
-          <text
-            :class="['order-btn', sortOrder === 'desc' ? 'active' : '']"
-            @tap="switchOrder('desc')"
-          >降序</text>
-          <text
-            :class="['order-btn', sortOrder === 'asc' ? 'active' : '']"
-            @tap="switchOrder('asc')"
-          >升序</text>
-        </view>
+        <Segmented
+          :items="[{ label: '降序', value: 'desc' }, { label: '升序', value: 'asc' }]"
+          :model-value="sortOrder"
+          @change="onOrderChange"
+        />
       </view>
     </view>
 
@@ -49,30 +40,31 @@
     </view>
 
     <!-- API 请求失败 -->
-    <view v-else-if="error" class="error-state">
-      <SvgIcon name="cloud-off-line" size="80rpx" color="#d1d5db" />
-      <text class="error-text">数据获取失败</text>
-      <text class="error-desc">网络异常或服务暂时不可用，请稍后重试</text>
-      <view class="retry-btn" @tap="retry">重试</view>
-    </view>
+    <EmptyState
+      v-else-if="error"
+      title="数据获取失败"
+      description="网络异常或服务暂时不可用，请稍后重试"
+      icon="cloud-off-line"
+    >
+      <Button type="primary" size="sm" @click="retry">重试</Button>
+    </EmptyState>
 
     <!-- 搜索无结果 -->
-    <view v-else-if="!list.length" class="empty-state">
-      <EmptyState :text="keyword ? '未搜索到相关股票' : '暂无业绩预测数据'" />
-    </view>
+    <EmptyState v-else-if="!list.length" :text="keyword ? '未搜索到相关股票' : '暂无业绩预测数据'" />
 
     <!-- 列表 -->
     <view v-if="list.length" class="forecast-list">
-      <view
+      <Card
         v-for="item in list"
         :key="item.code"
+        clickable
         class="forecast-card"
-        @tap="goStockDetail(item.code)"
+        @click="goStockDetail(item.code)"
       >
         <view class="info-row">
           <view class="stock-col">
             <text class="stock-name">{{ item.name }}</text>
-            <text class="stock-code">{{ item.code }}</text>
+            <Tag type="neutral" size="sm">{{ item.code }}</Tag>
           </view>
           <view class="metrics-area">
             <view class="metric-line">
@@ -101,11 +93,11 @@
             <text class="institution-value">{{ item.institutionCount }}家</text>
           </view>
         </view>
-      </view>
+      </Card>
     </view>
 
-    <view v-if="hasMore" class="load-more" @tap="loadMore">
-      <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
+    <view v-if="hasMore" class="load-more">
+      <Button type="ghost" size="sm" :loading="loadingMore" @click="loadMore">加载更多</Button>
     </view>
   </view>
 </template>
@@ -116,8 +108,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import { formatShanghaiClock } from '@/shared/utils/datetime'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import LoadingState from '@/shared/components/LoadingState.vue'
-import EmptyState from '@/shared/components/EmptyState.vue'
+import { Input, Segmented, Card, Tag, EmptyState, Button, LoadingState } from '@/shared/components'
 
 interface ForecastItem {
   code: string
@@ -207,6 +198,10 @@ function switchOrder(order: 'asc' | 'desc') {
   fetchData()
 }
 
+function onOrderChange(val: string | number) {
+  switchOrder(val as 'asc' | 'desc')
+}
+
 async function fetchData(append = false) {
   if (!append) {
     loading.value = true
@@ -265,19 +260,17 @@ async function fetchData(append = false) {
   }
 }
 
-function handleSearchInput() {
+function handleSearchInput(val: string) {
+  keyword.value = val
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     fetchData(false)
   }, 300)
 }
 
-function handleSearch() {
-  fetchData(false)
-}
-
 function handleReset() {
   keyword.value = ''
+  if (searchTimer) clearTimeout(searchTimer)
   fetchData(false)
 }
 
@@ -328,57 +321,34 @@ onShow(() => {
 
 <style lang="scss" scoped>
 .forecast-content {
-  background: #ffffff;
+  background: $bg-card;
 }
 
 /* 搜索+排序区域 */
 .forecast-fixed {
-  padding: 16rpx 24rpx 0;
+  padding: $s-2 $s-3 0;
 }
 
 /* 搜索栏 */
 .search-bar {
-  margin-bottom: 16rpx;
-}
-
-.search-input-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 16rpx 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-}
-
-.search-input {
-  flex: 1;
-  font-size: 26rpx;
-  color: $ink;
-  height: 40rpx;
-}
-
-.search-clear {
-  font-size: 28rpx;
-  color: #9ca3af;
-  padding: 8rpx;
+  margin-bottom: $s-2;
 }
 
 /* 排序方式栏 */
 .sort-bar {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  margin-bottom: 16rpx;
-  padding: 12rpx 16rpx;
-  background: #ffffff;
-  border-radius: 16rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  gap: $s-1;
+  margin-bottom: $s-2;
+  padding: $s-1 $s-2;
+  background: $bg-card;
+  border-radius: $r-md;
+  box-shadow: $shadow-sm;
 }
 
 .sort-label {
-  font-size: 22rpx;
-  color: #9ca3af;
+  font-size: $font-size-xs;
+  color: $ink-mute;
   flex-shrink: 0;
 }
 
@@ -387,102 +357,35 @@ onShow(() => {
   align-items: center;
   gap: 4rpx;
   padding: 6rpx 12rpx;
-  border-radius: 8rpx;
-  background: #f0f2f5;
+  border-radius: $r-xs;
+  background: $bg-deep;
 }
 
 .sort-picker-text {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   color: $primary;
   font-weight: 500;
   white-space: nowrap;
 }
 
-.sort-order {
-  display: flex;
-  gap: 0;
-  flex-shrink: 0;
-  border-radius: 8rpx;
-  overflow: hidden;
-  border: 1rpx solid #e0e3e8;
-}
-
-.order-btn {
-  font-size: 20rpx;
-  color: $ink-soft;
-  padding: 6rpx 12rpx;
-  background: #f9fafb;
-  font-weight: 500;
-  white-space: nowrap;
-
-  &.active {
-    color: #fff;
-    background: $primary;
-  }
-
-  &:first-child {
-    border-right: 1rpx solid #e0e3e8;
-  }
-}
-
-/* 加载/空/失败状态 */
-.loading-state,
-.empty-state,
-.error-state {
+/* 加载状态 */
+.loading-state {
   padding: 200rpx 0;
-}
-
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.error-text {
-  font-size: 28rpx;
-  color: #374151;
-  margin-top: 24rpx;
-  font-weight: 500;
-}
-
-.error-desc {
-  font-size: 24rpx;
-  color: #9ca3af;
-  margin-top: 12rpx;
-}
-
-.retry-btn {
-  margin-top: 40rpx;
-  padding: 16rpx 56rpx;
-  font-size: 26rpx;
-  color: #ffffff;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  border-radius: 40rpx;
-  text-align: center;
 }
 
 /* ===== 卡片 ===== */
 .forecast-list {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
-  padding: 0 24rpx 24rpx;
-}
-
-.forecast-card {
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 28rpx;
-  border: 1rpx solid $line;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  gap: $s-2;
+  padding: 0 $s-3 $s-3;
 }
 
 /* 信息行：股票信息(左) + 指标区(右) */
 .info-row {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: $s-2;
 }
 
 .stock-col {
@@ -490,7 +393,7 @@ onShow(() => {
   width: 140rpx;
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: $s-1;
 }
 
 /* 指标区：两行，每行 = 标签+值(左) + 增长率(右) */
@@ -511,51 +414,42 @@ onShow(() => {
 .metric-info {
   display: flex;
   align-items: baseline;
-  gap: 8rpx;
+  gap: $s-1;
   min-width: 0;
 }
 
 .metric-label {
   font-size: 20rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   flex-shrink: 0;
 }
 
 .metric-value {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   font-weight: 600;
   color: $primary;
 }
 
 .stock-name {
-  font-size: 26rpx;
+  font-size: $font-size-base;
   font-weight: 600;
   color: $ink;
 }
 
-.stock-code {
-  font-size: 20rpx;
-  color: $ink-soft;
-  background: #f0f2f5;
-  padding: 2rpx 10rpx;
-  border-radius: 6rpx;
-  align-self: flex-start;
-}
-
 .growth-val {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   font-weight: 600;
   flex-shrink: 0;
 
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 /* 分隔线 */
 .divider {
   height: 1rpx;
-  background: #f0f2f5;
-  margin: 16rpx 0;
+  background: $line-soft;
+  margin: $s-2 0;
 }
 
 /* 机构行 */
@@ -568,33 +462,28 @@ onShow(() => {
 .institution-info {
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: $s-1;
 }
 
 .info-label {
-  font-size: 22rpx;
-  color: #9ca3af;
+  font-size: $font-size-xs;
+  color: $ink-mute;
 }
 
 .institution-value {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   font-weight: 600;
   color: $ink;
 }
 
 .update-time {
   font-size: 20rpx;
-  color: #9ca3af;
+  color: $ink-mute;
 }
 
 /* 加载更多 */
 .load-more {
   text-align: center;
-  padding: 32rpx 0;
-}
-
-.load-more-text {
-  font-size: 26rpx;
-  color: $primary;
+  padding: $s-4 0;
 }
 </style>

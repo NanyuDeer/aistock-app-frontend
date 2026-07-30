@@ -43,11 +43,21 @@ page {
   background-color: $bg-color;
   color: $text-color;
   font-size: $font-size-base;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* 使用设计令牌 $font-sans（Noto Sans SC 优先），避免硬编码字体列表在部分系统回退到衬线字体 */
+  font-family: $font-sans;
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: auto;
 }
+
+/* uni-app H5 端 uni-page 内置 font-family: "Noto Sans SC"（无回退链） */
+/* 当系统未安装 Noto Sans SC 时，浏览器回退到默认衬线字体（Times New Roman） */
+/* 此处覆写，确保 uni-page 也携带完整 sans-serif 回退链 */
+/* #ifdef H5 */
+uni-page {
+  font-family: $font-sans;
+}
+/* #endif */
 
 /* #ifdef APP-PLUS */
 /* App 端整体放大 20%（rpx 换算基准不变，用 zoom 缩放整个页面） */

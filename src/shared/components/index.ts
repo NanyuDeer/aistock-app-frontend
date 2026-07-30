@@ -50,6 +50,35 @@ export { default as Timeline } from './Timeline.vue'
 export { default as ChatBubble } from './ChatBubble.vue'
 export { default as StreamingText } from './StreamingText.vue'
 export { default as AudioPlayer } from './AudioPlayer.vue'
+export { default as InsightListCard } from './InsightListCard.vue'
+export { default as GuideCard } from './GuideCard.vue'
+export { default as StatGrid } from './StatGrid.vue'
+
+/**
+ * InsightListItem 类型定义
+ * 注意：不能从 .vue 文件 re-export type（TypeScript 的 *.vue shim 不支持命名导出），
+ * 因此在此处直接定义，与 InsightListCard.vue 内部的 interface 保持结构一致。
+ */
+export interface InsightListItem {
+  name: string
+  tag?: string
+  score?: string
+  trend?: string
+  trendType?: 'up' | 'down'
+}
+
+/**
+ * StatGridItem 类型定义
+ * 注意：不能从 .vue 文件 re-export type（TypeScript 的 *.vue shim 不支持命名导出），
+ * 因此在此处直接定义，与 StatGrid.vue 内部的 interface 保持结构一致。
+ */
+export interface StatGridItem {
+  label: string
+  value: string | number
+  unit?: string
+  color?: 'brand' | 'up' | 'down' | 'warning'
+  subtitle?: string
+}
 
 // ===== 图表与可视化 =====
 export { default as Sparkline } from './Sparkline.vue'

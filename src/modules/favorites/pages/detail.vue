@@ -762,7 +762,7 @@
       <!-- 6. AI 投顾入口（页面最底部） -->
       <view class="ai-card" @tap="goChat">
         <view class="ai-icon-wrap">
-          <SvgIcon name="robot-line" size="36rpx" color="#0b5fff" />
+          <SvgIcon name="robot-line" size="36rpx" color="#ffffff" />
         </view>
         <view class="ai-content">
           <text class="ai-title">AI 智能投顾</text>
@@ -1401,8 +1401,8 @@ function formatEventTime(time: string | Date): string {
 
 function formatVolume(vol: number): string {
   if (!vol) return '--'
-  if (vol >= 100000000) return (vol / 100000000).toFixed(2) + '亿股'
-  if (vol >= 10000) return (vol / 10000).toFixed(2) + '万股'
+  if (vol >= 100000000) return (vol / 100000000).toFixed(2) + '亿'
+  if (vol >= 10000) return (vol / 10000).toFixed(2) + '万'
   return vol + '手'
 }
 
@@ -1591,7 +1591,6 @@ function goChat() {
 .limit-inline {
   display: flex;
   align-items: center;
-  gap: 12rpx;
   padding: 16rpx 24rpx;
   background: #ffffff;
   border-radius: 12rpx;
@@ -1599,6 +1598,8 @@ function goChat() {
 }
 
 .limit-inline-label {
+  flex: 1;
+  text-align: center;
   font-size: 26rpx;
   color: $ink-soft;
 
@@ -1609,6 +1610,7 @@ function goChat() {
 .limit-inline-sep {
   color: $line;
   font-size: 24rpx;
+  flex-shrink: 0;
 }
 
 /* 周期切换 Tabs */

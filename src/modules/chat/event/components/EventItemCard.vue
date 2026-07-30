@@ -32,23 +32,27 @@
     <!-- AI 摘要 + 操作按钮 -->
     <view class="card-bottom">
       <view class="card-ai-summary" v-if="event.aiSummary">
-        <text class="ai-badge">AI</text>
+        <Badge type="primary" :dot="false" size="sm" class="ai-badge">AI</Badge>
         <text class="ai-text">{{ event.aiSummary }}</text>
       </view>
       <view class="card-actions">
-        <view
+        <Button
+          type="ghost"
+          size="sm"
           class="follow-btn"
           :class="{ followed: event.isFollowed }"
-          @tap.stop="$emit('toggle-follow', event)"
+          @click.stop="$emit('toggle-follow', event)"
         >
-          <text class="follow-text">{{ event.isFollowed ? '✓ 已关注' : '+ 关注' }}</text>
-        </view>
-        <view class="detail-btn" @tap.stop="$emit('view-detail', event)">
-          <view class="robot-avatar">
-            <SvgIcon name="robot-line" size="28rpx" :color="iconPrimary" />
-          </view>
-          <text class="detail-text">AI解析 ›</text>
-        </view>
+          {{ event.isFollowed ? '已关注' : '关注' }}
+        </Button>
+        <Button
+          type="primary"
+          size="sm"
+          class="detail-btn"
+          @click.stop="$emit('view-detail', event)"
+        >
+          AI解析
+        </Button>
       </view>
     </view>
   </Card>
@@ -71,10 +75,8 @@
 import { computed } from 'vue'
 import type { EventItem } from '../types'
 import { EVENT_TYPE_COLORS } from '../constants'
-import Card from '@/shared/components/Card.vue'
+import { Card, Button, Tag, Badge } from '@/shared/components'
 import Rate from '@/shared/components/Rate.vue'
-import Tag from '@/shared/components/Tag.vue'
-import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 // ========== Props ==========
 
@@ -94,7 +96,7 @@ defineEmits<{
 
 // ========== 设计令牌（避免硬编码颜色） ==========
 
-const iconPrimary = '#0b5fff' // $primary，传递给 SvgIcon 的 color 必须是具体色值
+// typeColor 兜底色用于内联 style，无法使用 SCSS 变量
 
 // ========== 计算属性 ==========
 
@@ -202,25 +204,15 @@ function formatTime(time: string): string {
   gap: 8rpx;
   min-width: 0;
   padding: 10rpx 14rpx;
-  background: linear-gradient(135deg, $primary-50, rgba(59, 130, 246, 0.05));
+  background: linear-gradient(135deg, $primary-50, rgba($primary, 0.05));
   border-radius: $r-sm;
   border-left: 4rpx solid $primary;
   margin-bottom: 12rpx;
 }
 
+/* AI 徽标：外观由 Badge 组件管理，此处仅保留定位 */
 .ai-badge {
   flex-shrink: 0;
-  width: 28rpx;
-  height: 28rpx;
-  border-radius: 50%;
-  background: $primary;
-  color: $white;
-  font-size: 16rpx;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
   margin-top: 2rpx;
 }
 
@@ -293,70 +285,22 @@ function formatTime(time: string): string {
   flex-shrink: 0;
 }
 
-.follow-btn {
+/* 关注按钮：ghost 类型，followed 时切换为 warning 配色 */
+.follow-btn.as-btn {
+  height: auto;
   padding: 8rpx 16rpx;
   border-radius: $r-full;
-  border: 1px solid rgba($ink-faint, 0.15);
-  transition: all $t-fast;
 }
 
-.follow-text {
-  font-size: 20rpx;
-  font-weight: 500;
-  color: $ink-mute;
-  white-space: nowrap;
-}
-
-.follow-btn.followed {
+.follow-btn.as-btn--ghost.followed {
   background: $warning-soft;
-  border-color: rgba($warning, 0.25);
-}
-
-.follow-btn.followed .follow-text {
   color: $warning;
 }
 
-/* 查看详情按钮 */
-.detail-btn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 8rpx 18rpx 8rpx 12rpx;
+/* 查看详情按钮：primary 类型，覆写为紧凑圆角胶囊 */
+.detail-btn.as-btn {
+  height: auto;
+  padding: 8rpx 18rpx;
   border-radius: $r-full;
-  background: $brand-gradient;
-  box-shadow: $shadow-primary;
-  transition: all $t-fast;
-}
-
-.detail-btn:active {
-  opacity: $op-active;
-  transform: scale(0.97);
-}
-
-/* 机器人头像 */
-.robot-avatar {
-  width: 32rpx;
-  height: 32rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba($primary, 0.2), rgba($primary, 0.15));
-  border: 1px solid rgba($primary, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  animation: avatar-pulse 2s ease-in-out infinite;
-}
-
-@keyframes avatar-pulse {
-  0%, 100% { box-shadow: 0 0 0 rgba($primary, 0.2); }
-  50% { box-shadow: 0 0 10rpx rgba($primary, 0.4); }
-}
-
-.detail-text {
-  font-size: 20rpx;
-  font-weight: 500;
-  color: $white;
-  white-space: nowrap;
 }
 </style>

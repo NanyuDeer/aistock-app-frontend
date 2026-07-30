@@ -14,36 +14,30 @@
           <text class="analysis-header-title">AI 异动解读</text>
           <text class="analysis-header-sub">{{ symbol }} {{ cycleLabel }}</text>
         </view>
-        <view v-if="loading && !done" class="analysis-header-badge">
-          <text class="analysis-header-badge-text">分析中</text>
-        </view>
-        <view v-else-if="done" class="analysis-header-badge done">
-          <SvgIcon name="check-line" size="20rpx" color="#ffffff" />
-          <text class="analysis-header-badge-text">完成</text>
-        </view>
+        <Badge v-if="loading && !done" type="info" size="sm">分析中</Badge>
+        <Badge v-else-if="done" type="success" size="sm">完成</Badge>
       </view>
     </view>
 
     <!-- 错误状态 -->
-    <view v-if="error" class="analysis-error-card">
-      <SvgIcon name="error-warning-line" size="48rpx" color="#ef4444" />
-      <text class="analysis-error-text">{{ error }}</text>
-      <view class="analysis-retry-btn" @tap="retry">
-        <text class="analysis-retry-text">重试</text>
-      </view>
-    </view>
+    <Card v-if="error" class="error-section">
+      <EmptyState title="分析失败" :description="error">
+        <Button size="sm" @click="retry">重试</Button>
+      </EmptyState>
+    </Card>
 
     <!-- 关键词标签 -->
     <view v-if="!error && analysisKeywords.length" class="keywords-row">
-      <text
+      <Tag
         v-for="(kw, idx) in analysisKeywords"
         :key="idx"
-        :class="['keyword-chip', 'keyword-' + (idx % 4)]"
-      >{{ kw }}</text>
+        :type="keywordTagType(idx)"
+        size="sm"
+      >{{ kw }}</Tag>
     </view>
 
     <!-- 精简摘要卡片（优先展示，第一时间了解异动） -->
-    <view v-if="!error && (analysisSummary || loading)" class="summary-card">
+    <Card v-if="!error && (analysisSummary || loading)" class="summary-section">
       <view class="summary-header">
         <SvgIcon name="flashlight-line" size="24rpx" color="#92400e" />
         <text class="summary-title">一句话速览</text>
@@ -54,44 +48,34 @@
       <view v-else class="summary-loading">
         <text class="summary-loading-text">正在提取核心结论...</text>
       </view>
-    </view>
+    </Card>
 
     <!-- 工具执行步骤 -->
     <view v-if="!error && toolSteps.length" class="analysis-tools-section">
       <text class="section-label">分析进度</text>
       <view class="analysis-tools-list">
-        <view
+        <Tag
           v-for="(step, idx) in toolSteps"
           :key="idx"
-          :class="['analysis-tool-chip', step.endTime != null ? 'done' : 'running']"
-        >
-          <SvgIcon v-if="step.endTime != null" name="check-line" size="18rpx" color="#059669" />
-          <SvgIcon v-else name="loader-line" size="20rpx" color="#3b82f6" class="analysis-tool-chip-spinner" />
-          <text class="analysis-tool-chip-label">{{ step.label }}</text>
-        </view>
+          :type="step.endTime != null ? 'down' : 'neutral'"
+          size="sm"
+        >{{ step.label }}</Tag>
       </view>
     </view>
 
     <!-- 详细内容区域 -->
-    <view v-if="!error && content" class="analysis-content-card">
+    <Card v-if="!error && content" class="content-section">
       <text class="section-label">详细分析</text>
       <view class="analysis-body">
         <mp-html :content="htmlContent" class="analysis-html" />
         <text v-if="loading && !done" class="analysis-cursor">|</text>
       </view>
-    </view>
+    </Card>
 
     <!-- 加载中（初始） -->
-    <view v-if="!error && !content && loading" class="analysis-content-card">
-      <view class="analysis-loading">
-        <view class="analysis-loading-dots">
-          <view class="analysis-loading-dot" />
-          <view class="analysis-loading-dot" />
-          <view class="analysis-loading-dot" />
-        </view>
-        <text class="analysis-loading-tip">AI 正在分析异动数据...</text>
-      </view>
-    </view>
+    <Card v-if="!error && !content && loading" class="content-section">
+      <LoadingState text="AI 正在分析异动数据..." />
+    </Card>
   </view>
 </template>
 
@@ -101,6 +85,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { useAlertSSE } from '@/modules/market/utils/useAlertSSE'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { LoadingState, EmptyState, Tag, Badge, Button, Card } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 const symbol = ref('')
@@ -180,6 +165,11 @@ const analysisSummary = computed(() => {
 
   return ''
 })
+
+function keywordTagType(idx: number): 'neutral' | 'warning' | 'up' | 'down' {
+  const types: Array<'neutral' | 'warning' | 'up' | 'down'> = ['neutral', 'warning', 'up', 'down']
+  return types[idx % 4]
+}
 
 function begin() {
   start(symbol.value, cycle.value)
@@ -289,44 +279,10 @@ onUnmounted(() => {
   margin-top: 4rpx;
 }
 
-.analysis-header-badge {
-  padding: 4rpx 14rpx;
-  background: rgba(255,255,255,0.2);
-  border-radius: 20rpx;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 4rpx;
-  &.done { background: rgba(52,211,153,0.3); }
-}
-
-.analysis-header-badge-text {
-  font-size: 20rpx;
-  color: #ffffff;
-  font-weight: 500;
-}
-
 /* 错误 */
-.analysis-error-card {
+.error-section {
   margin: 24rpx 28rpx;
-  padding: 40rpx 28rpx;
-  background: #ffffff;
-  border-radius: 16rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16rpx;
 }
-
-.analysis-error-icon { display: none; }
-.analysis-error-text { font-size: 28rpx; color: #ef4444; text-align: center; }
-.analysis-retry-btn {
-  padding: 12rpx 40rpx;
-  background: linear-gradient(135deg, $primary, #6c5ce7);
-  border-radius: 24rpx;
-  margin-top: 8rpx;
-}
-.analysis-retry-text { font-size: 26rpx; color: #ffffff; font-weight: 500; }
 
 /* 关键词标签 */
 .keywords-row {
@@ -336,25 +292,9 @@ onUnmounted(() => {
   padding: 20rpx 28rpx;
 }
 
-.keyword-chip {
-  font-size: 22rpx;
-  padding: 6rpx 16rpx;
-  border-radius: 20rpx;
-  font-weight: 500;
-
-  &.keyword-0 { background: rgba(77,124,254,0.1); color: $primary; }
-  &.keyword-1 { background: rgba(245,158,11,0.1); color: #f59f0b; }
-  &.keyword-2 { background: rgba(239,68,68,0.08); color: #ef4444; }
-  &.keyword-3 { background: rgba(16,185,129,0.1); color: #10b981; }
-}
-
 /* 精简摘要卡片 */
-.summary-card {
+.summary-section {
   margin: 8rpx 28rpx 16rpx;
-  background: linear-gradient(135deg, #fefce8 0%, #fffbeb 100%);
-  border-radius: 16rpx;
-  padding: 20rpx 24rpx;
-  border: 1rpx solid #fef3c7;
 }
 
 .summary-header {
@@ -396,56 +336,10 @@ onUnmounted(() => {
 
 .analysis-tools-list { display: flex; flex-wrap: wrap; gap: 10rpx; }
 
-.analysis-tool-chip {
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-  padding: 6rpx 14rpx;
-  border-radius: 20rpx;
-  font-size: 22rpx;
-  background: #ffffff;
-
-  &.done { color: #059669; background: #ecfdf5; }
-  &.running { color: #3b82f6; background: #eff6ff; }
-}
-
-.analysis-tool-chip-icon { display: none; }
-.analysis-tool-chip-spinner { animation: spin 1s linear infinite; }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.analysis-tool-chip-label { font-size: 22rpx; }
-
 /* 内容卡片 */
-.analysis-content-card {
+.content-section {
   margin: 0 28rpx 40rpx;
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 24rpx;
 }
-
-/* 加载 */
-.analysis-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80rpx 0;
-  gap: 24rpx;
-}
-
-.analysis-loading-dots { display: flex; gap: 10rpx; }
-.analysis-loading-dot {
-  width: 12rpx; height: 12rpx;
-  background: $primary;
-  border-radius: 50%;
-  animation: pulse 1.4s ease-in-out infinite;
-  &:nth-child(2) { animation-delay: 0.2s; }
-  &:nth-child(3) { animation-delay: 0.4s; }
-}
-@keyframes pulse {
-  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1); }
-}
-.analysis-loading-tip { font-size: 26rpx; color: #9ca3af; }
 
 /* 正文 */
 .analysis-body { position: relative; }

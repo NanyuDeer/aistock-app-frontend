@@ -3,7 +3,7 @@
     <view v-if="orders.length" class="flow-chart-panel">
       <view class="chart-head">
         <text class="chart-title">资金拆解</text>
-        <text class="chart-unit">亿元</text>
+        <Tag type="neutral" size="sm">亿元</Tag>
       </view>
       <view class="split-chart-stage">
         <view class="split-axis-col">
@@ -34,9 +34,9 @@
       <view class="chart-head">
         <view class="chart-title-wrap">
           <text class="chart-title">10日资金趋势</text>
-          <text v-if="trendBadge" class="chart-badge">{{ trendBadge }}</text>
+          <Badge v-if="trendBadge" type="gold">{{ trendBadge }}</Badge>
         </view>
-        <text class="chart-unit">亿元</text>
+        <Tag type="neutral" size="sm">亿元</Tag>
       </view>
       <view class="trend-chart">
         <view class="trend-axis-col">
@@ -67,6 +67,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Tag, Badge } from '@/shared/components'
 import { compactNumber } from '@/shared/utils/format'
 
 interface FlowOrder {
@@ -197,27 +198,7 @@ function formatDateLabel(value: string): string {
   display: block;
   font-size: 30rpx;
   font-weight: 700;
-  color: #172033;
-}
-
-.chart-badge {
-  display: inline-flex;
-  margin-top: 8rpx;
-  padding: 6rpx 12rpx;
-  border-radius: 8rpx;
-  background: #fef3c7;
-  color: #92400e;
-  font-size: 22rpx;
-  line-height: 1.3;
-}
-
-.chart-unit {
-  flex-shrink: 0;
-  padding: 6rpx 12rpx;
-  border-radius: 999rpx;
-  background: #f1f5f9;
-  font-size: 21rpx;
-  color: #64748b;
+  color: $ink;
 }
 
 .split-chart-stage {
@@ -227,7 +208,7 @@ function formatDateLabel(value: string): string {
   height: 172px;
   margin-top: 4rpx;
   box-sizing: border-box;
-  background: #ffffff;
+  background: $bg-card;
 }
 
 .split-axis-col {
@@ -243,7 +224,7 @@ function formatDateLabel(value: string): string {
 .split-axis-text {
   font-size: 21rpx;
   line-height: 1;
-  color: #94a3b8;
+  color: $ink-mute;
 }
 
 .split-svg {
@@ -268,7 +249,7 @@ function formatDateLabel(value: string): string {
   gap: 8rpx;
   padding: 8rpx 10rpx;
   border-radius: 8rpx;
-  background: #f8fafc;
+  background: $bg-soft;
 }
 
 .order-dot {
@@ -277,15 +258,15 @@ function formatDateLabel(value: string): string {
   border-radius: 999rpx;
   flex-shrink: 0;
 
-  &.is-up { background: #ef4444; }
-  &.is-down { background: #22c55e; }
+  &.is-up { background: $up; }
+  &.is-down { background: $down; }
 }
 
 .order-label {
   flex: 1;
   min-width: 0;
   font-size: 22rpx;
-  color: #475569;
+  color: $ink-soft;
 }
 
 .order-value {
@@ -293,8 +274,8 @@ function formatDateLabel(value: string): string {
   font-size: 22rpx;
   font-weight: 700;
 
-  &.is-up { color: #ef4444; }
-  &.is-down { color: #22c55e; }
+  &.is-up { color: $up; }
+  &.is-down { color: $down; }
 }
 
 .trend-chart {
@@ -320,7 +301,7 @@ function formatDateLabel(value: string): string {
 .trend-axis-text {
   font-size: 21rpx;
   line-height: 1;
-  color: #94a3b8;
+  color: $ink-mute;
 }
 
 .trend-svg {
@@ -341,7 +322,7 @@ function formatDateLabel(value: string): string {
   min-width: 0;
   padding: 8rpx 4rpx;
   border-radius: 8rpx;
-  background: #f8fafc;
+  background: $bg-soft;
   text-align: center;
 }
 
@@ -349,7 +330,7 @@ function formatDateLabel(value: string): string {
   display: block;
   font-size: 19rpx;
   line-height: 1.2;
-  color: #94a3b8;
+  color: $ink-mute;
 }
 
 .trend-value-number {
@@ -359,7 +340,7 @@ function formatDateLabel(value: string): string {
   line-height: 1.2;
   font-weight: 700;
 
-  &.is-up { color: #ef4444; }
-  &.is-down { color: #22c55e; }
+  &.is-up { color: $up; }
+  &.is-down { color: $down; }
 }
 </style>

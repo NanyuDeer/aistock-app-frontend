@@ -37,7 +37,7 @@
         </view>
         <view class="briefing-right">
           <view class="ai-avatar-wrap" :class="{ 'ai-avatar-loading': briefingLoading }">
-            <SvgIcon name="headphone-line" size="40rpx" color="#0b5fff" />
+            <SvgIcon name="headphone-line" size="40rpx" color="#ffffff" />
           </view>
           <view class="ai-avatar-ring ring-1"></view>
           <view class="ai-avatar-ring ring-2"></view>
@@ -120,7 +120,7 @@
         </view>
         <view class="track-footer">
           <text class="track-arrow">∧</text>
-          <text class="track-tip">点击查看 AI 事件分析</text>
+          <text class="track-tip">点击查看资讯详情</text>
         </view>
       </Card>
 
@@ -184,10 +184,10 @@ function getBriefingDesc(): string {
   }
 }
 
-// 卡片点击：统一进入播报汇总页（briefing/index），由该页面处理数据加载与空状态
-// 链路：首页卡片 → 播报汇总页（方案四：音频条+结构化早晚报）→ 音频条点击 → 详情页
+// 卡片点击：进入早点听页面（音频播报 + 条目列表）
 function goBriefingDetail() {
-  uni.navigateTo({ url: '/pages-sub-app/briefing/index' })
+  const type = briefingTypeLabel.value === '晨报' ? 'morning' : 'review'
+  uni.navigateTo({ url: `/pages-sub-app/briefing/index?type=${type}` })
 }
 
 // 长线风口：从后端 API 获取风口板块数据，提取排行前3的板块在首页预览
@@ -362,12 +362,12 @@ function goAgentReport() {
 }
 
 function goTrackDetail() {
-  // 跳转到 AI 事件分析详情页；无 eventId 时降级到事件列表
-  if (topEvent.value.eventId) {
-    uni.navigateTo({ url: `/modules/chat/pages/event/detail?id=${topEvent.value.eventId}` })
-  } else {
-    uni.navigateTo({ url: '/modules/chat/pages/event/list' })
-  }
+  // 跳转到资讯详情页；携带 eventId 供 AI 深度解析入口使用
+  const eventId = topEvent.value.eventId
+  const url = eventId
+    ? `/modules/news/pages/detail?eventId=${eventId}`
+    : '/modules/news/pages/detail'
+  uni.navigateTo({ url })
 }
 
 function goSearch() {
@@ -398,6 +398,7 @@ function goLogin() {
   align-items: stretch;
   padding: $s-3;
   background: $bg-soft;
+  border: 2rpx solid $line;
   border-radius: $r-md;
   margin-bottom: $s-2;
   position: relative;
@@ -462,6 +463,11 @@ function goLogin() {
 .clue-text {
   font-size: $font-size-sm;
   color: $ink-soft;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  word-break: break-all;
 }
 
 .briefing-tags {
@@ -533,19 +539,22 @@ function goLogin() {
   width: 100rpx;
   height: 100rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, $gold-light, $gold);
+  /* 极光蓝紫渐变：蓝紫 → 天蓝，135° 对角 */
+  background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+  /* 白色细边框：增强头像在彩色背景上的边界感 */
+  border: 2rpx solid #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   z-index: 2;
-  box-shadow: 0 4rpx 12rpx rgba($gold, 0.3);
+  box-shadow: 0 4rpx 12rpx rgba(79, 70, 229, 0.3);
 }
 
 .ai-avatar-ring {
   position: absolute;
   border-radius: 50%;
-  border: 2rpx solid rgba($primary, 0.15);
+  border: 2rpx solid rgba(79, 70, 229, 0.15);
   pointer-events: none;
 }
 
@@ -639,6 +648,7 @@ function goLogin() {
   justify-content: space-between;
   gap: 8rpx;
   min-width: 0;
+  width: 100%;
 }
 
 .item-name {
@@ -646,10 +656,12 @@ function goLogin() {
   color: $ink-soft;
   flex: 1;
   min-width: 0;
-  display: block;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-all;
 }
 
 .item-name.placeholder {

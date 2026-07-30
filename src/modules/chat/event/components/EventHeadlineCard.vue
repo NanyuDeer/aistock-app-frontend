@@ -12,9 +12,9 @@
 
       <!-- 标签行 -->
       <view class="card-header">
-        <!-- 方向标签（第一视觉）：Tag up/down -->
-        <Tag :type="type === 'positive' ? 'up' : 'down'" size="sm">
-          <SvgIcon :name="type === 'positive' ? 'arrow-up-line' : 'arrow-down-line'" size="20rpx" :color="dirIconColor" />
+        <!-- 方向标签（第一视觉）：Tag up/down/neutral -->
+        <Tag :type="type === 'positive' ? 'up' : type === 'negative' ? 'down' : 'neutral'" size="sm">
+          <SvgIcon :name="type === 'positive' ? 'arrow-up-line' : type === 'negative' ? 'arrow-down-line' : 'arrow-up-down-line'" size="20rpx" :color="dirIconColor" />
           <text class="direction-text">{{ directionText }}</text>
         </Tag>
 
@@ -45,13 +45,21 @@
             <path d="M40 6L42 6L42 8" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <!-- 下降趋势图 -->
-          <svg v-else width="48" height="28" viewBox="0 0 48 28" fill="none">
+          <svg v-else-if="type === 'negative'" width="48" height="28" viewBox="0 0 48 28" fill="none">
             <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
             <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
             <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M12 6L18 10L24 8L30 16L36 14L42 22" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M40 22L42 22L42 20" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <!-- 综合趋势图（紫色波浪） -->
+          <svg v-else width="48" height="28" viewBox="0 0 48 28" fill="none">
+            <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
+            <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
+            <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 14L18 8L24 20L30 10L36 18L42 12" stroke="#7C3AED" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
           </svg>
         </view>
 
@@ -81,8 +89,8 @@ import Badge from '@/shared/components/Badge.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 interface Props {
-  /** 事件方向：利好/利空 */
-  type: 'positive' | 'negative'
+  /** 事件方向：利好/利空/综合 */
+  type: 'positive' | 'negative' | 'mixed'
   /** 事件标题 */
   title: string
   /** 重要性：重大/重要 */
@@ -105,7 +113,11 @@ const emit = defineEmits<{
 }>()
 
 // 设计令牌（SvgIcon color 需具体色值）
-const dirIconColor = computed(() => (props.type === 'positive' ? '#e54d5e' : '#18a058')) // $up / $down
+const dirIconColor = computed(() => {
+  if (props.type === 'positive') return '#e54d5e' // $up
+  if (props.type === 'negative') return '#18a058' // $down
+  return '#7c3aed' // purple for mixed
+})
 const fireColor = '#a67c1f' // $gold-deep
 
 // 点击处理
@@ -117,7 +129,9 @@ function handleClick() {
 
 // 计算方向文本（更符合投资用户理解）
 const directionText = computed(() => {
-  return props.type === 'positive' ? '机会' : '风险'
+  if (props.type === 'positive') return '机会'
+  if (props.type === 'negative') return '风险'
+  return '综合'
 })
 
 // 展示的行业（最多3个）
@@ -145,6 +159,7 @@ const remainingCount = computed(() => {
   box-shadow: $shadow-xs;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   flex: 1;
+  width: 100%;
 }
 
 .headline-card.as-card:active {
@@ -167,6 +182,13 @@ const remainingCount = computed(() => {
   background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 55%, #A7F3D0 100%);
   border-left-color: $down;
   box-shadow: 0 12rpx 40rpx rgba($down, 0.18);
+}
+
+/* 综合卡片样式（mixed） */
+.headline-card--mixed.as-card {
+  background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 55%, #DDD6FE 100%);
+  border-left-color: #7c3aed;
+  box-shadow: 0 12rpx 40rpx rgba(124, 58, 237, 0.18);
 }
 
 /* 内层容器：保留原焦点卡的紧凑布局 */
@@ -198,6 +220,10 @@ const remainingCount = computed(() => {
 
 .ai-glow-decoration--negative {
   background: radial-gradient(circle, rgba($down, 0.25) 0%, rgba($down, 0.08) 50%, transparent 70%);
+}
+
+.ai-glow-decoration--mixed {
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.25) 0%, rgba(124, 58, 237, 0.08) 50%, transparent 70%);
 }
 
 /* ========== 标签行 ========== */

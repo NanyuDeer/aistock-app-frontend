@@ -162,8 +162,10 @@ $lh-base: 1.5;
 $lh-loose: 1.75;
 
 /* ===== Font Families ===== */
-$font-sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-$font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+/* 注意：'Noto Sans SC' 未通过 @font-face 加载，依赖系统安装 */
+/* $font-mono 统一使用 $font-sans，避免等宽字体显示为"艺术字" */
+$font-sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, sans-serif;
+$font-mono: $font-sans;
 $font-display: 'Orbitron', sans-serif;
 
 /* Letter Spacing */

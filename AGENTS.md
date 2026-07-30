@@ -330,8 +330,14 @@ import Card from '@/shared/components/Card.vue'
 | `GlobalChatBar.vue` | App 专属 | 全局聊天栏（交易/自选按钮 + 语音输入） |
 | `AppBottomBar.vue` | App 专属 | 底部导航栏（3 Tab + 动态 bottom 偏移） |
 | `MainTabs.vue` | App 专属 | 首页三 Tab 容器（MorningContent / StockContent / AlertContent） |
-| `Card.vue` | [组件库] | 基础卡片（标题 + 副标题 + 内容区） |
+| `Card.vue` | [组件库] | 基础卡片（标题 + 副标题 + 内容区，支持 clickable/flat） |
 | `Button.vue` | [组件库] | 按钮（primary/secondary/ghost/accent/gold/danger 6 种类型） |
+| `Tag.vue` | [组件库] | 标签（up/down/neutral/warning 4 种语义 + sm/md 尺寸） |
+| `Badge.vue` | [组件库] | 徽标（primary/warning 2 种类型 + 可选圆点） |
+| `Collapse.vue` | [组件库] | 折叠面板（支持 accordion + 具名插槽） |
+| `Input.vue` | [组件库] | 输入框（支持 search-icon / clearable / model-value） |
+| `Segmented.vue` | [组件库] | 分段选择器（items + v-model + @change） |
+| `BottomSheet.vue` | [组件库] | 底部弹窗（v-model:visible + title + 具名插槽） |
 | `Avatar.vue` | [组件库] | 头像（文字头像，4 种尺寸 + 4 种配色） |
 | `LoadingState.vue` | [组件库] | 加载状态（3 种尺寸 + 水平/垂直布局） |
 | `EmptyState.vue` | [组件库] | 空状态（对应组件库 `Empty.vue`） |
@@ -340,8 +346,8 @@ import Card from '@/shared/components/Card.vue'
 | `TheNavbar.vue` | [组件库] | 导航栏（对应组件库 `NavBar.vue`） |
 | `TheFooter.vue` | [组件库] | 页脚（对应组件库 `Footer.vue`） |
 
-**组件库可复制使用的新组件**（app 前端尚未引入，需要时从组件库复制到 `shared/components/`）：
-`Tag` `Badge` `Input` `Switch` `Segmented` `Rate` `Progress` `Skeleton` `Toast` `BottomSheet` `ActionSheet` `Modal` `Collapse` `Steps` `StatCard` `ListCell` `QuoteHeader` `Gauge` `Sparkline` `DataTable` `IndexCard` `Timeline` `ChatBubble` `StreamingText` `AudioPlayer`
+**已引入但尚未在生产页面使用的组件**（已存在于 `shared/components/` 并通过 barrel export 导出，需要时直接 `import { ... } from '@/shared/components'`）：
+`Switch` `Rate` `Progress` `Skeleton` `Toast` `ActionSheet` `Modal` `Steps` `StatCard` `ListCell` `QuoteHeader` `Gauge` `Sparkline` `DataTable` `IndexCard` `Timeline` `ChatBubble` `StreamingText` `AudioPlayer` `InsightListCard` `StockItem`
 
 > **布局约束**: 所有需要预留底部空间的组件必须使用 `@/shared/utils/layout.ts` 中的函数（`getChatBarHeightPx` / `getBottomFixedHeightPx` / `getTabBarBottomPx`），禁止硬编码 rpx 值，以避免刘海屏设备底部内容被遮挡。
 

@@ -26,43 +26,23 @@
       <!-- 推送设置 -->
       <view v-if="isLoggedIn" class="section">
         <text class="section-title">推送设置</text>
-        <view class="settings-card">
-          <view class="setting-row">
-            <view class="setting-info">
-              <text class="setting-label">自选股异动</text>
-              <text class="setting-desc">重大利好/利空实时推送</text>
-            </view>
-            <switch
-              :checked="settings.stock_push"
-              color="#0b5fff"
-              @change="(e) => onSettingChange('stock_push', getSwitchValue(e))"
-            />
-          </view>
-          <view class="setting-divider" />
-          <view class="setting-row">
-            <view class="setting-info">
-              <text class="setting-label">机构调研推荐</text>
-              <text class="setting-desc">每日 9:00 和 17:00 推送</text>
-            </view>
-            <switch
-              :checked="settings.outbreak_push"
-              color="#0b5fff"
-              @change="(e) => onSettingChange('outbreak_push', getSwitchValue(e))"
-            />
-          </view>
-          <view class="setting-divider" />
-          <view class="setting-row">
-            <view class="setting-info">
-              <text class="setting-label">风口龙头</text>
-              <text class="setting-desc">每日 8:30 推送</text>
-            </view>
-            <switch
-              :checked="settings.leader_push"
-              color="#0b5fff"
-              @change="(e) => onSettingChange('leader_push', getSwitchValue(e))"
-            />
-          </view>
-        </view>
+        <Card flush>
+          <ListCell title="自选股异动" description="重大利好/利空实时推送" :border="true">
+            <template #value>
+              <Switch v-model="settings.stock_push" @change="(val) => onSettingChange('stock_push', val)" />
+            </template>
+          </ListCell>
+          <ListCell title="机构调研推荐" description="每日 9:00 和 17:00 推送" :border="true">
+            <template #value>
+              <Switch v-model="settings.outbreak_push" @change="(val) => onSettingChange('outbreak_push', val)" />
+            </template>
+          </ListCell>
+          <ListCell title="风口龙头" description="每日 8:30 推送" :border="true">
+            <template #value>
+              <Switch v-model="settings.leader_push" @change="(val) => onSettingChange('leader_push', val)" />
+            </template>
+          </ListCell>
+        </Card>
       </view>
 
       <!-- 我的自选股 -->
@@ -71,47 +51,43 @@
           <text class="section-title">我的自选股</text>
           <text class="section-count">{{ favoriteStocks.length }} 只</text>
         </view>
-        <view class="favorites-card">
-          <view
+        <Card flush>
+          <ListCell
             v-for="(stock, idx) in favoriteStocks"
             :key="idx"
-            class="favorite-row"
-            @tap="goStockDetail(stock.symbol)"
+            :title="stock.name"
+            :description="stock.symbol"
+            :border="true"
+            clickable
+            @click="goStockDetail(stock.symbol)"
           >
-            <view class="fav-left">
-              <text class="fav-name">{{ stock.name }}</text>
-              <text class="fav-code">{{ stock.symbol }}</text>
-            </view>
-            <view class="fav-right">
-              <text class="fav-market">{{ stock.market || 'SH' }}</text>
+            <template #value>
+              <Tag size="sm">{{ stock.market || 'SH' }}</Tag>
               <text class="fav-date">{{ formatDate(stock.addedAt || '') }}</text>
-            </view>
-          </view>
-        </view>
+            </template>
+          </ListCell>
+        </Card>
       </view>
 
       <!-- 菜单项 -->
       <view class="section">
-        <view class="menu-card">
-          <view class="menu-row" @tap="goFavorites">
-            <SvgIcon name="bar-chart-line" size="36rpx" color="#4b5a7a" />
-            <text class="menu-label">自选股</text>
-            <text class="menu-arrow">›</text>
-          </view>
-          <view class="setting-divider" />
-          <view class="menu-row" @tap="goAbout">
-            <SvgIcon name="information-line" size="36rpx" color="#4b5a7a" />
-            <text class="menu-label">关于</text>
-            <text class="menu-arrow">›</text>
-          </view>
-        </view>
+        <Card flush>
+          <ListCell title="自选股" clickable showArrow :border="true" @click="goFavorites">
+            <template #prefix>
+              <SvgIcon name="bar-chart-line" size="36rpx" color="#4b5a7a" />
+            </template>
+          </ListCell>
+          <ListCell title="关于" clickable showArrow :border="true" @click="goAbout">
+            <template #prefix>
+              <SvgIcon name="information-line" size="36rpx" color="#4b5a7a" />
+            </template>
+          </ListCell>
+        </Card>
       </view>
 
       <!-- 退出登录 -->
       <view v-if="isLoggedIn" class="section">
-        <view class="logout-btn" @tap="handleLogout">
-          <text class="logout-text">退出登录</text>
-        </view>
+        <Button type="danger" block @click="handleLogout">退出登录</Button>
       </view>
     </view>
   </SubPageCard>
@@ -125,6 +101,7 @@ import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { authApi, type UserSettings } from '@/shared/api/modules/auth'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { Switch, ListCell, Card, Tag, Button } from '@/shared/components'
 
 const userStore = useUserStore()
 const favoritesStore = useFavoritesStore()
@@ -179,15 +156,6 @@ async function onSettingChange(key: keyof UserSettings, enabled: boolean) {
     settings.value[key] = !enabled // 回滚
     uni.showToast({ title: '设置失败', icon: 'none' })
   }
-}
-
-/** 从 switch change 事件中安全提取 checked 值 */
-function getSwitchValue(e: unknown): boolean {
-  if (e && typeof e === 'object' && 'detail' in e) {
-    const detail = (e as { detail: { value?: boolean } }).detail
-    return !!detail.value
-  }
-  return false
 }
 
 function handleLogout() {
@@ -408,43 +376,5 @@ function formatDate(dateStr: string): string {
 .fav-date {
   font-size: 22rpx;
   color: #9ca3af;
-}
-
-/* ===== 菜单 ===== */
-.menu-row {
-  display: flex;
-  align-items: center;
-  padding: 28rpx 24rpx;
-  gap: 16rpx;
-}
-
-.menu-icon {
-  font-size: 36rpx;
-}
-
-.menu-label {
-  flex: 1;
-  font-size: 28rpx;
-  color: $ink;
-}
-
-.menu-arrow {
-  font-size: 32rpx;
-  color: #d1d5db;
-}
-
-/* ===== 退出登录 ===== */
-.logout-btn {
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: 28rpx 0;
-  text-align: center;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-}
-
-.logout-text {
-  font-size: 30rpx;
-  color: #f43f5e;
-  font-weight: 500;
 }
 </style>

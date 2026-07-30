@@ -3,7 +3,7 @@
     <!-- 自定义导航栏：返回按钮 -->
     <view class="login-nav">
       <view class="nav-back" @tap="goBack">
-        <text class="back-icon">‹</text>
+        <SvgIcon name="arrow-left-line" size="40rpx" color="#0a1733" />
       </view>
     </view>
 
@@ -44,8 +44,8 @@
         <view class="login-tip">
           <text class="tip-text">登录后可同步自选股、接收异动提醒</text>
         </view>
-        <view class="skip-btn" @tap="goHome">
-          <text class="skip-text">暂不登录，先看看</text>
+        <view class="skip-wrap">
+          <Button type="ghost" size="sm" @click="goHome">暂不登录，先看看</Button>
         </view>
       </view>
 
@@ -57,35 +57,32 @@
         <text v-else-if="scanStatus === 'scanned'" class="qr-status scanned">已扫描，请在手机上确认</text>
         <text v-else-if="scanStatus === 'expired'" class="qr-status expired">二维码已过期</text>
 
-        <view v-if="scanStatus === 'expired'" class="qr-refresh" @tap="startScanLogin">
-          <text class="refresh-text">点击刷新二维码</text>
+        <view v-if="scanStatus === 'expired'" class="qr-action">
+          <Button size="sm" @click="startScanLogin">刷新二维码</Button>
         </view>
-        <view class="qr-cancel" @tap="cancelScanLogin">
-          <text class="cancel-text">取消</text>
+        <view class="qr-action qr-action--cancel">
+          <Button type="ghost" size="sm" @click="cancelScanLogin">取消</Button>
         </view>
       </view>
 
       <!-- 错误状态 -->
-      <view v-else-if="errorMsg && !loginLoading" class="error-section">
-        <SvgIcon name="error-warning-line" size="36rpx" color="#ef4444" />
-        <text class="error-text">{{ errorMsg }}</text>
-        <view class="error-retry" @tap="handleRetry">
-          <text class="retry-text">重试</text>
+      <Card v-else-if="errorMsg && !loginLoading" class="error-section">
+        <EmptyState title="登录失败" :description="errorMsg">
+          <template #icon>
+            <SvgIcon name="error-warning-line" size="64rpx" color="#ef4444" />
+          </template>
+        </EmptyState>
+        <view class="error-actions">
+          <Button size="sm" @click="handleRetry">重试</Button>
+          <!-- #ifdef APP-PLUS -->
+          <Button type="ghost" size="sm" @click="startScanLogin">使用扫码登录</Button>
+          <!-- #endif -->
+          <Button type="ghost" size="sm" @click="goHome">暂不登录，先看看</Button>
         </view>
-        <!-- #ifdef APP-PLUS -->
-        <view class="scan-fallback" @tap="startScanLogin">
-          <text class="scan-fallback-text">使用扫码登录</text>
-        </view>
-        <!-- #endif -->
-        <view class="skip-btn" @tap="goHome">
-          <text class="skip-text">暂不登录，先看看</text>
-        </view>
-      </view>
+      </Card>
 
       <!-- 登录验证中 -->
-      <view v-else class="loading-section">
-        <text class="loading-text">登录中...</text>
-      </view>
+      <LoadingState v-else text="登录中..." />
     </view>
 
     <!-- 底部协议 -->
@@ -101,6 +98,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { useUserStore } from '@/shared/store/modules/user'
 import { authApi } from '@/shared/api/modules/auth'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { LoadingState, Card, EmptyState, Button } from '@/shared/components'
 
 const userStore = useUserStore()
 
@@ -309,13 +307,6 @@ function goBack() {
   justify-content: center;
 }
 
-.back-icon {
-  font-size: 48rpx;
-  color: $ink;
-  font-weight: 300;
-  line-height: 1;
-}
-
 .login-top {
   flex-shrink: 0;
   display: flex;
@@ -398,14 +389,8 @@ function goBack() {
   }
 }
 
-.skip-btn {
+.skip-wrap {
   margin-top: 48rpx;
-  padding: 16rpx 48rpx;
-
-  .skip-text {
-    font-size: 28rpx;
-    color: $ink-soft;
-  }
 }
 
 /* ===== 二维码区域 ===== */
@@ -445,86 +430,25 @@ function goBack() {
   }
 }
 
-.qr-refresh {
+.qr-action {
   margin-top: 24rpx;
-  padding: 16rpx 48rpx;
-  background: $primary;
-  border-radius: 32rpx;
-
-  .refresh-text {
-    font-size: 28rpx;
-    color: #ffffff;
-  }
 }
 
-.qr-cancel {
+.qr-action--cancel {
   margin-top: 32rpx;
-  padding: 16rpx 48rpx;
-
-  .cancel-text {
-    font-size: 28rpx;
-    color: #9ca3af;
-  }
-}
-
-/* ===== 加载中 ===== */
-.loading-section {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 80rpx 0;
-
-  .loading-text {
-    font-size: 32rpx;
-    color: $primary;
-  }
 }
 
 /* ===== 错误状态 ===== */
 .error-section {
   width: 100%;
+}
+
+.error-actions {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40rpx 0;
-}
-
-.error-icon {
-  font-size: 64rpx;
-  color: #f59e0b;
-  margin-bottom: 24rpx;
-}
-
-.error-text {
-  font-size: 28rpx;
-  color: $ink-soft;
-  text-align: center;
-  line-height: 1.6;
-  padding: 0 48rpx;
-  margin-bottom: 40rpx;
-}
-
-.error-retry {
-  padding: 16rpx 64rpx;
-  background: $primary;
-  border-radius: 32rpx;
-  margin-bottom: 24rpx;
-
-  .retry-text {
-    font-size: 28rpx;
-    color: #ffffff;
-    font-weight: 500;
-  }
-}
-
-.scan-fallback {
-  padding: 12rpx 48rpx;
-  margin-bottom: 24rpx;
-
-  .scan-fallback-text {
-    font-size: 26rpx;
-    color: $primary;
-  }
+  gap: 24rpx;
+  margin-top: 24rpx;
 }
 
 /* ===== 底部 ===== */

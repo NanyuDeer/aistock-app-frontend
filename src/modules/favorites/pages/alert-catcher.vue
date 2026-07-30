@@ -2,33 +2,26 @@
   <SubPageCard title="异动捕手">
     <view class="alert-catcher">
       <!-- 说明卡片 -->
-      <view class="intro-card">
+      <Card flat class="intro-card">
         <view class="intro-header">
           <SvgIcon name="bell-line" size="32rpx" color="#0b5fff" />
           <text class="intro-title">自选股异动监控</text>
         </view>
         <text class="intro-desc">实时监控自选股涨跌幅异动（超5%触发），AI反推三层级原因</text>
-      </view>
+      </Card>
 
       <!-- 幅度分级筛选 -->
       <view class="filter-bar">
-        <view
-          v-for="tab in amplitudeTabs"
-          :key="tab.value"
-          :class="['filter-tab', activeAmplitude === tab.value ? 'active' : '']"
-          @tap="activeAmplitude = tab.value"
-        >
-          <text class="filter-tab-text">{{ tab.label }}</text>
-        </view>
+        <Segmented :items="amplitudeTabs" v-model="activeAmplitude" fullWidth />
       </view>
 
       <!-- 异动列表 -->
       <view class="alert-list">
-        <view
+        <Card
           v-for="(item, idx) in filteredAlerts"
           :key="idx"
-          class="alert-card"
-          :class="'alert-card--' + item.level"
+          class="alert-item-card"
+          :class="'alert-level-' + item.level"
         >
           <!-- 股票头部 -->
           <view class="alert-card-header">
@@ -36,9 +29,7 @@
               <text class="stock-name">{{ item.name }}</text>
               <text class="stock-code">{{ item.code }}</text>
             </view>
-            <view :class="['change-badge', item.direction]">
-              <text class="change-text">{{ item.change }}</text>
-            </view>
+            <Tag :type="item.direction === 'up' ? 'up' : 'down'">{{ item.change }}</Tag>
           </view>
 
           <!-- 异动信息 -->
@@ -53,35 +44,26 @@
 
             <!-- 第一层：个股自身 -->
             <view class="cause-item">
-              <view :class="['cause-badge', 'cause-badge--self']">
-                <text class="cause-badge-text">个股</text>
-              </view>
+              <Tag type="up" size="sm">个股</Tag>
               <text class="cause-text">{{ item.causes.self }}</text>
             </view>
 
             <!-- 第二层：板块联动 -->
             <view class="cause-item">
-              <view :class="['cause-badge', 'cause-badge--sector']">
-                <text class="cause-badge-text">板块</text>
-              </view>
+              <Tag type="warning" size="sm">板块</Tag>
               <text class="cause-text">{{ item.causes.sector }}</text>
             </view>
 
             <!-- 第三层：市场整体 -->
             <view class="cause-item">
-              <view :class="['cause-badge', 'cause-badge--market']">
-                <text class="cause-badge-text">市场</text>
-              </view>
+              <Tag type="neutral" size="sm">市场</Tag>
               <text class="cause-text">{{ item.causes.market }}</text>
             </view>
           </view>
-        </view>
+        </Card>
 
         <!-- 空状态 -->
-        <view v-if="!filteredAlerts.length" class="empty-state">
-          <text class="empty-title">暂无异动</text>
-          <text class="empty-desc">自选股涨跌幅超5%时将自动捕获</text>
-        </view>
+        <EmptyState v-if="!filteredAlerts.length" title="暂无异动信号" description="自选股涨跌幅超5%时将自动捕获" />
       </view>
     </view>
   </SubPageCard>
@@ -91,6 +73,7 @@
 import { ref, computed } from 'vue'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { Card, Segmented, Tag, EmptyState } from '@/shared/components'
 
 type AmplitudeLevel = 'fast' | 'deep' | 'full'
 type Direction = 'up' | 'down'
@@ -208,10 +191,10 @@ const filteredAlerts = computed(() => {
 
 /* ===== 说明卡片 ===== */
 .intro-card {
-  background: rgba($brand-color, 0.06);
-  border-radius: $radius-base;
-  padding: $spacing-base;
-  margin-bottom: $spacing-base;
+  background: rgba($primary, 0.06) !important;
+  border-color: transparent !important;
+  padding: $s-3 !important;
+  margin-bottom: $s-3;
 }
 
 .intro-header {
@@ -235,55 +218,31 @@ const filteredAlerts = computed(() => {
 
 /* ===== 幅度筛选 ===== */
 .filter-bar {
-  display: flex;
-  gap: 12rpx;
-  margin-bottom: $spacing-base;
-}
-
-.filter-tab {
-  padding: 8rpx 24rpx;
-  border-radius: $radius-pill;
-  background: $bg-color-grey;
-
-  &.active {
-    background: $brand-color;
-  }
-}
-
-.filter-tab-text {
-  font-size: $font-size-sm;
-  color: $text-color-secondary;
-
-  .active & {
-    color: #ffffff;
-  }
+  margin-bottom: $s-3;
 }
 
 /* ===== 异动卡片 ===== */
 .alert-list {
   display: flex;
   flex-direction: column;
-  gap: $spacing-base;
+  gap: $s-3;
 }
 
-.alert-card {
-  background: #ffffff;
-  border-radius: 16rpx;
-  padding: $spacing-base;
-  box-shadow: $shadow-card;
+.alert-item-card {
+  padding: $s-3 !important;
   border-left: 6rpx solid transparent;
 }
 
-.alert-card--fast {
-  border-left-color: #f59e0b;
+.alert-level-fast {
+  border-left-color: $warning !important;
 }
 
-.alert-card--deep {
-  border-left-color: #f97316;
+.alert-level-deep {
+  border-left-color: #f97316 !important;
 }
 
-.alert-card--full {
-  border-left-color: #f43f5e;
+.alert-level-full {
+  border-left-color: $up !important;
 }
 
 .alert-card-header {
@@ -308,32 +267,6 @@ const filteredAlerts = computed(() => {
 .stock-code {
   font-size: $font-size-xs;
   color: $text-color-tertiary;
-}
-
-.change-badge {
-  padding: 4rpx 16rpx;
-  border-radius: 8rpx;
-
-  &.up {
-    background: rgba(244, 63, 94, 0.1);
-  }
-
-  &.down {
-    background: rgba(34, 197, 94, 0.1);
-  }
-}
-
-.change-text {
-  font-size: $font-size-base;
-  font-weight: 700;
-
-  .up & {
-    color: #f43f5e;
-  }
-
-  .down & {
-    color: #22c55e;
-  }
 }
 
 .alert-meta {
@@ -374,47 +307,8 @@ const filteredAlerts = computed(() => {
 .cause-item {
   display: flex;
   align-items: flex-start;
-  gap: $spacing-sm;
+  gap: $s-2;
   padding: 6rpx 0;
-}
-
-.cause-badge {
-  width: 48rpx;
-  height: 32rpx;
-  border-radius: 6rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.cause-badge--self {
-  background: rgba($brand-color, 0.1);
-}
-
-.cause-badge--sector {
-  background: rgba(39, 210, 191, 0.1);
-}
-
-.cause-badge--market {
-  background: rgba(239, 170, 23, 0.1);
-}
-
-.cause-badge-text {
-  font-size: 20rpx;
-  font-weight: 700;
-
-  .cause-badge--self & {
-    color: $brand-color;
-  }
-
-  .cause-badge--sector & {
-    color: #27D2BF;
-  }
-
-  .cause-badge--market & {
-    color: #EFAA17;
-  }
 }
 
 .cause-text {
@@ -422,23 +316,5 @@ const filteredAlerts = computed(() => {
   color: $text-color;
   line-height: 1.6;
   flex: 1;
-}
-
-/* ===== 空状态 ===== */
-.empty-state {
-  padding: $spacing-lg 0;
-  text-align: center;
-}
-
-.empty-title {
-  font-size: $font-size-base;
-  color: $text-color-secondary;
-  display: block;
-  margin-bottom: 8rpx;
-}
-
-.empty-desc {
-  font-size: $font-size-sm;
-  color: $text-color-tertiary;
 }
 </style>

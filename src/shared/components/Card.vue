@@ -9,7 +9,8 @@
     :class="{
       'is-hoverable': hoverable,
       'is-clickable': clickable,
-      'as-card--flat': flat
+      'as-card--flat': flat,
+      'as-card--flush': flush
     }"
     @click="handleClick"
   >
@@ -41,6 +42,8 @@ interface Props {
   clickable?: boolean
   /** 向后兼容：flat 模式无阴影，仅边框 */
   flat?: boolean
+  /** 去除 body 内边距，适合内嵌 ListCell 等自身带 padding 的子组件 */
+  flush?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -48,7 +51,8 @@ const props = withDefaults(defineProps<Props>(), {
   subtitle: '',
   hoverable: false,
   clickable: false,
-  flat: false
+  flat: false,
+  flush: false
 })
 
 const emit = defineEmits<{
@@ -67,8 +71,8 @@ const handleClick = (event: MouseEvent) => {
   background: $bg-card;
   border: 2rpx solid $line;
   border-radius: $r-xl;
-  padding: $s-5;
-  box-shadow: $shadow-xs;
+  padding: $s-4;
+  box-shadow: $shadow-sm;
   transition: all $t-base;
 }
 
@@ -76,6 +80,12 @@ const handleClick = (event: MouseEvent) => {
 .as-card--flat {
   box-shadow: none;
   border: 2rpx solid $line;
+}
+
+/* flush 模式：去除 body 内边距，适合内嵌 ListCell */
+.as-card--flush {
+  padding: 0;
+  overflow: hidden;
 }
 
 /* ===== Header ===== */

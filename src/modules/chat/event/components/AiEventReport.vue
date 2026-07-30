@@ -59,15 +59,14 @@
     </view>
   </view>
 
-  <view class="report-empty" v-else>
-    <text class="empty-text">暂无分析数据</text>
-  </view>
+  <EmptyState v-else text="暂无分析数据" />
 </template>
 
 <script setup lang="ts">
 import { onMounted, watch, nextTick, computed } from 'vue'
 import type { EventDetailResponse } from '../types'
 import { useAiReasoning } from '../composables/useAiReasoning'
+import { EmptyState } from '@/shared/components'
 import AiAnalysisSection from './AiAnalysisSection.vue'
 import AiEventUnderstanding from './AiEventUnderstanding.vue'
 import AiTransmissionAnalysis from './transmission/AiTransmissionAnalysis.vue'
@@ -157,14 +156,14 @@ watch(currentStep, async (stepId) => {
 
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .ai-event-report { padding: 0 0 48rpx; }
 
 .report-content {
   padding-top: 16rpx;
-  --ev-text-secondary: #374151;
-  --ev-text-muted: #4b5563;
-  --ev-text-tertiary: $ink-soft;
+  --ev-text-secondary: #{$ink-soft};
+  --ev-text-muted: #{$ink-mute};
+  --ev-text-tertiary: #{$ink-soft};
 }
 
 /* 来源信息栏 */
@@ -173,16 +172,16 @@ watch(currentStep, async (stepId) => {
   align-items: center;
   padding: 12rpx 24rpx;
   margin-bottom: 8rpx;
-  background: var(--ev-bg-elevated, #f9fafb);
+  background: var(--ev-bg-elevated, #{$bg-soft});
   border-radius: 10rpx;
 }
 .source-label {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   color: var(--ev-text-muted);
   flex-shrink: 0;
 }
 .source-link {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   color: var(--ev-accent);
   text-decoration: underline;
   overflow: hidden;
@@ -191,7 +190,7 @@ watch(currentStep, async (stepId) => {
   flex: 1;
 }
 .source-text {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   color: var(--ev-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -199,7 +198,7 @@ watch(currentStep, async (stepId) => {
   flex: 1;
 }
 .source-unverified {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   font-style: italic;
   color: var(--ev-text-tertiary);
   opacity: 0.7;
@@ -207,7 +206,4 @@ watch(currentStep, async (stepId) => {
 
 .report-footer { padding: 32rpx 48rpx 0; display: flex; justify-content: center; }
 .footer-text { font-size: 20rpx; color: var(--ev-text-muted); }
-
-.report-empty { display: flex; align-items: center; justify-content: center; padding: 300rpx 32rpx; }
-.empty-text { font-size: 28rpx; color: var(--ev-text-muted); }
 </style>

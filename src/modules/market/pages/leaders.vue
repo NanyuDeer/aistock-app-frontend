@@ -7,35 +7,19 @@
     </template>
     <view class="leaders-content">
       <!-- 引导卡片：点击查看今日分析报告 -->
-      <view class="report-guide-card" @tap="goAgentReport">
-        <view class="guide-left">
-          <SvgIcon name="file-line" color="#ffffff" size="40rpx" />
-          <text class="guide-title">点击查看今日分析报告</text>
-        </view>
-        <SvgIcon name="arrow-right-line" color="#ffffff" size="32rpx" />
-      </view>
+      <GuideCard title="点击查看今日分析报告" icon-name="file-line" theme="brand" @click="goAgentReport" />
 
-      <view v-if="errorMessage" class="state-card">
-        <text class="state-text">{{ errorMessage }}</text>
-        <text class="state-hint">请检查网络连接后重新加载</text>
-        <button
-          class="retry-button"
-          :class="{ disabled: loading }"
-          :disabled="loading"
-          @tap="loadData"
-        >
-          {{ loading ? '加载中...' : '重新加载' }}
-        </button>
-      </view>
+      <Card v-if="errorMessage" class="state-section">
+        <EmptyState :title="errorMessage" description="请检查网络连接后重新加载">
+          <Button size="sm" :loading="loading" :disabled="loading" @click="loadData">
+            {{ loading ? '加载中...' : '重新加载' }}
+          </Button>
+        </EmptyState>
+      </Card>
 
-      <view v-else-if="loading && !sectors.length" class="state-card">
-        <text class="state-text">正在加载长线风口数据...</text>
-      </view>
+      <LoadingState v-else-if="loading && !sectors.length" text="正在加载长线风口数据..." />
 
-      <view v-else-if="!sectors.length" class="state-card">
-        <text class="state-text">暂无长线风口数据</text>
-        <text class="state-hint">数据更新后将在这里展示</text>
-      </view>
+      <EmptyState v-else-if="!sectors.length" title="暂无长线风口数据" description="数据更新后将在这里展示" />
 
       <!-- 风口概念泡泡图 -->
       <view v-if="sectors.length" class="bubble-card">
@@ -74,38 +58,18 @@
         <!-- 板块头部 -->
         <view class="stats-header">
           <view class="stats-title-row">
-            <text class="sector-rank">No.{{ idx + 1 }}</text>
+            <Badge size="sm">No.{{ idx + 1 }}</Badge>
             <text class="stats-name">{{ sector.name }}</text>
-            <text
+            <Tag
               v-if="persistenceText(sector)"
-              :class="['persistence-badge', persistenceClass(sector)]"
-            >{{ persistenceText(sector) }}</text>
+              :type="persistenceTagType(sector)"
+              size="sm"
+            >{{ persistenceText(sector) }}</Tag>
           </view>
-          <text v-if="sector.frequency" class="freq-badge">上榜 {{ sector.frequency }} 次</text>
+          <Badge v-if="sector.frequency" size="sm">上榜 {{ sector.frequency }} 次</Badge>
         </view>
         <!-- 统计行 -->
-        <view class="stats-row">
-          <view class="stat-item">
-            <text class="stat-label">今日涨幅</text>
-            <text :class="['stat-value', (sector.today_change ?? 0) >= 0 ? 'up' : 'down']">
-              {{ (sector.today_change ?? 0) >= 0 ? '+' : '' }}{{ formatPct(sector.today_change) }}
-            </text>
-          </view>
-          <view class="stat-item">
-            <text class="stat-label">均涨幅</text>
-            <text :class="['stat-value', (sector.avg_change ?? 0) >= 0 ? 'up' : 'down']">
-              {{ (sector.avg_change ?? 0) >= 0 ? '+' : '' }}{{ formatPct(sector.avg_change) }}
-            </text>
-          </view>
-          <view class="stat-item">
-            <text class="stat-label">净流入</text>
-            <text class="stat-value">{{ formatNetInflow(sector.net_inflow) }}</text>
-          </view>
-          <view class="stat-item">
-            <text class="stat-label">领涨股</text>
-            <text class="stat-value leader-stock-name">{{ sector.leading_stock || sector.leading_stock_info?.name || '--' }}</text>
-          </view>
-        </view>
+        <StatGrid :items="sectorStatItems(sector)" :columns="4" />
         <!-- 单只龙头股详细行情（跨板块去重） -->
         <view v-if="getSectorLeader(sector)" class="leader-mini-row" @tap.stop="goStockDetail(getSectorLeader(sector)!.code)">
           <view class="leader-mini-left">
@@ -152,6 +116,8 @@ import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderAiAnalysis, WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid } from '@/shared/components'
+import type { StatGridItem } from '@/shared/components'
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -321,23 +287,34 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
     }
   }
 
-  // 最终质心居中：计算所有泡泡的质心，整体平移到画布中心
-  // 这是保证泡泡群"永远居中"的关键步骤——即使碰撞检测导致了偏移，也会被修正
+  // 最终包围盒居中 + 自适应缩放（单次计算，确定性结果）
+  // 1. 计算所有泡泡的包围盒
+  // 2. 计算缩放比例使包围盒恰好放入画布（含 padding）
+  // 3. 以包围盒中心为原点缩放位置和半径，再平移到画布中心
   if (nodes.length > 0) {
-    const sumX = nodes.reduce((sum, n) => sum + n.x, 0)
-    const sumY = nodes.reduce((sum, n) => sum + n.y, 0)
-    const centroidX = sumX / nodes.length
-    const centroidY = sumY / nodes.length
-    const dx = cx - centroidX
-    const dy = cy - centroidY
-
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
     for (const n of nodes) {
-      n.x += dx
-      n.y += dy
-      // 平移后再次约束边界
-      const safeR = n.radius + 2
-      n.x = Math.max(safeR, Math.min(W - safeR, n.x))
-      n.y = Math.max(safeR, Math.min(H - safeR, n.y))
+      minX = Math.min(minX, n.x - n.radius)
+      maxX = Math.max(maxX, n.x + n.radius)
+      minY = Math.min(minY, n.y - n.radius)
+      maxY = Math.max(maxY, n.y + n.radius)
+    }
+    const bboxCx = (minX + maxX) / 2
+    const bboxCy = (minY + maxY) / 2
+    const bboxW = maxX - minX
+    const bboxH = maxY - minY
+
+    // 计算缩放比例：画布留 8px padding，取宽高方向较小值，不超过 1（不放大）
+    const padding = 8
+    const scaleX = bboxW > 0 ? (W - padding * 2) / bboxW : 1
+    const scaleY = bboxH > 0 ? (H - padding * 2) / bboxH : 1
+    const fitScale = Math.min(1, scaleX, scaleY)
+
+    // 以包围盒中心为原点缩放，然后平移到画布中心
+    for (const n of nodes) {
+      n.radius *= fitScale
+      n.x = cx + (n.x - bboxCx) * fitScale
+      n.y = cy + (n.y - bboxCy) * fitScale
     }
   }
 
@@ -457,6 +434,25 @@ function persistenceClass(sector: WindLeaderSector): string {
   return ''
 }
 
+function persistenceTagType(sector: WindLeaderSector): 'down' | 'neutral' | 'warning' {
+  const tag = persistenceText(sector)
+  if (tag.includes('长期')) return 'down'
+  if (tag.includes('中期')) return 'neutral'
+  if (tag.includes('短期')) return 'warning'
+  return 'neutral'
+}
+
+function sectorStatItems(sector: WindLeaderSector): StatGridItem[] {
+  const todayChange = sector.today_change ?? 0
+  const avgChange = sector.avg_change ?? 0
+  return [
+    { label: '今日涨幅', value: (todayChange >= 0 ? '+' : '') + formatPct(sector.today_change), color: todayChange >= 0 ? 'up' : 'down' },
+    { label: '均涨幅', value: (avgChange >= 0 ? '+' : '') + formatPct(sector.avg_change), color: avgChange >= 0 ? 'up' : 'down' },
+    { label: '净流入', value: formatNetInflow(sector.net_inflow) },
+    { label: '领涨股', value: sector.leading_stock || sector.leading_stock_info?.name || '--' },
+  ]
+}
+
 // 从板块中提取龙头股列表：优先合并 leading_stock_info 和 main_stocks，去重后按 score 降序
 function getTopStocks(sector: WindLeaderSector): WindLeaderStock[] {
   const seen = new Set<string>()
@@ -550,83 +546,23 @@ onShow(() => {
   padding: 24rpx;
 }
 
-/* ===== 引导卡片 ===== */
-.report-guide-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24rpx 32rpx;
+/* GuideCard 与下方内容间距 */
+.leaders-content > :first-child {
+  margin-bottom: 20rpx;
+}
+
+.state-section {
   margin-bottom: 24rpx;
-  background: linear-gradient(135deg, $primary 0%, #667eea 100%);
-  border-radius: 16rpx;
-  box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
-}
-
-.guide-left {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.guide-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.state-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 260rpx;
-  padding: 40rpx 32rpx;
-  margin-bottom: 24rpx;
-  background: #ffffff;
-  border-radius: 20rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-  text-align: center;
-}
-
-.state-text {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #374151;
-}
-
-.state-hint {
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  color: #9ca3af;
-}
-
-.retry-button {
-  min-width: 200rpx;
-  margin-top: 28rpx;
-  padding: 0 32rpx;
-  color: #ffffff;
-  font-size: 26rpx;
-  line-height: 72rpx;
-  background: $primary;
-  border: 0;
-  border-radius: 36rpx;
-
-  &::after {
-    border: 0;
-  }
-
-  &.disabled {
-    opacity: 0.6;
-  }
 }
 
 /* ===== 泡泡图 ===== */
 .bubble-card {
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-lg;
+  padding: $s-3;
+  margin-bottom: $s-3;
+  box-shadow: $shadow-sm;
 }
 
 .bubble-title-row {
@@ -695,11 +631,12 @@ onShow(() => {
 /* stats-card 卡片（与板块详情页一致） */
 .stats-card {
   position: relative;
-  background: #ffffff;
-  border-radius: 20rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-lg;
   padding: 28rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  box-shadow: $shadow-sm;
 }
 
 .stats-header {
@@ -722,65 +659,6 @@ onShow(() => {
   color: $ink;
 }
 
-/* 持续性标签 */
-.persistence-badge {
-  font-size: 20rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 6rpx;
-  font-weight: 600;
-
-  &.long-term { color: #16a34a; background: #f0fdf4; }
-  &.mid-term { color: #2563eb; background: #eff6ff; }
-  &.short-term { color: #d97706; background: #fffbeb; }
-}
-
-/* 频次 badge */
-.freq-badge {
-  font-size: 20rpx;
-  color: $primary;
-  background: rgba(77, 124, 254, 0.1);
-  padding: 4rpx 12rpx;
-  border-radius: 6rpx;
-  font-weight: 600;
-}
-
-/* 统计行：一行四个字段 */
-.stats-row {
-  display: flex;
-  gap: 12rpx;
-}
-
-.stat-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-}
-
-.stat-label {
-  font-size: 22rpx;
-  color: $ink-soft;
-  margin-bottom: 8rpx;
-}
-
-.stat-value {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: $ink;
-
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
-
-  &.leader-stock-name {
-    font-size: 24rpx;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
-  }
-}
-
 /* 入口卡片：可点击 */
 .sector-entry {
   transition: transform 0.15s ease;
@@ -788,15 +666,6 @@ onShow(() => {
   &:active {
     transform: scale(0.98);
   }
-}
-
-.sector-rank {
-  font-size: 22rpx;
-  color: #ffffff;
-  background: $primary;
-  padding: 4rpx 12rpx;
-  border-radius: 8rpx;
-  font-weight: 500;
 }
 
 /* 箭头容器 */
@@ -858,7 +727,7 @@ onShow(() => {
 }
 
 .leader-mini-price {
-  font-size: 28rpx;
+  font-size: 25rpx;
   font-weight: 600;
   color: $ink;
 }

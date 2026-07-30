@@ -128,12 +128,17 @@ import {
   type Sentiment,
 } from '@/shared/api/modules/briefing'
 import { parseBriefingItemsFromContent, type ReportType } from '@/shared/utils/briefingAdapter'
+import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
+// 匹配后端 publicBroadcastProjection 返回结构
+// 详见 aistock-app-api/src/core/routes/internal.ts:1215-1233
 interface BroadcastReport {
   content: {
-    text?: string
+    schema_version?: string
+    brief_type?: string
+    dialogue?: Array<{ role: 'host' | 'analyst'; content: string }>
     audio_path?: string | null
   }
 }
@@ -198,10 +203,10 @@ function sentimentClass(sentiment: Sentiment): string {
   return `sentiment-${sentiment}`
 }
 
-/** 点击音频卡片跳转播报详情页 */
+/** 点击音频卡片跳转今日分析概览页（整合所有 agent 报告） */
 function goDetail() {
   uni.navigateTo({
-    url: `/pages-sub-app/briefing-detail/index?date=${currentDate.value}`,
+    url: `/modules/chat/pages/agent-report?date=${currentDate.value}`,
   })
 }
 
@@ -262,11 +267,12 @@ async function loadReport() {
   }
 
   // 并行获取广播音频和结构化报告
+  // 后端 /report/:intent/:date 拒绝 'broadcast'，需用专门的 /broadcast/:briefType/:date 端点
   const reportType = detectReportType()
 
   try {
     const [broadcastRes, briefRes] = await Promise.allSettled([
-      agentApi.getReport('broadcast', currentDate.value),
+      agentApi.getBroadcast(broadcastType.value, currentDate.value),
       agentApi.getReport(reportType, currentDate.value),
     ])
 

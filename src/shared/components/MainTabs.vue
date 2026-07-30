@@ -93,7 +93,8 @@ try {
  * 不能硬编码 207rpx——非刘海屏会留过多空白、刘海屏会遮挡内容。
  */
 const dynamicMarginBottom = computed(() => {
-  return px2rpx(getBottomFixedHeightPx()) + 'rpx'
+  // gap=0：卡片下边缘紧挨 Tab 栏上边缘，露出圆角
+  return px2rpx(getBottomFixedHeightPx(0)) + 'rpx'
 })
 
 function onTabChange(tab: string) {

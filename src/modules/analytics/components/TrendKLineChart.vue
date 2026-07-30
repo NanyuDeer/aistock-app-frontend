@@ -4,7 +4,9 @@
       <text class="chart-title">{{ title }}</text>
       <text v-if="dateRange" class="chart-range">{{ dateRange }}</text>
     </view>
-    <view v-if="!points.length" class="chart-empty">暂无K线数据</view>
+    <view v-if="!points.length" class="chart-empty">
+      <EmptyState text="暂无K线数据" />
+    </view>
     <!-- #ifdef H5 || APP-PLUS -->
     <!-- @vue-ignore renderjs module is injected by the uni-app compiler. -->
     <view
@@ -32,6 +34,7 @@
 <script setup lang="ts">
 // @ts-nocheck -- vue-tsc does not model uni-app's isolated renderjs module.
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
+import { EmptyState } from '@/shared/components'
 // #ifdef MP-WEIXIN
 import uCharts from '@qiun/ucharts'
 // #endif
@@ -460,7 +463,5 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: $text-color-tertiary;
-  font-size: $font-size-sm;
 }
 </style>

@@ -3,28 +3,21 @@
     <view class="event-catcher-content">
       <!-- 周期筛选 -->
       <view class="filter-bar">
-        <view
-          v-for="tab in cycleTabs"
-          :key="tab.value"
-          :class="['filter-tab', activeCycle === tab.value ? 'active' : '']"
-          @tap="switchCycle(tab.value)"
-        >
-          <text class="filter-tab-text">{{ tab.label }}</text>
-        </view>
+        <Segmented :items="cycleTabs" v-model="activeCycle" fullWidth @change="onCycleChange" />
       </view>
 
       <!-- 加载中 -->
       <view v-if="loading && !events.length" class="loading">
-        <text class="loading-text">加载中...</text>
+        <LoadingState />
       </view>
 
       <!-- 事件列表 -->
       <view v-if="events.length" class="event-list">
-        <view
+        <Card
           v-for="evt in events"
           :key="evt.event_id"
-          class="event-card"
-          @tap="goStockDetail(evt.stock_code)"
+          clickable
+          @click="goStockDetail(evt.stock_code)"
         >
           <view class="event-top">
             <view class="event-stock">
@@ -32,44 +25,40 @@
               <text class="stock-code">{{ evt.stock_code }}</text>
               <text v-if="evt.industry" class="stock-industry">{{ evt.industry }}</text>
             </view>
-            <view :class="['impact-tag', impactClass(evt.ai_impact)]">
-              <text class="impact-tag-text">{{ evt.ai_impact || '中性' }}</text>
-            </view>
+            <Tag :type="impactTagType(evt.ai_impact)">{{ evt.ai_impact || '中性' }}</Tag>
           </view>
           <text class="event-title">{{ evt.title }}</text>
           <text v-if="evt.summary" class="event-summary">{{ evt.summary }}</text>
           <view v-if="evt.ai_keywords && evt.ai_keywords.length" class="keyword-row">
-            <text
+            <Tag
               v-for="(kw, idx) in evt.ai_keywords.slice(0, 4)"
               :key="idx"
-              class="keyword-tag"
-            >{{ kw }}</text>
+              size="sm"
+            >{{ kw }}</Tag>
           </view>
           <view class="event-bottom">
             <view class="meta-left">
-              <text :class="['cycle-pill', cycleClass(evt.cycle)]">{{ evt.cycle }}</text>
+              <Badge :type="cycleBadgeType(evt.cycle)">{{ evt.cycle }}</Badge>
               <text class="meta-text">{{ evt.change_type_name || evt.info_type }}</text>
             </view>
             <view class="meta-right">
-              <view class="ai-btn" @tap.stop="goAlertAnalysis(evt.stock_code, evt.cycle)">
-                <text class="ai-btn-text">AI解读</text>
-              </view>
+              <Button size="sm" @click.stop="goAlertAnalysis(evt.stock_code, evt.cycle)">AI解读</Button>
               <text class="meta-time">{{ formatTime(evt.event_time) }}</text>
             </view>
           </view>
-        </view>
-        <view v-if="hasMore" class="load-more" @tap="loadMore">
-          <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
-        </view>
+        </Card>
+        <Button v-if="hasMore" type="ghost" size="sm" @click="loadMore">
+          {{ loadingMore ? '加载中...' : '加载更多' }}
+        </Button>
       </view>
 
       <!-- mock数据（API不可用时显示） -->
       <view v-if="!loading && !events.length" class="event-list">
-        <view
+        <Card
           v-for="evt in mockEvents"
           :key="evt.event_id"
-          class="event-card"
-          @tap="goNewsDetail(evt.event_id)"
+          clickable
+          @click="goNewsDetail(evt.event_id)"
         >
           <view class="event-top">
             <view class="event-stock">
@@ -77,32 +66,28 @@
               <text class="stock-code">{{ evt.stock_code }}</text>
               <text v-if="evt.industry" class="stock-industry">{{ evt.industry }}</text>
             </view>
-            <view :class="['impact-tag', impactClass(evt.ai_impact)]">
-              <text class="impact-tag-text">{{ evt.ai_impact || '中性' }}</text>
-            </view>
+            <Tag :type="impactTagType(evt.ai_impact)">{{ evt.ai_impact || '中性' }}</Tag>
           </view>
           <text class="event-title">{{ evt.title }}</text>
           <text v-if="evt.summary" class="event-summary">{{ evt.summary }}</text>
           <view v-if="evt.ai_keywords && evt.ai_keywords.length" class="keyword-row">
-            <text
+            <Tag
               v-for="(kw, idx) in evt.ai_keywords.slice(0, 4)"
               :key="idx"
-              class="keyword-tag"
-            >{{ kw }}</text>
+              size="sm"
+            >{{ kw }}</Tag>
           </view>
           <view class="event-bottom">
             <view class="meta-left">
-              <text :class="['cycle-pill', cycleClass(evt.cycle)]">{{ cycleLabel(evt.cycle) }}</text>
+              <Badge :type="cycleBadgeType(evt.cycle)">{{ cycleLabel(evt.cycle) }}</Badge>
               <text class="meta-text">{{ evt.info_type }}</text>
             </view>
             <view class="meta-right">
-              <view class="ai-btn" @tap.stop="goAlertAnalysis(evt.stock_code, evt.cycle)">
-                <text class="ai-btn-text">AI解读</text>
-              </view>
+              <Button size="sm" @click.stop="goAlertAnalysis(evt.stock_code, evt.cycle)">AI解读</Button>
               <text class="meta-time">{{ evt.event_time }}</text>
             </view>
           </view>
-        </view>
+        </Card>
       </view>
     </view>
   </SubPageCard>
@@ -113,6 +98,7 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import { LoadingState, Tag, Badge, Button, Card, Segmented } from '@/shared/components'
 
 interface TrendEvent {
   event_id: string
@@ -182,9 +168,7 @@ async function loadEvents(append = false) {
   }
 }
 
-function switchCycle(cycle: string) {
-  if (activeCycle.value === cycle) return
-  activeCycle.value = cycle
+function onCycleChange() {
   loadEvents(false)
 }
 
@@ -193,21 +177,19 @@ function loadMore() {
   loadEvents(true)
 }
 
-function impactClass(impact?: string): string {
+function impactTagType(impact?: string): 'up' | 'down' | 'neutral' {
   if (!impact) return 'neutral'
-  if (impact.includes('重大利好')) return 'major-up'
-  if (impact.includes('利好')) return 'up'
-  if (impact.includes('重大利空')) return 'major-down'
-  if (impact.includes('利空')) return 'down'
+  if (impact.includes('重大利好') || impact.includes('利好')) return 'up'
+  if (impact.includes('重大利空') || impact.includes('利空')) return 'down'
   return 'neutral'
 }
 
-function cycleClass(cycle?: string): string {
+function cycleBadgeType(cycle?: string): 'danger' | 'warning' | 'success' | 'info' {
   switch (cycle) {
-    case 'short': return 'cycle-short'
-    case 'mid': return 'cycle-mid'
-    case 'long': return 'cycle-long'
-    default: return 'cycle-all'
+    case 'short': return 'danger'
+    case 'mid': return 'warning'
+    case 'long': return 'success'
+    default: return 'info'
   }
 }
 
@@ -339,37 +321,11 @@ onShow(() => {
 
 /* 周期筛选 */
 .filter-bar {
-  display: flex;
-  gap: 16rpx;
   margin-bottom: 24rpx;
-  background: #ffffff;
-  padding: 12rpx;
-  border-radius: 16rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-.filter-tab {
-  flex: 1;
-  padding: 16rpx 0;
-  border-radius: 12rpx;
-  text-align: center;
-
-  &.active {
-    background: $primary;
-
-    .filter-tab-text {
-      color: #ffffff;
-    }
-  }
-}
-
-.filter-tab-text {
-  font-size: 26rpx;
-  color: $ink-soft;
-}
-
-/* 加载/空状态 */
-.loading, .empty {
+/* 加载状态 */
+.loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -378,27 +334,11 @@ onShow(() => {
   gap: 16rpx;
 }
 
-.loading-text, .empty-text {
-  font-size: 28rpx;
-  color: $ink-soft;
-}
-
-.empty-icon {
-  font-size: 64rpx;
-}
-
 /* 事件列表 */
 .event-list {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
-}
-
-.event-card {
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 28rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
 .event-top {
@@ -438,29 +378,6 @@ onShow(() => {
   border-radius: 8rpx;
 }
 
-.impact-tag {
-  padding: 6rpx 16rpx;
-  border-radius: 8rpx;
-
-  &.major-up { background: rgba(244, 63, 94, 0.15); }
-  &.up { background: rgba(244, 63, 94, 0.08); }
-  &.major-down { background: rgba(34, 197, 94, 0.15); }
-  &.down { background: rgba(34, 197, 94, 0.08); }
-  &.neutral { background: #f0f2f5; }
-}
-
-.impact-tag-text {
-  font-size: 22rpx;
-  font-weight: 500;
-  color: $ink;
-}
-
-.impact-tag.major-up .impact-tag-text { color: #f43f5e; }
-.impact-tag.up .impact-tag-text { color: #f43f5e; }
-.impact-tag.major-down .impact-tag-text { color: #22c55e; }
-.impact-tag.down .impact-tag-text { color: #22c55e; }
-.impact-tag.neutral .impact-tag-text { color: $ink-soft; }
-
 .event-title {
   font-size: 28rpx;
   font-weight: 500;
@@ -485,14 +402,6 @@ onShow(() => {
   margin-bottom: 16rpx;
 }
 
-.keyword-tag {
-  font-size: 22rpx;
-  color: $primary;
-  padding: 4rpx 12rpx;
-  background: rgba(77, 124, 254, 0.08);
-  border-radius: 8rpx;
-}
-
 .event-bottom {
   display: flex;
   justify-content: space-between;
@@ -505,17 +414,6 @@ onShow(() => {
   display: flex;
   align-items: center;
   gap: 12rpx;
-}
-
-.cycle-pill {
-  font-size: 20rpx;
-  padding: 2rpx 12rpx;
-  border-radius: 8rpx;
-
-  &.cycle-short { background: rgba(244, 63, 94, 0.1); color: #f43f5e; }
-  &.cycle-mid { background: rgba(245, 158, 11, 0.1); color: #f59f0b; }
-  &.cycle-long { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
-  &.cycle-all { background: #f0f2f5; color: $ink-soft; }
 }
 
 .meta-text {
@@ -532,27 +430,5 @@ onShow(() => {
   display: flex;
   align-items: center;
   gap: 16rpx;
-}
-
-.ai-btn {
-  padding: 6rpx 20rpx;
-  background: linear-gradient(135deg, $primary, #6c5ce7);
-  border-radius: 20rpx;
-}
-
-.ai-btn-text {
-  font-size: 20rpx;
-  color: #ffffff;
-  font-weight: 500;
-}
-
-.load-more {
-  text-align: center;
-  padding: 32rpx 0;
-}
-
-.load-more-text {
-  font-size: 26rpx;
-  color: $primary;
 }
 </style>
