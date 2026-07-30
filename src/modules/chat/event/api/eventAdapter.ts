@@ -46,6 +46,9 @@ export interface BackendEventListData {
     publishTime: string
     summary: string
     conclusion: string
+    globalImportanceRank?: number | null
+    globalImportanceDirection?: string | null
+    globalImportanceLevel?: string | null
   }>
   total: number
   page: number
@@ -204,6 +207,11 @@ function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventI
     importance: 3,          // 降级默认值，无法真实反映事件重要性
     affectedIndustries: [], // 列表接口无 chain，无法生成
     isFollowed: false,      // 功能暂不实现
+
+    // 透传字段
+    globalImportanceRank: backendEvent.globalImportanceRank,
+    globalImportanceDirection: backendEvent.globalImportanceDirection,
+    globalImportanceLevel: backendEvent.globalImportanceLevel,
   }
 }
 

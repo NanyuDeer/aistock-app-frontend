@@ -32,7 +32,7 @@
     <view class="industries-container">
       <!-- 股票趋势图标 -->
       <view class="trend-icon" :class="`trend-icon--${type}`">
-        <!-- 上升趋势图 -->
+        <!-- 上升趋势图（利好） -->
         <svg v-if="type === 'positive'" width="48" height="28" viewBox="0 0 48 28" fill="none">
           <!-- Y轴 -->
           <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
@@ -47,8 +47,8 @@
           <!-- 趋势线箭头 -->
           <path d="M40 6L42 6L42 8" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <!-- 下降趋势图 -->
-        <svg v-else width="48" height="28" viewBox="0 0 48 28" fill="none">
+        <!-- 下降趋势图（利空） -->
+        <svg v-else-if="type === 'negative'" width="48" height="28" viewBox="0 0 48 28" fill="none">
           <!-- Y轴 -->
           <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
           <!-- X轴 -->
@@ -61,6 +61,19 @@
           <path d="M12 6L18 10L24 8L30 16L36 14L42 22" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <!-- 趋势线箭头 -->
           <path d="M40 22L42 22L42 20" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <!-- 波动趋势图（综合影响） -->
+        <svg v-else width="48" height="28" viewBox="0 0 48 28" fill="none">
+          <!-- Y轴 -->
+          <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
+          <!-- X轴 -->
+          <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
+          <!-- Y轴箭头 -->
+          <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- X轴箭头 -->
+          <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- 波动趋势线（上下来回震荡） -->
+          <path d="M12 20L18 8L24 16L30 6L36 18L42 10" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </view>
 
@@ -88,8 +101,8 @@
 import { computed } from 'vue'
 
 interface Props {
-  /** 事件方向：利好/利空 */
-  type: 'positive' | 'negative'
+  /** 事件方向：利好/利空/综合影响 */
+  type: 'positive' | 'negative' | 'mixed'
   /** 事件标题 */
   title: string
   /** 重要性：重大/重要 */
@@ -120,12 +133,20 @@ function handleClick() {
 
 // 计算方向图标
 const directionIcon = computed(() => {
-  return props.type === 'positive' ? '▲' : '▼'
+  switch (props.type) {
+    case 'positive': return '▲'
+    case 'negative': return '▼'
+    case 'mixed': return '⚡'
+  }
 })
 
 // 计算方向文本（更符合投资用户理解）
 const directionText = computed(() => {
-  return props.type === 'positive' ? '机会' : '风险'
+  switch (props.type) {
+    case 'positive': return '机会'
+    case 'negative': return '风险'
+    case 'mixed': return '关注'
+  }
 })
 
 // 展示的行业（最多3个）
@@ -148,21 +169,15 @@ const remainingCount = computed(() => {
   padding: 12rpx 12rpx;
   border-radius: $radius-base;
   border-left: 8rpx solid;
-  overflow: hidden;
-  min-height: 140rpx;
-  max-height: 160rpx;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: 4rpx;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.event-headline-card:active {
-  transform: scale(0.98);
-}
-
-// ========== AI装饰光斑 ==========
 .ai-glow-decoration {
   position: absolute;
   top: -20rpx;
@@ -172,7 +187,19 @@ const remainingCount = computed(() => {
   border-radius: 50%;
   opacity: 0.4;
   pointer-events: none;
+  z-index: 0;
 }
+
+.event-headline-card > *:not(.ai-glow-decoration) {
+  position: relative;
+  z-index: 1;
+}
+
+.event-headline-card:active {
+  transform: scale(0.98);
+}
+
+// ========== AI装饰光斑颜色变体 ==========
 
 .ai-glow-decoration--positive {
   background: radial-gradient(circle, rgba(239, 68, 68, 0.35) 0%, rgba(239, 68, 68, 0.1) 50%, transparent 70%);
@@ -180,6 +207,10 @@ const remainingCount = computed(() => {
 
 .ai-glow-decoration--negative {
   background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.08) 50%, transparent 70%);
+}
+
+.ai-glow-decoration--mixed {
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.25) 0%, rgba(139, 92, 246, 0.08) 50%, transparent 70%);
 }
 
 // ========== 利好卡片样式（机会） - 视觉权重55% ==========
@@ -194,6 +225,13 @@ const remainingCount = computed(() => {
   background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 55%, #A7F3D0 100%);
   border-left-color: #10B981;
   box-shadow: 0 12rpx 40rpx rgba(16, 185, 129, 0.18);
+}
+
+// ========== 综合影响卡片样式（市场关注） — 中性，紫色系 ==========
+.event-headline-card--mixed {
+  background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 55%, #DDD6FE 100%);
+  border-left-color: #8B5CF6;
+  box-shadow: 0 12rpx 40rpx rgba(139, 92, 246, 0.18);
 }
 
 // ========== 标签行 ==========
@@ -224,6 +262,10 @@ const remainingCount = computed(() => {
   background: rgba(16, 185, 129, 0.16);
 }
 
+.direction-badge--mixed {
+  background: rgba(139, 92, 246, 0.16);
+}
+
 .direction-icon {
   font-size: 20rpx;
 }
@@ -234,6 +276,10 @@ const remainingCount = computed(() => {
 
 .direction-badge--negative .direction-icon {
   color: #059669;
+}
+
+.direction-badge--mixed .direction-icon {
+  color: #7C3AED;
 }
 
 .direction-text {
@@ -247,6 +293,10 @@ const remainingCount = computed(() => {
 
 .direction-badge--negative .direction-text {
   color: #059669;
+}
+
+.direction-badge--mixed .direction-text {
+  color: #7C3AED;
 }
 
 // ========== 重大标签（第二视觉） ==========
@@ -272,6 +322,16 @@ const remainingCount = computed(() => {
   font-size: 22rpx;
   font-weight: 700;
   color: $text-color;
+}
+
+// ========== 卡片榜单标题 ==========
+.card-title {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: $text-color-secondary;
+  line-height: 1.3;
+  position: relative;
+  z-index: 1;
 }
 
 // ========== 事件标题 ==========

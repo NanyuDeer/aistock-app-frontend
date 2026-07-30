@@ -72,6 +72,12 @@ export interface EventItem {
   aiSummary: string
   /** 是否已关注 */
   isFollowed: boolean
+  /** Global Importance 排名（1=当前焦点，2=持续影响，无则 null） */
+  globalImportanceRank?: number | null
+  /** Global Importance 方向（bullish/bearish/mixed，无则 null） */
+  globalImportanceDirection?: string | null
+  /** Global Importance 级别（critical/important/notable，无则 null） */
+  globalImportanceLevel?: string | null
 }
 
 /** 事件列表 API 响应 */
@@ -294,4 +300,42 @@ export interface AgentAnalysisReport {
     /** 风险提示 */
     risk: string
   }
+}
+
+// ==================== Global Importance ====================
+
+/** Global Importance 方向（后端原始枚举） */
+export type GiDirection = 'bullish' | 'bearish' | 'mixed'
+
+/** Global Importance 重要性等级（后端原始枚举） */
+export type GiImportanceLevel = 'critical' | 'important' | 'notable'
+
+/** Global Importance 单个事件（后端原始结构） */
+export interface GiEvent {
+  event_id: string
+  direction: GiDirection
+  importance_level: GiImportanceLevel
+  reason: string
+  rank: number
+}
+
+/** 前端展示方向 */
+export type FocusDirection = 'positive' | 'negative' | 'mixed'
+
+/** 前端展示重要性 */
+export type FocusImportance = 'major' | 'normal'
+
+/** 榜单类型 */
+export type FocusEventType = 'current_focus' | 'ongoing_significant'
+
+/** Global Importance 前端展示模型 */
+export interface FocusEventViewModel {
+  type: FocusEventType
+  eventId: string
+  title: string
+  summary: string
+  direction: FocusDirection
+  importance: FocusImportance
+  selectionReason: string
+  industries: string[]
 }
