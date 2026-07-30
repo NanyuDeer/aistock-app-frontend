@@ -237,7 +237,8 @@ export const stockApi = {
     return request.get<KLineItem[]>('/cn/stock/quotes/kline', {
       params: { symbol, klt, fqt: 1, limit: params?.count || 120 }
     }).then((res: any) => {
-      const klines = res?.['K线'] || res?.klines || res?.data?.['K线'] || []
+      const payload = res?.data || res
+      const klines = payload?.['K线'] || payload?.klines || res?.['K线'] || res?.klines || []
       if (!Array.isArray(klines)) return []
       const mapped = klines.map((k: any) => ({
         date: k['时间'] || k.date || '',
@@ -247,7 +248,7 @@ export const stockApi = {
         low: Number(k['最低价'] ?? k.low ?? 0),
         volume: Number(k['成交量'] ?? k.volume ?? 0),
       }))
-      return params?.period === 'yearly' ? aggregateYearlyKLines(mapped) : mapped
+      return mapped
     })
   },
 
