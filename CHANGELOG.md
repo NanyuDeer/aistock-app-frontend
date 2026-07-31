@@ -11,7 +11,12 @@
 - `src/modules/chat/event`：GI 数据适配 `/event/list`，修复双排名卡片布局
 - 删除 6 个 ghost 文件（组件重构后残留）：ChatBubble / SkillButton / SkillCard / StreamingText / EventTabBar / ImportanceStars
 
----
+## [master] 2026-07-31 — 早点听卡片 CSS 调整 + agent-report 跳转修复
+**开发者**: ARIA
+
+### 修复
+- `src/modules/chat/pages/agent-report.vue`：修复报告页跳转路径问题
+- `src/modules/home/components/MorningContent.vue`：「缺失来源」标记从 briefing-top 移到「专属播报」按钮右侧；`.feature-sub` 恢复 `$font-size-xs`；新增 `.briefing-btn-row` flex 布局，优化按钮排列
 
 ## [changer] 2026-07-29 — 早报降级路径：brief 接口优先 + 降级文案优化
 

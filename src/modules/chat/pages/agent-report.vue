@@ -45,64 +45,181 @@
       </template>
 
       <!-- 详情模式：单个 Agent 报告 -->
-      <Card v-else-if="report" class="report-body">
+      <view v-else-if="report" class="report-body">
         <text class="report-date">{{ reportDateText }}</text>
 
-        <!-- morning 晨报：摘要 + 详情 + 风险（不显示龙头股票，避免与长线风口混淆） -->
+        <!-- ===== 晨报（morning）：4步框架结构化 ===== -->
         <template v-if="isMorningIntent && displayReport">
-          <Card v-if="reportSummary" class="summary-box">
-            <text class="summary-text">{{ reportSummary }}</text>
+          <Card v-if="reportSummary" class="conclusion-card conclusion-card--morning">
+            <text class="section-kicker">今日结论</text>
+            <text class="conclusion-text">{{ reportSummary }}</text>
           </Card>
 
-          <view v-if="detailsText" class="section">
-            <text class="section-title">详细分析</text>
-            <view class="report-text-wrap">
-              <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
+          <Card v-if="morningOverseas.length" class="stream-section">
+            <text class="section-title">隔夜外盘回顾</text>
+            <view class="bullet-list">
+              <text v-for="(item, i) in morningOverseas" :key="i" class="bullet-item">{{ item }}</text>
             </view>
-          </view>
+          </Card>
 
-          <view v-if="risks.length" class="section">
-            <text class="section-title">风险提示</text>
-            <view v-for="(risk, idx) in risks" :key="idx" class="risk-item">
-              <text class="risk-text">· {{ risk }}</text>
+          <Card v-if="morningDomestic.length" class="stream-section">
+            <text class="section-title">国内宏观要闻</text>
+            <view class="bullet-list">
+              <text v-for="(item, i) in morningDomestic" :key="i" class="bullet-item">{{ item }}</text>
             </view>
-          </view>
+          </Card>
+
+          <Card v-if="morningSector.length" class="stream-section">
+            <text class="section-title">板块与市场情绪</text>
+            <view class="bullet-list">
+              <text v-for="(item, i) in morningSector" :key="i" class="bullet-item">{{ item }}</text>
+            </view>
+          </Card>
+
+          <Card v-if="morningFocus.length" class="stream-section">
+            <text class="section-title">今日焦点板块预测</text>
+            <view class="bullet-list">
+              <text v-for="(item, i) in morningFocus" :key="i" class="bullet-item">{{ item }}</text>
+            </view>
+          </Card>
+
+          <Card v-if="morningStrategy" class="stream-section">
+            <text class="section-title">今日关注与策略</text>
+            <text class="section-text">{{ morningStrategy }}</text>
+          </Card>
+
+          <Card v-if="risks.length" class="risk-card stream-section">
+            <text class="section-title">风险提示</text>
+            <view class="bullet-list">
+              <text v-for="(risk, i) in risks" :key="i" class="risk-item">{{ risk }}</text>
+            </view>
+          </Card>
         </template>
 
-        <!-- wind_leader / hot_burst / trend_score: 结构化展示（龙头股票+详细分析+风险提示） -->
-        <template v-else-if="displayReport">
-          <!-- 龙头股票 -->
-          <view v-if="leaderStocks.length" class="section">
-            <text class="section-title">龙头股票</text>
+        <!-- ===== 长线风口（wind_leader）：板块子卡片结构化 ===== -->
+        <template v-else-if="effectiveIntent === 'wind_leader' && displayReport">
+          <Card v-if="reportSummary" class="conclusion-card conclusion-card--wind">
+            <text class="section-kicker">风口结论</text>
+            <text class="conclusion-text">{{ reportSummary }}</text>
+          </Card>
+
+          <Card v-if="windOverview" class="stream-section">
+            <text class="section-title">风口概览</text>
+            <text class="section-text">{{ windOverview }}</text>
+          </Card>
+
+          <Card v-if="windSectors.length" class="stream-section">
+            <text class="section-title">重点板块分析 TOP{{ windSectors.length }}</text>
+            <view class="stock-list">
+              <Card v-for="(sector, i) in windSectors" :key="i" flat class="stock-card">
+                <view class="stock-card-head">
+                  <text class="stock-name">{{ sector.title }}</text>
+                </view>
+                <text v-if="sector.body" class="stock-description">{{ sector.body }}</text>
+              </Card>
+            </view>
+          </Card>
+
+          <Card v-if="windStocks.length" class="stream-section">
+            <text class="section-title">龙头股推荐</text>
+            <view class="stock-tags">
+              <Tag v-for="(code, i) in leaderStocks" :key="i" size="sm">{{ code }}</Tag>
+            </view>
+          </Card>
+
+          <Card v-if="risks.length" class="risk-card stream-section">
+            <text class="section-title">风险提示</text>
+            <view class="bullet-list">
+              <text v-for="(risk, i) in risks" :key="i" class="risk-item">{{ risk }}</text>
+            </view>
+          </Card>
+        </template>
+
+        <!-- ===== 趋势股评分（trend_score）：多维度结构化 ===== -->
+        <template v-else-if="effectiveIntent === 'trend_score' && displayReport">
+          <Card v-if="reportSummary" class="conclusion-card conclusion-card--trend">
+            <text class="section-kicker">评分结论</text>
+            <text class="conclusion-text">{{ reportSummary }}</text>
+          </Card>
+
+          <Card v-if="trendConclusion" class="stream-section">
+            <text class="section-title">结论摘要</text>
+            <text class="section-text">{{ trendConclusion }}</text>
+          </Card>
+
+          <Card v-if="trendDimensions" class="stream-section">
+            <text class="section-title">维度解读</text>
+            <text class="section-text">{{ trendDimensions }}</text>
+          </Card>
+
+          <Card v-if="trendJudgment" class="stream-section">
+            <text class="section-title">趋势判断</text>
+            <text class="section-text">{{ trendJudgment }}</text>
+          </Card>
+
+          <Card v-if="trendTrack" class="stream-section">
+            <text class="section-title">赛道分析</text>
+            <text class="section-text">{{ trendTrack }}</text>
+          </Card>
+
+          <Card v-if="leaderStocks.length" class="stream-section">
+            <text class="section-title">相关个股</text>
             <view class="stock-tags">
               <Tag v-for="code in leaderStocks" :key="code" size="sm">{{ code }}</Tag>
             </view>
-          </view>
+          </Card>
 
-          <!-- 详细分析 -->
-          <view v-if="detailsText" class="section">
+          <Card v-if="trendAdvice" class="judgment-card stream-section">
+            <text class="section-title">关注建议</text>
+            <text class="section-text">{{ trendAdvice }}</text>
+          </Card>
+
+          <Card v-if="risks.length" class="risk-card stream-section">
+            <text class="section-title">风险提示</text>
+            <view class="bullet-list">
+              <text v-for="(risk, i) in risks" :key="i" class="risk-item">{{ risk }}</text>
+            </view>
+          </Card>
+        </template>
+
+        <!-- ===== 兜底：其他 intent（hot_burst 等）用 mp-html 渲染 ===== -->
+        <template v-else-if="displayReport">
+          <Card v-if="reportSummary" class="conclusion-card">
+            <text class="section-kicker">今日结论</text>
+            <text class="conclusion-text">{{ reportSummary }}</text>
+          </Card>
+
+          <Card v-if="leaderStocks.length" class="stream-section">
+            <text class="section-title">相关个股</text>
+            <view class="stock-tags">
+              <Tag v-for="code in leaderStocks" :key="code" size="sm">{{ code }}</Tag>
+            </view>
+          </Card>
+
+          <Card v-if="detailsText" class="stream-section">
             <text class="section-title">详细分析</text>
             <view class="report-text-wrap">
               <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
             </view>
-          </view>
+          </Card>
 
-          <!-- 风险提示 -->
-          <view v-if="risks.length" class="section">
+          <Card v-if="risks.length" class="risk-card stream-section">
             <text class="section-title">风险提示</text>
-            <view v-for="(risk, idx) in risks" :key="idx" class="risk-item">
-              <text class="risk-text">· {{ risk }}</text>
+            <view class="bullet-list">
+              <text v-for="(risk, i) in risks" :key="i" class="risk-item">{{ risk }}</text>
             </view>
-          </view>
+          </Card>
         </template>
 
         <!-- 纯文本展示（broadcast 等） -->
         <template v-else>
-          <view class="report-text-wrap">
-            <text class="report-text">{{ reportText }}</text>
-          </view>
+          <Card class="stream-section">
+            <view class="report-text-wrap">
+              <text class="report-text">{{ reportText }}</text>
+            </view>
+          </Card>
         </template>
-      </Card>
+      </view>
 
       <!-- 无报告 -->
       <EmptyState v-else title="今日报告尚未生成" description="请在 9:10 后查看" icon="file-line" />
@@ -113,13 +230,59 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onLoad, onBackPress } from '@dcloudio/uni-app'
-import { agentApi } from '@/shared/api/modules/agent'
+import { agentApi, isPublicReportIntent } from '@/shared/api/modules/agent'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import { formatDate, formatDateTime } from '@/shared/utils/datetime'
+import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Card, Tag, Button } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
+
+// ===== Markdown 分区解析工具（参考 hot-burst-report 模式）=====
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** 提取 ## 标题下的内容（到下一个 ## 或末尾） */
+function extractSection(markdown: string, heading: string): string {
+  const match = markdown.match(new RegExp(`^##\\s+${escapeRegExp(heading)}\\s*\\n([\\s\\S]*?)(?=^##\\s+|(?![\\s\\S]))`, 'm'))
+  return match?.[1]?.trim() || ''
+}
+
+/** 清理 Markdown 行：去除列表符号和加粗 */
+function cleanLine(value: string): string {
+  return value.replace(/^[-*]\s+/, '').replace(/\*\*/g, '').replace(/`/g, '').trim()
+}
+
+/** 将 section 内容按行解析为 bullet 数组 */
+function sectionBullets(markdown: string, heading: string): string[] {
+  return extractSection(markdown, heading).split('\n').map(cleanLine).filter(Boolean)
+}
+
+/** 将 section 内容合并为纯文本段落 */
+function sectionText(markdown: string, heading: string): string {
+  return extractSection(markdown, heading).split('\n').map(cleanLine).filter(Boolean).join(' ')
+}
+
+/** 提取 ### 三级标题下的子区块（用于板块/股票子卡片） */
+function extractSubSections(markdown: string, heading: string): Array<{ title: string; body: string }> {
+  const section = extractSection(markdown, heading)
+  if (!section) return []
+  const headings = [...section.matchAll(/^###\s+(.+?)\s*$/gm)]
+  return headings.map((h, i) => {
+    const title = h[1].trim()
+    const bodyStart = (h.index || 0) + h[0].length
+    const bodyEnd = headings[i + 1]?.index ?? section.length
+    return { title, body: section.slice(bodyStart, bodyEnd).trim() }
+  })
+}
+
+/** 从子块 body 中提取 **字段名**：值 */
+function extractField(body: string, label: string): string {
+  const match = body.match(new RegExp(`^[-*]?\\s*\\*\\*${escapeRegExp(label)}\\*\\*[：:]?\\s*([\\s\\S]*?)(?=\\n[-*]?\\s*\\*\\*|(?![\\s\\S]))`, 'm'))
+  return match ? cleanLine(match[1]) : ''
+}
 
 interface DisplayReport {
   risks?: string[]
@@ -263,6 +426,36 @@ const reportText = computed(() => {
   return report.value?.content?.text || ''
 })
 
+// ===== 晨报（morning）结构化分区 =====
+const morningOverseas = computed(() => sectionBullets(detailsText.value, '第1步：隔夜外盘回顾'))
+const morningDomestic = computed(() => sectionBullets(detailsText.value, '第2步：国内宏观要闻'))
+const morningSector = computed(() => sectionBullets(detailsText.value, '第3步：板块与市场情绪'))
+const morningFocus = computed(() => sectionBullets(detailsText.value, '今日焦点板块预测'))
+const morningStrategy = computed(() => sectionText(detailsText.value, '第4步：今日关注与策略建议'))
+
+// ===== 长线风口（wind_leader）结构化分区 =====
+interface SectorCard { title: string; body: string }
+const windOverview = computed(() => sectionText(detailsText.value, '风口概览'))
+const windSectors = computed<SectorCard[]>(() => extractSubSections(detailsText.value, '重点板块分析'))
+const windStocks = computed(() => sectionBullets(detailsText.value, '龙头股推荐'))
+
+// ===== 趋势股评分（trend_score）结构化分区 =====
+const trendConclusion = computed(() => sectionText(detailsText.value, '结论摘要'))
+const trendDimensions = computed(() => sectionText(detailsText.value, '维度解读'))
+const trendJudgment = computed(() => sectionText(detailsText.value, '趋势判断'))
+const trendTrack = computed(() => sectionText(detailsText.value, '赛道分析'))
+const trendAdvice = computed(() => sectionText(detailsText.value, '关注建议'))
+
+/** intent 主题色映射（用于结论卡渐变和左边框） */
+const intentThemeColor = computed(() => {
+  const map: Record<string, string> = {
+    morning: '$warning',
+    wind_leader: '$primary',
+    trend_score: '$success',
+  }
+  return map[effectiveIntent.value] || '$primary'
+})
+
 /** 从 AgentReport 提取简报摘要 */
 function extractSummary(reportData: AgentReport): string {
   const content = reportData.content
@@ -362,7 +555,7 @@ function backToOverview() {
 onLoad((options) => {
   const requestedIntent = options?.intent || ''
   intent.value = isPublicReportIntent(requestedIntent) ? requestedIntent : ''
-  date.value = options?.date || new Date().toISOString().split('T')[0]
+  date.value = options?.date || shanghaiDateString()
 
   if (intent.value) {
     // 从 URL 参数直接进入详情
@@ -402,6 +595,11 @@ onBackPress(() => {
   display: flex;
   flex-direction: column;
   gap: 20rpx;
+}
+
+/* 概览卡片边框：与其他卡片保持一致的 $line 边界 */
+.brief-card {
+  border: 2rpx solid $line;
 }
 
 .brief-card :deep(.as-card__body) {
@@ -533,6 +731,164 @@ onBackPress(() => {
   line-height: 1.8;
   color: $ink;
   white-space: pre-wrap;
+}
+
+/* ===== 参考 hot-burst-report 规整排版：流式动画、主题色、结构化列表 ===== */
+.report-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+/* 流式入场动画：每个 stream-section 逐块淡入 */
+.stream-section {
+  animation: section-in 0.28s ease-out both;
+}
+
+@keyframes section-in {
+  from { opacity: 0; transform: translateY(12rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 结论卡片：kicker + 主题色变体 */
+.section-kicker {
+  display: block;
+  margin-bottom: 10rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+}
+
+.conclusion-text {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 1.5;
+  color: $ink;
+}
+
+/* 晨报主题色：橙色（与 AGENT_META.morning 一致） */
+.conclusion-card--morning {
+  border-left: 6rpx solid #f59e0b;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.06), rgba(245, 158, 11, 0.02));
+
+  .section-kicker { color: #f59e0b; }
+}
+
+/* 长线风口主题色：紫色 */
+.conclusion-card--wind {
+  border-left: 6rpx solid #8b5cf6;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06), rgba(139, 92, 246, 0.02));
+
+  .section-kicker { color: #8b5cf6; }
+}
+
+/* 趋势股评分主题色：绿色 */
+.conclusion-card--trend {
+  border-left: 6rpx solid #10b981;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.02));
+
+  .section-kicker { color: #10b981; }
+}
+
+/* 默认 conclusion-card（兜底模板）使用主品牌色 */
+.conclusion-card {
+  border-left: 6rpx solid $primary;
+
+  .section-kicker { color: $primary; }
+}
+
+/* 列表：bullet 项目符号 + 间距 */
+.bullet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.bullet-item {
+  display: block;
+  font-size: 25rpx;
+  line-height: 1.65;
+  color: $ink-soft;
+
+  &::before {
+    content: '•';
+    margin-right: 10rpx;
+    color: $primary;
+  }
+}
+
+/* 段落文本 */
+.section-text {
+  display: block;
+  font-size: 25rpx;
+  line-height: 1.65;
+  color: $ink-soft;
+}
+
+/* 子卡片列表（长线风口板块、机构调研个股等） */
+.stock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.stock-card {
+  padding: 20rpx;
+  background: $bg-soft;
+  border-radius: $r-sm;
+  border: 1rpx solid $line-soft;
+}
+
+.stock-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 8rpx;
+}
+
+.stock-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: $ink;
+}
+
+.stock-description {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.65;
+  color: $ink-soft;
+}
+
+/* 判断卡片：左边框强调（关注建议、持续性判断等） */
+.judgment-card {
+  border-left: 6rpx solid $primary;
+}
+
+/* 风险卡片：红色调强调 */
+.risk-card {
+  border-left: 6rpx solid $up;
+  background: linear-gradient(135deg, rgba(224, 69, 69, 0.04), rgba(224, 69, 69, 0.01));
+
+  .section-title { color: $up; }
+
+  .risk-item {
+    display: block;
+    font-size: 25rpx;
+    line-height: 1.65;
+    color: $ink-soft;
+    margin-bottom: 12rpx;
+
+    &::before {
+      content: '!';
+      margin-right: 8rpx;
+      font-weight: 600;
+      color: $up;
+    }
+
+    &:last-child { margin-bottom: 0; }
+  }
 }
 
 .risk-item {

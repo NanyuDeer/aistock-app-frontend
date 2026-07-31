@@ -119,7 +119,6 @@ import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { agentApi, type BriefType } from '@/shared/api/modules/agent'
 import { API_BASE_URL } from '@/shared/utils/constants'
-import { addCalendarDays, shanghaiDateString } from '@/shared/utils/tradingTime'
 import {
   SOURCE_LABELS,
   SOURCE_ICONS,
@@ -129,13 +128,17 @@ import {
   type Sentiment,
 } from '@/shared/api/modules/briefing'
 import { parseBriefingItemsFromContent, type ReportType } from '@/shared/utils/briefingAdapter'
-import { parseBroadcastReport } from '@/shared/utils/broadcastReport'
+import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
+// 匹配后端 publicBroadcastProjection 返回结构
+// 详见 aistock-app-api/src/core/routes/internal.ts:1215-1233
 interface BroadcastReport {
   content: {
-    text?: string
+    schema_version?: string
+    brief_type?: string
+    dialogue?: Array<{ role: 'host' | 'analyst'; content: string }>
     audio_path?: string | null
   }
 }
@@ -200,10 +203,10 @@ function sentimentClass(sentiment: Sentiment): string {
   return `sentiment-${sentiment}`
 }
 
-/** 点击音频卡片跳转播报详情页 */
+/** 点击音频卡片跳转今日分析概览页（整合所有 agent 报告） */
 function goDetail() {
   uni.navigateTo({
-    url: `/pages-sub-app/briefing-detail/index?date=${currentDate.value}`,
+    url: `/modules/chat/pages/agent-report?date=${currentDate.value}`,
   })
 }
 
@@ -263,52 +266,27 @@ async function loadReport() {
     isPlaying.value = false
   }
 
-  // 并行获取：广播音频 + brief（优先）；brief 失败时回退 report
+  // 并行获取广播音频和结构化报告
+  // 后端 /report/:intent/:date 拒绝 'broadcast'，需用专门的 /broadcast/:briefType/:date 端点
   const reportType = detectReportType()
-  const briefType: BriefType = reportType === 'review' ? 'evening' : 'morning'
 
   try {
     const [broadcastRes, briefRes] = await Promise.allSettled([
-      agentApi.getReport('broadcast', currentDate.value),
-      agentApi.getBrief(briefType, currentDate.value),
+      agentApi.getBroadcast(broadcastType.value, currentDate.value),
+      agentApi.getReport(reportType, currentDate.value),
     ])
 
-    // 广播报告（音频来源）— 仅消费通过严格 parser 的 dialogue 与音频路径
+    // 广播报告（音频来源）
     if (broadcastRes.status === 'fulfilled') {
-      const data = broadcastRes.value
-      const parsed = parseBroadcastReport(data, broadcastType.value, currentDate.value)
-      if (parsed) {
-        report.value = { content: { text: parsed.dialogue.map(d => d.content).join('\n'), audio_path: parsed.audio_path } }
-      } else {
-        report.value = null
-      }
+      report.value = (broadcastRes.value as BroadcastReport) || null
     } else {
       report.value = null
     }
 
-    // 优先使用 brief.v1（结构化条目，支持降级标记）
-    // 兼容两种响应格式：{ data: BriefV1 } 或 BriefV1 直接（与 useBriefingCard.ts 一致）
-    const briefData = briefRes.status === 'fulfilled'
-      ? ((briefRes.value as unknown as Record<string, unknown> | null)?.data ?? briefRes.value)
-      : null
-
-    if (briefData) {
-      items.value = parseBriefingItemsFromContent(briefData, reportType)
-      return
-    }
-
-    // 降级：获取 morning/review 报告（旧 schema 1.0/2.0 路径，兼容历史数据）
-    const reportRes = await agentApi
-      .getReport(reportType, currentDate.value)
-      .catch(() => null)
-
-    if (reportRes) {
-      const data = reportRes as BriefReportData
-      if (data.content) {
-        items.value = parseBriefingItemsFromContent(data.content, reportType)
-      } else {
-        items.value = []
-      }
+    // 结构化条目（降级解析：从 morning/review 报告解析为 BriefingItem[]）
+    if (briefRes.status === 'fulfilled' && briefRes.value) {
+      const briefData = briefRes.value as BriefReportData
+      items.value = parseBriefingItemsFromContent(briefData.content, reportType)
     } else {
       items.value = []
     }
