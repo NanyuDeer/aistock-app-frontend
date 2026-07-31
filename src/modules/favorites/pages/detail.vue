@@ -53,6 +53,58 @@
         </view>
       </view>
 
+      <view class="decision-card">
+        <view class="decision-head">
+          <view>
+            <text class="decision-kicker">综合决策</text>
+          </view>
+          <view class="decision-verdict">
+            <text :class="['decision-status', overallDecision.statusClass]">{{ overallDecision.status }}</text>
+            <text class="decision-period">{{ overallDecision.period }}</text>
+          </view>
+        </view>
+        <text class="decision-summary">{{ overallDecision.summary }}</text>
+        <view class="decision-next">
+          <text class="next-label">下一步</text>
+          <text class="next-text">{{ overallDecision.nextStep }}</text>
+        </view>
+        <view class="decision-points">
+          <view class="decision-point" @tap="toggleDecisionPoint('opportunity')">
+            <text class="point-label">机会</text>
+            <text :class="['point-text', { expanded: expandedDecisionPoint === 'opportunity' }]">{{ overallDecision.opportunity }}</text>
+            <text class="point-more">{{ expandedDecisionPoint === 'opportunity' ? '收起' : '展开' }}</text>
+          </view>
+          <view class="decision-point is-risk" @tap="toggleDecisionPoint('risk')">
+            <text class="point-label">风险</text>
+            <text :class="['point-text', { expanded: expandedDecisionPoint === 'risk' }]">{{ overallDecision.risk }}</text>
+            <text class="point-more">{{ expandedDecisionPoint === 'risk' ? '收起' : '展开' }}</text>
+          </view>
+        </view>
+      </view>
+
+      <view v-if="isFavorite" class="major-event-alert" :class="{ 'is-muted': !latestMajorEvent }">
+        <view class="major-event-head">
+          <text class="decision-kicker">最新重大异动</text>
+          <text v-if="latestMajorEvent" :class="['major-impact', majorEventImpactClass]">
+            {{ latestMajorEvent.ai_impact || latestMajorEvent.level || latestMajorEvent.change_type_name }}
+          </text>
+        </view>
+        <template v-if="latestMajorEvent">
+          <text class="major-event-title">{{ latestMajorEvent.summary || latestMajorEvent.title || latestMajorEvent.change_type_name }}</text>
+          <view class="major-event-meta">
+            <text>{{ latestMajorEvent.ai_horizon || latestMajorEvent.cycle || '周期待判' }}</text>
+            <text>{{ latestMajorEvent.change_type_name || latestMajorEvent.info_type || '资讯研判' }}</text>
+            <text>{{ latestMajorEvent.event_time_display || formatEventTime(latestMajorEvent.event_time) }}</text>
+          </view>
+        </template>
+        <template v-else>
+          <text class="major-event-title">暂无重大利好或重大利空异动</text>
+          <view class="major-event-meta">
+            <text>持续监控中</text>
+          </view>
+        </template>
+      </view>
+
       <!-- 2. 个股异动 -->
       <view v-if="isFavorite && stockEvents.length" class="section-card">
         <text class="section-title">个股异动</text>
@@ -73,7 +125,7 @@
           v-for="tab in viewTabs"
           :key="tab.key"
           :class="['view-tab', { 'is-active': activeView === tab.key }]"
-          @tap="activeView = tab.key"
+          @tap="selectActiveView(tab.key)"
         >
           <text class="tab-label">{{ tab.label }}</text>
           <text class="tab-desc">{{ tab.desc }}</text>
@@ -82,6 +134,16 @@
 
       <!-- 4. 短线视图 -->
       <view v-show="activeView === 'short'" class="view-content">
+        <view class="section-card action-card">
+          <text class="section-title">短线跟踪</text>
+          <view class="short-action-list">
+            <view v-for="item in shortActionItems" :key="item.label" class="short-action-item">
+              <text class="action-label">{{ item.label }}</text>
+              <text class="action-value">{{ item.value }}</text>
+            </view>
+          </view>
+        </view>
+
         <!-- AI 资讯分析 -->
         <view class="ai-analysis-card">
           <view class="card-header">
@@ -144,8 +206,8 @@
             <view class="info-news-divider"></view>
             <view class="news-list">
               <view
-                v-for="(news, idx) in pagedNewsList"
-                :key="(newsPage - 1) * newsPageSize + idx"
+                v-for="(news, idx) in visibleNewsList"
+                :key="idx"
                 class="news-item"
                 @tap="openNews(news)"
               >
@@ -155,17 +217,13 @@
                   <text v-if="news.publishTime" class="news-time">{{ news.publishTime }}</text>
                 </view>
               </view>
+              <view v-if="newsList.length > 3" class="news-toggle" @tap="newsExpanded = !newsExpanded">
+                <text class="news-toggle-text">
+                  {{ newsExpanded ? '收起' : `查看全部 ${newsList.length} 条` }}
+                </text>
+              </view>
               <view v-if="!newsList.length" class="ai-empty">
                 <text class="ai-empty-text">暂无相关资讯</text>
-              </view>
-              <view v-if="newsTotalPages > 1" class="news-pagination">
-                <view class="news-page-btn" :class="{ 'is-disabled': newsPage <= 1 }" @tap="newsPrevPage">
-                  <text class="news-page-arrow">‹</text>
-                </view>
-                <text class="news-page-info">{{ newsPage }} / {{ newsTotalPages }}</text>
-                <view class="news-page-btn" :class="{ 'is-disabled': newsPage >= newsTotalPages }" @tap="newsNextPage">
-                  <text class="news-page-arrow">›</text>
-                </view>
               </view>
           </view>
         </view>
@@ -204,16 +262,17 @@
             </text>
           </view>
           <CapitalFlowCharts
+            :main-inflow="capitalFlowInfo.mainInflow"
+            :ratio="capitalFlowInfo.ratio"
+            :five-day="capitalFlowInfo.fiveDay"
+            :streak="capitalFlowInfo.streak"
+            :narrative="capitalFlowInfo.narrative"
+            :risk="capitalFlowInfo.risk"
             :orders="capitalFlowInfo.orders || []"
             :trend="capitalFlowInfo.trend || []"
             :trend-dates="capitalFlowInfo.trendDates || []"
             :trend-badge="capitalFlowInfo.trendBadge"
           />
-          <!-- AI 叙述 -->
-          <view v-if="capitalFlowInfo.narrative" class="flow-narrative">
-            <text class="flow-narrative-text">{{ capitalFlowInfo.narrative }}</text>
-            <text v-if="capitalFlowInfo.risk" class="flow-narrative-risk">风险：{{ capitalFlowInfo.risk }}</text>
-          </view>
         </view>
 
         <!-- 交易数据 -->
@@ -223,10 +282,6 @@
             <view class="detail-item">
               <text class="detail-label">最新价</text>
               <text :class="['detail-value', quote.changePercent >= 0 ? 'up' : 'down']">{{ quote.price.toFixed(2) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="detail-label">均价</text>
-              <text class="detail-value">{{ quote.avgPrice.toFixed(2) }}</text>
             </view>
             <view class="detail-item">
               <text class="detail-label">涨跌幅</text>
@@ -269,12 +324,8 @@
               <text class="detail-value">{{ quote.prevClose.toFixed(2) }}</text>
             </view>
             <view class="detail-item">
-              <text class="detail-label">涨停</text>
-              <text class="detail-value up">{{ quote.limitUp.toFixed(2) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="detail-label">跌停</text>
-              <text class="detail-value down">{{ quote.limitDown.toFixed(2) }}</text>
+              <text class="detail-label">振幅</text>
+              <text class="detail-value">{{ quote.amplitude.toFixed(2) }}%</text>
             </view>
             <view class="detail-item">
               <text class="detail-label">市盈率</text>
@@ -301,6 +352,12 @@
             </view>
             <view class="ai-logic">
               <text class="ai-logic-text">{{ midAiAnalysis.logic }}</text>
+            </view>
+            <view class="ai-action-list">
+              <view v-for="item in midActionItems" :key="item.label" class="ai-action-item">
+                <text class="ai-action-label">{{ item.label }}</text>
+                <text class="ai-action-text">{{ item.value }}</text>
+              </view>
             </view>
             <view v-if="midBasisTags.length" class="ai-section">
               <text class="ai-section-title">研判依据</text>
@@ -355,111 +412,13 @@
 
         <!-- 财报分析 -->
         <view class="section-card">
-          <text class="section-title">财报分析</text>
-          <view class="finance-grid">
-            <view v-for="item in midMockData.finance" :key="item.label" class="finance-item">
-              <text class="finance-label">{{ item.label }}</text>
-              <text class="finance-value">{{ item.value }}</text>
-              <text :class="['finance-change', item.type]">{{ item.change }}</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- 业绩预测 -->
-        <view class="section-card">
           <view class="section-header">
-            <text class="section-title">业绩预测</text>
-            <view v-if="!forecastLoading" class="ai-refresh-btn" @tap="loadForecast(true)">
-              <text class="refresh-icon">↻</text>
-            </view>
-          </view>
-          <view v-if="forecastLoading" class="ai-loading">
-            <text class="ai-loading-text">加载中...</text>
-          </view>
-          <view v-else-if="forecastData && (forecastData.summary || (forecastData.predictions && forecastData.predictions.length))" class="forecast-content">
-            <view v-if="forecastData.updateTime" class="forecast-update-time">
-              <text class="forecast-update-label">更新时间：</text>
-              <text class="forecast-update-value">{{ forecastData.updateTime }}</text>
-            </view>
-            <view v-if="forecastData.summary" class="forecast-summary">
-              <text class="forecast-summary-text">{{ forecastData.summary }}</text>
-            </view>
-            <view v-if="forecastData.netProfitYoy != null" class="forecast-yoy">
-              <text class="forecast-yoy-label">净利润同比</text>
-              <text :class="['forecast-yoy-value', forecastData.netProfitYoy >= 0 ? 'up' : 'down']">
-                {{ forecastData.netProfitYoy >= 0 ? '+' : '' }}{{ forecastData.netProfitYoy }}%
-              </text>
-            </view>
-            <ForecastProfitChart
-              v-if="forecastChartItems.length"
-              :items="forecastChartItems"
-              :visible="activeView === 'mid'"
-            />
-            <ForecastTrendChart
-              v-if="forecastLineCategories.length && forecastLineSeries.length"
-              :categories="forecastLineCategories"
-              :series="forecastLineSeries"
-              :visible="activeView === 'mid'"
-            />
-            <view v-if="forecastData.predictions && forecastData.predictions.length" class="forecast-list">
-              <view class="forecast-list-header">
-                <text class="forecast-col-year">年度</text>
-                <text class="forecast-col-profit">净利润(亿)</text>
-                <text class="forecast-col-growth">增长率</text>
-              </view>
-              <view v-for="(pred, idx) in forecastData.predictions" :key="idx" class="forecast-item">
-                <text class="forecast-year">{{ pred.year }}</text>
-                <text class="forecast-value">{{ pred.netProfit }}</text>
-                <text
-                  v-if="pred.growth !== '--'"
-                  :class="['forecast-growth', pred.growth >= 0 ? 'up' : 'down']"
-                >
-                  {{ pred.growth >= 0 ? '+' : '' }}{{ pred.growth }}%
-                </text>
-                <text v-else class="forecast-growth">--</text>
-              </view>
-            </view>
-            <!-- 业绩预测详表 -->
-            <view v-if="forecastData.detailIndicators && forecastData.detailIndicators.length" class="forecast-detail-table">
-              <text class="forecast-detail-title">详细指标预测</text>
-              <view class="forecast-detail-scroll">
-                <view class="forecast-detail-row forecast-detail-head">
-                  <text class="forecast-detail-cell forecast-detail-cell-name">指标</text>
-                  <text
-                    v-for="(key, kidx) in forecastDetailYearKeys"
-                    :key="kidx"
-                    class="forecast-detail-cell"
-                  >{{ key }}</text>
-                </view>
-                <view
-                  v-for="(row, ridx) in forecastData.detailIndicators.slice(0, 6)"
-                  :key="ridx"
-                  class="forecast-detail-row"
-                >
-                  <text class="forecast-detail-cell forecast-detail-cell-name">{{ row['预测指标'] || row.indicator || '' }}</text>
-                  <text
-                    v-for="(key, kidx) in forecastDetailYearKeys"
-                    :key="kidx"
-                    class="forecast-detail-cell"
-                  >{{ row[key] || '--' }}</text>
-                </view>
-              </view>
-            </view>
-          </view>
-          <view v-else class="ai-empty">
-            <text class="ai-empty-text">暂无业绩预测数据</text>
-          </view>
-        </view>
-
-        <!-- 半年报信息 -->
-        <view v-if="semiAnnualReport" class="section-card">
-          <view class="section-header">
-            <text class="section-title">半年报财务数据</text>
-            <text v-if="semiAnnualReport.reports?.length" class="section-sub">
+            <text class="section-title">财报分析</text>
+            <text v-if="semiAnnualReport?.reports?.length" class="section-sub">
               {{ semiAnnualReport.reports[0]?.end_date?.slice(0, 4) }}年半年报
             </text>
           </view>
-          <view class="semi-grid">
+          <view v-if="semiAnnualReport" class="semi-grid">
             <view v-if="semiAnnualReport.reports?.length" class="semi-table">
               <view class="semi-row semi-header">
                 <text class="semi-cell semi-cell-label">财务指标</text>
@@ -501,9 +460,111 @@
             <view v-else class="semi-empty">
               <text class="semi-empty-text">暂无半年报数据</text>
             </view>
+            <view class="semi-footer">
+              <text class="semi-link" @tap="openDisclosureUrl">查看完整公告 ></text>
+            </view>
           </view>
-          <view class="semi-footer">
-            <text class="semi-link" @tap="openDisclosureUrl">查看完整公告 ></text>
+          <view v-else class="finance-grid">
+            <view v-for="item in midMockData.finance" :key="item.label" class="finance-item">
+              <text class="finance-label">{{ item.label }}</text>
+              <text class="finance-value">{{ item.value }}</text>
+              <text :class="['finance-change', item.type]">{{ item.change }}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 业绩预测 -->
+        <view class="section-card">
+          <view class="section-header">
+            <text class="section-title">业绩预测</text>
+            <view v-if="!forecastLoading" class="ai-refresh-btn" @tap="loadForecast(true)">
+              <text class="refresh-icon">↻</text>
+            </view>
+          </view>
+          <view v-if="forecastLoading" class="ai-loading">
+            <text class="ai-loading-text">加载中...</text>
+          </view>
+          <view v-else-if="forecastData && (forecastData.summary || (forecastData.predictions && forecastData.predictions.length))" class="forecast-content">
+            <view v-if="forecastData.updateTime" class="forecast-update-time">
+              <text class="forecast-update-label">更新时间：</text>
+              <text class="forecast-update-value">{{ forecastData.updateTime }}</text>
+            </view>
+            <view v-if="forecastData.summary" class="forecast-summary">
+              <text class="forecast-summary-text">{{ forecastData.summary }}</text>
+            </view>
+            <view v-if="forecastData.netProfitYoy != null" class="forecast-yoy">
+              <text class="forecast-yoy-label">净利润同比</text>
+              <text :class="['forecast-yoy-value', forecastData.netProfitYoy >= 0 ? 'up' : 'down']">
+                {{ forecastData.netProfitYoy >= 0 ? '+' : '' }}{{ forecastData.netProfitYoy }}%
+              </text>
+            </view>
+            <ForecastProfitChart
+              v-if="forecastChartItems.length"
+              :items="forecastChartItems"
+              :visible="activeView === 'mid'"
+            />
+            <view v-if="forecastYearRows.length" class="forecast-year-panel">
+              <view class="forecast-year-head">
+                <text class="forecast-year-title">年度预测</text>
+                <text class="forecast-year-unit">净利润 / 增长率</text>
+              </view>
+              <view class="forecast-year-list">
+                <view v-for="row in forecastYearRows" :key="row.year" class="forecast-year-item">
+                  <view class="forecast-year-main">
+                    <view class="forecast-year-left">
+                      <text class="forecast-year-label">{{ row.year }}</text>
+                      <text :class="['forecast-year-kind', row.kindClass]">{{ row.kindText }}</text>
+                    </view>
+                    <view class="forecast-year-right">
+                      <text class="forecast-year-value">{{ row.netProfit }}</text>
+                      <text :class="['forecast-year-growth', row.growthClass]">{{ row.growthText }}</text>
+                    </view>
+                  </view>
+                  <view class="forecast-progress-track">
+                    <view
+                      class="forecast-progress-fill"
+                      :class="row.kindClass"
+                      :style="{ width: `${row.progress}%` }"
+                    ></view>
+                  </view>
+                </view>
+              </view>
+            </view>
+            <view
+              v-if="forecastData.detailIndicators && forecastData.detailIndicators.length"
+              class="forecast-detail-toggle"
+              @tap="forecastDetailExpanded = !forecastDetailExpanded"
+            >
+              <text class="forecast-detail-toggle-text">{{ forecastDetailExpanded ? '收起详细指标' : '查看详细指标' }}</text>
+              <text class="forecast-detail-toggle-icon">{{ forecastDetailExpanded ? '−' : '+' }}</text>
+            </view>
+            <view v-if="forecastDetailExpanded && forecastData.detailIndicators && forecastData.detailIndicators.length" class="forecast-detail-table">
+              <view class="forecast-detail-scroll">
+                <view class="forecast-detail-row forecast-detail-head">
+                  <text class="forecast-detail-cell forecast-detail-cell-name">指标</text>
+                  <text
+                    v-for="(key, kidx) in forecastDetailYearKeys"
+                    :key="kidx"
+                    class="forecast-detail-cell"
+                  >{{ key }}</text>
+                </view>
+                <view
+                  v-for="(row, ridx) in forecastData.detailIndicators.slice(0, 6)"
+                  :key="ridx"
+                  class="forecast-detail-row"
+                >
+                  <text class="forecast-detail-cell forecast-detail-cell-name">{{ row['预测指标'] || row.indicator || '' }}</text>
+                  <text
+                    v-for="(key, kidx) in forecastDetailYearKeys"
+                    :key="kidx"
+                    class="forecast-detail-cell"
+                  >{{ row[key] || '--' }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+          <view v-else class="ai-empty">
+            <text class="ai-empty-text">暂无业绩预测数据</text>
           </view>
         </view>
 
@@ -522,6 +583,12 @@
             </view>
             <view class="ai-logic">
               <text class="ai-logic-text">{{ longAiAnalysis.logic }}</text>
+            </view>
+            <view class="ai-action-list">
+              <view v-for="item in longActionItems" :key="item.label" class="ai-action-item">
+                <text class="ai-action-label">{{ item.label }}</text>
+                <text class="ai-action-text">{{ item.value }}</text>
+              </view>
             </view>
             <view v-if="longBasisTags.length" class="ai-section">
               <text class="ai-section-title">研判依据</text>
@@ -730,7 +797,7 @@
       <!-- 6. AI 投顾入口（页面最底部） -->
       <view class="ai-card" @tap="goChat">
         <view class="ai-icon-wrap">
-          <SvgIcon name="robot-line" size="36rpx" color="#ffffff" />
+          <SvgIcon name="robot-line" size="36rpx" color="#4d7cfe" />
         </view>
         <view class="ai-content">
           <text class="ai-title">AI 智能投顾</text>
@@ -832,7 +899,6 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import KLineChart from '@/modules/favorites/components/KLineChart.vue'
 import ForecastProfitChart from '@/modules/favorites/components/ForecastProfitChart.vue'
-import ForecastTrendChart from '@/modules/favorites/components/ForecastTrendChart.vue'
 import CapitalFlowCharts from '@/modules/favorites/components/CapitalFlowCharts.vue'
 import { useStockAiAnalysis, extractTagsFromText, extractTagsFromArray } from '@/modules/favorites/composables/useStockAiAnalysis'
 
@@ -846,22 +912,11 @@ const symbol = ref('')
 const aiAnalysis = ref<any>(null)
 const aiLoading = ref(false)
 const newsList = ref<any[]>([])
-const newsPage = ref(1)
-const newsPageSize = 3
-const newsTotalPages = computed(() => Math.max(1, Math.ceil(newsList.value.length / newsPageSize)))
-const pagedNewsList = computed(() => {
-  const start = (newsPage.value - 1) * newsPageSize
-  return newsList.value.slice(start, start + newsPageSize)
-})
-function newsNextPage() {
-  if (newsPage.value < newsTotalPages.value) newsPage.value++
-}
-function newsPrevPage() {
-  if (newsPage.value > 1) newsPage.value--
-}
+const newsExpanded = ref(false)
 const stockEvents = ref<any[]>([])
 const forecastData = ref<any>(null)
 const forecastLoading = ref(false)
+const forecastDetailExpanded = ref(false)
 const klineData = ref<any[]>([])
 type KLinePeriod = 'daily' | 'weekly' | 'yearly'
 const klinePeriod = ref<KLinePeriod>('daily')
@@ -883,7 +938,7 @@ const activeView = ref<ViewKey>('short')
 const viewTabs: { key: ViewKey; label: string; desc: string }[] = [
   { key: 'short', label: '短线', desc: '日/周' },
   { key: 'mid', label: '中线', desc: '月/季' },
-  { key: 'long', label: '长线', desc: '季/年' }
+  { key: 'long', label: '长线', desc: '年' }
 ]
 const expandedDecisionPoint = ref<'opportunity' | 'risk' | null>(null)
 const policyExpanded = ref(false)
@@ -896,6 +951,12 @@ function selectActiveView(key: ViewKey) {
 const symbolRef = computed(() => symbol.value)
 const quoteRef = computed(() => ({ name: quote.value?.name, industry: stockInfo.value?.industry || quote.value?.industry }))
 const trendScoreDataRef = computed(() => trendScoreData.value)
+const stockAiContextRef = computed(() => ({
+  quote: quote.value,
+  stockInfo: stockInfo.value,
+  semiAnnualReport: semiAnnualReport.value,
+  forecastData: forecastData.value,
+}))
 const {
   midAiAnalysis,
   longAiAnalysis,
@@ -904,8 +965,9 @@ const {
   trendModel,
   trendVetoed,
   trendVetoReasons,
-} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef)
+} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef)
 
+const visibleNewsList = computed(() => newsExpanded.value ? newsList.value : newsList.value.slice(0, 3))
 const visiblePolicyList = computed(() => policyExpanded.value ? longMockData.value.policies : longMockData.value.policies.slice(0, 2))
 const policyNeedsExpand = computed(() => (
   longMockData.value.policies.length > 2
@@ -957,29 +1019,41 @@ const forecastChartItems = computed(() => {
         year: String(item.year || ''),
         value,
         label: value == null ? '--' : value.toFixed(2),
-        kind: item.kind,
+        kind: item.kind === 'actual' || item.kind === 'forecast' ? item.kind : undefined,
       }
     })
-    .filter(item => item.year && item.value != null) as Array<{ year: string; value: number; label: string; kind?: string }>
+    .filter(item => item.year && item.value != null) as Array<{ year: string; value: number; label: string; kind?: 'actual' | 'forecast' }>
   if (!parsed.length) return []
-  const max = Math.max(...parsed.map(item => Math.abs(item.value)), 0.01)
-  return parsed.map(item => ({
+  const max = Math.max(...parsed.map((item: any) => Math.abs(item.value)), 0.01)
+  return parsed.map((item: any) => ({
     ...item,
     height: Math.max(14, Math.round((Math.abs(item.value) / max) * 100)),
   }))
 })
 
-const forecastLineCategories = computed(() => forecastYearKeys.value.map(item => item.year))
-
-const forecastLineSeries = computed(() => {
-  const details = forecastData.value?.detailIndicators
-  if (!Array.isArray(details) || details.length === 0 || !forecastYearKeys.value.length) return []
-  return [
-    { name: '净利增长率', data: readForecastSeries(details, '净利润增长率') },
-    { name: '营收增长率', data: readForecastSeries(details, '营业收入增长率') },
-    { name: 'ROE', data: readForecastSeries(details, '净资产收益率') },
-    { name: '市盈率', data: readForecastSeries(details, '市盈率') },
-  ].filter(item => item.data.some(v => v !== 0))
+const forecastYearRows = computed(() => {
+  const rows = Array.isArray(forecastData.value?.predictions) ? forecastData.value.predictions : []
+  if (!rows.length) return []
+  const parsed = rows
+    .slice(0, 3)
+    .map((item: any) => {
+      const value = parseForecastProfit(item.netProfit)
+      return {
+        year: String(item.year || ''),
+        netProfit: item.netProfit || '--',
+        growth: item.growth,
+        value: value ?? 0,
+        kindClass: item.growth === '--' || item.growth == null ? 'is-forecast' : item.growth >= 0 ? 'is-actual' : 'is-forecast',
+        kindText: item.growth === '--' || item.growth == null ? '预测' : item.growth >= 0 ? '改善' : '承压',
+        growthText: item.growth === '--' || item.growth == null ? '--' : `${item.growth >= 0 ? '+' : ''}${item.growth}%`,
+        growthClass: item.growth === '--' || item.growth == null ? '' : item.growth >= 0 ? 'up' : 'down',
+      }
+    })
+  const max = Math.max(...parsed.map((item: any) => Math.abs(item.value)), 0.01)
+  return parsed.map((item: any) => ({
+    ...item,
+    progress: Math.max(18, Math.round((Math.abs(item.value) / max) * 100)),
+  }))
 })
 
 const forecastYearKeys = computed(() => {
@@ -998,7 +1072,7 @@ const forecastYearKeys = computed(() => {
     .sort((a: any, b: any) => Number(a.year) - Number(b.year)) as Array<{ key: string; year: string; kind: 'actual' | 'forecast' }>
 })
 
-function buildForecastChartSource(): Array<{ year: string; netProfit: any; kind?: string }> {
+function buildForecastChartSource(): Array<{ year: string; netProfit: any; kind?: 'actual' | 'forecast' }> {
   const predictions = forecastData.value?.predictions
   if (Array.isArray(predictions) && predictions.length > 0) {
     return predictions.map((item: any) => ({ year: String(item.year || ''), netProfit: item.netProfit }))
@@ -1013,12 +1087,6 @@ function buildForecastChartSource(): Array<{ year: string; netProfit: any; kind?
     netProfit: profitRow[item.key],
     kind: item.kind,
   }))
-}
-
-function readForecastSeries(details: any[], indicator: string): number[] {
-  const row = details.find((item: any) => String(item['预测指标'] || item.indicator || '').includes(indicator))
-  if (!row) return forecastYearKeys.value.map(() => 0)
-  return forecastYearKeys.value.map(item => parseForecastNumber(row[item.key]) ?? 0)
 }
 
 function parseForecastProfit(value: any): number | null {
@@ -1078,6 +1146,188 @@ const midRiskTags = computed(() => extractTagsFromArray(midAiAnalysis.value.risk
 const longBasisTags = computed(() => extractTagsFromArray(longAiAnalysis.value.basis))
 const longAdviceTags = computed(() => extractTagsFromArray(longAiAnalysis.value.advice))
 const longRiskTags = computed(() => extractTagsFromArray(longAiAnalysis.value.riskTips))
+const shortActionItems = computed(() => {
+  const low = formatMetricText(quote.value?.low)
+  const high = formatMetricText(quote.value?.high)
+  const volumeRatio = formatMetricText(quote.value?.volumeRatio)
+  const amount = formatAmount(quote.value?.amount || 0)
+  return [
+    { label: '风险线', value: low === '--' ? '先等关键支撑位明确，跌破后短线转弱' : `跌破 ${low} 后短线转弱，先控制仓位` },
+    { label: '观察区间', value: high === '--' || low === '--' ? '重点观察日内高低点和回踩承接' : `${low} - ${high} 内看承接，突破再确认强度` },
+    { label: '量能条件', value: volumeRatio === '--' ? `成交额 ${amount}，继续看资金是否接力` : `量比 ${volumeRatio}，成交额 ${amount}，明日重点看放量后的承接` },
+  ]
+})
+const midActionItems = computed(() => {
+  const conclusion = String(midAiAnalysis.value.conclusion || '')
+  const hasRisk = midRiskTags.value.length > 0
+  const isPositive = /看多|买入|增持|积极|继续/.test(conclusion)
+  return [
+    {
+      label: '当前判断',
+      value: isPositive
+        ? '中线逻辑仍可跟踪，但需要继续等业绩和行业数据验证。'
+        : '中线信号还不够强，先降低预期，等待更明确的基本面确认。',
+    },
+    {
+      label: '下一步验证',
+      value: '重点看业绩预期是否上修、行业景气是否延续，以及回调时成交量是否收缩。',
+    },
+    {
+      label: '风险判断',
+      value: hasRisk
+        ? `如果 ${midRiskTags.value[0]?.tag} 开始兑现，中线逻辑就需要降级。`
+        : '如果业绩预期下修、回调放量或行业热度降温，中线逻辑需要降级。',
+    },
+  ]
+})
+const longActionItems = computed(() => {
+  const score = Number(trendModel.value?.score || 0)
+  const hasVeto = Boolean(trendModel.value?.isVetoed)
+  const risk = longRiskTags.value[0]?.tag
+  return [
+    {
+      label: '长期判断',
+      value: hasVeto
+        ? '当前存在一票否决项，不适合直接放入长期核心池。'
+        : score >= 75
+          ? '具备长期观察价值，但仍要确认盈利质量和行业空间能否持续。'
+          : '长期确定性还不充分，更适合作为观察池标的。',
+    },
+    {
+      label: '长期跟踪',
+      value: '重点跟踪 ROE、收入增速、利润率、竞争格局和估值消化情况。',
+    },
+    {
+      label: '移出条件',
+      value: risk
+        ? `如果 ${risk} 兑现，或收入增速和利润率连续走弱，应降低长期关注级别。`
+        : '如果增长放缓、利润率下滑、竞争格局恶化或估值明显透支，应降低长期关注级别。',
+    },
+  ]
+})
+const latestMajorEvent = computed(() => stockEvents.value[0] || null)
+const majorEventImpactClass = computed(() => {
+  const impact = getEventImpact(latestMajorEvent.value)
+  if (impact.includes('利好')) return 'is-positive'
+  if (impact.includes('利空')) return 'is-negative'
+  return 'is-neutral'
+})
+
+const overallDecision = computed(() => {
+  const conclusion = String(aiAnalysis.value?.conclusion || '').trim()
+  const changePercent = toDecisionNumber(quote.value?.changePercent)
+  const score = Number(trendModel.value?.score || 0)
+  const flow = Number(capitalFlowInfo.value?.mainInflow || 0)
+  const majorImpact = getEventImpact(latestMajorEvent.value)
+  const hasBearSignal = majorImpact.includes('利空')
+    || /看空|卖出|利空|回避/.test(conclusion)
+    || (changePercent !== null && changePercent <= -5)
+  const hasBullSignal = majorImpact.includes('利好')
+    || /看多|买入|利好/.test(conclusion)
+    || score >= 75
+    || (flow > 0 && changePercent !== null && changePercent >= 0)
+
+  let status = '等待确认'
+  let statusClass = 'is-neutral'
+  if (hasBearSignal) {
+    status = '控制风险'
+    statusClass = 'is-risk'
+  } else if (hasBullSignal) {
+    status = '继续跟踪'
+    statusClass = 'is-positive'
+  }
+
+  const horizon = String(latestMajorEvent.value?.ai_horizon || latestMajorEvent.value?.cycle || '')
+  let period = '中线跟踪'
+  if (/短|short/i.test(horizon) || (changePercent !== null && Math.abs(changePercent) >= 5)) period = '短线观察'
+  if (/长|long/i.test(horizon) || score >= 82) period = '长线观察'
+
+  const opportunitySource = latestMajorEvent.value?.summary
+    || capitalFlowInfo.value?.narrative
+    || logicTags.value[0]?.tag
+    || trendModel.value?.description
+  const riskSource = (majorImpact.includes('利空') && latestMajorEvent.value?.summary)
+    || riskTags.value[0]?.tag
+    || capitalFlowInfo.value?.risk
+    || '留意趋势破坏和消息兑现风险'
+
+  let summary = '当前信号还不够明确，暂不急于操作，继续观察资金、趋势和消息变化。'
+  let nextStep = '先观察资金承接和价格位置'
+  if (hasBearSignal) {
+    summary = changePercent !== null && changePercent <= -5
+      ? '跌幅已经偏大，短线先控制风险，等待价格企稳和资金回流后再判断。'
+      : '出现利空或偏弱信号，当前不宜加仓，先观察风险是否继续扩散。'
+    nextStep = changePercent !== null && changePercent <= -5
+      ? '等价格企稳和资金回流'
+      : '先看利空是否继续扩散'
+  } else if (hasBullSignal) {
+    summary = flow > 0
+      ? '资金和趋势仍有支撑，可以继续跟踪，但买点需要等待回踩或放量确认。'
+      : '逻辑上有积极信号，可以纳入观察，但是否介入仍要看价格位置。'
+    nextStep = flow > 0
+      ? '等回踩企稳或放量确认'
+      : '先看价格位置和量能配合'
+  }
+
+  if (majorImpact.includes('利好')) {
+    nextStep = '重点看利好后的资金承接'
+  } else if (majorImpact.includes('利空')) {
+    nextStep = '先确认利空影响是否扩散'
+  } else if (period.includes('长')) {
+    nextStep = '跟踪模型评分和基本面变化'
+  } else if (period.includes('中')) {
+    nextStep = '跟踪趋势延续和业绩预期'
+  }
+
+  return {
+    status,
+    statusClass,
+    period,
+    summary,
+    nextStep,
+    opportunity: toPlainDecisionPoint(opportunitySource, '关注资金承接、趋势延续和消息催化能否兑现'),
+    risk: toPlainDecisionPoint(riskSource, '警惕冲高回落、趋势破位或利好兑现后的承接不足'),
+  }
+})
+
+function toggleDecisionPoint(type: 'opportunity' | 'risk') {
+  expandedDecisionPoint.value = expandedDecisionPoint.value === type ? null : type
+}
+
+function formatMetricText(value: any, digits = 2): string {
+  if (value === null || value === undefined || value === '') return '--'
+  if (typeof value === 'number') return Number.isFinite(value) ? value.toFixed(digits) : '--'
+  const text = String(value).trim()
+  if (!text || text === '--') return '--'
+  const num = Number(text.replace(/[,%]/g, ''))
+  return Number.isFinite(num) ? num.toFixed(digits) : text
+}
+
+function compactText(value: any, fallback = '--', maxLength = 72): string {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) return fallback
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+}
+
+function toPlainDecisionPoint(value: any, fallback: string, maxLength = 72): string {
+  const text = compactText(value, fallback, maxLength)
+  return text
+    .replace(/^综合评分解读[:：]?/, '')
+    .replace(/^风险[:：]?/, '')
+    .replace(/^摘要[:：]?/, '')
+    .trim() || fallback
+}
+
+function toDecisionNumber(value: any): number | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  const parsed = Number(String(value).replace(/[^\d.-]/g, ''))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function getEventImpact(event: any): string {
+  return String(event?.ai_impact || event?.level || '').trim()
+}
 
 onShow(() => {
   void favoritesStore.fetchFavorites({ silent: true })
@@ -1117,6 +1367,7 @@ async function loadData() {
     if (newsData.status === 'fulfilled') {
       const news = newsData.value as any
       const rawList = Array.isArray(news) ? news : (news?.['个股新闻'] || news?.data?.['个股新闻'] || news?.data || news?.news || [])
+      newsExpanded.value = false
       // 归一化中文键名为英文
       newsList.value = rawList.map((n: any) => ({
         id: n['ID'] || n.id || '',
@@ -1127,7 +1378,6 @@ async function loadData() {
         source: n['来源'] || n.source || '财联社',
         publishTime: n['时间'] || n.publish_time || n.time || '',
       }))
-      newsPage.value = 1
     }
     if (infoData.status === 'fulfilled' && infoData.value) {
       stockInfo.value = infoData.value
@@ -1381,8 +1631,8 @@ function formatEventTime(time: string | Date): string {
 
 function formatVolume(vol: number): string {
   if (!vol) return '--'
-  if (vol >= 100000000) return (vol / 100000000).toFixed(2) + '亿'
-  if (vol >= 10000) return (vol / 10000).toFixed(2) + '万'
+  if (vol >= 100000000) return (vol / 100000000).toFixed(2) + '亿股'
+  if (vol >= 10000) return (vol / 10000).toFixed(2) + '万股'
   return vol + '手'
 }
 
@@ -1441,7 +1691,7 @@ function goChat() {
 
 .page-detail {
   padding: 24rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   box-sizing: border-box;
   width: 100%;
   max-width: 430px;
@@ -1457,7 +1707,7 @@ function goChat() {
 
 .loading-text, .empty-text {
   font-size: 28rpx;
-  color: $ink-soft;
+  color: #6b7280;
 }
 
 /* 股票头部 */
@@ -1479,12 +1729,12 @@ function goChat() {
 .stock-name {
   font-size: 36rpx;
   font-weight: 600;
-  color: $ink;
+  color: #1a1d24;
 }
 
 .stock-code {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
   padding: 4rpx 16rpx;
   background: #f0f2f5;
   border-radius: 8rpx;
@@ -1553,7 +1803,7 @@ function goChat() {
   align-items: center;
   gap: 6rpx;
   padding: 6rpx 14rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 8rpx;
 
   .tag-label {
@@ -1571,6 +1821,7 @@ function goChat() {
 .limit-inline {
   display: flex;
   align-items: center;
+  gap: 12rpx;
   padding: 16rpx 24rpx;
   background: #ffffff;
   border-radius: 12rpx;
@@ -1578,19 +1829,267 @@ function goChat() {
 }
 
 .limit-inline-label {
-  flex: 1;
-  text-align: center;
   font-size: 26rpx;
-  color: $ink-soft;
+  color: #6b7280;
 
   .up { color: #f43f5e; font-weight: 600; }
   .down { color: #22c55e; font-weight: 600; }
 }
 
 .limit-inline-sep {
-  color: $line;
+  color: #e5e7eb;
   font-size: 24rpx;
+}
+
+/* 综合决策 */
+.decision-card,
+.major-event-alert {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+
+.decision-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+  border-top: 4rpx solid #4d7cfe;
+}
+
+.decision-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.decision-kicker {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.3;
+  font-weight: 800;
+  color: #1a1d24;
+}
+
+.decision-summary {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.6;
+  font-weight: 600;
+  color: #334155;
+}
+
+.decision-next {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 14rpx;
+  background: #f8fafc;
+}
+
+.next-label {
   flex-shrink: 0;
+  padding: 4rpx 10rpx;
+  border-radius: 8rpx;
+  background: #eef4ff;
+  color: #2563eb;
+  font-size: 22rpx;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.next-text {
+  min-width: 0;
+  color: #1f2937;
+  font-size: 27rpx;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.decision-verdict {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.decision-status {
+  padding: 6rpx 14rpx;
+  border-radius: 10rpx;
+  background: #eef4ff;
+  font-size: 24rpx;
+  line-height: 1.35;
+  font-weight: 800;
+
+  &.is-positive {
+    color: #f43f5e;
+    background: #fff1f2;
+  }
+
+  &.is-neutral {
+    color: #2563eb;
+    background: #eef4ff;
+  }
+
+  &.is-risk {
+    color: #16a34a;
+    background: #ecfdf3;
+  }
+}
+
+.decision-period {
+  padding: 6rpx 12rpx;
+  border-radius: 10rpx;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 22rpx;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.decision-points {
+  display: flex;
+  flex-direction: column;
+  border-top: 1rpx solid #eef2f7;
+}
+
+.decision-point {
+  display: grid;
+  grid-template-columns: 64rpx minmax(0, 1fr) 56rpx;
+  gap: 14rpx;
+  align-items: start;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #eef2f7;
+
+  &.is-risk {
+    .point-label {
+      color: #16a34a;
+      background: #ecfdf3;
+    }
+  }
+
+  &:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+}
+
+.point-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56rpx;
+  height: 38rpx;
+  border-radius: 8rpx;
+  background: #fff1f2;
+  font-size: 24rpx;
+  line-height: 1.4;
+  font-weight: 800;
+  color: #f43f5e;
+}
+
+.point-more {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  line-height: 38rpx;
+  font-weight: 700;
+  text-align: right;
+  color: #94a3b8;
+}
+
+.point-text {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 26rpx;
+  line-height: 1.55;
+  font-weight: 600;
+  color: #334155;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+
+  &.expanded {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+}
+
+.major-event-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  padding-top: 18rpx;
+  padding-bottom: 18rpx;
+  border-left: 6rpx solid #4d7cfe;
+
+  &.is-muted {
+    background: #fbfdff;
+    border-left-color: #cbd5e1;
+  }
+}
+
+.major-event-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.major-impact {
+  flex-shrink: 0;
+  padding: 4rpx 14rpx;
+  border: 1rpx solid;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.4;
+  font-weight: 800;
+
+  &.is-positive {
+    color: #f43f5e;
+    border-color: #fecaca;
+    background: #fef2f2;
+  }
+
+  &.is-negative {
+    color: #16a34a;
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+  }
+
+  &.is-neutral {
+    color: #64748b;
+    border-color: #cbd5e1;
+    background: #f8fafc;
+  }
+}
+
+.major-event-title {
+  display: block;
+  font-size: 26rpx;
+  line-height: 1.5;
+  font-weight: 600;
+  color: #334155;
+}
+
+.major-event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 2rpx;
+
+  text {
+    padding: 4rpx 12rpx;
+    border-radius: 8rpx;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 22rpx;
+    line-height: 1.4;
+    font-weight: 700;
+  }
 }
 
 /* 周期切换 Tabs */
@@ -1678,7 +2177,7 @@ function goChat() {
 .card-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: $ink;
+  color: #1a1d24;
 }
 
 .ai-refresh-btn {
@@ -1688,7 +2187,7 @@ function goChat() {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: $bg-soft;
+  background: #f5f7fa;
 
   &:active { background: #e8ecf1; }
 }
@@ -1852,9 +2351,87 @@ function goChat() {
 .section-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: $ink;
+  color: #1a1d24;
   margin-bottom: 20rpx;
   display: block;
+}
+
+.action-card {
+  border-left: 6rpx solid #4d7cfe;
+}
+
+.short-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.short-action-item {
+  display: grid;
+  grid-template-columns: 132rpx minmax(0, 1fr);
+  gap: 16rpx;
+  align-items: center;
+  min-width: 0;
+  padding: 18rpx 20rpx;
+  border-radius: 14rpx;
+  background: #f8fafc;
+  border: 1rpx solid #eef2f7;
+}
+
+.action-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40rpx;
+  padding: 4rpx 10rpx;
+  border-radius: 8rpx;
+  background: #eef4ff;
+  color: #2563eb;
+  font-size: 23rpx;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.action-value {
+  display: block;
+  min-width: 0;
+  font-size: 27rpx;
+  line-height: 1.5;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.ai-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin: 18rpx 0 22rpx;
+}
+
+.ai-action-item {
+  display: grid;
+  grid-template-columns: 128rpx minmax(0, 1fr);
+  gap: 14rpx;
+  align-items: start;
+  padding: 16rpx 18rpx;
+  border-radius: 14rpx;
+  background: #f8fafc;
+  border: 1rpx solid #eef2f7;
+}
+
+.ai-action-label {
+  color: #2563eb;
+  font-size: 24rpx;
+  line-height: 1.45;
+  font-weight: 800;
+}
+
+.ai-action-text {
+  min-width: 0;
+  color: #334155;
+  font-size: 26rpx;
+  line-height: 1.55;
+  font-weight: 600;
 }
 
 .section-header {
@@ -1866,7 +2443,7 @@ function goChat() {
 
 .section-sub {
   font-size: 24rpx;
-  color: $primary;
+  color: #4d7cfe;
   font-weight: 500;
 }
 
@@ -1887,7 +2464,7 @@ function goChat() {
   width: 16rpx;
   height: 16rpx;
   border-radius: 50%;
-  background: $primary;
+  background: #4d7cfe;
   margin-top: 8rpx;
   flex-shrink: 0;
 
@@ -1903,7 +2480,7 @@ function goChat() {
 
 .event-title {
   font-size: 28rpx;
-  color: $ink;
+  color: #1a1d24;
   line-height: 1.4;
 }
 
@@ -1917,7 +2494,7 @@ function goChat() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rpx;
-  background: $line;
+  background: #e5e7eb;
   border-radius: 12rpx;
   overflow: hidden;
 }
@@ -1932,12 +2509,12 @@ function goChat() {
 
 .detail-label {
   font-size: 26rpx;
-  color: $ink-soft;
+  color: #6b7280;
 }
 
 .detail-value {
   font-size: 28rpx;
-  color: $ink;
+  color: #1a1d24;
   font-weight: 500;
 
   &.up { color: #f43f5e; }
@@ -1955,13 +2532,13 @@ function goChat() {
   display: flex;
   flex-direction: column;
   padding: 20rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 12rpx;
 }
 
 .flow-label {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
   margin-bottom: 8rpx;
 }
 
@@ -1982,7 +2559,7 @@ function goChat() {
 
 .flow-narrative-text {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
   line-height: 1.5;
 }
 
@@ -1997,20 +2574,20 @@ function goChat() {
   display: flex;
   flex-direction: column;
   padding: 20rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 12rpx;
 }
 
 .finance-label {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
   margin-bottom: 8rpx;
 }
 
 .finance-value {
   font-size: 32rpx;
   font-weight: 600;
-  color: $ink;
+  color: #1a1d24;
   margin-bottom: 4rpx;
 }
 
@@ -2031,7 +2608,7 @@ function goChat() {
 
 .forecast-summary {
   padding: 16rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 12rpx;
 }
 
@@ -2052,14 +2629,14 @@ function goChat() {
   align-items: center;
   gap: 16rpx;
   padding: 16rpx 20rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 12rpx;
 }
 
 .forecast-year {
   font-size: 28rpx;
   font-weight: 600;
-  color: $ink;
+  color: #1a1d24;
   min-width: 80rpx;
 }
 
@@ -2075,115 +2652,6 @@ function goChat() {
 
   &.up { color: #f43f5e; }
   &.down { color: #22c55e; }
-}
-
-/* 行业景气指数 */
-.industry-health-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20rpx;
-}
-
-.industry-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8rpx;
-}
-
-.industry-pill {
-  padding: 6rpx 16rpx;
-  background: rgba(77, 124, 254, 0.1);
-  border-radius: 8rpx;
-
-  text {
-    font-size: 22rpx;
-    color: $primary;
-  }
-}
-
-.industry-score {
-  font-size: 36rpx;
-  font-weight: 700;
-
-  &.is-hot { color: #f43f5e; }
-  &.is-warm { color: #f59e0b; }
-  &.is-normal { color: $primary; }
-  &.is-cold { color: #22c55e; }
-}
-
-.industry-trend {
-  margin-bottom: 20rpx;
-}
-
-.trend-bars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  height: 160rpx;
-  padding: 0 8rpx;
-}
-
-.trend-bar-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.trend-bar {
-  width: 32rpx;
-  background: linear-gradient(180deg, $primary, $primary-600);
-  border-radius: 6rpx 6rpx 0 0;
-}
-
-.trend-month {
-  font-size: 20rpx;
-  color: #9ca3af;
-}
-
-.industry-detail-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12rpx;
-}
-
-.industry-detail-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16rpx;
-  background: $bg-soft;
-  border-radius: 12rpx;
-}
-
-.industry-detail-icon {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 50%;
-  background: $primary;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 8rpx;
-
-  text {
-    font-size: 24rpx;
-    color: #ffffff;
-    font-weight: 600;
-  }
-}
-
-.industry-detail-title {
-  font-size: 22rpx;
-  color: $ink-soft;
-  margin-bottom: 4rpx;
-}
-
-.industry-detail-desc {
-  font-size: 24rpx;
-  color: $ink;
-  font-weight: 500;
 }
 
 /* 趋势股模�?*/
@@ -2208,19 +2676,19 @@ function goChat() {
   .tenx-score {
     font-size: 64rpx;
     font-weight: 700;
-    color: $primary;
+    color: #4d7cfe;
     line-height: 1;
   }
 
   .tenx-score-label {
     font-size: 22rpx;
-    color: $ink-soft;
+    color: #6b7280;
     margin-top: 4rpx;
   }
 
   .tenx-multiple {
     font-size: 24rpx;
-    color: $primary;
+    color: #4d7cfe;
     font-weight: 500;
     margin-top: 8rpx;
   }
@@ -2232,7 +2700,7 @@ function goChat() {
   .verdict-tag {
     display: inline-block;
     padding: 8rpx 20rpx;
-    background: $primary;
+    background: #4d7cfe;
     color: #ffffff;
     border-radius: 28rpx;
     font-size: 26rpx;
@@ -2257,7 +2725,7 @@ function goChat() {
 }
 
 .tenx-dim-item {
-  border: 1rpx solid $line;
+  border: 1rpx solid #e5e7eb;
   border-radius: 12rpx;
   overflow: hidden;
   background: #ffffff;
@@ -2274,14 +2742,14 @@ function goChat() {
 .tenx-dim-label {
   font-size: 26rpx;
   font-weight: 600;
-  color: $ink;
+  color: #1a1d24;
   flex: 1;
 }
 
 .tenx-dim-score {
   font-size: 28rpx;
   font-weight: 700;
-  color: $primary;
+  color: #4d7cfe;
 }
 
 .tenx-dim-weight {
@@ -2301,14 +2769,14 @@ function goChat() {
 
 .tenx-dim-question {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
   line-height: 1.5;
   margin-bottom: 12rpx;
 }
 
 .tenx-dim-bar-wrap {
   height: 10rpx;
-  background: $line;
+  background: #e5e7eb;
   border-radius: 999rpx;
   overflow: hidden;
   margin: 0 20rpx 14rpx;
@@ -2316,7 +2784,7 @@ function goChat() {
 
 .tenx-dim-bar {
   height: 100%;
-  background: linear-gradient(90deg, $primary, $primary-600);
+  background: linear-gradient(90deg, #4d7cfe, #6366f1);
   border-radius: 999rpx;
 }
 
@@ -2377,6 +2845,7 @@ function goChat() {
   }
 }
 
+/* 公司护城�?*/
 .moat-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2388,7 +2857,7 @@ function goChat() {
   flex-direction: column;
   align-items: center;
   padding: 20rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 12rpx;
   text-align: center;
 }
@@ -2397,7 +2866,7 @@ function goChat() {
   width: 56rpx;
   height: 56rpx;
   border-radius: 50%;
-  background: $primary;
+  background: #4d7cfe;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2413,13 +2882,13 @@ function goChat() {
 .moat-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: $ink;
+  color: #1a1d24;
   margin-bottom: 8rpx;
 }
 
 .moat-desc {
   font-size: 22rpx;
-  color: $ink-soft;
+  color: #6b7280;
   line-height: 1.5;
 }
 
@@ -2434,20 +2903,20 @@ function goChat() {
   display: flex;
   flex-direction: column;
   padding: 20rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 12rpx;
 }
 
 .annual-label {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
   margin-bottom: 8rpx;
 }
 
 .annual-value {
   font-size: 28rpx;
   font-weight: 600;
-  color: $ink;
+  color: #1a1d24;
   margin-bottom: 4rpx;
 }
 
@@ -2467,7 +2936,7 @@ function goChat() {
 .semi-table {
   border-radius: 12rpx;
   overflow: hidden;
-  border: 1rpx solid $line;
+  border: 1rpx solid #e5e7eb;
 }
 
 .semi-row {
@@ -2480,7 +2949,7 @@ function goChat() {
   }
 
   &.semi-header {
-    background: $bg-soft;
+    background: #f5f7fa;
     font-weight: 600;
   }
 }
@@ -2496,7 +2965,7 @@ function goChat() {
     flex: 1.2;
     text-align: left;
     padding-left: 16rpx;
-    color: $ink-soft;
+    color: #6b7280;
   }
 
   &.semi-cell-value {
@@ -2525,7 +2994,7 @@ function goChat() {
 
 .semi-link {
   font-size: 26rpx;
-  color: $primary;
+  color: #4d7cfe;
   font-weight: 500;
 }
 
@@ -2544,9 +3013,25 @@ function goChat() {
   &:active { opacity: 0.7; }
 }
 
+.news-toggle {
+  display: flex;
+  justify-content: center;
+  padding: 14rpx 0 4rpx;
+}
+
+.news-toggle-text {
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  color: #2563eb;
+  font-size: 24rpx;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
 .news-title {
   font-size: 28rpx;
-  color: $ink;
+  color: #1a1d24;
   line-height: 1.4;
   margin-bottom: 6rpx;
 }
@@ -2558,48 +3043,12 @@ function goChat() {
 
 .news-source {
   font-size: 22rpx;
-  color: $ink-soft;
+  color: #6b7280;
 }
 
 .news-time {
   font-size: 22rpx;
   color: #9ca3af;
-}
-
-/* 新闻翻页 */
-.news-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20rpx;
-  padding: 16rpx 0 4rpx;
-}
-
-.news-page-btn {
-  width: 56rpx;
-  height: 56rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f1f5f9;
-  border-radius: 50%;
-
-  &.is-disabled { opacity: 0.35; }
-  &:active:not(.is-disabled) { background: #e2e8f0; }
-}
-
-.news-page-arrow {
-  font-size: 36rpx;
-  color: $primary;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.news-page-info {
-  font-size: 24rpx;
-  color: $ink-soft;
-  min-width: 80rpx;
-  text-align: center;
 }
 
 /* AI 投顾入口 */
@@ -2618,7 +3067,7 @@ function goChat() {
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
-  background: $primary;
+  background: #4d7cfe;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2633,18 +3082,18 @@ function goChat() {
 .ai-title {
   font-size: 28rpx;
   font-weight: 500;
-  color: $ink;
+  color: #1a1d24;
 }
 
 .ai-desc {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
   margin-top: 4rpx;
 }
 
 .ai-arrow {
   font-size: 36rpx;
-  color: $primary;
+  color: #4d7cfe;
 }
 
 /* 卡片头部操作�?*/
@@ -2665,7 +3114,7 @@ function goChat() {
 
 .history-icon {
   font-size: 22rpx;
-  color: $primary-600;
+  color: #6366f1;
   font-weight: 500;
 }
 
@@ -2696,10 +3145,10 @@ function goChat() {
 
 .cf-tag-mini {
   padding: 4rpx 12rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 6rpx;
   font-size: 20rpx;
-  color: $ink-soft;
+  color: #6b7280;
 }
 
 .cf-hero-card {
@@ -2714,7 +3163,7 @@ function goChat() {
 
 .cf-hero-label {
   font-size: 26rpx;
-  color: $ink-soft;
+  color: #6b7280;
 }
 
 .cf-hero-card-value {
@@ -2731,7 +3180,7 @@ function goChat() {
 
 .cf-orders-title {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
   margin-bottom: 12rpx;
   display: block;
 }
@@ -2788,7 +3237,7 @@ function goChat() {
 
 .cf-trend-title {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
 }
 
 .cf-trend-badge {
@@ -2796,7 +3245,7 @@ function goChat() {
   background: rgba(77, 124, 254, 0.1);
   border-radius: 6rpx;
   font-size: 20rpx;
-  color: $primary;
+  color: #4d7cfe;
 }
 
 .cf-trend-bars {
@@ -2853,7 +3302,7 @@ function goChat() {
 
 .forecast-update-value {
   font-size: 22rpx;
-  color: $ink-soft;
+  color: #6b7280;
 }
 
 .forecast-yoy {
@@ -2861,7 +3310,7 @@ function goChat() {
   align-items: center;
   justify-content: space-between;
   padding: 16rpx 20rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 12rpx;
   margin-bottom: 16rpx;
 }
@@ -2925,6 +3374,18 @@ function goChat() {
   margin-bottom: 12rpx;
 }
 
+.forecast-year-left {
+  min-width: 0;
+}
+
+.forecast-year-right {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4rpx;
+}
+
 .forecast-year-label {
   display: block;
   font-size: 26rpx;
@@ -2938,19 +3399,58 @@ function goChat() {
   font-size: 21rpx;
   color: #64748b;
 
-  &.is-actual { color: $primary; }
+  &.is-actual { color: #4d7cfe; }
   &.is-forecast { color: #d97706; }
 }
 
 .forecast-year-value {
-  font-size: 30rpx;
+  font-size: 28rpx;
   color: #1e293b;
+  font-weight: 800;
+}
+
+.forecast-year-growth {
+  font-size: 22rpx;
+  font-weight: 700;
+
+  &.up { color: #f43f5e; }
+  &.down { color: #22c55e; }
+}
+
+.forecast-detail-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  padding: 16rpx 18rpx;
+  margin-top: 14rpx;
+  background: #f8fafc;
+  border: 1rpx solid #eef2f7;
+  border-radius: 12rpx;
+}
+
+.forecast-detail-toggle-text {
+  font-size: 24rpx;
+  color: #334155;
+  font-weight: 600;
+}
+
+.forecast-detail-toggle-icon {
+  flex-shrink: 0;
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  background: #eaf1ff;
+  color: #4d7cfe;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  text-align: center;
   font-weight: 700;
 }
 
 .forecast-progress-track {
   height: 16rpx;
-  background: $line;
+  background: #e5e7eb;
   border-radius: 999rpx;
   overflow: hidden;
 }
@@ -2961,7 +3461,7 @@ function goChat() {
   border-radius: 999rpx;
 
   &.is-actual {
-    background: linear-gradient(90deg, $primary, #7c9cff);
+    background: linear-gradient(90deg, #4d7cfe, #7c9cff);
   }
 
   &.is-forecast {
@@ -2977,12 +3477,12 @@ function goChat() {
   margin-bottom: 4rpx;
 }
 
-.forecast-col-year { flex: 1; font-size: 22rpx; color: $ink-soft; font-weight: 600; }
-.forecast-col-profit { flex: 1; font-size: 22rpx; color: $ink-soft; font-weight: 600; text-align: center; }
-.forecast-col-growth { flex: 1; font-size: 22rpx; color: $ink-soft; font-weight: 600; text-align: right; }
+.forecast-col-year { flex: 1; font-size: 22rpx; color: #6b7280; font-weight: 600; }
+.forecast-col-profit { flex: 1; font-size: 22rpx; color: #6b7280; font-weight: 600; text-align: center; }
+.forecast-col-growth { flex: 1; font-size: 22rpx; color: #6b7280; font-weight: 600; text-align: right; }
 
 .forecast-detail-table {
-  margin-top: 16rpx;
+  margin-top: 12rpx;
 }
 
 .forecast-detail-title {
@@ -2995,8 +3495,9 @@ function goChat() {
 
 .forecast-detail-scroll {
   overflow-x: auto;
-  border: 1rpx solid $line;
+  border: 1rpx solid #e5e7eb;
   border-radius: 12rpx;
+  background: #fff;
 }
 
 .forecast-detail-row {
@@ -3006,7 +3507,7 @@ function goChat() {
   &:last-child { border-bottom: none; }
 
   &.forecast-detail-head {
-    background: $bg-soft;
+    background: #f5f7fa;
     font-weight: 600;
   }
 }
@@ -3024,7 +3525,7 @@ function goChat() {
     min-width: 160rpx;
     text-align: left;
     padding-left: 16rpx;
-    color: $ink-soft;
+    color: #6b7280;
     font-weight: 500;
   }
 }
@@ -3079,7 +3580,7 @@ function goChat() {
   padding: 16rpx 20rpx;
   background: linear-gradient(135deg, rgba(77, 124, 254, 0.06), rgba(99, 102, 241, 0.03));
   border-radius: 12rpx;
-  border-left: 4rpx solid $primary;
+  border-left: 4rpx solid #4d7cfe;
 }
 
 .tenx-ai-conclusion-header {
@@ -3093,7 +3594,7 @@ function goChat() {
   width: 36rpx;
   height: 36rpx;
   border-radius: 8rpx;
-  background: $primary;
+  background: #4d7cfe;
   color: #ffffff;
   font-size: 20rpx;
   font-weight: 700;
@@ -3123,7 +3624,7 @@ function goChat() {
   align-items: center;
   gap: 8rpx;
   padding: 8rpx 0;
-  border-bottom: 1rpx solid $bg-soft;
+  border-bottom: 1rpx solid #f5f7fa;
 
   &:last-child { border-bottom: none; }
 }
@@ -3131,7 +3632,7 @@ function goChat() {
 .tenx-ind-name {
   flex: 1;
   font-size: 22rpx;
-  color: $ink-soft;
+  color: #6b7280;
 }
 
 .tenx-ind-right {
@@ -3143,7 +3644,7 @@ function goChat() {
 
 .tenx-ind-value {
   font-size: 22rpx;
-  color: $ink;
+  color: #1a1d24;
   font-weight: 500;
   min-width: 80rpx;
   text-align: right;
@@ -3194,7 +3695,7 @@ function goChat() {
   padding: 16rpx;
   background: #f8fafc;
   border-radius: 12rpx;
-  border-left: 4rpx solid $primary-600;
+  border-left: 4rpx solid #6366f1;
 }
 
 .tenx-sub-dims-title {
@@ -3278,7 +3779,7 @@ function goChat() {
 
 .tenx-vetoed-desc {
   font-size: 26rpx;
-  color: $ink-soft;
+  color: #6b7280;
   line-height: 1.5;
   margin-bottom: 16rpx;
 }
@@ -3334,7 +3835,7 @@ function goChat() {
 .history-dialog-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: $ink;
+  color: #1a1d24;
 }
 
 .history-dialog-close {
@@ -3344,14 +3845,14 @@ function goChat() {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: $bg-soft;
+  background: #f5f7fa;
 
   &:active { background: #e8ecf1; }
 }
 
 .close-icon {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
 }
 
 .history-dialog-body {
@@ -3368,7 +3869,7 @@ function goChat() {
 
 .history-item {
   padding: 16rpx 20rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 12rpx;
 
   &:active { background: #eef0f3; }
@@ -3413,10 +3914,10 @@ function goChat() {
 
 .history-page-btn {
   padding: 8rpx 24rpx;
-  background: $bg-soft;
+  background: #f5f7fa;
   border-radius: 8rpx;
 
-  text { font-size: 24rpx; color: $primary; }
+  text { font-size: 24rpx; color: #4d7cfe; }
 
   &.disabled {
     opacity: 0.4;
@@ -3429,7 +3930,7 @@ function goChat() {
 
 .history-page-info {
   font-size: 24rpx;
-  color: $ink-soft;
+  color: #6b7280;
 }
 
 .history-detail-back {
@@ -3441,12 +3942,12 @@ function goChat() {
 
 .back-icon {
   font-size: 32rpx;
-  color: $primary;
+  color: #4d7cfe;
 }
 
 .back-text {
   font-size: 24rpx;
-  color: $primary;
+  color: #4d7cfe;
 }
 
 .history-detail-meta {

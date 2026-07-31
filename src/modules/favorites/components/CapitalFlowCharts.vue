@@ -4,10 +4,10 @@
       <text class="flow-overview-note">{{ summaryNote }}</text>
     </view>
 
-    <view v-if="orders.length" class="flow-chart-panel">
-      <view class="chart-head">
-        <text class="chart-title">资金拆解</text>
-        <Tag type="neutral" size="sm">亿元</Tag>
+    <view v-if="orders.length" class="flow-panel">
+      <view class="panel-head">
+        <text class="panel-title">资金拆解</text>
+        <text class="panel-unit">亿元</text>
       </view>
       <view class="balance-axis">
         <text>流出</text>
@@ -31,13 +31,13 @@
       </view>
     </view>
 
-    <view v-if="trendModel.points.length" class="flow-chart-panel">
-      <view class="chart-head">
-        <view class="chart-title-wrap">
-          <text class="chart-title">10日资金趋势</text>
-          <Badge v-if="trendBadge" type="gold">{{ trendBadge }}</Badge>
+    <view v-if="trendModel.points.length" class="flow-panel">
+      <view class="panel-head">
+        <view class="panel-title-wrap">
+          <text class="panel-title">10日资金节奏</text>
+          <text v-if="trendBadge" class="panel-badge">{{ trendBadge }}</text>
         </view>
-        <Tag type="neutral" size="sm">亿元</Tag>
+        <text class="panel-unit">亿元</text>
       </view>
       <view class="trend-chart">
         <view class="trend-axis-col">
@@ -84,7 +84,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Tag, Badge } from '@/shared/components'
 import { compactNumber } from '@/shared/utils/format'
 
 interface FlowOrder {
@@ -260,35 +259,28 @@ function formatDateLabel(value: string): string {
 
 .panel-title {
   display: block;
-  font-size: 30rpx;
-  font-weight: 700;
-  color: $ink;
+  font-size: 28rpx;
+  line-height: 1.35;
+  font-weight: 800;
+  color: #172033;
 }
 
-.split-chart-stage {
-  display: grid;
-  grid-template-columns: 46px 1fr;
-  column-gap: 4rpx;
-  height: 172px;
-  margin-top: 4rpx;
-  box-sizing: border-box;
-  background: $bg-card;
-}
-
-.split-axis-col {
-  height: 150px;
-  padding-top: 18px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-end;
-  box-sizing: border-box;
-}
-
-.split-axis-text {
+.panel-unit {
+  flex-shrink: 0;
   font-size: 21rpx;
-  line-height: 1;
-  color: $ink-mute;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.panel-badge {
+  display: inline-flex;
+  margin-top: 8rpx;
+  padding: 6rpx 12rpx;
+  border-radius: 8rpx;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 22rpx;
+  line-height: 1.3;
 }
 
 .balance-axis {
@@ -296,7 +288,7 @@ function formatDateLabel(value: string): string {
   align-items: center;
   padding-bottom: 8rpx;
   font-size: 20rpx;
-  color: $ink-mute;
+  color: #94a3b8;
 }
 
 .balance-axis text:last-child {
@@ -349,26 +341,19 @@ function formatDateLabel(value: string): string {
   align-items: center;
   justify-content: space-between;
   gap: 8rpx;
-  padding: 8rpx 10rpx;
-  border-radius: 8rpx;
-  background: $bg-soft;
+  min-width: 0;
+  padding: 10rpx 12rpx;
+  border-radius: 10rpx;
+  background: #ffffff;
+  border: 1rpx solid #eef2f7;
 }
 
-.order-dot {
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 999rpx;
-  flex-shrink: 0;
-
-  &.is-up { background: $up; }
-  &.is-down { background: $down; }
-}
-
-.order-label {
-  flex: 1;
+.split-name {
   min-width: 0;
   font-size: 22rpx;
-  color: $ink-soft;
+  line-height: 1.35;
+  font-weight: 700;
+  color: #475569;
 }
 
 .split-value {
@@ -377,8 +362,13 @@ function formatDateLabel(value: string): string {
   line-height: 1.35;
   font-weight: 800;
 
-  &.is-up { color: $up; }
-  &.is-down { color: $down; }
+  &.is-up {
+    color: #ef4444;
+  }
+
+  &.is-down {
+    color: #22c55e;
+  }
 }
 
 .trend-chart {
@@ -406,7 +396,7 @@ function formatDateLabel(value: string): string {
 .trend-axis-text {
   font-size: 21rpx;
   line-height: 1;
-  color: $ink-mute;
+  color: #94a3b8;
 }
 
 .trend-svg {
@@ -427,7 +417,8 @@ function formatDateLabel(value: string): string {
   min-width: 0;
   padding: 6rpx 4rpx;
   border-radius: 8rpx;
-  background: $bg-soft;
+  background: #ffffff;
+  border: 1rpx solid #eef2f7;
   text-align: center;
 }
 
@@ -435,7 +426,7 @@ function formatDateLabel(value: string): string {
   display: block;
   font-size: 19rpx;
   line-height: 1.2;
-  color: $ink-mute;
+  color: #94a3b8;
 }
 
 .trend-value-number {
@@ -445,7 +436,12 @@ function formatDateLabel(value: string): string {
   line-height: 1.2;
   font-weight: 800;
 
-  &.is-up { color: $up; }
-  &.is-down { color: $down; }
+  &.is-up {
+    color: #ef4444;
+  }
+
+  &.is-down {
+    color: #22c55e;
+  }
 }
 </style>

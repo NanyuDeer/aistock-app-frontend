@@ -7,13 +7,21 @@
           {{ formatSigned(lastPoint.change) }} {{ formatSigned(lastPoint.changePercent) }}%
         </text>
       </view>
-      <Segmented :model-value="currentPeriod" :items="periodItems" @change="onPeriodChange" />
+      <view class="as-kline-periods">
+        <text
+          v-for="p in periods"
+          :key="p.value"
+          :class="['as-kline-period', currentPeriod === p.value ? 'active' : '']"
+          @tap="switchPeriod(p.value)"
+        >{{ p.label }}</text>
+      </view>
     </view>
-    <view v-if="loading" class="as-kline-state">
-      <LoadingState />
+
+    <view v-if="loading" class="as-kline-loading">
+      <text class="as-kline-loading-text">加载中...</text>
     </view>
-    <view v-else-if="!chartModel.items.length" class="as-kline-state">
-      <EmptyState text="暂无K线数据" />
+    <view v-else-if="!normalizedItems.length" class="as-kline-empty">
+      <text class="as-kline-empty-text">暂无K线数据</text>
     </view>
 
     <!-- #ifdef H5 || APP-PLUS -->
@@ -73,7 +81,6 @@
 <script setup lang="ts">
 // @ts-nocheck -- uni-app renderjs module is compiled outside normal vue-tsc context.
 import { computed, ref, watch } from 'vue'
-import { Segmented, LoadingState, EmptyState } from '@/shared/components'
 
 interface KLineItem {
   date: string
@@ -105,7 +112,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ (e: 'period-change', p: Period): void }>()
 
-const periodItems = [
+const periods = [
   { label: '日K', value: 'daily' as Period },
   { label: '周K', value: 'weekly' as Period },
   { label: '月K', value: 'yearly' as Period },
@@ -224,11 +231,10 @@ const fallbackModel = computed(() => {
   }
 })
 
-function onPeriodChange(value: string | number) {
-  const next = value as Period
-  if (currentPeriod.value === next) return
-  currentPeriod.value = next
-  emit('period-change', next)
+function switchPeriod(p: Period) {
+  if (currentPeriod.value === p) return
+  currentPeriod.value = p
+  emit('period-change', p)
 }
 
 function parseTradingDate(value: string): number {
@@ -535,8 +541,8 @@ export default {
 
 <style lang="scss" scoped>
 .as-kline {
-  background: $bg-card;
-  border-radius: $r-sm;
+  background: #ffffff;
+  border-radius: 12rpx;
   padding: 0;
 }
 
@@ -574,6 +580,26 @@ export default {
   color: #16a34a;
 }
 
+.as-kline-periods {
+  display: flex;
+  gap: 6rpx;
+  flex-shrink: 0;
+}
+
+.as-kline-period {
+  font-size: 22rpx;
+  color: #6b7280;
+  padding: 5rpx 13rpx;
+  border-radius: 12rpx;
+  background: #f5f7fa;
+}
+
+.as-kline-period.active {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  font-weight: 600;
+}
+
 .kline-host {
   display: block;
   width: 100%;
@@ -604,7 +630,7 @@ export default {
   display: block;
   font-size: 21rpx;
   line-height: 1;
-  color: $ink-soft;
+  color: #6b7280;
   white-space: nowrap;
 }
 
@@ -630,13 +656,20 @@ export default {
   display: block;
   font-size: 22rpx;
   line-height: 1;
-  color: $ink-mute;
+  color: #94a3b8;
 }
 
-.as-kline-state {
-  height: 240px;
+.as-kline-loading,
+.as-kline-empty {
+  height: 560rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.as-kline-loading-text,
+.as-kline-empty-text {
+  font-size: 26rpx;
+  color: #9ca3af;
 }
 </style>
