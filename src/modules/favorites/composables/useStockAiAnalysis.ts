@@ -372,7 +372,7 @@ function buildMoatsFromTrend(trendApiData: TrendScoreData | null, profile: Parti
     return subDimensions.slice(0, 4).map((item: any, index: number) => ({
       icon: ['A', 'C', 'S', 'G'][index] || 'F',
       title: String(item.name || '基本面因子'),
-      desc: `真实评分 ${Number(item.score) || 0} 分，权重 ${Number(item.weight) || 0}%`
+      desc: `${Number(item.score) || 0}分`
     }))
   }
   return [
@@ -556,9 +556,13 @@ export function useStockAiAnalysis(
     const trackDim = findTrendDimension(trendApiData.value, name => name.includes('行业') || name.includes('赛道'))
     const trackDetail = trackDim?.detail || {}
     const policyItems = Array.isArray(trackDetail.policyItems) ? trackDetail.policyItems : []
-    const policies = policyItems.length
-      ? policyItems.slice(0, 3).map((item: any) => ({
-        tag: '真实',
+    const effectivePolicyItems = policyItems.filter((item: any) => {
+      const text = `${item.name || ''}${item.desc || ''}${item.value || ''}`
+      return !text.includes('暂无明显政策')
+    })
+    const policies = effectivePolicyItems.length
+      ? effectivePolicyItems.slice(0, 3).map((item: any) => ({
+        tag: '利好',
         type: 'is-good',
         text: `${String(item.name || '政策 / 产业趋势')}：${String(item.desc || item.value || '来自趋势评分后端')}`
       }))
