@@ -5,8 +5,8 @@ import { test } from 'node:test'
 const source = readFileSync(new URL('./index.vue', import.meta.url), 'utf8')
 
 test('播报页只消费通过严格 parser 的 dialogue 与音频路径', () => {
-  assert.match(source, /parseBroadcastReport\(data, broadcastType\.value, currentDate\.value\)/)
-  assert.match(source, /agentApi\.getBrief\(broadcastType\.value, currentDate\.value\)/)
+  assert.match(source, /parseBroadcastReport\(broadcastRes\.value, broadcastType\.value, date\)/)
+  assert.match(source, /agentApi\.getBrief\(broadcastType\.value, date\)/)
   assert.doesNotMatch(source, /agentApi\.getReport\(reportType, currentDate\.value\)/)
   assert.doesNotMatch(source, /reportText/)
   assert.doesNotMatch(source, /text\.split\('\\n'\)/)
@@ -18,4 +18,11 @@ test('播报页通过共享纯日历工具切换日期', () => {
   assert.match(source, /addCalendarDays/)
   assert.match(source, /shanghaiDateString/)
   assert.match(source, /currentDate\.value = addCalendarDays\(currentDate\.value, delta\)/)
+})
+
+test('非交易日无当日报告时自动回退最近可用报告并标注日期', () => {
+  assert.match(source, /MAX_FALLBACK_DAYS/)
+  assert.match(source, /addCalendarDays\(requested, -offset\)/)
+  assert.match(source, /当前显示最近可用报告/)
+  assert.match(source, /isFallback\.value = true/)
 })
