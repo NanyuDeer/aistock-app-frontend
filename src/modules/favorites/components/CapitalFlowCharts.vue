@@ -1,57 +1,74 @@
 <template>
   <view class="capital-flow-charts">
-    <view v-if="orders.length" class="flow-chart-panel">
-      <view class="chart-head">
-        <text class="chart-title">资金拆解</text>
-        <Tag type="neutral" size="sm">亿元</Tag>
+    <view class="flow-overview">
+      <text class="flow-overview-note">{{ summaryNote }}</text>
+    </view>
+
+    <view v-if="orders.length" class="flow-panel">
+      <view class="panel-head">
+        <text class="panel-title">资金拆解</text>
+        <text class="panel-unit">亿元</text>
       </view>
-      <view class="split-chart-stage">
-        <view class="split-axis-col">
-          <view class="split-axis-text">{{ compactNumber(splitModel.maxAbs) }}</view>
-          <view class="split-axis-text">0</view>
-          <view class="split-axis-text">{{ compactNumber(-splitModel.maxAbs) }}</view>
-        </view>
-        <svg class="split-svg" viewBox="0 0 360 172" preserveAspectRatio="none">
-          <line :x1="splitModel.left" :y1="splitModel.top" :x2="splitModel.right" :y2="splitModel.top" stroke="#eef2f7" stroke-width="1" />
-          <line :x1="splitModel.left" :y1="splitModel.zeroY" :x2="splitModel.right" :y2="splitModel.zeroY" stroke="#94a3b8" stroke-width="1" />
-          <line :x1="splitModel.left" :y1="splitModel.bottom" :x2="splitModel.right" :y2="splitModel.bottom" stroke="#eef2f7" stroke-width="1" />
-          <line :x1="splitModel.left" :y1="splitModel.top" :x2="splitModel.left" :y2="splitModel.bottom" stroke="#d1d5db" stroke-width="1" />
-          <g v-for="bar in splitModel.bars" :key="bar.key">
-            <rect :x="bar.x - splitModel.barWidth / 2" :y="bar.y" :width="splitModel.barWidth" :height="bar.height" :fill="bar.color" rx="4" />
-          </g>
-        </svg>
+      <view class="balance-axis">
+        <text>流出</text>
+        <text>流入</text>
       </view>
-      <view class="order-legend-grid">
-        <view v-for="item in orders" :key="item.label" class="order-legend-item">
-          <view :class="['order-dot', item.value >= 0 ? 'is-up' : 'is-down']"></view>
-          <text class="order-label">{{ item.label }}</text>
-          <text :class="['order-value', item.value >= 0 ? 'is-up' : 'is-down']">{{ formatSigned(item.value) }}</text>
+      <view class="balance-track">
+        <view class="balance-center-line"></view>
+        <view
+          v-for="seg in splitSegments"
+          :key="seg.key"
+          class="balance-seg"
+          :class="seg.isPositive ? 'is-up' : 'is-down'"
+          :style="seg.style"
+        ></view>
+      </view>
+      <view class="split-legend">
+        <view v-for="item in breakdownRows" :key="item.key" class="split-legend-item">
+          <text class="split-name">{{ item.label }}</text>
+          <text :class="['split-value', item.isPositive ? 'is-up' : 'is-down']">{{ formatSigned(item.value) }}</text>
         </view>
       </view>
     </view>
 
-    <view v-if="trendModel.points.length" class="flow-chart-panel">
-      <view class="chart-head">
-        <view class="chart-title-wrap">
-          <text class="chart-title">10日资金趋势</text>
-          <Badge v-if="trendBadge" type="gold">{{ trendBadge }}</Badge>
+    <view v-if="trendModel.points.length" class="flow-panel">
+      <view class="panel-head">
+        <view class="panel-title-wrap">
+          <text class="panel-title">10日资金节奏</text>
+          <text v-if="trendBadge" class="panel-badge">{{ trendBadge }}</text>
         </view>
-        <Tag type="neutral" size="sm">亿元</Tag>
+        <text class="panel-unit">亿元</text>
       </view>
       <view class="trend-chart">
         <view class="trend-axis-col">
           <text v-for="tick in trendModel.ticks" :key="`axis-${tick.label}`" class="trend-axis-text">{{ tick.label }}</text>
         </view>
-        <svg class="trend-svg" viewBox="0 0 360 236" preserveAspectRatio="none">
+        <svg class="trend-svg" viewBox="0 0 360 218" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="trendUpBar" x1="0" x2="0" y1="1" y2="0">
+              <stop offset="0%" stop-color="#fecdd3" />
+              <stop offset="100%" stop-color="#ef4444" />
+            </linearGradient>
+            <linearGradient id="trendDownBar" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#bbf7d0" />
+              <stop offset="100%" stop-color="#22c55e" />
+            </linearGradient>
+          </defs>
           <g v-for="tick in trendModel.ticks" :key="`tick-${tick.label}`">
-            <line :x1="trendModel.plotLeft" :y1="tick.y" :x2="trendModel.plotRight" :y2="tick.y" stroke="#eef2f7" stroke-width="1" />
+            <line :x1="trendModel.plotLeft" :y1="tick.y" :x2="trendModel.plotRight" :y2="tick.y" stroke="#eef2f7" stroke-width="1" stroke-dasharray="4 6" />
           </g>
-          <line :x1="trendModel.plotLeft" :y1="trendModel.top" :x2="trendModel.plotLeft" :y2="trendModel.bottom" stroke="#d1d5db" stroke-width="1" />
-          <line :x1="trendModel.plotLeft" :y1="trendModel.bottom" :x2="trendModel.plotRight" :y2="trendModel.bottom" stroke="#d1d5db" stroke-width="1" />
-          <line :x1="trendModel.plotLeft" :y1="trendModel.zeroY" :x2="trendModel.plotRight" :y2="trendModel.zeroY" stroke="#94a3b8" stroke-width="1" />
-          <polyline :points="trendModel.linePoints" fill="none" stroke="#f97316" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+          <line :x1="trendModel.plotLeft" :y1="trendModel.bottom" :x2="trendModel.plotRight" :y2="trendModel.bottom" stroke="#d8dee8" stroke-width="1" />
+          <line :x1="trendModel.plotLeft" :y1="trendModel.zeroY" :x2="trendModel.plotRight" :y2="trendModel.zeroY" stroke="#94a3b8" stroke-width="1.4" />
           <g v-for="point in trendModel.points" :key="point.key">
-            <circle :cx="point.x" :cy="point.y" r="5" fill="#f97316" stroke="#fff" stroke-width="2" />
+            <rect
+              :x="point.barX"
+              :y="point.barY"
+              :width="trendModel.barWidth"
+              :height="point.barHeight"
+              :fill="point.raw >= 0 ? 'url(#trendUpBar)' : 'url(#trendDownBar)'"
+              rx="5"
+            />
+            <circle v-if="point.isLatest" :cx="point.x" :cy="point.raw >= 0 ? point.barY : point.barY + point.barHeight" r="4" :fill="point.raw >= 0 ? '#ef4444' : '#22c55e'" stroke="#fff" stroke-width="2" />
           </g>
         </svg>
       </view>
@@ -67,7 +84,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Tag, Badge } from '@/shared/components'
 import { compactNumber } from '@/shared/utils/format'
 
 interface FlowOrder {
@@ -76,50 +92,87 @@ interface FlowOrder {
 }
 
 const props = defineProps<{
+  mainInflow?: number
+  ratio?: string | number
+  fiveDay?: number
+  streak?: string
+  narrative?: string
+  risk?: string
   orders?: FlowOrder[]
   trend?: number[]
   trendDates?: string[]
   trendBadge?: string
 }>()
 
-const UP_COLOR = '#ef4444'
-const DOWN_COLOR = '#22c55e'
+const summaryNote = computed(() => props.narrative || props.trendBadge || '先看总量，再看结构和节奏')
 const orders = computed(() => (props.orders || []).filter(item => item.label && item.value !== null && item.value !== undefined))
 const trend = computed(() => props.trend || [])
 const trendDates = computed(() => props.trendDates?.length ? props.trendDates : trend.value.map((_, idx) => `${idx + 1}`))
-const splitMaxAbs = computed(() => Math.max(0.01, ...orders.value.map(item => Math.abs(Number(item.value) || 0))))
 
-const splitModel = computed(() => {
+const breakdownRows = computed(() => {
   const values = orders.value.map(item => Number(item.value) || 0)
-  const left = 16
-  const right = 338
-  const top = 18
-  const bottom = 150
-  const zeroY = (top + bottom) / 2
   const maxAbs = Math.max(0.01, ...values.map(value => Math.abs(value)))
-  const slot = (right - left) / Math.max(1, values.length)
-  const barWidth = Math.min(28, Math.max(18, slot * 0.36))
-  const bars = values.map((value, idx) => {
-    const height = Math.max(4, Math.abs(value) / maxAbs * ((bottom - top) / 2 - 12))
-    const isUp = value >= 0
+  return orders.value.map((item, idx) => {
+    const value = Number(item.value) || 0
     return {
-      key: `${orders.value[idx]?.label || idx}-${value}`,
-      x: left + slot * idx + slot / 2,
-      y: isUp ? zeroY - height : zeroY,
-      height,
-      color: isUp ? UP_COLOR : DOWN_COLOR,
+      key: `${item.label}-${idx}-${value}`,
+      label: item.label,
+      value,
+      isPositive: value >= 0,
+      share: Math.round((Math.abs(value) / maxAbs) * 100),
     }
   })
-  return { bars, maxAbs, left, right, top, bottom, zeroY, barWidth }
+})
+
+const splitSegments = computed(() => {
+  const values = orders.value.map(item => Number(item.value) || 0)
+  const maxAbs = Math.max(0.01, ...values.map(value => Math.abs(value)))
+  const positive: Array<{ key: string; style: Record<string, string>; isPositive: boolean }> = []
+  const negative: Array<{ key: string; style: Record<string, string>; isPositive: boolean }> = []
+  let positiveOffset = 0
+  let negativeOffset = 0
+
+  orders.value.forEach((item, idx) => {
+    const value = Number(item.value) || 0
+    const width = Math.max(6, (Math.abs(value) / maxAbs) * 50)
+    if (value >= 0) {
+      const size = Math.min(50 - positiveOffset, width)
+      positive.push({
+        key: `${item.label}-${idx}-${value}`,
+        isPositive: true,
+        style: {
+          left: `${50 + positiveOffset}%`,
+          width: `${size}%`,
+        },
+      })
+      positiveOffset += size
+    } else {
+      const size = Math.min(50 - negativeOffset, width)
+      negative.push({
+        key: `${item.label}-${idx}-${value}`,
+        isPositive: false,
+        style: {
+          left: `${Math.max(0, 50 - negativeOffset - size)}%`,
+          width: `${size}%`,
+        },
+      })
+      negativeOffset += size
+    }
+  })
+
+  return [...negative, ...positive]
 })
 
 const trendModel = computed(() => {
   const values = trend.value.map(value => Number(value) || 0)
-  const left = 16
-  const right = 338
-  const top = 24
-  const bottom = 188
-  if (!values.length) return { points: [], ticks: [], zeroY: 106, linePoints: '', left, right, plotLeft: left, plotRight: right, top, bottom }
+  const left = 8
+  const right = 340
+  const top = 20
+  const bottom = 172
+  if (!values.length) {
+    return { points: [], ticks: [], zeroY: 106, linePoints: '', areaPoints: '', left, right, plotLeft: left, plotRight: right, top, bottom }
+  }
+
   const max = Math.max(0, ...values)
   const min = Math.min(0, ...values)
   const pad = Math.max(0.3, (max - min) * 0.16)
@@ -128,33 +181,31 @@ const trendModel = computed(() => {
   const range = Math.max(1, domainMax - domainMin)
   const yFor = (value: number) => top + ((domainMax - value) / range) * (bottom - top)
   const zeroY = yFor(0)
+  const slot = values.length <= 1 ? right - left : (right - left) / values.length
+  const barWidth = Math.min(18, Math.max(10, slot * 0.48))
+
   const points = values.map((value, idx) => {
-    const x = values.length === 1 ? (left + right) / 2 : left + (idx / (values.length - 1)) * (right - left)
+    const x = left + slot * idx + slot / 2
     const y = yFor(value)
-    const isEdgeLeft = idx === 0
-    const isEdgeRight = idx === values.length - 1
-    const labelX = isEdgeLeft ? x + 2 : isEdgeRight ? x - 2 : x
-    const anchor = isEdgeLeft ? 'start' : isEdgeRight ? 'end' : 'middle'
-    const labelY = value < 0 ? Math.min(214, y + 18) : Math.max(14, y - 10)
+    const barHeight = Math.max(4, Math.abs(y - zeroY))
     return {
       key: `${idx}-${value}`,
       x,
       y,
       raw: value,
-      labelX,
-      labelY,
-      dateY: Math.min(230, labelY + 18),
-      anchor,
+      isLatest: idx === values.length - 1,
+      barX: x - barWidth / 2,
+      barY: value >= 0 ? y : zeroY,
+      barHeight,
       text: formatSigned(value),
       date: formatDateLabel(trendDates.value[idx] || `${idx + 1}`),
-      showDate: idx === 0 || idx === values.length - 1 || idx === Math.floor((values.length - 1) / 2),
     }
   })
-  const ticks = [domainMax, 0, domainMin].map(value => ({
-    label: compactNumber(value),
-    y: yFor(value),
-  }))
-  return { points, ticks, zeroY, linePoints: points.map(point => `${point.x},${point.y}`).join(' '), left, right, plotLeft: left, plotRight: right, top, bottom }
+
+  const linePoints = points.map(point => `${point.x},${point.y}`).join(' ')
+  const areaPoints = `${left},${zeroY} ${linePoints} ${right},${zeroY}`
+  const ticks = [domainMax, 0, domainMin].map(value => ({ label: compactNumber(value), y: yFor(value) }))
+  return { points, ticks, zeroY, linePoints, areaPoints, left, right, plotLeft: left, plotRight: right, top, bottom, barWidth }
 })
 
 function formatSigned(value: number): string {
@@ -168,128 +219,172 @@ function formatDateLabel(value: string): string {
   if (/^\d{8}$/.test(text)) return `${text.slice(4, 6)}/${text.slice(6, 8)}`
   return text.slice(0, 5)
 }
+
 </script>
 
 <style lang="scss" scoped>
 .capital-flow-charts {
   display: flex;
   flex-direction: column;
-  gap: 28rpx;
+  gap: 22rpx;
 }
 
-.flow-chart-panel {
-  padding: 18rpx 0 2rpx;
+.flow-overview,
+.flow-panel {
+  padding: 18rpx;
+  border-radius: 18rpx;
+  background: #f8fafc;
+  border: 1rpx solid #eef2f7;
 }
 
-.chart-head {
+.flow-overview-note {
+  display: block;
+  font-size: 25rpx;
+  line-height: 1.55;
+  color: #334155;
+  word-break: break-word;
+}
+
+.panel-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16rpx;
-  padding: 0 4rpx;
-  margin-bottom: 10rpx;
+  margin-bottom: 14rpx;
 }
 
-.chart-title-wrap {
+.panel-title-wrap {
   min-width: 0;
 }
 
-.chart-title {
+.panel-title {
   display: block;
-  font-size: 30rpx;
-  font-weight: 700;
-  color: $ink;
+  font-size: 28rpx;
+  line-height: 1.35;
+  font-weight: 800;
+  color: #172033;
 }
 
-.split-chart-stage {
-  display: grid;
-  grid-template-columns: 46px 1fr;
-  column-gap: 4rpx;
-  height: 172px;
-  margin-top: 4rpx;
-  box-sizing: border-box;
-  background: $bg-card;
-}
-
-.split-axis-col {
-  height: 150px;
-  padding-top: 18px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-end;
-  box-sizing: border-box;
-}
-
-.split-axis-text {
+.panel-unit {
+  flex-shrink: 0;
   font-size: 21rpx;
-  line-height: 1;
-  color: $ink-mute;
+  line-height: 1.5;
+  color: #64748b;
 }
 
-.split-svg {
-  display: block;
-  width: 100%;
-  height: 172px;
-  overflow: visible;
+.panel-badge {
+  display: inline-flex;
+  margin-top: 8rpx;
+  padding: 6rpx 12rpx;
+  border-radius: 8rpx;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 22rpx;
+  line-height: 1.3;
 }
 
-.order-legend-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10rpx 16rpx;
-  margin-top: 12rpx;
-  padding: 0 4rpx;
-}
-
-.order-legend-item {
+.balance-axis {
   display: flex;
   align-items: center;
-  min-width: 0;
-  gap: 8rpx;
-  padding: 8rpx 10rpx;
-  border-radius: 8rpx;
-  background: $bg-soft;
+  padding-bottom: 8rpx;
+  font-size: 20rpx;
+  color: #94a3b8;
 }
 
-.order-dot {
-  width: 14rpx;
-  height: 14rpx;
+.balance-axis text:last-child {
+  margin-left: auto;
+}
+
+.balance-track {
+  position: relative;
+  height: 24rpx;
+  background: #edf2f7;
   border-radius: 999rpx;
-  flex-shrink: 0;
-
-  &.is-up { background: $up; }
-  &.is-down { background: $down; }
+  overflow: hidden;
+  margin-bottom: 16rpx;
 }
 
-.order-label {
-  flex: 1;
+.balance-center-line {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-0.5px);
+  background: rgba(148, 163, 184, 0.7);
+}
+
+.balance-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999rpx;
+  opacity: 0.95;
+
+  &.is-up {
+    background: linear-gradient(90deg, #fecdd3, #ef4444);
+  }
+
+  &.is-down {
+    background: linear-gradient(90deg, #34d399, #22c55e);
+  }
+}
+
+.split-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10rpx;
+}
+
+.split-legend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8rpx;
+  min-width: 0;
+  padding: 10rpx 12rpx;
+  border-radius: 10rpx;
+  background: #ffffff;
+  border: 1rpx solid #eef2f7;
+}
+
+.split-name {
   min-width: 0;
   font-size: 22rpx;
-  color: $ink-soft;
+  line-height: 1.35;
+  font-weight: 700;
+  color: #475569;
 }
 
-.order-value {
+.split-value {
   flex-shrink: 0;
   font-size: 22rpx;
-  font-weight: 700;
+  line-height: 1.35;
+  font-weight: 800;
 
-  &.is-up { color: $up; }
-  &.is-down { color: $down; }
+  &.is-up {
+    color: #ef4444;
+  }
+
+  &.is-down {
+    color: #22c55e;
+  }
 }
 
 .trend-chart {
   display: grid;
-  grid-template-columns: 46px 1fr;
+  grid-template-columns: 36px 1fr;
   column-gap: 4rpx;
   width: 100%;
-  height: 236px;
+  height: 218px;
   overflow: visible;
+  padding-top: 4rpx;
+  box-sizing: border-box;
 }
 
 .trend-axis-col {
-  height: 188px;
-  padding-top: 20px;
+  height: 172px;
+  padding-top: 18px;
   padding-bottom: 28px;
   display: flex;
   flex-direction: column;
@@ -301,28 +396,29 @@ function formatDateLabel(value: string): string {
 .trend-axis-text {
   font-size: 21rpx;
   line-height: 1;
-  color: $ink-mute;
+  color: #94a3b8;
 }
 
 .trend-svg {
   display: block;
   width: 100%;
-  height: 236px;
+  height: 218px;
   overflow: visible;
 }
 
 .trend-value-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8rpx;
-  padding: 0 4rpx 8rpx;
+  gap: 8rpx 10rpx;
+  padding: 4rpx 2rpx 6rpx;
 }
 
 .trend-value-item {
   min-width: 0;
-  padding: 8rpx 4rpx;
+  padding: 6rpx 4rpx;
   border-radius: 8rpx;
-  background: $bg-soft;
+  background: #ffffff;
+  border: 1rpx solid #eef2f7;
   text-align: center;
 }
 
@@ -330,17 +426,22 @@ function formatDateLabel(value: string): string {
   display: block;
   font-size: 19rpx;
   line-height: 1.2;
-  color: $ink-mute;
+  color: #94a3b8;
 }
 
 .trend-value-number {
   display: block;
   margin-top: 4rpx;
-  font-size: 20rpx;
+  font-size: 21rpx;
   line-height: 1.2;
-  font-weight: 700;
+  font-weight: 800;
 
-  &.is-up { color: $up; }
-  &.is-down { color: $down; }
+  &.is-up {
+    color: #ef4444;
+  }
+
+  &.is-down {
+    color: #22c55e;
+  }
 }
 </style>
