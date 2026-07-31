@@ -2,6 +2,17 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [changer] 2026-07-31 — 同步 PR#30 focusEvents + GI 数据适配 + ghost 文件清理
+
+**开发者**: 37588
+
+### 改进
+- 合并 origin/master：同步 PR#30 focusEvents + mixed type 支持 + 组件库同步
+- `src/modules/chat/event`：GI 数据适配 `/event/list`，修复双排名卡片布局
+- 删除 6 个 ghost 文件（组件重构后残留）：ChatBubble / SkillButton / SkillCard / StreamingText / EventTabBar / ImportanceStars
+
+---
+
 ## [changer] 2026-07-29 — 早报降级路径：brief 接口优先 + 降级文案优化
 
 **开发者**: 37588
