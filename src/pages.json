@@ -45,6 +45,7 @@
       "path": "modules/favorites/pages/monitor",
       "style": {
         "navigationBarTitleText": "异动监控",
+        "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
@@ -61,7 +62,10 @@
     {
       "path": "modules/favorites/pages/stock-trace",
       "style": {
-        "navigationBarTitleText": "异动捕手"
+        "navigationBarTitleText": "异动溯源",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {

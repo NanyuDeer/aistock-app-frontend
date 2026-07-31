@@ -513,8 +513,8 @@ onShow(() => {
 
 .stock-col {
   flex-shrink: 0;
-  /* 406px H5 预览中对应 80px；保留 rpx 以便不同端等比例适配。 */
-  width: 154rpx;
+  /* 406px H5 预览中对应 70px；保留 rpx 以便不同端等比例适配。 */
+  width: 140rpx;
 }
 
 .data-cols {
@@ -526,13 +526,13 @@ onShow(() => {
 }
 
 .forecast-col {
-  flex: 1;
+  flex: 5;
   min-width: 0;
   align-items: flex-start;
 }
 
 .eps-col {
-  flex: 1;
+  flex: 4;
   min-width: 0;
   align-items: flex-start;
 }

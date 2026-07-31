@@ -167,7 +167,7 @@ function onIntelTabChange(val: string | number) {
 
 /** 异动捕手（新模块：自选股异动监控） */
 function goAlertCatcher() {
-  uni.navigateTo({ url: '/modules/favorites/pages/alert-catcher' })
+  uni.navigateTo({ url: '/modules/favorites/pages/monitor' })
 }
 
 /** 个股情报（原异动捕手/event-catcher，已改名） */

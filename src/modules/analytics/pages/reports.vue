@@ -121,7 +121,6 @@
               <text class="stock-code">{{ item.code }}</text>
             </view>
             <view class="report-period">{{ item.period }}</view>
-            <text v-if="item.aiScore != null" :class="['report-score', scoreClass(item.aiScore)]">{{ item.aiScore }}分</text>
             <text :class="['report-tag', tagClass(item.tag)]">{{ item.tag }}</text>
           </view>
           <!-- 底部：核心财务 + 更新时间 -->
@@ -148,6 +147,7 @@
             </view>
             <view class="report-time-row">
               <text class="update-time">更新时间：{{ item.updateTime }}</text>
+              <text v-if="item.aiScore != null" :class="['report-score', scoreClass(item.aiScore)]">{{ item.aiScore }}分</text>
             </view>
           </view>
         </view>
@@ -898,7 +898,6 @@ fetchData(false)
   padding: 4rpx 12rpx;
   border-radius: 8rpx;
   flex-shrink: 0;
-  margin-left: 8rpx;
 
   &.score-high {
     color: #059669;
@@ -1048,7 +1047,8 @@ fetchData(false)
 
 .report-time-row {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .update-time {

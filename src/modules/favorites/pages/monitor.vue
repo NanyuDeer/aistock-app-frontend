@@ -1,9 +1,6 @@
 <template>
-  <view class="page-monitor">
-    <view class="monitor-header">
-      <text class="monitor-title">异动监控</text>
-      <text class="monitor-subtitle">AI 实时盯盘 · 自选股异动推送</text>
-    </view>
+  <SubPageCard2 title="异动监控" subtitle="AI 实时盯盘 · 自选股异动推送">
+    <view class="page-monitor">
 
     <!-- 订阅状态 -->
     <view class="subscribe-card">
@@ -58,7 +55,8 @@
       <text class="ws-text">{{ wsConnected ? '实时连接中' : '未连接（仅 App 支持）' }}</text>
     </view>
     <!-- #endif -->
-  </view>
+    </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
@@ -70,6 +68,7 @@ import { getMarketStatus } from '@/shared/utils/tradingTime'
 import { formatTime } from '@/shared/utils/datetime'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockTraceApi } from '@/shared/api/modules/stockTrace'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 
 interface AlertItem {
   eventId: string
@@ -192,15 +191,10 @@ onUnmounted(() => disconnectWs())
 
 <style lang="scss" scoped>
 .page-monitor {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  display: flex; flex-direction: column; overflow: hidden;
-  overscroll-behavior: none; touch-action: none;
-  padding: 20rpx;
+  min-height: 100%;
+  padding: $s-3;
+  background: $bg-page;
 }
-
-.monitor-header { padding: 20rpx 0; }
-.monitor-title { font-size: 40rpx; font-weight: 600; color: $ink; display: block; }
-.monitor-subtitle { font-size: 24rpx; color: $ink-soft; margin-top: 4rpx; display: block; }
 
 .subscribe-card {
   display: flex; align-items: center; justify-content: space-between;

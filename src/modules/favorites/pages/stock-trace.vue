@@ -1,5 +1,6 @@
 <template>
-  <view class="page-stock-trace">
+  <SubPageCard2 title="异动溯源" subtitle="证据驱动的异动归因">
+    <view class="page-stock-trace">
     <view v-if="loading" class="state"><text>加载中</text></view>
     <view v-else-if="!event" class="state"><text>异动事件不存在或已过期</text></view>
     <template v-else>
@@ -47,13 +48,15 @@
       </view>
       <view v-else-if="!analysis?.artifact" class="section"><text class="summary">归因处理中，结果仅在证据校验通过后展示。</text></view>
     </template>
-  </view>
+    </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockTraceApi, type MovementCandidate, type StockTraceAnalysisResponse, type StockTraceEvent, type TraceChainNode, type TraceEvidence } from '@/shared/api/modules/stockTrace'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 
 const eventId = ref('')
 const event = ref<StockTraceEvent | null>(null)
@@ -142,8 +145,8 @@ function sourceKindLabel(value: TraceEvidence['kind']): string { return ({ annou
 
 <style lang="scss" scoped>
 @use '@/shared/styles/variables.scss' as *;
-.page-stock-trace { min-height: 100%; padding: $spacing-base; background: $bg-color-grey; }
-.event-card, .section { display: flex; flex-direction: column; gap: $spacing-sm; padding: $spacing-base; margin-bottom: $spacing-base; background: $bg-color; border-radius: $radius-base; }
+.page-stock-trace { min-height: 100%; padding: $s-3; background: $bg-page; }
+.event-card, .section { display: flex; flex-direction: column; gap: $s-2; padding: $s-3; margin-bottom: $s-3; background: $bg-card; border: 2rpx solid $line; border-radius: $r-lg; box-shadow: $shadow-sm; }
 .event-title { display: flex; align-items: baseline; gap: $spacing-sm; color: $text-color-title; font-size: $font-size-lg; font-weight: 600; }.symbol, .meta, .event-fact { color: $text-color-secondary; font-size: $font-size-sm; font-weight: 400; }.change { font-size: 44rpx; font-weight: 700; }.change.up { color: $stock-up-color; }.change.down { color: $stock-down-color; }
 .section-title { color: $text-color-title; font-size: $font-size-base; font-weight: 600; }.summary, .row-text { color: $text-color-secondary; font-size: $font-size-sm; line-height: 1.6; }.row { display: flex; gap: $spacing-sm; align-items: flex-start; padding-top: $spacing-sm; border-top: 1rpx solid $border-color-light; }.tag { flex: 0 0 auto; padding: 2rpx 8rpx; color: $brand-color; background: rgba($brand-color, .1); border-radius: $radius-sm; font-size: $font-size-xs; }.unavailable { border-left: 6rpx solid $warning-color; }.state { padding: 120rpx 0; text-align: center; color: $text-color-secondary; font-size: $font-size-base; }
 </style>
