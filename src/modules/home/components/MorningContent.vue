@@ -88,9 +88,8 @@
           </view>
           <text class="feature-sub">市场异动溯源分析</text>
           <view class="feature-list">
-            <view v-for="(item, idx) in traceReports.slice(0, 3)" :key="idx" class="feature-item">
-              <text class="item-name">{{ item.name }}</text>
-              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
+            <view class="feature-item">
+              <text class="item-name">查看已完成的每日复盘报告</text>
             </view>
           </view>
         </Card>
@@ -311,12 +310,6 @@ async function loadAiReports() {
 
   aiReports.value = display
 }
-
-const traceReports = ref<LeaderStockPreview[]>([
-  { name: '北向资金异动', tag: '流入', tagType: 'buy' },
-  { name: '板块轮动分析', tag: '关注', tagType: 'wash' },
-  { name: '主力资金动向', tag: '流出', tagType: 'sell' },
-])
 
 /**
  * 业务 tagType → 组件库 Tag type 映射

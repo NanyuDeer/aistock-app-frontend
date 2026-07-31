@@ -10,6 +10,7 @@ export function markdownToHtml(md: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 
+  html = html.replace(/^# (.+)$/gm, '<h1 class="md-h1">$1</h1>')
   html = html.replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>')
   html = html.replace(/^## (.+)$/gm, '<h2 class="md-h2">$1</h2>')
 

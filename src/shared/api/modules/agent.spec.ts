@@ -62,6 +62,43 @@ test('市场复盘问答请求使用独立的较长超时', async () => {
   }
 })
 
+test('大盘溯源读取固定走公开 review 报告接口', async () => {
+  const server = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    resolve: {
+      alias: {
+        '@': path.resolve(process.cwd(), 'src'),
+      },
+    },
+    server: { middlewareMode: true },
+    appType: 'custom',
+  })
+
+  try {
+    const requestModule = await server.ssrLoadModule('/src/shared/api/request.ts')
+    const agentModule = await server.ssrLoadModule('/src/shared/api/modules/agent.ts')
+    const request = requestModule.default
+    const originalGet = request.get
+    const calls: string[] = []
+
+    request.get = ((url: string) => {
+      calls.push(url)
+      return Promise.resolve(null)
+    }) as typeof request.get
+
+    try {
+      await agentModule.agentApi.getMarketTraceReview('2026-07-31')
+    } finally {
+      request.get = originalGet
+    }
+
+    assert.deepEqual(calls, ['/agent/report/review/2026-07-31'])
+  } finally {
+    await server.close()
+  }
+})
+
 test('request.post 将独立超时传给 luch-request', async () => {
   const server = await createServer({
     root: process.cwd(),
