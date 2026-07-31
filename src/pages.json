@@ -59,6 +59,12 @@
       }
     },
     {
+      "path": "modules/favorites/pages/stock-trace",
+      "style": {
+        "navigationBarTitleText": "异动捕手"
+      }
+    },
+    {
       "path": "modules/favorites/pages/favorites",
       "style": {
         "navigationBarTitleText": "自选",

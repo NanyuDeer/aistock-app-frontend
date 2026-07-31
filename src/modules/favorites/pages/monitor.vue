@@ -31,7 +31,7 @@
       </view>
 
       <view v-else-if="alerts.length" class="alert-list">
-        <view v-for="(alert, idx) in alerts" :key="idx" class="alert-item" @tap="goStockDetail(alert.symbol)">
+        <view v-for="alert in alerts" :key="alert.eventId" class="alert-item" @tap="goTrace(alert.eventId)">
           <view class="alert-left">
             <SvgIcon :name="alertIcon(alert.type).name" :color="alertIcon(alert.type).color" size="24rpx" />
             <view class="alert-info">
@@ -66,12 +66,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { useAppStore } from '@/shared/store/modules/app'
-import { portfolioApi } from '@/shared/api/modules/portfolio'
 import { getMarketStatus } from '@/shared/utils/tradingTime'
 import { formatTime } from '@/shared/utils/datetime'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { stockTraceApi } from '@/shared/api/modules/stockTrace'
 
 interface AlertItem {
+  eventId: string
   symbol: string
   name?: string
   type: string
@@ -111,8 +112,15 @@ function alertIcon(type: string): { name: string; color: string } {
 async function fetchAlerts() {
   loading.value = true
   try {
-    const data: any = await portfolioApi.getAlertList()
-    alerts.value = Array.isArray(data) ? data : (data?.data || [])
+    const data = await stockTraceApi.list(50)
+    alerts.value = data.items.map((event) => ({
+      eventId: event.event_id,
+      symbol: event.symbol,
+      name: event.stock_name,
+      type: event.direction === 'up' ? '大涨' : '大跌',
+      message: `价格异动 ${event.change_pct >= 0 ? '+' : ''}${event.change_pct.toFixed(2)}%，阈值 ${event.threshold_pct.toFixed(0)}%`,
+      time: event.triggered_at,
+    }))
   } catch {
     alerts.value = []
   } finally {
@@ -156,8 +164,8 @@ function disconnectWs() {
   wsConnected.value = false
 }
 
-function goStockDetail(symbol: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
+function goTrace(eventId: string) {
+  uni.navigateTo({ url: `/modules/favorites/pages/stock-trace?event_id=${encodeURIComponent(eventId)}` })
 }
 
 onShow(() => {
