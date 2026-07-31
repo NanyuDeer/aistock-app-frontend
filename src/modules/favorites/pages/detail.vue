@@ -507,41 +507,6 @@
           </view>
         </view>
 
-        <!-- 行业景气指数 -->
-        <view class="section-card">
-          <text class="section-title">行业景气指数</text>
-          <view class="industry-health-head">
-            <view class="industry-pills">
-              <view v-for="tag in midMockData.industryHealth.tags" :key="tag.text" class="industry-pill">
-                <text>{{ tag.text }}</text>
-              </view>
-            </view>
-            <text :class="['industry-score', midMockData.industryHealth.levelClass]">
-              {{ midMockData.industryHealth.score }}/100
-            </text>
-          </view>
-          <view class="industry-trend">
-            <view class="trend-bars">
-              <view
-                v-for="(item, idx) in midMockData.industryHealth.trend"
-                :key="idx"
-                class="trend-bar-wrap"
-              >
-                <view class="trend-bar" :style="{ height: (item.value * 1.2) + 'rpx' }"></view>
-                <text class="trend-month">{{ item.month }}</text>
-              </view>
-            </view>
-          </view>
-          <view class="industry-detail-grid">
-            <view v-for="detail in midMockData.industryHealth.details" :key="detail.title" class="industry-detail-item">
-              <view class="industry-detail-icon">
-                <text>{{ detail.icon }}</text>
-              </view>
-              <text class="industry-detail-title">{{ detail.title }}</text>
-              <text class="industry-detail-desc">{{ detail.desc }}</text>
-            </view>
-          </view>
-        </view>
       </view>
 
       <!-- 6. 长线视图 -->
@@ -725,10 +690,13 @@
         <view class="section-card">
           <text class="section-title">行业政策</text>
           <view class="policy-list">
-            <view v-for="(policy, idx) in longMockData.policies" :key="idx" class="policy-item">
-              <text :class="['policy-tag', policy.type]">{{ policy.tag }}</text>
-              <text class="policy-text">{{ policy.text }}</text>
+            <view v-for="(policy, idx) in visiblePolicyList" :key="idx" class="policy-item">
+              <text v-if="policy.tag" :class="['policy-tag', policy.type]">{{ policy.tag }}</text>
+              <text :class="['policy-text', { 'is-collapsed': !policyExpanded }]">{{ policy.text }}</text>
             </view>
+          </view>
+          <view v-if="policyNeedsExpand" class="news-toggle" @tap="policyExpanded = !policyExpanded">
+            <text class="news-toggle-text">{{ policyExpanded ? '收起' : '查看完整' }}</text>
           </view>
         </view>
 
@@ -917,6 +885,12 @@ const viewTabs: { key: ViewKey; label: string; desc: string }[] = [
   { key: 'mid', label: '中线', desc: '月/季' },
   { key: 'long', label: '长线', desc: '季/年' }
 ]
+const expandedDecisionPoint = ref<'opportunity' | 'risk' | null>(null)
+const policyExpanded = ref(false)
+
+function selectActiveView(key: ViewKey) {
+  activeView.value = key
+}
 
 // AI 研判 composable（接入真实 trend-score 数据）
 const symbolRef = computed(() => symbol.value)
@@ -931,6 +905,12 @@ const {
   trendVetoed,
   trendVetoReasons,
 } = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef)
+
+const visiblePolicyList = computed(() => policyExpanded.value ? longMockData.value.policies : longMockData.value.policies.slice(0, 2))
+const policyNeedsExpand = computed(() => (
+  longMockData.value.policies.length > 2
+  || longMockData.value.policies.some((policy: any) => String(policy.text || '').length > 42)
+))
 
 // 资金流向归一化（对齐网页端 capitalFlowInfo）
 const capitalFlowInfo = computed(() => {
@@ -2344,20 +2324,17 @@ function goChat() {
 .policy-list {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
 .policy-item {
   display: flex;
   align-items: flex-start;
-  gap: 16rpx;
-  padding: 18rpx 0;
-  background: transparent;
-  border-radius: 12rpx;
+  gap: 14rpx;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f0f2f5;
 
-  & + .policy-item {
-    border-top: 1rpx solid #eef2f7;
-  }
+  &:last-child { border-bottom: none; }
 }
 
 .policy-tag {
@@ -2365,8 +2342,9 @@ function goChat() {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 64rpx;
-  height: 36rpx;
+  min-width: 56rpx;
+  height: 34rpx;
+  padding: 0 10rpx;
   border-radius: 8rpx;
   font-size: 22rpx;
   line-height: 1;
@@ -2384,13 +2362,21 @@ function goChat() {
 }
 
 .policy-text {
+  flex: 1;
+  min-width: 0;
   font-size: 26rpx;
   color: #334155;
   line-height: 1.65;
-  flex: 1;
+
+  &.is-collapsed {
+    display: -webkit-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
 }
 
-/* 公司护城�?*/
 .moat-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
