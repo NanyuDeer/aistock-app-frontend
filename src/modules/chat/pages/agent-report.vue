@@ -233,6 +233,7 @@ import { onLoad, onBackPress } from '@dcloudio/uni-app'
 import { agentApi, isPublicReportIntent } from '@/shared/api/modules/agent'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import { formatDate, formatDateTime } from '@/shared/utils/datetime'
+import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Card, Tag, Button } from '@/shared/components'
@@ -554,7 +555,7 @@ function backToOverview() {
 onLoad((options) => {
   const requestedIntent = options?.intent || ''
   intent.value = isPublicReportIntent(requestedIntent) ? requestedIntent : ''
-  date.value = options?.date || new Date().toISOString().split('T')[0]
+  date.value = options?.date || shanghaiDateString()
 
   if (intent.value) {
     // 从 URL 参数直接进入详情

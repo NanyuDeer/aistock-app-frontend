@@ -7,9 +7,6 @@
           <view class="briefing-top">
             <text class="briefing-title">今日专属 · {{ briefingTypeLabel }}</text>
             <text v-if="report?.degraded" class="briefing-degraded">证据不完整</text>
-            <text v-if="report?.degraded && report.missing_sources.length" class="briefing-missing">
-              缺失来源：{{ report?.missing_sources.join('、') }}
-            </text>
           </view>
           <!-- 有数据时：显示线索数量和简洁摘要 -->
           <template v-if="briefingStatus === 'ready'">
@@ -30,9 +27,14 @@
           <view v-else class="briefing-clue">
             <text class="clue-text">{{ getBriefingDesc() }}</text>
           </view>
-          <view class="briefing-btn" @tap.stop="goBriefing">
-            <text class="btn-icon">◉</text>
-            <text class="btn-text">专属播报</text>
+          <view class="briefing-btn-row">
+            <view class="briefing-btn" @tap.stop="goBriefing">
+              <text class="btn-icon">◉</text>
+              <text class="btn-text">专属播报</text>
+            </view>
+            <text v-if="report?.degraded && report.missing_sources.length" class="briefing-missing">
+              缺失来源：{{ report?.missing_sources.join('、') }}
+            </text>
           </view>
         </view>
         <view class="briefing-right">
@@ -139,6 +141,7 @@ import { buildBriefingUrl } from '@/shared/utils/briefingNavigation'
 import { stockApi } from '@/shared/api/modules/stock'
 import { agentApi } from '@/shared/api/modules/agent'
 import { getEventList } from '@/modules/chat/event/api/eventApi'
+import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
 
 const {
@@ -282,7 +285,7 @@ const AGENT_REPORT_LABELS: Array<{ intent: string; name: string }> = [
 ]
 
 async function loadAiReports() {
-  const today = new Date().toISOString().split('T')[0]
+  const today = shanghaiDateString()
   const results = await Promise.allSettled(
     AGENT_REPORT_LABELS.map(item => agentApi.getReport(item.intent, today))
   )
@@ -389,7 +392,7 @@ function goLogin() {
 }
 
 .content-wrap {
-  padding: $s-3;
+  padding: $s-2;
 }
 
 /* ===== 晨报卡片 ===== */
@@ -434,6 +437,18 @@ function goLogin() {
   align-items: center;
 }
 
+.briefing-btn-row {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+  margin-top: 6rpx;
+}
+
+.briefing-missing {
+  font-size: 20rpx;
+  color: $warning;
+}
+
 .briefing-title {
   font-size: $font-size-lg;
   font-weight: 600;
@@ -449,11 +464,6 @@ function goLogin() {
   border-radius: $r-xs;
   font-size: $font-size-xs;
   line-height: 1.4;
-}
-
-.briefing-missing {
-  font-size: 20rpx;
-  color: $warning;
 }
 
 .briefing-clue {

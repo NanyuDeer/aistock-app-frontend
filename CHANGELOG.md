@@ -2,6 +2,15 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [master] 2026-07-31 — 早点听卡片 CSS 调整 + agent-report 跳转修复
+**开发者**: ARIA
+
+### 修复
+- `src/modules/chat/pages/agent-report.vue`：修复报告页跳转路径问题
+- `src/modules/home/components/MorningContent.vue`：「缺失来源」标记从 briefing-top 移到「专属播报」按钮右侧；`.feature-sub` 恢复 `$font-size-xs`；新增 `.briefing-btn-row` flex 布局，优化按钮排列
+
+---
+
 ## [master] 2026-07-28 — PR #29 合并后类型修复 + mock 清理 + 组件化
 **开发者**: Aria
 
