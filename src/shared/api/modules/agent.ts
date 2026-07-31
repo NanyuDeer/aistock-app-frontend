@@ -51,6 +51,36 @@ export interface MarketTraceQaResponse {
   trace: MarketTraceQaTrace
 }
 
+export type MarketTraceConfidence = 'high' | 'medium' | 'low'
+
+export interface MarketTraceReviewDisplayReport {
+  summary?: unknown
+  details?: unknown
+  sectors?: unknown
+  risks?: unknown
+}
+
+export interface MarketTraceReviewRecord {
+  report_type: string
+  report_date: string
+  status?: string
+  data_source?: string | null
+  created_at?: string
+  content: {
+    schema_version?: string
+    snapshot_id?: string
+    display_report?: MarketTraceReviewDisplayReport
+    market_trace?: {
+      snapshot?: {
+        captured_at?: string
+      }
+      trace?: {
+        confidence?: unknown
+      }
+    }
+  }
+}
+
 export interface BriefingData {
   date: string
   title: string
@@ -212,6 +242,11 @@ export const agentApi = {
   /** 读取分析报告（broadcast/morning/review/wind_leader/hot_burst 等）。 */
   getReport(intent: string, date: string) {
     return request.get(`/agent/report/${intent}/${date}`)
+  },
+
+  /** 读取大盘复盘报告。 */
+  getMarketTraceReview(date: string) {
+    return request.get<MarketTraceReviewRecord | null>(`/agent/report/review/${date}`)
   },
 
   /** 异动提醒 AI 解读 SSE 流 URL（不走 request 拦截器，直接拼接） */
