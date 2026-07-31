@@ -328,7 +328,12 @@ export const stockApi = {
       params: { symbol, klt, fqt: 1, limit: params?.count || 120 }
     }).then((res: Record<string, unknown>) => {
       const data = (res.data as Record<string, unknown>) || res
-      const klines = (data['K线'] as Record<string, unknown>[]) || (data['klines'] as Record<string, unknown>[]) || []
+      const payload = (data.data as Record<string, unknown>) || data
+      const klines = (payload['K线'] as Record<string, unknown>[])
+        || (payload.klines as Record<string, unknown>[])
+        || (data['K线'] as Record<string, unknown>[])
+        || (data.klines as Record<string, unknown>[])
+        || []
       if (!Array.isArray(klines)) return []
       const mapped = klines.map((k: Record<string, unknown>) => ({
         date: String(k['时间'] ?? k['date'] ?? ''),
@@ -338,7 +343,7 @@ export const stockApi = {
         low: Number(k['最低价'] ?? k['low'] ?? 0),
         volume: Number(k['成交量'] ?? k['volume'] ?? 0),
       }))
-      return params?.period === 'yearly' ? aggregateYearlyKLines(mapped) : mapped
+      return mapped
     })
   },
 
