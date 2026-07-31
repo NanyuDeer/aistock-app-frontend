@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 import { createServer, type ViteDevServer } from 'vite'
+import viteConfig from './vite.config'
 
 type ReceivedRequest = { path: string }
 
@@ -30,6 +31,12 @@ async function request(port: number, path: string) {
     }).on('error', reject)
   })
 }
+
+test('生产构建将组件样式合并为全局样式，懒加载详情页可独立打开', () => {
+  const config = viteConfig({ command: 'build', mode: 'production', isSsrBuild: false, isPreview: false })
+
+  assert.equal(config.build?.cssCodeSplit, false)
+})
 
 test('公共 Brief 与 Broadcast 精确代理到 Node，近似路径仍代理到 Python 且保留路径', async (t) => {
   const cacheDir = await mkdtemp(path.join(tmpdir(), 'aistock-vite-proxy-'))

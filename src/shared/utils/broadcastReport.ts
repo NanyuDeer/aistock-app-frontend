@@ -11,6 +11,11 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
 }
 
+function isSourceBriefId(value: unknown): value is string | number {
+  return isNonEmptyString(value)
+    || (typeof value === 'number' && Number.isInteger(value) && value > 0)
+}
+
 function isStringList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isNonEmptyString)
 }
@@ -24,7 +29,7 @@ function isCalendarDate(value: string): boolean {
 function isSourceBrief(value: unknown, expectedType: BriefType, expectedDate: string): value is BroadcastSourceBrief {
   if (!value || typeof value !== 'object') return false
   const source = value as Record<string, unknown>
-  return isNonEmptyString(source.id)
+  return isSourceBriefId(source.id)
     && source.report_type === `brief_${expectedType}`
     && source.report_date === expectedDate
     && isNonEmptyString(source.as_of)

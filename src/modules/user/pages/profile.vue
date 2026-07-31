@@ -215,19 +215,19 @@ function formatDate(dateStr: string): string {
 .user-card {
   background: linear-gradient(135deg, $primary, $primary-600);
   border-radius: 20rpx;
-  padding: 32rpx 24rpx;
+  padding: 20rpx 24rpx;
   margin-bottom: 32rpx;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 24rpx;
+  gap: 16rpx;
 }
 
 .avatar-wrap {
-  width: 100rpx;
-  height: 100rpx;
+  width: 76rpx;
+  height: 76rpx;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.3);
   display: flex;
@@ -243,17 +243,17 @@ function formatDate(dateStr: string): string {
 }
 
 .avatar-default {
-  font-size: 56rpx;
+  font-size: 44rpx;
 }
 
 .user-detail {
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: 4rpx;
 }
 
 .user-name {
-  font-size: 36rpx;
+  font-size: 30rpx;
   font-weight: 600;
   color: #ffffff;
 

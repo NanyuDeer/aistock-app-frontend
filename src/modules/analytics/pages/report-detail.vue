@@ -33,9 +33,9 @@
         <text class="header-meta">更新：{{ stock.updateTime }}</text>
       </view>
       <view class="header-actions">
-        <Button type="ghost" size="sm" @click="goBackToList">返回列表</Button>
-        <Button type="ghost" size="sm" @click="addToFavorites">{{ isFav ? '已自选' : '加入自选' }}</Button>
-        <Button type="ghost" size="sm" @click="exportReport">导出摘要</Button>
+        <Button type="secondary" size="sm" @click="goBackToList">返回列表</Button>
+        <Button type="secondary" size="sm" @click="addToFavorites">{{ isFav ? '已自选' : '加入自选' }}</Button>
+        <Button type="secondary" size="sm" @click="exportReport">导出摘要</Button>
       </view>
     </view>
 
@@ -1173,9 +1173,17 @@ watch(allPeriods, () => {
 
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 16rpx;
   padding-top: 16rpx;
   border-top: 1rpx solid $line-soft;
+}
+
+.header-actions :deep(.as-btn) {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  white-space: nowrap;
 }
 
 /* ===== AI 研判 ===== */

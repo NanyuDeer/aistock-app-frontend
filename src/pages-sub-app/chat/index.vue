@@ -97,7 +97,7 @@
         </view>
 
         <!-- 流式进度卡片（general 模式，当前正在生成） -->
-        <view v-if="isStreaming && chatMode === 'general'" class="message-item assistant">
+        <view v-if="isStreaming && chatMode === 'general'" class="message-item assistant streaming-message">
           <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
           <view class="bubble">
             <!-- 进度步骤 -->
@@ -125,7 +125,7 @@
         </view>
 
         <!-- 加载指示器（market_review 模式） -->
-        <view v-if="isStreaming && chatMode === 'market_review'" class="message-item assistant">
+        <view v-if="isStreaming && chatMode === 'market_review'" class="message-item assistant streaming-message">
           <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
           <view class="bubble">
             <view class="loading-dots">
@@ -321,6 +321,18 @@ onUnmounted(() => {
 .bubble {
   background: #ffffff; border-radius: 16rpx 16rpx 16rpx 4rpx; padding: 16rpx 24rpx;
   max-width: 80%; box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+
+/* 流式消息的头像和内容需要处于同一横向消息行，避免内容未生成时气泡换到头像下一行。 */
+.streaming-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.streaming-message .bubble {
+  flex: 1;
+  min-width: 0;
 }
 
 /* mp-html 样式覆盖：keep-all 必须覆盖到内部所有子元素（p/div/span 等） */

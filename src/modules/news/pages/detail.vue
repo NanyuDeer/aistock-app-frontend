@@ -19,13 +19,13 @@
           <!-- AI深度解析入口 -->
           <Card v-if="relatedEventId" clickable class="ai-analysis-entry" @click="goToEventDetail">
             <view class="ai-entry-icon">
-              <SvgIcon name="robot-line" size="32rpx" />
+              <SvgIcon name="robot-line" size="32rpx" color="#0b5fff" />
             </view>
             <view class="ai-entry-content">
               <text class="ai-entry-title">AI深度解析</text>
               <text class="ai-entry-subtitle">查看事件影响链与产业机会</text>
             </view>
-            <text class="ai-entry-arrow">›</text>
+            <SvgIcon name="arrow-right-s-line" size="36rpx" color="#8a96b0" />
           </Card>
 
           <Card v-if="detail.summary" class="news-summary">
@@ -212,10 +212,11 @@ function goToEventDetail() {
   font-weight: 500;
 }
 
-/* AI深度解析入口（Card 已处理容器，保留渐变背景） */
+/* AI 深度解析入口：遵循 Card 的白底、细边框与品牌蓝强调。 */
 .ai-analysis-entry {
   margin: 28rpx 0;
-  background: linear-gradient(135deg, #E0E7FF 0%, #FCE7F3 100%);
+  background: $bg-card;
+  border-color: $line;
 }
 .ai-analysis-entry :deep(.as-card__body) {
   display: flex;
@@ -223,12 +224,14 @@ function goToEventDetail() {
 }
 
 .ai-entry-icon {
-  width: 48rpx;
-  height: 48rpx;
+  width: 64rpx;
+  height: 64rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: $r-sm;
+  background: $primary-50;
 }
 
 .ai-entry-content {
@@ -250,10 +253,4 @@ function goToEventDetail() {
   margin-top: 4rpx;
 }
 
-.ai-entry-arrow {
-  font-size: 40rpx;
-  color: $primary-600;
-  font-weight: 300;
-  flex-shrink: 0;
-}
 </style>

@@ -51,6 +51,27 @@ function extractConclusion(text: string, maxSentences = 3): string {
   return result ? result + '。' : ''
 }
 
+/** 早点听中的事件传导只展示短摘要，避免单条长文挤占整页阅读空间。 */
+function displayConclusion(source: BriefingSource, conclusion: string): string {
+  if (source !== 'event' || conclusion.length <= 100) return conclusion
+  return `${conclusion.slice(0, 99)}…`
+}
+
+/** 事件 Agent 的旧标题通常是“事件传导分析”，优先从结论中取真正的事件主题。 */
+function displayTitle(source: BriefingSource, title: string, conclusion: string): string {
+  if (source !== 'event' || title !== '事件传导分析') return title
+
+  const focused = conclusion.match(/(?:今日聚焦|聚焦)([^：，。；]{4,30})/)
+  if (focused?.[1]) return focused[1].trim()
+
+  const firstSentence = conclusion
+    .replace(/^各位投资者[，,:：]*/, '')
+    .split(/[。；]/)[0]
+    .trim()
+  if (!firstSentence) return title
+  return firstSentence.length > 20 ? `${firstSentence.slice(0, 19)}…` : firstSentence
+}
+
 /** 晨报卡片 key → BriefingSource 映射 */
 const MORNING_SOURCE_MAP: Record<string, BriefingSource> = {
   overnight: 'morning',
@@ -123,8 +144,8 @@ function cardsToItems(
       id: `${type}-${card.key}-${idx}`,
       source,
       sentiment: detectSentiment(text, card.key),
-      title: card.title || extractConclusion(text, 1).replace(/。$/, ''),
-      conclusion: extractConclusion(text),
+      title: displayTitle(source, card.title || extractConclusion(text, 1).replace(/。$/, ''), text),
+      conclusion: displayConclusion(source, extractConclusion(text)),
       relatedTags,
       isHeadline,
       isAlert,
@@ -156,16 +177,19 @@ export function parseBriefingItemsFromReport(
 export function parseBriefingItemsFromBrief(brief: BriefV1 | null): BriefingItem[] {
   if (!brief) return []
 
-  return brief.items.map((item, index) => ({
-    id: `${brief.brief_type}-${index}`,
-    source: sourceFromBriefEvidence(item.evidence[0]?.report_type, brief.brief_type),
-    sentiment: detectSentiment(`${item.title} ${item.conclusion}`, ''),
-    title: item.title,
-    conclusion: item.conclusion,
-    relatedTags: [],
-    isHeadline: index === 0,
-    isAlert: false,
-  }))
+  return brief.items.map((item, index) => {
+    const source = sourceFromBriefEvidence(item.evidence[0]?.report_type, brief.brief_type)
+    return {
+      id: `${brief.brief_type}-${index}`,
+      source,
+      sentiment: detectSentiment(`${item.title} ${item.conclusion}`, ''),
+      title: displayTitle(source, item.title, item.conclusion),
+      conclusion: displayConclusion(source, item.conclusion),
+      relatedTags: [],
+      isHeadline: index === 0,
+      isAlert: false,
+    }
+  })
 }
 
 function sourceFromBriefEvidence(reportType: unknown, briefType: BriefingType): BriefingSource {

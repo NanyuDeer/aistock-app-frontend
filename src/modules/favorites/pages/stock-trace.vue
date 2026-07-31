@@ -69,13 +69,65 @@ const evidence = computed<TraceEvidence[]>(() => {
   return (analysis.value?.artifact?.artifactJson.evidence_index || []).filter((source) => ids.has(source.source_id))
 })
 
+/** 仅开发预览：让落后分支页面在后端暂未对接时也能完整查看归因链样式。 */
+const STOCK_TRACE_MOCK_EVENT: StockTraceEvent = {
+  event_id: 'mock-trace-001', trigger_revision: 1, symbol: '300204', stock_name: '舒泰神', event_type: 'price',
+  direction: 'up', triggered_at: '2026-07-31T10:15:00+08:00', latest_price: 18.72, previous_close: 17.04,
+  change_pct: 9.86, threshold_pct: 5, severity: 'high', rule_version: 'mock-v1', analysis_status: 'completed',
+}
+
+const STOCK_TRACE_MOCK_ANALYSIS: StockTraceAnalysisResponse = {
+  event_id: 'mock-trace-001', trigger_revision: 1, processing_status: 'completed',
+  artifact: {
+    artifactId: 'mock-artifact-001', artifactVersion: 1,
+    movementView: {
+      schemaVersion: 'movement-view-v2', eventId: 'mock-trace-001', artifactId: 'mock-artifact-001', artifactVersion: 1,
+      status: 'confirmed', confidenceScore: 0.82, confidenceLevel: 'high', evidenceCount: 3,
+      generatedAt: '2026-07-31T10:18:00+08:00',
+      primaryCandidate: {
+        layer: 'company', status: 'supported', verdict: '创新药临床进展与资金放量共振，推动股价快速上行。',
+        supportingEvidenceIds: ['mock-news-001', 'mock-quote-001'],
+      },
+      alternatives: [{ layer: 'sector', status: 'weak', verdict: '医药板块回暖提供情绪支撑，但非唯一驱动。', supportingEvidenceIds: ['mock-sector-001'] }],
+      unresolvedQuestions: [], suggestedActions: ['关注后续公告与量能持续性。'],
+    },
+    artifactJson: {
+      primary_chain_id: 'mock-chain-primary',
+      chains: [{
+        chainId: 'mock-chain-primary', candidateId: 'mock-candidate-primary', role: 'primary', nodes: [
+          { nodeId: 'mock-node-1', stage: 'structural_root', stageOrder: 1, epistemicType: 'fact', status: 'established', claim: '公司创新药管线近期披露积极临床进展。', evidenceIds: ['mock-news-001'], counterEvidenceIds: [] },
+          { nodeId: 'mock-node-2', stage: 'transmission', stageOrder: 2, epistemicType: 'inference', status: 'established', claim: '基本面催化提升市场对产品商业化预期。', evidenceIds: ['mock-news-001'], counterEvidenceIds: [] },
+          { nodeId: 'mock-node-3', stage: 'observable_result', stageOrder: 3, epistemicType: 'fact', status: 'established', claim: '盘中放量上涨 9.86%，触发异动阈值。', evidenceIds: ['mock-quote-001'], counterEvidenceIds: [] },
+        ],
+      }],
+      evidence_index: [
+        { source_id: 'mock-news-001', kind: 'news', provider: 'mock', source_level: 'A', title: '创新药临床进展披露，市场关注度上升', content_excerpt: '', content_hash: 'mock-hash-news' },
+        { source_id: 'mock-quote-001', kind: 'quote_fact', provider: 'mock', source_level: 'A', title: '舒泰神盘中涨幅 9.86%，成交额显著放大', content_excerpt: '', content_hash: 'mock-hash-quote' },
+        { source_id: 'mock-sector-001', kind: 'sector_fact', provider: 'mock', source_level: 'B', title: '医药板块整体走强', content_excerpt: '', content_hash: 'mock-hash-sector' },
+      ],
+    },
+    createdAt: '2026-07-31T10:18:00+08:00',
+  },
+}
+
+function loadMockTrace() {
+  event.value = STOCK_TRACE_MOCK_EVENT
+  analysis.value = STOCK_TRACE_MOCK_ANALYSIS
+}
+
 onLoad((options) => { eventId.value = typeof options?.event_id === 'string' ? options.event_id : '' })
 onMounted(async () => {
-  if (!eventId.value) { loading.value = false; return }
+  if (!eventId.value) {
+    if (import.meta.env.DEV) loadMockTrace()
+    loading.value = false
+    return
+  }
   try {
     event.value = await stockTraceApi.get(eventId.value)
     analysis.value = await stockTraceApi.getAnalysis(eventId.value)
     await stockTraceApi.markRead(eventId.value)
+  } catch {
+    if (import.meta.env.DEV) loadMockTrace()
   } finally { loading.value = false }
 })
 

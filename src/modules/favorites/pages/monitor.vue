@@ -80,6 +80,13 @@ interface AlertItem {
   time: string | number
 }
 
+/** 仅开发预览：接口暂无数据时保留完整的异动卡片视觉。 */
+const MONITOR_MOCK_ALERTS: AlertItem[] = [
+  { eventId: 'mock-monitor-001', symbol: '300204', name: '舒泰神', type: '大涨', message: '价格异动 +9.84%，封板资金持续流入', time: '2026-07-31T10:15:00+08:00' },
+  { eventId: 'mock-monitor-002', symbol: '300760', name: '迈瑞医疗', type: '大跌', message: '价格异动 -4.21%，短线成交量放大', time: '2026-07-31T13:45:00+08:00' },
+  { eventId: 'mock-monitor-003', symbol: '600276', name: '恒瑞医药', type: '放量', message: '成交额较昨日同期放大 2.6 倍', time: '2026-07-31T13:58:00+08:00' },
+]
+
 const favoritesStore = useFavoritesStore()
 const appStore = useAppStore()
 
@@ -121,8 +128,11 @@ async function fetchAlerts() {
       message: `价格异动 ${event.change_pct >= 0 ? '+' : ''}${event.change_pct.toFixed(2)}%，阈值 ${event.threshold_pct.toFixed(0)}%`,
       time: event.triggered_at,
     }))
+    if (import.meta.env.DEV && !alerts.value.length) {
+      alerts.value = MONITOR_MOCK_ALERTS
+    }
   } catch {
-    alerts.value = []
+    alerts.value = import.meta.env.DEV ? MONITOR_MOCK_ALERTS : []
   } finally {
     loading.value = false
   }

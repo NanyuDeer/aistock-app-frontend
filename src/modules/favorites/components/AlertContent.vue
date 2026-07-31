@@ -188,7 +188,8 @@ defineExpose({
 }
 
 .content-wrap {
-  padding: $s-3;
+  /* 上下各缩小 2rpx，整张模块卡高度减少约 2px。 */
+  padding: 20rpx $s-3;
 }
 
 /* ===== 模块通用 ===== */

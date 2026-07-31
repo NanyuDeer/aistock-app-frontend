@@ -119,7 +119,8 @@ function handleClick() {
   background: $bg-soft;
   border: 2rpx solid $line;
   border-radius: $r-lg;
-  padding: $s-3;
+  /* 上下各缩小 2rpx，整张首页洞见卡高度减少约 2px。 */
+  padding: 20rpx $s-3;
   margin-bottom: $s-3;
   position: relative;
   overflow: hidden;

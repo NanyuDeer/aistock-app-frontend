@@ -27,6 +27,16 @@ test('仅接受绑定同类型 Brief 的 Broadcast v1', () => {
   assert.equal(report?.dialogue[1]?.role, 'analyst')
 })
 
+test('接受后端返回的数字 source_brief.id，保留播报音频路径', () => {
+  const report = parseBroadcastReport({
+    ...MORNING_BROADCAST,
+    source_brief: { ...MORNING_BROADCAST.source_brief, id: 66 },
+  }, 'morning', '2026-07-25')
+
+  assert.equal(report?.source_brief.id, 66)
+  assert.equal(report?.audio_path, '/api/agent/audio/broadcast-morning-2026-07-25.mp3')
+})
+
 test('拒绝旧 text Broadcast、错误 source Brief 和非法 dialogue', () => {
   assert.equal(parseBroadcastReport({ content: { text: '旧播报', audio_path: '/api/agent/audio/a.mp3' } }, 'morning', '2026-07-25'), null)
   assert.equal(parseBroadcastReport({

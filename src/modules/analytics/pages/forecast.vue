@@ -513,7 +513,8 @@ onShow(() => {
 
 .stock-col {
   flex-shrink: 0;
-  width: 190rpx;
+  /* 406px H5 预览中对应 80px；保留 rpx 以便不同端等比例适配。 */
+  width: 154rpx;
 }
 
 .data-cols {
@@ -558,13 +559,13 @@ onShow(() => {
 }
 
 .col-main {
-  font-size: 20rpx;
+  font-size: 24rpx;
   color: $ink;
   white-space: nowrap;
 }
 
 .col-value {
-  font-size: 20rpx;
+  font-size: 24rpx;
   font-weight: 700;
   color: $ink;
 }
@@ -578,7 +579,7 @@ onShow(() => {
 }
 
 .col-growth {
-  font-size: 18rpx;
+  font-size: 20rpx;
   color: #9ca3af;
   font-weight: 400;
 }

@@ -138,7 +138,8 @@ export interface BriefV1 {
 }
 
 export interface BroadcastSourceBrief {
-  id: string
+  /** API 返回的数据库主键通常为 number，兼容旧字符串格式。 */
+  id: string | number
   report_type: `brief_${BriefType}`
   report_date: string
   as_of: string

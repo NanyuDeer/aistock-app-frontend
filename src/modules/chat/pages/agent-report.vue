@@ -770,7 +770,7 @@ onBackPress(() => {
 /* 晨报主题色：橙色（与 AGENT_META.morning 一致） */
 .conclusion-card--morning {
   border-left: 6rpx solid #f59e0b;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.06), rgba(245, 158, 11, 0.02));
+  background: $bg-card;
 
   .section-kicker { color: #f59e0b; }
 }
