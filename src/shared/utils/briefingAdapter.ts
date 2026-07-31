@@ -13,7 +13,7 @@
  */
 import { splitReportToCards, type ReportCard } from './reportCard'
 import { parseBriefingReport } from './briefingReport'
-import type { BriefingReport, BriefingType } from './briefingReport'
+import type { BriefingReport, BriefingType, BriefV1 } from './briefingReport'
 import type {
   BriefingItem,
   BriefingSource,
@@ -145,6 +145,43 @@ export function parseBriefingItemsFromReport(
   if (!report || !report.details) return []
   const cards = splitReportToCards(report.details, type)
   return cardsToItems(cards, type, report)
+}
+
+/**
+ * 将当前后端的结构化 Brief v1 映射为早点听卡片。
+ *
+ * Brief v1 不再携带旧报告的 Markdown 卡片和股票/赛道标签，因此直接保留
+ * 标题、结论与顺序：第一条作为今日头条，其余条目展示为 Agent 洞见。
+ */
+export function parseBriefingItemsFromBrief(brief: BriefV1 | null): BriefingItem[] {
+  if (!brief) return []
+
+  return brief.items.map((item, index) => ({
+    id: `${brief.brief_type}-${index}`,
+    source: sourceFromBriefEvidence(item.evidence[0]?.report_type, brief.brief_type),
+    sentiment: detectSentiment(`${item.title} ${item.conclusion}`, ''),
+    title: item.title,
+    conclusion: item.conclusion,
+    relatedTags: [],
+    isHeadline: index === 0,
+    isAlert: false,
+  }))
+}
+
+function sourceFromBriefEvidence(reportType: unknown, briefType: BriefingType): BriefingSource {
+  switch (reportType) {
+    case 'morning':
+    case 'wind_leader':
+    case 'hot_burst':
+    case 'review':
+      return reportType
+    case 'trend_score':
+      return 'trend'
+    case 'event_conduction':
+      return 'event'
+    default:
+      return briefType === 'evening' ? 'review' : 'morning'
+  }
 }
 
 /**

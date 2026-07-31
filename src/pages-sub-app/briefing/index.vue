@@ -117,7 +117,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { agentApi, type BriefType } from '@/shared/api/modules/agent'
+import { agentApi, type BriefType, type BroadcastV1 } from '@/shared/api/modules/agent'
 import { API_BASE_URL } from '@/shared/utils/constants'
 import {
   SOURCE_LABELS,
@@ -127,30 +127,17 @@ import {
   type BriefingSource,
   type Sentiment,
 } from '@/shared/api/modules/briefing'
-import { parseBriefingItemsFromContent, type ReportType } from '@/shared/utils/briefingAdapter'
+import { parseBriefingItemsFromBrief } from '@/shared/utils/briefingAdapter'
+import { parseBriefingReport } from '@/shared/utils/briefingReport'
+import { parseBroadcastReport } from '@/shared/utils/broadcastReport'
 import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
-// 匹配后端 publicBroadcastProjection 返回结构
-// 详见 aistock-app-api/src/core/routes/internal.ts:1215-1233
-interface BroadcastReport {
-  content: {
-    schema_version?: string
-    brief_type?: string
-    dialogue?: Array<{ role: 'host' | 'analyst'; content: string }>
-    audio_path?: string | null
-  }
-}
-
-interface BriefReportData {
-  content?: unknown
-}
-
 const currentDate = ref('')
 const broadcastType = ref<BriefType>('morning')
 const loading = ref(true)
-const report = ref<BroadcastReport | null>(null)
+const report = ref<BroadcastV1 | null>(null)
 const items = ref<BriefingItem[]>([])
 const isPlaying = ref(false)
 const audioContext = ref<UniApp.InnerAudioContext | null>(null)
@@ -164,7 +151,7 @@ const subtitleText = computed(() => {
 })
 
 const audioPath = computed(() => {
-  return report.value?.content?.audio_path || null
+  return report.value?.audio_path || null
 })
 
 const audioStatusText = computed(() => {
@@ -245,18 +232,6 @@ function changeDate(delta: number) {
   loadReport()
 }
 
-/** 根据当前时间判断报告类型：15:30 前=晨报，之后=复盘 */
-function detectReportType(): ReportType {
-  const now = new Date()
-  const hour = now.getHours()
-  const minute = now.getMinutes()
-  // 15:30 后用 review（复盘），之前用 morning（晨报）
-  if (hour > 15 || (hour === 15 && minute >= 30)) {
-    return 'review'
-  }
-  return 'morning'
-}
-
 async function loadReport() {
   if (!currentDate.value) return
   loading.value = true
@@ -266,27 +241,27 @@ async function loadReport() {
     isPlaying.value = false
   }
 
-  // 并行获取广播音频和结构化报告
-  // 后端 /report/:intent/:date 拒绝 'broadcast'，需用专门的 /broadcast/:briefType/:date 端点
-  const reportType = detectReportType()
+  // 广播和展示内容都从同日、同类型的结构化 Brief/Broadcast 读取。
+  // 不再依赖旧的 /report/morning|review 路由，以免已经生成的播报被误判为空。
 
   try {
     const [broadcastRes, briefRes] = await Promise.allSettled([
       agentApi.getBroadcast(broadcastType.value, currentDate.value),
-      agentApi.getReport(reportType, currentDate.value),
+      agentApi.getBrief(broadcastType.value, currentDate.value),
     ])
 
-    // 广播报告（音频来源）
+    // 仅消费通过严格校验的 Broadcast v1，避免跨日期或旧结构数据混入。
     if (broadcastRes.status === 'fulfilled') {
-      report.value = (broadcastRes.value as BroadcastReport) || null
+      const data: unknown = broadcastRes.value
+      report.value = parseBroadcastReport(data, broadcastType.value, currentDate.value)
     } else {
       report.value = null
     }
 
-    // 结构化条目（降级解析：从 morning/review 报告解析为 BriefingItem[]）
+    // Brief v1 已是前端展示报告的事实层，校验后转换为现有卡片展示格式。
     if (briefRes.status === 'fulfilled' && briefRes.value) {
-      const briefData = briefRes.value as BriefReportData
-      items.value = parseBriefingItemsFromContent(briefData.content, reportType)
+      const brief = parseBriefingReport(briefRes.value, broadcastType.value)
+      items.value = parseBriefingItemsFromBrief(brief)
     } else {
       items.value = []
     }
