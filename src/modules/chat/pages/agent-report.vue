@@ -98,50 +98,21 @@
           </Card>
         </template>
 
-        <!-- ===== 长线风口（wind_leader）：板块子卡片结构化 ===== -->
+        <!-- ===== 长线风口（wind_leader）：mp-html 全文渲染 + 结构化增强 ===== -->
         <template v-else-if="effectiveIntent === 'wind_leader' && displayReport">
           <Card v-if="reportSummary" class="conclusion-card conclusion-card--wind">
             <text class="section-kicker">风口结论</text>
             <text class="conclusion-text">{{ reportSummary }}</text>
           </Card>
 
-          <Card v-if="windOverviewHtml" class="stream-section">
-            <text class="section-title">风口概览</text>
-            <view class="report-text-wrap">
-              <mp-html :content="windOverviewHtml" class="report-html" />
-            </view>
-          </Card>
-
-          <Card v-if="windSectors.length" class="stream-section">
-            <text class="section-title">重点板块分析 TOP{{ windSectors.length }}</text>
-            <view class="stock-list">
-              <Card v-for="(sector, i) in windSectors" :key="i" flat class="stock-card">
-                <view class="stock-card-head">
-                  <text class="stock-name">{{ sector.title }}</text>
-                </view>
-                <view v-if="sector.body" class="report-text-wrap">
-                  <mp-html :content="markdownToHtml(sector.body)" class="report-html" />
-                </view>
-              </Card>
-            </view>
-          </Card>
-
           <Card v-if="leaderStocks.length" class="stream-section">
-            <text class="section-title">龙头股推荐</text>
+            <text class="section-title">龙头股</text>
             <view class="stock-tags">
               <Tag v-for="(code, i) in leaderStocks" :key="i" size="sm">{{ code }}</Tag>
             </view>
           </Card>
 
-          <Card v-if="risks.length" class="risk-card stream-section">
-            <text class="section-title">风险提示</text>
-            <view class="bullet-list">
-              <text v-for="(risk, i) in risks" :key="i" class="risk-item">{{ risk }}</text>
-            </view>
-          </Card>
-
-          <!-- 兜底：结构化解析全空时用 mp-html 渲染 details 原始 markdown，避免空页面 -->
-          <Card v-if="!reportSummary && !windOverviewHtml && !windSectors.length && !leaderStocks.length && !risks.length && detailsText" class="stream-section">
+          <Card v-if="detailsText" class="stream-section">
             <text class="section-title">报告详情</text>
             <view class="report-text-wrap">
               <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
@@ -149,31 +120,11 @@
           </Card>
         </template>
 
-        <!-- ===== 趋势股评分（trend_score）：多维度结构化 ===== -->
+        <!-- ===== 趋势股评分（trend_score）：mp-html 全文渲染 + 结构化增强 ===== -->
         <template v-else-if="effectiveIntent === 'trend_score' && displayReport">
           <Card v-if="reportSummary" class="conclusion-card conclusion-card--trend">
             <text class="section-kicker">评分结论</text>
             <text class="conclusion-text">{{ reportSummary }}</text>
-          </Card>
-
-          <Card v-if="trendConclusion" class="stream-section">
-            <text class="section-title">结论摘要</text>
-            <text class="section-text">{{ trendConclusion }}</text>
-          </Card>
-
-          <Card v-if="trendDimensions" class="stream-section">
-            <text class="section-title">维度解读</text>
-            <text class="section-text">{{ trendDimensions }}</text>
-          </Card>
-
-          <Card v-if="trendJudgment" class="stream-section">
-            <text class="section-title">趋势判断</text>
-            <text class="section-text">{{ trendJudgment }}</text>
-          </Card>
-
-          <Card v-if="trendTrack" class="stream-section">
-            <text class="section-title">赛道分析</text>
-            <text class="section-text">{{ trendTrack }}</text>
           </Card>
 
           <Card v-if="leaderStocks.length" class="stream-section">
@@ -183,15 +134,10 @@
             </view>
           </Card>
 
-          <Card v-if="trendAdvice" class="judgment-card stream-section">
-            <text class="section-title">关注建议</text>
-            <text class="section-text">{{ trendAdvice }}</text>
-          </Card>
-
-          <Card v-if="risks.length" class="risk-card stream-section">
-            <text class="section-title">风险提示</text>
-            <view class="bullet-list">
-              <text v-for="(risk, i) in risks" :key="i" class="risk-item">{{ risk }}</text>
+          <Card v-if="detailsText" class="stream-section">
+            <text class="section-title">报告详情</text>
+            <view class="report-text-wrap">
+              <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
             </view>
           </Card>
         </template>
@@ -361,7 +307,7 @@ function extractSection(markdown: string, heading: string): string {
     const looseMatch = markdown.match(looseRe)
     if (looseMatch) {
       const startIdx = (looseMatch.index ?? 0) + looseMatch[0].length
-      const nextRe = new RegExp(`^${nextPrefix.replace('\\', '')}`, 'm')
+      const nextRe = new RegExp(nextPrefix, 'm')
       const nextIdx = markdown.slice(startIdx).search(nextRe)
       const content = nextIdx === -1 ? markdown.slice(startIdx) : markdown.slice(startIdx, startIdx + nextIdx)
       return content.trim()
@@ -476,6 +422,8 @@ const selectedIntent = ref('')
 const loading = ref(true)
 const loadingText = ref('报告加载中...')
 const report = ref<AgentReport | null>(null)
+/** 降级标记：后端返回的是最近一份报告（非当日），用于标题标注 */
+const isFallbackReport = ref(false)
 
 // 概览模式数据
 interface AgentBrief {
@@ -507,6 +455,10 @@ const pageTitle = computed(() => {
 const pageSubtitle = computed(() => {
   if (isOverview.value) {
     return `${date.value} · AI 生成内容，仅供参考`
+  }
+  // 降级报告：标注实际报告日期
+  if (isFallbackReport.value && report.value?.report_date) {
+    return `${formatDate(report.value.report_date)} 生成 · 当日尚未生成，显示最近报告 · 仅供参考`
   }
   // 优先用 created_at（实际生成时间），后端已用 AT TIME ZONE 'UTC' 修正为真UTC
   if (report.value?.created_at) {
@@ -566,19 +518,6 @@ const morningDomesticHtml = computed(() => sectionHtml(detailsText.value, '第2�
 const morningSectorHtml = computed(() => sectionHtml(detailsText.value, '第3步：板块与市场情绪'))
 const morningFocusHtml = computed(() => sectionHtml(detailsText.value, '今日焦点板块预测'))
 const morningStrategyHtml = computed(() => sectionHtml(detailsText.value, '第4步：今日关注与策略建议'))
-
-// ===== 长线风口（wind_leader）结构化分区 =====
-interface SectorCard { title: string; body: string }
-const windOverviewHtml = computed(() => sectionHtml(detailsText.value, '风口概览'))
-const windSectors = computed<SectorCard[]>(() => extractSubSections(detailsText.value, '重点板块分析'))
-const windStocks = computed(() => sectionBullets(detailsText.value, '龙头股推荐'))
-
-// ===== 趋势股评分（trend_score）结构化分区 =====
-const trendConclusion = computed(() => sectionText(detailsText.value, '结论摘要'))
-const trendDimensions = computed(() => sectionText(detailsText.value, '维度解读'))
-const trendJudgment = computed(() => sectionText(detailsText.value, '趋势判断'))
-const trendTrack = computed(() => sectionText(detailsText.value, '赛道分析'))
-const trendAdvice = computed(() => sectionText(detailsText.value, '关注建议'))
 
 // ===== 机构调研（hot_burst）结构化分区 =====
 interface HotStockCard {
@@ -658,6 +597,10 @@ async function loadAllReports() {
       if (data?.content && data.report_date === date.value) {
         summary = extractSummary(data)
         available = true
+      } else if (data?.content) {
+        // 降级：当日无报告但后端返回了最近一份报告，显示摘要但标记为待生成
+        summary = extractSummary(data)
+        available = false
       }
     }
 
@@ -686,15 +629,17 @@ async function loadReport() {
   try {
     const res: unknown = await agentApi.getReport(currentIntent, date.value)
     const data = (res as AgentReport) || null
-    // 后端在指定日期无报告时会降级返回最近一份报告，检查 report_date 是否匹配请求日期，
-    // 不匹配则视为当日无报告（显示空状态而非其他日期的内容）
+    // 后端在指定日期无报告时会降级返回最近一份报告。
+    // 保留降级报告内容供用户查看，但记录实际报告日期用于标题标注。
     if (data && data.report_date && data.report_date !== date.value) {
-      report.value = null
+      isFallbackReport.value = true
     } else {
-      report.value = data
+      isFallbackReport.value = false
     }
+    report.value = data
   } catch {
     report.value = null
+    isFallbackReport.value = false
   } finally {
     loading.value = false
   }

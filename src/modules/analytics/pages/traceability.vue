@@ -25,11 +25,11 @@
 
       <view v-else class="report-content">
         <MarketTraceHeader :presentation="presentation" />
-        <MarketTracePendingRisks :presentation="presentation" />
         <MarketTracePhenomenon :presentation="presentation" />
         <MarketTraceTimeline :presentation="presentation" :layout="timelineLayout" />
         <MarketTraceAlternatives :presentation="presentation" />
         <MarketTraceRejected :presentation="presentation" />
+        <MarketTracePendingRisks :presentation="presentation" />
 
         <!-- 折叠兜底：完整 markdown -->
         <view class="markdown-section">

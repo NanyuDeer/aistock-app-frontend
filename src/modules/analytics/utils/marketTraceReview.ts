@@ -100,6 +100,7 @@ export interface MarketTraceAlternativeView {
   categoryLabel: string
   conclusion: string
   transmission: string
+  supportingEvidence: string[]
   counterEvidence: string[]
 }
 
@@ -269,6 +270,7 @@ export function toMarketTracePresentation(
         categoryLabel: CATEGORY_LABELS[candidate.category] ?? candidate.category,
         conclusion: asString(candidate.verdict),
         transmission: asString(findNodeByStage(candidate.chain, 'transmission')?.claim),
+        supportingEvidence: asStringList(candidate.supporting_evidence_ids),
         counterEvidence: asStringList(candidate.counter_evidence_ids),
       })
       continue
@@ -280,6 +282,7 @@ export function toMarketTracePresentation(
         categoryLabel: CATEGORY_LABELS[candidate.category] ?? candidate.category,
         conclusion: asString(candidate.verdict),
         transmission: asString(findNodeByStage(candidate.chain, 'transmission')?.claim),
+        supportingEvidence: asStringList(candidate.supporting_evidence_ids),
         counterEvidence: asStringList(candidate.counter_evidence_ids),
       })
       continue

@@ -14,9 +14,19 @@
           <text class="trans-label">传导：</text>
           <text class="trans-text">{{ alt.transmission }}</text>
         </view>
-        <view v-if="alt.counterEvidence.length" class="alt-counter">
-          <text class="counter-label">反证：</text>
-          <text class="counter-text">{{ alt.counterEvidence.join('、') }}</text>
+        <view v-if="alt.supportingEvidence.length || alt.counterEvidence.length" class="evidence-twocol">
+          <view v-if="alt.supportingEvidence.length" class="ev-col">
+            <text class="ev-col-label ev-col-sup">支持证据</text>
+            <view class="ev-col-chips">
+              <Tag v-for="ev in alt.supportingEvidence" :key="ev" type="neutral" size="sm">{{ ev }}</Tag>
+            </view>
+          </view>
+          <view v-if="alt.counterEvidence.length" class="ev-col">
+            <text class="ev-col-label ev-col-ctr">反证</text>
+            <view class="ev-col-chips">
+              <Tag v-for="ev in alt.counterEvidence" :key="ev" type="warning" size="sm">{{ ev }}</Tag>
+            </view>
+          </view>
         </view>
       </Card>
     </view>
@@ -51,8 +61,20 @@ const titleText = computed(() => {
 .alt-header { display: flex; align-items: center; gap: $spacing-sm; margin-bottom: $spacing-xs; }
 .alt-label { font-size: 24rpx; font-weight: 600; color: $text-color-title; flex: 1; }
 .alt-conclusion { display: block; font-size: 24rpx; color: $text-color; line-height: 1.5; }
-.alt-transmission, .alt-counter { margin-top: $spacing-xs; display: flex; align-items: flex-start; gap: 4rpx; }
-.trans-label, .counter-label { font-size: 22rpx; color: $text-color-secondary; flex-shrink: 0; }
-.trans-text, .counter-text { font-size: 22rpx; color: $text-color; line-height: 1.5; flex: 1; }
-.counter-text { font-family: $font-mono; }
+.alt-transmission { margin-top: $spacing-xs; display: flex; align-items: flex-start; gap: 4rpx; }
+.trans-label { font-size: 22rpx; color: $text-color-secondary; flex-shrink: 0; }
+.trans-text { font-size: 22rpx; color: $text-color; line-height: 1.5; flex: 1; }
+
+/* 支持/反证分栏 */
+.evidence-twocol {
+  display: flex; gap: $spacing-sm; margin-top: $spacing-xs;
+}
+.ev-col {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 6rpx;
+}
+.ev-col-label { font-size: 22rpx; font-weight: 600; }
+.ev-col-sup { color: $up; }
+.ev-col-ctr { color: $warning; }
+.ev-col-chips { display: flex; flex-wrap: wrap; gap: 6rpx; }
 </style>

@@ -17,9 +17,9 @@
 
     <!-- 成功态：主因时间线 -->
     <Card v-else class="timeline-card">
-      <view class="primary-conclusion">
-        <text class="conclusion-label">主因</text>
-        <text class="conclusion-text">{{ primaryCause.conclusion }}</text>
+      <view class="primary-conclusion-banner">
+        <text class="banner-label">归因结论</text>
+        <text class="banner-text">{{ primaryCause.conclusion }}</text>
       </view>
 
       <view class="timeline-steps" :class="`is-${layout}`">
@@ -97,9 +97,23 @@ const titleText = computed(() => {
 
 /* 成功态时间线卡片 */
 .timeline-card { margin: 0; }
-.primary-conclusion { margin-bottom: $spacing-base; padding-bottom: $spacing-sm; border-bottom: 1rpx solid $line-soft; }
-.conclusion-label { display: block; font-size: 22rpx; color: $text-color-secondary; margin-bottom: 4rpx; }
-.conclusion-text { display: block; font-size: 26rpx; color: $text-color-title; line-height: 1.6; font-weight: 500; }
+
+/* 归因结论品牌横幅 */
+.primary-conclusion-banner {
+  margin-bottom: $spacing-base;
+  padding: $spacing-sm $spacing-base;
+  background: $primary;
+  border-radius: $r-lg;
+  box-shadow: 0 4rpx 12rpx rgba(11, 95, 255, 0.2);
+}
+.banner-label {
+  display: block; font-size: 22rpx; color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 2rpx; margin-bottom: 4rpx;
+}
+.banner-text {
+  display: block; font-size: 28rpx; font-weight: 600;
+  color: #ffffff; line-height: 1.5;
+}
 
 /* 时间线步骤 */
 .timeline-steps { display: flex; }

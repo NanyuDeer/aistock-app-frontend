@@ -114,6 +114,7 @@ import { ref, computed, getCurrentInstance } from 'vue'
 import { onShow, onReady } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderAiAnalysis, WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
+import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid } from '@/shared/components'
@@ -346,7 +347,7 @@ function selectBubble(b: Bubble) {
 }
 
 function goAgentReport() {
-  const today = new Date().toISOString().split('T')[0]
+  const today = shanghaiDateString()
   uni.navigateTo({
     url: `/modules/chat/pages/agent-report?intent=wind_leader&date=${today}`
   })
