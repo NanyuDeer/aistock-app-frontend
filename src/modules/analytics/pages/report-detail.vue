@@ -42,7 +42,7 @@
     <!-- ===== 模块2：AI 智能研判（原有标签+分析 / partial状态） ===== -->
     <view class="section section-ai">
       <view class="section-title-row">
-        <SvgIcon name="robot-line" size="28rpx" color="#0b5fff" />
+        <SvgIcon name="robot-line" size="28rpx" :color="primaryColor" />
         <text class="section-title-text">AI 智能研判</text>
         <text v-if="aiScoreData?.dataStatus === 'partial'" class="section-title-sub">
           {{ aiScoreData?.dataPeriod || '' }}
@@ -102,7 +102,7 @@
           v-if="aiScoreData?.missingFieldLabels && aiScoreData.missingFieldLabels.length > 0"
           class="partial-missing-bar"
         >
-          <SvgIcon name="alert-line" size="28rpx" color="#f59e0b" class="partial-missing-icon" />
+          <SvgIcon name="alert-line" size="28rpx" :color="warningColor" class="partial-missing-icon" />
           <view class="partial-missing-content">
             <text class="partial-missing-main">
               当前缺失：{{ aiScoreData.missingFieldLabels.join('、') }}
@@ -159,7 +159,7 @@
     <!-- ===== 模块4：核心财务指标数据表 ===== -->
     <view id="table-section" class="section section-table">
       <view class="section-title-row">
-        <SvgIcon name="file-list-line" size="28rpx" color="#0b5fff" />
+        <SvgIcon name="file-list-line" size="28rpx" :color="primaryColor" />
         <text class="section-title-text">核心财务指标</text>
         <view class="table-year-toggle">
           <text
@@ -201,7 +201,7 @@
     <!-- ===== 模块4：多维度折线图 ===== -->
     <view class="section section-chart">
       <view class="section-title-row">
-        <SvgIcon name="bar-chart-line" size="28rpx" color="#0b5fff" />
+        <SvgIcon name="bar-chart-line" size="28rpx" :color="primaryColor" />
         <text class="section-title-text">走势图表</text>
         <view class="chart-filter-group">
           <view
@@ -289,6 +289,10 @@ import { Tag, Button } from '@/shared/components'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import AiAnalysis from '@/modules/analytics/components/ai-analysis.vue'
 import { stockApi } from '@/shared/api/modules/stock'
+
+// ===== 设计令牌颜色（与组件库 tokens.json 对齐） =====
+const primaryColor = '#0b5fff'
+const warningColor = '#f0a020'
 
 // ===== 参数 =====
 const symbol = ref('')
@@ -1070,20 +1074,20 @@ watch(allPeriods, () => {
 
 .error-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-soft;
   font-weight: 500;
 }
 
 .error-desc {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   text-align: center;
 }
 
 .retry-btn {
   margin-top: 24rpx;
   padding: 16rpx 48rpx;
-  background: #4d7cfe;
+  background: $primary;
   color: #fff;
   font-size: 26rpx;
   border-radius: 12rpx;
@@ -1093,10 +1097,10 @@ watch(allPeriods, () => {
 /* ===== 通用区块 ===== */
 .section {
   margin: 0 24rpx 24rpx;
-  background: #ffffff;
+  background: $bg-card;
   border-radius: 24rpx;
   padding: 28rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  box-shadow: $shadow-card;
 }
 
 .section-title-row {
@@ -1104,6 +1108,15 @@ watch(allPeriods, () => {
   align-items: center;
   gap: 8rpx;
   margin-bottom: 20rpx;
+
+  &::before {
+    content: '';
+    width: 6rpx;
+    height: 28rpx;
+    background: $primary;
+    border-radius: 3rpx;
+    margin-right: 4rpx;
+  }
 }
 
 .section-title-text {
@@ -1142,7 +1155,7 @@ watch(allPeriods, () => {
 .header-stock-code {
   font-size: 24rpx;
   color: $ink-soft;
-  background: #f0f2f5;
+  background: $primary-50;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
 }
@@ -1163,12 +1176,12 @@ watch(allPeriods, () => {
 
 .header-meta {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-mute;
 }
 
 .header-meta-divider {
   font-size: 22rpx;
-  color: #e0e3e8;
+  color: $line-strong;
 }
 
 .header-actions {
@@ -1188,7 +1201,7 @@ watch(allPeriods, () => {
 
 /* ===== AI 研判 ===== */
 .section-ai {
-  background: #ffffff;
+  background: $bg-card;
 }
 
 .ai-tags {
@@ -1196,7 +1209,7 @@ watch(allPeriods, () => {
   flex-direction: column;
   gap: 16rpx;
   margin-bottom: 20rpx;
-  background: #f8fafc;
+  background: $bg-soft;
   border-radius: 16rpx;
   padding: 20rpx;
 }
@@ -1220,14 +1233,14 @@ watch(allPeriods, () => {
 }
 
 .ai-summary {
-  background: #ffffff;
+  background: $bg-card;
   border-radius: 16rpx;
   padding: 20rpx;
 }
 
 .ai-summary-text {
   font-size: 24rpx;
-  color: #374151;
+  color: $ink-soft;
   line-height: 1.8;
 }
 
@@ -1235,8 +1248,8 @@ watch(allPeriods, () => {
 
 // 评分区
 .partial-score-card {
-  background: #f8f7f4;
-  border-radius: 12px;
+  background: $bg-soft;
+  border-radius: 12rpx;
   padding: 32rpx 24rpx;
   display: flex;
   flex-direction: column;
@@ -1251,13 +1264,13 @@ watch(allPeriods, () => {
 .partial-score-number {
   font-size: 48rpx;
   font-weight: 700;
-  color: #b4b2a9;
+  color: $ink-faint;
   line-height: 1;
 }
 
 .partial-score-total {
   font-size: 24rpx;
-  color: #b4b2a9;
+  color: $ink-faint;
   margin-left: 4rpx;
 }
 
@@ -1273,13 +1286,13 @@ watch(allPeriods, () => {
   display: inline-block;
   padding: 4rpx 16rpx;
   border-radius: 22rpx;
-  background: #f1efe8;
+  background: $line-soft;
 }
 
 .partial-status-text {
   font-size: 22rpx;
   font-weight: 500;
-  color: #888780;
+  color: $ink-mute;
 }
 
 .partial-original-tag {
@@ -1296,7 +1309,7 @@ watch(allPeriods, () => {
 
 .partial-prompt {
   font-size: 24rpx;
-  color: #888780;
+  color: $ink-mute;
   margin-top: 12rpx;
   text-align: center;
 }
@@ -1305,7 +1318,7 @@ watch(allPeriods, () => {
 .partial-highlights-title {
   font-size: 24rpx;
   font-weight: 600;
-  color: #2c2c2a;
+  color: $ink;
   margin-bottom: 12rpx;
   display: block;
   padding-top: 8rpx;
@@ -1318,8 +1331,8 @@ watch(allPeriods, () => {
 }
 
 .partial-highlight-card {
-  background: #ffffff;
-  border: 1rpx solid #e5e2d8;
+  background: $bg-card;
+  border: 1rpx solid $line;
   border-radius: 12rpx;
   padding: 20rpx;
   display: flex;
@@ -1343,32 +1356,32 @@ watch(allPeriods, () => {
 .partial-highlight-label {
   font-size: 24rpx;
   font-weight: 500;
-  color: #2c2c2a;
+  color: $ink;
 }
 
 .partial-highlight-detail {
   font-size: 22rpx;
-  color: #888780;
+  color: $ink-mute;
   line-height: 1.6;
   margin-top: 6rpx;
 }
 
 // 空亮点兜底
 .partial-highlights-empty {
-  background: #f8f7f4;
+  background: $bg-soft;
   border-radius: 12rpx;
   padding: 32rpx 24rpx;
 }
 
 .partial-highlights-empty-text {
   font-size: 24rpx;
-  color: #888780;
+  color: $ink-mute;
   text-align: center;
 }
 
 // 缺失字段提示条
 .partial-missing-bar {
-  background: #faeeda;
+  background: $warning-bg;
   border-radius: 12rpx;
   padding: 20rpx 24rpx;
   display: flex;
@@ -1380,7 +1393,7 @@ watch(allPeriods, () => {
 
 .partial-missing-icon {
   font-size: 24rpx;
-  color: #ef9f27;
+  color: $warning;
   flex-shrink: 0;
   line-height: 1.4;
 }
@@ -1393,13 +1406,13 @@ watch(allPeriods, () => {
 
 .partial-missing-main {
   font-size: 22rpx;
-  color: #854f0b;
+  color: $warning;
   font-weight: 500;
 }
 
 .partial-missing-sub {
   font-size: 20rpx;
-  color: #ba7517;
+  color: $ink-mute;
   margin-top: 6rpx;
 }
 
@@ -1411,7 +1424,7 @@ watch(allPeriods, () => {
 .table-year-toggle {
   display: flex;
   margin-left: auto;
-  background: #f0f2f5;
+  background: $bg-soft;
   border-radius: 8rpx;
   padding: 3rpx;
 }
@@ -1444,7 +1457,7 @@ watch(allPeriods, () => {
 .finance-table td {
   text-align: center;
   padding: 16rpx 12rpx;
-  border-bottom: 1rpx solid $bg-soft;
+  border-bottom: 1rpx solid $line-soft;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1454,7 +1467,7 @@ watch(allPeriods, () => {
 .th-category {
   text-align: left;
   width: 120rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   font-weight: 500;
   font-size: 22rpx;
 }
@@ -1462,28 +1475,28 @@ watch(allPeriods, () => {
 .th-name {
   text-align: left;
   width: 160rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   font-weight: 500;
   font-size: 22rpx;
 }
 
 .th-value {
   width: 160rpx;
-  color: #374151;
+  color: $ink;
   font-weight: 600;
   font-size: 22rpx;
 }
 
 .td-category {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   text-align: left;
 }
 
 .td-name {
   text-align: left;
   font-weight: 500;
-  color: #374151;
+  color: $ink;
   font-size: 22rpx;
 }
 
@@ -1493,7 +1506,7 @@ watch(allPeriods, () => {
 
 .td-name-tip {
   font-size: 20rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   margin-left: 4rpx;
 }
 
@@ -1502,15 +1515,15 @@ watch(allPeriods, () => {
   font-size: 22rpx;
 }
 
-.val-up { color: #dc2626; }
-.val-down { color: #059669; }
+.val-up { color: $up; }
+.val-down { color: $down; }
 
 /* ===== 走势图表（新设计） ===== */
 .section-chart {
   margin: 0 24rpx 24rpx;
-  background: #ffffff;
-  border: 0.5px solid #e0e0e0;
-  border-radius: 12px;
+  background: $bg-card;
+  border: 1rpx solid $line;
+  border-radius: 12rpx;
   padding: 24rpx;
 }
 
@@ -1519,9 +1532,9 @@ watch(allPeriods, () => {
   color: $ink-soft;
   padding: 8rpx 20rpx;
   border-radius: 12rpx;
-  background: #f0f2f5;
+  background: $bg-soft;
   font-weight: 500;
-  color: #2c2c2a;
+  color: $ink;
 }
 
 .chart-header-row {
@@ -1534,30 +1547,30 @@ watch(allPeriods, () => {
 .chart-header-title {
   font-size: 30rpx;
   font-weight: 500;
-  color: #2c2c2a;
+  color: $ink;
 }
 
 .chart-header-badge {
   font-size: 22rpx;
-  color: #888780;
-  background: #f1efe8;
-  border-radius: 4px;
+  color: $ink-mute;
+  background: $bg-soft;
+  border-radius: 4rpx;
   padding: 4rpx 16rpx;
 }
 
 .chart-filter-group {
   display: flex;
   gap: 0;
-  border: 0.5px solid #d3d1c7;
-  border-radius: 6px;
+  border: 1rpx solid $line-strong;
+  border-radius: 6rpx;
   overflow: hidden;
 }
 
 .chart-filter-btn {
   font-size: 22rpx;
-  color: #888780;
+  color: $ink-mute;
   padding: 6rpx 20rpx;
-  background: #ffffff;
+  background: $bg-card;
   font-weight: 400;
   cursor: pointer;
 
@@ -1568,7 +1581,7 @@ watch(allPeriods, () => {
   }
 
   &:not(:last-child) {
-    border-right: 0.5px solid #d3d1c7;
+    border-right: 1rpx solid $line-strong;
   }
 }
 
@@ -1582,14 +1595,14 @@ watch(allPeriods, () => {
 .chart-tabs-underline {
   display: flex;
   white-space: nowrap;
-  border-bottom: 0.5px solid #e0e0e0;
+  border-bottom: 1rpx solid $line;
   gap: 0;
 }
 
 .chart-tab-item {
   position: relative;
   font-size: 24rpx;
-  color: #888780;
+  color: $ink-mute;
   padding: 16rpx 28rpx;
   flex-shrink: 0;
   font-weight: 400;
@@ -1597,7 +1610,7 @@ watch(allPeriods, () => {
 }
 
 .chart-tab-item.active {
-  color: #534ab7;
+  color: $primary;
   font-weight: 500;
 }
 
@@ -1607,7 +1620,7 @@ watch(allPeriods, () => {
   left: 28rpx;
   right: 28rpx;
   height: 4rpx;
-  background: #534ab7;
+  background: $primary;
   border-radius: 2rpx;
 }
 
@@ -1618,18 +1631,18 @@ watch(allPeriods, () => {
   gap: 8rpx;
   margin: 20rpx 0 16rpx;
   padding-bottom: 16rpx;
-  border-bottom: 0.5px solid #f1efe8;
+  border-bottom: 1rpx solid $line-soft;
 }
 
 .chart-big-value {
   font-size: 48rpx;
   font-weight: 500;
-  color: #2c2c2a;
+  color: $ink;
 }
 
 .chart-big-unit {
   font-size: 26rpx;
-  color: #888780;
+  color: $ink-mute;
 }
 
 .chart-big-yoy {
@@ -1638,11 +1651,11 @@ watch(allPeriods, () => {
 }
 
 .chart-big-yoy.up {
-  color: #e24b4a;
+  color: $up;
 }
 
 .chart-big-yoy.down {
-  color: #1d9e75;
+  color: $down;
 }
 
 /* 图表区域 */
@@ -1650,9 +1663,9 @@ watch(allPeriods, () => {
   position: relative;
   width: 100%;
   min-height: 240px;
-  background: #fafafa;
-  border-radius: 8px;
-  padding: 12px;
+  background: $bg-soft;
+  border-radius: 8rpx;
+  padding: 12rpx;
   box-sizing: border-box;
 }
 
@@ -1667,7 +1680,7 @@ watch(allPeriods, () => {
   top: 50%;
   transform: translate(-50%, -50%);
   font-size: 24rpx;
-  color: #b4b2a9;
+  color: $ink-faint;
   text-align: center;
 }
 
@@ -1677,7 +1690,7 @@ watch(allPeriods, () => {
   gap: 32rpx;
   margin-top: 12rpx;
   padding-top: 12rpx;
-  border-top: 0.5px solid #f1efe8;
+  border-top: 1rpx solid $line-soft;
 }
 
 .chart-legend-item {
@@ -1695,7 +1708,7 @@ watch(allPeriods, () => {
 
 .chart-legend-text {
   font-size: 24rpx;
-  color: #888780;
+  color: $ink-mute;
 }
 
 /* 底部摘要卡片 */
@@ -1704,13 +1717,13 @@ watch(allPeriods, () => {
   gap: 8rpx;
   margin-top: 12rpx;
   padding-top: 12rpx;
-  border-top: 0.5px solid #f1efe8;
+  border-top: 1rpx solid $line-soft;
 }
 
 .chart-summary-card {
   flex: 1;
-  background: #f1efe8;
-  border-radius: 6px;
+  background: $bg-soft;
+  border-radius: 6rpx;
   padding: 8rpx 20rpx;
   display: flex;
   flex-direction: column;
@@ -1719,12 +1732,12 @@ watch(allPeriods, () => {
 
 .chart-summary-label {
   font-size: 20rpx;
-  color: #888780;
+  color: $ink-mute;
 }
 
 .chart-summary-value {
   font-size: 32rpx;
   font-weight: 500;
-  color: #2c2c2a;
+  color: $ink;
 }
 </style>

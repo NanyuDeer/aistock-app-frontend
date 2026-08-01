@@ -22,7 +22,7 @@
     <!-- 数据不足 -->
     <template v-else-if="data.dataStatus === 'insufficient'">
       <view class="insufficient-card">
-        <SvgIcon name="alert-line" size="48rpx" color="#f59e0b" class="insufficient-icon" />
+        <SvgIcon name="alert-line" size="48rpx" :color="warningColor" class="insufficient-icon" />
         <text class="insufficient-title">数据不足</text>
         <text class="insufficient-desc">暂无法进行AI研判</text>
         <text class="insufficient-note">
@@ -30,7 +30,7 @@
         </text>
       </view>
       <view class="advice-bar" v-if="data.message">
-        <SvgIcon name="lightbulb-line" size="28rpx" color="#f59e0b" class="advice-icon" />
+        <SvgIcon name="lightbulb-line" size="28rpx" :color="warningColor" class="advice-icon" />
         <text class="advice-text">{{ data.message }}</text>
       </view>
     </template>
@@ -113,7 +113,7 @@
 
       <!-- 建议条 -->
       <view class="advice-bar" v-if="data.advice">
-        <SvgIcon name="lightbulb-line" size="28rpx" color="#f59e0b" class="advice-icon" />
+        <SvgIcon name="lightbulb-line" size="28rpx" :color="warningColor" class="advice-icon" />
         <text class="advice-text">{{ data.advice }}</text>
       </view>
     </template>
@@ -123,6 +123,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+
+// ===== 设计令牌颜色（与组件库 tokens.json 对齐） =====
+const warningColor = '#f0a020'
 
 const props = defineProps<{
   loading: boolean
@@ -154,6 +157,8 @@ function formatMetricKey(key: string): string {
 </script>
 
 <style lang="scss" scoped>
+@import '@/shared/styles/variables.scss';
+
 .ai-analysis-section {
   width: 100%;
   display: flex;
@@ -167,12 +172,12 @@ function formatMetricKey(key: string): string {
   align-items: center;
   gap: 8px;
   padding: 0 0 12px 0;
-  border-bottom: 0.5px solid #f1efe8;
+  border-bottom: 0.5px solid $line;
 
   .title-bar {
     width: 3px;
     height: 16px;
-    background: #534ab7;
+    background: $primary;
     border-radius: 2px;
     flex-shrink: 0;
   }
@@ -180,19 +185,19 @@ function formatMetricKey(key: string): string {
   .title-text {
     font-size: 15px;
     font-weight: 600;
-    color: #2c2c2a;
+    color: $ink;
   }
 
   .subtitle {
     margin-left: auto;
     font-size: 11px;
-    color: #888780;
+    color: $ink-mute;
   }
 }
 
 // 评分区
 .score-card {
-  background: #eeedfe;
+  background: $primary-50;
   border-radius: 12px;
   padding: 20px 16px;
   display: flex;
@@ -215,13 +220,13 @@ function formatMetricKey(key: string): string {
   .score-number {
     font-size: 36px;
     font-weight: 700;
-    color: #534ab7;
+    color: $primary;
     line-height: 1;
   }
 
   .score-total {
     font-size: 14px;
-    color: #888780;
+    color: $ink-mute;
     margin-left: 2px;
   }
 
@@ -231,7 +236,7 @@ function formatMetricKey(key: string): string {
     border-radius: 11px;
     font-size: 12px;
     font-weight: 500;
-    color: #ffffff;
+    color: $white;
     line-height: 1.6;
   }
 
@@ -245,12 +250,12 @@ function formatMetricKey(key: string): string {
   .conclusion-main {
     font-size: 15px;
     font-weight: 500;
-    color: #2c2c2a;
+    color: $ink;
   }
 
   .conclusion-sub {
     font-size: 12px;
-    color: #888780;
+    color: $ink-mute;
     line-height: 1.4;
   }
 }
@@ -263,7 +268,7 @@ function formatMetricKey(key: string): string {
 }
 
 .dimension-card {
-  background: #f8f7f4;
+  background: $bg-soft;
   border-radius: 10px;
   padding: 12px;
   display: flex;
@@ -277,7 +282,7 @@ function formatMetricKey(key: string): string {
 
     .dim-name {
       font-size: 12px;
-      color: #888780;
+      color: $ink-mute;
     }
 
     .dim-score {
@@ -287,7 +292,7 @@ function formatMetricKey(key: string): string {
   }
 
   .progress-bar-bg {
-    background: #e5e2d8;
+    background: $line;
     border-radius: 3px;
     height: 5px;
     width: 100%;
@@ -308,7 +313,7 @@ function formatMetricKey(key: string): string {
 
   .metric-item {
     font-size: 11px;
-    color: #888780;
+    color: $ink-mute;
     line-height: 1.6;
   }
 }
@@ -332,11 +337,11 @@ function formatMetricKey(key: string): string {
   }
 
   .strength-title {
-    color: #1d9e75;
+    color: $down;
   }
 
   .risk-title {
-    color: #ef9f27;
+    color: $warning;
   }
 
   .list-item {
@@ -355,23 +360,23 @@ function formatMetricKey(key: string): string {
   }
 
   .strength-dot {
-    background: #1d9e75;
+    background: $down;
   }
 
   .risk-dot {
-    background: #ef9f27;
+    background: $warning;
   }
 
   .item-text {
     font-size: 12px;
-    color: #444441;
+    color: $ink-soft;
     line-height: 1.8;
   }
 
   .no-risk {
     .no-risk-text {
       font-size: 12px;
-      color: #888780;
+      color: $ink-mute;
     }
   }
 
@@ -382,7 +387,7 @@ function formatMetricKey(key: string): string {
 
 // 建议条
 .advice-bar {
-  background: #f5f0e1;
+  background: $warning-bg;
   border-radius: 8px;
   padding: 12px 14px;
   display: flex;
@@ -397,14 +402,14 @@ function formatMetricKey(key: string): string {
 
   .advice-text {
     font-size: 12px;
-    color: #854f0b;
+    color: $warning;
     line-height: 1.7;
   }
 }
 
 // 数据不足
 .insufficient-card {
-  background: #f8f7f4;
+  background: $bg-soft;
   border-radius: 12px;
   padding: 24px 16px;
   display: flex;
@@ -419,17 +424,17 @@ function formatMetricKey(key: string): string {
   .insufficient-title {
     font-size: 15px;
     font-weight: 500;
-    color: #888780;
+    color: $ink-mute;
   }
 
   .insufficient-desc {
     font-size: 13px;
-    color: #888780;
+    color: $ink-mute;
   }
 
   .insufficient-note {
     font-size: 12px;
-    color: #888780;
+    color: $ink-mute;
     text-align: center;
     margin-top: 4px;
     line-height: 1.5;
@@ -444,13 +449,13 @@ function formatMetricKey(key: string): string {
 
   .empty-text {
     font-size: 14px;
-    color: #888780;
+    color: $ink-mute;
   }
 }
 
 // 骨架屏
 .skeleton-card {
-  background: #f8f7f4;
+  background: $bg-soft;
   border-radius: 12px;
   height: 180px;
   animation: skeleton-pulse 1.2s ease-in-out infinite;

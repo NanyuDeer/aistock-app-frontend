@@ -1,6 +1,25 @@
 # Changelog — aistock-app-frontend
 
-> 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
+> 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
+
+## [master] 2026-08-01 — alert-analysis 结构化渲染 + 通用播报卡片 + 当日缓存 + dev代理指向远程
+
+**开发者**: Aria
+
+### 新增
+- `src/shared/components/PodcastCard.vue`：通用播报卡片组件（idle/loading/ready/error 四态），点击"生成播报"调 `POST /api/agent/brief/generate-podcast` 合成单主播音频，已在 `components/index.ts` 导出，可复用到其他 AI 报告页面
+- `src/shared/api/modules/agent.ts`：新增 `generatePodcast(text, key)` 方法、`getAlertReport(symbol, date)` 方法和 `AlertReportRecord` 类型
+- `src/modules/market/utils/useAlertSSE.ts`：新增 `loadFromCache(symbol, date)` 方法，从 DB 加载 alert 报告并填充 result；新增 `result` 事件处理；超时从 30s 调整为 60s（异动分析含 3 个子 Agent + Master，耗时较长）
+
+### 修复
+- `src/modules/market/pages/alert-analysis.vue`：改用 `result.displayReport` 结构化渲染（summary/details/stocks/risks/keywords/impact），不再用 `markdownToHtml(content)` 渲染原始 JSON 文本（修复 stocks/risks/podcast_brief 等内部字段直接显示的问题）；进入页面先查当日缓存命中直接展示，未命中才 SSE；新增"重新分析"按钮强制刷新；最上方新增 `PodcastCard` 播报卡片
+- `env/.env.development`：`VITE_PROXY_AGENT_TARGET` 从 `http://localhost:8080` 改为 `https://gupiao-api.yaozhineng.com`（本地未启动 Python Agent 服务导致 AI 异动解读 SSE 流连接失败）
+
+### 改进
+- `src/modules/analytics/pages/report-detail.vue`：SVG 图标硬编码 hex 颜色抽为设计令牌常量（primaryColor/warningColor），与组件库 tokens.json 对齐
+- `src/modules/analytics/components/ai-analysis.vue`：SVG 图标硬编码 hex 颜色抽为设计令牌常量（warningColor），与组件库 tokens.json 对齐
+
+---
 
 ## [master] 2026-08-01 — 大盘溯源卡片改进 + 资金流向图表颜色令牌化
 

@@ -88,6 +88,28 @@ export interface BriefingData {
   provider: string
 }
 
+/** 异动分析报告 DB 记录（GET /api/agent/report/alert/:symbol/:date 返回） */
+export interface AlertReportRecord {
+  id?: string
+  report_type: string
+  report_date: string
+  status?: string
+  data_source?: string | null
+  created_at?: string
+  content: {
+    symbol?: string
+    display_report?: {
+      summary?: string
+      impact?: string
+      keywords?: string[]
+      details?: string
+      stocks?: string[]
+      risks?: string[]
+    }
+    podcast_brief?: string
+  }
+}
+
 export type BriefType = 'morning' | 'evening'
 export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score'] as const
 export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
@@ -206,6 +228,18 @@ export const agentApi = {
     return request.post('/agent/briefing/generate-audio', { type })
   },
 
+  /**
+   * 生成通用播报音频（单主播朗读文本）
+   * 对接 Node.js 公开路由 POST /api/agent/brief/generate-podcast
+   * 同一 key 的音频已存在时后端直接返回缓存，不重复合成
+   */
+  generatePodcast(text: string, key: string) {
+    return request.post<{ audio_url: string; cached: boolean }>(
+      '/agent/brief/generate-podcast',
+      { text, key }
+    )
+  },
+
   /** 获取动态估值 */
   // TODO: 后端 valuation 接口尚未实现，待 Agent 落地后启用
   getValuation(symbol: string) {
@@ -243,6 +277,15 @@ export const agentApi = {
   /** 读取分析报告（broadcast/morning/review/wind_leader/hot_burst 等）。 */
   getReport(intent: string, date: string) {
     return request.get(`/agent/report/${intent}/${date}`)
+  },
+
+  /**
+   * 查询指定股票的异动分析报告（缓存查询）
+   * 对接 Node.js 公开路由 GET /api/agent/report/alert/:symbol/:date
+   * 命中缓存时直接返回 DB 中的报告，未命中返回 null（前端再走 SSE 流式分析）
+   */
+  getAlertReport(symbol: string, date: string) {
+    return request.get<AlertReportRecord | null>(`/agent/report/alert/${symbol}/${date}`)
   },
 
   /** 读取大盘复盘报告。 */
