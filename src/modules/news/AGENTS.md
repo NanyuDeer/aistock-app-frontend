@@ -18,7 +18,10 @@
 ## 依赖的 shared/ 中的类型
 - `@/shared/api/modules/stock` - 股票 API（含 getNewsDetail）
 - `@/shared/components/SvgIcon.vue` - 图标组件
+- `@/shared/components/SubPageCard2.vue` - 子页面卡片容器（白色导航栏 + scroll-view + GlobalChatBar）
+- `@/shared/components` - LoadingState / EmptyState / Tag / Card 基础组件
 
 ## 开发注意事项
 - 资讯内容支持 rich-text 渲染
 - 无 ID 时降级到 mock 数据
+- 页面使用 SubPageCard2 包裹，pages.json 已配置 `navigationStyle: "custom"`，禁止恢复系统默认导航栏

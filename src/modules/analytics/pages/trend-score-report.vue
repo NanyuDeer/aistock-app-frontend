@@ -1,55 +1,49 @@
 <template>
   <SubPageCard title="趋势股评分分析">
     <view class="page-content">
-      <view v-if="loading" class="loading-state">
-        <text>报告加载中...</text>
-      </view>
+      <LoadingState v-if="loading" text="报告加载中..." />
 
       <view v-else-if="report" class="report-content">
         <text class="report-date">{{ report.created_at ? formatDateTime(report.created_at) : report.report_date }} · 仅供参考</text>
 
-        <view class="conclusion-card">
+        <Card class="conclusion-card">
           <text class="section-kicker">今日结论</text>
           <text class="conclusion-text">{{ streamedConclusion }}<text v-if="isStreaming" class="stream-cursor">|</text></text>
-        </view>
+        </Card>
 
-        <view v-if="streamedDimensions.length" class="section-card stream-section">
+        <Card v-if="streamedDimensions.length" class="stream-section">
           <text class="section-title">维度解读</text>
           <view class="bullet-list">
             <text v-for="item in streamedDimensions" :key="item" class="bullet-item">{{ item }}</text>
           </view>
-        </view>
+        </Card>
 
-        <view v-if="streamedTrendJudgment" class="section-card stream-section">
+        <Card v-if="streamedTrendJudgment" class="judgment-card stream-section">
           <text class="section-title">趋势判断</text>
           <text class="section-text">{{ streamedTrendJudgment }}</text>
-        </view>
+        </Card>
 
-        <view v-if="streamedTrackAnalysis.length" class="section-card stream-section">
+        <Card v-if="streamedTrackAnalysis.length" class="stream-section">
           <text class="section-title">赛道分析</text>
           <view class="bullet-list">
             <text v-for="item in streamedTrackAnalysis" :key="item" class="bullet-item">{{ item }}</text>
           </view>
-        </view>
+        </Card>
 
-        <view v-if="streamedRisks.length" class="section-card risk-card stream-section">
+        <Card v-if="streamedRisks.length" class="risk-card stream-section">
           <text class="section-title">风险提示</text>
           <view class="bullet-list">
             <text v-for="risk in streamedRisks" :key="risk" class="risk-item">{{ risk }}</text>
           </view>
-        </view>
+        </Card>
 
-        <view v-if="streamedAdvice" class="section-card stream-section">
+        <Card v-if="streamedAdvice" class="stream-section">
           <text class="section-title">关注建议</text>
           <text class="section-text">{{ streamedAdvice }}</text>
-        </view>
+        </Card>
       </view>
 
-      <view v-else class="empty-state">
-        <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
-        <text class="empty-text">今日趋势股评分报告尚未生成</text>
-        <text class="empty-hint">报告生成后将自动显示</text>
-      </view>
+      <EmptyState v-else title="今日趋势股评分报告尚未生成" description="报告生成后将自动显示" icon="file-line" />
     </view>
   </SubPageCard>
 </template>
@@ -60,7 +54,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { agentApi } from '@/shared/api/modules/agent'
 import { formatDateTime } from '@/shared/utils/datetime'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
-import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { LoadingState, EmptyState, Card } from '@/shared/components'
 import trendScoreMockContent from '../mock/trend-score-report.json'
 
 interface DisplayReport {
@@ -293,14 +287,9 @@ onUnmounted(stopAll)
 
 <style lang="scss" scoped>
 .page-content { padding: 24rpx; }
-.loading-state, .empty-state { display: flex; flex-direction: column; align-items: center; padding: 120rpx 0; font-size: 28rpx; color: $ink-soft; }
-.empty-text { margin-top: 24rpx; }
-.empty-hint, .report-date { margin-top: 12rpx; font-size: 22rpx; color: #9ca3af; }
-.report-date { display: block; margin: 0 0 16rpx; }
+.report-date { display: block; margin: 0 0 16rpx; font-size: 22rpx; color: $ink-mute; }
 .report-content { display: flex; flex-direction: column; gap: 20rpx; }
-.conclusion-card, .section-card { padding: 24rpx; border-radius: 16rpx; background: #ffffff; }
-.conclusion-card { background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 1rpx solid #bfdbfe; }
-.section-kicker { display: block; margin-bottom: 10rpx; font-size: 22rpx; font-weight: 600; color: #1d4ed8; }
+.section-kicker { display: block; margin-bottom: 10rpx; font-size: 22rpx; font-weight: 600; color: $primary; }
 .conclusion-text { display: block; font-size: 32rpx; font-weight: 600; line-height: 1.5; color: $ink; }
 .stream-cursor { margin-left: 4rpx; color: $primary; animation: cursor-blink 0.8s infinite; }
 .stream-section { animation: section-in 0.28s ease-out both; }
@@ -308,10 +297,9 @@ onUnmounted(stopAll)
 @keyframes cursor-blink { 50% { opacity: 0; } }
 .section-title { display: block; margin-bottom: 16rpx; font-size: 28rpx; font-weight: 600; color: $ink; }
 .bullet-list { display: flex; flex-direction: column; gap: 14rpx; }
-.bullet-item, .section-text { display: block; font-size: 25rpx; line-height: 1.65; color: #4b5563; }
+.bullet-item, .risk-item, .section-text { display: block; font-size: 25rpx; line-height: 1.65; color: $ink-soft; }
 .bullet-item::before { content: '•'; margin-right: 10rpx; color: $primary; }
 .judgment-card { border-left: 6rpx solid $primary; }
-.risk-card { background: #fff7f7; }
-.risk-item { display: block; font-size: 25rpx; line-height: 1.65; color: #4b5563; }
-.risk-item::before { content: '•'; margin-right: 8rpx; font-weight: 600; color: #dc2626; }
+.risk-card { background: $up-bg; }
+.risk-item::before { content: '•'; margin-right: 8rpx; font-weight: 600; color: $up; }
 </style>

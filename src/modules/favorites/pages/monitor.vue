@@ -23,29 +23,39 @@
         <text class="section-tip">{{ getMarketStatus() }}</text>
       </view>
 
+      <!-- 幅度分级筛选（借鉴 alert-catcher） -->
+      <view class="filter-bar">
+        <Segmented :items="amplitudeTabs" v-model="activeAmplitude" fullWidth />
+      </view>
+
       <view v-if="loading" class="loading-wrap">
         <text class="loading-text">加载中...</text>
       </view>
 
-      <view v-else-if="alerts.length" class="alert-list">
-        <view v-for="alert in alerts" :key="alert.eventId" class="alert-item" @tap="goTrace(alert.eventId)">
-          <view class="alert-left">
-            <SvgIcon :name="alertIcon(alert.type).name" :color="alertIcon(alert.type).color" size="24rpx" />
-            <view class="alert-info">
+      <view v-else-if="filteredAlerts.length" class="alert-list">
+        <Card
+          v-for="alert in filteredAlerts"
+          :key="alert.eventId"
+          class="alert-item-card"
+          clickable
+          @click="goTrace(alert.eventId)"
+        >
+          <view class="alert-card-header">
+            <view class="alert-stock">
               <text class="alert-name">{{ alert.name || alert.symbol }}</text>
-              <text class="alert-desc">{{ alert.message }}</text>
-              <text class="alert-time">{{ formatTime(String(alert.time)) }}</text>
+              <text class="stock-code">{{ alert.symbol }}</text>
             </view>
+            <Tag :type="alert.direction === 'up' ? 'up' : 'down'">{{ alertBadgeLabel(alert.direction) }}</Tag>
           </view>
-          <text class="alert-arrow">›</text>
-        </view>
+          <text class="alert-desc">{{ alert.message }}</text>
+          <view class="alert-meta">
+            <text class="meta-type">{{ alert.type }}</text>
+            <text class="meta-time">{{ formatTime(String(alert.time)) }}</text>
+          </view>
+        </Card>
       </view>
 
-      <view v-else class="empty-wrap">
-        <SvgIcon name="bell-line" size="80rpx" color="#d1d5db" />
-        <text class="empty-text">暂无异动提醒</text>
-        <text class="empty-desc">{{ alertEnabled ? '盘中如有异动将实时推送' : '已关闭异动监控' }}</text>
-      </view>
+      <EmptyState v-else :title="alertEnabled ? '暂无异动提醒' : '异动监控已关闭'" :description="alertEnabled ? '盘中如有异动将实时推送' : '点击上方开关开启监控'" />
     </view>
 
     <!-- WS 连接状态 -->
@@ -66,7 +76,10 @@ import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { useAppStore } from '@/shared/store/modules/app'
 import { getMarketStatus } from '@/shared/utils/tradingTime'
 import { formatTime } from '@/shared/utils/datetime'
-import SvgIcon from '@/shared/components/SvgIcon.vue'
+import Card from '@/shared/components/Card.vue'
+import Tag from '@/shared/components/Tag.vue'
+import Segmented from '@/shared/components/Segmented.vue'
+import EmptyState from '@/shared/components/EmptyState.vue'
 import { stockTraceApi } from '@/shared/api/modules/stockTrace'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 
@@ -74,17 +87,11 @@ interface AlertItem {
   eventId: string
   symbol: string
   name?: string
+  direction: 'up' | 'down'
   type: string
   message: string
   time: string | number
 }
-
-/** 仅开发预览：接口暂无数据时保留完整的异动卡片视觉。 */
-const MONITOR_MOCK_ALERTS: AlertItem[] = [
-  { eventId: 'mock-monitor-001', symbol: '300204', name: '舒泰神', type: '大涨', message: '价格异动 +9.84%，封板资金持续流入', time: '2026-07-31T10:15:00+08:00' },
-  { eventId: 'mock-monitor-002', symbol: '300760', name: '迈瑞医疗', type: '大跌', message: '价格异动 -4.21%，短线成交量放大', time: '2026-07-31T13:45:00+08:00' },
-  { eventId: 'mock-monitor-003', symbol: '600276', name: '恒瑞医药', type: '放量', message: '成交额较昨日同期放大 2.6 倍', time: '2026-07-31T13:58:00+08:00' },
-]
 
 const favoritesStore = useFavoritesStore()
 const appStore = useAppStore()
@@ -93,6 +100,18 @@ const loading = ref(false)
 const alerts = ref<AlertItem[]>([])
 const wsConnected = ref(false)
 let wsTask: UniApp.SocketTask | null = null
+
+/** 幅度分级筛选（借鉴 alert-catcher） */
+const amplitudeTabs = [
+  { label: '全部', value: 'all' as const },
+  { label: '大涨', value: 'up' as const },
+  { label: '大跌', value: 'down' as const },
+]
+const activeAmplitude = ref<'all' | 'up' | 'down'>('all')
+const filteredAlerts = computed(() => {
+  if (activeAmplitude.value === 'all') return alerts.value
+  return alerts.value.filter(a => a.direction === activeAmplitude.value)
+})
 
 const subscribedSymbols = computed(() => favoritesStore.stocks.map(s => s.symbol))
 const alertEnabled = computed(() => appStore.config.alertEnabled)
@@ -106,13 +125,8 @@ function toggleAlert() {
   }
 }
 
-function alertIcon(type: string): { name: string; color: string } {
-  if (type.includes('涨停') || type.includes('大涨')) return { name: 'checkbox-blank-circle-fill', color: '#f43f5e' }
-  if (type.includes('跌停') || type.includes('大跌')) return { name: 'checkbox-blank-circle-fill', color: '#22c55e' }
-  if (type.includes('放量')) return { name: 'arrow-up-line', color: '#f43f5e' }
-  if (type.includes('缩量')) return { name: 'arrow-down-line', color: '#22c55e' }
-  if (type.includes('资金')) return { name: 'money-cny-circle-line', color: '#f59f0b' }
-  return { name: 'flashlight-line', color: '#f59f0b' }
+function alertBadgeLabel(direction: 'up' | 'down'): string {
+  return direction === 'up' ? '涨' : '跌'
 }
 
 async function fetchAlerts() {
@@ -123,15 +137,14 @@ async function fetchAlerts() {
       eventId: event.event_id,
       symbol: event.symbol,
       name: event.stock_name,
+      direction: event.direction,
       type: event.direction === 'up' ? '大涨' : '大跌',
       message: `价格异动 ${event.change_pct >= 0 ? '+' : ''}${event.change_pct.toFixed(2)}%，阈值 ${event.threshold_pct.toFixed(0)}%`,
       time: event.triggered_at,
     }))
-    if (import.meta.env.DEV && !alerts.value.length) {
-      alerts.value = MONITOR_MOCK_ALERTS
-    }
   } catch {
-    alerts.value = import.meta.env.DEV ? MONITOR_MOCK_ALERTS : []
+    // API 失败时显示空状态，不再使用 mock 数据兜底
+    alerts.value = []
   } finally {
     loading.value = false
   }
@@ -198,48 +211,42 @@ onUnmounted(() => disconnectWs())
 
 .subscribe-card {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx; background: #ffffff; border-radius: 12rpx; margin-bottom: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  padding: $s-3; background: $bg-card; border: 2rpx solid $line; border-radius: $r-md; margin-bottom: $s-3;
 }
 .subscribe-info { display: flex; flex-direction: column; gap: 4rpx; }
-.subscribe-label { font-size: 24rpx; color: $ink-soft; }
-.subscribe-value { font-size: 28rpx; font-weight: 600; color: $ink; }
+.subscribe-label { font-size: $font-size-xs; color: $ink-soft; }
+.subscribe-value { font-size: $font-size-base; font-weight: 600; color: $ink; }
 
 .subscribe-switch { padding: 12rpx 24rpx; border-radius: 20rpx; }
 .subscribe-switch.on { background: $primary; }
 .subscribe-switch.off { background: $line; }
-.switch-text { font-size: 24rpx; color: #ffffff; }
+.switch-text { font-size: $font-size-xs; color: #ffffff; }
 .subscribe-switch.off .switch-text { color: $ink-soft; }
 
-.section { margin-bottom: 24rpx; }
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16rpx; }
-.section-title { font-size: 30rpx; font-weight: 600; color: $ink; }
-.section-tip { font-size: 22rpx; color: $ink-soft; }
+.section { margin-bottom: $s-3; }
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: $s-2; }
+.section-title { font-size: $font-size-lg; font-weight: 600; color: $ink; }
+.section-tip { font-size: $font-size-xs; color: $ink-soft; }
 
-.loading-wrap { padding: 40rpx; text-align: center; }
-.loading-text { font-size: 26rpx; color: #9ca3af; }
+.filter-bar { margin-bottom: $s-2; }
 
-.alert-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx; background: #ffffff; border-radius: 12rpx; margin-bottom: 12rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-}
-.alert-left { display: flex; gap: 16rpx; align-items: flex-start; flex: 1; }
-.alert-icon { font-size: 36rpx; }
-.alert-info { display: flex; flex-direction: column; gap: 4rpx; flex: 1; }
-.alert-name { font-size: 28rpx; font-weight: 600; color: $ink; }
-.alert-desc { font-size: 24rpx; color: $ink-soft; line-height: 1.4; }
-.alert-time { font-size: 20rpx; color: #9ca3af; }
-.alert-arrow { font-size: 32rpx; color: #d1d5db; }
+.loading-wrap { padding: $s-4; text-align: center; }
+.loading-text { font-size: $font-size-sm; color: $ink-soft; }
 
-.empty-wrap { padding: 80rpx 40rpx; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12rpx; }
-.empty-icon { font-size: 80rpx; }
-.empty-text { font-size: 28rpx; color: $ink-soft; }
-.empty-desc { font-size: 22rpx; color: #9ca3af; }
+.alert-list { display: flex; flex-direction: column; gap: $s-2; }
+.alert-item-card { display: flex; flex-direction: column; gap: 8rpx; }
+.alert-card-header { display: flex; align-items: center; justify-content: space-between; }
+.alert-stock { display: flex; align-items: baseline; gap: $s-2; }
+.alert-name { font-size: $font-size-base; font-weight: 600; color: $ink; }
+.stock-code { font-size: $font-size-xs; color: $ink-soft; }
+.alert-desc { font-size: $font-size-sm; color: $ink-soft; line-height: 1.4; }
+.alert-meta { display: flex; justify-content: space-between; align-items: center; }
+.meta-type { font-size: $font-size-xs; color: $ink-soft; }
+.meta-time { font-size: $font-size-xs; color: $ink-soft; }
 
-.ws-status { display: flex; align-items: center; gap: 8rpx; padding: 16rpx; justify-content: center; }
+.ws-status { display: flex; align-items: center; gap: 8rpx; padding: $s-2; justify-content: center; }
 .ws-dot { width: 16rpx; height: 16rpx; border-radius: 50%; }
-.ws-dot.online { background: #22c55e; }
-.ws-dot.offline { background: #d1d5db; }
-.ws-text { font-size: 22rpx; color: #9ca3af; }
+.ws-dot.online { background: $stock-down-color; }
+.ws-dot.offline { background: $line; }
+.ws-text { font-size: $font-size-xs; color: $ink-soft; }
 </style>

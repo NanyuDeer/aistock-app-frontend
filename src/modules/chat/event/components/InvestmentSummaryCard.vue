@@ -1,10 +1,5 @@
 <template>
   <view class="summary-card" v-if="data">
-    <!-- 评级标签 -->
-    <view class="summary-rating" :class="'rating-' + data.rating">
-      <text class="rating-text">{{ ratingLabel }}</text>
-    </view>
-
     <!-- 核心判断 -->
     <view class="summary-section">
       <text class="section-title">核心判断</text>
@@ -50,25 +45,17 @@
  * InvestmentSummaryCard — AI 投资总结卡片
  *
  * 展示 AI 的最终投资观点，包括核心判断、关注方向、存在机会、风险提示。
+ * 评级标签（整体偏积极/谨慎/中性）已上移至 AiEventReport 的 Hero 卡，避免重复展示。
  *
  * Props: data — InvestmentSummary
  */
-import { computed } from 'vue'
 import type { InvestmentSummary } from '../types'
 
 interface Props {
   data?: InvestmentSummary | null
 }
 
-const props = defineProps<Props>()
-
-const ratingLabel = computed(() => {
-  switch (props.data?.rating) {
-    case 'positive': return '整体偏积极'
-    case 'negative': return '整体偏谨慎'
-    default: return '整体中性'
-  }
-})
+defineProps<Props>()
 </script>
 
 <style scoped>
@@ -77,24 +64,6 @@ const ratingLabel = computed(() => {
   flex-direction: column;
   gap: 0;
 }
-
-/* 评级标签 */
-.summary-rating {
-  display: inline-flex;
-  align-self: flex-start;
-  padding: 6rpx 16rpx;
-  border-radius: 9999rpx;
-  margin-bottom: 16rpx;
-}
-
-.rating-positive { background: var(--ev-positive-soft); border: 1px solid var(--ev-positive-soft); }
-.rating-positive .rating-text { color: var(--ev-positive); }
-.rating-neutral { background: rgba(148,163,184,0.1); border: 1px solid rgba(148,163,184,0.15); }
-.rating-neutral .rating-text { color: var(--ev-text-tertiary); }
-.rating-negative { background: var(--ev-negative-soft); border: 1px solid rgba(244,63,94,0.2); }
-.rating-negative .rating-text { color: var(--ev-negative); }
-
-.rating-text { font-size: 20rpx; font-weight: 600; }
 
 /* 区块 */
 .summary-section {

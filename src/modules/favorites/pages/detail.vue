@@ -797,7 +797,7 @@
       <!-- 6. AI 投顾入口（页面最底部） -->
       <view class="ai-card" @tap="goChat">
         <view class="ai-icon-wrap">
-          <SvgIcon name="robot-line" size="36rpx" color="#4d7cfe" />
+          <SvgIcon name="robot-line" size="36rpx" color="#ffffff" />
         </view>
         <view class="ai-content">
           <text class="ai-title">AI 智能投顾</text>
@@ -1691,7 +1691,7 @@ function goChat() {
 
 .page-detail {
   padding: 24rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   box-sizing: border-box;
   width: 100%;
   max-width: 430px;
@@ -1707,16 +1707,16 @@ function goChat() {
 
 .loading-text, .empty-text {
   font-size: 28rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 
 /* 股票头部 */
 .stock-header {
-  background: #ffffff;
-  border-radius: 20rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
   padding: 32rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  margin-bottom: 16rpx;
 }
 
 .stock-name-row {
@@ -1729,14 +1729,14 @@ function goChat() {
 .stock-name {
   font-size: 36rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .stock-code {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
   padding: 4rpx 16rpx;
-  background: #f0f2f5;
+  background: $line-soft;
   border-radius: 8rpx;
 }
 
@@ -1771,8 +1771,8 @@ function goChat() {
   font-size: 44rpx;
   font-weight: 700;
 
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 .stock-change-box {
@@ -1787,8 +1787,8 @@ function goChat() {
   font-size: 26rpx;
   font-weight: 500;
 
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 .stock-tags-row {
@@ -1803,17 +1803,17 @@ function goChat() {
   align-items: center;
   gap: 6rpx;
   padding: 6rpx 14rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 8rpx;
 
   .tag-label {
     font-size: 22rpx;
-    color: #9ca3af;
+    color: $ink-faint;
   }
 
   .tag-value {
     font-size: 24rpx;
-    color: #4b5563;
+    color: $ink-soft;
   }
 }
 
@@ -1823,39 +1823,39 @@ function goChat() {
   align-items: center;
   gap: 12rpx;
   padding: 16rpx 24rpx;
-  background: #ffffff;
+  background: $bg-card;
   border-radius: 12rpx;
   margin-top: 16rpx;
 }
 
 .limit-inline-label {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-mute;
 
-  .up { color: #f43f5e; font-weight: 600; }
-  .down { color: #22c55e; font-weight: 600; }
+  .up { color: $up; font-weight: 600; }
+  .down { color: $down; font-weight: 600; }
 }
 
 .limit-inline-sep {
-  color: #e5e7eb;
+  color: $line;
   font-size: 24rpx;
 }
 
 /* 综合决策 */
 .decision-card,
 .major-event-alert {
-  background: #ffffff;
-  border-radius: 20rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
   padding: 24rpx 28rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  margin-bottom: 16rpx;
 }
 
 .decision-card {
   display: flex;
   flex-direction: column;
   gap: 18rpx;
-  border-top: 4rpx solid #4d7cfe;
+  border-top: 4rpx solid $primary;
 }
 
 .decision-head {
@@ -1871,7 +1871,7 @@ function goChat() {
   font-size: 28rpx;
   line-height: 1.3;
   font-weight: 800;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .decision-summary {
@@ -1879,7 +1879,7 @@ function goChat() {
   font-size: 28rpx;
   line-height: 1.6;
   font-weight: 600;
-  color: #334155;
+  color: $ink-soft;
 }
 
 .decision-next {
@@ -1888,15 +1888,15 @@ function goChat() {
   gap: 14rpx;
   padding: 16rpx 18rpx;
   border-radius: 14rpx;
-  background: #f8fafc;
+  background: $bg-soft;
 }
 
 .next-label {
   flex-shrink: 0;
   padding: 4rpx 10rpx;
   border-radius: 8rpx;
-  background: #eef4ff;
-  color: #2563eb;
+  background: $primary-50;
+  color: $primary;
   font-size: 22rpx;
   line-height: 1.35;
   font-weight: 800;
@@ -1904,7 +1904,7 @@ function goChat() {
 
 .next-text {
   min-width: 0;
-  color: #1f2937;
+  color: $ink;
   font-size: 27rpx;
   line-height: 1.45;
   font-weight: 700;
@@ -1920,32 +1920,32 @@ function goChat() {
 .decision-status {
   padding: 6rpx 14rpx;
   border-radius: 10rpx;
-  background: #eef4ff;
+  background: $primary-50;
   font-size: 24rpx;
   line-height: 1.35;
   font-weight: 800;
 
   &.is-positive {
-    color: #f43f5e;
-    background: #fff1f2;
+    color: $up;
+    background: $up-soft;
   }
 
   &.is-neutral {
-    color: #2563eb;
-    background: #eef4ff;
+    color: $primary;
+    background: $primary-50;
   }
 
   &.is-risk {
-    color: #16a34a;
-    background: #ecfdf3;
+    color: $down;
+    background: $down-soft;
   }
 }
 
 .decision-period {
   padding: 6rpx 12rpx;
   border-radius: 10rpx;
-  background: #f1f5f9;
-  color: #475569;
+  background: $bg-deep;
+  color: $ink-soft;
   font-size: 22rpx;
   line-height: 1.35;
   font-weight: 700;
@@ -1954,7 +1954,7 @@ function goChat() {
 .decision-points {
   display: flex;
   flex-direction: column;
-  border-top: 1rpx solid #eef2f7;
+  border-top: 1rpx solid $line-soft;
 }
 
 .decision-point {
@@ -1963,12 +1963,12 @@ function goChat() {
   gap: 14rpx;
   align-items: start;
   padding: 18rpx 0;
-  border-bottom: 1rpx solid #eef2f7;
+  border-bottom: 1rpx solid $line-soft;
 
   &.is-risk {
     .point-label {
-      color: #16a34a;
-      background: #ecfdf3;
+      color: $down;
+      background: $down-soft;
     }
   }
 
@@ -1985,11 +1985,11 @@ function goChat() {
   min-width: 56rpx;
   height: 38rpx;
   border-radius: 8rpx;
-  background: #fff1f2;
+  background: $up-soft;
   font-size: 24rpx;
   line-height: 1.4;
   font-weight: 800;
-  color: #f43f5e;
+  color: $up;
 }
 
 .point-more {
@@ -1998,7 +1998,7 @@ function goChat() {
   line-height: 38rpx;
   font-weight: 700;
   text-align: right;
-  color: #94a3b8;
+  color: $ink-mute;
 }
 
 .point-text {
@@ -2007,7 +2007,7 @@ function goChat() {
   font-size: 26rpx;
   line-height: 1.55;
   font-weight: 600;
-  color: #334155;
+  color: $ink-soft;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 
@@ -2024,11 +2024,11 @@ function goChat() {
   gap: 10rpx;
   padding-top: 18rpx;
   padding-bottom: 18rpx;
-  border-left: 6rpx solid #4d7cfe;
+  border-left: 6rpx solid $primary;
 
   &.is-muted {
-    background: #fbfdff;
-    border-left-color: #cbd5e1;
+    background: $bg-soft;
+    border-left-color: $line-strong;
   }
 }
 
@@ -2049,21 +2049,21 @@ function goChat() {
   font-weight: 800;
 
   &.is-positive {
-    color: #f43f5e;
+    color: $up;
     border-color: #fecaca;
-    background: #fef2f2;
+    background: $up-soft;
   }
 
   &.is-negative {
-    color: #16a34a;
+    color: $down;
     border-color: #bbf7d0;
-    background: #f0fdf4;
+    background: $down-soft;
   }
 
   &.is-neutral {
-    color: #64748b;
-    border-color: #cbd5e1;
-    background: #f8fafc;
+    color: $ink-mute;
+    border-color: $line-strong;
+    background: $bg-soft;
   }
 }
 
@@ -2072,7 +2072,7 @@ function goChat() {
   font-size: 26rpx;
   line-height: 1.5;
   font-weight: 600;
-  color: #334155;
+  color: $ink-soft;
 }
 
 .major-event-meta {
@@ -2084,8 +2084,8 @@ function goChat() {
   text {
     padding: 4rpx 12rpx;
     border-radius: 8rpx;
-    background: #f1f5f9;
-    color: #64748b;
+    background: $bg-deep;
+    color: $ink-mute;
     font-size: 22rpx;
     line-height: 1.4;
     font-weight: 700;
@@ -2097,10 +2097,10 @@ function goChat() {
   display: flex;
   height: 120rpx;
   margin-bottom: 20rpx;
-  background: #ffffff;
-  border-radius: 20rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
   overflow: hidden;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
   box-sizing: border-box;
 }
 
@@ -2113,20 +2113,20 @@ function goChat() {
   min-width: 0;
   height: 100%;
   padding: 0 8rpx;
-  background: #ffffff;
+  background: $bg-card;
   border-bottom: 4rpx solid transparent;
   box-sizing: border-box;
 
   &:not(:last-child) {
-    border-right: 1rpx solid #f0f2f5;
+    border-right: 1rpx solid $line-soft;
   }
 
   &:active {
-    background: #f8fafc;
+    background: $bg-soft;
   }
 
   &.is-active {
-    background: #f0f7ff;
+    background: $primary-50;
     border-bottom-color: $brand-color;
 
     .tab-label { color: $brand-color; }
@@ -2138,7 +2138,7 @@ function goChat() {
   display: block;
   font-size: 32rpx;
   font-weight: 600;
-  color: #64748b;
+  color: $ink-mute;
   line-height: 1.4;
   text-align: center;
 }
@@ -2146,7 +2146,7 @@ function goChat() {
 .tab-desc {
   display: block;
   font-size: 22rpx;
-  color: #94a3b8;
+  color: $ink-mute;
   margin-top: 4rpx;
   line-height: 1.4;
   text-align: center;
@@ -2155,16 +2155,16 @@ function goChat() {
 .view-content {
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
-  margin-bottom: 24rpx;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
 }
 
 /* AI 研判卡片 */
 .ai-analysis-card {
-  background: #ffffff;
-  border-radius: 20rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
   padding: 28rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
 .card-header {
@@ -2177,7 +2177,7 @@ function goChat() {
 .card-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .ai-refresh-btn {
@@ -2187,9 +2187,9 @@ function goChat() {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #f5f7fa;
+  background: $bg-soft;
 
-  &:active { background: #e8ecf1; }
+  &:active { background: $bg-deep; }
 }
 
 .refresh-icon {
@@ -2204,7 +2204,7 @@ function goChat() {
 
 .ai-loading-text {
   font-size: 26rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 .ai-empty {
@@ -2214,7 +2214,7 @@ function goChat() {
 
 .ai-empty-text {
   font-size: 26rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 .ai-conclusion {
@@ -2228,14 +2228,14 @@ function goChat() {
   font-size: 36rpx;
   font-weight: 700;
 
-  &.is-bull { color: #f43f5e; }
-  &.is-bear { color: #22c55e; }
-  &.is-hold { color: #0066cc; }
+  &.is-bull { color: $up; }
+  &.is-bear { color: $down; }
+  &.is-hold { color: $primary; }
 }
 
 .analysis-date {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 .ai-logic {
@@ -2244,7 +2244,7 @@ function goChat() {
 
 .ai-logic-text {
   font-size: 28rpx;
-  color: #4b5563;
+  color: $ink-soft;
   line-height: 1.7;
 }
 
@@ -2259,11 +2259,11 @@ function goChat() {
 .ai-section-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #334155;
+  color: $ink-soft;
   margin-bottom: 12rpx;
   display: block;
 
-  &.risk { color: #7f1d1d; }
+  &.risk { color: $up-deep; }
 }
 
 .research-tags {
@@ -2286,7 +2286,7 @@ function goChat() {
 
   &.is-logic {
     background: rgba(59, 130, 246, 0.08);
-    color: #2563eb;
+    color: $primary;
     border: 1rpx solid rgba(59, 130, 246, 0.25);
 
     &.is-expanded { background: rgba(59, 130, 246, 0.15); }
@@ -2294,7 +2294,7 @@ function goChat() {
 
   &.is-basis {
     background: rgba(99, 102, 241, 0.08);
-    color: #4f46e5;
+    color: $primary;
     border: 1rpx solid rgba(99, 102, 241, 0.25);
 
     &.is-expanded { background: rgba(99, 102, 241, 0.15); }
@@ -2302,7 +2302,7 @@ function goChat() {
 
   &.is-advice {
     background: rgba(34, 197, 94, 0.08);
-    color: #16a34a;
+    color: $down;
     border: 1rpx solid rgba(34, 197, 94, 0.25);
 
     &.is-expanded { background: rgba(34, 197, 94, 0.15); }
@@ -2310,7 +2310,7 @@ function goChat() {
 
   &.is-risk {
     background: rgba(239, 68, 68, 0.08);
-    color: #dc2626;
+    color: $up;
     border: 1rpx solid rgba(239, 68, 68, 0.25);
 
     &.is-expanded { background: rgba(239, 68, 68, 0.15); }
@@ -2324,40 +2324,40 @@ function goChat() {
 .tag-detail {
   margin-top: 12rpx;
   padding: 16rpx 20rpx;
-  background: #f8fafc;
+  background: $bg-soft;
   border-radius: 12rpx;
-  border-left: 4rpx solid #2563eb;
+  border-left: 4rpx solid $primary;
 
-  &.basis { border-left-color: #4f46e5; }
-  &.advice { border-left-color: #16a34a; }
-  &.risk { border-left-color: #dc2626; }
+  &.basis { border-left-color: $primary; }
+  &.advice { border-left-color: $down; }
+  &.risk { border-left-color: $up; }
 }
 
 .tag-detail-text {
   font-size: 26rpx;
-  color: #4b5563;
+  color: $ink-soft;
   line-height: 1.6;
 }
 
 /* 通用卡片 */
 .section-card {
-  background: #ffffff;
-  border-radius: 20rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
   padding: 28rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  margin-bottom: 16rpx;
 }
 
 .section-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 20rpx;
   display: block;
 }
 
 .action-card {
-  border-left: 6rpx solid #4d7cfe;
+  border-left: 6rpx solid $primary;
 }
 
 .short-action-list {
@@ -2374,8 +2374,8 @@ function goChat() {
   min-width: 0;
   padding: 18rpx 20rpx;
   border-radius: 14rpx;
-  background: #f8fafc;
-  border: 1rpx solid #eef2f7;
+  background: $bg-soft;
+  border: 1rpx solid $line-soft;
 }
 
 .action-label {
@@ -2385,8 +2385,8 @@ function goChat() {
   min-height: 40rpx;
   padding: 4rpx 10rpx;
   border-radius: 8rpx;
-  background: #eef4ff;
-  color: #2563eb;
+  background: $primary-50;
+  color: $primary;
   font-size: 23rpx;
   line-height: 1.35;
   font-weight: 800;
@@ -2397,7 +2397,7 @@ function goChat() {
   min-width: 0;
   font-size: 27rpx;
   line-height: 1.5;
-  color: #1f2937;
+  color: $ink;
   font-weight: 700;
 }
 
@@ -2415,12 +2415,12 @@ function goChat() {
   align-items: start;
   padding: 16rpx 18rpx;
   border-radius: 14rpx;
-  background: #f8fafc;
-  border: 1rpx solid #eef2f7;
+  background: $bg-soft;
+  border: 1rpx solid $line-soft;
 }
 
 .ai-action-label {
-  color: #2563eb;
+  color: $primary;
   font-size: 24rpx;
   line-height: 1.45;
   font-weight: 800;
@@ -2428,7 +2428,7 @@ function goChat() {
 
 .ai-action-text {
   min-width: 0;
-  color: #334155;
+  color: $ink-soft;
   font-size: 26rpx;
   line-height: 1.55;
   font-weight: 600;
@@ -2443,7 +2443,7 @@ function goChat() {
 
 .section-sub {
   font-size: 24rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 
@@ -2464,11 +2464,11 @@ function goChat() {
   width: 16rpx;
   height: 16rpx;
   border-radius: 50%;
-  background: #4d7cfe;
+  background: $primary;
   margin-top: 8rpx;
   flex-shrink: 0;
 
-  &.default { background: #94a3b8; }
+  &.default { background: $ink-mute; }
 }
 
 .event-content {
@@ -2480,13 +2480,13 @@ function goChat() {
 
 .event-title {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.4;
 }
 
 .event-time {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 /* 交易数据网格 */
@@ -2494,7 +2494,7 @@ function goChat() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rpx;
-  background: #e5e7eb;
+  background: $line;
   border-radius: 12rpx;
   overflow: hidden;
 }
@@ -2504,21 +2504,21 @@ function goChat() {
   justify-content: space-between;
   align-items: center;
   padding: 20rpx 24rpx;
-  background: #ffffff;
+  background: $bg-card;
 }
 
 .detail-label {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 
 .detail-value {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
 
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 /* 资金流向 */
@@ -2532,13 +2532,13 @@ function goChat() {
   display: flex;
   flex-direction: column;
   padding: 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
 .flow-label {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
   margin-bottom: 8rpx;
 }
 
@@ -2546,20 +2546,20 @@ function goChat() {
   font-size: 30rpx;
   font-weight: 600;
 
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 .flow-narrative {
   margin-top: 12rpx;
   padding: 12rpx 16rpx;
-  background: #f8fafc;
+  background: $bg-soft;
   border-radius: 8rpx;
 }
 
 .flow-narrative-text {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
   line-height: 1.5;
 }
 
@@ -2574,29 +2574,29 @@ function goChat() {
   display: flex;
   flex-direction: column;
   padding: 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
 .finance-label {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
   margin-bottom: 8rpx;
 }
 
 .finance-value {
   font-size: 32rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 4rpx;
 }
 
 .finance-change {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 
-  &.is-up { color: #f43f5e; }
-  &.is-down { color: #22c55e; }
+  &.is-up { color: $up; }
+  &.is-down { color: $down; }
 }
 
 /* 业绩预测 */
@@ -2608,13 +2608,13 @@ function goChat() {
 
 .forecast-summary {
   padding: 16rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
 .forecast-summary-text {
   font-size: 26rpx;
-  color: #4b5563;
+  color: $ink-soft;
   line-height: 1.6;
 }
 
@@ -2629,29 +2629,29 @@ function goChat() {
   align-items: center;
   gap: 16rpx;
   padding: 16rpx 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
 .forecast-year {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   min-width: 80rpx;
 }
 
 .forecast-value {
   flex: 1;
   font-size: 26rpx;
-  color: #4b5563;
+  color: $ink-soft;
 }
 
 .forecast-growth {
   font-size: 26rpx;
   font-weight: 600;
 
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 /* 趋势股模�?*/
@@ -2663,7 +2663,7 @@ function goChat() {
     padding: 24rpx;
     background: linear-gradient(135deg, rgba(77, 124, 254, 0.08), rgba(99, 102, 241, 0.04));
     border-radius: 16rpx;
-    margin-bottom: 24rpx;
+    margin-bottom: 16rpx;
   }
 
   .tenx-score-wrap {
@@ -2676,19 +2676,19 @@ function goChat() {
   .tenx-score {
     font-size: 64rpx;
     font-weight: 700;
-    color: #4d7cfe;
+    color: $primary;
     line-height: 1;
   }
 
   .tenx-score-label {
     font-size: 22rpx;
-    color: #6b7280;
+    color: $ink-mute;
     margin-top: 4rpx;
   }
 
   .tenx-multiple {
     font-size: 24rpx;
-    color: #4d7cfe;
+    color: $primary;
     font-weight: 500;
     margin-top: 8rpx;
   }
@@ -2700,8 +2700,8 @@ function goChat() {
   .verdict-tag {
     display: inline-block;
     padding: 8rpx 20rpx;
-    background: #4d7cfe;
-    color: #ffffff;
+    background: $primary;
+    color: $white;
     border-radius: 28rpx;
     font-size: 26rpx;
     font-weight: 600;
@@ -2715,7 +2715,7 @@ function goChat() {
 .tenx-dim-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #334155;
+  color: $ink-soft;
 }
 
 .tenx-dimensions {
@@ -2725,10 +2725,10 @@ function goChat() {
 }
 
 .tenx-dim-item {
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
   border-radius: 12rpx;
   overflow: hidden;
-  background: #ffffff;
+  background: $bg-card;
 }
 
 .tenx-dim-head {
@@ -2736,47 +2736,47 @@ function goChat() {
   align-items: center;
   gap: 12rpx;
   padding: 16rpx 20rpx;
-  background: #f8fafc;
+  background: $bg-soft;
 }
 
 .tenx-dim-label {
   font-size: 26rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   flex: 1;
 }
 
 .tenx-dim-score {
   font-size: 28rpx;
   font-weight: 700;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .tenx-dim-weight {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 .tenx-dim-arrow {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 .tenx-dim-body {
   padding: 16rpx 20rpx;
-  border-top: 1rpx solid #f0f2f5;
+  border-top: 1rpx solid $line-soft;
 }
 
 .tenx-dim-question {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
   line-height: 1.5;
   margin-bottom: 12rpx;
 }
 
 .tenx-dim-bar-wrap {
   height: 10rpx;
-  background: #e5e7eb;
+  background: $line;
   border-radius: 999rpx;
   overflow: hidden;
   margin: 0 20rpx 14rpx;
@@ -2784,7 +2784,7 @@ function goChat() {
 
 .tenx-dim-bar {
   height: 100%;
-  background: linear-gradient(90deg, #4d7cfe, #6366f1);
+  background: linear-gradient(90deg, $primary, $primary);
   border-radius: 999rpx;
 }
 
@@ -2800,7 +2800,7 @@ function goChat() {
   align-items: flex-start;
   gap: 14rpx;
   padding: 16rpx 0;
-  border-bottom: 1rpx solid #f0f2f5;
+  border-bottom: 1rpx solid $line-soft;
 
   &:last-child { border-bottom: none; }
 }
@@ -2819,13 +2819,13 @@ function goChat() {
   font-weight: 700;
 
   &.is-good {
-    background: #fff1f2;
-    color: #ef4444;
+    background: $up-soft;
+    color: $up;
   }
 
   &.is-neutral {
-    background: #f1f5f9;
-    color: #64748b;
+    background: $bg-deep;
+    color: $ink-mute;
   }
 }
 
@@ -2833,7 +2833,7 @@ function goChat() {
   flex: 1;
   min-width: 0;
   font-size: 26rpx;
-  color: #334155;
+  color: $ink-soft;
   line-height: 1.65;
 
   &.is-collapsed {
@@ -2857,7 +2857,7 @@ function goChat() {
   flex-direction: column;
   align-items: center;
   padding: 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
   text-align: center;
 }
@@ -2866,7 +2866,7 @@ function goChat() {
   width: 56rpx;
   height: 56rpx;
   border-radius: 50%;
-  background: #4d7cfe;
+  background: $primary;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2874,7 +2874,7 @@ function goChat() {
 
   text {
     font-size: 28rpx;
-    color: #ffffff;
+    color: $white;
     font-weight: 700;
   }
 }
@@ -2882,13 +2882,13 @@ function goChat() {
 .moat-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 8rpx;
 }
 
 .moat-desc {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-mute;
   line-height: 1.5;
 }
 
@@ -2903,29 +2903,29 @@ function goChat() {
   display: flex;
   flex-direction: column;
   padding: 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 }
 
 .annual-label {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
   margin-bottom: 8rpx;
 }
 
 .annual-value {
   font-size: 28rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
   margin-bottom: 4rpx;
 }
 
 .annual-note {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 
-  &.is-up { color: #f43f5e; }
-  &.is-down { color: #22c55e; }
+  &.is-up { color: $up; }
+  &.is-down { color: $down; }
 }
 
 /* 半年�?*/
@@ -2936,20 +2936,20 @@ function goChat() {
 .semi-table {
   border-radius: 12rpx;
   overflow: hidden;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
 }
 
 .semi-row {
   display: flex;
   align-items: center;
-  border-bottom: 1rpx solid #f0f2f5;
+  border-bottom: 1rpx solid $line-soft;
 
   &:last-child {
     border-bottom: none;
   }
 
   &.semi-header {
-    background: #f5f7fa;
+    background: $bg-soft;
     font-weight: 600;
   }
 }
@@ -2958,21 +2958,21 @@ function goChat() {
   flex: 1;
   padding: 16rpx 12rpx;
   font-size: 24rpx;
-  color: #374151;
+  color: $ink-soft;
   text-align: center;
 
   &.semi-cell-label {
     flex: 1.2;
     text-align: left;
     padding-left: 16rpx;
-    color: #6b7280;
+    color: $ink-mute;
   }
 
   &.semi-cell-value {
     font-weight: 500;
 
-    &.up { color: #f43f5e; }
-    &.down { color: #22c55e; }
+    &.up { color: $up; }
+    &.down { color: $down; }
   }
 }
 
@@ -2983,18 +2983,18 @@ function goChat() {
 
 .semi-empty-text {
   font-size: 26rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 .semi-footer {
-  border-top: 1rpx solid #f0f2f5;
+  border-top: 1rpx solid $line-soft;
   padding-top: 16rpx;
   text-align: center;
 }
 
 .semi-link {
   font-size: 26rpx;
-  color: #4d7cfe;
+  color: $primary;
   font-weight: 500;
 }
 
@@ -3007,7 +3007,7 @@ function goChat() {
 
 .news-item {
   padding: 16rpx 0;
-  border-bottom: 1rpx solid #f0f2f5;
+  border-bottom: 1rpx solid $line-soft;
 
   &:last-child { border-bottom: none; }
   &:active { opacity: 0.7; }
@@ -3022,8 +3022,8 @@ function goChat() {
 .news-toggle-text {
   padding: 8rpx 18rpx;
   border-radius: 999rpx;
-  background: #f1f5f9;
-  color: #2563eb;
+  background: $bg-deep;
+  color: $primary;
   font-size: 24rpx;
   line-height: 1.35;
   font-weight: 700;
@@ -3031,7 +3031,7 @@ function goChat() {
 
 .news-title {
   font-size: 28rpx;
-  color: #1a1d24;
+  color: $ink;
   line-height: 1.4;
   margin-bottom: 6rpx;
 }
@@ -3043,12 +3043,12 @@ function goChat() {
 
 .news-source {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 
 .news-time {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 /* AI 投顾入口 */
@@ -3060,14 +3060,14 @@ function goChat() {
   padding: 28rpx;
   background: linear-gradient(135deg, rgba(77, 124, 254, 0.1), rgba(99, 102, 241, 0.05));
   border: 1rpx solid rgba(77, 124, 254, 0.2);
-  border-radius: 20rpx;
+  border-radius: $r-md;
 }
 
 .ai-icon-wrap {
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
-  background: #4d7cfe;
+  background: $primary;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3082,18 +3082,18 @@ function goChat() {
 .ai-title {
   font-size: 28rpx;
   font-weight: 500;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .ai-desc {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
   margin-top: 4rpx;
 }
 
 .ai-arrow {
   font-size: 36rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 /* 卡片头部操作�?*/
@@ -3114,7 +3114,7 @@ function goChat() {
 
 .history-icon {
   font-size: 22rpx;
-  color: #6366f1;
+  color: $primary;
   font-weight: 500;
 }
 
@@ -3132,9 +3132,9 @@ function goChat() {
   font-size: 22rpx;
   font-weight: 600;
 
-  &.is-bullish { background: rgba(244, 63, 94, 0.1); color: #f43f5e; }
-  &.is-bearish { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
-  &.is-neutral { background: rgba(148, 163, 184, 0.1); color: #64748b; }
+  &.is-bullish { background: rgba(244, 63, 94, 0.1); color: $up; }
+  &.is-bearish { background: rgba(34, 197, 94, 0.1); color: $down; }
+  &.is-neutral { background: rgba(148, 163, 184, 0.1); color: $ink-mute; }
 }
 
 .cf-tags-inline {
@@ -3145,10 +3145,10 @@ function goChat() {
 
 .cf-tag-mini {
   padding: 4rpx 12rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 6rpx;
   font-size: 20rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 
 .cf-hero-card {
@@ -3163,15 +3163,15 @@ function goChat() {
 
 .cf-hero-label {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 
 .cf-hero-card-value {
   font-size: 36rpx;
   font-weight: 700;
 
-  &.is-up { color: #f43f5e; }
-  &.is-down { color: #22c55e; }
+  &.is-up { color: $up; }
+  &.is-down { color: $down; }
 }
 
 .cf-orders {
@@ -3180,7 +3180,7 @@ function goChat() {
 
 .cf-orders-title {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
   margin-bottom: 12rpx;
   display: block;
 }
@@ -3194,14 +3194,14 @@ function goChat() {
 
 .cf-order-label {
   font-size: 24rpx;
-  color: #4b5563;
+  color: $ink-soft;
   min-width: 100rpx;
 }
 
 .cf-order-bar-wrap {
   flex: 1;
   height: 16rpx;
-  background: #f0f2f5;
+  background: $line-soft;
   border-radius: 4rpx;
   overflow: hidden;
 }
@@ -3210,8 +3210,8 @@ function goChat() {
   height: 100%;
   border-radius: 4rpx;
 
-  &.is-up { background: linear-gradient(90deg, #f43f5e, #fb7185); }
-  &.is-down { background: linear-gradient(90deg, #22c55e, #4ade80); }
+  &.is-up { background: linear-gradient(90deg, $up, $up-light); }
+  &.is-down { background: linear-gradient(90deg, $down, $down-light); }
 }
 
 .cf-order-value {
@@ -3220,8 +3220,8 @@ function goChat() {
   min-width: 100rpx;
   text-align: right;
 
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 .cf-trend {
@@ -3237,7 +3237,7 @@ function goChat() {
 
 .cf-trend-title {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 
 .cf-trend-badge {
@@ -3245,7 +3245,7 @@ function goChat() {
   background: rgba(77, 124, 254, 0.1);
   border-radius: 6rpx;
   font-size: 20rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .cf-trend-bars {
@@ -3269,13 +3269,13 @@ function goChat() {
   border-radius: 4rpx 4rpx 0 0;
   min-height: 4rpx;
 
-  &.is-up { background: #f43f5e; }
-  &.is-down { background: #22c55e; }
+  &.is-up { background: $up; }
+  &.is-down { background: $down; }
 }
 
 .cf-trend-date {
   font-size: 18rpx;
-  color: #9ca3af;
+  color: $ink-faint;
   text-align: center;
 }
 
@@ -3283,7 +3283,7 @@ function goChat() {
   display: block;
   margin-top: 8rpx;
   font-size: 22rpx;
-  color: #dc2626;
+  color: $up;
   line-height: 1.5;
 }
 
@@ -3297,12 +3297,12 @@ function goChat() {
 
 .forecast-update-label {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 .forecast-update-value {
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 
 .forecast-yoy {
@@ -3310,27 +3310,27 @@ function goChat() {
   align-items: center;
   justify-content: space-between;
   padding: 16rpx 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
   margin-bottom: 16rpx;
 }
 
 .forecast-yoy-label {
   font-size: 26rpx;
-  color: #4b5563;
+  color: $ink-soft;
 }
 
 .forecast-yoy-value {
   font-size: 32rpx;
   font-weight: 700;
 
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 .forecast-year-panel {
   padding: 20rpx;
-  background: #f8fafc;
+  background: $bg-soft;
   border-radius: 12rpx;
   margin-bottom: 16rpx;
 }
@@ -3345,12 +3345,12 @@ function goChat() {
 .forecast-year-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: #334155;
+  color: $ink-soft;
 }
 
 .forecast-year-unit {
   font-size: 22rpx;
-  color: #94a3b8;
+  color: $ink-mute;
 }
 
 .forecast-year-list {
@@ -3361,9 +3361,9 @@ function goChat() {
 
 .forecast-year-item {
   padding: 16rpx;
-  background: #ffffff;
+  background: $bg-card;
   border-radius: 12rpx;
-  border: 1rpx solid #eef2f7;
+  border: 1rpx solid $line-soft;
 }
 
 .forecast-year-main {
@@ -3389,7 +3389,7 @@ function goChat() {
 .forecast-year-label {
   display: block;
   font-size: 26rpx;
-  color: #334155;
+  color: $ink-soft;
   font-weight: 600;
 }
 
@@ -3397,15 +3397,15 @@ function goChat() {
   display: block;
   margin-top: 2rpx;
   font-size: 21rpx;
-  color: #64748b;
+  color: $ink-mute;
 
-  &.is-actual { color: #4d7cfe; }
-  &.is-forecast { color: #d97706; }
+  &.is-actual { color: $primary; }
+  &.is-forecast { color: $warning; }
 }
 
 .forecast-year-value {
   font-size: 28rpx;
-  color: #1e293b;
+  color: $ink;
   font-weight: 800;
 }
 
@@ -3413,8 +3413,8 @@ function goChat() {
   font-size: 22rpx;
   font-weight: 700;
 
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
+  &.up { color: $up; }
+  &.down { color: $down; }
 }
 
 .forecast-detail-toggle {
@@ -3424,14 +3424,14 @@ function goChat() {
   gap: 12rpx;
   padding: 16rpx 18rpx;
   margin-top: 14rpx;
-  background: #f8fafc;
-  border: 1rpx solid #eef2f7;
+  background: $bg-soft;
+  border: 1rpx solid $line-soft;
   border-radius: 12rpx;
 }
 
 .forecast-detail-toggle-text {
   font-size: 24rpx;
-  color: #334155;
+  color: $ink-soft;
   font-weight: 600;
 }
 
@@ -3440,8 +3440,8 @@ function goChat() {
   width: 32rpx;
   height: 32rpx;
   border-radius: 50%;
-  background: #eaf1ff;
-  color: #4d7cfe;
+  background: $primary-50;
+  color: $primary;
   font-size: 24rpx;
   line-height: 32rpx;
   text-align: center;
@@ -3450,7 +3450,7 @@ function goChat() {
 
 .forecast-progress-track {
   height: 16rpx;
-  background: #e5e7eb;
+  background: $line;
   border-radius: 999rpx;
   overflow: hidden;
 }
@@ -3461,25 +3461,25 @@ function goChat() {
   border-radius: 999rpx;
 
   &.is-actual {
-    background: linear-gradient(90deg, #4d7cfe, #7c9cff);
+    background: linear-gradient(90deg, $primary, $primary-light);
   }
 
   &.is-forecast {
-    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    background: linear-gradient(90deg, $warning, $warning-light);
   }
 }
 
 .forecast-list-header {
   display: flex;
   padding: 12rpx 20rpx;
-  background: #f0f2f5;
+  background: $line-soft;
   border-radius: 8rpx;
   margin-bottom: 4rpx;
 }
 
-.forecast-col-year { flex: 1; font-size: 22rpx; color: #6b7280; font-weight: 600; }
-.forecast-col-profit { flex: 1; font-size: 22rpx; color: #6b7280; font-weight: 600; text-align: center; }
-.forecast-col-growth { flex: 1; font-size: 22rpx; color: #6b7280; font-weight: 600; text-align: right; }
+.forecast-col-year { flex: 1; font-size: 22rpx; color: $ink-mute; font-weight: 600; }
+.forecast-col-profit { flex: 1; font-size: 22rpx; color: $ink-mute; font-weight: 600; text-align: center; }
+.forecast-col-growth { flex: 1; font-size: 22rpx; color: $ink-mute; font-weight: 600; text-align: right; }
 
 .forecast-detail-table {
   margin-top: 12rpx;
@@ -3488,26 +3488,26 @@ function goChat() {
 .forecast-detail-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: #334155;
+  color: $ink-soft;
   margin-bottom: 12rpx;
   display: block;
 }
 
 .forecast-detail-scroll {
   overflow-x: auto;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid $line;
   border-radius: 12rpx;
-  background: #fff;
+  background: $white;
 }
 
 .forecast-detail-row {
   display: flex;
-  border-bottom: 1rpx solid #f0f2f5;
+  border-bottom: 1rpx solid $line-soft;
 
   &:last-child { border-bottom: none; }
 
   &.forecast-detail-head {
-    background: #f5f7fa;
+    background: $bg-soft;
     font-weight: 600;
   }
 }
@@ -3517,7 +3517,7 @@ function goChat() {
   min-width: 120rpx;
   padding: 12rpx 8rpx;
   font-size: 22rpx;
-  color: #4b5563;
+  color: $ink-soft;
   text-align: center;
 
   &.forecast-detail-cell-name {
@@ -3525,7 +3525,7 @@ function goChat() {
     min-width: 160rpx;
     text-align: left;
     padding-left: 16rpx;
-    color: #6b7280;
+    color: $ink-mute;
     font-weight: 500;
   }
 }
@@ -3539,40 +3539,40 @@ function goChat() {
 
 .tenx-real-text {
   font-size: 20rpx;
-  color: #22c55e;
+  color: $down;
   font-weight: 600;
 }
 
 .tenx-score {
-  &.is-high { color: #22c55e; }
-  &.is-mid { color: #eab308; }
-  &.is-low { color: #ef4444; }
+  &.is-high { color: $down; }
+  &.is-mid { color: $warning; }
+  &.is-low { color: $up; }
 }
 
 .verdict-tag {
-  &.is-high { background: #22c55e; }
-  &.is-mid { background: #eab308; }
-  &.is-low { background: #ef4444; }
+  &.is-high { background: $down; }
+  &.is-mid { background: $warning; }
+  &.is-low { background: $up; }
 }
 
 .verdict-text {
   display: block;
   margin-top: 12rpx;
   font-size: 24rpx;
-  color: #4b5563;
+  color: $ink-soft;
   line-height: 1.5;
 }
 
 .tenx-dim-score {
-  &.is-high { color: #22c55e; }
-  &.is-mid { color: #eab308; }
-  &.is-low { color: #ef4444; }
+  &.is-high { color: $down; }
+  &.is-mid { color: $warning; }
+  &.is-low { color: $up; }
 }
 
 .tenx-dim-bar {
-  &.is-high { background: linear-gradient(90deg, #16a34a, #22c55e); }
-  &.is-mid { background: linear-gradient(90deg, #ca8a04, #eab308); }
-  &.is-low { background: linear-gradient(90deg, #dc2626, #ef4444); }
+  &.is-high { background: linear-gradient(90deg, $down, $down); }
+  &.is-mid { background: linear-gradient(90deg, $warning, $warning); }
+  &.is-low { background: linear-gradient(90deg, $up, $up); }
 }
 
 .tenx-ai-conclusion {
@@ -3580,7 +3580,7 @@ function goChat() {
   padding: 16rpx 20rpx;
   background: linear-gradient(135deg, rgba(77, 124, 254, 0.06), rgba(99, 102, 241, 0.03));
   border-radius: 12rpx;
-  border-left: 4rpx solid #4d7cfe;
+  border-left: 4rpx solid $primary;
 }
 
 .tenx-ai-conclusion-header {
@@ -3594,8 +3594,8 @@ function goChat() {
   width: 36rpx;
   height: 36rpx;
   border-radius: 8rpx;
-  background: #4d7cfe;
-  color: #ffffff;
+  background: $primary;
+  color: $white;
   font-size: 20rpx;
   font-weight: 700;
   display: flex;
@@ -3606,12 +3606,12 @@ function goChat() {
 .tenx-ai-conclusion-label {
   font-size: 26rpx;
   font-weight: 600;
-  color: #334155;
+  color: $ink-soft;
 }
 
 .tenx-ai-conclusion-text {
   font-size: 26rpx;
-  color: #4b5563;
+  color: $ink-soft;
   line-height: 1.6;
 }
 
@@ -3624,7 +3624,7 @@ function goChat() {
   align-items: center;
   gap: 8rpx;
   padding: 8rpx 0;
-  border-bottom: 1rpx solid #f5f7fa;
+  border-bottom: 1rpx solid $bg-soft;
 
   &:last-child { border-bottom: none; }
 }
@@ -3632,7 +3632,7 @@ function goChat() {
 .tenx-ind-name {
   flex: 1;
   font-size: 22rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 
 .tenx-ind-right {
@@ -3644,7 +3644,7 @@ function goChat() {
 
 .tenx-ind-value {
   font-size: 22rpx;
-  color: #1a1d24;
+  color: $ink;
   font-weight: 500;
   min-width: 80rpx;
   text-align: right;
@@ -3653,7 +3653,7 @@ function goChat() {
 .tenx-ind-bar-track {
   flex: 1;
   height: 8rpx;
-  background: #f0f2f5;
+  background: $line-soft;
   border-radius: 4rpx;
   overflow: hidden;
 }
@@ -3662,9 +3662,9 @@ function goChat() {
   height: 100%;
   border-radius: 4rpx;
 
-  &.is-high { background: linear-gradient(90deg, #16a34a, #22c55e); }
-  &.is-mid { background: linear-gradient(90deg, #ca8a04, #eab308); }
-  &.is-low { background: linear-gradient(90deg, #dc2626, #ef4444); }
+  &.is-high { background: linear-gradient(90deg, $down, $down); }
+  &.is-mid { background: linear-gradient(90deg, $warning, $warning); }
+  &.is-low { background: linear-gradient(90deg, $up, $up); }
 }
 
 .tenx-ind-score {
@@ -3673,42 +3673,42 @@ function goChat() {
   min-width: 40rpx;
   text-align: right;
 
-  &.is-high { color: #22c55e; }
-  &.is-mid { color: #eab308; }
-  &.is-low { color: #ef4444; }
+  &.is-high { color: $down; }
+  &.is-mid { color: $warning; }
+  &.is-low { color: $up; }
 }
 
 .tenx-data-source {
   margin-top: 16rpx;
   padding-top: 12rpx;
-  border-top: 1rpx solid #f0f2f5;
+  border-top: 1rpx solid $line-soft;
 }
 
 .tenx-source-text {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 /* 基本面子维度 */
 .tenx-sub-dims {
   margin-top: 16rpx;
   padding: 16rpx;
-  background: #f8fafc;
+  background: $bg-soft;
   border-radius: 12rpx;
-  border-left: 4rpx solid #6366f1;
+  border-left: 4rpx solid $primary;
 }
 
 .tenx-sub-dims-title {
   font-size: 24rpx;
   font-weight: 600;
-  color: #4338ca;
+  color: $primary-deep;
   margin-bottom: 12rpx;
   display: block;
 }
 
 .tenx-sub-dim-item {
   padding: 12rpx 0;
-  border-bottom: 1rpx solid #eef2f7;
+  border-bottom: 1rpx solid $line-soft;
 
   &:last-child { border-bottom: none; }
 }
@@ -3724,23 +3724,23 @@ function goChat() {
   flex: 1;
   font-size: 24rpx;
   font-weight: 500;
-  color: #334155;
+  color: $ink-soft;
 }
 
 .tenx-sub-dim-score {
   font-size: 26rpx;
   font-weight: 700;
 
-  &.is-high { color: #22c55e; }
-  &.is-mid { color: #eab308; }
-  &.is-low { color: #ef4444; }
+  &.is-high { color: $down; }
+  &.is-mid { color: $warning; }
+  &.is-low { color: $up; }
 }
 
 .tenx-sub-dim-weight {
   font-size: 20rpx;
-  color: #9ca3af;
+  color: $ink-faint;
   padding: 2rpx 8rpx;
-  background: #eef2f7;
+  background: $line-soft;
   border-radius: 4rpx;
 }
 
@@ -3767,19 +3767,19 @@ function goChat() {
 .tenx-vetoed-icon-text {
   font-size: 48rpx;
   font-weight: 700;
-  color: #ef4444;
+  color: $up;
 }
 
 .tenx-vetoed-title {
   font-size: 32rpx;
   font-weight: 700;
-  color: #ef4444;
+  color: $up;
   margin-bottom: 8rpx;
 }
 
 .tenx-vetoed-desc {
   font-size: 26rpx;
-  color: #6b7280;
+  color: $ink-mute;
   line-height: 1.5;
   margin-bottom: 16rpx;
 }
@@ -3795,7 +3795,7 @@ function goChat() {
 
 .tenx-vetoed-reason-text {
   font-size: 24rpx;
-  color: #4b5563;
+  color: $ink-soft;
   line-height: 1.5;
 }
 
@@ -3817,7 +3817,7 @@ function goChat() {
   width: 90%;
   max-width: 680rpx;
   max-height: 80vh;
-  background: #ffffff;
+  background: $bg-card;
   border-radius: 20rpx;
   display: flex;
   flex-direction: column;
@@ -3829,13 +3829,13 @@ function goChat() {
   align-items: center;
   justify-content: space-between;
   padding: 24rpx 28rpx;
-  border-bottom: 1rpx solid #f0f2f5;
+  border-bottom: 1rpx solid $line-soft;
 }
 
 .history-dialog-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #1a1d24;
+  color: $ink;
 }
 
 .history-dialog-close {
@@ -3845,14 +3845,14 @@ function goChat() {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #f5f7fa;
+  background: $bg-soft;
 
-  &:active { background: #e8ecf1; }
+  &:active { background: $bg-deep; }
 }
 
 .close-icon {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 
 .history-dialog-body {
@@ -3869,10 +3869,10 @@ function goChat() {
 
 .history-item {
   padding: 16rpx 20rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 12rpx;
 
-  &:active { background: #eef0f3; }
+  &:active { background: $bg-deep; }
 }
 
 .history-item-meta {
@@ -3884,21 +3884,21 @@ function goChat() {
 
 .history-item-time {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 .history-item-conclusion {
   font-size: 24rpx;
   font-weight: 600;
 
-  &.is-bull { color: #f43f5e; }
-  &.is-bear { color: #22c55e; }
-  &.is-hold { color: #0066cc; }
+  &.is-bull { color: $up; }
+  &.is-bear { color: $down; }
+  &.is-hold { color: $primary; }
 }
 
 .history-item-logic {
   font-size: 24rpx;
-  color: #4b5563;
+  color: $ink-soft;
   line-height: 1.5;
 }
 
@@ -3909,28 +3909,28 @@ function goChat() {
   gap: 16rpx;
   margin-top: 20rpx;
   padding-top: 16rpx;
-  border-top: 1rpx solid #f0f2f5;
+  border-top: 1rpx solid $line-soft;
 }
 
 .history-page-btn {
   padding: 8rpx 24rpx;
-  background: #f5f7fa;
+  background: $bg-soft;
   border-radius: 8rpx;
 
-  text { font-size: 24rpx; color: #4d7cfe; }
+  text { font-size: 24rpx; color: $primary; }
 
   &.disabled {
     opacity: 0.4;
 
-    text { color: #9ca3af; }
+    text { color: $ink-faint; }
   }
 
-  &:active:not(.disabled) { background: #e8ecf1; }
+  &:active:not(.disabled) { background: $bg-deep; }
 }
 
 .history-page-info {
   font-size: 24rpx;
-  color: #6b7280;
+  color: $ink-mute;
 }
 
 .history-detail-back {
@@ -3942,12 +3942,12 @@ function goChat() {
 
 .back-icon {
   font-size: 32rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .back-text {
   font-size: 24rpx;
-  color: #4d7cfe;
+  color: $primary;
 }
 
 .history-detail-meta {
@@ -3959,16 +3959,16 @@ function goChat() {
 
 .history-detail-time {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: $ink-faint;
 }
 
 .history-detail-conclusion {
   font-size: 28rpx;
   font-weight: 600;
 
-  &.is-bull { color: #f43f5e; }
-  &.is-bear { color: #22c55e; }
-  &.is-hold { color: #0066cc; }
+  &.is-bull { color: $up; }
+  &.is-bear { color: $down; }
+  &.is-hold { color: $primary; }
 }
 
 .history-detail-section {
@@ -3978,16 +3978,16 @@ function goChat() {
 .history-detail-section-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: #334155;
+  color: $ink-soft;
   margin-bottom: 8rpx;
   display: block;
 
-  &.risk { color: #7f1d1d; }
+  &.risk { color: $up-deep; }
 }
 
 .history-detail-section-text {
   font-size: 26rpx;
-  color: #4b5563;
+  color: $ink-soft;
   line-height: 1.6;
 }
 </style>

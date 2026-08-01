@@ -88,8 +88,9 @@
           </view>
           <text class="feature-sub">市场异动溯源分析</text>
           <view class="feature-list">
-            <view class="feature-item">
-              <text class="item-name">查看已完成的每日复盘报告</text>
+            <view v-for="(item, idx) in traceReports" :key="idx" class="feature-item">
+              <text class="item-name">{{ item.name }}</text>
+              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
             </view>
           </view>
         </Card>
@@ -140,7 +141,8 @@ import { buildBriefingUrl } from '@/shared/utils/briefingNavigation'
 import { stockApi } from '@/shared/api/modules/stock'
 import { agentApi } from '@/shared/api/modules/agent'
 import { getEventList } from '@/modules/chat/event/api/eventApi'
-import { shanghaiDateString } from '@/shared/utils/tradingTime'
+import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
+import { toMarketTraceViewModel } from '@/modules/analytics/utils/marketTraceReview'
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
 
 const {
@@ -275,6 +277,36 @@ async function loadChainEvents() {
 
 const aiReports = ref<LeaderStockPreview[]>([])
 
+const traceReports = ref<LeaderStockPreview[]>([])
+
+/**
+ * 大盘溯源卡片：查询最近 3 个自然日的复盘报告状态。
+ * 标签统一用日期（MM-DD），和事件传导卡片一致。
+ * 名称：当日已生成 → 现象快照摘要；待更新 → 规则提示文字。
+ */
+async function loadTraceReports() {
+  const today = shanghaiDateString()
+  const dates = [today, addCalendarDays(today, -1), addCalendarDays(today, -2)]
+  const results = await Promise.allSettled(
+    dates.map(d => agentApi.getMarketTraceReview(d))
+  )
+  traceReports.value = dates.map((d, idx) => {
+    const r = results[idx]
+    const record = r.status === 'fulfilled' ? r.value : null
+    const vm = record ? toMarketTraceViewModel(record, d) : null
+    const isToday = !!record && record.report_date === d
+    const summary = vm?.summary || ''
+    const name = isToday
+      ? (summary || '市场异动溯源分析')
+      : '每日收盘后生成异动溯源'
+    return {
+      name,
+      tag: d.slice(5), // MM-DD
+      tagType: 'date' as const,
+    }
+  })
+}
+
 /** Agent 报告状态预览：检查 4 个 agent（晨报/风口龙头/机构调研/趋势股评分），最多显示3个已更新，不足则补"待更新" */
 const AGENT_REPORT_LABELS: Array<{ intent: string; name: string }> = [
   { intent: 'morning', name: '晨报' },
@@ -331,6 +363,7 @@ onShow(() => {
   loadLeaderSectors()
   loadAiReports()
   loadChainEvents()
+  loadTraceReports()
 })
 
 function goChat() {

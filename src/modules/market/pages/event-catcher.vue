@@ -52,8 +52,15 @@
         </Button>
       </view>
 
+      <!-- 空状态（API成功但无数据） -->
+      <EmptyState
+        v-if="!loading && !events.length && !apiFailed"
+        title="暂无情报"
+        :description="activeCycle === 'all' ? '当前暂无情报数据' : '该周期暂无情报数据'"
+      />
+
       <!-- mock数据（API不可用时显示） -->
-      <view v-if="!loading && !events.length" class="event-list">
+      <view v-if="!loading && !events.length && apiFailed" class="event-list">
         <Card
           v-for="evt in mockEvents"
           :key="evt.event_id"
@@ -98,7 +105,7 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
-import { LoadingState, Tag, Badge, Button, Card, Segmented } from '@/shared/components'
+import { LoadingState, Tag, Badge, Button, Card, Segmented, EmptyState } from '@/shared/components'
 
 interface TrendEvent {
   event_id: string
@@ -135,6 +142,8 @@ const activeCycle = ref('all')
 const total = ref(0)
 const page = ref(0)
 const pageSize = 20
+/** API 是否调用失败（仅失败时才用 mock 兜底，空数据不兜底） */
+const apiFailed = ref(false)
 
 const hasMore = computed(() => events.value.length < total.value)
 
@@ -160,8 +169,10 @@ async function loadEvents(append = false) {
       events.value = list
     }
     if (list.length) page.value++
+    apiFailed.value = false
   } catch (err) {
     if (!append) events.value = []
+    apiFailed.value = true
   } finally {
     loading.value = false
     loadingMore.value = false
@@ -231,7 +242,7 @@ function cycleLabel(cycle?: string): string {
 }
 
 // Mock 数据（本地降级模式）
-const mockEvents: TrendEvent[] = [
+const mockEventsRaw: TrendEvent[] = [
   {
     event_id: 'mock-1',
     symbol: '600740',
@@ -308,6 +319,11 @@ const mockEvents: TrendEvent[] = [
     source: '财联社',
   },
 ]
+
+/** mock 数据按当前 cycle 筛选（DEV 兜底下也能响应 tab 切换） */
+const mockEvents = computed(() =>
+  activeCycle.value === 'all' ? mockEventsRaw : mockEventsRaw.filter(e => e.cycle === activeCycle.value)
+)
 
 onShow(() => {
   loadEvents(false)

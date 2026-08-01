@@ -1,6 +1,65 @@
 # Changelog — aistock-app-frontend
 
-> 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
+> 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
+
+## [master] 2026-08-01 — alert-analysis 结构化渲染 + 通用播报卡片 + 当日缓存 + dev代理指向远程
+
+**开发者**: Aria
+
+### 新增
+- `src/shared/components/PodcastCard.vue`：通用播报卡片组件（idle/loading/ready/error 四态），点击"生成播报"调 `POST /api/agent/brief/generate-podcast` 合成单主播音频，已在 `components/index.ts` 导出，可复用到其他 AI 报告页面
+- `src/shared/api/modules/agent.ts`：新增 `generatePodcast(text, key)` 方法、`getAlertReport(symbol, date)` 方法和 `AlertReportRecord` 类型
+- `src/modules/market/utils/useAlertSSE.ts`：新增 `loadFromCache(symbol, date)` 方法，从 DB 加载 alert 报告并填充 result；新增 `result` 事件处理；超时从 30s 调整为 60s（异动分析含 3 个子 Agent + Master，耗时较长）
+
+### 修复
+- `src/modules/market/pages/alert-analysis.vue`：改用 `result.displayReport` 结构化渲染（summary/details/stocks/risks/keywords/impact），不再用 `markdownToHtml(content)` 渲染原始 JSON 文本（修复 stocks/risks/podcast_brief 等内部字段直接显示的问题）；进入页面先查当日缓存命中直接展示，未命中才 SSE；新增"重新分析"按钮强制刷新；最上方新增 `PodcastCard` 播报卡片
+- `env/.env.development`：`VITE_PROXY_AGENT_TARGET` 从 `http://localhost:8080` 改为 `https://gupiao-api.yaozhineng.com`（本地未启动 Python Agent 服务导致 AI 异动解读 SSE 流连接失败）
+
+### 改进
+- `src/modules/analytics/pages/report-detail.vue`：SVG 图标硬编码 hex 颜色抽为设计令牌常量（primaryColor/warningColor），与组件库 tokens.json 对齐
+- `src/modules/analytics/components/ai-analysis.vue`：SVG 图标硬编码 hex 颜色抽为设计令牌常量（warningColor），与组件库 tokens.json 对齐
+
+---
+
+## [master] 2026-08-01 — 大盘溯源卡片改进 + 资金流向图表颜色令牌化
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/home/components/MorningContent.vue`：大盘溯源卡片标签改为日期(MM-DD)格式(和事件传导一致)，名称改为现象快照摘要文字，待更新时显示规则提示文字"每日收盘后生成异动溯源"
+- `src/modules/favorites/components/CapitalFlowCharts.vue`：数值网格背景改纯白$white(原$bg-soft灰底)，SVG柱形图硬编码hex颜色替换为设计令牌(通过CSS自定义属性桥接SCSS变量$up/$down/$line-soft/$ink-mute/$ink)
+
+---
+
+## [master] 2026-08-01 — 资金流向图表重设计 + 多页面组件库样式统一 + agent-report 空页面修复
+
+**开发者**: Aria
+
+### 重设计
+- `src/modules/favorites/components/CapitalFlowCharts.vue`：资金流向图表重设计（方案C 垂直柱形+数值网格）
+  - 资金拆解：4 条独立横向条形（中心线在50%，正值向右红色，负值向左绿色）
+  - 10日资金节奏：面积折线图改为垂直柱形图（柱子圆角纯色 rx=3，红正绿负，对齐资金拆解样式；最新柱 $ink 深色边框高亮）
+  - 数值网格：底部 5×2 网格显示每日日期+数值，最新格白底 $bg-card + $ink 深边框高亮
+  - 面板纯白底 $bg-card + $line 边框，颜色全部令牌化，删除 latestIsPositive computed
+- `src/modules/analytics/pages/traceability.vue`：大盘溯源页重设计（方案C 调查推理板）
+  - Hero 可信度进度条、现象快照合并卡、归因结论品牌横幅、候选解释双栏、证据 chip 云
+  - 未解问题（蓝 question-line）/风险提示（琥珀 alert-line）颜色区分，删除 hero-icon
+- `src/modules/analytics/pages/trend-score-report.vue`：按 hot-burst-report 样式统一（引入 LoadingState/EmptyState/Card，移除渐变）
+- `src/modules/chat/event/components/AiEventReport.vue`：AI事件分析详情页重设计（Hero卡 + 左侧蓝色色条 + 评级徽章）
+- `src/modules/chat/event/components/AiAnalysisSection.vue`：卡片化 + 蓝色实心编号圆 01-05（$primary 底 + 白字）
+- `src/modules/chat/event/components/InvestmentSummaryCard.vue`：删除重复评级标签（已上移至 Hero 卡）
+- `src/modules/favorites/pages/detail.vue`：个股详情页样式统一（卡片统一 $bg-card+$line+$r-md，间距 24rpx→16rpx，22+处硬编码 hex 令牌化）
+
+### 修复
+- `src/modules/news/pages/detail.vue` + `src/pages.json`：修复顶部多余导航栏（navigationStyle:custom + SubPageCard2 包裹）
+- `src/modules/chat/pages/agent-report.vue`：长线风口空页面兜底（5个结构化Card全不渲染且 detailsText 存在时用 mp-html 渲染 details 原始 markdown）
+- `src/modules/favorites/pages/detail.vue`：AI投顾入口图标改纯白 #ffffff（配合 ai-icon-wrap 蓝色背景圆形）
+
+### 改进
+- `src/modules/home/components/MorningContent.vue`：大盘溯源卡片改为多日列表（方案C，查询 today/today-1/today-2 三天报告状态）
+- `src/modules/chat/event/components/EventTransmissionGraph.vue`：画布背景改浅蓝 $primary-50（#eaf2ff）
+
+---
 
 ## [changer] 2026-08-01 — 大盘溯源报告 app 界面 + 多端适配 + 搜索页导航栏改造
 
@@ -36,6 +95,8 @@
 
 ### 改进
 - `AGENTS.md`：同步早点听页面回退行为说明
+
+---
 
 ## [changer] 2026-07-31 — 同步 PR#30 focusEvents + GI 数据适配 + ghost 文件清理
 
