@@ -1,61 +1,56 @@
 <template>
-  <view class="news-detail-page">
+  <SubPageCard2 title="资讯详情" back-url="/modules/home/pages/index">
     <!-- 加载中 -->
     <LoadingState v-if="loading" />
 
     <!-- 新闻内容 -->
     <template v-else-if="detail">
-      <scroll-view scroll-y class="news-scroll" :enhanced="true" :bounces="false" :style="{ height: scrollHeight + 'px' }">
-        <view class="news-content">
-          <view class="news-header">
-            <text class="news-title">{{ detail.title }}</text>
-            <view class="news-meta">
-              <Tag size="sm">{{ detail.source }}</Tag>
-              <text class="meta-dot">·</text>
-              <text class="news-time">{{ detail.publishTime }}</text>
-            </view>
-          </view>
-
-          <!-- AI深度解析入口 -->
-          <Card v-if="relatedEventId" clickable class="ai-analysis-entry" @click="goToEventDetail">
-            <view class="ai-entry-icon">
-              <SvgIcon name="robot-line" size="32rpx" color="#0b5fff" />
-            </view>
-            <view class="ai-entry-content">
-              <text class="ai-entry-title">AI深度解析</text>
-              <text class="ai-entry-subtitle">查看事件影响链与产业机会</text>
-            </view>
-            <SvgIcon name="arrow-right-s-line" size="36rpx" color="#8a96b0" />
-          </Card>
-
-          <Card v-if="detail.summary" class="news-summary">
-            <text class="summary-text">{{ detail.summary }}</text>
-          </Card>
-
-          <view class="news-body">
-            <rich-text :nodes="formattedContent" />
-          </view>
-
-          <view v-if="detail.url" class="news-footer">
-            <text class="footer-link" @tap="openOriginal">查看原文 ›</text>
+      <view class="news-content">
+        <view class="news-header">
+          <text class="news-title">{{ detail.title }}</text>
+          <view class="news-meta">
+            <Tag size="sm">{{ detail.source }}</Tag>
+            <text class="meta-dot">·</text>
+            <text class="news-time">{{ detail.publishTime }}</text>
           </view>
         </view>
-      </scroll-view>
+
+        <!-- AI深度解析入口 -->
+        <Card v-if="relatedEventId" clickable class="ai-analysis-entry" @click="goToEventDetail">
+          <view class="ai-entry-icon">
+            <SvgIcon name="robot-line" size="32rpx" color="#0b5fff" />
+          </view>
+          <view class="ai-entry-content">
+            <text class="ai-entry-title">AI深度解析</text>
+            <text class="ai-entry-subtitle">查看事件影响链与产业机会</text>
+          </view>
+          <SvgIcon name="arrow-right-s-line" size="36rpx" color="#8a96b0" />
+        </Card>
+
+        <Card v-if="detail.summary" class="news-summary">
+          <text class="summary-text">{{ detail.summary }}</text>
+        </Card>
+
+        <view class="news-body">
+          <rich-text :nodes="formattedContent" />
+        </view>
+
+        <view v-if="detail.url" class="news-footer">
+          <text class="footer-link" @tap="openOriginal">查看原文 ›</text>
+        </view>
+      </view>
     </template>
 
     <!-- 加载失败 / 空状态 -->
     <EmptyState v-else title="暂无资讯详情" />
-
-    <!-- 全局AI对话栏 -->
-    <GlobalChatBar />
-  </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
-import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Tag, Card } from '@/shared/components'
 
@@ -77,17 +72,6 @@ const formattedContent = computed(() => {
   const text = detail.value.content
   return text.split(/\n+/).map(p => `<p style="margin:0 0 16rpx 0;line-height:1.8;font-size:28rpx;color:#374151;">${p}</p>`).join('')
 })
-
-// 动态计算 scroll-view 高度
-const windowHeight = ref(0)
-try {
-  const sysInfo = uni.getSystemInfoSync()
-  windowHeight.value = sysInfo.windowHeight || 667
-} catch (e) {
-  windowHeight.value = 667
-}
-// 系统导航栏页面：windowHeight 已排除导航栏区域
-const scrollHeight = computed(() => windowHeight.value)
 
 onLoad((options) => {
   const newsId = options?.id || ''
@@ -141,21 +125,9 @@ function goToEventDetail() {
 </script>
 
 <style scoped lang="scss">
-/* 系统导航栏页面：不需要 position:fixed，disableScroll 已在 pages.json 中配置 */
-.news-detail-page {
-  min-height: 100vh;
-  background: $bg-card;
-}
-
-/* Scroll */
-.news-scroll {
-  min-height: 0;
-  touch-action: auto;
-  overscroll-behavior: contain;
-}
-
+/* SubPageCard2 已提供白色导航栏 + scroll-view + GlobalChatBar，本页只关心内容样式 */
 .news-content {
-  padding: 16rpx 32rpx 40rpx;
+  padding: 24rpx 32rpx 40rpx;
 }
 
 .news-header {
@@ -252,5 +224,4 @@ function goToEventDetail() {
   color: $ink-soft;
   margin-top: 4rpx;
 }
-
 </style>

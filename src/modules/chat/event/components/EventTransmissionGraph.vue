@@ -108,7 +108,7 @@ const downChain = computed<TransmissionChainNode[]>(() =>
 )
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .transmission-graph {
   display: flex;
   flex-direction: column;
@@ -121,7 +121,7 @@ const downChain = computed<TransmissionChainNode[]>(() =>
   align-items: center;
   width: 100%;
   padding: 16rpx 0;
-  background: #ffffff;
+  background: $primary-50;
   border-radius: 14rpx;
 }
 

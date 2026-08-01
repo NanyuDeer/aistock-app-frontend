@@ -51,15 +51,6 @@
       }
     },
     {
-      "path": "modules/favorites/pages/alert-catcher",
-      "style": {
-        "navigationBarTitleText": "异动捕手",
-        "navigationStyle": "custom",
-        "disableScroll": true,
-        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
-      }
-    },
-    {
       "path": "modules/favorites/pages/stock-trace",
       "style": {
         "navigationBarTitleText": "异动溯源",
@@ -101,6 +92,7 @@
       "path": "modules/market/pages/alert-analysis",
       "style": {
         "navigationBarTitleText": "AI 异动解读",
+        "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }

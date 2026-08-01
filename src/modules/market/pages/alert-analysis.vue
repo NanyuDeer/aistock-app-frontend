@@ -1,82 +1,71 @@
 <template>
-  <view class="page-alert-analysis">
-    <!-- 头部信息区 -->
-    <view class="analysis-header">
-      <view class="analysis-header-bg" />
-      <view class="analysis-header-content">
-        <view class="analysis-back-btn" @tap="goBack">
-          <text class="analysis-back-arrow">←</text>
-        </view>
-        <view class="analysis-header-icon">
-          <SvgIcon name="robot-line" size="36rpx" color="#ffffff" />
-        </view>
-        <view class="analysis-header-info">
-          <text class="analysis-header-title">AI 异动解读</text>
-          <text class="analysis-header-sub">{{ symbol }} {{ cycleLabel }}</text>
-        </view>
+  <SubPageCard2 title="AI 异动解读" :subtitle="`${symbol} ${cycleLabel}`">
+    <view class="page-alert-analysis">
+      <!-- 状态徽标 -->
+      <view class="status-row">
         <Badge v-if="loading && !done" type="info" size="sm">分析中</Badge>
         <Badge v-else-if="done" type="success" size="sm">完成</Badge>
       </view>
-    </view>
 
-    <!-- 错误状态 -->
-    <Card v-if="error" class="error-section">
-      <EmptyState title="分析失败" :description="error">
-        <Button size="sm" @click="retry">重试</Button>
-      </EmptyState>
-    </Card>
+      <!-- 错误状态 -->
+      <Card v-if="error" class="error-section">
+        <EmptyState title="分析失败" :description="error">
+          <Button size="sm" @click="retry">重试</Button>
+        </EmptyState>
+      </Card>
 
-    <!-- 关键词标签 -->
-    <view v-if="!error && analysisKeywords.length" class="keywords-row">
-      <Tag
-        v-for="(kw, idx) in analysisKeywords"
-        :key="idx"
-        :type="keywordTagType(idx)"
-        size="sm"
-      >{{ kw }}</Tag>
-    </view>
-
-    <!-- 精简摘要卡片（优先展示，第一时间了解异动） -->
-    <Card v-if="!error && (analysisSummary || loading)" class="summary-section">
-      <view class="summary-header">
-        <SvgIcon name="flashlight-line" size="24rpx" color="#92400e" />
-        <text class="summary-title">一句话速览</text>
-      </view>
-      <view v-if="analysisSummary" class="summary-body">
-        <text class="summary-text">{{ analysisSummary }}</text>
-      </view>
-      <view v-else class="summary-loading">
-        <text class="summary-loading-text">正在提取核心结论...</text>
-      </view>
-    </Card>
-
-    <!-- 工具执行步骤 -->
-    <view v-if="!error && toolSteps.length" class="analysis-tools-section">
-      <text class="section-label">分析进度</text>
-      <view class="analysis-tools-list">
+      <!-- 关键词标签 -->
+      <view v-if="!error && analysisKeywords.length" class="keywords-row">
         <Tag
-          v-for="(step, idx) in toolSteps"
+          v-for="(kw, idx) in analysisKeywords"
           :key="idx"
-          :type="step.endTime != null ? 'down' : 'neutral'"
+          :type="keywordTagType(idx)"
           size="sm"
-        >{{ step.label }}</Tag>
+        >{{ kw }}</Tag>
       </view>
+
+      <!-- 精简摘要卡片（优先展示，第一时间了解异动） -->
+      <Card v-if="!error && (analysisSummary || loading)" class="summary-section">
+        <view class="summary-header">
+          <SvgIcon name="flashlight-line" size="24rpx" color="#92400e" />
+          <text class="summary-title">一句话速览</text>
+        </view>
+        <view v-if="analysisSummary" class="summary-body">
+          <text class="summary-text">{{ analysisSummary }}</text>
+        </view>
+        <view v-else class="summary-loading">
+          <text class="summary-loading-text">正在提取核心结论...</text>
+        </view>
+      </Card>
+
+      <!-- 工具执行步骤 -->
+      <view v-if="!error && toolSteps.length" class="analysis-tools-section">
+        <text class="section-label">分析进度</text>
+        <view class="analysis-tools-list">
+          <Tag
+            v-for="(step, idx) in toolSteps"
+            :key="idx"
+            :type="step.endTime != null ? 'down' : 'neutral'"
+            size="sm"
+          >{{ step.label }}</Tag>
+        </view>
+      </view>
+
+      <!-- 详细内容区域 -->
+      <Card v-if="!error && content" class="content-section">
+        <text class="section-label">详细分析</text>
+        <view class="analysis-body">
+          <mp-html :content="htmlContent" class="analysis-html" />
+          <text v-if="loading && !done" class="analysis-cursor">|</text>
+        </view>
+      </Card>
+
+      <!-- 加载中（初始） -->
+      <Card v-if="!error && !content && loading" class="content-section">
+        <LoadingState text="AI 正在分析异动数据..." />
+      </Card>
     </view>
-
-    <!-- 详细内容区域 -->
-    <Card v-if="!error && content" class="content-section">
-      <text class="section-label">详细分析</text>
-      <view class="analysis-body">
-        <mp-html :content="htmlContent" class="analysis-html" />
-        <text v-if="loading && !done" class="analysis-cursor">|</text>
-      </view>
-    </Card>
-
-    <!-- 加载中（初始） -->
-    <Card v-if="!error && !content && loading" class="content-section">
-      <LoadingState text="AI 正在分析异动数据..." />
-    </Card>
-  </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
@@ -85,6 +74,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { useAlertSSE } from '@/modules/market/utils/useAlertSSE'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
@@ -180,11 +170,6 @@ function retry() {
   begin()
 }
 
-function goBack() {
-  stop()
-  uni.navigateBack()
-}
-
 onLoad((options: any) => {
   symbol.value = options?.symbol || ''
   cycle.value = options?.cycle || ''
@@ -200,88 +185,20 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .page-alert-analysis {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  padding: $s-3;
   background: $bg-soft;
-  overscroll-behavior: none;
-  touch-action: none;
 }
 
-/* 头部 */
-.analysis-header {
-  position: relative;
-  padding: 48rpx 28rpx 36rpx;
-  overflow: hidden;
-}
-
-.analysis-header-bg {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(135deg, $primary 0%, #6c5ce7 100%);
-  &::after {
-    content: '';
-    position: absolute;
-    top: -40%; right: -15%;
-    width: 240rpx; height: 240rpx;
-    background: rgba(255,255,255,0.06);
-    border-radius: 50%;
-  }
-}
-
-.analysis-header-content {
-  position: relative;
+/* 状态徽标 */
+.status-row {
   display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.analysis-back-btn {
-  width: 56rpx; height: 56rpx;
-  background: rgba(255,255,255,0.2);
-  border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  &:active { opacity: 0.6; }
-}
-
-.analysis-back-arrow { font-size: 32rpx; color: #ffffff; font-weight: 700; }
-
-.analysis-header-icon {
-  width: 64rpx; height: 64rpx;
-  background: rgba(255,255,255,0.2);
-  border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.analysis-header-emoji { display: none; }
-
-.analysis-header-info { flex: 1; min-width: 0; }
-
-.analysis-header-title {
-  font-size: 30rpx;
-  font-weight: 700;
-  color: #ffffff;
-  display: block;
-}
-
-.analysis-header-sub {
-  font-size: 22rpx;
-  color: rgba(255,255,255,0.7);
-  display: block;
-  margin-top: 4rpx;
+  justify-content: flex-end;
+  margin-bottom: $s-2;
 }
 
 /* 错误 */
 .error-section {
-  margin: 24rpx 28rpx;
+  margin-bottom: $s-3;
 }
 
 /* 关键词标签 */
@@ -289,12 +206,12 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 10rpx;
-  padding: 20rpx 28rpx;
+  margin-bottom: $s-3;
 }
 
 /* 精简摘要卡片 */
 .summary-section {
-  margin: 8rpx 28rpx 16rpx;
+  margin-bottom: $s-3;
 }
 
 .summary-header {
@@ -304,7 +221,6 @@ onUnmounted(() => {
   margin-bottom: 10rpx;
 }
 
-.summary-icon { display: none; }
 .summary-title { font-size: 24rpx; font-weight: 600; color: #92400e; }
 
 .summary-text {
@@ -320,15 +236,15 @@ onUnmounted(() => {
 
 .summary-loading-text {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: $ink-mute;
 }
 
 /* 工具步骤 */
-.analysis-tools-section { margin: 0 28rpx 12rpx; }
+.analysis-tools-section { margin-bottom: $s-3; }
 
 .section-label {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   margin-bottom: 10rpx;
   display: block;
   padding-left: 4rpx;
@@ -338,7 +254,7 @@ onUnmounted(() => {
 
 /* 内容卡片 */
 .content-section {
-  margin: 0 28rpx 40rpx;
+  margin-bottom: $s-4;
 }
 
 /* 正文 */
@@ -350,9 +266,9 @@ onUnmounted(() => {
   :deep(h2.md-h2) {
     font-size: 32rpx; font-weight: 600; color: $ink;
     margin: 24rpx 0 16rpx; padding-bottom: 12rpx;
-    border-bottom: 2rpx solid #f0f2f5;
+    border-bottom: 2rpx solid $line-soft;
   }
-  :deep(h3.md-h3) { font-size: 28rpx; font-weight: 600; color: #374151; margin: 20rpx 0 10rpx; }
+  :deep(h3.md-h3) { font-size: 28rpx; font-weight: 600; color: $ink-soft; margin: 20rpx 0 10rpx; }
   :deep(hr.md-hr) {
     border: none; height: 1rpx;
     background: linear-gradient(90deg, transparent, $line, transparent);
@@ -362,12 +278,12 @@ onUnmounted(() => {
   :deep(table.md-table) {
     width: 100%; border-collapse: collapse; margin: 12rpx 0;
     font-size: 24rpx; border-radius: 12rpx; overflow: hidden;
-    th { background: #f0f4ff; padding: 12rpx 16rpx; text-align: left; font-weight: 600; color: $primary; }
-    td { padding: 10rpx 16rpx; border-bottom: 1rpx solid #f0f2f5; color: #374151; }
+    th { background: $bg-soft; padding: 12rpx 16rpx; text-align: left; font-weight: 600; color: $primary; }
+    td { padding: 10rpx 16rpx; border-bottom: 1rpx solid $line-soft; color: $ink-soft; }
     tr:last-child td { border-bottom: none; }
   }
   :deep(ol.md-ol), :deep(ul.md-ul) { padding-left: 32rpx; margin: 8rpx 0; }
-  :deep(li) { font-size: 26rpx; color: #374151; line-height: 1.8; }
+  :deep(li) { font-size: 26rpx; color: $ink-soft; line-height: 1.8; }
 }
 
 .analysis-cursor {

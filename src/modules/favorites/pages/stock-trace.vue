@@ -17,19 +17,32 @@
         <text v-if="primary" class="meta">主因层级：{{ layerLabel(primary.layer) }} · 已校验证据 {{ analysis.artifact.movementView.evidenceCount }} 条</text>
       </view>
 
+      <view v-if="analysisSummary" class="section">
+        <text class="section-title">归因摘要</text>
+        <text class="summary">{{ analysisSummary }}</text>
+      </view>
+
       <view v-if="chainNodes.length" class="section">
         <text class="section-title">可审计推理链</text>
-        <view v-for="node in chainNodes" :key="node.nodeId" class="row">
-          <text class="tag">{{ stageLabel(node.stage) }}</text>
+        <view v-for="node in chainNodes" :key="node.nodeId" class="chain-node">
+          <view class="chain-node-header">
+            <text class="tag">{{ stageLabel(node.stage) }}</text>
+            <text :class="['tag', 'ghost']">{{ epistemicLabel(node.epistemicType) }}</text>
+            <text :class="['tag', node.status === 'established' ? 'ghost' : 'warning']">{{ nodeStatusLabel(node.status) }}</text>
+          </view>
           <text class="row-text">{{ node.claim }}</text>
         </view>
       </view>
 
       <view v-if="evidence.length" class="section">
         <text class="section-title">新闻 / 公告证据</text>
-        <view v-for="source in evidence" :key="source.source_id" class="row">
-          <text class="tag">{{ source.source_level }}级{{ sourceKindLabel(source.kind) }}</text>
-          <text class="row-text">{{ source.title }}</text>
+        <view v-for="source in evidence" :key="source.source_id" class="evidence-card" @tap="openEvidence(source.canonical_url)">
+          <view class="row">
+            <text class="tag">{{ source.source_level }}级{{ sourceKindLabel(source.kind) }}</text>
+            <text class="row-text">{{ source.title }}</text>
+          </view>
+          <text v-if="source.content_excerpt" class="evidence-excerpt">{{ source.content_excerpt }}</text>
+          <text v-if="source.canonical_url" class="evidence-link">查看原始来源</text>
         </view>
       </view>
 
@@ -70,6 +83,18 @@ const chainNodes = computed<TraceChainNode[]>(() => {
 const evidence = computed<TraceEvidence[]>(() => {
   const ids = new Set(primary.value?.supportingEvidenceIds || [])
   return (analysis.value?.artifact?.artifactJson.evidence_index || []).filter((source) => ids.has(source.source_id))
+})
+
+/** 自然语言归因摘要：把事件 + 证据 + 主因候选拼成可读段落（借鉴 PR #38） */
+const analysisSummary = computed<string>(() => {
+  const evt = event.value
+  const artifact = analysis.value?.artifact
+  const primaryCandidate = artifact?.movementView.primaryCandidate
+  if (!evt || !artifact || !primaryCandidate) return ''
+  const source = evidence.value[0]
+  const movement = `${evt.stock_name}（${evt.symbol}）在 ${formatTime(evt.triggered_at)} 出现 ${signedChange(evt.change_pct)} 的价格异动。`
+  if (!source) return `${movement}当前没有可引用的主因证据，结论仅保留为待验证。`
+  return `${movement}在异动时间窗内发现 ${source.source_level} 级${sourceKindLabel(source.kind)}《${source.title}》，该事实支持“${layerLabel(primaryCandidate.layer)}”为当前主因候选；结论为${statusLabel(artifact.movementView.status)}，置信度${confidenceLabel(artifact.movementView.confidenceLevel)}。`
 })
 
 /** 仅开发预览：让落后分支页面在后端暂未对接时也能完整查看归因链样式。 */
@@ -118,7 +143,13 @@ function loadMockTrace() {
   analysis.value = STOCK_TRACE_MOCK_ANALYSIS
 }
 
-onLoad((options) => { eventId.value = typeof options?.event_id === 'string' ? options.event_id : '' })
+onLoad((options) => {
+  // uni-app 传递的 event_id 可能被 encodeURIComponent 编码过（monitor.vue goTrace + uni.navigateTo），
+  // 需要 decodeURIComponent 还原为原始 event_id（含冒号），否则后续 stockTraceApi.get 中的
+  // encodeURIComponent 会双重编码导致后端收到 mv%3A... 而非 mv:...
+  const raw = typeof options?.event_id === 'string' ? options.event_id : ''
+  try { eventId.value = decodeURIComponent(raw) } catch { eventId.value = raw }
+})
 onMounted(async () => {
   if (!eventId.value) {
     if (import.meta.env.DEV) loadMockTrace()
@@ -141,6 +172,19 @@ function confidenceLabel(value?: string): string { return ({ high: '高', medium
 function layerLabel(value: string): string { return ({ company: '个股自身', sector: '板块联动', market: '市场环境' } as Record<string, string>)[value] || value }
 function stageLabel(value: TraceChainNode['stage']): string { return ({ structural_root: '根因事实', trigger: '异动触发', transmission: '传导路径', exposure: '影响暴露', repricing: '市场重估', observable_result: '可观测结果' })[value] }
 function sourceKindLabel(value: TraceEvidence['kind']): string { return ({ announcement: '公告', news: '新闻', trigger_fact: '触发事实', quote_fact: '行情事实', sector_fact: '板块事实', market_fact: '市场事实' })[value] }
+function epistemicLabel(value: TraceChainNode['epistemicType']): string { return ({ fact: '事实', inference: '推断', hypothesis: '假设' })[value] }
+function nodeStatusLabel(value: TraceChainNode['status']): string { return ({ established: '已建立', partial: '部分成立', not_established: '未建立' })[value] }
+
+/** 证据原文跳转：H5 新窗口打开，非 H5 复制链接到剪贴板 */
+function openEvidence(url?: string) {
+  if (!url) return
+  // #ifdef H5
+  window.open(url, '_blank', 'noopener')
+  // #endif
+  // #ifndef H5
+  void uni.setClipboardData({ data: url })
+  // #endif
+}
 </script>
 
 <style lang="scss" scoped>
@@ -148,5 +192,8 @@ function sourceKindLabel(value: TraceEvidence['kind']): string { return ({ annou
 .page-stock-trace { min-height: 100%; padding: $s-3; background: $bg-page; }
 .event-card, .section { display: flex; flex-direction: column; gap: $s-2; padding: $s-3; margin-bottom: $s-3; background: $bg-card; border: 2rpx solid $line; border-radius: $r-lg; box-shadow: $shadow-sm; }
 .event-title { display: flex; align-items: baseline; gap: $spacing-sm; color: $text-color-title; font-size: $font-size-lg; font-weight: 600; }.symbol, .meta, .event-fact { color: $text-color-secondary; font-size: $font-size-sm; font-weight: 400; }.change { font-size: 44rpx; font-weight: 700; }.change.up { color: $stock-up-color; }.change.down { color: $stock-down-color; }
-.section-title { color: $text-color-title; font-size: $font-size-base; font-weight: 600; }.summary, .row-text { color: $text-color-secondary; font-size: $font-size-sm; line-height: 1.6; }.row { display: flex; gap: $spacing-sm; align-items: flex-start; padding-top: $spacing-sm; border-top: 1rpx solid $border-color-light; }.tag { flex: 0 0 auto; padding: 2rpx 8rpx; color: $brand-color; background: rgba($brand-color, .1); border-radius: $radius-sm; font-size: $font-size-xs; }.unavailable { border-left: 6rpx solid $warning-color; }.state { padding: 120rpx 0; text-align: center; color: $text-color-secondary; font-size: $font-size-base; }
+.section-title { color: $text-color-title; font-size: $font-size-base; font-weight: 600; }.summary, .row-text { color: $text-color-secondary; font-size: $font-size-sm; line-height: 1.6; }.row { display: flex; gap: $spacing-sm; align-items: flex-start; padding-top: $spacing-sm; border-top: 1rpx solid $border-color-light; }.tag { flex: 0 0 auto; padding: 2rpx 8rpx; color: $brand-color; background: rgba($brand-color, .1); border-radius: $radius-sm; font-size: $font-size-xs; }.tag.ghost { color: $text-color-secondary; background: rgba($text-color-secondary, .1); }.tag.warning { color: $warning-color; background: rgba($warning-color, .12); }
+.chain-node { display: flex; flex-direction: column; gap: 6rpx; padding-top: $spacing-sm; border-top: 1rpx solid $border-color-light; }.chain-node-header { display: flex; align-items: center; gap: 8rpx; flex-wrap: wrap; }
+.evidence-card { display: flex; flex-direction: column; gap: 6rpx; padding-top: $spacing-sm; border-top: 1rpx solid $border-color-light; }.evidence-excerpt { color: $text-color-secondary; font-size: $font-size-xs; line-height: 1.5; }.evidence-link { color: $brand-color; font-size: $font-size-xs; }
+.unavailable { border-left: 6rpx solid $warning-color; }.state { padding: 120rpx 0; text-align: center; color: $text-color-secondary; font-size: $font-size-base; }
 </style>

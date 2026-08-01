@@ -1,17 +1,16 @@
 <template>
-  <view class="analysis-section" :class="{ 'is-pending': status === 'pending', 'is-last': isLast }">
-    <!-- 步骤头部：编号圆 + 标题 + 状态 -->
+  <view class="analysis-section" :class="{ 'is-pending': status === 'pending' }">
+    <!-- 步骤头部：蓝色编号圆 + 标题 + 状态 -->
     <view class="section-header">
       <view class="section-number" :class="numStatusClass">
-        <text class="section-num-text" v-if="status === 'completed'">✓</text>
-        <text class="section-num-text" v-else>{{ padNumber }}</text>
+        <text class="section-num-text">{{ padNumber }}</text>
       </view>
       <text class="section-title">{{ title }}</text>
       <view class="section-status" v-if="status === 'processing' || status === 'generating'">
         <LoadingState size="sm" layout="horizontal" :text="status === 'processing' ? 'AI开始分析...' : 'AI正在生成...'" />
       </view>
       <view class="section-status" v-else-if="status === 'completed'">
-        <text class="status-label done">分析完成</text>
+        <text class="status-label done">✓ 完成</text>
       </view>
       <text class="section-status pending-label" v-else>等待中</text>
     </view>
@@ -48,13 +47,15 @@
  * 支持 pending / processing / generating / completed 四态。
  * processing + generating 时展示内容的逐字流式输出效果。
  *
+ * 视觉：白底卡片 + 蓝色实心编号圆 01-05（方案C），状态用右侧标签表达。
+ *
  * Props:
  * - stepNumber: 步骤序号
  * - title: 步骤标题
  * - status: pending | processing | generating | completed
  * - explanation: AI 完成后的解释文本
  * - streamingText: 流式输出的实时文本
- * - isFirst / isLast: 连接线控制
+ * - isFirst / isLast: 连接线控制（保留兼容，卡片化后不再用 border-bottom 分隔）
  *
  * Slot: default — completed 后的业务组件
  */
@@ -97,39 +98,42 @@ watch(() => props.status, (val) => {
   }
 })
 
+/** 编号圆配色：completed/processing/generating 用品牌蓝实心，pending 用浅灰 */
 const numStatusClass = computed(() => {
-  if (props.status === 'completed') return 'num-completed'
-  if (props.status === 'generating' || props.status === 'processing') return 'num-processing'
-  return 'num-pending'
+  if (props.status === 'pending') return 'num-pending'
+  return 'num-active'
 })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+/* 卡片化（方案C）：白底 + 边框 + 圆角，卡片间留间距 */
 .analysis-section {
   position: relative;
-  padding: 32rpx 32rpx 28rpx;
-  border-bottom: 1px solid var(--ev-border);
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+  padding: 28rpx 28rpx 24rpx;
+  margin-bottom: 20rpx;
   transition: opacity 0.3s ease;
 }
 
-.analysis-section.is-last { border-bottom: none; }
-
 .analysis-section.is-pending {
-  opacity: 0.5;
+  opacity: 0.55;
 }
 
 /* ===== 步骤头部 ===== */
 .section-header {
   display: flex;
   align-items: center;
-  gap: 14rpx;
+  gap: 16rpx;
   margin-bottom: 16rpx;
 }
 
+/* 蓝色实心编号圆 01-05（方案C 标识） */
 .section-number {
   flex-shrink: 0;
-  width: 44rpx;
-  height: 44rpx;
+  width: 48rpx;
+  height: 48rpx;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -137,28 +141,34 @@ const numStatusClass = computed(() => {
   transition: all 0.3s ease;
 }
 
-.num-pending { background: rgba(148, 163, 184, 0.1); }
-.num-processing { background: var(--ev-accent-soft); }
-.num-completed { background: var(--ev-positive-soft); }
+/* 活跃态（processing/generating/completed）：品牌蓝实心 + 白字 */
+.num-active {
+  background: $primary;
+  box-shadow: 0 2rpx 8rpx rgba(11, 95, 255, 0.25);
+}
+
+/* 等待态：浅灰底 + 灰字 */
+.num-pending {
+  background: rgba(138, 150, 176, 0.15);
+}
 
 .section-num-text {
-  font-size: 20rpx;
+  font-size: 22rpx;
   font-weight: 700;
   transition: color 0.3s ease;
 }
 
-.num-pending .section-num-text { color: var(--ev-text-muted); }
-.num-processing .section-num-text { color: var(--ev-accent); }
-.num-completed .section-num-text { color: var(--ev-positive); }
+.num-active .section-num-text { color: #ffffff; }
+.num-pending .section-num-text { color: $ink-mute; }
 
 .section-title {
   flex: 1;
-  font-size: 26rpx;
+  font-size: 28rpx;
   font-weight: 700;
-  color: var(--ev-text-primary);
+  color: $ink;
   min-width: 0;
 }
-.is-pending .section-title { color: var(--ev-text-muted); }
+.is-pending .section-title { color: $ink-mute; }
 
 /* 状态标签 */
 .section-status {
@@ -168,9 +178,9 @@ const numStatusClass = computed(() => {
   gap: 6rpx;
 }
 
-.status-label { font-size: 20rpx; color: var(--ev-accent); font-weight: 500; }
-.status-label.done { color: var(--ev-positive); }
-.pending-label { font-size: 20rpx; color: var(--ev-text-muted); }
+.status-label { font-size: 22rpx; color: $primary; font-weight: 500; }
+.status-label.done { color: $down; }
+.pending-label { font-size: 22rpx; color: $ink-mute; }
 
 /* ===== 流式文本 ===== */
 .section-stream {
@@ -184,7 +194,7 @@ const numStatusClass = computed(() => {
 }
 .thinking-body {
   font-size: 22rpx;
-  color: var(--ev-text-tertiary);
+  color: $ink-mute;
   line-height: 1.6;
 }
 

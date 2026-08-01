@@ -18,14 +18,16 @@
             <ListCell
               v-for="(item, idx) in displayCaptureList"
               :key="idx"
-              :title="item.name"
-              :description="item.detail"
+              :title="item.stock_name"
+              :description="captureDetail(item)"
+              clickable
+              @click="goTrace(item.event_id)"
             >
               <template #prefix>
-                <Tag :type="captureTagType(item.type)" size="sm">{{ badgeLabel(item.type) }}</Tag>
+                <Tag :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
               </template>
               <template #value>
-                <text class="capture-time">{{ item.time }}</text>
+                <text class="capture-time">{{ formatTime(item.triggered_at) }}</text>
               </template>
             </ListCell>
             <EmptyState v-if="!captureList.length" title="暂无异动数据" />
@@ -55,9 +57,11 @@
               :key="idx"
               :title="item.title"
               :description="item.meta"
+              clickable
+              @click="goAlertAnalysis(item.symbol, item.cycle)"
             >
               <template #prefix>
-                <Tag :type="sourceTagType(item.sourceType)" size="sm">{{ sourceLabel(item.sourceType) }}</Tag>
+                <Tag :type="impactTagType(item.sentiment)" size="sm">{{ impactLabel(item.sentiment) }}</Tag>
               </template>
             </ListCell>
             <EmptyState v-if="!filteredIntelList.length" title="暂无情报数据" />
@@ -69,22 +73,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Segmented from '@/shared/components/Segmented.vue'
 import ListCell from '@/shared/components/ListCell.vue'
 import Tag from '@/shared/components/Tag.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-
-// 异动类型
-type CaptureType = 'up' | 'vol' | 'speed' | 'limit'
-
-interface CaptureItem {
-  type: CaptureType
-  name: string
-  detail: string
-  time: string
-}
+import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
+import { stockApi } from '@/shared/api/modules/stock'
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -94,6 +90,10 @@ interface IntelItem {
   title: string
   meta: string
   sentiment: 'positive' | 'negative' | 'neutral'
+  /** 关联股票代码（点击跳 AI 解读用） */
+  symbol: string
+  /** 分析周期（点击跳 AI 解读用） */
+  cycle: string
 }
 
 const intelSubTab = ref<'all' | 'positive' | 'negative'>('all')
@@ -104,22 +104,81 @@ const intelTabItems = [
   { label: '利空', value: 'negative' as const },
 ]
 
-// 异动捕手 mock 数据
-const captureList = ref<CaptureItem[]>([
-  { type: 'limit', name: '舒泰神', detail: '涨停封板 · 封单金额12.3亿', time: '10:15' },
-  { type: 'speed', name: '迈瑞医疗', detail: '急速下跌 · 3分钟跌幅4.2%', time: '13:45' },
-  { type: 'vol', name: '恒瑞医药', detail: '异常放量 · 成交额超昨日全天', time: '13:58' },
-  { type: 'up', name: '广生堂', detail: '快速拉升 · 5分钟涨幅8.5%', time: '14:32' },
-])
+// 异动捕手：接真实 API（DEV 模式下后端无数据时用 mock 兜底，保留首页视觉完整性）
+const captureList = ref<StockTraceEvent[]>([])
 
-// 个股情报 mock 数据
-const intelList = ref<IntelItem[]>([
-  { sourceType: 'announce', title: '恒瑞医药：PD-1新药获FDA批准上市', meta: '利好 · 2小时前', sentiment: 'positive' },
-  { sourceType: 'research', title: '中金上调宁德时代目标价至320元', meta: '利好 · 4小时前', sentiment: 'positive' },
-  { sourceType: 'news', title: '比亚迪：上半年新能源汽车销量同比增长38%', meta: '利好 · 6小时前', sentiment: 'positive' },
-  { sourceType: 'announce', title: '药明康德：美国拟扩大对华生物制造限制', meta: '利空 · 1天前', sentiment: 'negative' },
-  { sourceType: 'research', title: '某头部券商下调贵州茅台评级至"中性"', meta: '利空 · 2天前', sentiment: 'negative' },
-])
+/** DEV 模式 mock 数据（结构与 StockTraceEvent 对齐） */
+const CAPTURE_MOCK_DATA: StockTraceEvent[] = [
+  { event_id: 'mock-cap-001', trigger_revision: 1, symbol: '300204', stock_name: '舒泰神', event_type: 'price', direction: 'up', triggered_at: '2026-07-31T10:15:00+08:00', latest_price: 12.34, previous_close: 11.23, change_pct: 9.84, threshold_pct: 5, severity: 'high', rule_version: 'v1', analysis_status: 'completed' },
+  { event_id: 'mock-cap-002', trigger_revision: 1, symbol: '300760', stock_name: '迈瑞医疗', event_type: 'price', direction: 'down', triggered_at: '2026-07-31T13:45:00+08:00', latest_price: 245.60, previous_close: 256.40, change_pct: -4.21, threshold_pct: 5, severity: 'medium', rule_version: 'v1', analysis_status: 'completed' },
+  { event_id: 'mock-cap-003', trigger_revision: 1, symbol: '600276', stock_name: '恒瑞医药', event_type: 'price', direction: 'up', triggered_at: '2026-07-31T13:58:00+08:00', latest_price: 48.92, previous_close: 46.20, change_pct: 5.89, threshold_pct: 5, severity: 'medium', rule_version: 'v1', analysis_status: 'processing' },
+  { event_id: 'mock-cap-004', trigger_revision: 1, symbol: '300436', stock_name: '广生堂', event_type: 'price', direction: 'up', triggered_at: '2026-07-31T14:32:00+08:00', latest_price: 23.45, previous_close: 21.60, change_pct: 8.56, threshold_pct: 5, severity: 'high', rule_version: 'v1', analysis_status: 'completed' },
+]
+
+async function loadCaptureList() {
+  try {
+    const result = await stockTraceApi.list(4)
+    captureList.value = result.items
+    if (import.meta.env.DEV && !captureList.value.length) {
+      captureList.value = CAPTURE_MOCK_DATA
+    }
+  } catch {
+    captureList.value = import.meta.env.DEV ? CAPTURE_MOCK_DATA : []
+  }
+}
+
+// 个股情报：接真实 API（DEV 模式下后端无数据时用 mock 兜底）
+const intelList = ref<IntelItem[]>([])
+
+/** DEV 模式 mock 数据 */
+const INTEL_MOCK_DATA: IntelItem[] = [
+  { sourceType: 'announce', title: '恒瑞医药：PD-1新药获FDA批准上市', meta: '利好 · 2小时前', sentiment: 'positive', symbol: '600276', cycle: 'mid' },
+  { sourceType: 'research', title: '中金上调宁德时代目标价至320元', meta: '利好 · 4小时前', sentiment: 'positive', symbol: '300750', cycle: 'mid' },
+  { sourceType: 'news', title: '比亚迪：上半年新能源汽车销量同比增长38%', meta: '利好 · 6小时前', sentiment: 'positive', symbol: '002594', cycle: 'mid' },
+  { sourceType: 'announce', title: '药明康德：美国拟扩大对华生物制造限制', meta: '利空 · 1天前', sentiment: 'negative', symbol: '603259', cycle: 'short' },
+  { sourceType: 'research', title: '某头部券商下调贵州茅台评级至"中性"', meta: '利空 · 2天前', sentiment: 'negative', symbol: '600519', cycle: 'long' },
+]
+
+/** 把后端 TrendEvent 映射成 IntelItem（推断来源类型和情感倾向） */
+function mapTrendEventToIntelItem(evt: Record<string, unknown>): IntelItem {
+  const impact = String(evt.ai_impact ?? '中性')
+  const sentiment: IntelItem['sentiment'] = impact.includes('利空') ? 'negative' : impact.includes('利') ? 'positive' : 'neutral'
+  const infoType = String(evt.info_type ?? evt.change_type_name ?? '')
+  const sourceType: SourceType = infoType.includes('公告') ? 'announce' : infoType.includes('研') ? 'research' : 'news'
+  return {
+    sourceType,
+    title: String(evt.title ?? ''),
+    meta: `${impact} · ${formatRelativeTime(String(evt.event_time ?? evt.published_at ?? ''))}`,
+    sentiment,
+    symbol: String(evt.stock_code ?? evt.symbol ?? ''),
+    cycle: String(evt.cycle ?? 'mid'),
+  }
+}
+
+async function loadIntelList() {
+  try {
+    const res = await stockApi.getTrendEvents({ limit: 10 }) as Record<string, unknown>
+    const list = (res?.events || (res?.data as Record<string, unknown>)?.events || []) as Record<string, unknown>[]
+    intelList.value = list.map(mapTrendEventToIntelItem)
+    if (import.meta.env.DEV && !intelList.value.length) {
+      intelList.value = INTEL_MOCK_DATA
+    }
+  } catch {
+    intelList.value = import.meta.env.DEV ? INTEL_MOCK_DATA : []
+  }
+}
+
+/** 相对时间格式化：刚刚 / X小时前 / X天前 */
+function formatRelativeTime(value: string): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const diff = Date.now() - date.getTime()
+  const hours = Math.floor(diff / 3600000)
+  if (hours < 1) return '刚刚'
+  if (hours < 24) return `${hours}小时前`
+  return `${Math.floor(hours / 24)}天前`
+}
 
 const filteredIntelList = computed(() => {
   if (intelSubTab.value === 'all') return intelList.value
@@ -131,33 +190,35 @@ const MAX_PREVIEW = 4
 const displayCaptureList = computed(() => captureList.value.slice(0, MAX_PREVIEW))
 const displayIntelList = computed(() => filteredIntelList.value.slice(0, MAX_PREVIEW))
 
-function badgeLabel(type: CaptureType): string {
-  const map: Record<CaptureType, string> = { up: '涨', vol: '量', speed: '速', limit: '封' }
-  return map[type]
+function badgeLabel(direction: 'up' | 'down'): string {
+  return direction === 'up' ? '涨' : '跌'
 }
 
-function sourceLabel(type: SourceType): string {
-  const map: Record<SourceType, string> = { announce: '公', research: '研', news: '新' }
-  return map[type]
+/** 情感 → 标签文案：利好→好，利空→空，中性→中（与 event-catcher 风格一致） */
+function impactLabel(sentiment: IntelItem['sentiment']): string {
+  return sentiment === 'positive' ? '好' : sentiment === 'negative' ? '空' : '中'
 }
 
-/** 异动类型 → Tag type：涨→up(红)，量→neutral(蓝)，速→gold，封→warning(橙) */
-function captureTagType(type: CaptureType): 'up' | 'neutral' | 'gold' | 'warning' {
-  switch (type) {
-    case 'up': return 'up'
-    case 'vol': return 'neutral'
-    case 'speed': return 'gold'
-    case 'limit': return 'warning'
-  }
+/** 情感 → Tag type：利好→up(红)，利空→down(绿)，中性→neutral(蓝) */
+function impactTagType(sentiment: IntelItem['sentiment']): 'up' | 'down' | 'neutral' {
+  return sentiment === 'positive' ? 'up' : sentiment === 'negative' ? 'down' : 'neutral'
 }
 
-/** 情报来源 → Tag type：公告→neutral(蓝)，研报→gold，新闻→warning(橙) */
-function sourceTagType(type: SourceType): 'neutral' | 'gold' | 'warning' {
-  switch (type) {
-    case 'announce': return 'neutral'
-    case 'research': return 'gold'
-    case 'news': return 'warning'
-  }
+/** 异动方向 → Tag type：涨→up(红)，跌→down(绿) */
+function captureTagType(direction: 'up' | 'down'): 'up' | 'down' {
+  return direction
+}
+
+/** 格式化异动详情：价格异动 +X.XX%，阈值 X% */
+function captureDetail(item: StockTraceEvent): string {
+  const sign = item.change_pct >= 0 ? '+' : ''
+  return `价格异动 ${sign}${item.change_pct.toFixed(2)}%，阈值 ${item.threshold_pct.toFixed(0)}%`
+}
+
+function formatTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '--:--'
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 /** Segmented 的 change 回调（emit string|number），收敛回窄联合类型 */
@@ -170,15 +231,31 @@ function goAlertCatcher() {
   uni.navigateTo({ url: '/modules/favorites/pages/monitor' })
 }
 
+/** 异动详情：跳转到异动溯源页 */
+function goTrace(eventId: string) {
+  uni.navigateTo({ url: `/modules/favorites/pages/stock-trace?event_id=${encodeURIComponent(eventId)}` })
+}
+
 /** 个股情报（原异动捕手/event-catcher，已改名） */
 function goStockIntel() {
   uni.navigateTo({ url: '/modules/market/pages/event-catcher' })
+}
+
+/** 情报 AI 解读：跳转到 alert-analysis 页面 */
+function goAlertAnalysis(symbol: string, cycle: string) {
+  if (!symbol) return
+  uni.navigateTo({ url: `/modules/market/pages/alert-analysis?symbol=${symbol}&cycle=${cycle}` })
 }
 
 /** 暴露给父组件（保留接口兼容性） */
 defineExpose({
   currentStockIdx: computed(() => 0),
   totalCount: computed(() => captureList.value.length),
+})
+
+onMounted(() => {
+  void loadCaptureList()
+  void loadIntelList()
 })
 </script>
 

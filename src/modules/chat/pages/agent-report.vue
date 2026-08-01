@@ -41,7 +41,7 @@
           </Card>
         </view>
 
-        <EmptyState v-else title="今日报告尚未生成" description="请在 9:10 后查看" icon="file-line" />
+        <EmptyState v-else title="当日报告尚未生成" description="请切换日期或于 9:10 后查看" icon="file-line" />
       </template>
 
       <!-- 详情模式：单个 Agent 报告 -->
@@ -133,6 +133,14 @@
               <text v-for="(risk, i) in risks" :key="i" class="risk-item">{{ risk }}</text>
             </view>
           </Card>
+
+          <!-- 兜底：结构化解析全空时用 mp-html 渲染 details 原始 markdown，避免空页面 -->
+          <Card v-if="!reportSummary && !windOverview && !windSectors.length && !windStocks.length && !risks.length && detailsText" class="stream-section">
+            <text class="section-title">报告详情</text>
+            <view class="report-text-wrap">
+              <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
+            </view>
+          </Card>
         </template>
 
         <!-- ===== 趋势股评分（trend_score）：多维度结构化 ===== -->
@@ -222,8 +230,22 @@
       </view>
 
       <!-- 无报告 -->
-      <EmptyState v-else title="今日报告尚未生成" description="请在 9:10 后查看" icon="file-line" />
+      <EmptyState v-else title="当日报告尚未生成" description="请切换日期或于 9:10 后查看" icon="file-line" />
     </view>
+
+    <!-- 日期切换（放在 footer 插槽，固定在底部不依赖 scroll-view 滚动） -->
+    <template v-if="!loading" #footer>
+      <view class="date-nav">
+        <view class="date-btn" @click="changeDate(-1)">
+          <SvgIcon name="arrow-left-line" size="32rpx" color="#0b5fff" />
+          <text class="date-btn-text">前一天</text>
+        </view>
+        <view class="date-btn" @click="changeDate(1)">
+          <text class="date-btn-text">后一天</text>
+          <SvgIcon name="arrow-right-line" size="32rpx" color="#0b5fff" />
+        </view>
+      </view>
+    </template>
   </SubPageCard2>
 </template>
 
@@ -233,7 +255,7 @@ import { onLoad, onBackPress } from '@dcloudio/uni-app'
 import { agentApi, isPublicReportIntent } from '@/shared/api/modules/agent'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import { formatDate, formatDateTime } from '@/shared/utils/datetime'
-import { shanghaiDateString } from '@/shared/utils/tradingTime'
+import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Card, Tag, Button } from '@/shared/components'
@@ -497,7 +519,9 @@ async function loadAllReports() {
 
     if (result.status === 'fulfilled' && result.value) {
       const data = result.value as AgentReport
-      if (data?.content) {
+      // 检查 report_date 是否与请求日期匹配：后端在指定日期无报告时会降级返回最近一份报告，
+      // 不匹配时视为当日无报告（显示"待生成"而非"已更新"）
+      if (data?.content && data.report_date === date.value) {
         summary = extractSummary(data)
         available = true
       }
@@ -527,7 +551,14 @@ async function loadReport() {
   loadingText.value = '报告加载中...'
   try {
     const res: unknown = await agentApi.getReport(currentIntent, date.value)
-    report.value = (res as AgentReport) || null
+    const data = (res as AgentReport) || null
+    // 后端在指定日期无报告时会降级返回最近一份报告，检查 report_date 是否匹配请求日期，
+    // 不匹配则视为当日无报告（显示空状态而非其他日期的内容）
+    if (data && data.report_date && data.report_date !== date.value) {
+      report.value = null
+    } else {
+      report.value = data
+    }
   } catch {
     report.value = null
   } finally {
@@ -548,6 +579,18 @@ function backToOverview() {
   report.value = null
   // 如果已有缓存数据则不重新加载
   if (!agentBriefs.value.length) {
+    loadAllReports()
+  }
+}
+
+/** 切换日期（前一天/后一天），重新加载当前模式的报告 */
+function changeDate(delta: number) {
+  date.value = addCalendarDays(date.value, delta)
+  report.value = null
+  agentBriefs.value = []
+  if (selectedIntent.value) {
+    loadReport()
+  } else {
     loadAllReports()
   }
 }
@@ -899,5 +942,29 @@ onBackPress(() => {
   font-size: 26rpx;
   line-height: 1.6;
   color: $ink-soft;
+}
+
+/* 日期切换（参考早点听样式，放在 footer 插槽固定显示） */
+.date-nav {
+  display: flex;
+  justify-content: space-between;
+  padding: 16rpx 32rpx;
+  background: $bg-page;
+  border-top: 2rpx solid $line-soft;
+}
+
+.date-btn {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 14rpx 22rpx;
+  background: #ffffff;
+  border-radius: 999rpx;
+  box-shadow: 0 2rpx 8rpx rgba(11, 95, 255, 0.08);
+}
+
+.date-btn-text {
+  font-size: 24rpx;
+  color: $primary;
 }
 </style>
