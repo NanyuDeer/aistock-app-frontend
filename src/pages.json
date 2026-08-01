@@ -37,6 +37,7 @@
       "path": "modules/favorites/pages/search",
       "style": {
         "navigationBarTitleText": "搜索",
+        "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
       }

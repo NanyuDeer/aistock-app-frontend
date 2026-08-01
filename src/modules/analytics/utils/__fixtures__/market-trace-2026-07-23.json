@@ -1,0 +1,148 @@
+{
+  "report_type": "review_full",
+  "report_date": "2026-07-23",
+  "status": "completed",
+  "data_source": "review_agent_full",
+  "created_at": "2026-07-23T16:05:00+08:00",
+  "content": {
+    "schema_version": "2.0",
+    "snapshot_id": "snap-2026-07-23",
+    "display_report": {
+      "summary": "概念板块集中异动，与大盘方向相反",
+      "details": "# 2026-07-23 A股收盘溯源\n\n（完整 markdown 兜底）",
+      "sectors": ["兵装重组概念", "可燃冰"],
+      "risks": ["兵装重组概念大涨无明确公开消息源"]
+    },
+    "market_trace": {
+      "snapshot": {
+        "snapshot_id": "snap-2026-07-23",
+        "trade_date": "2026-07-23",
+        "captured_at": "2026-07-23T15:30:00+08:00",
+        "a_share": {
+          "indexes": [
+            { "name": "上证指数", "pct_change": 0.25 },
+            { "name": "深证成指", "pct_change": 0.31 },
+            { "name": "中证1000", "pct_change": 0.78 }
+          ],
+          "sectors": {
+            "top_gainers": [
+              { "name": "兵装重组概念", "pct_change": 6.39 },
+              { "name": "可燃冰", "pct_change": 5.67 },
+              { "name": "柔性直流输电", "pct_change": 4.12 },
+              { "name": "赛马概念", "pct_change": 3.85 },
+              { "name": "金属锌", "pct_change": 3.21 }
+            ],
+            "top_losers": [
+              { "name": "国家大基金持股", "pct_change": -3.36 },
+              { "name": "存储芯片", "pct_change": -1.59 },
+              { "name": "汽车芯片", "pct_change": -1.42 },
+              { "name": "MCU芯片", "pct_change": -1.18 },
+              { "name": "中芯国际概念", "pct_change": -0.95 }
+            ]
+          }
+        },
+        "sources": {
+          "SEARCH_007": {
+            "source_id": "SEARCH_007",
+            "kind": "event_evidence",
+            "provider": "tavily",
+            "title": "中东紧张局势推高油价",
+            "url": "https://example.com/news/007",
+            "occurred_at": "2026-07-23T08:00:00+08:00",
+            "captured_at": "2026-07-23T15:30:00+08:00",
+            "source_level": "reporting"
+          },
+          "SECTORS_ALL": {
+            "source_id": "SECTORS_ALL",
+            "kind": "market_fact",
+            "provider": "tushare:sectors",
+            "title": "全市场板块涨跌幅",
+            "url": null,
+            "occurred_at": null,
+            "captured_at": "2026-07-23T15:30:00+08:00",
+            "source_level": "market_data"
+          }
+        },
+        "missing_fields": [],
+        "phenomenon_discovery": {
+          "status": "detected",
+          "primary": {
+            "kind": "sector_concentration",
+            "summary": "概念板块集中异动，与大盘方向相反",
+            "severity": "medium",
+            "fact_ids": ["SECTORS_ALL"],
+            "tags": ["sector_divergence"]
+          }
+        }
+      },
+      "trace": {
+        "schema_version": "1.1",
+        "attribution_status": "confirmed",
+        "primary_chain_id": "industry_technology_supply",
+        "alternative_chain_id": "market_positioning_liquidity",
+        "confidence": "medium",
+        "unresolved_questions": [
+          "兵装重组概念大涨无明确公开消息源，触发因素未证实",
+          "全球市场数据缺失，无法评估外部流动性冲击",
+          "主力资金明细缺失，资金流向验证不完整"
+        ],
+        "candidates": [
+          {
+            "id": "industry_technology_supply",
+            "category": "industry_technology_supply",
+            "status": "supported",
+            "verdict": "能源板块受益油价高企、军工重组概念异动，与芯片板块获利回吐形成鲜明的板块分化，是今日市场结构性异动的主因。",
+            "chain": {
+              "nodes": [
+                { "stage": "structural_root", "claim": "全球能源供给偏紧，地缘风险溢价上行", "evidence_ids": ["SEARCH_007"] },
+                { "stage": "trigger", "claim": "中东紧张局势推高布伦特原油至98美元上方，分析师警告能源市场脆弱可能破百；同时兵装重组概念成为市场新热点。", "evidence_ids": ["SEARCH_007", "SEARCH_008"] },
+                { "stage": "transmission", "claim": "高油价提升可燃冰、金属锌等能源相关公司盈利预期；军工重组预期吸引短线资金；前期涨幅较大的芯片概念获利了结。", "evidence_ids": ["SECTORS_ALL"] },
+                { "stage": "exposure", "claim": "能源板块与军工概念仓位集中，芯片板块前期持仓较高", "evidence_ids": [] },
+                { "stage": "repricing", "claim": "能源板块盈利预期上调推动估值修复，芯片板块因资金撤出和前期估值压力导致风险溢价上升，部分品种被重新定价。", "evidence_ids": [] },
+                { "stage": "observable_result", "claim": "大盘指数微涨但板块冷热悬殊。", "evidence_ids": ["SECTORS_ALL"] }
+              ]
+            },
+            "supporting_evidence_ids": ["SEARCH_007", "SEARCH_008", "SECTORS_ALL"],
+            "counter_evidence_ids": []
+          },
+          {
+            "id": "market_positioning_liquidity",
+            "category": "market_positioning_liquidity",
+            "status": "weak",
+            "verdict": "缩量环境下资金轮动明显，芯片等科技板块主力资金流出与概念板块流入对应，但因主力资金明细缺失，证据较弱。",
+            "chain": {
+              "nodes": [
+                { "stage": "structural_root", "claim": "市场存量博弈", "evidence_ids": [] },
+                { "stage": "trigger", "claim": "成交额较前日萎缩17%", "evidence_ids": [] },
+                { "stage": "transmission", "claim": "资金从芯片、汽车电子等板块净流出，流入锂电池、国企改革、固态电池等概念。", "evidence_ids": ["SECTORS_ALL"] },
+                { "stage": "exposure", "claim": "", "evidence_ids": [] },
+                { "stage": "repricing", "claim": "", "evidence_ids": [] },
+                { "stage": "observable_result", "claim": "", "evidence_ids": [] }
+              ]
+            },
+            "supporting_evidence_ids": ["SECTORS_ALL"],
+            "counter_evidence_ids": ["MAIN_FORCE_ALL"]
+          },
+          {
+            "id": "global_risk_liquidity",
+            "category": "global_risk_liquidity",
+            "status": "rejected",
+            "verdict": "全球风险事件未能压制A股，大盘温和上涨且广度极佳，与风险厌恶逻辑相悖，故排除。",
+            "chain": null,
+            "supporting_evidence_ids": [],
+            "counter_evidence_ids": ["SECTORS_ALL"]
+          },
+          {
+            "id": "domestic_macro_policy",
+            "category": "domestic_macro_policy",
+            "status": "weak",
+            "verdict": "中美互减关税征询意见带来宏观利好，可解释大盘温和上涨，但无法解释芯片等板块的大幅分化下跌，故不作为主因。",
+            "chain": null,
+            "supporting_evidence_ids": [],
+            "counter_evidence_ids": ["SECTORS_ALL"]
+          }
+        ]
+      }
+    }
+  }
+}

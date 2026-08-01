@@ -85,6 +85,30 @@
 
 ---
 
+## [changer] 2026-08-01 — 大盘溯源报告 app 界面 + 多端适配 + 搜索页导航栏改造
+
+**开发者**: 37588
+
+### 新增
+- `docs/superpowers/specs/2026-08-01-market-trace-review-redesign-design.md`：大盘溯源报告页重构设计文档（schema 2.0 字段提取规则、ViewModel 类型树、UI 章节顺序、跨端断点策略）
+- `docs/superpowers/plans/2026-08-01-market-trace-review-redesign.md`：大盘溯源重构实施计划（8 个独立任务）
+- `src/shared/components/SubPageCard.vue`：新增 `noChatBar` prop（与 SubPageCard2 对齐，向后兼容默认 false），用于搜索页等模态场景隐藏全局 AI 对话栏
+
+### 改进
+- `src/modules/favorites/pages/search.vue`：改用 `SubPageCard title="搜索股票" noChatBar`（透明导航栏与 favorites 列表页视觉一致），搜索框放导航栏下方；删除自定义 statusBarHeight/goBack/back-btn（SubPageCard 内置）
+- `src/pages.json`：search 页新增 `navigationStyle: "custom"`，隐藏 uni-app 原生导航栏（消除"搜索"标题文字覆盖问题）
+- `src/modules/analytics/components/MarketTracePhenomenon.vue`：板块列表从 flex wrap 改为响应式 grid 布局（sm 1 列 / md 2 列 / lg 3 列）
+- `src/modules/analytics/components/MarketTracePendingRisks.vue`：精简风险列表样式
+- `src/modules/analytics/pages/traceability.vue`：清理冗余代码
+- `tests/TraceabilityPage.test.ts`：补充测试用例
+- `README.md`：analytics 模块描述补充"大盘溯源报告"
+
+### 类型标签
+- 新增：设计文档、实施计划、SubPageCard noChatBar prop
+- 改进：搜索页导航栏改造、大盘溯源板块列表响应式 grid 布局、文档补充
+
+---
+
 ## [changer] 2026-08-01 — 早点听/晚报非交易日自动回退最近可用报告
 
 **开发者**: 37588

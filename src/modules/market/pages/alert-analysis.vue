@@ -14,7 +14,7 @@
         <view class="status-left">
           <Badge v-if="loading && !done" type="info" size="sm">分析中</Badge>
           <Badge v-else-if="done" type="success" size="sm">完成</Badge>
-          <Badge v-if="done" type="neutral" size="sm">当日缓存</Badge>
+          <Badge v-if="done" type="info" size="sm">当日缓存</Badge>
         </view>
         <view v-if="done && !loading" class="refresh-btn" @click="forceRefresh">
           <SvgIcon name="refresh-line" size="24rpx" color="#4b5a7a" />
