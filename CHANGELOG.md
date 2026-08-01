@@ -32,6 +32,19 @@
 
 ---
 
+## [changer] 2026-08-01 — 早点听/晚报非交易日自动回退最近可用报告
+
+**开发者**: 37588
+
+### 新增
+- `src/pages-sub-app/briefing/index.vue`：当日无报告（非交易日/未生成）时自动向前回退最近可用报告（最多 7 天），并展示提示"当日（X）播报尚未生成，当前显示最近可用报告（Y）"
+- `src/pages-sub-app/briefing/index.spec.ts`：新增非交易日回退用例（MAX_FALLBACK_DAYS / addCalendarDays 向前回退 / 回退提示文案）
+
+### 改进
+- `AGENTS.md`：同步早点听页面回退行为说明
+
+---
+
 ## [changer] 2026-07-31 — 同步 PR#30 focusEvents + GI 数据适配 + ghost 文件清理
 
 **开发者**: 37588

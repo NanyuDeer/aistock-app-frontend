@@ -40,7 +40,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 
 | 页面 | 文件 | 说明 |
 |------|------|------|
-| 早点听 | `briefing/index.vue` | 结构化早晚报（音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页） |
+| 早点听 | `briefing/index.vue` | 结构化早晚报（音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期 |
 | 持仓管理 | `portfolio/index.vue` | 持仓分析 |
 | 事件传导链 | `event-chain/index.vue` | 事件传导链路可视化 |
 | 估值分析 | `valuation/index.vue` | 个股估值 |
