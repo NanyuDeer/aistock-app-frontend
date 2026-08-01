@@ -7,6 +7,13 @@
       </view>
 
       <template v-else>
+        <!-- 非交易日回退提示：当日无报告时展示最近可用报告 -->
+        <view v-if="isFallback" class="fallback-notice">
+          <text class="fallback-notice-text">
+            当日（{{ requestedDate }}）播报尚未生成，当前显示最近可用报告（{{ currentDate }}）
+          </text>
+        </view>
+
         <!-- 音频入口条（点击进入播报详情页） -->
         <view
           v-if="audioPath || items.length"
@@ -160,6 +167,13 @@ const items = ref<BriefingItem[]>([])
 const isPlaying = ref(false)
 const audioContext = ref<UniApp.InnerAudioContext | null>(null)
 
+/** 无当日报告时最多向前回退的自然日数（覆盖周末与长假缺口）。 */
+const MAX_FALLBACK_DAYS = 7
+/** 是否正在展示回退得到的最近可用报告（非交易日场景）。 */
+const isFallback = ref(false)
+/** 用户请求的原始日期，当日无报告时用于回退提示。 */
+const requestedDate = ref('')
+
 const subtitleText = computed(() => {
   const typeLabel = broadcastType.value === 'morning' ? '晨报' : '晚报'
   if (currentDate.value) {
@@ -307,28 +321,21 @@ function changeDate(delta: number) {
   loadReport()
 }
 
-async function loadReport() {
-  if (!currentDate.value) return
-  loading.value = true
-  // 停止当前播放
-  if (audioContext.value && isPlaying.value) {
-    audioContext.value.stop()
-    isPlaying.value = false
-  }
-
-  // 广播和展示内容都从同日、同类型的结构化 Brief/Broadcast 读取。
-  // 不再依赖旧的 /report/morning|review 路由，以免已经生成的播报被误判为空。
-
+/**
+ * 拉取指定日期的广播与简报并写入展示状态，返回是否找到可用内容。
+ * 仅消费通过严格校验的 Broadcast v1 / Brief v1（解析器强制绑定同日同类型，
+ * 不会把跨日期或旧结构数据混入）。
+ */
+async function fetchReportFor(date: string): Promise<boolean> {
   try {
     const [broadcastRes, briefRes] = await Promise.allSettled([
-      agentApi.getBroadcast(broadcastType.value, currentDate.value),
-      agentApi.getBrief(broadcastType.value, currentDate.value),
+      agentApi.getBroadcast(broadcastType.value, date),
+      agentApi.getBrief(broadcastType.value, date),
     ])
 
     // 仅消费通过严格校验的 Broadcast v1，避免跨日期或旧结构数据混入。
     if (broadcastRes.status === 'fulfilled') {
-      const data: unknown = broadcastRes.value
-      report.value = parseBroadcastReport(data, broadcastType.value, currentDate.value)
+      report.value = parseBroadcastReport(broadcastRes.value, broadcastType.value, date)
     } else {
       report.value = null
     }
@@ -340,9 +347,47 @@ async function loadReport() {
     } else {
       items.value = []
     }
+
+    return report.value !== null || items.value.length > 0
   } catch {
     report.value = null
     items.value = []
+    return false
+  }
+}
+
+async function loadReport() {
+  if (!currentDate.value) return
+  loading.value = true
+  // 停止当前播放
+  if (audioContext.value && isPlaying.value) {
+    audioContext.value.stop()
+    isPlaying.value = false
+  }
+
+  const requested = currentDate.value
+  isFallback.value = false
+  requestedDate.value = ''
+
+  try {
+    // 非交易日/当日未生成时，向前回退到最近一个存在报告的日期并明确标注。
+    let found = false
+    for (let offset = 0; offset <= MAX_FALLBACK_DAYS; offset++) {
+      const date = offset === 0 ? requested : addCalendarDays(requested, -offset)
+      if (await fetchReportFor(date)) {
+        if (offset > 0) {
+          currentDate.value = date
+          isFallback.value = true
+          requestedDate.value = requested
+        }
+        found = true
+        break
+      }
+    }
+    if (!found) {
+      // 回退窗口内无任何报告：保持请求日期，展示空状态。
+      currentDate.value = requested
+    }
   } finally {
     loading.value = false
   }
@@ -723,6 +768,21 @@ onUnmounted(() => {
   color: #e04545;
   border: 1rpx solid rgba(224, 69, 69, 0.20);
   font-weight: 500;
+}
+
+/* 非交易日回退提示 */
+.fallback-notice {
+  background: rgba(217, 119, 6, 0.08);
+  border: 1rpx solid rgba(217, 119, 6, 0.20);
+  border-radius: 16rpx;
+  padding: 16rpx 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.fallback-notice-text {
+  font-size: 22rpx;
+  color: #92400e;
+  line-height: 1.5;
 }
 
 /* 空状态 */
