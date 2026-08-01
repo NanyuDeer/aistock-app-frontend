@@ -55,37 +55,39 @@
             <text class="conclusion-text">{{ reportSummary }}</text>
           </Card>
 
-          <Card v-if="morningOverseas.length" class="stream-section">
+          <Card v-if="morningOverseasHtml" class="stream-section">
             <text class="section-title">隔夜外盘回顾</text>
-            <view class="bullet-list">
-              <text v-for="(item, i) in morningOverseas" :key="i" class="bullet-item">{{ item }}</text>
+            <view class="report-text-wrap">
+              <mp-html :content="morningOverseasHtml" class="report-html" />
             </view>
           </Card>
 
-          <Card v-if="morningDomestic.length" class="stream-section">
+          <Card v-if="morningDomesticHtml" class="stream-section">
             <text class="section-title">国内宏观要闻</text>
-            <view class="bullet-list">
-              <text v-for="(item, i) in morningDomestic" :key="i" class="bullet-item">{{ item }}</text>
+            <view class="report-text-wrap">
+              <mp-html :content="morningDomesticHtml" class="report-html" />
             </view>
           </Card>
 
-          <Card v-if="morningSector.length" class="stream-section">
+          <Card v-if="morningSectorHtml" class="stream-section">
             <text class="section-title">板块与市场情绪</text>
-            <view class="bullet-list">
-              <text v-for="(item, i) in morningSector" :key="i" class="bullet-item">{{ item }}</text>
+            <view class="report-text-wrap">
+              <mp-html :content="morningSectorHtml" class="report-html" />
             </view>
           </Card>
 
-          <Card v-if="morningFocus.length" class="stream-section">
+          <Card v-if="morningFocusHtml" class="stream-section">
             <text class="section-title">今日焦点板块预测</text>
-            <view class="bullet-list">
-              <text v-for="(item, i) in morningFocus" :key="i" class="bullet-item">{{ item }}</text>
+            <view class="report-text-wrap">
+              <mp-html :content="morningFocusHtml" class="report-html" />
             </view>
           </Card>
 
-          <Card v-if="morningStrategy" class="stream-section">
+          <Card v-if="morningStrategyHtml" class="stream-section">
             <text class="section-title">今日关注与策略</text>
-            <text class="section-text">{{ morningStrategy }}</text>
+            <view class="report-text-wrap">
+              <mp-html :content="morningStrategyHtml" class="report-html" />
+            </view>
           </Card>
 
           <Card v-if="risks.length" class="risk-card stream-section">
@@ -103,9 +105,11 @@
             <text class="conclusion-text">{{ reportSummary }}</text>
           </Card>
 
-          <Card v-if="windOverview" class="stream-section">
+          <Card v-if="windOverviewHtml" class="stream-section">
             <text class="section-title">风口概览</text>
-            <text class="section-text">{{ windOverview }}</text>
+            <view class="report-text-wrap">
+              <mp-html :content="windOverviewHtml" class="report-html" />
+            </view>
           </Card>
 
           <Card v-if="windSectors.length" class="stream-section">
@@ -115,12 +119,14 @@
                 <view class="stock-card-head">
                   <text class="stock-name">{{ sector.title }}</text>
                 </view>
-                <text v-if="sector.body" class="stock-description">{{ sector.body }}</text>
+                <view v-if="sector.body" class="report-text-wrap">
+                  <mp-html :content="markdownToHtml(sector.body)" class="report-html" />
+                </view>
               </Card>
             </view>
           </Card>
 
-          <Card v-if="windStocks.length" class="stream-section">
+          <Card v-if="leaderStocks.length" class="stream-section">
             <text class="section-title">龙头股推荐</text>
             <view class="stock-tags">
               <Tag v-for="(code, i) in leaderStocks" :key="i" size="sm">{{ code }}</Tag>
@@ -135,7 +141,7 @@
           </Card>
 
           <!-- 兜底：结构化解析全空时用 mp-html 渲染 details 原始 markdown，避免空页面 -->
-          <Card v-if="!reportSummary && !windOverview && !windSectors.length && !windStocks.length && !risks.length && detailsText" class="stream-section">
+          <Card v-if="!reportSummary && !windOverviewHtml && !windSectors.length && !leaderStocks.length && !risks.length && detailsText" class="stream-section">
             <text class="section-title">报告详情</text>
             <view class="report-text-wrap">
               <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
@@ -190,7 +196,78 @@
           </Card>
         </template>
 
-        <!-- ===== 兜底：其他 intent（hot_burst 等）用 mp-html 渲染 ===== -->
+        <!-- ===== 机构调研（hot_burst）：结构化卡片 ===== -->
+        <template v-else-if="effectiveIntent === 'hot_burst' && displayReport">
+          <Card v-if="reportSummary" class="conclusion-card conclusion-card--hot">
+            <text class="section-kicker">调研结论</text>
+            <text class="conclusion-text">{{ reportSummary }}</text>
+          </Card>
+
+          <Card v-if="hotOverviewBullets.length" class="stream-section">
+            <text class="section-title">今日热门概览</text>
+            <view class="bullet-list">
+              <text v-for="(item, i) in hotOverviewBullets" :key="i" class="bullet-item">{{ item }}</text>
+            </view>
+          </Card>
+
+          <Card v-if="hotStocks.length" class="stream-section">
+            <text class="section-title">重点个股分析</text>
+            <view class="stock-list">
+              <Card v-for="(stock, i) in hotStocks" :key="i" flat class="stock-card hot-stock-card">
+                <view class="stock-card-head">
+                  <text class="stock-name">{{ stock.title }}</text>
+                </view>
+                <view v-if="stock.popularity" class="stock-field">
+                  <text class="stock-field-label">热门程度</text>
+                  <text class="stock-field-value">{{ stock.popularity }}</text>
+                </view>
+                <view v-if="stock.facts" class="stock-field">
+                  <text class="stock-field-label">核心事实</text>
+                  <text class="stock-field-value">{{ stock.facts }}</text>
+                </view>
+                <view v-if="stock.sectorLogic" class="stock-field">
+                  <text class="stock-field-label">板块逻辑</text>
+                  <text class="stock-field-value">{{ stock.sectorLogic }}</text>
+                </view>
+                <view v-if="stock.duration" class="stock-field">
+                  <text class="stock-field-label">持续性判断</text>
+                  <text class="stock-field-value">{{ stock.duration }}</text>
+                </view>
+              </Card>
+            </view>
+          </Card>
+
+          <Card v-if="hotSectorLogic" class="stream-section">
+            <text class="section-title">板块逻辑</text>
+            <text class="section-text">{{ hotSectorLogic }}</text>
+          </Card>
+
+          <Card v-if="hotDuration" class="stream-section">
+            <text class="section-title">持续性判断</text>
+            <text class="section-text">{{ hotDuration }}</text>
+          </Card>
+
+          <Card v-if="leaderStocks.length" class="stream-section">
+            <text class="section-title">相关个股</text>
+            <view class="stock-tags">
+              <Tag v-for="code in leaderStocks" :key="code" size="sm">{{ code }}</Tag>
+            </view>
+          </Card>
+
+          <Card v-if="hotAdvice" class="judgment-card stream-section">
+            <text class="section-title">关注建议</text>
+            <text class="section-text">{{ hotAdvice }}</text>
+          </Card>
+
+          <Card v-if="risks.length" class="risk-card stream-section">
+            <text class="section-title">风险提示</text>
+            <view class="bullet-list">
+              <text v-for="(risk, i) in risks" :key="i" class="risk-item">{{ risk }}</text>
+            </view>
+          </Card>
+        </template>
+
+        <!-- ===== 兜底：其他 intent 用 mp-html 渲染 ===== -->
         <template v-else-if="displayReport">
           <Card v-if="reportSummary" class="conclusion-card">
             <text class="section-kicker">今日结论</text>
@@ -266,10 +343,33 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** 提取 ## 标题下的内容（到下一个 ## 或末尾） */
+/** 提取 ## 标题下的内容（到下一个 ## 或末尾）
+ *  容忍标题中的 emoji、序号前缀（如"一、"）和额外修饰，只要标题包含指定 heading 文本即匹配。
+ *  同时兼容 ### 三级标题（当 LLM 把章节写成 ### 而非 ## 时）。
+ */
 function extractSection(markdown: string, heading: string): string {
-  const match = markdown.match(new RegExp(`^##\\s+${escapeRegExp(heading)}\\s*\\n([\\s\\S]*?)(?=^##\\s+|(?![\\s\\S]))`, 'm'))
-  return match?.[1]?.trim() || ''
+  const tryMatch = (prefix: string, nextPrefix: string): string => {
+    // 严格匹配
+    const strictRe = new RegExp(`^${prefix}\\s+${escapeRegExp(heading)}\\s*$`, 'm')
+    if (strictRe.test(markdown)) {
+      const re = new RegExp(`^${prefix}\\s+${escapeRegExp(heading)}\\s*\\n([\\s\\S]*?)(?=${nextPrefix}|(?![\\s\\S]))`, 'm')
+      const m = markdown.match(re)
+      if (m?.[1]) return m[1].trim()
+    }
+    // 包含匹配（容忍 emoji/序号/修饰）
+    const looseRe = new RegExp(`^${prefix}\\s+[^\\n]*${escapeRegExp(heading)}[^\\n]*$`, 'm')
+    const looseMatch = markdown.match(looseRe)
+    if (looseMatch) {
+      const startIdx = (looseMatch.index ?? 0) + looseMatch[0].length
+      const nextRe = new RegExp(`^${nextPrefix.replace('\\', '')}`, 'm')
+      const nextIdx = markdown.slice(startIdx).search(nextRe)
+      const content = nextIdx === -1 ? markdown.slice(startIdx) : markdown.slice(startIdx, startIdx + nextIdx)
+      return content.trim()
+    }
+    return ''
+  }
+  // 优先 ## 匹配，降级 ### 匹配
+  return tryMatch('##', '^##\\s+') || tryMatch('###', '^##\\s+|^###\\s+') || ''
 }
 
 /** 清理 Markdown 行：去除列表符号和加粗 */
@@ -287,11 +387,23 @@ function sectionText(markdown: string, heading: string): string {
   return extractSection(markdown, heading).split('\n').map(cleanLine).filter(Boolean).join(' ')
 }
 
-/** 提取 ### 三级标题下的子区块（用于板块/股票子卡片） */
+/** 将 section 内容转为 HTML（保留 ###、表格、列表等完整 markdown 语法） */
+function sectionHtml(markdown: string, heading: string): string {
+  const section = extractSection(markdown, heading)
+  return section ? markdownToHtml(section) : ''
+}
+
+/** 提取 ### 三级标题下的子区块（用于板块/股票子卡片）
+ *  兼容 #### 四级标题（当 LLM 误用四级标题时）。
+ */
 function extractSubSections(markdown: string, heading: string): Array<{ title: string; body: string }> {
   const section = extractSection(markdown, heading)
   if (!section) return []
-  const headings = [...section.matchAll(/^###\s+(.+?)\s*$/gm)]
+  // 优先 ### 三级标题，降级 #### 四级标题
+  let headings = [...section.matchAll(/^###\s+(.+?)\s*$/gm)]
+  if (headings.length === 0) {
+    headings = [...section.matchAll(/^####\s+(.+?)\s*$/gm)]
+  }
   return headings.map((h, i) => {
     const title = h[1].trim()
     const bodyStart = (h.index || 0) + h[0].length
@@ -336,11 +448,11 @@ interface AgentMeta {
 }
 
 const AGENT_META: Record<string, AgentMeta> = {
-  morning: { title: '今日晨报', icon: 'sun-line', color: '#f59e0b', bgColor: '#f59e0b', desc: '每日开盘前市场概览' },
-  wind_leader: { title: '长线风口', icon: 'windy-line', color: '#8b5cf6', bgColor: '#8b5cf6', desc: '中长期赛道与龙头股追踪' },
-  hot_burst: { title: '机构调研', icon: 'eye-line', color: '#f97316', bgColor: '#f97316', desc: '机构调研热门股分析' },
-  trend_score: { title: '趋势股评分', icon: 'line-chart-line', color: '#10b981', bgColor: '#10b981', desc: '趋势形态评分排名' },
-  broadcast: { title: '双人播报', icon: 'broadcast-line', color: '#06b6d4', bgColor: '#06b6d4', desc: 'AI 双人对话播报' },
+  morning: { title: '今日晨报', icon: 'sun-line', color: '#f0a020', bgColor: '#f0a020', desc: '每日开盘前市场概览' },
+  wind_leader: { title: '长线风口', icon: 'windy-line', color: '#0b5fff', bgColor: '#0b5fff', desc: '中长期赛道与龙头股追踪' },
+  hot_burst: { title: '机构调研', icon: 'eye-line', color: '#00b8ff', bgColor: '#00b8ff', desc: '机构调研热门股分析' },
+  trend_score: { title: '趋势股评分', icon: 'line-chart-line', color: '#18a058', bgColor: '#18a058', desc: '趋势形态评分排名' },
+  broadcast: { title: '双人播报', icon: 'broadcast-line', color: '#0b5fff', bgColor: '#0b5fff', desc: 'AI 双人对话播报' },
 }
 
 /** 概览模式下的 Agent 顺序（不含 broadcast，用户不需要在概览中看到双人播报） */
@@ -449,15 +561,15 @@ const reportText = computed(() => {
 })
 
 // ===== 晨报（morning）结构化分区 =====
-const morningOverseas = computed(() => sectionBullets(detailsText.value, '第1步：隔夜外盘回顾'))
-const morningDomestic = computed(() => sectionBullets(detailsText.value, '第2步：国内宏观要闻'))
-const morningSector = computed(() => sectionBullets(detailsText.value, '第3步：板块与市场情绪'))
-const morningFocus = computed(() => sectionBullets(detailsText.value, '今日焦点板块预测'))
-const morningStrategy = computed(() => sectionText(detailsText.value, '第4步：今日关注与策略建议'))
+const morningOverseasHtml = computed(() => sectionHtml(detailsText.value, '第1步：隔夜外盘回顾'))
+const morningDomesticHtml = computed(() => sectionHtml(detailsText.value, '第2步：国内宏观要闻'))
+const morningSectorHtml = computed(() => sectionHtml(detailsText.value, '第3步：板块与市场情绪'))
+const morningFocusHtml = computed(() => sectionHtml(detailsText.value, '今日焦点板块预测'))
+const morningStrategyHtml = computed(() => sectionHtml(detailsText.value, '第4步：今日关注与策略建议'))
 
 // ===== 长线风口（wind_leader）结构化分区 =====
 interface SectorCard { title: string; body: string }
-const windOverview = computed(() => sectionText(detailsText.value, '风口概览'))
+const windOverviewHtml = computed(() => sectionHtml(detailsText.value, '风口概览'))
 const windSectors = computed<SectorCard[]>(() => extractSubSections(detailsText.value, '重点板块分析'))
 const windStocks = computed(() => sectionBullets(detailsText.value, '龙头股推荐'))
 
@@ -467,6 +579,28 @@ const trendDimensions = computed(() => sectionText(detailsText.value, '维度解
 const trendJudgment = computed(() => sectionText(detailsText.value, '趋势判断'))
 const trendTrack = computed(() => sectionText(detailsText.value, '赛道分析'))
 const trendAdvice = computed(() => sectionText(detailsText.value, '关注建议'))
+
+// ===== 机构调研（hot_burst）结构化分区 =====
+interface HotStockCard {
+  title: string
+  popularity: string
+  facts: string
+  sectorLogic: string
+  duration: string
+}
+const hotOverviewBullets = computed(() => sectionBullets(detailsText.value, '今日热门概览'))
+const hotStocks = computed<HotStockCard[]>(() => {
+  return extractSubSections(detailsText.value, '重点个股分析').map(s => ({
+    title: s.title,
+    popularity: extractField(s.body, '热门程度'),
+    facts: extractField(s.body, '核心事实'),
+    sectorLogic: extractField(s.body, '板块逻辑'),
+    duration: extractField(s.body, '持续性判断'),
+  }))
+})
+const hotSectorLogic = computed(() => sectionText(detailsText.value, '板块逻辑'))
+const hotDuration = computed(() => sectionText(detailsText.value, '持续性判断'))
+const hotAdvice = computed(() => sectionText(detailsText.value, '关注建议'))
 
 /** intent 主题色映射（用于结论卡渐变和左边框） */
 const intentThemeColor = computed(() => {
@@ -761,13 +895,37 @@ onBackPress(() => {
   color: $ink;
   line-height: 1.8;
 }
-:deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; }
-:deep(.md-h3) { font-size: 30rpx; font-weight: 600; margin: 12rpx 0 6rpx; }
+:deep(.md-h2) { font-size: 32rpx; font-weight: 600; margin: 16rpx 0 8rpx; color: $ink; }
+:deep(.md-h3) { font-size: 28rpx; font-weight: 600; margin: 12rpx 0 6rpx; color: $ink; padding-left: 12rpx; border-left: 4rpx solid $primary; }
+:deep(.md-h4) { font-size: 26rpx; font-weight: 600; margin: 10rpx 0 4rpx; color: $ink-soft; }
 :deep(.md-hr) { border: none; border-top: 1rpx solid $line; margin: 12rpx 0; }
 :deep(.md-ul) { padding-left: 20rpx; margin: 8rpx 0; }
 :deep(.md-ol) { padding-left: 20rpx; margin: 8rpx 0; }
-:deep(.md-ul-li) { font-size: 28rpx; color: $ink; line-height: 1.8; }
-:deep(.md-ol-li) { font-size: 28rpx; color: $ink; line-height: 1.8; }
+:deep(.md-ul-li) { font-size: 26rpx; color: $ink-soft; line-height: 1.8; }
+:deep(.md-ol-li) { font-size: 26rpx; color: $ink-soft; line-height: 1.8; }
+:deep(.md-table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12rpx 0;
+  font-size: 24rpx;
+}
+:deep(.md-table th) {
+  background: $bg-soft;
+  color: $ink;
+  font-weight: 600;
+  padding: 10rpx 12rpx;
+  border: 1rpx solid $line;
+  text-align: left;
+}
+:deep(.md-table td) {
+  color: $ink-soft;
+  padding: 10rpx 12rpx;
+  border: 1rpx solid $line;
+}
+:deep(.md-table tr:nth-child(even) td) {
+  background: $bg-soft;
+}
+:deep(strong) { color: $ink; font-weight: 600; }
 
 .report-text {
   font-size: 28rpx;
@@ -810,28 +968,36 @@ onBackPress(() => {
   color: $ink;
 }
 
-/* 晨报主题色：橙色（与 AGENT_META.morning 一致） */
+/* 晨报主题色：$warning（与 AGENT_META.morning 一致） */
 .conclusion-card--morning {
-  border-left: 6rpx solid #f59e0b;
+  border-left: 6rpx solid $warning;
   background: $bg-card;
 
-  .section-kicker { color: #f59e0b; }
+  .section-kicker { color: $warning; }
 }
 
-/* 长线风口主题色：紫色 */
+/* 长线风口主题色：$primary 主品牌蓝 */
 .conclusion-card--wind {
-  border-left: 6rpx solid #8b5cf6;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06), rgba(139, 92, 246, 0.02));
+  border-left: 6rpx solid $primary;
+  background: linear-gradient(135deg, rgba(11, 95, 255, 0.06), rgba(11, 95, 255, 0.02));
 
-  .section-kicker { color: #8b5cf6; }
+  .section-kicker { color: $primary; }
 }
 
-/* 趋势股评分主题色：绿色 */
-.conclusion-card--trend {
-  border-left: 6rpx solid #10b981;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.02));
+/* 机构调研主题色：$accent 青 */
+.conclusion-card--hot {
+  border-left: 6rpx solid $accent;
+  background: linear-gradient(135deg, rgba(0, 184, 255, 0.06), rgba(0, 184, 255, 0.02));
 
-  .section-kicker { color: #10b981; }
+  .section-kicker { color: $accent; }
+}
+
+/* 趋势股评分主题色：$down 绿 */
+.conclusion-card--trend {
+  border-left: 6rpx solid $down;
+  background: linear-gradient(135deg, rgba(24, 160, 88, 0.06), rgba(24, 160, 88, 0.02));
+
+  .section-kicker { color: $down; }
 }
 
 /* 默认 conclusion-card（兜底模板）使用主品牌色 */
@@ -899,6 +1065,37 @@ onBackPress(() => {
 
 .stock-description {
   display: block;
+  font-size: 24rpx;
+  line-height: 1.65;
+  color: $ink-soft;
+}
+
+/* 机构调研个股字段（label: value 结构） */
+.hot-stock-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.stock-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.stock-field-label {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: $ink-mute;
+  background: $bg-deep;
+  padding: 4rpx 12rpx;
+  border-radius: $r-xs;
+  line-height: 1.5;
+}
+
+.stock-field-value {
+  flex: 1;
   font-size: 24rpx;
   line-height: 1.65;
   color: $ink-soft;

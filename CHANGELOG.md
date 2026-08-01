@@ -2,6 +2,20 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-01 — 重磅事件跳 AI 事件分析页 + 早晚报切换 + agent-report 兜底渲染
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/home/components/MorningContent.vue`：重磅事件跟踪卡片点击跳转目标从资讯详情页改为 AI 事件分析页（`/modules/chat/pages/event/detail?id=${eventId}`），无 eventId 时回退到事件列表页
+- `src/pages-sub-app/briefing/index.vue`：新增"晨报/晚报"切换按钮（type-switch），切换后重新加载当日对应类型报告；subtitle 同步显示当前类型（晨报/晚报）
+
+### 修复
+- `src/modules/chat/pages/agent-report.vue`：晨报/风口报告卡片由纯文本列表改为 mp-html 渲染 markdown（修复 LLM 偶发返回纯文本/段落结构时 5 个结构化 Card 全不渲染导致空白页面的问题，兜底用 mp-html 渲染 details 原文）
+- `src/shared/utils/markdown.ts`：新增 `#### h4` 标签支持；剔除 ```json``` 等 fenced 代码块（防止 LLM 违规输出原始 JSON 混入渲染）
+
+---
+
 ## [master] 2026-08-01 — 异动监控新增"立即检测"按钮
 
 **开发者**: Aria

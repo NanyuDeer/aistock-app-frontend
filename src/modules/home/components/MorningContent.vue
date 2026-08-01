@@ -391,12 +391,13 @@ function goAgentReport() {
 }
 
 function goTrackDetail() {
-  // 跳转到资讯详情页；携带 eventId 供 AI 深度解析入口使用
+  // 跳转到 AI 事件分析页（事件传导解析），携带 eventId
   const eventId = topEvent.value.eventId
-  const url = eventId
-    ? `/modules/news/pages/detail?eventId=${eventId}`
-    : '/modules/news/pages/detail'
-  uni.navigateTo({ url })
+  if (!eventId) {
+    uni.navigateTo({ url: '/modules/chat/pages/event/list' })
+    return
+  }
+  uni.navigateTo({ url: `/modules/chat/pages/event/detail?id=${eventId}` })
 }
 
 function goSearch() {

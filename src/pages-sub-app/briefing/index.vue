@@ -122,14 +122,30 @@
         </view>
 
         <!-- 日期切换 -->
-        <view class="date-nav">
-          <view class="date-btn" @tap="changeDate(-1)">
-            <SvgIcon name="arrow-left-line" size="32rpx" color="#0b5fff" />
-            <text class="date-btn-text">前一天</text>
+        <view class="briefing-toolbar">
+          <view class="type-switch">
+            <view
+              :class="['type-btn', broadcastType === 'morning' ? 'active' : '']"
+              @tap="switchType('morning')"
+            >
+              <text class="type-btn-text">晨报</text>
+            </view>
+            <view
+              :class="['type-btn', broadcastType === 'evening' ? 'active' : '']"
+              @tap="switchType('evening')"
+            >
+              <text class="type-btn-text">晚报</text>
+            </view>
           </view>
-          <view class="date-btn" @tap="changeDate(1)">
-            <text class="date-btn-text">后一天</text>
-            <SvgIcon name="arrow-right-line" size="32rpx" color="#0b5fff" />
+          <view class="date-nav">
+            <view class="date-btn" @tap="changeDate(-1)">
+              <SvgIcon name="arrow-left-line" size="32rpx" color="#0b5fff" />
+              <text class="date-btn-text">前一天</text>
+            </view>
+            <view class="date-btn" @tap="changeDate(1)">
+              <text class="date-btn-text">后一天</text>
+              <SvgIcon name="arrow-right-line" size="32rpx" color="#0b5fff" />
+            </view>
           </view>
         </view>
       </template>
@@ -318,6 +334,13 @@ function togglePlay() {
 
 function changeDate(delta: number) {
   currentDate.value = addCalendarDays(currentDate.value, delta)
+  loadReport()
+}
+
+/** 切换晨报/晚报，重新加载当日对应类型的报告 */
+function switchType(type: BriefType) {
+  if (broadcastType.value === type) return
+  broadcastType.value = type
   loadReport()
 }
 
@@ -805,11 +828,49 @@ onUnmounted(() => {
   color: #9ca3af;
 }
 
+/* 晨报/晚报切换 + 日期切换组合工具栏 */
+.briefing-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-top: 36rpx;
+}
+
+.type-switch {
+  display: flex;
+  gap: 16rpx;
+}
+
+.type-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16rpx 0;
+  border-radius: 12rpx;
+  background: #ffffff;
+  border: 2rpx solid $line;
+}
+
+.type-btn.active {
+  background: $primary;
+  border-color: $primary;
+}
+
+.type-btn-text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: $ink-soft;
+}
+
+.type-btn.active .type-btn-text {
+  color: #ffffff;
+}
+
 /* 日期切换 */
 .date-nav {
   display: flex;
   justify-content: space-between;
-  margin-top: 36rpx;
 }
 
 .date-btn {
