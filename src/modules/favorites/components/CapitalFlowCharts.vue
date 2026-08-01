@@ -49,7 +49,7 @@
               :y1="tick.y"
               :x2="trendModel.plotRight"
               :y2="tick.y"
-              :stroke="'rgba(225, 233, 245, 0.6)'"
+              :style="{ stroke: 'var(--cf-grid-line)' }"
               stroke-width="1"
               stroke-dasharray="4 6"
             />
@@ -60,7 +60,7 @@
             :y1="trendModel.zeroY"
             :x2="trendModel.plotRight"
             :y2="trendModel.zeroY"
-            :stroke="'rgba(138, 150, 176, 0.5)'"
+            :style="{ stroke: 'var(--cf-zero-line)' }"
             stroke-width="1.2"
           />
           <!-- 柱子：圆角纯色，红正绿负（对齐资金拆解样式） -->
@@ -72,7 +72,7 @@
             :width="trendModel.barWidth"
             :height="point.barH"
             :rx="3"
-            :fill="point.raw >= 0 ? '#e54d5e' : '#18a058'"
+            :style="{ fill: point.raw >= 0 ? 'var(--cf-bar-up)' : 'var(--cf-bar-down)' }"
           />
           <!-- 最新柱深色边框高亮 -->
           <rect
@@ -82,8 +82,7 @@
             :width="trendModel.barWidth"
             :height="latestPoint.barH"
             :rx="3"
-            fill="none"
-            :stroke="'#1a2233'"
+            :style="{ stroke: 'var(--cf-latest-border)', fill: 'none' }"
             stroke-width="1.5"
           />
         </svg>
@@ -212,6 +211,12 @@ function formatDateLabel(value: string): string {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
+  /* SVG 柱形图颜色令牌：桥接 SCSS 变量到 SVG 内联样式 */
+  --cf-bar-up: #{$up};
+  --cf-bar-down: #{$down};
+  --cf-grid-line: #{$line-soft};
+  --cf-zero-line: #{$ink-mute};
+  --cf-latest-border: #{$ink};
 }
 
 /* 面板：白底 + 细边框 + 圆角，对齐 section-card 令牌 */
@@ -387,13 +392,12 @@ function formatDateLabel(value: string): string {
   min-width: 0;
   padding: 6rpx 4rpx;
   border-radius: $r-xs;
-  background: $bg-soft;
+  background: $white;
   text-align: center;
   border: 2rpx solid transparent;
   box-sizing: border-box;
 
   &.is-latest {
-    background: $bg-card;
     border-color: $ink;
   }
 }

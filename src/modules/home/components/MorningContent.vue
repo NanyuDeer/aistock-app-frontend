@@ -142,6 +142,7 @@ import { stockApi } from '@/shared/api/modules/stock'
 import { agentApi } from '@/shared/api/modules/agent'
 import { getEventList } from '@/modules/chat/event/api/eventApi'
 import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
+import { toMarketTraceViewModel } from '@/modules/analytics/utils/marketTraceReview'
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
 
 const {
@@ -280,9 +281,8 @@ const traceReports = ref<LeaderStockPreview[]>([])
 
 /**
  * 大盘溯源卡片：查询最近 3 个自然日的复盘报告状态。
- * 后端在指定日期无报告时会降级返回最近可用报告，因此需比对 report_date 与请求日期：
- *   - 匹配 → "已更新"（buy/neutral 蓝）
- *   - 不匹配 → "待更新"（wash 橙）
+ * 标签统一用日期（MM-DD），和事件传导卡片一致。
+ * 名称：当日已生成 → 现象快照摘要；待更新 → 规则提示文字。
  */
 async function loadTraceReports() {
   const today = shanghaiDateString()
@@ -293,11 +293,16 @@ async function loadTraceReports() {
   traceReports.value = dates.map((d, idx) => {
     const r = results[idx]
     const record = r.status === 'fulfilled' ? r.value : null
+    const vm = record ? toMarketTraceViewModel(record, d) : null
     const isToday = !!record && record.report_date === d
+    const summary = vm?.parsed?.phenomenon?.summary || ''
+    const name = isToday
+      ? (summary || '市场异动溯源分析')
+      : '每日收盘后生成异动溯源'
     return {
-      name: d.slice(5), // MM-DD
-      tag: isToday ? '已更新' : '待更新',
-      tagType: isToday ? ('buy' as const) : ('wash' as const),
+      name,
+      tag: d.slice(5), // MM-DD
+      tagType: 'date' as const,
     }
   })
 }

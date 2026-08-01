@@ -2,6 +2,16 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
 
+## [master] 2026-08-01 — 大盘溯源卡片改进 + 资金流向图表颜色令牌化
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/home/components/MorningContent.vue`：大盘溯源卡片标签改为日期(MM-DD)格式(和事件传导一致)，名称改为现象快照摘要文字，待更新时显示规则提示文字"每日收盘后生成异动溯源"
+- `src/modules/favorites/components/CapitalFlowCharts.vue`：数值网格背景改纯白$white(原$bg-soft灰底)，SVG柱形图硬编码hex颜色替换为设计令牌(通过CSS自定义属性桥接SCSS变量$up/$down/$line-soft/$ink-mute/$ink)
+
+---
+
 ## [master] 2026-08-01 — 资金流向图表重设计 + 多页面组件库样式统一 + agent-report 空页面修复
 
 **开发者**: Aria
