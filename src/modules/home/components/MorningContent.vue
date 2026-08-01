@@ -295,7 +295,7 @@ async function loadTraceReports() {
     const record = r.status === 'fulfilled' ? r.value : null
     const vm = record ? toMarketTraceViewModel(record, d) : null
     const isToday = !!record && record.report_date === d
-    const summary = vm?.parsed?.phenomenon?.summary || ''
+    const summary = vm?.summary || ''
     const name = isToday
       ? (summary || '市场异动溯源分析')
       : '每日收盘后生成异动溯源'

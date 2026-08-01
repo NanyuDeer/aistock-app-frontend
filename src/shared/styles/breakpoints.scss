@@ -1,0 +1,23 @@
+/**
+ * 跨端断点变量
+ * 范围定义：
+ *   sm < 480px       手机竖屏 / Mate X 折叠态外屏
+ *   md 480-768px     手机横屏 / 小平板
+ *   lg >= 768px      iPad 竖屏 / Mate X 展开态内屏
+ * 注意：H5 不做 xl 宽屏特殊适配，按手机端布局自然渲染
+ */
+$bp-sm: 480px;
+$bp-md: 768px;
+$bp-lg: 1024px;
+
+@mixin respond-to-md {
+  @media (min-width: $bp-sm) {
+    @content;
+  }
+}
+
+@mixin respond-to-lg {
+  @media (min-width: $bp-md) {
+    @content;
+  }
+}

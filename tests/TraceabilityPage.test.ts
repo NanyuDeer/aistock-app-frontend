@@ -70,7 +70,34 @@ const report: MarketTraceReviewRecord = {
       risks: ['成交量不足'],
     },
     market_trace: {
-      trace: { confidence: 'medium' },
+      snapshot: {
+        snapshot_id: 'snap-2026-07-31',
+        trade_date: '2026-07-31',
+        captured_at: '2026-07-31T15:30:00+08:00',
+        a_share: {
+          indexes: [{ name: '上证指数', pct_change: 0.5 }],
+          sectors: {
+            top_gainers: [{ name: '半导体', pct_change: 3.2 }],
+            top_losers: [],
+          },
+        },
+        missing_fields: [],
+        phenomenon_discovery: {
+          status: 'detected',
+          primary: {
+            kind: 'sector_concentration',
+            summary: '真实市场摘要',
+            severity: 'medium',
+            fact_ids: [],
+          },
+        },
+      },
+      trace: {
+        schema_version: '1.1',
+        attribution_status: 'confirmed',
+        confidence: 'medium',
+        candidates: [],
+      },
     },
   },
 }
@@ -110,6 +137,10 @@ describe('大盘溯源页面', () => {
     expect(wrapper.text()).toContain('2026-08-01 03:25')
     expect(wrapper.text()).toContain('半导体')
     expect(wrapper.text()).not.toContain('北向资金大幅流入半导体板块')
+
+    // 展开折叠的 markdown 兜底区域，验证原始报告渲染
+    await wrapper.get('.markdown-section .section-title').trigger('tap')
+    await flushPromises()
     expect(wrapper.html()).toContain('<h1 class="md-h1">报告标题</h1>')
 
     wrapper.unmount()

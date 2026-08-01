@@ -1,6 +1,7 @@
 <template>
-  <view class="page-search">
-    <!-- 搜索栏 -->
+  <SubPageCard title="搜索股票" noChatBar>
+    <view class="page-search">
+    <!-- 搜索框（位于导航栏下方） -->
     <view class="search-bar">
       <view class="search-input-wrap">
         <SvgIcon name="search-line" size="32rpx" color="#9ca3af" />
@@ -14,7 +15,6 @@
         />
         <SvgIcon v-if="keyword" name="close-line" size="32rpx" color="#9ca3af" @tap="clearKeyword" />
       </view>
-      <text class="search-btn" @tap="onSearch">搜索</text>
     </view>
 
     <!-- 热门搜索 -->
@@ -65,7 +65,8 @@
     <view v-else-if="searched" class="empty">
       <text class="empty-text">未找到相关股票</text>
     </view>
-  </view>
+    </view>
+  </SubPageCard>
 </template>
 
 <script setup lang="ts">
@@ -74,6 +75,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import SubPageCard from '@/shared/components/SubPageCard.vue'
 
 interface StockSearchItem {
   symbol: string
@@ -154,15 +156,11 @@ async function toggleFavorite(stock: StockSearchItem) {
 @import '@/shared/styles/variables.scss';
 
 .page-search {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  background: $bg-soft;
-  overscroll-behavior: none;
-  touch-action: none;
   padding: 24rpx;
+  background: $bg-page;
+  min-height: 100%;
 }
 
 /* 搜索栏 */
@@ -198,13 +196,6 @@ async function toggleFavorite(stock: StockSearchItem) {
   font-size: 28rpx;
   color: #9ca3af;
   padding: 4rpx 8rpx;
-}
-
-.search-btn {
-  font-size: 28rpx;
-  color: $primary;
-  font-weight: 500;
-  padding: 8rpx 16rpx;
 }
 
 /* 热门搜索 */

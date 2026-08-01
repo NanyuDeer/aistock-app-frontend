@@ -51,13 +51,128 @@ export interface MarketTraceQaResponse {
   trace: MarketTraceQaTrace
 }
 
-export type MarketTraceConfidence = 'high' | 'medium' | 'low'
-
 export interface MarketTraceReviewDisplayReport {
   summary?: unknown
   details?: unknown
   sectors?: unknown
   risks?: unknown
+}
+
+/* ===== 大盘溯源 schema 2.0 完整类型树（前端只读消费，字段对齐后端 pydantic models） ===== */
+
+export type MarketTraceConfidence = 'high' | 'medium' | 'low'
+export type MarketTraceAttributionStatus = 'confirmed' | 'hypothesis' | 'insufficient' | 'not_applicable'
+export type MarketTraceCandidateStatus = 'supported' | 'weak' | 'rejected' | 'insufficient'
+export type MarketTraceCandidateCategory =
+  | 'global_risk_liquidity'
+  | 'domestic_macro_policy'
+  | 'industry_technology_supply'
+  | 'market_positioning_liquidity'
+export type MarketTraceCausalStage =
+  | 'structural_root'
+  | 'trigger'
+  | 'transmission'
+  | 'exposure'
+  | 'repricing'
+  | 'observable_result'
+export type MarketTracePhenomenonKind =
+  | 'broad_rally'
+  | 'broad_decline'
+  | 'style_divergence'
+  | 'sector_concentration'
+  | 'sentiment_extreme'
+export type MarketTraceSeverity = 'low' | 'medium' | 'high'
+
+export interface MarketTraceCausalNode {
+  stage: MarketTraceCausalStage
+  claim: string
+  evidence_ids?: unknown
+}
+
+export interface MarketTraceCausalChain {
+  nodes: MarketTraceCausalNode[]
+}
+
+export interface MarketTraceCandidateExplanation {
+  id: string
+  category: MarketTraceCandidateCategory
+  status: MarketTraceCandidateStatus
+  verdict: string
+  chain?: MarketTraceCausalChain | null
+  supporting_evidence_ids?: unknown
+  counter_evidence_ids?: unknown
+}
+
+export interface MarketTraceTrace {
+  schema_version?: string
+  attribution_status?: MarketTraceAttributionStatus
+  candidates?: MarketTraceCandidateExplanation[]
+  primary_chain_id?: string | null
+  alternative_chain_id?: string | null
+  confidence?: MarketTraceConfidence
+  unresolved_questions?: unknown
+}
+
+export interface MarketTraceDetectedPhenomenon {
+  kind?: MarketTracePhenomenonKind
+  summary?: string
+  severity?: MarketTraceSeverity
+  fact_ids?: unknown
+  tags?: unknown
+}
+
+export interface MarketTracePhenomenonDiscovery {
+  status?: 'detected' | 'no_phenomenon' | 'insufficient_data'
+  primary?: MarketTraceDetectedPhenomenon | null
+}
+
+export interface MarketTraceSectorItem {
+  name?: unknown
+  pct_change?: unknown
+  net_amount?: unknown
+}
+
+export interface MarketTraceAShareSectors {
+  top_gainers?: MarketTraceSectorItem[]
+  top_losers?: MarketTraceSectorItem[]
+  top_inflows?: MarketTraceSectorItem[]
+  top_outflows?: MarketTraceSectorItem[]
+}
+
+export interface MarketTraceAShare {
+  indexes?: unknown
+  breadth?: unknown
+  turnover?: unknown
+  limits?: unknown
+  main_force?: unknown
+  sectors?: MarketTraceAShareSectors
+}
+
+export interface MarketTraceSourceRecord {
+  source_id?: string
+  kind?: 'market_fact' | 'event_evidence'
+  provider?: string
+  title?: string
+  content?: string
+  url?: string | null
+  occurred_at?: string | null
+  captured_at?: string
+  source_level?: 'primary' | 'reporting' | 'market_data'
+}
+
+export interface MarketTraceSnapshot {
+  snapshot_id?: string
+  trade_date?: string
+  captured_at?: string
+  a_share?: MarketTraceAShare
+  sources?: Record<string, MarketTraceSourceRecord>
+  missing_fields?: unknown
+  phenomenon_discovery?: MarketTracePhenomenonDiscovery
+}
+
+export interface MarketTraceArtifact {
+  snapshot?: MarketTraceSnapshot
+  trace?: MarketTraceTrace
 }
 
 export interface MarketTraceReviewRecord {
@@ -70,14 +185,7 @@ export interface MarketTraceReviewRecord {
     schema_version?: string
     snapshot_id?: string
     display_report?: MarketTraceReviewDisplayReport
-    market_trace?: {
-      snapshot?: {
-        captured_at?: string
-      }
-      trace?: {
-        confidence?: unknown
-      }
-    }
+    market_trace?: MarketTraceArtifact
   }
 }
 
