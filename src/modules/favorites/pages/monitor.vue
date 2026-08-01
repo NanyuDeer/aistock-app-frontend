@@ -20,7 +20,16 @@
     <view class="section">
       <view class="section-header">
         <text class="section-title">异动提醒</text>
-        <text class="section-tip">{{ getMarketStatus() }}</text>
+        <view class="section-header-right">
+          <text class="section-tip">{{ getMarketStatus() }}</text>
+          <view
+            class="detect-btn"
+            :class="{ 'detecting': detecting }"
+            @tap="handleDetect"
+          >
+            <text class="detect-text">{{ detecting ? '检测中...' : '立即检测' }}</text>
+          </view>
+        </view>
       </view>
 
       <!-- 幅度分级筛选（借鉴 alert-catcher） -->
@@ -99,6 +108,7 @@ const appStore = useAppStore()
 const loading = ref(false)
 const alerts = ref<AlertItem[]>([])
 const wsConnected = ref(false)
+const detecting = ref(false)
 let wsTask: UniApp.SocketTask | null = null
 
 /** 幅度分级筛选（借鉴 alert-catcher） */
@@ -147,6 +157,23 @@ async function fetchAlerts() {
     alerts.value = []
   } finally {
     loading.value = false
+  }
+}
+
+/** 手动触发异动检测（绕过交易时段限制），检测完刷新列表 */
+async function handleDetect() {
+  if (detecting.value) return
+  detecting.value = true
+  try {
+    await stockTraceApi.detect()
+    // 检测完成，延迟 1 秒刷新列表（等待事件写入 DB）
+    setTimeout(() => {
+      fetchAlerts()
+      detecting.value = false
+    }, 1000)
+  } catch {
+    detecting.value = false
+    uni.showToast({ title: '检测失败，请稍后重试', icon: 'none' })
   }
 }
 
@@ -225,8 +252,21 @@ onUnmounted(() => disconnectWs())
 
 .section { margin-bottom: $s-3; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: $s-2; }
+.section-header-right { display: flex; align-items: center; gap: $s-2; }
 .section-title { font-size: $font-size-lg; font-weight: 600; color: $ink; }
 .section-tip { font-size: $font-size-xs; color: $ink-soft; }
+
+.detect-btn {
+  padding: 6rpx 20rpx;
+  border-radius: 24rpx;
+  background: $primary;
+  /* #ifdef H5 */
+  cursor: pointer;
+  /* #endif */
+}
+.detect-btn.detecting { background: $line; }
+.detect-text { font-size: $font-size-xs; color: #ffffff; }
+.detect-btn.detecting .detect-text { color: $ink-soft; }
 
 .filter-bar { margin-bottom: $s-2; }
 

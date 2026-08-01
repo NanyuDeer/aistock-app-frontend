@@ -2,6 +2,16 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-01 — 异动监控新增"立即检测"按钮
+
+**开发者**: Aria
+
+### 新增
+- `src/modules/favorites/pages/monitor.vue`：section-header 新增"立即检测"按钮，点击调 `stockTraceApi.detect()` 触发后端绕过交易时段限制的价格检测，检测完延迟1秒刷新列表；detecting 状态防重复点击
+- `src/shared/api/modules/stockTrace.ts`：新增 `detect()` 方法，调 `POST /cn/favorites/movements/detect`
+
+---
+
 ## [master] 2026-08-01 — alert-analysis 结构化渲染 + 通用播报卡片 + 当日缓存 + dev代理指向远程
 
 **开发者**: Aria
