@@ -8,10 +8,6 @@
         <text class="risk-dot">·</text>
         <text class="risk-text">{{ risk }}</text>
       </view>
-      <view v-if="presentation.pendingRisks.missingEvidence.length" class="missing-block">
-        <text class="missing-label">缺失数据：</text>
-        <text class="missing-text">{{ presentation.pendingRisks.missingEvidence.join('、') }}</text>
-      </view>
     </Card>
   </view>
 </template>
@@ -24,8 +20,7 @@ import type { MarketTracePresentation } from '@/modules/analytics/utils/marketTr
 const props = defineProps<{ presentation: MarketTracePresentation }>()
 
 const hasRisks = computed(() => {
-  const r = props.presentation.pendingRisks
-  return r.openQuestions.length > 0 || r.missingEvidence.length > 0
+  return props.presentation.pendingRisks.openQuestions.length > 0
 })
 </script>
 
@@ -40,11 +35,4 @@ const hasRisks = computed(() => {
 .risk-item:first-child { margin-top: 0; }
 .risk-dot { color: $warning; font-size: 28rpx; line-height: 1.4; }
 .risk-text { flex: 1; color: $text-color; font-size: 24rpx; line-height: 1.5; }
-.missing-block {
-  margin-top: $spacing-sm; padding-top: $spacing-sm;
-  border-top: 1rpx solid $line-soft;
-  display: flex; align-items: flex-start; gap: 8rpx; flex-wrap: wrap;
-}
-.missing-label { font-size: 22rpx; color: $warning; font-weight: 600; }
-.missing-text { font-size: 22rpx; color: $text-color-secondary; line-height: 1.5; }
 </style>

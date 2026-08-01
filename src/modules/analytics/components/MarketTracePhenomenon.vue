@@ -71,18 +71,32 @@ function changeClass(v: number | null): string {
 .perf-block, .sector-block { margin-top: $spacing-sm; }
 .block-label { display: block; font-size: 22rpx; color: $text-color-secondary; margin-bottom: $spacing-xs; }
 
-.perf-list, .sector-list {
+.perf-list {
   display: flex; flex-wrap: wrap; gap: 8rpx;
   @include bp.respond-to-lg { gap: 12rpx; }
 }
-.perf-item, .sector-item {
+.perf-item {
   display: flex; align-items: center; gap: 8rpx;
   padding: 8rpx 16rpx; border-radius: $r-md;
   background: $bg-soft; min-width: 200rpx;
 }
-.perf-name, .sector-name { font-size: 22rpx; color: $text-color; flex: 1; }
-.perf-change, .sector-pct { font-size: 24rpx; font-weight: 600; font-family: $font-mono; }
-.up, .perf-change.up { color: $up; }
-.down, .perf-change.down { color: $down; }
-.flat { color: $text-color-secondary; }
+.perf-name { font-size: 22rpx; color: $text-color; flex: 1; }
+.perf-change { font-size: 24rpx; font-weight: 600; font-family: $font-mono; }
+.perf-change.up { color: $up; }
+.perf-change.down { color: $down; }
+.perf-change.flat { color: $text-color-secondary; }
+
+.sector-list {
+  display: grid; grid-template-columns: 1fr; gap: 8rpx;
+  @include bp.respond-to-md { grid-template-columns: 1fr 1fr; }
+  @include bp.respond-to-lg { grid-template-columns: repeat(3, 1fr); }
+}
+.sector-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8rpx 16rpx; border-radius: $r-md; background: $bg-soft;
+}
+.sector-name { font-size: 22rpx; color: $text-color; flex: 1; }
+.sector-pct { font-size: 24rpx; font-weight: 600; font-family: $font-mono; }
+.sector-pct.up { color: $up; }
+.sector-pct.down { color: $down; }
 </style>

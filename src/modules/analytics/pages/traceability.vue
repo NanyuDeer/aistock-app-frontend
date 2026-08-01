@@ -30,7 +30,6 @@
         <MarketTraceTimeline :presentation="presentation" :layout="timelineLayout" />
         <MarketTraceAlternatives :presentation="presentation" />
         <MarketTraceRejected :presentation="presentation" />
-        <MarketTraceSectors :presentation="presentation" />
 
         <!-- 折叠兜底：完整 markdown -->
         <view class="markdown-section">
@@ -63,7 +62,6 @@ import MarketTracePhenomenon from '@/modules/analytics/components/MarketTracePhe
 import MarketTraceTimeline from '@/modules/analytics/components/MarketTraceTimeline.vue'
 import MarketTraceAlternatives from '@/modules/analytics/components/MarketTraceAlternatives.vue'
 import MarketTraceRejected from '@/modules/analytics/components/MarketTraceRejected.vue'
-import MarketTraceSectors from '@/modules/analytics/components/MarketTraceSectors.vue'
 
 const loading = ref(false)
 const error = ref(false)
