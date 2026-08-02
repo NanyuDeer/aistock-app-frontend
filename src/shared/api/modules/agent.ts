@@ -103,6 +103,29 @@ export interface MarketTraceCandidateExplanation {
   counter_evidence_ids?: unknown
 }
 
+export interface MarketTraceSectorHit {
+  sector: string
+  morning_direction: string
+  actual_direction: string
+  result: 'hit' | 'miss'
+  deviation_note?: string
+}
+
+export interface MarketTraceEventHit {
+  event_title: string
+  morning_direction: string
+  actual_impact: string
+  result: 'hit' | 'miss' | 'unverifiable'
+  note?: string
+}
+
+export interface MarketTracePredictionValidation {
+  status: 'hit' | 'partial' | 'miss' | 'no_forecast'
+  sector_hits?: MarketTraceSectorHit[]
+  event_hits?: MarketTraceEventHit[]
+  overall_note?: string
+}
+
 export interface MarketTraceTrace {
   schema_version?: string
   attribution_status?: MarketTraceAttributionStatus
@@ -111,6 +134,7 @@ export interface MarketTraceTrace {
   alternative_chain_id?: string | null
   confidence?: MarketTraceConfidence
   unresolved_questions?: unknown
+  prediction_validation?: MarketTracePredictionValidation | null
 }
 
 export interface MarketTraceDetectedPhenomenon {
