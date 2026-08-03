@@ -45,7 +45,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 | 事件传导链 | `event-chain/index.vue` | 事件传导链路可视化 |
 | 估值分析 | `valuation/index.vue` | 个股估值 |
 | 交易复盘 | `review/index.vue` | 复盘归因 |
-| AI 对话 | `chat/index.vue` | App 专属 AI 对话 |
+| AI 对话 | `chat/index.vue` | App 专属 AI 对话（含 AI 思考过程卡片 ReasoningCard，P3-fix；流式过程实时思考链渲染 `streamingReasoning`，P3-fix-2） |
 
 > 分包页面除 `briefing/index.vue`（已实现）外，其余为占位实现，待后端 Agent/Skills 完成后对接。
 > 主包 `modules/chat/pages/agent-report.vue` 为通用分析报告展示页，被 leaders.vue 和 hot-burst.vue 跳转调用。
@@ -95,12 +95,14 @@ src/
 │   │   ├── layout.ts        # 布局工具（底部固定栏高度计算，含安全区补偿）
 │   │   ├── useAuth.ts         # 认证 hook
 │   │   ├── useFavorites.ts    # 自选股 hook
-│   │   ├── useStreamingChat.ts # 流式对话 hook
+│   │   ├── useStreamingChat.ts # 流式对话 hook（SSE）
+│   │   ├── useChatStream.ts  # 对话流 hook（WS 为主，HTTP 降级；send 支持 forceDeep，DONE 重组 execSteps/lastDeepReport，P3；订阅 reasoning 事件按节点聚合为 reasoningSteps，P3-fix；currentRunReasoning 改 ref + return 新增 streamingReasoning 流式实时思考链，P3-fix-2）
+│   │   ├── buildExecTree.ts  # WS 事件流 → 执行细节层级树纯函数（D21，P3）
 │   │   ├── useStockCycle.ts   # 股票周期 hook
 │   │   ├── useWebSocket.ts    # WebSocket hook
 │   │   ├── useTimer.ts        # 定时器 hook
 │   │   ├── usePushNotification.ts # 推送通知 hook
-│   │   ├── constants.ts       # 常量
+│   │   ├── constants.ts       # 常量（AGENT_WS_BASE_URL fallback 本地 8000，P3-fix-2）
 │   │   ├── stock.ts           # 股票工具
 │   │   ├── tradingTime.ts     # 交易时间
 │   │   ├── datetime.ts        # 日期时间
@@ -301,7 +303,7 @@ import Card from '@/shared/components/Card.vue'
 
 | 模块文件 | 说明 | 后端路径 |
 |---------|------|---------|
-| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务） | `/api/agent/*` |
+| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约） | `/api/agent/*` |
 | `auth.ts` | 认证（登录、用户信息） | `/api/auth/wechat/*` |
 | `briefing.ts` | 早晚报结构化（BriefingItem/BriefingSummary 类型 + 降级解析适配器） | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |
@@ -358,6 +360,7 @@ import Card from '@/shared/components/Card.vue'
 | `useAuth` | 认证状态和登录/登出 |
 | `useFavorites` | 自选股增删改查 |
 | `useStreamingChat` | 流式对话（SSE） |
+| `useChatStream` | 对话流（WS 为主，HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`，P3；订阅 reasoning 聚合 `reasoningSteps` + `_testHandleWsMessage` 测试钩子，P3-fix；return `streamingReasoning` 流式实时思考链，P3-fix-2） |
 | `useStockCycle` | 股票周期切换 |
 | `useWebSocket` | WebSocket 连接管理 |
 | `useTimer` | 定时器管理 |
