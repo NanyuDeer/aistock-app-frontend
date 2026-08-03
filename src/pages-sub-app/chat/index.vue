@@ -11,14 +11,14 @@
           <view v-else class="msg-content assistant">
             <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
             <view class="bubble">
+              <!-- AI 思考链卡片（顶部，替代原执行过程面板） -->
+              <ReasoningCard v-if="msg.reasoningSteps && msg.reasoningSteps.length > 0" :steps="msg.reasoningSteps" />
+
               <!-- Markdown 渲染的回复内容 -->
               <mp-html v-if="msg.content" :content="markdownToHtml(msg.content)" class="bubble-html" />
 
               <!-- D20：深度分析 summary 卡片（仅 deep 结果） -->
               <DeepSummaryCard v-if="msg.lastDeepReport" :report="msg.lastDeepReport" />
-
-              <!-- D21：执行细节面板（事件流层级树，纯前端） -->
-              <ExecStepsPanel v-if="msg.execSteps && msg.execSteps.length > 0" :steps="msg.execSteps" />
 
               <!-- D4：force_deep「深度分析」按钮（仅非 deep / 非错误回复） -->
               <view
@@ -64,7 +64,7 @@
 
       <!-- 快捷 Skills -->
       <view class="quick-skills">
-        <view class="skill-btn" @tap="quickAsk('今日大盘怎么样?')">
+        <view class="skill-btn" @tap="quickAsk('今日大盘怎么样')">
           <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
           <text class="skill-btn-text">大盘</text>
         </view>
@@ -72,7 +72,7 @@
           <SvgIcon name="money-cny-circle-line" size="28rpx" color="#0b5fff" />
           <text class="skill-btn-text">资金</text>
         </view>
-        <view class="skill-btn" @tap="quickAsk('今天的龙头股有哪些?')">
+        <view class="skill-btn" @tap="quickAsk('今天的龙头股有哪些')">
           <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
           <text class="skill-btn-text">龙头</text>
         </view>
@@ -96,7 +96,9 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 import DeepSummaryCard from './DeepSummaryCard.vue'
-import ExecStepsPanel from './ExecStepsPanel.vue'
+import ReasoningCard from './ReasoningCard.vue'
+// ExecStepsPanel 保留以备 P9 后续可能复用（msg.execSteps 仍随消息下发），但 chat 页面不再使用
+// import ExecStepsPanel from './ExecStepsPanel.vue'
 
 const chatStream = useChatStream()
 
