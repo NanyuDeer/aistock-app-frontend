@@ -30,6 +30,10 @@ export function useChatStream() {
   let socket: UniApp.SocketTask | null = null
   let wsConnected = false
   let doneReceived = false
+  // P3-fix-2：当前轮 send 的 promise 解析器。onMessage 只在 connect 注册一次
+  // （uni-app H5 的 onMessage 是 push 累积而非替换，若在 send 内重复注册，
+  //  第 2 条消息起每个 WS 事件会被处理 N 遍 → reasoning 文本逐字翻倍）。
+  let resolveSend: (() => void) | null = null
 
   function connect(): Promise<boolean> {
     return new Promise((resolve) => {
@@ -51,6 +55,18 @@ export function useChatStream() {
             resolve(false)
           }
           wsConnected = false
+        })
+
+        // 单次注册 WS 消息处理（每次 send 不再重复注册）
+        socket.onMessage((msg: any) => {
+          try {
+            const data = JSON.parse(msg.data)
+            handleWsMessage(data, () => {
+              const r = resolveSend
+              resolveSend = null
+              r?.()
+            })
+          } catch { /* JSON 解析失败忽略 */ }
         })
 
         // 超时降级
@@ -205,18 +221,11 @@ export function useChatStream() {
     if (wsConnected && socket) {
       // WS 流式模式
       await new Promise<void>((resolve) => {
-        const onDone = () => {
+        // P3-fix-2：onMessage 已在 connect 单次注册，这里只更新当前轮的解析器
+        resolveSend = () => {
           streaming.value = false
           resolve()
         }
-
-        // 注册 onMessage（uni-app 会替换之前的回调）
-        socket!.onMessage((msg: any) => {
-          try {
-            const data = JSON.parse(msg.data)
-            handleWsMessage(data, onDone)
-          } catch { /* JSON 解析失败忽略 */ }
-        })
 
         const userInfo = useUserStore().userInfo
         socket!.send({
