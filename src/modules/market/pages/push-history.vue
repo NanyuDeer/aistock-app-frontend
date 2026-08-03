@@ -3,7 +3,7 @@
     <view class="push-history-content">
       <!-- 统计信息区域 -->
       <view v-if="!loading && allRecords.length" class="summary-section">
-        <StatGrid :items="summaryStatItems" :columns="2" labelFirst />
+        <StatGrid class="history-summary-grid" :items="summaryStatItems" :columns="2" labelFirst />
       </view>
 
       <!-- 标签栏 + 日期筛选合并行 -->
@@ -304,6 +304,11 @@ onLoad(() => {
 
 .summary-section {
   margin-bottom: 24rpx;
+}
+
+/* 历史表现统计值是此页的关键读数，稍作放大以提高扫读效率。 */
+:deep(.history-summary-grid .as-stat-grid__value) {
+  font-size: 32rpx;
 }
 
 .tabs-filter-row {

@@ -69,7 +69,7 @@
           <Badge v-if="sector.frequency" size="sm">上榜 {{ sector.frequency }} 次</Badge>
         </view>
         <!-- 统计行 -->
-        <StatGrid :items="sectorStatItems(sector)" :columns="4" />
+        <StatGrid class="leader-stat-grid" :items="sectorStatItems(sector)" :columns="4" />
         <!-- 单只龙头股详细行情（跨板块去重） -->
         <view v-if="getSectorLeader(sector)" class="leader-mini-row" @tap.stop="goStockDetail(getSectorLeader(sector)!.code)">
           <view class="leader-mini-left">
@@ -114,6 +114,7 @@ import { ref, computed, getCurrentInstance } from 'vue'
 import { onShow, onReady } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderAiAnalysis, WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
+import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid } from '@/shared/components'
@@ -346,7 +347,7 @@ function selectBubble(b: Bubble) {
 }
 
 function goAgentReport() {
-  const today = new Date().toISOString().split('T')[0]
+  const today = shanghaiDateString()
   uni.navigateTo({
     url: `/modules/chat/pages/agent-report?intent=wind_leader&date=${today}`
   })
@@ -637,6 +638,11 @@ onShow(() => {
   padding: 28rpx;
   margin-bottom: 20rpx;
   box-shadow: $shadow-sm;
+}
+
+/* 第四格是“领涨股”名称，较长时比数值字号略小以保持单行。 */
+:deep(.leader-stat-grid .as-stat-grid__item:nth-child(4) .as-stat-grid__value) {
+  font-size: 24rpx;
 }
 
 .stats-header {

@@ -1,656 +1,246 @@
 <template>
-  <SubPageCard :title="pageTitle">
-    <view class="briefing-detail-content">
-      <view v-if="loading" class="loading-state">
-        <view class="loading-spinner"></view>
-        <text class="loading-text">加载中...</text>
+  <SubPageCard2 :title="pageTitle" :subtitle="subtitle">
+    <view class="broadcast-detail">
+      <view v-if="loading" class="state-view">
+        <text>播报加载中...</text>
+      </view>
+
+      <view v-else-if="!broadcast" class="state-view">
+        <SvgIcon name="file-line" size="72rpx" color="#8a96b0" />
+        <text>{{ typeLabel }}播报尚未生成</text>
       </view>
 
       <template v-else>
-        <!-- 摘要卡：AI 核心观点 -->
-        <view v-if="report?.summary" class="summary-card">
-          <view class="summary-header">
-            <text class="ai-badge">AI</text>
-            <text class="summary-label">核心观点</text>
-          </view>
-          <text class="summary-text">{{ report.summary }}</text>
-        </view>
+        <AudioPlayer
+          v-if="audioUrl"
+          class="broadcast-audio-player"
+          :src="audioUrl"
+        />
 
-        <view v-if="report" class="brief-status" :class="{ degraded: report.degraded }">
-          <text>{{ report.degraded ? '证据不足' : '完整 Brief' }}</text>
-          <text v-if="report.degraded && report.missing_sources.length">
-            缺失来源：{{ report.missing_sources.join('、') }}
-          </text>
-        </view>
-
-        <!-- 播报入口 -->
-        <view
-          v-if="report"
-          class="podcast-btn"
-          @tap="goBriefing"
-        >
-          <SvgIcon name="headphone-line" size="28rpx" color="#ffffff" />
-          <text class="podcast-text">收听播报</text>
-          <text class="podcast-arrow">›</text>
-        </view>
-
-        <!-- ReportCard[] 统一渲染：晨报/复盘按 type 分流，未匹配正文入"补充分析" -->
-        <view
-          v-for="card in cards"
-          :key="card.key"
-          class="detail-card"
-          :class="{ 'highlight-card': isHighlightCard(card.key) }"
-        >
-          <view class="card-header">
-            <text class="card-type-tag" :class="cardTagClass(card.key)">{{ card.title }}</text>
-          </view>
-          <view class="markdown-content">
-            <mp-html :content="card.html" />
-          </view>
-        </view>
-
-        <view
-          v-for="item in report?.items"
-          :key="`${item.title}-${item.as_of}`"
-          class="detail-card"
-        >
-          <view class="card-header">
-            <text class="card-type-tag">{{ item.title }}</text>
-          </view>
-          <text class="summary-text">{{ item.conclusion }}</text>
-          <text class="item-as-of">截至 {{ item.as_of }} · 置信度 {{ item.confidence }}</text>
-          <text v-if="item.uncertainty" class="item-uncertainty">
-            不确定性：{{ Array.isArray(item.uncertainty) ? item.uncertainty.join('、') : item.uncertainty }}
-          </text>
-          <view v-if="item.evidence.length" class="evidence-list">
-            <text v-for="evidence in item.evidence" :key="evidence.id" class="evidence-item">
-              {{ evidence.report_type }} · {{ evidence.id }} · {{ evidence.data_source }}
-            </text>
-          </view>
-        </view>
-
-        <!-- 关联板块：横向滚动标签 -->
-        <view v-if="relatedItems.length" class="detail-card">
-          <view class="card-footer">
-            <text class="industries-label">{{ relatedItemsLabel }}</text>
-            <view class="industries-row">
-              <scroll-view class="industries-scroll" scroll-x="true" :show-scrollbar="false">
-                <view class="industries-tags">
-                  <text
-                    v-for="item in relatedItems"
-                    :key="item"
-                    class="industry-item item-neutral"
-                    @tap="goSectorSearch(item)"
-                  >
-                    {{ item }}
-                    <text class="industry-arrow">›</text>
-                  </text>
-                </view>
-              </scroll-view>
+        <view class="dialogue-list">
+          <view
+            v-for="(line, index) in broadcast.dialogue"
+            :key="`${line.role}-${index}`"
+            class="dialogue-line"
+            :class="line.role"
+          >
+            <view class="speaker-icon">
+              <SvgIcon
+                :name="line.role === 'host' ? 'mic-line' : 'broadcast-line'"
+                size="30rpx"
+                color="#ffffff"
+              />
+            </view>
+            <view class="dialogue-copy">
+              <text class="speaker-name">{{ line.role === 'host' ? '主持人' : '分析师' }}</text>
+              <text class="dialogue-content">{{ line.content }}</text>
             </view>
           </view>
         </view>
 
-        <!-- 风险提示 -->
-        <view v-if="report?.risks?.length" class="detail-card">
-          <view class="card-header">
-            <text class="card-type-tag risk-tag">风险提示</text>
-          </view>
-          <view class="risks-list">
-            <view v-for="(risk, idx) in report.risks" :key="idx" class="risk-item">
-              <SvgIcon name="alert-line" size="22rpx" :color="errorColor" />
-              <text class="risk-text">{{ risk }}</text>
-            </view>
-          </view>
-        </view>
-
-        <view v-if="status === 'empty'" class="empty-state">
-          <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
-          <text class="empty-text">{{ typeLabel }}尚未生成</text>
-          <text class="empty-hint">
-            {{ typeLabel === '晨报' ? '请在 9:00 后查看' : '请在 15:30 后查看' }}
-          </text>
-        </view>
-
-        <view v-if="status === 'error'" class="empty-state">
-          <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
-          <text class="empty-text">加载失败</text>
-          <view class="retry-btn" @tap="refresh">
-            <text class="retry-text">重试</text>
-          </view>
-        </view>
       </template>
 
       <view class="date-nav">
         <view class="date-btn" @tap="changeDate(-1)">
-          <SvgIcon name="arrow-left-line" size="28rpx" :color="brandColor" />
-          <text class="date-btn-text">前一天</text>
+          <SvgIcon name="arrow-left-line" size="28rpx" color="#0b5fff" />
+          <text>前一天</text>
         </view>
         <view class="date-btn" @tap="changeDate(1)">
-          <text class="date-btn-text">后一天</text>
-          <SvgIcon name="arrow-right-line" size="28rpx" :color="brandColor" />
+          <text>后一天</text>
+          <SvgIcon name="arrow-right-line" size="28rpx" color="#0b5fff" />
         </view>
       </view>
     </view>
-  </SubPageCard>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
+import { agentApi, type BriefType, type BroadcastV1 } from '@/shared/api/modules/agent'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import SubPageCard from '@/shared/components/SubPageCard.vue'
-import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
-import { useBriefingCard, type BriefingType } from '@/shared/utils/useBriefingCard'
-import { splitReportToCards, type ReportCard } from '@/shared/utils/reportCard'
+import AudioPlayer from '@/shared/components/AudioPlayer.vue'
+import { parseBroadcastReport } from '@/shared/utils/broadcastReport'
+import { normalizeBriefingType } from '@/shared/utils/briefingDetail'
+import { API_BASE_URL } from '@/shared/utils/constants'
 import { addCalendarDays, shanghaiDateString } from '@/shared/utils/tradingTime'
 
-const pageType = ref<BriefingType>('evening')
 const currentDate = ref('')
+const briefType = ref<BriefType>('morning')
+const broadcast = ref<BroadcastV1 | null>(null)
+const loading = ref(true)
 
-const brandColor = '#0b5fff'
-const errorColor = '#f43f5e'
-
-const pageTitle = computed(() => pageType.value === 'morning' ? '晨报详情' : '晚报详情')
-
-const {
-  type: briefingType,
-  date: briefingDate,
-  typeLabel,
-  report,
-  status,
-  loading,
-  refresh,
-} = useBriefingCard()
-
-const cards = computed<ReportCard[]>(() => {
-  return []
+const typeLabel = computed(() => briefType.value === 'morning' ? '晨报' : '晚报')
+const pageTitle = computed(() => `${typeLabel.value}双人播报`)
+const subtitle = computed(() => `${currentDate.value} · AI 生成内容，仅供参考`)
+const audioUrl = computed(() => {
+  const audioPath = broadcast.value?.audio_path
+  if (!audioPath) return ''
+  const filename = audioPath.split('/').pop() || ''
+  return `${API_BASE_URL}/agent/audio/${filename}`
 })
 
-/** 关联项目：晚报展示 sectors，晨报展示 stocks */
-const relatedItems = computed(() => {
-  if (!report.value) return []
-  return pageType.value === 'evening' ? report.value.sectors : report.value.stocks
-})
-
-/** 关联项目标签 */
-const relatedItemsLabel = computed(() => (
-  pageType.value === 'evening' ? '关联板块' : '关联标的'
-))
-
-/** 高亮卡片：核心结论、异常信号 */
-function isHighlightCard(key: string): boolean {
-  return key === 'coreConclusion' || key === 'anomalySignal'
-}
-
-/** 卡片标签附加 class */
-function cardTagClass(key: string): string {
-  if (key === 'coreConclusion') return 'conclusion-tag'
-  if (key === 'anomalySignal') return 'anomaly-tag'
-  return ''
-}
-
-function goBriefing() {
-  uni.navigateTo({ url: `/pages-sub-app/briefing/index?type=${pageType.value}&date=${currentDate.value}` })
-}
-
-function goSectorSearch(keyword: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/search?keyword=${encodeURIComponent(keyword)}` })
+async function loadBroadcast() {
+  loading.value = true
+  try {
+    const data = await agentApi.getBroadcast(briefType.value, currentDate.value)
+    broadcast.value = parseBroadcastReport(data, briefType.value, currentDate.value)
+  } catch {
+    broadcast.value = null
+  } finally {
+    loading.value = false
+  }
 }
 
 function changeDate(delta: number) {
   currentDate.value = addCalendarDays(currentDate.value, delta)
-  briefingDate.value = currentDate.value
-  refresh()
+  loadBroadcast()
 }
 
 onLoad((options) => {
   const opts = options as Record<string, string> || {}
-  const type = (opts.type === 'morning' || opts.type === 'evening') ? opts.type : 'evening'
-  pageType.value = type
+  briefType.value = normalizeBriefingType(opts.type)
   currentDate.value = opts.date || shanghaiDateString()
-  briefingType.value = type
-  briefingDate.value = currentDate.value
-  refresh()
+  loadBroadcast()
 })
+
 </script>
 
 <style lang="scss" scoped>
-@use '@/shared/styles/variables.scss' as *;
-
-.briefing-detail-content {
-  padding: 0 32rpx 40rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
+.broadcast-detail {
+  min-height: 100%;
+  padding: 32rpx 28rpx 44rpx;
+  background: $bg-page;
 }
 
-.loading-state {
+.state-view {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 200rpx 0;
-}
-
-.loading-spinner {
-  width: 60rpx;
-  height: 60rpx;
-  border: 4rpx solid var(--ev-border);
-  border-top-color: var(--ev-accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.loading-text {
+  gap: 18rpx;
+  padding-top: 200rpx;
+  color: $ink-mute;
   font-size: $font-size-sm;
-  color: var(--ev-text-muted);
-  margin-top: $spacing-base;
 }
 
-/* ===== 摘要卡：AI 核心观点 ===== */
-.summary-card {
-  background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.05));
-  border-radius: 20rpx;
-  padding: 22rpx;
-  border-left: 6rpx solid var(--ev-accent);
-  border-top: 1rpx solid var(--ev-border-light);
-  border-right: 1rpx solid var(--ev-border-light);
-  border-bottom: 1rpx solid var(--ev-border-light);
+/* 详情页只保留播放控制：去掉标题行，并收紧三个圆形按钮，避免抢占对话内容空间。 */
+:deep(.broadcast-audio-player) {
+  margin-bottom: 28rpx;
 }
 
-.summary-header {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
+:deep(.broadcast-audio-player .as-audio-player__controls) {
+  gap: 36rpx;
   margin-bottom: 12rpx;
 }
 
-.ai-badge {
-  width: 32rpx;
+:deep(.broadcast-audio-player .as-audio-player__btn--side) {
+  width: 64rpx;
+  height: 64rpx;
+}
+
+:deep(.broadcast-audio-player .as-audio-player__btn--main) {
+  width: 88rpx;
+  height: 88rpx;
+}
+
+:deep(.broadcast-audio-player .as-audio-player__btn-icon) {
+  width: 30rpx;
+  height: 30rpx;
+}
+
+:deep(.broadcast-audio-player .as-audio-player__btn-icon--main) {
+  width: 38rpx;
+  height: 38rpx;
+}
+
+:deep(.broadcast-audio-player .as-audio-player__progress) {
   height: 32rpx;
-  border-radius: 50%;
-  background: var(--ev-accent);
-  color: #ffffff;
-  font-size: 18rpx;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
 }
 
-.summary-label {
-  font-size: 22rpx;
-  color: var(--ev-text-muted);
-  font-weight: 500;
-}
-
-.summary-text {
-  font-size: 28rpx;
-  color: var(--ev-text-primary);
-  line-height: 1.6;
-  font-weight: 500;
-}
-
-.brief-status {
+.dialogue-list {
   display: flex;
   flex-direction: column;
-  gap: 6rpx;
-  padding: 18rpx 22rpx;
-  background: var(--ev-accent-soft);
-  border-radius: 8rpx;
-  color: var(--ev-accent);
-  font-size: 22rpx;
+  gap: 24rpx;
 }
 
-.brief-status.degraded {
-  background: var(--ev-warning-bg);
-  color: var(--ev-warning);
-}
-
-.item-as-of,
-.item-uncertainty,
-.evidence-item {
-  display: block;
-  margin-top: 12rpx;
-  font-size: 22rpx;
-  line-height: 1.5;
-  color: var(--ev-text-muted);
-}
-
-.evidence-list {
-  margin-top: 12rpx;
-  padding-top: 12rpx;
-  border-top: 1rpx solid var(--ev-border);
-}
-
-/* ===== 播报按钮 ===== */
-.podcast-btn {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  padding: 14rpx 24rpx;
-  border-radius: 9999rpx;
-  background: var(--ev-blue-gradient);
-  box-shadow: 0 4rpx 16rpx var(--ev-blue-shadow);
-  align-self: flex-start;
-  transition: all 0.2s ease;
-
-  &:active {
-    opacity: 0.85;
-    transform: scale(0.97);
-  }
-}
-
-.podcast-text {
-  font-size: 26rpx;
-  font-weight: 500;
-  color: #ffffff;
-}
-
-.podcast-arrow {
-  font-size: 28rpx;
-  color: #ffffff;
-  font-weight: 600;
-}
-
-/* ===== 通用卡片 ===== */
-.detail-card {
-  background: var(--ev-bg-card);
-  border-radius: 20rpx;
-  padding: 22rpx;
-  border: 1rpx solid var(--ev-border);
-  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  margin-bottom: 14rpx;
-}
-
-.card-type-tag {
-  font-size: 22rpx;
-  font-weight: 600;
-  padding: 6rpx 16rpx;
-  border-radius: 6rpx;
-  letter-spacing: 0.5rpx;
-  background: var(--ev-accent-soft);
-  color: var(--ev-accent);
-}
-
-.card-type-tag.risk-tag {
-  background: var(--ev-negative-soft);
-  color: var(--ev-negative);
-}
-
-.highlight-card {
-  border-left: 6rpx solid var(--ev-accent);
-}
-
-.card-type-tag.conclusion-tag {
-  background: linear-gradient(135deg, rgba(77,124,254,0.12), rgba(99,102,241,0.08));
-  color: var(--ev-accent);
-  font-size: 24rpx;
-}
-
-.card-type-tag.anomaly-tag {
-  background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(249,115,22,0.08));
-  color: var(--ev-warning);
-  font-size: 24rpx;
-}
-
-.exclusion-note {
-  margin-top: 14rpx;
-  padding: 12rpx 16rpx;
-  background: rgba(148, 163, 184, 0.06);
-  border-radius: 8rpx;
-  font-size: 22rpx;
-  color: var(--ev-text-muted);
-}
-
-/* ===== Markdown 内容 ===== */
-.markdown-content {
-  font-size: 26rpx;
-  color: var(--ev-text-secondary);
-  line-height: 1.8;
-  word-break: keep-all;
-  overflow-wrap: break-word;
-
-  :deep(.md-h2) {
-    font-size: 32rpx;
-    font-weight: 700;
-    color: var(--ev-text-primary);
-    margin: 24rpx 0 12rpx;
-    padding-bottom: 8rpx;
-    border-bottom: 2rpx solid var(--ev-border);
-  }
-
-  :deep(.md-h3) {
-    font-size: 28rpx;
-    font-weight: 600;
-    color: var(--ev-text-primary);
-    margin: 18rpx 0 10rpx;
-  }
-
-  :deep(.md-hr) {
-    border: 0;
-    height: 1rpx;
-    background: var(--ev-border);
-    margin: 18rpx 0;
-  }
-
-  :deep(strong) {
-    font-weight: 600;
-    color: var(--ev-text-primary);
-  }
-
-  :deep(blockquote) {
-    margin: 10rpx 0 14rpx;
-    padding: 10rpx 20rpx;
-    border-left: 4rpx solid var(--ev-accent);
-    background: rgba(77, 124, 254, 0.04);
-    color: var(--ev-text-tertiary);
-    font-size: 24rpx;
-    line-height: 1.5;
-  }
-
-  :deep(.md-ol), :deep(.md-ul) {
-    padding-left: 36rpx;
-    margin-bottom: 14rpx;
-  }
-
-  :deep(.md-ol-li), :deep(.md-ul-li) {
-    margin-bottom: 6rpx;
-    display: list-item;
-  }
-
-  :deep(.md-table) {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 14rpx 0;
-    font-size: 24rpx;
-  }
-
-  :deep(.md-table th) {
-    background: rgba(77, 124, 254, 0.06);
-    font-weight: 600;
-    color: var(--ev-text-primary);
-    border: 1rpx solid var(--ev-border);
-    padding: 10rpx 12rpx;
-    text-align: left;
-  }
-
-  :deep(.md-table td) {
-    border: 1rpx solid var(--ev-border);
-    padding: 8rpx 12rpx;
-    color: var(--ev-text-secondary);
-  }
-
-  :deep(br) {
-    display: block;
-    content: '';
-    margin-bottom: 8rpx;
-  }
-}
-
-/* ===== 卡片底部：标签行（借鉴事件列表） ===== */
-.card-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-}
-
-.industries-label {
-  font-size: 22rpx;
-  color: var(--ev-text-muted);
-  line-height: 1;
-}
-
-.industries-row {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-}
-
-.industries-scroll {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.industries-tags {
-  display: inline-flex;
-  gap: 8rpx;
-  white-space: nowrap;
-}
-
-.industry-item {
-  font-size: 22rpx;
-  padding: 8rpx 16rpx;
-  border-radius: 6rpx;
-  white-space: nowrap;
-  transition: opacity 0.2s ease;
-
-  &:active {
-    opacity: 0.7;
-  }
-}
-
-.industry-arrow {
-  margin-left: 4rpx;
-  font-weight: 700;
-  font-size: 20rpx;
-}
-
-.item-neutral {
-  background: var(--ev-accent-soft);
-  border: 1rpx solid rgba(77, 124, 254, 0.15);
-  color: var(--ev-accent);
-}
-
-.item-neutral .industry-arrow {
-  color: var(--ev-accent);
-}
-
-/* ===== 风险列表 ===== */
-.risks-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-}
-
-.risk-item {
+.dialogue-line {
   display: flex;
   align-items: flex-start;
-  gap: 10rpx;
-  padding: 12rpx 14rpx;
-  background: var(--ev-negative-bg);
-  border-radius: 10rpx;
-}
+  gap: 16rpx;
 
-.risk-text {
-  font-size: 24rpx;
-  color: var(--ev-text-secondary);
-  line-height: 1.5;
-  flex: 1;
-}
-
-/* ===== 空状态 / 错误 ===== */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 160rpx 0;
-}
-
-.empty-text {
-  font-size: 28rpx;
-  color: var(--ev-text-secondary);
-  margin-top: $spacing-base;
-  margin-bottom: $spacing-xs;
-}
-
-.empty-hint {
-  font-size: 24rpx;
-  color: var(--ev-text-muted);
-}
-
-.retry-btn {
-  margin-top: $spacing-base;
-  padding: 14rpx 48rpx;
-  border-radius: 9999rpx;
-  background: var(--ev-accent-soft);
-  border: 1rpx solid var(--ev-accent);
-  transition: all 0.2s ease;
-
-  &:active {
-    background: var(--ev-accent-bg);
+  &.analyst {
+    flex-direction: row-reverse;
+    text-align: right;
   }
 }
 
-.retry-text {
-  font-size: 26rpx;
-  color: var(--ev-accent);
-  font-weight: 500;
+.speaker-icon {
+  display: flex;
+  flex: 0 0 56rpx;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: $brand-color;
 }
 
-/* ===== 日期导航 ===== */
+.analyst .speaker-icon {
+  background: $success-color;
+}
+
+.dialogue-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8rpx;
+  min-width: 0;
+  max-width: 80%;
+  padding: 16rpx 24rpx;
+  border-radius: 16rpx 16rpx 16rpx 4rpx;
+  background: #ffffff;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+
+.analyst .dialogue-copy {
+  border-radius: 16rpx 16rpx 4rpx 16rpx;
+  background: $primary;
+  text-align: left;
+}
+
+.speaker-name {
+  color: $ink-mute;
+  font-size: $font-size-xs;
+  font-weight: 600;
+}
+
+.dialogue-content {
+  color: $ink;
+  font-size: $font-size-base;
+  line-height: 1.75;
+}
+
+.analyst .speaker-name,
+.analyst .dialogue-content {
+  color: #ffffff;
+}
+
 .date-nav {
   display: flex;
   justify-content: space-between;
-  gap: 20rpx;
-  margin-top: 8rpx;
+  margin-top: 36rpx;
 }
 
 .date-btn {
-  flex: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  padding: 18rpx 0;
-  background: var(--ev-bg-card);
-  border-radius: 9999rpx;
-  border: 1rpx solid var(--ev-border);
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
-  transition: all 0.2s ease;
-
-  &:active {
-    transform: scale(0.97);
-    background: var(--ev-accent-bg);
-  }
-}
-
-.date-btn-text {
-  font-size: 26rpx;
-  color: var(--ev-accent);
-  font-weight: 500;
+  gap: 6rpx;
+  padding: 14rpx 22rpx;
+  border-radius: $r-full;
+  background: #ffffff;
+  box-shadow: 0 2rpx 8rpx rgba(11, 95, 255, 0.08);
+  color: $brand-color;
+  font-size: $font-size-sm;
 }
 </style>

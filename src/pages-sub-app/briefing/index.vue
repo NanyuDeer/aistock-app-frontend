@@ -7,6 +7,13 @@
       </view>
 
       <template v-else>
+        <!-- 非交易日回退提示：当日无报告时展示最近可用报告 -->
+        <view v-if="isFallback" class="fallback-notice">
+          <text class="fallback-notice-text">
+            当日（{{ requestedDate }}）播报尚未生成，当前显示最近可用报告（{{ currentDate }}）
+          </text>
+        </view>
+
         <!-- 音频入口条（点击进入播报详情页） -->
         <view
           v-if="audioPath || items.length"
@@ -46,26 +53,23 @@
           <view class="section-line" />
         </view>
 
-        <view
-          v-for="item in insightItems"
-          :key="item.id"
-          class="insight-row"
-        >
-          <view class="insight-icon" :class="item.source">
-            <text class="insight-icon-text">{{ sourceIcon(item.source) }}</text>
+        <template v-for="entry in insightDisplayItems" :key="entry.id">
+        <view v-if="entry.kind === 'item'" class="insight-row">
+          <view class="insight-icon" :class="entry.item.source">
+            <text class="insight-icon-text">{{ sourceIcon(entry.item.source) }}</text>
           </view>
           <view class="insight-body">
             <view class="insight-top">
-              <text class="insight-source">{{ sourceLabel(item.source) }}</text>
-              <text class="sentiment-badge" :class="sentimentClass(item.sentiment)">
-                {{ sentimentLabel(item.sentiment) }}
+              <text class="insight-source">{{ sourceLabel(entry.item.source) }}</text>
+              <text class="sentiment-badge" :class="sentimentClass(entry.item.sentiment)">
+                {{ sentimentLabel(entry.item.sentiment) }}
               </text>
             </view>
-            <text class="insight-title">{{ item.title }}</text>
-            <text class="insight-conclusion">{{ item.conclusion }}</text>
-            <view v-if="item.relatedTags.length" class="insight-tags">
+            <text v-if="entry.item.source !== 'hot_burst'" class="insight-title">{{ entry.item.title }}</text>
+            <text class="insight-conclusion">{{ entry.item.conclusion }}</text>
+            <view v-if="entry.item.relatedTags.length" class="insight-tags">
               <text
-                v-for="tag in item.relatedTags"
+                v-for="tag in entry.item.relatedTags"
                 :key="tag.text"
                 class="mini-tag"
                 :class="tag.type === 'sector' ? 'sector' : ''"
@@ -73,6 +77,25 @@
             </view>
           </view>
         </view>
+
+        <view v-else class="insight-row event-insight-row">
+          <view class="insight-icon event">
+            <text class="insight-icon-text">{{ sourceIcon('event') }}</text>
+          </view>
+          <view class="insight-body">
+            <view class="insight-top">
+              <text class="insight-source">事件传导</text>
+              <text class="sentiment-badge sentiment-mixed">{{ entry.items.length }}条重点事件</text>
+            </view>
+            <view class="event-insight-list">
+              <view v-for="event in entry.items" :key="event.id" class="event-insight-item" @tap="goEventAnalysis(event)">
+                <text class="event-insight-title">{{ event.title }}</text>
+                <text class="event-insight-conclusion">{{ event.conclusion }}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+        </template>
 
         <!-- 异动公告强调 -->
         <view v-if="alertItem" class="alert-card">
@@ -99,14 +122,30 @@
         </view>
 
         <!-- 日期切换 -->
-        <view class="date-nav">
-          <view class="date-btn" @tap="changeDate(-1)">
-            <SvgIcon name="arrow-left-line" size="32rpx" color="#0b5fff" />
-            <text class="date-btn-text">前一天</text>
+        <view class="briefing-toolbar">
+          <view class="type-switch">
+            <view
+              :class="['type-btn', broadcastType === 'morning' ? 'active' : '']"
+              @tap="switchType('morning')"
+            >
+              <text class="type-btn-text">晨报</text>
+            </view>
+            <view
+              :class="['type-btn', broadcastType === 'evening' ? 'active' : '']"
+              @tap="switchType('evening')"
+            >
+              <text class="type-btn-text">晚报</text>
+            </view>
           </view>
-          <view class="date-btn" @tap="changeDate(1)">
-            <text class="date-btn-text">后一天</text>
-            <SvgIcon name="arrow-right-line" size="32rpx" color="#0b5fff" />
+          <view class="date-nav">
+            <view class="date-btn" @tap="changeDate(-1)">
+              <SvgIcon name="arrow-left-line" size="32rpx" color="#0b5fff" />
+              <text class="date-btn-text">前一天</text>
+            </view>
+            <view class="date-btn" @tap="changeDate(1)">
+              <text class="date-btn-text">后一天</text>
+              <SvgIcon name="arrow-right-line" size="32rpx" color="#0b5fff" />
+            </view>
           </view>
         </view>
       </template>
@@ -117,7 +156,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { agentApi, type BriefType } from '@/shared/api/modules/agent'
+import { agentApi, type BriefType, type BroadcastV1 } from '@/shared/api/modules/agent'
 import { API_BASE_URL } from '@/shared/utils/constants'
 import {
   SOURCE_LABELS,
@@ -127,28 +166,29 @@ import {
   type BriefingSource,
   type Sentiment,
 } from '@/shared/api/modules/briefing'
-import { parseBriefingItemsFromContent, type ReportType } from '@/shared/utils/briefingAdapter'
+import { parseBriefingItemsFromBrief } from '@/shared/utils/briefingAdapter'
+import { parseBriefingReport } from '@/shared/utils/briefingReport'
+import { parseBroadcastReport } from '@/shared/utils/broadcastReport'
+import { buildBriefingDetailUrl, normalizeBriefingType } from '@/shared/utils/briefingDetail'
+import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-
-interface BroadcastReport {
-  content: {
-    text?: string
-    audio_path?: string | null
-  }
-}
-
-interface BriefReportData {
-  content?: unknown
-}
+import { getEventList } from '@/modules/chat/event/api/eventApi'
 
 const currentDate = ref('')
 const broadcastType = ref<BriefType>('morning')
 const loading = ref(true)
-const report = ref<BroadcastReport | null>(null)
+const report = ref<BroadcastV1 | null>(null)
 const items = ref<BriefingItem[]>([])
 const isPlaying = ref(false)
 const audioContext = ref<UniApp.InnerAudioContext | null>(null)
+
+/** 无当日报告时最多向前回退的自然日数（覆盖周末与长假缺口）。 */
+const MAX_FALLBACK_DAYS = 7
+/** 是否正在展示回退得到的最近可用报告（非交易日场景）。 */
+const isFallback = ref(false)
+/** 用户请求的原始日期，当日无报告时用于回退提示。 */
+const requestedDate = ref('')
 
 const subtitleText = computed(() => {
   const typeLabel = broadcastType.value === 'morning' ? '晨报' : '晚报'
@@ -159,7 +199,7 @@ const subtitleText = computed(() => {
 })
 
 const audioPath = computed(() => {
-  return report.value?.content?.audio_path || null
+  return report.value?.audio_path || null
 })
 
 const audioStatusText = computed(() => {
@@ -182,6 +222,30 @@ const alertItem = computed(() => {
   return items.value.find((item) => item.isAlert) || null
 })
 
+type InsightDisplayItem =
+  | { kind: 'item'; id: string; item: BriefingItem }
+  | { kind: 'event-group'; id: string; items: BriefingItem[] }
+
+/** 同一份 Brief 中的事件传导条目合并为一个容器，最多保留三条重点摘要。 */
+const insightDisplayItems = computed<InsightDisplayItem[]>(() => {
+  const sourceItems = insightItems.value
+  const eventItems = sourceItems.filter((item) => item.source === 'event').slice(0, 3)
+  const result: InsightDisplayItem[] = []
+  let eventGroupAdded = false
+
+  for (const item of sourceItems) {
+    if (item.source === 'event') {
+      if (!eventGroupAdded && eventItems.length) {
+        result.push({ kind: 'event-group', id: 'event-group', items: eventItems })
+        eventGroupAdded = true
+      }
+      continue
+    }
+    result.push({ kind: 'item', id: item.id, item })
+  }
+  return result
+})
+
 function sourceLabel(source: BriefingSource): string {
   return SOURCE_LABELS[source] || source
 }
@@ -198,10 +262,43 @@ function sentimentClass(sentiment: Sentiment): string {
   return `sentiment-${sentiment}`
 }
 
-/** 点击音频卡片跳转播报详情页 */
+/** 将早点听摘要与事件库标题做最小匹配，命中后直达对应 AI 事件分析。 */
+function eventMatchScore(target: string, candidate: string): number {
+  const normalizedTarget = target.replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '')
+  const normalizedCandidate = candidate.replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '')
+  const chunks = new Set<string>()
+  for (let index = 0; index < normalizedTarget.length - 1; index++) {
+    chunks.add(normalizedTarget.slice(index, index + 2))
+  }
+  let score = 0
+  for (const chunk of chunks) {
+    if (normalizedCandidate.includes(chunk)) score++
+  }
+  return score
+}
+
+async function goEventAnalysis(event: BriefingItem) {
+  try {
+    const response = await getEventList({ page: 1, pageSize: 100 })
+    const target = `${event.title}${event.conclusion}`
+    const matched = response.events
+      .map((candidate) => ({ candidate, score: eventMatchScore(target, candidate.title) }))
+      .sort((left, right) => right.score - left.score)[0]
+
+    if (matched && matched.score >= 2) {
+      uni.navigateTo({ url: `/modules/chat/pages/event/detail?id=${matched.candidate.eventId}` })
+      return
+    }
+  } catch {
+    // 找不到精确事件时回退到事件列表，避免点击无反馈。
+  }
+  uni.navigateTo({ url: '/pages-sub-app/event-chain/index' })
+}
+
+/** 点击音频卡片进入双人播报详情页，查看主持人/分析师对话。 */
 function goDetail() {
   uni.navigateTo({
-    url: `/pages-sub-app/briefing-detail/index?date=${currentDate.value}`,
+    url: buildBriefingDetailUrl(currentDate.value, broadcastType.value),
   })
 }
 
@@ -240,16 +337,46 @@ function changeDate(delta: number) {
   loadReport()
 }
 
-/** 根据当前时间判断报告类型：15:30 前=晨报，之后=复盘 */
-function detectReportType(): ReportType {
-  const now = new Date()
-  const hour = now.getHours()
-  const minute = now.getMinutes()
-  // 15:30 后用 review（复盘），之前用 morning（晨报）
-  if (hour > 15 || (hour === 15 && minute >= 30)) {
-    return 'review'
+/** 切换晨报/晚报，重新加载当日对应类型的报告 */
+function switchType(type: BriefType) {
+  if (broadcastType.value === type) return
+  broadcastType.value = type
+  loadReport()
+}
+
+/**
+ * 拉取指定日期的广播与简报并写入展示状态，返回是否找到可用内容。
+ * 仅消费通过严格校验的 Broadcast v1 / Brief v1（解析器强制绑定同日同类型，
+ * 不会把跨日期或旧结构数据混入）。
+ */
+async function fetchReportFor(date: string): Promise<boolean> {
+  try {
+    const [broadcastRes, briefRes] = await Promise.allSettled([
+      agentApi.getBroadcast(broadcastType.value, date),
+      agentApi.getBrief(broadcastType.value, date),
+    ])
+
+    // 仅消费通过严格校验的 Broadcast v1，避免跨日期或旧结构数据混入。
+    if (broadcastRes.status === 'fulfilled') {
+      report.value = parseBroadcastReport(broadcastRes.value, broadcastType.value, date)
+    } else {
+      report.value = null
+    }
+
+    // Brief v1 已是前端展示报告的事实层，校验后转换为现有卡片展示格式。
+    if (briefRes.status === 'fulfilled' && briefRes.value) {
+      const brief = parseBriefingReport(briefRes.value, broadcastType.value)
+      items.value = parseBriefingItemsFromBrief(brief)
+    } else {
+      items.value = []
+    }
+
+    return report.value !== null || items.value.length > 0
+  } catch {
+    report.value = null
+    items.value = []
+    return false
   }
-  return 'morning'
 }
 
 async function loadReport() {
@@ -261,32 +388,29 @@ async function loadReport() {
     isPlaying.value = false
   }
 
-  // 并行获取广播音频和结构化报告
-  const reportType = detectReportType()
+  const requested = currentDate.value
+  isFallback.value = false
+  requestedDate.value = ''
 
   try {
-    const [broadcastRes, briefRes] = await Promise.allSettled([
-      agentApi.getReport('broadcast', currentDate.value),
-      agentApi.getReport(reportType, currentDate.value),
-    ])
-
-    // 广播报告（音频来源）
-    if (broadcastRes.status === 'fulfilled') {
-      report.value = (broadcastRes.value as BroadcastReport) || null
-    } else {
-      report.value = null
+    // 非交易日/当日未生成时，向前回退到最近一个存在报告的日期并明确标注。
+    let found = false
+    for (let offset = 0; offset <= MAX_FALLBACK_DAYS; offset++) {
+      const date = offset === 0 ? requested : addCalendarDays(requested, -offset)
+      if (await fetchReportFor(date)) {
+        if (offset > 0) {
+          currentDate.value = date
+          isFallback.value = true
+          requestedDate.value = requested
+        }
+        found = true
+        break
+      }
     }
-
-    // 结构化条目（降级解析：从 morning/review 报告解析为 BriefingItem[]）
-    if (briefRes.status === 'fulfilled' && briefRes.value) {
-      const briefData = briefRes.value as BriefReportData
-      items.value = parseBriefingItemsFromContent(briefData.content, reportType)
-    } else {
-      items.value = []
+    if (!found) {
+      // 回退窗口内无任何报告：保持请求日期，展示空状态。
+      currentDate.value = requested
     }
-  } catch {
-    report.value = null
-    items.value = []
   } finally {
     loading.value = false
   }
@@ -294,7 +418,7 @@ async function loadReport() {
 
 onLoad((options) => {
   const opts = options as Record<string, string> || {}
-  broadcastType.value = opts.type === 'evening' ? 'evening' : 'morning'
+  broadcastType.value = normalizeBriefingType(opts.type)
   // 未传日期时用上海交易日：toISOString 返回 UTC 日期，凌晨 0:00-8:00
   // （上海时间）期间 UTC 仍是前一天，会取到错误的播报。
   currentDate.value = opts.date || shanghaiDateString()
@@ -376,7 +500,7 @@ onUnmounted(() => {
 
 /* 头条卡片 */
 .headline-card {
-  background: linear-gradient(135deg, rgba(77, 124, 254, 0.04), rgba(99, 102, 241, 0.06));
+  background: #ffffff;
   border-radius: 20rpx;
   padding: 32rpx;
   margin-bottom: 24rpx;
@@ -558,6 +682,42 @@ onUnmounted(() => {
   gap: 8rpx;
 }
 
+.event-insight-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.event-insight-item {
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid $line-soft;
+  cursor: pointer;
+
+  &:first-child { padding-top: 4rpx; }
+  &:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+}
+
+.event-insight-title {
+  display: block;
+  margin-bottom: 6rpx;
+  color: $ink;
+  font-size: 25rpx;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.event-insight-conclusion {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: #4b5563;
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+
 .mini-tag {
   font-size: 20rpx;
   padding: 4rpx 16rpx;
@@ -633,6 +793,21 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
+/* 非交易日回退提示 */
+.fallback-notice {
+  background: rgba(217, 119, 6, 0.08);
+  border: 1rpx solid rgba(217, 119, 6, 0.20);
+  border-radius: 16rpx;
+  padding: 16rpx 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.fallback-notice-text {
+  font-size: 22rpx;
+  color: #92400e;
+  line-height: 1.5;
+}
+
 /* 空状态 */
 .empty-state {
   display: flex;
@@ -653,30 +828,63 @@ onUnmounted(() => {
   color: #9ca3af;
 }
 
+/* 晨报/晚报切换 + 日期切换组合工具栏 */
+.briefing-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-top: 36rpx;
+}
+
+.type-switch {
+  display: flex;
+  gap: 16rpx;
+}
+
+.type-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16rpx 0;
+  border-radius: 12rpx;
+  background: #ffffff;
+  border: 2rpx solid $line;
+}
+
+.type-btn.active {
+  background: $primary;
+  border-color: $primary;
+}
+
+.type-btn-text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: $ink-soft;
+}
+
+.type-btn.active .type-btn-text {
+  color: #ffffff;
+}
+
 /* 日期切换 */
 .date-nav {
   display: flex;
   justify-content: space-between;
-  gap: 24rpx;
-  margin-top: 32rpx;
 }
 
 .date-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  flex: 1;
-  padding: 24rpx 0;
+  gap: 6rpx;
+  padding: 14rpx 22rpx;
   background: #ffffff;
   border-radius: 999rpx;
-  border: 1rpx solid $line;
-  box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2rpx 8rpx rgba(11, 95, 255, 0.08);
 }
 
 .date-btn-text {
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: $primary;
-  font-weight: 500;
 }
 </style>

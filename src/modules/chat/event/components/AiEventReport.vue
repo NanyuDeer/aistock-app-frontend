@@ -1,17 +1,32 @@
 <template>
   <view class="ai-event-report" v-if="detail">
     <view class="report-content">
-      <!-- 来源信息：真实来源 URL 或"来源暂不可验证" -->
-      <view class="source-info-bar">
-        <text class="source-label">来源：</text>
-        <text
-          v-if="detail.event.sourceInfo?.url"
-          class="source-link"
-          @tap="openSourceUrl(detail.event.sourceInfo!.url!)"
-        >{{ detail.event.sourceInfo.name }}</text>
-        <text v-else-if="detail.event.source" class="source-text">{{ detail.event.source }}</text>
-        <text v-else class="source-unverified">来源暂不可验证</text>
+      <!-- Hero 卡：白底 + 左侧蓝色色条 + 事件标题/来源/评级徽章（方案A 样式） -->
+      <view class="hero-card">
+        <view class="hero-bar"></view>
+        <text class="hero-title">{{ detail.event.title }}</text>
+        <view class="hero-meta">
+          <text class="meta-label">来源：</text>
+          <text
+            v-if="detail.event.sourceInfo?.url"
+            class="meta-link"
+            @tap="openSourceUrl(detail.event.sourceInfo!.url!)"
+          >{{ detail.event.sourceInfo.name }}</text>
+          <text v-else-if="detail.event.source" class="meta-text">{{ detail.event.source }}</text>
+          <text v-else class="meta-unverified">暂不可验证</text>
+          <text class="meta-dot">·</text>
+          <text class="meta-time">{{ detail.event.publishTime }}</text>
+        </view>
+        <!-- 评级徽章：Step 1 完成后展示 -->
+        <view
+          v-if="detail.investmentSummary"
+          class="hero-rating"
+          :class="'rating-' + detail.investmentSummary.rating"
+        >
+          <text class="rating-text">{{ ratingLabel }}</text>
+        </view>
       </view>
+
       <!-- Step 1: AI投资机会 -->
       <AiAnalysisSection
         v-for="(step, index) in mainSteps"
@@ -98,6 +113,15 @@ const thinkingSubtitle = computed(() => {
   return currentStepTitle.value || ''
 })
 
+/** Hero 卡评级徽章文案（与 InvestmentSummaryCard 保持一致） */
+const ratingLabel = computed(() => {
+  switch (props.detail?.investmentSummary?.rating) {
+    case 'positive': return '★ 整体偏积极'
+    case 'negative': return '★ 整体偏谨慎'
+    default: return '★ 整体中性'
+  }
+})
+
 watch(thinkingSubtitle, (text) => {
   emit('update:subtitle', text)
 }, { immediate: true })
@@ -160,48 +184,107 @@ watch(currentStep, async (stepId) => {
 .ai-event-report { padding: 0 0 48rpx; }
 
 .report-content {
-  padding-top: 16rpx;
+  padding: 16rpx 24rpx 0;
   --ev-text-secondary: #{$ink-soft};
   --ev-text-muted: #{$ink-mute};
   --ev-text-tertiary: #{$ink-soft};
 }
 
-/* 来源信息栏 */
-.source-info-bar {
+/* ===== Hero 卡（方案A 样式：白底 + 左侧蓝色色条 + 标题/来源/评级徽章） ===== */
+.hero-card {
+  position: relative;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+  padding: 24rpx 28rpx 22rpx 36rpx;
+  margin-bottom: 24rpx;
+  overflow: hidden;
+}
+.hero-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8rpx;
+  background: $primary;
+}
+.hero-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: $ink;
+  line-height: 1.4;
+  margin-bottom: 12rpx;
+}
+.hero-meta {
   display: flex;
   align-items: center;
-  padding: 12rpx 24rpx;
-  margin-bottom: 8rpx;
-  background: var(--ev-bg-elevated, #{$bg-soft});
-  border-radius: 10rpx;
+  flex-wrap: wrap;
+  gap: 6rpx;
 }
-.source-label {
-  font-size: $font-size-xs;
-  color: var(--ev-text-muted);
+.meta-label {
+  font-size: 22rpx;
+  color: $ink-mute;
   flex-shrink: 0;
 }
-.source-link {
-  font-size: $font-size-xs;
-  color: var(--ev-accent);
+.meta-link {
+  font-size: 22rpx;
+  color: $primary;
   text-decoration: underline;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
+  max-width: 200rpx;
 }
-.source-text {
-  font-size: $font-size-xs;
-  color: var(--ev-text-secondary);
+.meta-text {
+  font-size: 22rpx;
+  color: $ink-soft;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
+  max-width: 200rpx;
 }
-.source-unverified {
-  font-size: $font-size-xs;
+.meta-unverified {
+  font-size: 22rpx;
   font-style: italic;
-  color: var(--ev-text-tertiary);
+  color: $ink-mute;
   opacity: 0.7;
+}
+.meta-dot {
+  font-size: 22rpx;
+  color: $ink-mute;
+}
+.meta-time {
+  font-size: 22rpx;
+  color: $ink-mute;
+}
+
+/* 评级徽章：复用 InvestmentSummaryCard 的语义色（A股：positive=绿/跌，negative=红/涨） */
+.hero-rating {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 6rpx 18rpx;
+  border-radius: $r-full;
+  margin-top: 16rpx;
+}
+.rating-positive {
+  background: var(--ev-positive-soft);
+  border: 2rpx solid var(--ev-positive-soft);
+}
+.rating-positive .rating-text { color: var(--ev-positive); }
+.rating-neutral {
+  background: rgba(148, 163, 184, 0.12);
+  border: 2rpx solid rgba(148, 163, 184, 0.18);
+}
+.rating-neutral .rating-text { color: var(--ev-text-tertiary); }
+.rating-negative {
+  background: var(--ev-negative-soft);
+  border: 2rpx solid rgba(229, 77, 94, 0.2);
+}
+.rating-negative .rating-text { color: var(--ev-negative); }
+.rating-text {
+  font-size: 22rpx;
+  font-weight: 600;
 }
 
 .report-footer { padding: 32rpx 48rpx 0; display: flex; justify-content: center; }

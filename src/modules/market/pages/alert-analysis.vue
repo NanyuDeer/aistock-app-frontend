@@ -1,82 +1,124 @@
 <template>
-  <view class="page-alert-analysis">
-    <!-- 头部信息区 -->
-    <view class="analysis-header">
-      <view class="analysis-header-bg" />
-      <view class="analysis-header-content">
-        <view class="analysis-back-btn" @tap="goBack">
-          <text class="analysis-back-arrow">←</text>
+  <SubPageCard2 title="AI 异动解读" :subtitle="`${symbol} ${cycleLabel}`">
+    <view class="page-alert-analysis">
+      <!-- AI 播报卡片（最上方，有 podcast_brief 时显示） -->
+      <PodcastCard
+        v-if="podcastBrief"
+        :text="podcastBrief"
+        :cache-key="podcastCacheKey"
+        title="AI 异动播报"
+      />
+
+      <!-- 状态徽标 + 强制刷新按钮 -->
+      <view class="status-row">
+        <view class="status-left">
+          <Badge v-if="loading && !done" type="info" size="sm">分析中</Badge>
+          <Badge v-else-if="done" type="success" size="sm">完成</Badge>
+          <Badge v-if="done" type="info" size="sm">当日缓存</Badge>
         </view>
-        <view class="analysis-header-icon">
-          <SvgIcon name="robot-line" size="36rpx" color="#ffffff" />
+        <view v-if="done && !loading" class="refresh-btn" @click="forceRefresh">
+          <SvgIcon name="refresh-line" size="24rpx" color="#4b5a7a" />
+          <text class="refresh-text">重新分析</text>
         </view>
-        <view class="analysis-header-info">
-          <text class="analysis-header-title">AI 异动解读</text>
-          <text class="analysis-header-sub">{{ symbol }} {{ cycleLabel }}</text>
+      </view>
+
+      <!-- 错误状态 -->
+      <Card v-if="error" class="error-section">
+        <EmptyState title="分析失败" :description="error">
+          <Button size="sm" @click="retry">重试</Button>
+        </EmptyState>
+      </Card>
+
+      <template v-else>
+        <!-- impact + keywords 标签行 -->
+        <view v-if="impactBadgeType || displayKeywords.length" class="keywords-row">
+          <Tag v-if="impactBadgeType" :type="impactBadgeType" size="sm">{{ impactLabel }}</Tag>
+          <Tag
+            v-for="(kw, idx) in displayKeywords"
+            :key="idx"
+            :type="keywordTagType(idx)"
+            size="sm"
+          >{{ kw }}</Tag>
         </view>
-        <Badge v-if="loading && !done" type="info" size="sm">分析中</Badge>
-        <Badge v-else-if="done" type="success" size="sm">完成</Badge>
-      </view>
+
+        <!-- 一句话速览 -->
+        <Card v-if="summary || loading" class="summary-section">
+          <view class="summary-header">
+            <SvgIcon name="flashlight-line" size="24rpx" color="#92400e" />
+            <text class="summary-title">一句话速览</text>
+          </view>
+          <view v-if="summary" class="summary-body">
+            <text class="summary-text">{{ summary }}</text>
+          </view>
+          <view v-else class="summary-loading">
+            <text class="summary-loading-text">正在提取核心结论...</text>
+          </view>
+        </Card>
+
+        <!-- 分析进度 -->
+        <view v-if="toolSteps.length" class="analysis-tools-section">
+          <text class="section-label">分析进度</text>
+          <view class="analysis-tools-list">
+            <Tag
+              v-for="(step, idx) in toolSteps"
+              :key="idx"
+              :type="step.endTime != null ? 'down' : 'neutral'"
+              size="sm"
+            >{{ step.label }}</Tag>
+          </view>
+        </view>
+
+        <!-- 详细分析 -->
+        <Card v-if="detailsHtml" class="content-section">
+          <text class="section-label">详细分析</text>
+          <view class="analysis-body">
+            <mp-html :content="detailsHtml" class="analysis-html" />
+          </view>
+        </Card>
+
+        <!-- 相关股票 -->
+        <Card v-if="stocks.length" class="stocks-section">
+          <text class="section-label">相关股票</text>
+          <view class="stocks-list">
+            <view
+              v-for="(code, idx) in stocks"
+              :key="idx"
+              class="stock-chip"
+              @click="goStock(code)"
+            >
+              <Tag type="neutral" size="sm">{{ code }}</Tag>
+            </view>
+          </view>
+        </Card>
+
+        <!-- 风险提示 -->
+        <Card v-if="risks.length" class="risks-section">
+          <view class="risks-header">
+            <SvgIcon name="alert-line" size="24rpx" color="#dc2626" />
+            <text class="risks-title">风险提示</text>
+          </view>
+          <view class="risks-list">
+            <view v-for="(risk, idx) in risks" :key="idx" class="risk-item">
+              <text class="risk-text">{{ risk }}</text>
+            </view>
+          </view>
+        </Card>
+
+        <!-- 加载中（初始，无结构化结果） -->
+        <Card v-if="!summary && !detailsHtml && loading" class="content-section">
+          <LoadingState text="AI 正在分析异动数据..." />
+        </Card>
+
+        <!-- 兜底：解析失败时用 raw 渲染 -->
+        <Card v-if="!summary && !detailsHtml && rawContent && done" class="content-section">
+          <text class="section-label">详细分析</text>
+          <view class="analysis-body">
+            <mp-html :content="rawHtml" class="analysis-html" />
+          </view>
+        </Card>
+      </template>
     </view>
-
-    <!-- 错误状态 -->
-    <Card v-if="error" class="error-section">
-      <EmptyState title="分析失败" :description="error">
-        <Button size="sm" @click="retry">重试</Button>
-      </EmptyState>
-    </Card>
-
-    <!-- 关键词标签 -->
-    <view v-if="!error && analysisKeywords.length" class="keywords-row">
-      <Tag
-        v-for="(kw, idx) in analysisKeywords"
-        :key="idx"
-        :type="keywordTagType(idx)"
-        size="sm"
-      >{{ kw }}</Tag>
-    </view>
-
-    <!-- 精简摘要卡片（优先展示，第一时间了解异动） -->
-    <Card v-if="!error && (analysisSummary || loading)" class="summary-section">
-      <view class="summary-header">
-        <SvgIcon name="flashlight-line" size="24rpx" color="#92400e" />
-        <text class="summary-title">一句话速览</text>
-      </view>
-      <view v-if="analysisSummary" class="summary-body">
-        <text class="summary-text">{{ analysisSummary }}</text>
-      </view>
-      <view v-else class="summary-loading">
-        <text class="summary-loading-text">正在提取核心结论...</text>
-      </view>
-    </Card>
-
-    <!-- 工具执行步骤 -->
-    <view v-if="!error && toolSteps.length" class="analysis-tools-section">
-      <text class="section-label">分析进度</text>
-      <view class="analysis-tools-list">
-        <Tag
-          v-for="(step, idx) in toolSteps"
-          :key="idx"
-          :type="step.endTime != null ? 'down' : 'neutral'"
-          size="sm"
-        >{{ step.label }}</Tag>
-      </view>
-    </view>
-
-    <!-- 详细内容区域 -->
-    <Card v-if="!error && content" class="content-section">
-      <text class="section-label">详细分析</text>
-      <view class="analysis-body">
-        <mp-html :content="htmlContent" class="analysis-html" />
-        <text v-if="loading && !done" class="analysis-cursor">|</text>
-      </view>
-    </Card>
-
-    <!-- 加载中（初始） -->
-    <Card v-if="!error && !content && loading" class="content-section">
-      <LoadingState text="AI 正在分析异动数据..." />
-    </Card>
-  </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
@@ -85,13 +127,14 @@ import { onLoad } from '@dcloudio/uni-app'
 import { useAlertSSE } from '@/modules/market/utils/useAlertSSE'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { LoadingState, EmptyState, Tag, Badge, Button, Card } from '@/shared/components'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import { LoadingState, EmptyState, Tag, Badge, Button, Card, PodcastCard } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 const symbol = ref('')
 const cycle = ref('')
 
-const { content, toolSteps, loading, error, done, start, stop } = useAlertSSE()
+const { content, toolSteps, loading, error, done, result, start, stop, loadFromCache } = useAlertSSE()
 
 const cycleLabel = computed(() => {
   switch (cycle.value) {
@@ -102,68 +145,46 @@ const cycleLabel = computed(() => {
   }
 })
 
-const htmlContent = computed(() => (content.value ? markdownToHtml(content.value) : ''))
+/** 结构化展示字段（来自 result 事件） */
+const summary = computed(() => result.value?.displayReport?.summary || '')
+const details = computed(() => result.value?.displayReport?.details || '')
+const detailsHtml = computed(() => (details.value ? markdownToHtml(details.value) : ''))
+const stocks = computed(() => result.value?.displayReport?.stocks || [])
+const risks = computed(() => result.value?.displayReport?.risks || [])
+const displayKeywords = computed(() => result.value?.displayReport?.keywords || [])
+const podcastBrief = computed(() => result.value?.podcastBrief || '')
+const rawContent = computed(() => result.value?.raw || content.value)
+const rawHtml = computed(() => (rawContent.value ? markdownToHtml(rawContent.value) : ''))
 
-/** 从流式内容中动态提取关键词（emoji 标记的指标名 + 股票名） */
-const analysisKeywords = computed(() => {
-  const c = content.value || ''
-  const kw: string[] = []
-  // 从 **粗体** 标记中提取核心指标名
-  const boldRe = /\*\*(.+?)\*\*/g
-  let m: RegExpExecArray | null
-  const seen = new Set<string>()
-  while ((m = boldRe.exec(c)) !== null) {
-    const key = m[1].trim()
-    // 只取分析结论类关键词（评分/判断/驱动力等），过滤长文本
-    if (key.length <= 12 && !seen.has(key) && (
-      key.includes('评分') || key.includes('判断') || key.includes('驱动力') ||
-      key.includes('诊断') || key.includes('提示') || key.includes('条件') ||
-      key.includes('信息源') || key.includes('补涨') || key.includes('候选') ||
-      key.includes('材料') || key.includes('扩散') || key.includes('逻辑')
-    )) {
-      kw.push(key)
-      seen.add(key)
-    }
-  }
-  // 提取 emoticon 标记的关键指标
-  const emojiRe = /[💡🔍📝⚠️📊🚨🔗🎯]/g
-  while ((m = emojiRe.exec(c)) !== null) {
-    // 获取 emoji 后面的文字（到下一个 emoji 或换行）
-    const rest = c.slice(m.index + 1)
-    const line = rest.split(/[\n💡🔍📝⚠️📊🚨🔗🎯]/)[0].trim()
-    const word = line.replace(/\*\*/g, '').slice(0, 12)
-    if (word && !seen.has(word)) {
-      kw.push(word)
-      seen.add(word)
-    }
-  }
-  return kw.slice(0, 6) // 最多 6 个关键词
+/** impact 映射为 Badge/Tag 类型 */
+const impactLabel = computed(() => {
+  const impact = result.value?.displayReport?.impact || ''
+  return impact
 })
 
-/** 从流式内容中提取一句话精简摘要 */
-const analysisSummary = computed(() => {
-  const c = content.value || ''
-  // 1. 优先提取 异动驱动力
-  const driverRe = /异动驱动力\*?\*?[：:]\s*(.+?)(?:\n|$)/u
-  let m = c.match(driverRe)
-  if (m) return m[1].trim()
-
-  // 2. 提取 含金量评分
-  const scoreRe = /含金量评分\*?\*?[：:]\s*(.+?)(?:\n|$)/u
-  m = c.match(scoreRe)
-  if (m) return m[1].trim()
-
-  // 3. 提取核心判断
-  const judgeRe = /核心判断\*?\*?[：:]\s*(.+?)(?:\n|$)/u
-  m = c.match(judgeRe)
-  if (m) return m[1].trim()
-
-  // 4. 提取盘口诊断
-  const diagRe = /盘口诊断\*?\*?[：:]\s*(.+?)(?:\n|$)/u
-  m = c.match(diagRe)
-  if (m) return m[1].trim()
-
+const impactBadgeType = computed<'up' | 'down' | 'neutral' | ''>(() => {
+  const impact = result.value?.displayReport?.impact || ''
+  if (impact.includes('利好')) return 'up'
+  if (impact.includes('利空')) return 'down'
+  if (impact.includes('中性')) return 'neutral'
   return ''
+})
+
+/** 播报缓存键：alert_{symbol}_{date} */
+const podcastCacheKey = computed(() => {
+  return `alert_${symbol.value}_${todayStr.value}`
+})
+
+/** 今日日期字符串 YYYY-MM-DD（上海时区） */
+const todayStr = computed(() => {
+  const now = new Date()
+  // 用上海时区构造日期字符串（UTC+8）
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000
+  const shanghai = new Date(utc + 8 * 3600000)
+  const y = shanghai.getFullYear()
+  const m = String(shanghai.getMonth() + 1).padStart(2, '0')
+  const d = String(shanghai.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 })
 
 function keywordTagType(idx: number): 'neutral' | 'warning' | 'up' | 'down' {
@@ -171,18 +192,32 @@ function keywordTagType(idx: number): 'neutral' | 'warning' | 'up' | 'down' {
   return types[idx % 4]
 }
 
-function begin() {
+function goStock(code: string) {
+  uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${code}` })
+}
+
+/** 进入页面：先查当日缓存，命中直接展示，未命中才 SSE 流式分析 */
+async function begin() {
+  loading.value = true
+  const cached = await loadFromCache(symbol.value, todayStr.value)
+  if (!cached) {
+    // 缓存未命中，发起 SSE 流式分析
+    start(symbol.value, cycle.value)
+  }
+}
+
+/** 强制刷新：忽略缓存，重新发起 SSE 分析 */
+function forceRefresh() {
+  stop()
+  result.value = null
+  done.value = false
+  error.value = ''
   start(symbol.value, cycle.value)
 }
 
 function retry() {
   stop()
   begin()
-}
-
-function goBack() {
-  stop()
-  uni.navigateBack()
 }
 
 onLoad((options: any) => {
@@ -200,101 +235,57 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .page-alert-analysis {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  padding: $s-3;
   background: $bg-soft;
-  overscroll-behavior: none;
-  touch-action: none;
 }
 
-/* 头部 */
-.analysis-header {
-  position: relative;
-  padding: 48rpx 28rpx 36rpx;
-  overflow: hidden;
+/* 状态徽标 + 强制刷新 */
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $s-2;
 }
 
-.analysis-header-bg {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(135deg, $primary 0%, #6c5ce7 100%);
-  &::after {
-    content: '';
-    position: absolute;
-    top: -40%; right: -15%;
-    width: 240rpx; height: 240rpx;
-    background: rgba(255,255,255,0.06);
-    border-radius: 50%;
-  }
+.status-left {
+  display: flex;
+  gap: 8rpx;
+  align-items: center;
 }
 
-.analysis-header-content {
-  position: relative;
+.refresh-btn {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  gap: 6rpx;
+  padding: 4rpx 12rpx;
+  border-radius: $r-sm;
+  background: $bg-soft;
+  /* #ifdef H5 */
+  cursor: pointer;
+  /* #endif */
 }
 
-.analysis-back-btn {
-  width: 56rpx; height: 56rpx;
-  background: rgba(255,255,255,0.2);
-  border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  &:active { opacity: 0.6; }
-}
-
-.analysis-back-arrow { font-size: 32rpx; color: #ffffff; font-weight: 700; }
-
-.analysis-header-icon {
-  width: 64rpx; height: 64rpx;
-  background: rgba(255,255,255,0.2);
-  border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.analysis-header-emoji { display: none; }
-
-.analysis-header-info { flex: 1; min-width: 0; }
-
-.analysis-header-title {
-  font-size: 30rpx;
-  font-weight: 700;
-  color: #ffffff;
-  display: block;
-}
-
-.analysis-header-sub {
+.refresh-text {
   font-size: 22rpx;
-  color: rgba(255,255,255,0.7);
-  display: block;
-  margin-top: 4rpx;
+  color: $ink-soft;
 }
 
 /* 错误 */
 .error-section {
-  margin: 24rpx 28rpx;
+  margin-bottom: $s-3;
 }
 
-/* 关键词标签 */
+/* 关键词标签行 */
 .keywords-row {
   display: flex;
   flex-wrap: wrap;
   gap: 10rpx;
-  padding: 20rpx 28rpx;
+  margin-bottom: $s-3;
 }
 
-/* 精简摘要卡片 */
+/* 一句话速览 */
 .summary-section {
-  margin: 8rpx 28rpx 16rpx;
+  margin-bottom: $s-3;
 }
 
 .summary-header {
@@ -304,7 +295,6 @@ onUnmounted(() => {
   margin-bottom: 10rpx;
 }
 
-.summary-icon { display: none; }
 .summary-title { font-size: 24rpx; font-weight: 600; color: #92400e; }
 
 .summary-text {
@@ -320,15 +310,15 @@ onUnmounted(() => {
 
 .summary-loading-text {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: $ink-mute;
 }
 
-/* 工具步骤 */
-.analysis-tools-section { margin: 0 28rpx 12rpx; }
+/* 分析进度 */
+.analysis-tools-section { margin-bottom: $s-3; }
 
 .section-label {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: $ink-mute;
   margin-bottom: 10rpx;
   display: block;
   padding-left: 4rpx;
@@ -336,12 +326,11 @@ onUnmounted(() => {
 
 .analysis-tools-list { display: flex; flex-wrap: wrap; gap: 10rpx; }
 
-/* 内容卡片 */
+/* 详细分析 */
 .content-section {
-  margin: 0 28rpx 40rpx;
+  margin-bottom: $s-3;
 }
 
-/* 正文 */
 .analysis-body { position: relative; }
 
 .analysis-html {
@@ -350,9 +339,9 @@ onUnmounted(() => {
   :deep(h2.md-h2) {
     font-size: 32rpx; font-weight: 600; color: $ink;
     margin: 24rpx 0 16rpx; padding-bottom: 12rpx;
-    border-bottom: 2rpx solid #f0f2f5;
+    border-bottom: 2rpx solid $line-soft;
   }
-  :deep(h3.md-h3) { font-size: 28rpx; font-weight: 600; color: #374151; margin: 20rpx 0 10rpx; }
+  :deep(h3.md-h3) { font-size: 28rpx; font-weight: 600; color: $ink-soft; margin: 20rpx 0 10rpx; }
   :deep(hr.md-hr) {
     border: none; height: 1rpx;
     background: linear-gradient(90deg, transparent, $line, transparent);
@@ -362,17 +351,65 @@ onUnmounted(() => {
   :deep(table.md-table) {
     width: 100%; border-collapse: collapse; margin: 12rpx 0;
     font-size: 24rpx; border-radius: 12rpx; overflow: hidden;
-    th { background: #f0f4ff; padding: 12rpx 16rpx; text-align: left; font-weight: 600; color: $primary; }
-    td { padding: 10rpx 16rpx; border-bottom: 1rpx solid #f0f2f5; color: #374151; }
+    th { background: $bg-soft; padding: 12rpx 16rpx; text-align: left; font-weight: 600; color: $primary; }
+    td { padding: 10rpx 16rpx; border-bottom: 1rpx solid $line-soft; color: $ink-soft; }
     tr:last-child td { border-bottom: none; }
   }
   :deep(ol.md-ol), :deep(ul.md-ul) { padding-left: 32rpx; margin: 8rpx 0; }
-  :deep(li) { font-size: 26rpx; color: #374151; line-height: 1.8; }
+  :deep(li) { font-size: 26rpx; color: $ink-soft; line-height: 1.8; }
 }
 
-.analysis-cursor {
-  display: inline; color: $primary; font-weight: 700;
-  font-size: 26rpx; animation: blink 0.8s infinite;
+/* 相关股票 */
+.stocks-section {
+  margin-bottom: $s-3;
 }
-@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+.stocks-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.stock-chip {
+  /* #ifdef H5 */
+  cursor: pointer;
+  /* #endif */
+}
+
+/* 风险提示 */
+.risks-section {
+  margin-bottom: $s-3;
+}
+
+.risks-header {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 10rpx;
+}
+
+.risks-title {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.risks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.risk-item {
+  background: $warning-bg;
+  padding: 10rpx 16rpx;
+  border-radius: $r-sm;
+  border-left: 4rpx solid #dc2626;
+}
+
+.risk-text {
+  font-size: 24rpx;
+  color: $ink-soft;
+  line-height: 1.5;
+}
 </style>

@@ -1,7 +1,7 @@
 /**
  * 精简 Markdown → HTML 转换（uni-app 安全渲染）
  *
- * 支持：## ### --- **bold** | 表格 有序/无序列表
+ * 支持：## ### #### --- **bold** | 表格 有序/无序列表
  * 用于 mp-html 组件的 content 属性
  */
 export function markdownToHtml(md: string): string {
@@ -10,6 +10,11 @@ export function markdownToHtml(md: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 
+  // 剔除 ```json ... ``` 等 fenced 代码块（防止 LLM 违规输出原始 JSON）
+  html = html.replace(/```[\w]*\n[\s\S]*?```/g, '')
+
+  html = html.replace(/^# (.+)$/gm, '<h1 class="md-h1">$1</h1>')
+  html = html.replace(/^#### (.+)$/gm, '<h4 class="md-h4">$1</h4>')
   html = html.replace(/^### (.+)$/gm, '<h3 class="md-h3">$1</h3>')
   html = html.replace(/^## (.+)$/gm, '<h2 class="md-h2">$1</h2>')
 

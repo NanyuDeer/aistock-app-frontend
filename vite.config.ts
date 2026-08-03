@@ -14,6 +14,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [uni()],
+    // AudioPlayer 同时被首页和懒加载的播报详情页使用。合并 CSS 可避免样式
+    // 被首个分包独占，导致详情页单独打开时播放器成为无样式结构。
+    build: {
+      cssCodeSplit: false,
+    },
     // 指定 env 文件目录（env/.env.development 和 env/.env.production）
     // 不指定时 Vite 默认读取项目根目录的 .env 文件，会导致 env/ 目录下的文件被忽略
     envDir: path.resolve(__dirname, 'env'),

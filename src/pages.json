@@ -37,6 +37,7 @@
       "path": "modules/favorites/pages/search",
       "style": {
         "navigationBarTitleText": "搜索",
+        "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
       }
@@ -45,14 +46,15 @@
       "path": "modules/favorites/pages/monitor",
       "style": {
         "navigationBarTitleText": "异动监控",
+        "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
-      "path": "modules/favorites/pages/alert-catcher",
+      "path": "modules/favorites/pages/stock-trace",
       "style": {
-        "navigationBarTitleText": "异动捕手",
+        "navigationBarTitleText": "异动溯源",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
@@ -91,6 +93,7 @@
       "path": "modules/market/pages/alert-analysis",
       "style": {
         "navigationBarTitleText": "AI 异动解读",
+        "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
@@ -295,6 +298,7 @@
         {
           "path": "briefing-detail/index",
           "style": {
+            "navigationBarTitleText": "播报详情",
             "navigationStyle": "custom",
             "disableScroll": true,
             "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }

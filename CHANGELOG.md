@@ -1,6 +1,155 @@
 # Changelog — aistock-app-frontend
 
-> 所有修改记录按时间倒序排列。每条记录标注分支、时间区间、开发者。
+> 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
+
+## [master] 2026-08-01 — 重磅事件跳 AI 事件分析页 + 早晚报切换 + agent-report 兜底渲染
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/home/components/MorningContent.vue`：重磅事件跟踪卡片点击跳转目标从资讯详情页改为 AI 事件分析页（`/modules/chat/pages/event/detail?id=${eventId}`），无 eventId 时回退到事件列表页
+- `src/pages-sub-app/briefing/index.vue`：新增"晨报/晚报"切换按钮（type-switch），切换后重新加载当日对应类型报告；subtitle 同步显示当前类型（晨报/晚报）
+
+### 修复
+- `src/modules/chat/pages/agent-report.vue`：晨报/风口报告卡片由纯文本列表改为 mp-html 渲染 markdown（修复 LLM 偶发返回纯文本/段落结构时 5 个结构化 Card 全不渲染导致空白页面的问题，兜底用 mp-html 渲染 details 原文）
+- `src/shared/utils/markdown.ts`：新增 `#### h4` 标签支持；剔除 ```json``` 等 fenced 代码块（防止 LLM 违规输出原始 JSON 混入渲染）
+
+---
+
+## [master] 2026-08-01 — 异动监控新增"立即检测"按钮
+
+**开发者**: Aria
+
+### 新增
+- `src/modules/favorites/pages/monitor.vue`：section-header 新增"立即检测"按钮，点击调 `stockTraceApi.detect()` 触发后端绕过交易时段限制的价格检测，检测完延迟1秒刷新列表；detecting 状态防重复点击
+- `src/shared/api/modules/stockTrace.ts`：新增 `detect()` 方法，调 `POST /cn/favorites/movements/detect`
+
+---
+
+## [master] 2026-08-01 — alert-analysis 结构化渲染 + 通用播报卡片 + 当日缓存 + dev代理指向远程
+
+**开发者**: Aria
+
+### 新增
+- `src/shared/components/PodcastCard.vue`：通用播报卡片组件（idle/loading/ready/error 四态），点击"生成播报"调 `POST /api/agent/brief/generate-podcast` 合成单主播音频，已在 `components/index.ts` 导出，可复用到其他 AI 报告页面
+- `src/shared/api/modules/agent.ts`：新增 `generatePodcast(text, key)` 方法、`getAlertReport(symbol, date)` 方法和 `AlertReportRecord` 类型
+- `src/modules/market/utils/useAlertSSE.ts`：新增 `loadFromCache(symbol, date)` 方法，从 DB 加载 alert 报告并填充 result；新增 `result` 事件处理；超时从 30s 调整为 60s（异动分析含 3 个子 Agent + Master，耗时较长）
+
+### 修复
+- `src/modules/market/pages/alert-analysis.vue`：改用 `result.displayReport` 结构化渲染（summary/details/stocks/risks/keywords/impact），不再用 `markdownToHtml(content)` 渲染原始 JSON 文本（修复 stocks/risks/podcast_brief 等内部字段直接显示的问题）；进入页面先查当日缓存命中直接展示，未命中才 SSE；新增"重新分析"按钮强制刷新；最上方新增 `PodcastCard` 播报卡片
+- `env/.env.development`：`VITE_PROXY_AGENT_TARGET` 从 `http://localhost:8080` 改为 `https://gupiao-api.yaozhineng.com`（本地未启动 Python Agent 服务导致 AI 异动解读 SSE 流连接失败）
+
+### 改进
+- `src/modules/analytics/pages/report-detail.vue`：SVG 图标硬编码 hex 颜色抽为设计令牌常量（primaryColor/warningColor），与组件库 tokens.json 对齐
+- `src/modules/analytics/components/ai-analysis.vue`：SVG 图标硬编码 hex 颜色抽为设计令牌常量（warningColor），与组件库 tokens.json 对齐
+
+---
+
+## [master] 2026-08-01 — 大盘溯源卡片改进 + 资金流向图表颜色令牌化
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/home/components/MorningContent.vue`：大盘溯源卡片标签改为日期(MM-DD)格式(和事件传导一致)，名称改为现象快照摘要文字，待更新时显示规则提示文字"每日收盘后生成异动溯源"
+- `src/modules/favorites/components/CapitalFlowCharts.vue`：数值网格背景改纯白$white(原$bg-soft灰底)，SVG柱形图硬编码hex颜色替换为设计令牌(通过CSS自定义属性桥接SCSS变量$up/$down/$line-soft/$ink-mute/$ink)
+
+---
+
+## [master] 2026-08-01 — 资金流向图表重设计 + 多页面组件库样式统一 + agent-report 空页面修复
+
+**开发者**: Aria
+
+### 重设计
+- `src/modules/favorites/components/CapitalFlowCharts.vue`：资金流向图表重设计（方案C 垂直柱形+数值网格）
+  - 资金拆解：4 条独立横向条形（中心线在50%，正值向右红色，负值向左绿色）
+  - 10日资金节奏：面积折线图改为垂直柱形图（柱子圆角纯色 rx=3，红正绿负，对齐资金拆解样式；最新柱 $ink 深色边框高亮）
+  - 数值网格：底部 5×2 网格显示每日日期+数值，最新格白底 $bg-card + $ink 深边框高亮
+  - 面板纯白底 $bg-card + $line 边框，颜色全部令牌化，删除 latestIsPositive computed
+- `src/modules/analytics/pages/traceability.vue`：大盘溯源页重设计（方案C 调查推理板）
+  - Hero 可信度进度条、现象快照合并卡、归因结论品牌横幅、候选解释双栏、证据 chip 云
+  - 未解问题（蓝 question-line）/风险提示（琥珀 alert-line）颜色区分，删除 hero-icon
+- `src/modules/analytics/pages/trend-score-report.vue`：按 hot-burst-report 样式统一（引入 LoadingState/EmptyState/Card，移除渐变）
+- `src/modules/chat/event/components/AiEventReport.vue`：AI事件分析详情页重设计（Hero卡 + 左侧蓝色色条 + 评级徽章）
+- `src/modules/chat/event/components/AiAnalysisSection.vue`：卡片化 + 蓝色实心编号圆 01-05（$primary 底 + 白字）
+- `src/modules/chat/event/components/InvestmentSummaryCard.vue`：删除重复评级标签（已上移至 Hero 卡）
+- `src/modules/favorites/pages/detail.vue`：个股详情页样式统一（卡片统一 $bg-card+$line+$r-md，间距 24rpx→16rpx，22+处硬编码 hex 令牌化）
+
+### 修复
+- `src/modules/news/pages/detail.vue` + `src/pages.json`：修复顶部多余导航栏（navigationStyle:custom + SubPageCard2 包裹）
+- `src/modules/chat/pages/agent-report.vue`：长线风口空页面兜底（5个结构化Card全不渲染且 detailsText 存在时用 mp-html 渲染 details 原始 markdown）
+- `src/modules/favorites/pages/detail.vue`：AI投顾入口图标改纯白 #ffffff（配合 ai-icon-wrap 蓝色背景圆形）
+
+### 改进
+- `src/modules/home/components/MorningContent.vue`：大盘溯源卡片改为多日列表（方案C，查询 today/today-1/today-2 三天报告状态）
+- `src/modules/chat/event/components/EventTransmissionGraph.vue`：画布背景改浅蓝 $primary-50（#eaf2ff）
+
+---
+
+## [changer] 2026-08-01 — 大盘溯源报告 app 界面 + 多端适配 + 搜索页导航栏改造
+
+**开发者**: 37588
+
+### 新增
+- `docs/superpowers/specs/2026-08-01-market-trace-review-redesign-design.md`：大盘溯源报告页重构设计文档（schema 2.0 字段提取规则、ViewModel 类型树、UI 章节顺序、跨端断点策略）
+- `docs/superpowers/plans/2026-08-01-market-trace-review-redesign.md`：大盘溯源重构实施计划（8 个独立任务）
+- `src/shared/components/SubPageCard.vue`：新增 `noChatBar` prop（与 SubPageCard2 对齐，向后兼容默认 false），用于搜索页等模态场景隐藏全局 AI 对话栏
+
+### 改进
+- `src/modules/favorites/pages/search.vue`：改用 `SubPageCard title="搜索股票" noChatBar`（透明导航栏与 favorites 列表页视觉一致），搜索框放导航栏下方；删除自定义 statusBarHeight/goBack/back-btn（SubPageCard 内置）
+- `src/pages.json`：search 页新增 `navigationStyle: "custom"`，隐藏 uni-app 原生导航栏（消除"搜索"标题文字覆盖问题）
+- `src/modules/analytics/components/MarketTracePhenomenon.vue`：板块列表从 flex wrap 改为响应式 grid 布局（sm 1 列 / md 2 列 / lg 3 列）
+- `src/modules/analytics/components/MarketTracePendingRisks.vue`：精简风险列表样式
+- `src/modules/analytics/pages/traceability.vue`：清理冗余代码
+- `tests/TraceabilityPage.test.ts`：补充测试用例
+- `README.md`：analytics 模块描述补充"大盘溯源报告"
+
+### 类型标签
+- 新增：设计文档、实施计划、SubPageCard noChatBar prop
+- 改进：搜索页导航栏改造、大盘溯源板块列表响应式 grid 布局、文档补充
+
+---
+
+## [changer] 2026-08-01 — 早点听/晚报非交易日自动回退最近可用报告
+
+**开发者**: 37588
+
+### 新增
+- `src/pages-sub-app/briefing/index.vue`：当日无报告（非交易日/未生成）时自动向前回退最近可用报告（最多 7 天），并展示提示"当日（X）播报尚未生成，当前显示最近可用报告（Y）"
+- `src/pages-sub-app/briefing/index.spec.ts`：新增非交易日回退用例（MAX_FALLBACK_DAYS / addCalendarDays 向前回退 / 回退提示文案）
+
+### 改进
+- `AGENTS.md`：同步早点听页面回退行为说明
+
+---
+
+## [changer] 2026-07-31 — 同步 PR#30 focusEvents + GI 数据适配 + ghost 文件清理
+
+**开发者**: 37588
+
+### 改进
+- 合并 origin/master：同步 PR#30 focusEvents + mixed type 支持 + 组件库同步
+- `src/modules/chat/event`：GI 数据适配 `/event/list`，修复双排名卡片布局
+- 删除 6 个 ghost 文件（组件重构后残留）：ChatBubble / SkillButton / SkillCard / StreamingText / EventTabBar / ImportanceStars
+
+## [master] 2026-07-31 — 早点听卡片 CSS 调整 + agent-report 跳转修复
+**开发者**: ARIA
+
+### 修复
+- `src/modules/chat/pages/agent-report.vue`：修复报告页跳转路径问题
+- `src/modules/home/components/MorningContent.vue`：「缺失来源」标记从 briefing-top 移到「专属播报」按钮右侧；`.feature-sub` 恢复 `$font-size-xs`；新增 `.briefing-btn-row` flex 布局，优化按钮排列
+
+## [changer] 2026-07-29 — 早报降级路径：brief 接口优先 + 降级文案优化
+
+**开发者**: 37588
+
+### 新增
+- `briefingReport.spec.ts`：4 个回归测试覆盖 parseBriefingReport 降级路径（degraded=true 单条目、degraded=false 多条目、missing_sources 为空拒绝、brief_type 不匹配拒绝）
+
+### 修复
+- `briefing/index.vue`：`loadReport` 优先调 `agentApi.getBrief()` 获取 brief.v1 结构化数据，失败回退 `agentApi.getReport()` 兼容旧 schema 1.0/2.0 历史数据
+- `briefing-detail/index.vue`：降级提示文案从"缺失来源：X"改为"部分数据源暂不可用（X），以下为可用内容"，不阻塞内容显示
+
+---
 
 ## [master] 2026-07-28 — PR #29 合并后类型修复 + mock 清理 + 组件化
 **开发者**: Aria

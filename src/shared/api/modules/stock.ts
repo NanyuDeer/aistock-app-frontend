@@ -328,7 +328,12 @@ export const stockApi = {
       params: { symbol, klt, fqt: 1, limit: params?.count || 120 }
     }).then((res: Record<string, unknown>) => {
       const data = (res.data as Record<string, unknown>) || res
-      const klines = (data['K线'] as Record<string, unknown>[]) || (data['klines'] as Record<string, unknown>[]) || []
+      const payload = (data.data as Record<string, unknown>) || data
+      const klines = (payload['K线'] as Record<string, unknown>[])
+        || (payload.klines as Record<string, unknown>[])
+        || (data['K线'] as Record<string, unknown>[])
+        || (data.klines as Record<string, unknown>[])
+        || []
       if (!Array.isArray(klines)) return []
       const mapped = klines.map((k: Record<string, unknown>) => ({
         date: String(k['时间'] ?? k['date'] ?? ''),
@@ -338,7 +343,7 @@ export const stockApi = {
         low: Number(k['最低价'] ?? k['low'] ?? 0),
         volume: Number(k['成交量'] ?? k['volume'] ?? 0),
       }))
-      return params?.period === 'yearly' ? aggregateYearlyKLines(mapped) : mapped
+      return mapped
     })
   },
 
@@ -505,14 +510,14 @@ export const stockApi = {
 
   /** 获取业绩报告列表 */
   getPerformanceReportList(params?: {
-    page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; reportType?: string
+    page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; reportType?: string; endYear?: string
   }) {
     return request.get('/cn/stocks/performance-reports', { params })
   },
 
   /** 搜索业绩报告 */
   searchPerformanceReport(params?: {
-    keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; reportType?: string
+    keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; reportType?: string; endYear?: string
   }) {
     return request.get('/cn/stocks/performance-reports/search', { params })
   },
@@ -520,7 +525,17 @@ export const stockApi = {
   /** 手动刷新业绩报告 */
   refreshPerformanceReports() {
     return request.post('/cn/stocks/performance-reports/refresh')
-  }
+  },
+
+  /** 获取业绩报告 AI 智能研判分析（亮点/风险词条 + 综合研判短文 + 多期财务数据） */
+  getReportAnalysis(params: { symbol: string; endDate?: string }) {
+    return request.get('/cn/stocks/performance-reports/analysis', { params })
+  },
+
+  /** 获取 AI 四维评分 */
+  getAiScore(params: { symbol: string }) {
+    return request.get('/cn/stocks/performance-reports/ai-analysis', { params })
+  },
 }
 
 function normalizeForecast(res: Record<string, unknown> | null): ForecastData | null {

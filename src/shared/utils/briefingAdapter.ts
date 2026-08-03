@@ -13,7 +13,7 @@
  */
 import { splitReportToCards, type ReportCard } from './reportCard'
 import { parseBriefingReport } from './briefingReport'
-import type { BriefingReport, BriefingType } from './briefingReport'
+import type { BriefingReport, BriefingType, BriefV1 } from './briefingReport'
 import type {
   BriefingItem,
   BriefingSource,
@@ -49,6 +49,27 @@ function extractConclusion(text: string, maxSentences = 3): string {
     .filter((s) => s && !s.startsWith('#') && !s.startsWith('|'))
   const result = sentences.slice(0, maxSentences).join('。')
   return result ? result + '。' : ''
+}
+
+/** 早点听中的事件传导只展示短摘要，避免单条长文挤占整页阅读空间。 */
+function displayConclusion(source: BriefingSource, conclusion: string): string {
+  if (source !== 'event' || conclusion.length <= 100) return conclusion
+  return `${conclusion.slice(0, 99)}…`
+}
+
+/** 事件 Agent 的旧标题通常是“事件传导分析”，优先从结论中取真正的事件主题。 */
+function displayTitle(source: BriefingSource, title: string, conclusion: string): string {
+  if (source !== 'event' || title !== '事件传导分析') return title
+
+  const focused = conclusion.match(/(?:今日聚焦|聚焦)([^：，。；]{4,30})/)
+  if (focused?.[1]) return focused[1].trim()
+
+  const firstSentence = conclusion
+    .replace(/^各位投资者[，,:：]*/, '')
+    .split(/[。；]/)[0]
+    .trim()
+  if (!firstSentence) return title
+  return firstSentence.length > 20 ? `${firstSentence.slice(0, 19)}…` : firstSentence
 }
 
 /** 晨报卡片 key → BriefingSource 映射 */
@@ -123,8 +144,8 @@ function cardsToItems(
       id: `${type}-${card.key}-${idx}`,
       source,
       sentiment: detectSentiment(text, card.key),
-      title: card.title || extractConclusion(text, 1).replace(/。$/, ''),
-      conclusion: extractConclusion(text),
+      title: displayTitle(source, card.title || extractConclusion(text, 1).replace(/。$/, ''), text),
+      conclusion: displayConclusion(source, extractConclusion(text)),
       relatedTags,
       isHeadline,
       isAlert,
@@ -145,6 +166,46 @@ export function parseBriefingItemsFromReport(
   if (!report || !report.details) return []
   const cards = splitReportToCards(report.details, type)
   return cardsToItems(cards, type, report)
+}
+
+/**
+ * 将当前后端的结构化 Brief v1 映射为早点听卡片。
+ *
+ * Brief v1 不再携带旧报告的 Markdown 卡片和股票/赛道标签，因此直接保留
+ * 标题、结论与顺序：第一条作为今日头条，其余条目展示为 Agent 洞见。
+ */
+export function parseBriefingItemsFromBrief(brief: BriefV1 | null): BriefingItem[] {
+  if (!brief) return []
+
+  return brief.items.map((item, index) => {
+    const source = sourceFromBriefEvidence(item.evidence[0]?.report_type, brief.brief_type)
+    return {
+      id: `${brief.brief_type}-${index}`,
+      source,
+      sentiment: detectSentiment(`${item.title} ${item.conclusion}`, ''),
+      title: displayTitle(source, item.title, item.conclusion),
+      conclusion: displayConclusion(source, item.conclusion),
+      relatedTags: [],
+      isHeadline: index === 0,
+      isAlert: false,
+    }
+  })
+}
+
+function sourceFromBriefEvidence(reportType: unknown, briefType: BriefingType): BriefingSource {
+  switch (reportType) {
+    case 'morning':
+    case 'wind_leader':
+    case 'hot_burst':
+    case 'review':
+      return reportType
+    case 'trend_score':
+      return 'trend'
+    case 'event_conduction':
+      return 'event'
+    default:
+      return briefType === 'evening' ? 'review' : 'morning'
+  }
 }
 
 /**

@@ -31,10 +31,7 @@ export function formatDate(t?: string | Date): string {
   return `${y}-${mo}-${dd}`
 }
 
-/**
- * 格式化日期时间为 YYYY-MM-DD HH:mm（上海时区）。
- * 适用于真UTC时间戳（如后端 TIMESTAMPTZ 字段），new Date() 会自动转上海时区。
- */
+/** 格式化日期时间为 YYYY-MM-DD HH:mm（设备本地时区）。 */
 export function formatDateTime(t?: string | Date): string {
   if (!t) return ''
   const d = new Date(t)
@@ -44,6 +41,21 @@ export function formatDateTime(t?: string | Date): string {
   const dd = String(d.getDate()).padStart(2, '0')
   const hh = String(d.getHours()).padStart(2, '0')
   const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${y}-${mo}-${dd} ${hh}:${mm}`
+}
+
+/** 格式化 UTC 时间戳为固定 UTC+8 的 YYYY-MM-DD HH:mm。 */
+export function formatShanghaiDateTime(t?: string | Date): string {
+  if (!t) return ''
+  const date = new Date(t)
+  if (isNaN(date.getTime())) return ''
+
+  const shanghai = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+  const y = shanghai.getUTCFullYear()
+  const mo = String(shanghai.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(shanghai.getUTCDate()).padStart(2, '0')
+  const hh = String(shanghai.getUTCHours()).padStart(2, '0')
+  const mm = String(shanghai.getUTCMinutes()).padStart(2, '0')
   return `${y}-${mo}-${dd} ${hh}:${mm}`
 }
 

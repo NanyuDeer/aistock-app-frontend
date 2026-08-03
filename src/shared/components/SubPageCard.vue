@@ -16,7 +16,7 @@
     </view>
 
     <!-- 中间内容区域 -->
-    <view class="as-sub1__body">
+    <view class="as-sub1__body" :class="{ 'as-sub1__body--no-chat': noChatBar }">
       <scroll-view
         scroll-y
         class="as-sub1__scroll"
@@ -31,8 +31,8 @@
       </view>
     </view>
 
-    <!-- 全局AI对话栏 -->
-    <GlobalChatBar :active-panel="activePanel" />
+    <!-- 全局AI对话栏（可通过 noChatBar 隐藏） -->
+    <GlobalChatBar v-if="!noChatBar" :active-panel="activePanel" />
   </view>
 </template>
 
@@ -45,9 +45,12 @@ const props = withDefaults(defineProps<{
   title?: string
   /** 当前激活的面板页：'favorites' | 'trade' | '' */
   activePanel?: string
+  /** 隐藏底部全局 AI 对话栏（搜索页等模态页面使用） */
+  noChatBar?: boolean
 }>(), {
   title: '',
   activePanel: '',
+  noChatBar: false,
 })
 
 // 获取真实状态栏高度
@@ -149,6 +152,11 @@ function goBack() {
   flex-direction: column;
   overflow: hidden;
   padding-bottom: calc(148rpx + env(safe-area-inset-bottom));
+}
+
+/* noChatBar 时去掉底部 ChatBar 占位 */
+.as-sub1__body--no-chat {
+  padding-bottom: 0;
 }
 
 .as-sub1__scroll {

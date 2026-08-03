@@ -51,6 +51,144 @@ export interface MarketTraceQaResponse {
   trace: MarketTraceQaTrace
 }
 
+export interface MarketTraceReviewDisplayReport {
+  summary?: unknown
+  details?: unknown
+  sectors?: unknown
+  risks?: unknown
+}
+
+/* ===== 大盘溯源 schema 2.0 完整类型树（前端只读消费，字段对齐后端 pydantic models） ===== */
+
+export type MarketTraceConfidence = 'high' | 'medium' | 'low'
+export type MarketTraceAttributionStatus = 'confirmed' | 'hypothesis' | 'insufficient' | 'not_applicable'
+export type MarketTraceCandidateStatus = 'supported' | 'weak' | 'rejected' | 'insufficient'
+export type MarketTraceCandidateCategory =
+  | 'global_risk_liquidity'
+  | 'domestic_macro_policy'
+  | 'industry_technology_supply'
+  | 'market_positioning_liquidity'
+export type MarketTraceCausalStage =
+  | 'structural_root'
+  | 'trigger'
+  | 'transmission'
+  | 'exposure'
+  | 'repricing'
+  | 'observable_result'
+export type MarketTracePhenomenonKind =
+  | 'broad_rally'
+  | 'broad_decline'
+  | 'style_divergence'
+  | 'sector_concentration'
+  | 'sentiment_extreme'
+export type MarketTraceSeverity = 'low' | 'medium' | 'high'
+
+export interface MarketTraceCausalNode {
+  stage: MarketTraceCausalStage
+  claim: string
+  evidence_ids?: unknown
+}
+
+export interface MarketTraceCausalChain {
+  nodes: MarketTraceCausalNode[]
+}
+
+export interface MarketTraceCandidateExplanation {
+  id: string
+  category: MarketTraceCandidateCategory
+  status: MarketTraceCandidateStatus
+  verdict: string
+  chain?: MarketTraceCausalChain | null
+  supporting_evidence_ids?: unknown
+  counter_evidence_ids?: unknown
+}
+
+export interface MarketTraceTrace {
+  schema_version?: string
+  attribution_status?: MarketTraceAttributionStatus
+  candidates?: MarketTraceCandidateExplanation[]
+  primary_chain_id?: string | null
+  alternative_chain_id?: string | null
+  confidence?: MarketTraceConfidence
+  unresolved_questions?: unknown
+}
+
+export interface MarketTraceDetectedPhenomenon {
+  kind?: MarketTracePhenomenonKind
+  summary?: string
+  severity?: MarketTraceSeverity
+  fact_ids?: unknown
+  tags?: unknown
+}
+
+export interface MarketTracePhenomenonDiscovery {
+  status?: 'detected' | 'no_phenomenon' | 'insufficient_data'
+  primary?: MarketTraceDetectedPhenomenon | null
+}
+
+export interface MarketTraceSectorItem {
+  name?: unknown
+  pct_change?: unknown
+  net_amount?: unknown
+}
+
+export interface MarketTraceAShareSectors {
+  top_gainers?: MarketTraceSectorItem[]
+  top_losers?: MarketTraceSectorItem[]
+  top_inflows?: MarketTraceSectorItem[]
+  top_outflows?: MarketTraceSectorItem[]
+}
+
+export interface MarketTraceAShare {
+  indexes?: unknown
+  breadth?: unknown
+  turnover?: unknown
+  limits?: unknown
+  main_force?: unknown
+  sectors?: MarketTraceAShareSectors
+}
+
+export interface MarketTraceSourceRecord {
+  source_id?: string
+  kind?: 'market_fact' | 'event_evidence'
+  provider?: string
+  title?: string
+  content?: string
+  url?: string | null
+  occurred_at?: string | null
+  captured_at?: string
+  source_level?: 'primary' | 'reporting' | 'market_data'
+}
+
+export interface MarketTraceSnapshot {
+  snapshot_id?: string
+  trade_date?: string
+  captured_at?: string
+  a_share?: MarketTraceAShare
+  sources?: Record<string, MarketTraceSourceRecord>
+  missing_fields?: unknown
+  phenomenon_discovery?: MarketTracePhenomenonDiscovery
+}
+
+export interface MarketTraceArtifact {
+  snapshot?: MarketTraceSnapshot
+  trace?: MarketTraceTrace
+}
+
+export interface MarketTraceReviewRecord {
+  report_type: string
+  report_date: string
+  status?: string
+  data_source?: string | null
+  created_at?: string
+  content: {
+    schema_version?: string
+    snapshot_id?: string
+    display_report?: MarketTraceReviewDisplayReport
+    market_trace?: MarketTraceArtifact
+  }
+}
+
 export interface BriefingData {
   date: string
   title: string
@@ -58,8 +196,30 @@ export interface BriefingData {
   provider: string
 }
 
+/** 异动分析报告 DB 记录（GET /api/agent/report/alert/:symbol/:date 返回） */
+export interface AlertReportRecord {
+  id?: string
+  report_type: string
+  report_date: string
+  status?: string
+  data_source?: string | null
+  created_at?: string
+  content: {
+    symbol?: string
+    display_report?: {
+      summary?: string
+      impact?: string
+      keywords?: string[]
+      details?: string
+      stocks?: string[]
+      risks?: string[]
+    }
+    podcast_brief?: string
+  }
+}
+
 export type BriefType = 'morning' | 'evening'
-export const PUBLIC_REPORT_INTENTS = ['wind_leader', 'hot_burst'] as const
+export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score'] as const
 export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
 
 export function isPublicReportIntent(intent: string): intent is PublicReportIntent {
@@ -108,7 +268,8 @@ export interface BriefV1 {
 }
 
 export interface BroadcastSourceBrief {
-  id: string
+  /** API 返回的数据库主键通常为 number，兼容旧字符串格式。 */
+  id: string | number
   report_type: `brief_${BriefType}`
   report_date: string
   as_of: string
@@ -175,6 +336,18 @@ export const agentApi = {
     return request.post('/agent/briefing/generate-audio', { type })
   },
 
+  /**
+   * 生成通用播报音频（单主播朗读文本）
+   * 对接 Node.js 公开路由 POST /api/agent/brief/generate-podcast
+   * 同一 key 的音频已存在时后端直接返回缓存，不重复合成
+   */
+  generatePodcast(text: string, key: string) {
+    return request.post<{ audio_url: string; cached: boolean }>(
+      '/agent/brief/generate-podcast',
+      { text, key }
+    )
+  },
+
   /** 获取动态估值 */
   // TODO: 后端 valuation 接口尚未实现，待 Agent 落地后启用
   getValuation(symbol: string) {
@@ -212,6 +385,20 @@ export const agentApi = {
   /** 读取分析报告（broadcast/morning/review/wind_leader/hot_burst 等）。 */
   getReport(intent: string, date: string) {
     return request.get(`/agent/report/${intent}/${date}`)
+  },
+
+  /**
+   * 查询指定股票的异动分析报告（缓存查询）
+   * 对接 Node.js 公开路由 GET /api/agent/report/alert/:symbol/:date
+   * 命中缓存时直接返回 DB 中的报告，未命中返回 null（前端再走 SSE 流式分析）
+   */
+  getAlertReport(symbol: string, date: string) {
+    return request.get<AlertReportRecord | null>(`/agent/report/alert/${symbol}/${date}`)
+  },
+
+  /** 读取大盘复盘报告。 */
+  getMarketTraceReview(date: string) {
+    return request.get<MarketTraceReviewRecord | null>(`/agent/report/review/${date}`)
   },
 
   /** 异动提醒 AI 解读 SSE 流 URL（不走 request 拦截器，直接拼接） */

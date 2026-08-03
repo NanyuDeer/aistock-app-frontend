@@ -114,7 +114,7 @@
           class="report-card"
           @tap="goStockDetail(item)"
         >
-          <!-- 顶部：股票名称 + 代码｜报告期｜标签 -->
+          <!-- 顶部：股票名称 + 代码｜报告期｜评分｜标签 -->
           <view class="report-top">
             <view class="report-top-left">
               <text class="stock-name">{{ item.name }}</text>
@@ -123,25 +123,6 @@
             <view class="report-period">{{ item.period }}</view>
             <text :class="['report-tag', tagClass(item.tag)]">{{ item.tag }}</text>
           </view>
-
-          <!-- 中部：AI 研判标签 -->
-          <view class="report-mid">
-            <view class="report-tags-wrap">
-              <view class="report-tags-group">
-                <text class="report-tags-label">经营亮点</text>
-                <view class="report-tags-list">
-                  <text v-for="(gt, gi) in item.goodTags" :key="gi" class="report-tag-pill good">{{ gt }}</text>
-                </view>
-              </view>
-              <view v-if="item.riskTags.length" class="report-tags-group">
-                <text class="report-tags-label">潜在风险</text>
-                <view class="report-tags-list">
-                  <text v-for="(rt, ri) in item.riskTags" :key="ri" class="report-tag-pill risk">{{ rt }}</text>
-                </view>
-              </view>
-            </view>
-          </view>
-
           <!-- 底部：核心财务 + 更新时间 -->
           <view class="report-bottom">
             <view class="report-data-row">
@@ -166,6 +147,7 @@
             </view>
             <view class="report-time-row">
               <text class="update-time">更新时间：{{ item.updateTime }}</text>
+              <text v-if="item.aiScore != null" :class="['report-score', scoreClass(item.aiScore)]">{{ item.aiScore }}分</text>
             </view>
           </view>
         </view>
@@ -191,6 +173,7 @@ interface ReportItem {
   name: string
   period: string
   tag: string
+  aiScore: number | null
   revenue: string
   revenueYoy: number
   netProfit: string
@@ -203,22 +186,23 @@ interface ReportItem {
   riskTags: string[]
 }
 
-type SortField = 'revenue' | 'revenueYoy' | 'netProfit' | 'profitYoy' | 'updateTime'
+type SortField = 'revenue' | 'revenueYoy' | 'netProfit' | 'profitYoy' | 'updateTime' | 'aiScore'
 
-const SORT_KEYS: SortField[] = ['netProfit', 'profitYoy', 'revenue', 'revenueYoy', 'updateTime']
+const SORT_KEYS: SortField[] = ['aiScore', 'netProfit', 'profitYoy', 'revenue', 'revenueYoy', 'updateTime']
 const SORT_LABELS: Record<SortField, string> = {
+  aiScore: '四维评分',
   netProfit: '净利规模',
   profitYoy: '净利增速',
   revenue: '营收规模',
   revenueYoy: '营收增速',
   updateTime: '更新时间',
 }
-const sortLabels = ['净利规模', '净利增速', '营收规模', '营收增速', '更新时间']
+const sortLabels = ['四维评分', '净利规模', '净利增速', '营收规模', '营收增速', '更新时间']
 
 const STORAGE_KEY = 'report_filter_sort'
 
 // ===== 年份列表（10年） =====
-const yearList = ['2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017', '2016', '2015']
+const yearList = ['2026', '2025', '2024', '2023', '2022', '2021', '2020']
 
 // ===== 状态 =====
 const activeTab = ref('reports')
@@ -234,7 +218,7 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 // 年份筛选
 const showYearPicker = ref(false)
-const selectedYear = ref('2024')
+const selectedYear = ref('2026')
 
 // 排序
 const sortFieldIndex = ref(0)        // 当前排序维度在 SORT_KEYS 中的索引
@@ -277,6 +261,7 @@ const hasMore = computed(() => {
 // 排序映射：前端 SortField → 后端 sortBy 参数
 function sortFieldToApi(field: SortField): string {
   const map: Record<SortField, string> = {
+    aiScore: 'ai_score',
     revenue: 'total_revenue',
     revenueYoy: 'total_revenue',
     netProfit: 'n_income_attr_p',
@@ -290,12 +275,7 @@ function sortFieldToApi(field: SortField): string {
 const filteredList = computed(() => {
   let items = [...rawList.value]
 
-  // 第一步：年份筛选
-  if (selectedYear.value) {
-    items = items.filter(item => item.period.startsWith(selectedYear.value))
-  }
-
-  // 第二步：排序
+  // 排序
   const field = currentSortField.value
   const asc = sortAsc.value
   items.sort((a, b) => {
@@ -317,6 +297,9 @@ const filteredList = computed(() => {
     } else if (field === 'updateTime') {
       valA = new Date(a.updateTime).getTime()
       valB = new Date(b.updateTime).getTime()
+    } else if (field === 'aiScore') {
+      valA = a.aiScore ?? -1
+      valB = b.aiScore ?? -1
     }
 
     return asc ? valA - valB : valB - valA
@@ -351,6 +334,7 @@ async function fetchData(append = false) {
       pageSize,
       sortBy: sortFieldToApi(currentSortField.value),
       sortOrder: sortAsc.value ? 'asc' : 'desc',
+      endYear: selectedYear.value || undefined,
     }
 
     const kw = keyword.value.trim()
@@ -361,7 +345,10 @@ async function fetchData(append = false) {
     if (!res) throw new Error('API 返回为空')
 
     // 响应拦截器已提取 data，res 即为数据对象
-    const reportList: any[] = res['报告列表'] || []
+    const reportList: any[] = (res['报告列表'] || []).filter(item => {
+      const type = item['报告类型'] || '';
+      return type === '正式报告' || type === '快报/预告';
+    })
     total.value = res['总数量'] || 0
 
     const mapped = reportList.map(item => mapApiItem(item))
@@ -397,6 +384,12 @@ function mapApiItem(item: any): ReportItem {
   const rating = item['评级'] || ''
   const orgName = item['机构名称'] || ''
 
+  // 从 API 获取 AI 研判标签
+  const aiTag = item['AI研判'] || ''
+
+  // 从 API 获取四维评分
+  const aiScore = item['AI评分']
+
   // 格式化日期: YYYYMMDD → YYYY-MM-DD
   const formatDate = (d: string) => {
     if (!d || d.length < 8) return d
@@ -406,11 +399,31 @@ function mapApiItem(item: any): ReportItem {
   // 报告期显示
   let period = endDate
   if (period && !period.includes('年')) {
-    const y = period.slice(0, 4)
-    const m = period.slice(4, 6)
-    if (m === '06') period = `${y}年半年报`
-    else if (m === '12') period = `${y}年报`
-    else period = `${y}年${m}月报`
+    // 格式如 "2026Q4"（研报评级 - 预测数据）
+    const qMatch = period.match(/^(\d{4})Q([1-4])$/)
+    if (qMatch) {
+      const isRating = reportType === '研报评级'
+      const qMap: Record<string, string> = {
+        '1': isRating ? '一季度预测' : '一季报',
+        '2': isRating ? '半年预测' : '半年报',
+        '3': isRating ? '三季预测' : '三季报',
+        '4': isRating ? '全年预测' : '年报',
+      }
+      period = `${qMatch[1]}${qMap[qMatch[2]] || 'Q'+qMatch[2]+'季报'}`
+    } else {
+      const y = period.slice(0, 4)
+      const m = period.slice(4, 6)
+      if (m === '03') period = `${y}一季报`
+      else if (m === '06') period = `${y}半年报`
+      else if (m === '09') period = `${y}三季报`
+      else if (m === '12') period = `${y}年报`
+      else period = `${y}年${m}月报`
+    }
+  }
+
+  // 快报/预告 -> 追加（快报）标识
+  if (reportType === '快报/预告') {
+    period += '（快报）'
   }
 
   // 金额转换（元→亿）
@@ -424,15 +437,26 @@ function mapApiItem(item: any): ReportItem {
   let revenueYoy = 0
   let profitYoy = 0
 
-  // 生成模拟AI标签（API 暂无该字段，暂用 mock）
-  const goodTags = ['营收稳定', '净利增长']
-  const riskTags: string[] = []
+  // 根据 AI 研判标签生成经营亮点 / 风险词条
+  const goodTagSet = new Set(['向好', '高增', '修复', '扭盈'])
+  const tagDescriptions: Record<string, { good: string[]; risk: string[] }> = {
+    '向好': { good: ['业绩稳步增长'], risk: [] },
+    '高增': { good: ['营收高速增长', '净利大幅提升'], risk: [] },
+    '修复': { good: ['业绩回暖修复'], risk: [] },
+    '扭盈': { good: ['成功扭亏为盈'], risk: [] },
+    '承压': { good: [], risk: ['成本承压'] },
+    '走弱': { good: [], risk: ['业绩增速放缓'] },
+    '疲弱': { good: [], risk: ['业绩持续疲弱'] },
+    '转亏': { good: [], risk: ['业绩由盈转亏'] },
+  }
+  const desc = tagDescriptions[aiTag] || { good: [], risk: [] }
 
   return {
     code,
     name,
     period,
-    tag: rating || (reportType === '快报/预告' ? '预告' : '报告'),
+    tag: aiTag || rating || (reportType === '快报/预告' ? '预告' : ''),
+    aiScore: aiScore != null ? Number(aiScore) : null,
     revenue: toYi(rawRevenue),
     revenueYoy,
     netProfit: toYi(rawProfit),
@@ -441,8 +465,8 @@ function mapApiItem(item: any): ReportItem {
     grossMargin: '',
     cashFlow: '',
     updateTime: formatDate(annDate),
-    goodTags,
-    riskTags,
+    goodTags: desc.good,
+    riskTags: desc.risk,
   }
 }
 
@@ -518,6 +542,12 @@ function switchTo(tab: string) {
 function tagClass(tag: string): string {
   const goodTags = ['向好', '高增', '修复', '扭盈']
   return goodTags.includes(tag) ? 'tag-good' : 'tag-bad'
+}
+
+function scoreClass(score: number): string {
+  if (score >= 70) return 'score-high'
+  if (score >= 50) return 'score-mid'
+  return 'score-low'
 }
 
 function yoyClass(val: number): string {
@@ -862,6 +892,27 @@ fetchData(false)
   }
 }
 
+.report-score {
+  font-size: 20rpx;
+  font-weight: 600;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  flex-shrink: 0;
+
+  &.score-high {
+    color: #059669;
+    background: rgba(5, 150, 105, 0.1);
+  }
+  &.score-mid {
+    color: #d97706;
+    background: rgba(217, 119, 6, 0.1);
+  }
+  &.score-low {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+  }
+}
+
 /* 中部：AI 研判标签 */
 .report-mid {
   background: #f9fafb;
@@ -996,7 +1047,8 @@ fetchData(false)
 
 .report-time-row {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .update-time {

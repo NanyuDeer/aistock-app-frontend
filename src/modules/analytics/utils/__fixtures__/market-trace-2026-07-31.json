@@ -1,0 +1,135 @@
+{
+  "report_type": "review_full",
+  "report_date": "2026-07-31",
+  "status": "completed",
+  "data_source": "review_agent_full",
+  "created_at": "2026-07-31T16:10:00+08:00",
+  "content": {
+    "schema_version": "2.0",
+    "snapshot_id": "snap-2026-07-31",
+    "display_report": {
+      "summary": "多个核心指数同步上涨，市场广度偏强",
+      "details": "# 2026-07-31 A股收盘溯源\n\n（完整 markdown 兜底）",
+      "sectors": ["AI视频", "快手概念"],
+      "risks": ["7月30日政治局会议新闻的具体报道与市场接收时间无法通过occurred_at字段确认"]
+    },
+    "market_trace": {
+      "snapshot": {
+        "snapshot_id": "snap-2026-07-31",
+        "trade_date": "2026-07-31",
+        "captured_at": "2026-07-31T15:35:00+08:00",
+        "a_share": {
+          "indexes": [
+            { "name": "创业板指", "pct_change": 3.06 },
+            { "name": "深证成指", "pct_change": 2.21 }
+          ],
+          "sectors": {
+            "top_gainers": [
+              { "name": "AI视频", "pct_change": 7.12 },
+              { "name": "快手概念", "pct_change": 6.45 },
+              { "name": "智谱AI", "pct_change": 5.88 },
+              { "name": "AI语料", "pct_change": 5.21 },
+              { "name": "MLOps概念", "pct_change": 4.67 }
+            ],
+            "top_losers": []
+          }
+        },
+        "sources": {
+          "NEWS_001": {
+            "source_id": "NEWS_001",
+            "kind": "event_evidence",
+            "provider": "cls",
+            "title": "政治局会议新闻",
+            "url": "https://example.com/news/001",
+            "occurred_at": null,
+            "captured_at": "2026-07-31T15:35:00+08:00",
+            "source_level": "reporting"
+          }
+        },
+        "missing_fields": [
+          "a_share.main_force.large_and_extra_large_net_yuan",
+          "global_markets"
+        ],
+        "phenomenon_discovery": {
+          "status": "detected",
+          "primary": {
+            "kind": "broad_rally",
+            "summary": "多个核心指数同步上涨，市场广度偏强",
+            "severity": "medium",
+            "fact_ids": ["INDEX_DAILY"],
+            "tags": ["broad_rally"]
+          }
+        }
+      },
+      "trace": {
+        "schema_version": "1.1",
+        "attribution_status": "insufficient",
+        "primary_chain_id": null,
+        "alternative_chain_id": null,
+        "confidence": "low",
+        "unresolved_questions": [
+          "7月30日政治局会议新闻的具体报道与市场接收时间无法通过occurred_at字段确认，触发时机不精确",
+          "缺乏北向资金和主力资金流向数据，无法验证外部流动性或外资推动作用",
+          "全球市场整体表现缺失，无法全面评估外部风险溢价的传导及其与A股的因果关系",
+          "美股科技股大涨的驱动因素（如微软财报超预期）与A股板块的映射机制未获直接证据证实"
+        ],
+        "candidates": [
+          {
+            "id": "global_risk_liquidity",
+            "category": "global_risk_liquidity",
+            "status": "weak",
+            "verdict": "美股科技股大涨提振全球风险偏好，A股科技板块跟随，但传导证据不足，缺少北向资金和全球市场整体数据。",
+            "chain": {
+              "nodes": [
+                { "stage": "structural_root", "claim": "全球科技股风险偏好上升", "evidence_ids": [] },
+                { "stage": "trigger", "claim": "7月30日美股科技股大涨，微软涨超15%，纳斯达克指数上涨2.78%。", "evidence_ids": ["NEWS_002"] },
+                { "stage": "transmission", "claim": "A股科技板块跟随上涨", "evidence_ids": [] },
+                { "stage": "exposure", "claim": "", "evidence_ids": [] },
+                { "stage": "repricing", "claim": "", "evidence_ids": [] },
+                { "stage": "observable_result", "claim": "", "evidence_ids": [] }
+              ]
+            },
+            "supporting_evidence_ids": ["NEWS_002"],
+            "counter_evidence_ids": ["a_share.main_force.large_and_extra_large_net_yuan", "global_markets"]
+          },
+          {
+            "id": "domestic_macro_policy",
+            "category": "domestic_macro_policy",
+            "status": "weak",
+            "verdict": "政治局会议释放资本市场改革与逆周期调节信号，提振投资者信心，但触发时间未能精确确定。",
+            "chain": {
+              "nodes": [
+                { "stage": "structural_root", "claim": "", "evidence_ids": [] },
+                { "stage": "trigger", "claim": "7月30日政治局会议", "evidence_ids": ["NEWS_001"] },
+                { "stage": "transmission", "claim": "政策信号提振投资者信心", "evidence_ids": [] },
+                { "stage": "exposure", "claim": "", "evidence_ids": [] },
+                { "stage": "repricing", "claim": "", "evidence_ids": [] },
+                { "stage": "observable_result", "claim": "", "evidence_ids": [] }
+              ]
+            },
+            "supporting_evidence_ids": ["NEWS_001"],
+            "counter_evidence_ids": []
+          },
+          {
+            "id": "industry_technology_supply",
+            "category": "industry_technology_supply",
+            "status": "insufficient",
+            "verdict": "无明确产业政策、技术突破或供应冲击，无法解释市场广度普涨",
+            "chain": null,
+            "supporting_evidence_ids": [],
+            "counter_evidence_ids": []
+          },
+          {
+            "id": "market_positioning_liquidity",
+            "category": "market_positioning_liquidity",
+            "status": "insufficient",
+            "verdict": "主力资金数据缺失，个股回购增持公告规模不足以驱动系统性上涨",
+            "chain": null,
+            "supporting_evidence_ids": [],
+            "counter_evidence_ids": ["a_share.main_force.large_and_extra_large_net_yuan"]
+          }
+        ]
+      }
+    }
+  }
+}

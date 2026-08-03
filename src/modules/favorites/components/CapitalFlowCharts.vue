@@ -1,64 +1,100 @@
 <template>
   <view class="capital-flow-charts">
-    <view v-if="orders.length" class="flow-chart-panel">
-      <view class="chart-head">
-        <text class="chart-title">资金拆解</text>
-        <Tag type="neutral" size="sm">亿元</Tag>
+    <view class="flow-overview">
+      <text class="flow-overview-note">{{ summaryNote }}</text>
+    </view>
+
+    <!-- 资金拆解：横向条形（每项独立轨道，中心线在50%） -->
+    <view v-if="orders.length" class="flow-panel">
+      <view class="panel-head">
+        <text class="panel-title">资金拆解</text>
+        <text class="panel-unit">亿元</text>
       </view>
-      <view class="split-chart-stage">
-        <view class="split-axis-col">
-          <view class="split-axis-text">{{ compactNumber(splitModel.maxAbs) }}</view>
-          <view class="split-axis-text">0</view>
-          <view class="split-axis-text">{{ compactNumber(-splitModel.maxAbs) }}</view>
-        </view>
-        <svg class="split-svg" viewBox="0 0 360 172" preserveAspectRatio="none">
-          <line :x1="splitModel.left" :y1="splitModel.top" :x2="splitModel.right" :y2="splitModel.top" stroke="#eef2f7" stroke-width="1" />
-          <line :x1="splitModel.left" :y1="splitModel.zeroY" :x2="splitModel.right" :y2="splitModel.zeroY" stroke="#94a3b8" stroke-width="1" />
-          <line :x1="splitModel.left" :y1="splitModel.bottom" :x2="splitModel.right" :y2="splitModel.bottom" stroke="#eef2f7" stroke-width="1" />
-          <line :x1="splitModel.left" :y1="splitModel.top" :x2="splitModel.left" :y2="splitModel.bottom" stroke="#d1d5db" stroke-width="1" />
-          <g v-for="bar in splitModel.bars" :key="bar.key">
-            <rect :x="bar.x - splitModel.barWidth / 2" :y="bar.y" :width="splitModel.barWidth" :height="bar.height" :fill="bar.color" rx="4" />
-          </g>
-        </svg>
-      </view>
-      <view class="order-legend-grid">
-        <view v-for="item in orders" :key="item.label" class="order-legend-item">
-          <view :class="['order-dot', item.value >= 0 ? 'is-up' : 'is-down']"></view>
-          <text class="order-label">{{ item.label }}</text>
-          <text :class="['order-value', item.value >= 0 ? 'is-up' : 'is-down']">{{ formatSigned(item.value) }}</text>
+      <view class="hbar-list">
+        <view v-for="item in breakdownRows" :key="item.key" class="hbar-row">
+          <text class="hbar-label">{{ item.label }}</text>
+          <view class="hbar-track">
+            <view class="hbar-center"></view>
+            <view
+              class="hbar-fill"
+              :class="item.isPositive ? 'is-up' : 'is-down'"
+              :style="item.isPositive
+                ? { left: '50%', width: item.share + '%' }
+                : { right: '50%', width: item.share + '%' }"
+            ></view>
+          </view>
+          <text :class="['hbar-value', item.isPositive ? 'is-up' : 'is-down']">{{ formatSigned(item.value) }}</text>
         </view>
       </view>
     </view>
 
-    <view v-if="trendModel.points.length" class="flow-chart-panel">
-      <view class="chart-head">
-        <view class="chart-title-wrap">
-          <text class="chart-title">10日资金趋势</text>
-          <Badge v-if="trendBadge" type="gold">{{ trendBadge }}</Badge>
+    <!-- 10日资金节奏：垂直柱形 + 数值网格（方案 C，柱子样式对齐资金拆解） -->
+    <view v-if="trendModel.points.length" class="flow-panel">
+      <view class="panel-head">
+        <view class="panel-title-wrap">
+          <text class="panel-title">10日资金节奏</text>
+          <text v-if="trendBadge" class="panel-badge">{{ trendBadge }}</text>
         </view>
-        <Tag type="neutral" size="sm">亿元</Tag>
+        <text class="panel-unit">亿元</text>
       </view>
-      <view class="trend-chart">
-        <view class="trend-axis-col">
-          <text v-for="tick in trendModel.ticks" :key="`axis-${tick.label}`" class="trend-axis-text">{{ tick.label }}</text>
+      <view class="line-chart">
+        <view class="line-axis-col">
+          <text v-for="tick in trendModel.ticks" :key="`axis-${tick.label}`" class="line-axis-text">{{ tick.label }}</text>
         </view>
-        <svg class="trend-svg" viewBox="0 0 360 236" preserveAspectRatio="none">
+        <svg class="line-svg" :viewBox="`0 0 ${trendModel.plotRight} 200`" preserveAspectRatio="none">
+          <!-- 网格虚线 -->
           <g v-for="tick in trendModel.ticks" :key="`tick-${tick.label}`">
-            <line :x1="trendModel.plotLeft" :y1="tick.y" :x2="trendModel.plotRight" :y2="tick.y" stroke="#eef2f7" stroke-width="1" />
+            <line
+              :x1="trendModel.plotLeft"
+              :y1="tick.y"
+              :x2="trendModel.plotRight"
+              :y2="tick.y"
+              :style="{ stroke: 'var(--cf-grid-line)' }"
+              stroke-width="1"
+              stroke-dasharray="4 6"
+            />
           </g>
-          <line :x1="trendModel.plotLeft" :y1="trendModel.top" :x2="trendModel.plotLeft" :y2="trendModel.bottom" stroke="#d1d5db" stroke-width="1" />
-          <line :x1="trendModel.plotLeft" :y1="trendModel.bottom" :x2="trendModel.plotRight" :y2="trendModel.bottom" stroke="#d1d5db" stroke-width="1" />
-          <line :x1="trendModel.plotLeft" :y1="trendModel.zeroY" :x2="trendModel.plotRight" :y2="trendModel.zeroY" stroke="#94a3b8" stroke-width="1" />
-          <polyline :points="trendModel.linePoints" fill="none" stroke="#f97316" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-          <g v-for="point in trendModel.points" :key="point.key">
-            <circle :cx="point.x" :cy="point.y" r="5" fill="#f97316" stroke="#fff" stroke-width="2" />
-          </g>
+          <!-- 零线（实线） -->
+          <line
+            :x1="trendModel.plotLeft"
+            :y1="trendModel.zeroY"
+            :x2="trendModel.plotRight"
+            :y2="trendModel.zeroY"
+            :style="{ stroke: 'var(--cf-zero-line)' }"
+            stroke-width="1.2"
+          />
+          <!-- 柱子：圆角纯色，红正绿负（对齐资金拆解样式） -->
+          <rect
+            v-for="point in trendModel.points"
+            :key="`bar-${point.key}`"
+            :x="point.barX"
+            :y="point.barY"
+            :width="trendModel.barWidth"
+            :height="point.barH"
+            :rx="3"
+            :style="{ fill: point.raw >= 0 ? 'var(--cf-bar-up)' : 'var(--cf-bar-down)' }"
+          />
+          <!-- 最新柱深色边框高亮 -->
+          <rect
+            v-if="latestPoint"
+            :x="latestPoint.barX"
+            :y="latestPoint.barY"
+            :width="trendModel.barWidth"
+            :height="latestPoint.barH"
+            :rx="3"
+            :style="{ stroke: 'var(--cf-latest-border)', fill: 'none' }"
+            stroke-width="1.5"
+          />
         </svg>
       </view>
-      <view class="trend-value-grid">
-        <view v-for="point in trendModel.points" :key="`detail-${point.key}`" class="trend-value-item">
-          <text class="trend-value-date">{{ point.date }}</text>
-          <text :class="['trend-value-number', point.raw >= 0 ? 'is-up' : 'is-down']">{{ point.text }}</text>
+      <view class="line-value-grid">
+        <view
+          v-for="point in trendModel.points"
+          :key="`detail-${point.key}`"
+          :class="['line-value-item', { 'is-latest': point.isLatest }]"
+        >
+          <text class="line-value-date">{{ point.date }}</text>
+          <text :class="['line-value-number', point.raw >= 0 ? 'is-up' : 'is-down']">{{ point.text }}</text>
         </view>
       </view>
     </view>
@@ -67,7 +103,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Tag, Badge } from '@/shared/components'
 import { compactNumber } from '@/shared/utils/format'
 
 interface FlowOrder {
@@ -76,50 +111,49 @@ interface FlowOrder {
 }
 
 const props = defineProps<{
+  mainInflow?: number
+  ratio?: string | number
+  fiveDay?: number
+  streak?: string
+  narrative?: string
+  risk?: string
   orders?: FlowOrder[]
   trend?: number[]
   trendDates?: string[]
   trendBadge?: string
 }>()
 
-const UP_COLOR = '#ef4444'
-const DOWN_COLOR = '#22c55e'
+const summaryNote = computed(() => props.narrative || props.trendBadge || '先看总量，再看结构和节奏')
 const orders = computed(() => (props.orders || []).filter(item => item.label && item.value !== null && item.value !== undefined))
 const trend = computed(() => props.trend || [])
 const trendDates = computed(() => props.trendDates?.length ? props.trendDates : trend.value.map((_, idx) => `${idx + 1}`))
-const splitMaxAbs = computed(() => Math.max(0.01, ...orders.value.map(item => Math.abs(Number(item.value) || 0))))
 
-const splitModel = computed(() => {
+const breakdownRows = computed(() => {
   const values = orders.value.map(item => Number(item.value) || 0)
-  const left = 16
-  const right = 338
-  const top = 18
-  const bottom = 150
-  const zeroY = (top + bottom) / 2
   const maxAbs = Math.max(0.01, ...values.map(value => Math.abs(value)))
-  const slot = (right - left) / Math.max(1, values.length)
-  const barWidth = Math.min(28, Math.max(18, slot * 0.36))
-  const bars = values.map((value, idx) => {
-    const height = Math.max(4, Math.abs(value) / maxAbs * ((bottom - top) / 2 - 12))
-    const isUp = value >= 0
+  return orders.value.map((item, idx) => {
+    const value = Number(item.value) || 0
     return {
-      key: `${orders.value[idx]?.label || idx}-${value}`,
-      x: left + slot * idx + slot / 2,
-      y: isUp ? zeroY - height : zeroY,
-      height,
-      color: isUp ? UP_COLOR : DOWN_COLOR,
+      key: `${item.label}-${idx}-${value}`,
+      label: item.label,
+      value,
+      isPositive: value >= 0,
+      share: Math.round((Math.abs(value) / maxAbs) * 50),
     }
   })
-  return { bars, maxAbs, left, right, top, bottom, zeroY, barWidth }
 })
 
 const trendModel = computed(() => {
   const values = trend.value.map(value => Number(value) || 0)
-  const left = 16
-  const right = 338
-  const top = 24
-  const bottom = 188
-  if (!values.length) return { points: [], ticks: [], zeroY: 106, linePoints: '', left, right, plotLeft: left, plotRight: right, top, bottom }
+  const left = 8
+  const right = 352
+  const top = 20
+  const bottom = 172
+  const barWidth = 24
+  if (!values.length) {
+    return { points: [], ticks: [], zeroY: 106, plotLeft: left, plotRight: right, top, bottom, barWidth }
+  }
+
   const max = Math.max(0, ...values)
   const min = Math.min(0, ...values)
   const pad = Math.max(0.3, (max - min) * 0.16)
@@ -128,33 +162,34 @@ const trendModel = computed(() => {
   const range = Math.max(1, domainMax - domainMin)
   const yFor = (value: number) => top + ((domainMax - value) / range) * (bottom - top)
   const zeroY = yFor(0)
+  const slot = values.length <= 1 ? right - left : (right - left) / values.length
+
   const points = values.map((value, idx) => {
-    const x = values.length === 1 ? (left + right) / 2 : left + (idx / (values.length - 1)) * (right - left)
+    const centerX = left + slot * idx + slot / 2
+    const barX = centerX - barWidth / 2
     const y = yFor(value)
-    const isEdgeLeft = idx === 0
-    const isEdgeRight = idx === values.length - 1
-    const labelX = isEdgeLeft ? x + 2 : isEdgeRight ? x - 2 : x
-    const anchor = isEdgeLeft ? 'start' : isEdgeRight ? 'end' : 'middle'
-    const labelY = value < 0 ? Math.min(214, y + 18) : Math.max(14, y - 10)
+    const barY = value >= 0 ? y : zeroY
+    const barH = Math.max(1, Math.abs(y - zeroY))
     return {
       key: `${idx}-${value}`,
-      x,
-      y,
+      centerX,
+      barX,
+      barY,
+      barH,
       raw: value,
-      labelX,
-      labelY,
-      dateY: Math.min(230, labelY + 18),
-      anchor,
+      isLatest: idx === values.length - 1,
       text: formatSigned(value),
       date: formatDateLabel(trendDates.value[idx] || `${idx + 1}`),
-      showDate: idx === 0 || idx === values.length - 1 || idx === Math.floor((values.length - 1) / 2),
     }
   })
-  const ticks = [domainMax, 0, domainMin].map(value => ({
-    label: compactNumber(value),
-    y: yFor(value),
-  }))
-  return { points, ticks, zeroY, linePoints: points.map(point => `${point.x},${point.y}`).join(' '), left, right, plotLeft: left, plotRight: right, top, bottom }
+
+  const ticks = [domainMax, 0, domainMin].map(value => ({ label: compactNumber(value), y: yFor(value) }))
+  return { points, ticks, zeroY, plotLeft: left, plotRight: right, top, bottom, barWidth }
+})
+
+const latestPoint = computed(() => {
+  const points = trendModel.value.points
+  return points.length ? points[points.length - 1] : null
 })
 
 function formatSigned(value: number): string {
@@ -168,128 +203,163 @@ function formatDateLabel(value: string): string {
   if (/^\d{8}$/.test(text)) return `${text.slice(4, 6)}/${text.slice(6, 8)}`
   return text.slice(0, 5)
 }
+
 </script>
 
 <style lang="scss" scoped>
 .capital-flow-charts {
   display: flex;
   flex-direction: column;
-  gap: 28rpx;
+  gap: 16rpx;
+  /* SVG 柱形图颜色令牌：桥接 SCSS 变量到 SVG 内联样式 */
+  --cf-bar-up: #{$up};
+  --cf-bar-down: #{$down};
+  --cf-grid-line: #{$line-soft};
+  --cf-zero-line: #{$ink-mute};
+  --cf-latest-border: #{$ink};
 }
 
-.flow-chart-panel {
-  padding: 18rpx 0 2rpx;
+/* 面板：白底 + 细边框 + 圆角，对齐 section-card 令牌 */
+.flow-overview,
+.flow-panel {
+  padding: 18rpx;
+  border-radius: $r-md;
+  background: $bg-card;
+  border: 2rpx solid $line;
 }
 
-.chart-head {
+.flow-overview-note {
+  display: block;
+  font-size: $font-size-sm;
+  line-height: 1.55;
+  color: $ink-soft;
+  word-break: break-word;
+}
+
+.panel-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16rpx;
-  padding: 0 4rpx;
-  margin-bottom: 10rpx;
+  margin-bottom: 14rpx;
 }
 
-.chart-title-wrap {
+.panel-title-wrap {
   min-width: 0;
 }
 
-.chart-title {
+.panel-title {
   display: block;
-  font-size: 30rpx;
+  font-size: $font-size-md;
+  line-height: 1.35;
   font-weight: 700;
   color: $ink;
 }
 
-.split-chart-stage {
-  display: grid;
-  grid-template-columns: 46px 1fr;
-  column-gap: 4rpx;
-  height: 172px;
-  margin-top: 4rpx;
-  box-sizing: border-box;
-  background: $bg-card;
-}
-
-.split-axis-col {
-  height: 150px;
-  padding-top: 18px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-end;
-  box-sizing: border-box;
-}
-
-.split-axis-text {
-  font-size: 21rpx;
-  line-height: 1;
+.panel-unit {
+  flex-shrink: 0;
+  font-size: $font-size-xs;
+  line-height: 1.5;
   color: $ink-mute;
 }
 
-.split-svg {
-  display: block;
-  width: 100%;
-  height: 172px;
-  overflow: visible;
+.panel-badge {
+  display: inline-flex;
+  margin-top: 8rpx;
+  padding: 6rpx 12rpx;
+  border-radius: $r-xs;
+  background: $warning-soft;
+  color: $warning;
+  font-size: $font-size-xs;
+  line-height: 1.3;
 }
 
-.order-legend-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10rpx 16rpx;
-  margin-top: 12rpx;
-  padding: 0 4rpx;
+/* ===== 横向条形（资金拆解） ===== */
+.hbar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
 }
 
-.order-legend-item {
+.hbar-row {
   display: flex;
   align-items: center;
-  min-width: 0;
-  gap: 8rpx;
-  padding: 8rpx 10rpx;
-  border-radius: 8rpx;
-  background: $bg-soft;
+  gap: 12rpx;
 }
 
-.order-dot {
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 999rpx;
-  flex-shrink: 0;
-
-  &.is-up { background: $up; }
-  &.is-down { background: $down; }
-}
-
-.order-label {
-  flex: 1;
-  min-width: 0;
-  font-size: 22rpx;
+.hbar-label {
+  width: 80rpx;
+  font-size: $font-size-xs;
+  font-weight: 600;
   color: $ink-soft;
-}
-
-.order-value {
   flex-shrink: 0;
-  font-size: 22rpx;
-  font-weight: 700;
-
-  &.is-up { color: $up; }
-  &.is-down { color: $down; }
 }
 
-.trend-chart {
+.hbar-track {
+  flex: 1;
+  height: 28rpx;
+  background: $bg-deep;
+  border-radius: $r-xs;
+  position: relative;
+  overflow: hidden;
+}
+
+.hbar-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2rpx;
+  background: $line-strong;
+  transform: translateX(-1rpx);
+}
+
+.hbar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: $r-xs;
+
+  &.is-up {
+    background: $up;
+  }
+
+  &.is-down {
+    background: $down;
+  }
+}
+
+.hbar-value {
+  width: 96rpx;
+  text-align: right;
+  font-size: $font-size-xs;
+  font-weight: 700;
+  flex-shrink: 0;
+
+  &.is-up {
+    color: $up;
+  }
+
+  &.is-down {
+    color: $down;
+  }
+}
+
+/* ===== 垂直柱形图（10日资金节奏，方案 C） ===== */
+.line-chart {
   display: grid;
-  grid-template-columns: 46px 1fr;
+  grid-template-columns: 36px 1fr;
   column-gap: 4rpx;
   width: 100%;
-  height: 236px;
+  height: 200px;
   overflow: visible;
+  padding-top: 4rpx;
+  box-sizing: border-box;
 }
 
-.trend-axis-col {
-  height: 188px;
-  padding-top: 20px;
+.line-axis-col {
+  height: 172px;
+  padding-top: 18px;
   padding-bottom: 28px;
   display: flex;
   flex-direction: column;
@@ -298,49 +368,60 @@ function formatDateLabel(value: string): string {
   box-sizing: border-box;
 }
 
-.trend-axis-text {
-  font-size: 21rpx;
+.line-axis-text {
+  font-size: $font-size-xs;
   line-height: 1;
   color: $ink-mute;
 }
 
-.trend-svg {
+.line-svg {
   display: block;
   width: 100%;
-  height: 236px;
+  height: 200px;
   overflow: visible;
 }
 
-.trend-value-grid {
+.line-value-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8rpx;
-  padding: 0 4rpx 8rpx;
+  gap: 8rpx 10rpx;
+  padding: 8rpx 2rpx 4rpx;
 }
 
-.trend-value-item {
+.line-value-item {
   min-width: 0;
-  padding: 8rpx 4rpx;
-  border-radius: 8rpx;
-  background: $bg-soft;
+  padding: 6rpx 4rpx;
+  border-radius: $r-xs;
+  background: $white;
   text-align: center;
+  border: 2rpx solid transparent;
+  box-sizing: border-box;
+
+  &.is-latest {
+    border-color: $ink;
+  }
 }
 
-.trend-value-date {
+.line-value-date {
   display: block;
-  font-size: 19rpx;
+  font-size: 20rpx;
   line-height: 1.2;
   color: $ink-mute;
 }
 
-.trend-value-number {
+.line-value-number {
   display: block;
   margin-top: 4rpx;
-  font-size: 20rpx;
+  font-size: $font-size-xs;
   line-height: 1.2;
   font-weight: 700;
 
-  &.is-up { color: $up; }
-  &.is-down { color: $down; }
+  &.is-up {
+    color: $up;
+  }
+
+  &.is-down {
+    color: $down;
+  }
 }
 </style>
