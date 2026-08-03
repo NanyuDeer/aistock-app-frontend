@@ -1,9 +1,14 @@
 <template>
   <SubPageCard title="趋势股评分">
-    <!-- 导航栏右侧刷新按钮 -->
+    <!-- 导航栏右侧：刷新 + 播报 -->
     <template #header-right>
-      <view class="nav-refresh" @tap="loadTopStocks">
-        <SvgIcon name="refresh-line" size="34rpx" color="#0b5fff" />
+      <view class="header-right-actions">
+        <view class="header-podcast-btn" @tap="openPodcast('趋势股评分播报')">
+          <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
+        </view>
+        <view class="nav-refresh" @tap="loadTopStocks">
+          <SvgIcon name="refresh-line" size="34rpx" color="#0b5fff" />
+        </view>
       </view>
     </template>
 
@@ -78,6 +83,9 @@ import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
+import { useReportPodcast } from '@/shared/utils/useReportPodcast'
+
+const { loadPodcast, openPodcast } = useReportPodcast('trend_score')
 
 const stocks = ref<TrendScoreListItem[]>([])
 const keyword = ref('')
@@ -140,6 +148,8 @@ function goBack() {
 
 onShow(() => {
   if (!stocks.value.length) loadTopStocks()
+  // 静默预拉取播报稿，保证标题栏播报按钮可即时使用
+  void loadPodcast()
 })
 </script>
 
@@ -149,6 +159,21 @@ onShow(() => {
 .nav-refresh {
   width: 64rpx;
   height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 标题栏右侧按钮容器 + 播报按钮 */
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.header-podcast-btn {
+  width: 56rpx;
+  height: 56rpx;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -1,8 +1,13 @@
 <template>
   <SubPageCard2 :title="pageTitle" :subtitle="pageSubtitle">
-    <!-- 从概览进入详情时，右上角显示"概览"按钮 -->
-    <template v-if="canBackToOverview" #header-right>
-      <Button type="ghost" size="sm" @click="backToOverview">概览</Button>
+    <!-- 右上角：播报按钮（有播报稿时）+ 概览按钮（从概览进入详情时） -->
+    <template v-if="canBackToOverview || podcastBriefForFloating" #header-right>
+      <view class="header-right-actions">
+        <view v-if="podcastBriefForFloating" class="header-podcast-btn" @tap="openFloatingPodcast">
+          <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
+        </view>
+        <Button v-if="canBackToOverview" type="ghost" size="sm" @click="backToOverview">概览</Button>
+      </view>
     </template>
 
     <view class="report-content-wrap">
@@ -281,6 +286,7 @@ import { formatDate, formatDateTime } from '@/shared/utils/datetime'
 import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { usePodcastStore } from '@/shared/store/modules/podcast'
 import { LoadingState, EmptyState, Card, Tag, Button } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
@@ -451,6 +457,25 @@ const pageTitle = computed(() => {
   if (isOverview.value) return '今日分析概览'
   return titleMap[effectiveIntent.value] || '分析报告'
 })
+
+/** 当前报告的播报稿（详情模式有 podcast_brief 时标题栏显示播报按钮） */
+const podcastStore = usePodcastStore()
+const podcastBriefForFloating = computed(() => {
+  if (isOverview.value) return ''
+  const brief = report.value?.content?.podcast_brief
+  return typeof brief === 'string' ? brief : ''
+})
+
+/** 打开悬浮播报窗 */
+function openFloatingPodcast() {
+  const brief = podcastBriefForFloating.value
+  if (!brief) return
+  void podcastStore.open(
+    brief,
+    `report_${effectiveIntent.value}_${report.value?.report_date || date.value || 'latest'}`,
+    pageTitle.value
+  )
+}
 
 const pageSubtitle = computed(() => {
   if (isOverview.value) {
@@ -699,6 +724,21 @@ onBackPress(() => {
 </script>
 
 <style lang="scss" scoped>
+/* 标题栏右侧：播报按钮 + 概览按钮 */
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.header-podcast-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .report-content-wrap {
   padding: 32rpx;
 }

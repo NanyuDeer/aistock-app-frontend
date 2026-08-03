@@ -2,6 +2,29 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [feat/market-trace-improvement] 2026-08-03 — 三大任务前端：播报优化 + OCR识图加自选 + 悬浮播报
+
+**开发者**: Aria
+
+### 新增
+- `src/shared/components/FloatingPodcast.vue`：悬浮播报（右侧贴边、纵向 1/3、悬浮球 72rpx 可拖动吸附左右边缘、展开态仅 AudioPlayer，按钮经 #actions 插槽放标题右侧）
+- `src/shared/store/modules/podcast.ts`：Pinia 播报 store（open/generate/expand/collapse/close，跨页共享）
+- `src/shared/utils/ocrImage.ts`：OCR 选图/压缩（H5 canvas 压缩 / App uni.compressImage + base64）
+- `src/shared/utils/useReportPodcast.ts`：从 /agent/report/:intent/:date 拉取 podcast_brief，以 report_{intent}_{date} 为缓存 key 打开悬浮播报
+
+### 改进
+- `src/shared/components/PodcastCard.vue`：MAX_PODCAST_TEXT_LENGTH=250 文本裁剪（与后端校验一致）+ 音频命中缓存时 cached 提示
+- `src/shared/components/AudioPlayer.vue`：新增 `#actions` 具名插槽（标题右侧操作区）
+- `src/modules/favorites/pages/search.vue`：重写为「文字搜索 / 识图添加」双 Tab，支持选图→预览→识别→勾选→批量加自选
+- `src/shared/api/modules/stock.ts`：新增 OcrImageInput/OcrStockItem 类型 + ocrStocksFromImages（timeout 100s，batchConcurrency 2）
+- `src/shared/store/modules/favorites.ts`：新增 addMany 批量加自选（已存在跳过）
+- 报告页播报按钮接线：alert-analysis / agent-report / hot-burst / leaders / trend-score；SubPageCard/SubPageCard2/MainTabs 挂载 FloatingPodcast
+
+### 修复
+- `ai-analysis.vue` / `reports.vue`：预先存在类型错误修复（formatMetricKey String 转换、filter 参数标注），保证 type-check 全绿
+
+---
+
 ## [master] 2026-08-01 — 重磅事件跳 AI 事件分析页 + 早晚报切换 + agent-report 兜底渲染
 
 **开发者**: Aria

@@ -33,12 +33,16 @@
 
     <!-- 全局AI对话栏（可通过 noChatBar 隐藏） -->
     <GlobalChatBar v-if="!noChatBar" :active-panel="activePanel" />
+
+    <!-- 播报悬浮窗（报告页调用 podcastStore.open 后显示） -->
+    <FloatingPodcast />
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
+import FloatingPodcast from '@/shared/components/FloatingPodcast.vue'
 
 const props = withDefaults(defineProps<{
   /** 主标题 */
