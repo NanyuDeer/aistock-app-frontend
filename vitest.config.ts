@@ -19,6 +19,9 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src'),
     },
+    // uni-app 组件以无扩展名深度导入（如 mp-html/.../mp-html.vue），
+    // vite 默认 extensions 不含 .vue，需补充才能解析（uni 插件在业务构建里做了同样的事）
+    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.vue'],
   },
   test: {
     environment: 'happy-dom',
