@@ -11,96 +11,33 @@
           <view v-else class="msg-content assistant">
             <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
             <view class="bubble">
-              <!-- 折叠的进度步骤（完成后保留，仅 general 模式） -->
-              <view
-                v-if="chatMode === 'general' && msg.progressSteps && msg.progressSteps.length > 0"
-                class="progress-collapse"
-                @tap="toggleProgress(idx)"
-              >
-                <text class="progress-collapse-title">运行过程 ({{ msg.progressSteps.length }})</text>
-                <SvgIcon
-                  :name="expandedProgress[idx] ? 'arrow-up-s-line' : 'arrow-down-s-line'"
-                  size="24rpx"
-                  color="#9ca3af"
-                />
-              </view>
-              <view v-if="chatMode === 'general' && msg.progressSteps && expandedProgress[idx]" class="progress-card static">
-                <view
-                  v-for="(step, sIdx) in msg.progressSteps"
-                  :key="sIdx"
-                  class="progress-step done"
-                >
-                  <view class="step-icon">
-                    <text class="step-check">✓</text>
-                  </view>
-                  <text class="step-label">{{ step.label }}</text>
-                </view>
-              </view>
-
               <!-- Markdown 渲染的回复内容 -->
               <mp-html v-if="msg.content" :content="markdownToHtml(msg.content)" class="bubble-html" />
-              <AdvisorTraceStatus v-if="chatMode === 'general'" :trace="msg.advisorTrace" />
 
-              <!-- General 模式：Skill 结果卡片 -->
-              <template v-if="chatMode === 'general'">
-                <!-- 股票行情卡片 -->
-                <view
-                  v-if="msg.skillResult?.data?.symbol && msg.skillResult?.data?.price !== undefined"
-                  class="quote-card"
-                  @tap="goStockDetail(msg.skillResult.data.symbol)"
-                >
-                  <view class="quote-card-top">
-                    <view class="quote-card-info">
-                      <text class="quote-card-name">{{ msg.skillResult.data.name }}</text>
-                      <text class="quote-card-code">{{ msg.skillResult.data.symbol }}</text>
-                    </view>
-                    <view class="quote-card-price-wrap">
-                      <text :class="['quote-card-price', (msg.skillResult.data.changePercent ?? 0) >= 0 ? 'up' : 'down']">
-                        {{ Number(msg.skillResult.data.price).toFixed(2) }}
-                      </text>
-                      <text :class="['quote-card-change', (msg.skillResult.data.changePercent ?? 0) >= 0 ? 'up' : 'down']">
-                        {{ (msg.skillResult.data.changePercent ?? 0) >= 0 ? '+' : '' }}{{ Number(msg.skillResult.data.changePercent).toFixed(2) }}%
-                      </text>
-                    </view>
-                  </view>
-                  <view v-if="msg.skillResult.data.high !== undefined" class="quote-card-detail">
-                    <text class="detail-item">高 {{ Number(msg.skillResult.data.high).toFixed(2) }}</text>
-                    <text class="detail-item">低 {{ Number(msg.skillResult.data.low).toFixed(2) }}</text>
-                    <text class="detail-item">开 {{ Number(msg.skillResult.data.open).toFixed(2) }}</text>
-                  </view>
-                </view>
+              <!-- D20：深度分析 summary 卡片（仅 deep 结果） -->
+              <DeepSummaryCard v-if="msg.lastDeepReport" :report="msg.lastDeepReport" />
 
-                <!-- 资金流向卡片 -->
-                <view
-                  v-else-if="msg.skillResult?.data?.netAmount !== undefined || msg.skillResult?.data?.net_amount !== undefined"
-                  class="flow-card"
-                >
-                  <text class="flow-card-title">资金流向</text>
-                  <view class="flow-card-row">
-                    <text class="flow-label">主力净流入</text>
-                    <text :class="['flow-value', getFlowClass(msg.skillResult.data)]">
-                      {{ formatFlowAmount(msg.skillResult.data) }}
-                    </text>
-                  </view>
-                </view>
+              <!-- D21：执行细节面板（事件流层级树，纯前端） -->
+              <ExecStepsPanel v-if="msg.execSteps && msg.execSteps.length > 0" :steps="msg.execSteps" />
 
-                <!-- 纯文本 Skill 结果 -->
-                <view v-else-if="msg.skillResult?.narrative && msg.skillResult.type === 'text'" class="skill-text-card">
-                  <text class="skill-text">{{ msg.skillResult.narrative }}</text>
-                </view>
-              </template>
-
-              <!-- Market review 模式：证据溯源区域（组件化，逻辑在 MarketTraceEvidence.vue） -->
-              <MarketTraceEvidence v-if="chatMode === 'market_review' && msg.trace" :trace="msg.trace" />
+              <!-- D4：force_deep「深度分析」按钮（仅非 deep / 非错误回复） -->
+              <view
+                v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了')"
+                class="deep-btn"
+                @tap="rerunDeep(idx)"
+              >
+                <SvgIcon name="line-chart-line" size="24rpx" color="#0b5fff" />
+                <text class="deep-btn-text">深度分析</text>
+              </view>
             </view>
           </view>
         </view>
 
-        <!-- 流式进度卡片（general 模式，当前正在生成） -->
-        <view v-if="isStreaming && chatMode === 'general'" class="message-item assistant streaming-message">
+        <!-- 流式进度卡片（当前正在生成） -->
+        <view v-if="isStreaming" class="message-item assistant streaming-message">
           <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
           <view class="bubble">
-            <!-- 进度步骤 -->
+            <!-- 实时进度步骤 -->
             <view v-if="progressSteps.length > 0" class="progress-card">
               <view
                 v-for="(step, sIdx) in progressSteps"
@@ -123,68 +60,22 @@
             />
           </view>
         </view>
-
-        <!-- 加载指示器（market_review 模式） -->
-        <view v-if="isStreaming && chatMode === 'market_review'" class="message-item assistant streaming-message">
-          <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
-          <view class="bubble">
-            <view class="loading-dots">
-              <view class="loading-dot" />
-              <view class="loading-dot" />
-              <view class="loading-dot" />
-            </view>
-          </view>
-        </view>
       </scroll-view>
-
-      <!-- 模式切换 -->
-      <view class="mode-toggle">
-        <view
-          :class="['mode-btn', chatMode === 'general' ? 'active' : '']"
-          @tap="switchMode('general')"
-        >
-          <text class="mode-btn-text">对话</text>
-        </view>
-        <view
-          :class="['mode-btn', chatMode === 'market_review' ? 'active' : '']"
-          @tap="switchMode('market_review')"
-        >
-          <text class="mode-btn-text">市场复盘</text>
-        </view>
-      </view>
 
       <!-- 快捷 Skills -->
       <view class="quick-skills">
-        <!-- General 模式快捷技能 -->
-        <template v-if="chatMode === 'general'">
-          <view class="skill-btn" @tap="quickAsk('查一下 600519 的行情')">
-            <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">行情</text>
-          </view>
-          <view class="skill-btn" @tap="quickAsk('查一下 600519 的资金流向')">
-            <SvgIcon name="money-cny-circle-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">资金</text>
-          </view>
-          <view class="skill-btn" @tap="quickAsk('今天的龙头股有哪些')">
-            <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">龙头</text>
-          </view>
-        </template>
-        <!-- Market review 模式快捷问题 -->
-        <template v-else>
-          <view class="skill-btn" @tap="quickAsk('大盘为何涨跌')">
-            <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">大盘为何涨跌</text>
-          </view>
-          <view class="skill-btn" @tap="quickAsk('主导板块是什么')">
-            <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">主导板块</text>
-          </view>
-          <view class="skill-btn" @tap="quickAsk('海外因素有何影响')">
-            <SvgIcon name="global-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">海外影响</text>
-          </view>
-        </template>
+        <view class="skill-btn" @tap="quickAsk('今日大盘怎么样?')">
+          <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
+          <text class="skill-btn-text">大盘</text>
+        </view>
+        <view class="skill-btn" @tap="quickAsk('今日板块资金流向如何')">
+          <SvgIcon name="money-cny-circle-line" size="28rpx" color="#0b5fff" />
+          <text class="skill-btn-text">资金</text>
+        </view>
+        <view class="skill-btn" @tap="quickAsk('今天的龙头股有哪些?')">
+          <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
+          <text class="skill-btn-text">龙头</text>
+        </view>
       </view>
 
       <!-- 输入框 -->
@@ -197,102 +88,69 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, nextTick, onUnmounted } from 'vue'
+import { ref, nextTick, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useChatStream } from '@/shared/utils/useChatStream'
-import { useMarketTraceQa } from '@/shared/utils/useMarketTraceQa'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import MarketTraceEvidence from './MarketTraceEvidence.vue'
-import AdvisorTraceStatus from './AdvisorTraceStatus.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
+import DeepSummaryCard from './DeepSummaryCard.vue'
+import ExecStepsPanel from './ExecStepsPanel.vue'
 
 const chatStream = useChatStream()
-const marketQa = useMarketTraceQa()
-
-const chatMode = ref<'general' | 'market_review'>('general')
 
 onLoad((options: Record<string, string> | undefined) => {
   const q = options?.q
   if (!q) return
-  chatMode.value = 'general'
   nextTick(() => {
     void chatStream.send(q)
     scrollToBottom()
   })
 })
 
-const displayMessages = computed(() =>
-  chatMode.value === 'market_review' ? marketQa.messages.value : chatStream.messages
-)
-const isStreaming = computed(() =>
-  chatMode.value === 'market_review' ? marketQa.loading.value : chatStream.streaming.value
-)
+const displayMessages = chatStream.messages
+const isStreaming = chatStream.streaming
 const progressSteps = chatStream.progressSteps
 const streamingText = chatStream.streamingText
 
 const inputText = ref('')
 const scrollTop = ref(0)
-const expandedProgress = reactive<Record<number, boolean>>({})
-
-function toggleProgress(idx: number) {
-  expandedProgress[idx] = !expandedProgress[idx]
-}
-
-function switchMode(mode: 'general' | 'market_review') {
-  if (chatMode.value === mode) return
-  if (chatStream.streaming.value || marketQa.loading.value) return
-  if (mode === 'market_review') {
-    chatStream.disconnect()
-  }
-  chatMode.value = mode
-}
 
 function handleSend() {
   const content = inputText.value.trim()
   if (!content || isStreaming.value) return
   inputText.value = ''
-  if (chatMode.value === 'market_review') {
-    marketQa.send(content)
-  } else {
-    chatStream.send(content)
-  }
+  chatStream.send(content)
   scrollToBottom()
 }
 
 function quickAsk(text: string) {
   if (isStreaming.value) return
-  if (chatMode.value === 'market_review') {
-    marketQa.send(text)
-  } else {
-    chatStream.send(text)
-  }
+  chatStream.send(text)
   scrollToBottom()
-}
-
-function goStockDetail(symbol: string) {
-  if (!symbol) return
-  uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
-}
-
-function getFlowClass(data: any): string {
-  const net = data?.netAmount ?? data?.net_amount ?? 0
-  return net >= 0 ? 'up' : 'down'
-}
-
-function formatFlowAmount(data: any): string {
-  const net = data?.netAmount ?? data?.net_amount ?? 0
-  const abs = Math.abs(net)
-  if (abs >= 100000000) return (net / 100000000).toFixed(2) + '亿'
-  if (abs >= 10000) return (net / 10000).toFixed(2) + '万'
-  return net.toFixed(2) + '元'
 }
 
 function scrollToBottom() {
   nextTick(() => {
     scrollTop.value = 99999
   })
+}
+
+/**
+ * D4：light 误判一键升级——以 force_deep=true 重发该条回复前最近一条 user 消息。
+ * 闸门短路回复也显示按钮（重复点击返回同话术，无副作用）。
+ */
+function rerunDeep(idx: number) {
+  if (isStreaming.value) return
+  for (let i = idx - 1; i >= 0; i--) {
+    const prev = displayMessages.value[i]
+    if (prev && prev.role === 'user') {
+      chatStream.send(prev.content, { forceDeep: true })
+      scrollToBottom()
+      return
+    }
+  }
 }
 
 onUnmounted(() => {
@@ -369,27 +227,8 @@ onUnmounted(() => {
 }
 @keyframes blink { 50% { opacity: 0.6; } }
 
-/* 涨跌色 */
-.up { color: #f43f5e; }
-.down { color: #22c55e; }
-
-/* 折叠的进度步骤 */
-.progress-collapse {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8rpx 0;
-  margin-bottom: 4rpx;
-  border-bottom: 1rpx solid #f0f0f0;
-}
-.progress-collapse-title {
-  font-size: 22rpx;
-  color: #9ca3af;
-}
-
-/* 进度卡片 */
+/* 实时进度步骤 */
 .progress-card { padding: 4rpx 0 12rpx; }
-.progress-card.static { padding-top: 8rpx; }
 .progress-step {
   display: flex; align-items: center; gap: 12rpx; padding: 6rpx 0;
 }
@@ -406,88 +245,6 @@ onUnmounted(() => {
 .step-label { font-size: 24rpx; color: $ink-soft; }
 .progress-step.done .step-label { color: #9ca3af; }
 
-/* 行情卡片 */
-.quote-card {
-  margin-top: 16rpx; padding: 20rpx; background: $bg-soft; border-radius: 12rpx;
-}
-.quote-card-top {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 12rpx;
-}
-.quote-card-info { display: flex; align-items: center; gap: 12rpx; }
-.quote-card-name { font-size: 28rpx; font-weight: 600; color: $ink; }
-.quote-card-code { font-size: 22rpx; color: $ink-soft; padding: 2rpx 10rpx; background: $line; border-radius: 6rpx; }
-.quote-card-price-wrap { display: flex; flex-direction: column; align-items: flex-end; }
-.quote-card-price { font-size: 32rpx; font-weight: 700; }
-.quote-card-change { font-size: 24rpx; margin-top: 2rpx; }
-.quote-card-detail {
-  display: flex; gap: 24rpx; padding-top: 12rpx; border-top: 1rpx solid $line;
-}
-.detail-item { font-size: 22rpx; color: $ink-soft; }
-
-/* 资金流向卡片 */
-.flow-card {
-  margin-top: 16rpx; padding: 20rpx; background: $bg-soft; border-radius: 12rpx;
-}
-.flow-card-title { font-size: 26rpx; font-weight: 500; color: $ink; display: block; margin-bottom: 12rpx; }
-.flow-card-row { display: flex; justify-content: space-between; align-items: center; }
-.flow-label { font-size: 24rpx; color: $ink-soft; }
-.flow-value { font-size: 28rpx; font-weight: 600; }
-
-/* 纯文本 Skill 结果 */
-.skill-text-card {
-  margin-top: 16rpx; padding: 20rpx; background: rgba(77, 124, 254, 0.06); border-radius: 12rpx;
-}
-.skill-text { font-size: 26rpx; color: $ink-soft; line-height: 1.5; }
-
-/* 模式切换 */
-.mode-toggle {
-  display: flex;
-  gap: 8rpx;
-  padding: 8rpx 20rpx;
-  background: #ffffff;
-  flex-shrink: 0;
-}
-.mode-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10rpx 0;
-  border-radius: $radius-pill;
-  background: $bg-color-muted;
-}
-.mode-btn.active {
-  background: $brand-color;
-}
-.mode-btn-text {
-  font-size: $font-size-base;
-  color: $text-color-secondary;
-}
-.mode-btn.active .mode-btn-text {
-  color: #ffffff;
-  font-weight: 600;
-}
-
-/* 加载指示器 */
-.loading-dots {
-  display: flex;
-  gap: 8rpx;
-  padding: 8rpx 0;
-}
-.loading-dot {
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
-  background: #9ca3af;
-  animation: loading-pulse 1.4s ease-in-out infinite;
-}
-.loading-dot:nth-child(2) { animation-delay: 0.2s; }
-.loading-dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes loading-pulse {
-  0%, 80%, 100% { opacity: 0.3; }
-  40% { opacity: 1; }
-}
-
 .quick-skills { display: flex; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; flex-shrink: 0; }
 .skill-btn {
   display: inline-flex; align-items: center; gap: 6rpx;
@@ -499,4 +256,19 @@ onUnmounted(() => {
 .input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
 .input { flex: 1; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
 .send-btn { background: $primary; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
+
+/* force_deep 深度分析按钮 */
+.deep-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  margin-top: 12rpx;
+  padding: 6rpx 20rpx;
+  background: rgba(77, 124, 254, 0.08);
+  border-radius: 20rpx;
+}
+.deep-btn-text {
+  font-size: 22rpx;
+  color: #0b5fff;
+}
 </style>
