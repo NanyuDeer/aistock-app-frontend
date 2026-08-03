@@ -2,9 +2,8 @@
  * AI 智能体相关 API（App 专属功能）
  */
 import request from '../request'
+import { useUserStore } from '@/shared/store/modules/user'
 import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
-
-export const MARKET_TRACE_QA_TIMEOUT = 120_000
 
 export interface ProgressStep {
   label: string
@@ -12,13 +11,54 @@ export interface ProgressStep {
   timestamp: number
 }
 
+/** 深度分析引用（对齐 Python DeepReportRef，P2 task-4 冻结结构；前端只读消费） */
+export interface DeepReportRef {
+  worker?: 'stock' | 'sector' | 'hot_burst'
+  report_id?: string | null
+  question?: string
+  summary?: string
+  symbols?: string[]
+  tag_codes?: string[]
+  created_at?: string
+}
+
+/** 执行细节：单个工具调用（D21 二级节点） */
+export interface ExecToolStep {
+  tool: string          // 工具名（tool_start.tool）
+  label?: string        // tool_start 下发的显示名
+  startAt: number       // 前端时间戳（ms）
+  endAt?: number        // tool_end 配对时间（ms）
+  status: 'done' | 'failed'
+}
+
+/** 执行细节：一级节点（D21 层级树） */
+export interface ExecStepNode {
+  node: string          // intermediate 的 node 名（分组 key）
+  label: string         // intermediate 下发的 label（后端生成，前端零硬编码）
+  startAt: number
+  endAt?: number        // 下一节点或 DONE 时间
+  tools: ExecToolStep[] // 二级缩进：工具调用序列
+  thinkingMs?: number   // llm_start → 首个 text
+}
+
+/** AI 思考链单步（流式聚合） */
+export interface ReasoningStep {
+  node: string           // 节点名（qa_router / skill_executor / ...）
+  text: string           // 累积的思考文本
+  status: 'streaming' | 'done' | 'failed'
+  startAt: number
+  endAt?: number
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   skillResult?: SkillResult
   progressSteps?: ProgressStep[]
-  trace?: MarketTraceQaTrace
   advisorTrace?: AdvisorTrace
+  lastDeepReport?: DeepReportRef
+  execSteps?: ExecStepNode[]
+  reasoningSteps?: ReasoningStep[]   // NEW: AI 思考链
   timestamp: number
 }
 
@@ -26,29 +66,6 @@ export interface SkillResult {
   type: 'text' | 'card' | 'chart' | 'graph'
   data: any
   narrative?: string
-}
-
-export interface MarketTraceQaSource {
-  source_id: string
-  title: string
-  kind: 'market_fact' | 'event_evidence'
-  provider: string
-}
-
-export interface MarketTraceQaTrace {
-  artifact_id: string
-  sources: MarketTraceQaSource[]
-  as_of: string
-  confidence: 'high' | 'medium' | 'low'
-  uncertainty: string[]
-  degraded: boolean
-  degraded_reason: string | null
-}
-
-export interface MarketTraceQaResponse {
-  content: string
-  session_id: string
-  trace: MarketTraceQaTrace
 }
 
 export interface MarketTraceReviewDisplayReport {
@@ -319,22 +336,15 @@ export const agentApi = {
    * 发送对话消息（非流式，降级方案）
    * App 端推荐使用 WebSocket 流式，见 useStreamingChat
    */
-  sendMessage(message: string, sessionId?: string) {
-    return request.post('/agent/chat/message', { message, session_id: sessionId })
-  },
-
-  /**
-   * 发送市场复盘问答消息（HTTP，非流式）
-   * 通过 Node 代理转发到 Python /api/agent/market-trace-qa/message
-   * 返回包含 trace 证据元数据的响应
-   */
-  async sendMarketTraceQaMessage(message: string, reportDate?: string, sessionId?: string): Promise<MarketTraceQaResponse> {
-    return request.post<MarketTraceQaResponse>('/agent/market-trace-qa/message', {
+  sendMessage(message: string, sessionId?: string, options?: { forceDeep?: boolean }) {
+    const userId = useUserStore().userInfo?.id
+    return request.post('/agent/chat/message', {
       message,
-      report_date: reportDate,
       session_id: sessionId,
-    }, {
-      timeout: MARKET_TRACE_QA_TIMEOUT,
+      // D11：HTTP 降级路径同样透传 user_id（与 WS 路径对齐）
+      ...(userId != null ? { user_id: String(userId) } : {}),
+      // D4：HTTP 降级路径透传 force_deep（与 WS 路径对齐，Task 1 Python 侧支持）
+      ...(options?.forceDeep ? { force_deep: true } : {})
     })
   },
 

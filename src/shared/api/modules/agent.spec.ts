@@ -1,66 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import path from 'node:path'
-import Request from 'luch-request'
 import { createServer } from 'vite'
-
-test('市场复盘问答请求使用独立的较长超时', async () => {
-  const server = await createServer({
-    root: process.cwd(),
-    configFile: false,
-    resolve: {
-      alias: {
-        '@': path.resolve(process.cwd(), 'src'),
-      },
-    },
-    server: { middlewareMode: true },
-    appType: 'custom',
-  })
-
-  try {
-    const requestModule = await server.ssrLoadModule('/src/shared/api/request.ts')
-    const agentModule = await server.ssrLoadModule('/src/shared/api/modules/agent.ts')
-    const { MARKET_TRACE_QA_TIMEOUT } = agentModule
-    const request = requestModule.default
-    const originalPost = request.post
-    const calls: Array<{ url: string; data: unknown; config: unknown }> = []
-
-    request.post = ((url: string, data?: unknown, config?: unknown) => {
-      calls.push({ url, data, config })
-      return Promise.resolve({
-        content: '市场复盘结果',
-        session_id: 'session-1',
-        trace: {
-          artifact_id: 'artifact-1',
-          sources: [],
-          as_of: '2026-07-23T15:00:00+08:00',
-          confidence: 'medium',
-          uncertainty: [],
-          degraded: false,
-          degraded_reason: null,
-        },
-      })
-    }) as typeof request.post
-
-    try {
-      await agentModule.agentApi.sendMarketTraceQaMessage('大盘为何涨跌', '2026-07-23', 'session-1')
-    } finally {
-      request.post = originalPost
-    }
-
-    assert.deepEqual(calls, [{
-      url: '/agent/market-trace-qa/message',
-      data: {
-        message: '大盘为何涨跌',
-        report_date: '2026-07-23',
-        session_id: 'session-1',
-      },
-      config: { timeout: MARKET_TRACE_QA_TIMEOUT },
-    }])
-  } finally {
-    await server.close()
-  }
-})
 
 test('大盘溯源读取固定走公开 review 报告接口', async () => {
   const server = await createServer({
@@ -99,41 +40,45 @@ test('大盘溯源读取固定走公开 review 报告接口', async () => {
   }
 })
 
-test('request.post 将独立超时传给 luch-request', async () => {
+test('sendMessage 支持 forceDeep 透传（HTTP 降级对齐 WS）', async () => {
   const server = await createServer({
     root: process.cwd(),
     configFile: false,
-    resolve: {
-      alias: {
-        '@': path.resolve(process.cwd(), 'src'),
-      },
-    },
+    resolve: { alias: { '@': path.resolve(process.cwd(), 'src') } },
     server: { middlewareMode: true },
     appType: 'custom',
+    // pinia 需与测试运行环境隔离，避免 Node ESM 与 vite resolver 双实例导致
+    // getActivePinia() 找不到 active pinia（useUserStore 依赖全局 active pinia）
+    ssr: { noExternal: ['pinia'] },
   })
-  const originalPost = Request.prototype.post
-  const calls: Array<{ url: string; data: unknown; config: unknown }> = []
-
-  Request.prototype.post = ((url: string, data?: unknown, config?: unknown) => {
-    calls.push({ url, data, config })
-    return Promise.resolve({})
-  }) as unknown as typeof Request.prototype.post
 
   try {
+    // 通过 vite 模块图获取 pinia，保证与 agent.ts 依赖的 pinia 同一实例
+    const piniaModule = await server.ssrLoadModule('pinia')
+    piniaModule.setActivePinia(piniaModule.createPinia())
     const requestModule = await server.ssrLoadModule('/src/shared/api/request.ts')
     const agentModule = await server.ssrLoadModule('/src/shared/api/modules/agent.ts')
-    const { MARKET_TRACE_QA_TIMEOUT } = agentModule
-    await requestModule.default.post('/agent/market-trace-qa/message', { message: '测试' }, {
-      timeout: MARKET_TRACE_QA_TIMEOUT,
-    })
+    const request = requestModule.default
+    const originalPost = request.post
+    const calls: Array<{ url: string; data: unknown; config: unknown }> = []
+
+    request.post = ((url: string, data?: unknown, config?: unknown) => {
+      calls.push({ url, data, config })
+      return Promise.resolve({ content: 'ok', session_id: 's1', advisor_trace: null })
+    }) as typeof request.post
+
+    try {
+      await agentModule.agentApi.sendMessage('深度分析一下600519', 's1', { forceDeep: true })
+    } finally {
+      request.post = originalPost
+    }
 
     assert.deepEqual(calls, [{
-      url: '/agent/market-trace-qa/message',
-      data: { message: '测试' },
-      config: { header: undefined, timeout: MARKET_TRACE_QA_TIMEOUT },
+      url: '/agent/chat/message',
+      data: { message: '深度分析一下600519', session_id: 's1', force_deep: true },
+      config: undefined,
     }])
   } finally {
-    Request.prototype.post = originalPost
     await server.close()
   }
 })
