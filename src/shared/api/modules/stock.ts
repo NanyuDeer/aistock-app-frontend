@@ -121,6 +121,52 @@ export interface FavoriteStock {
   addedAt?: string | null
 }
 
+// ---- 股票列表搜索接口类型 ----
+export interface StockListItem {
+  symbol: string
+  name: string
+  market: string
+  industry: string
+}
+
+export interface StockListResult {
+  list: StockListItem[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+interface StockListPayload {
+  数据源?: string
+  当前页?: number
+  每页数量?: number
+  总数量?: number
+  总页数?: number
+  股票列表?: Array<{
+    股票代码?: string
+    股票简称?: string
+    市场代码?: string
+    所属行业?: string
+  }>
+}
+
+function normalizeStockList(payload: StockListPayload | null | undefined): StockListResult {
+  const rawList = payload?.股票列表 || []
+  return {
+    list: rawList.map((item) => ({
+      symbol: String(item.股票代码 || '').trim(),
+      name: String(item.股票简称 || ''),
+      market: String(item.市场代码 || ''),
+      industry: String(item.所属行业 || ''),
+    })).filter((item) => item.symbol),
+    total: Number(payload?.总数量) || 0,
+    page: Number(payload?.当前页) || 1,
+    pageSize: Number(payload?.每页数量) || 0,
+    totalPages: Number(payload?.总页数) || 0,
+  }
+}
+
 interface FavoriteStockPayload {
   股票代码?: string
   股票简称?: string | null
@@ -265,10 +311,40 @@ function normalizeHotBurstHistory(records: HotBurstHistoryRecord[] | undefined):
   }))
 }
 
+/** OCR 图片输入（后端 StockOcrService.normalizeImages 支持 { data, mime } 对象） */
+export interface OcrImageInput {
+  /** 图片 base64 内容（不含 data: 前缀） */
+  data: string
+  /** MIME 类型，压缩后统一 image/jpeg */
+  mime: string
+}
+
+/** OCR 识别结果中的单只股票（后端已用 stocks 表归一化代码/名称） */
+export interface OcrStockItem {
+  '股票简称': string
+  '股票代码': string
+}
+
 export const stockApi = {
-  /** 获取股票列表 */
-  getStockList(params?: { keyword?: string; page?: number; size?: number }) {
-    return request.get('/cn/stocks', { params })
+  /** 获取股票列表（支持 keyword 模糊搜索 symbol/name/pinyin） */
+  getStockList(params?: { keyword?: string; page?: number; pageSize?: number }) {
+    return request.get<StockListPayload>('/cn/stocks', { params }).then(normalizeStockList)
+  },
+
+  /** OCR 识图识别股票（对接 POST /api/cn/stocks/ocr，返回每张图的股票数组） */
+  ocrStocksFromImages(images: OcrImageInput[], hint?: string) {
+    return request.post<OcrStockItem[][]>(
+      '/cn/stocks/ocr',
+      {
+        images,
+        hint,
+        batchConcurrency: 2,
+        maxImagesPerRequest: 4,
+        timeoutMs: 90000,
+      },
+      // 覆盖默认 15s 超时：VLM 识图较慢，单独设长超时
+      { timeout: 100000 }
+    )
   },
 
   /** 获取个股实时行情（activity 级别，含完整数据） */

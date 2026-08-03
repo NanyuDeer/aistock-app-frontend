@@ -37,6 +37,9 @@
     <AppBottomBar :current-tab="activeTab" @change="onTabChange" />
     <!-- 全局 AI 对话栏（共享，不闪烁） -->
     <GlobalChatBar />
+
+    <!-- 播报悬浮窗（首页晨报等调用 podcastStore.open 后显示） -->
+    <FloatingPodcast />
   </view>
 </template>
 
@@ -44,6 +47,7 @@
 import { ref, computed } from 'vue'
 import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
+import FloatingPodcast from '@/shared/components/FloatingPodcast.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { px2rpx, getBottomFixedHeightPx } from '@/shared/utils/layout'
 import MorningContent from '@/modules/home/components/MorningContent.vue'
