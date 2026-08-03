@@ -29,3 +29,8 @@ test('force_deep 深度分析按钮已接入（仅非 deep 回复显示）', () 
   assert.match(pageSource, /rerunDeep/)
   assert.match(pageSource, /forceDeep: true/)
 })
+
+test('流式过程块渲染 ReasoningCard（streamingReasoning 绑定，dot 动画）', () => {
+  assert.match(pageSource, /streamingReasoning/)
+  assert.match(pageSource, /<ReasoningCard\s+v-if="streamingReasoning\.length > 0"/)
+})

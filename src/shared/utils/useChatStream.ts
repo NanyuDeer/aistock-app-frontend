@@ -24,7 +24,8 @@ export function useChatStream() {
   // D21：本轮原始事件序列（每轮 send 重置；DONE/error 时重组为 execSteps）
   const currentRunEvents: RawWsEvent[] = []
   // 本轮 reasoning 步骤累积器（每轮 send 重置；DONE/error 时存入 message）
-  const currentRunReasoning: ReasoningStep[] = []
+  // P3-fix-2 T2：改为 ref 并整体替换，保证流式过程中 ReasoningCard 实时重渲染
+  const currentRunReasoning = ref<ReasoningStep[]>([])
 
   let socket: UniApp.SocketTask | null = null
   let wsConnected = false
@@ -103,12 +104,17 @@ export function useChatStream() {
           const node = data.node as string
           const chunk = String(data.chunk || '')
           if (!node || !chunk) break
-          let step = currentRunReasoning.find(s => s.node === node)
-          if (!step) {
-            step = { node, text: '', status: 'streaming', startAt: Date.now() }
-            currentRunReasoning.push(step)
+          const idx = currentRunReasoning.value.findIndex(s => s.node === node)
+          if (idx === -1) {
+            currentRunReasoning.value = [
+              ...currentRunReasoning.value,
+              { node, text: chunk, status: 'streaming', startAt: Date.now() }
+            ]
+          } else {
+            const steps = [...currentRunReasoning.value]
+            steps[idx] = { ...steps[idx], text: steps[idx].text + chunk }
+            currentRunReasoning.value = steps
           }
-          step.text += chunk
         }
         break
 
@@ -126,11 +132,11 @@ export function useChatStream() {
           doneReceived = true
           const finalText = data.content || streamingText.value
           // 标记 reasoning 步骤完成
-          for (const step of currentRunReasoning) {
+          for (const step of currentRunReasoning.value) {
             step.status = 'done'
             step.endAt = Date.now()
           }
-          const reasoningSteps = currentRunReasoning.length > 0 ? [...currentRunReasoning] : undefined
+          const reasoningSteps = currentRunReasoning.value.length > 0 ? [...currentRunReasoning.value] : undefined
           // D21：事件流 → 执行细节层级树（纯前端重组）
           const execSteps = buildExecTree(currentRunEvents, Date.now())
           progressSteps.value = []
@@ -153,11 +159,11 @@ export function useChatStream() {
         {
           doneReceived = true
           // 标记 reasoning 步骤失败
-          for (const step of currentRunReasoning) {
+          for (const step of currentRunReasoning.value) {
             step.status = 'failed'
             step.endAt = Date.now()
           }
-          const reasoningSteps = currentRunReasoning.length > 0 ? [...currentRunReasoning] : undefined
+          const reasoningSteps = currentRunReasoning.value.length > 0 ? [...currentRunReasoning.value] : undefined
           // D21：error 同样重组（未配对工具标 failed 语义由 buildExecTree 保证）
           const execSteps = buildExecTree(currentRunEvents, Date.now())
           progressSteps.value = []
@@ -189,7 +195,7 @@ export function useChatStream() {
     // D21：每轮重置事件收集
     currentRunEvents.length = 0
     // 每轮重置 reasoning 累积
-    currentRunReasoning.length = 0
+    currentRunReasoning.value = []
 
     // 尝试 WebSocket 流式
     if (!wsConnected) {
@@ -273,6 +279,8 @@ export function useChatStream() {
     streaming,
     progressSteps,
     streamingText,
+    // P3-fix-2 T2：流式过程中实时思考链（供模板渲染 ReasoningCard dot 动画）
+    streamingReasoning: currentRunReasoning,
     send,
     disconnect,
     // 透传 chatStore

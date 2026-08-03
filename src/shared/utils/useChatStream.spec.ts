@@ -73,4 +73,20 @@ describe('useChatStream reasoning event', () => {
     expect(arg.reasoningSteps).toBeDefined()
     expect(arg.reasoningSteps[0].status).toBe('failed')
   })
+
+  it('exposes streamingReasoning reactively during streaming', () => {
+    const stream = useChatStream() as any
+    const onDone = vi.fn()
+
+    stream._testHandleWsMessage({ type: 'reasoning', node: 'qa_router', chunk: '我先' }, onDone)
+    stream._testHandleWsMessage({ type: 'reasoning', node: 'qa_router', chunk: '拆解' }, onDone)
+    stream._testHandleWsMessage({ type: 'reasoning', node: 'skill_executor', chunk: '收集' }, onDone)
+
+    // streamingReasoning 是响应式 ref，流式中实时可读
+    expect(stream.streamingReasoning.value).toHaveLength(2)
+    expect(stream.streamingReasoning.value[0].node).toBe('qa_router')
+    expect(stream.streamingReasoning.value[0].text).toBe('我先拆解')
+    expect(stream.streamingReasoning.value[0].status).toBe('streaming')
+    expect(stream.streamingReasoning.value[1].node).toBe('skill_executor')
+  })
 })

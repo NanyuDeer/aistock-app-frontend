@@ -37,6 +37,11 @@
         <view v-if="isStreaming" class="message-item assistant streaming-message">
           <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
           <view class="bubble">
+            <!-- P3-fix-2 T2：AI 思考链（流式 dot 动画，steps 含 streaming 时自动展开） -->
+            <ReasoningCard
+              v-if="streamingReasoning.length > 0"
+              :steps="streamingReasoning"
+            />
             <!-- 实时进度步骤 -->
             <view v-if="progressSteps.length > 0" class="progress-card">
               <view
@@ -115,6 +120,8 @@ const displayMessages = chatStream.messages
 const isStreaming = chatStream.streaming
 const progressSteps = chatStream.progressSteps
 const streamingText = chatStream.streamingText
+// P3-fix-2 T2：流式过程中的实时思考链（ref 自动解包，模板直接读数组）
+const streamingReasoning = chatStream.streamingReasoning
 
 const inputText = ref('')
 const scrollTop = ref(0)
@@ -146,7 +153,7 @@ function scrollToBottom() {
 function rerunDeep(idx: number) {
   if (isStreaming.value) return
   for (let i = idx - 1; i >= 0; i--) {
-    const prev = displayMessages.value[i]
+    const prev = displayMessages[i]
     if (prev && prev.role === 'user') {
       chatStream.send(prev.content, { forceDeep: true })
       scrollToBottom()
