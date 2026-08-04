@@ -160,7 +160,6 @@ export function useChatStream() {
           chatStore.appendMessage({
             role: 'assistant',
             content: finalText,
-            advisorTrace: data.advisor_trace,
             // D19：deep 升级引用随 DONE 下发（light/闸门为 null，前端兼容）
             lastDeepReport: data.last_deep_report ?? undefined,
             execSteps,
@@ -253,8 +252,6 @@ export function useChatStream() {
         chatStore.appendMessage({
           role: 'assistant',
           content: result.content || result.message || '',
-          skillResult: result.skill_result,
-          advisorTrace: result.advisor_trace,
           progressSteps: savedSteps,
           timestamp: Date.now()
         })

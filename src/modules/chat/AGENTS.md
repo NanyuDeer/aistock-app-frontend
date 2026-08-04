@@ -12,7 +12,7 @@ AI 对话模块提供智能投顾对话功能，支持行情查询、资金流�
 - `../pages-sub-app/chat/DeepSummaryCard.vue` - 深度分析摘要卡片（消费 `ChatMessage.lastDeepReport`，worker 标签 + summary + symbols + 生成时间）
 - `../pages-sub-app/chat/ExecStepsPanel.vue` - 执行细节面板（消费 `ChatMessage.execSteps` 层级树：一级节点 + 二级工具 + 耗时/思考时长，默认收起；**P3-fix 起对话页已退役，文件保留待 P9 复用**）
 - `../pages-sub-app/chat/ReasoningCard.vue` - AI 思考过程卡片（P3-fix 新增，消费 `ChatMessage.reasoningSteps`，渲染于回复内容上方；折叠/展开 + 流式 dot 动画）
-- 通用气泡/流式文本组件位于 `shared/components/`（`ChatBubble.vue`/`StreamingText.vue`）；skillResult 卡片与 SkillButton 已随 P3 删除
+- 通用气泡/流式文本组件位于 `shared/components/`（`ChatBubble.vue`/`StreamingText.vue`）；skillResult 卡片与 SkillButton 已随 P3/P6 删除
 
 ## Hooks
 - 使用 `shared/utils/useChatStream.ts`（对话流主 hook：WS 为主、HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`；P3-fix 起订阅 reasoning 事件按节点聚合 `reasoningSteps`）

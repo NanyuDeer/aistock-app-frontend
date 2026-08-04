@@ -2,6 +2,27 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-04 — ChatAgent P6 退役清理（市场复盘 tab 前端代码 + $success 修复）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\2026-08-04-chat-agent-p6-retirement.md`
+
+### 重构
+- 删除 `src/shared/utils/useStreamingChat.ts`（SSE 旧对话流死代码，全仓 0 消费者）+ `tests/AdvisorTraceTransport.test.ts`
+- 移除 `skillResult` / `advisorTrace` 类型字段与渲染：agent.ts（`ChatMessage.skillResult/advisorTrace` + `SkillResult`/`AdvisorTrace` 接口）、useChatStream.ts 映射、chat.ts store（`setLastAssistantAdvisorTrace` + sendMessage 两字段映射，sendMessage 本体保留）、modules/chat/pages/index.vue（skillResult 卡片渲染块 + goStockDetail/getFlowClass/formatFlowAmount 辅助函数）；`MarketTrace*` 类型族与 `getMarketTraceReview` 保留（analytics 消费）
+
+### 修复
+- `src/modules/favorites/pages/search.vue`：`$success` → `$success-color`（未定义 SCSS 变量基线错误，master 合并 4dc71be 引入，阻塞 build:h5）
+
+### 文档
+- 根 AGENTS.md 移除 2 处陈旧 useStreamingChat 引用；modules/chat/AGENTS.md 注释更新
+
+### 测试
+- vitest 20/20 + `npx tsc --noEmit` 0 errors + `pnpm build:h5` 通过
+
+---
+
 ## [changer] 2026-08-04 — ChatAgent P5 大盘概览接入（工作线 C）
 
 **开发者**: Aria

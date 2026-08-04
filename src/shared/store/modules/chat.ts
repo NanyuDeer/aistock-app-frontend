@@ -20,13 +20,6 @@ export const useChatStore = defineStore('chat', () => {
     storage.set(STORAGE_KEYS.CHAT_HISTORY, messages.value)
   }
 
-  function setLastAssistantAdvisorTrace(advisorTrace: NonNullable<ChatMessage['advisorTrace']>) {
-    const lastMessage = messages.value[messages.value.length - 1]
-    if (lastMessage?.role !== 'assistant') return
-    lastMessage.advisorTrace = advisorTrace
-    storage.set(STORAGE_KEYS.CHAT_HISTORY, messages.value)
-  }
-
   function clearHistory() {
     messages.value = []
     storage.remove(STORAGE_KEYS.CHAT_HISTORY)
@@ -45,8 +38,6 @@ export const useChatStore = defineStore('chat', () => {
       appendMessage({
         role: 'assistant',
         content: result.content || result.message || '',
-        skillResult: result.skill_result,
-        advisorTrace: result.advisor_trace,
         timestamp: Date.now()
       })
     } catch (e: any) {
@@ -67,5 +58,5 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  return { messages, streaming, sessionId, appendMessage, setLastAssistantAdvisorTrace, clearHistory, sendMessage }
+  return { messages, streaming, sessionId, appendMessage, clearHistory, sendMessage }
 })
