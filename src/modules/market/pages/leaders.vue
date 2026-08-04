@@ -1,8 +1,13 @@
 <template>
   <SubPageCard title="长线风口">
     <template #header-right>
-      <view class="history-btn" @tap="goPushHistory">
-        <text class="history-btn-text">历史推送</text>
+      <view class="header-right-actions">
+        <view class="header-podcast-btn" @tap="openPodcast('长线风口播报')">
+          <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
+        </view>
+        <view class="history-btn" @tap="goPushHistory">
+          <text class="history-btn-text">历史推送</text>
+        </view>
       </view>
     </template>
     <view class="leaders-content">
@@ -110,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, getCurrentInstance } from 'vue'
+import { ref, computed, getCurrentInstance, watch, nextTick } from 'vue'
 import { onShow, onReady } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderAiAnalysis, WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
@@ -119,6 +124,9 @@ import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
+import { useReportPodcast } from '@/shared/utils/useReportPodcast'
+
+const { loadPodcast, openPodcast } = useReportPodcast('wind_leader')
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -159,7 +167,7 @@ try {
 // onReady 中测量 .bubble-wrap 的实际渲染宽度并修正 containerWidth。
 // 上面 getSystemInfoSync() 只能拿到 windowWidth，无法感知 App 端 zoom:1.2 缩放等
 // 导致的实际容器宽度差异，这里用 boundingClientRect 拿到真实渲染宽度兜底。
-onReady(() => {
+function measureBubbleWidth() {
   const instance = getCurrentInstance()
   const query = uni.createSelectorQuery()
   if (instance?.proxy) {
@@ -176,6 +184,16 @@ onReady(() => {
       }
     })
     .exec()
+}
+
+onReady(measureBubbleWidth)
+
+// sectors 异步加载完成后，.bubble-wrap 才进入 DOM（v-if="sectors.length"），
+// onReady 时测量不到，需在数据首次到达后重新测量。
+watch(sectors, (val) => {
+  if (val.length) {
+    nextTick(measureBubbleWidth)
+  }
 })
 
 // 根据持续性决定半径，放大泡泡尺寸
@@ -539,6 +557,8 @@ function goSectorDetail(sector: WindLeaderSector) {
 
 onShow(() => {
   loadData()
+  // 静默预拉取播报稿，保证标题栏播报按钮可即时使用
+  void loadPodcast()
 })
 </script>
 

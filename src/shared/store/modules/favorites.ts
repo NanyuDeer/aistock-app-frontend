@@ -154,6 +154,34 @@ export const useFavoritesStore = defineStore('favorites', () => {
     }
   }
 
+  /** 批量添加自选（OCR 识图勾选后一次性提交，减少请求数） */
+  async function addMany(items: Array<{ symbol: string; name: string }>) {
+    const userStore = useUserStore()
+    if (!userStore.isLoggedIn()) {
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      return false
+    }
+    const symbols = items.map(item => item.symbol)
+    const toAdd = symbols.filter(symbol => !stocks.value.some(stock => stock.symbol === symbol))
+    if (!toAdd.length) {
+      uni.showToast({ title: '所选股票已在自选中', icon: 'none' })
+      return true
+    }
+    pendingSymbols.value = [...pendingSymbols.value, ...toAdd]
+    try {
+      const data = await stockApi.addFavorites(toAdd)
+      replaceWithServerStocks(data)
+      void refreshQuotes()
+      return true
+    } catch (error: unknown) {
+      if (getErrorStatus(error) === 401) userStore.clearSession()
+      uni.showToast({ title: '添加自选失败，请重试', icon: 'none' })
+      return false
+    } finally {
+      pendingSymbols.value = pendingSymbols.value.filter(item => !toAdd.includes(item))
+    }
+  }
+
   function isFavorite(symbol: string) {
     return stocks.value.some(stock => stock.symbol === symbol)
   }
@@ -170,6 +198,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
     fetchFavorites,
     refreshQuotes,
     add,
+    addMany,
     remove,
     isFavorite,
     isPending,
