@@ -95,7 +95,6 @@ src/
 │   │   ├── layout.ts        # 布局工具（底部固定栏高度计算，含安全区补偿）
 │   │   ├── useAuth.ts         # 认证 hook
 │   │   ├── useFavorites.ts    # 自选股 hook
-│   │   ├── useStreamingChat.ts # 流式对话 hook（SSE）
 │   │   ├── useChatStream.ts  # 对话流 hook（WS 为主，HTTP 降级；send 支持 forceDeep，DONE 重组 execSteps/lastDeepReport，P3；订阅 reasoning 事件按节点聚合为 reasoningSteps，P3-fix；currentRunReasoning 改 ref + return 新增 streamingReasoning 流式实时思考链，P3-fix-2）
 │   │   ├── buildExecTree.ts  # WS 事件流 → 执行细节层级树纯函数（D21，P3）
 │   │   ├── useStockCycle.ts   # 股票周期 hook
@@ -359,7 +358,6 @@ import Card from '@/shared/components/Card.vue'
 |------|------|
 | `useAuth` | 认证状态和登录/登出 |
 | `useFavorites` | 自选股增删改查 |
-| `useStreamingChat` | 流式对话（SSE） |
 | `useChatStream` | 对话流（WS 为主，HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`，P3；订阅 reasoning 聚合 `reasoningSteps` + `_testHandleWsMessage` 测试钩子，P3-fix；return `streamingReasoning` 流式实时思考链，P3-fix-2） |
 | `useStockCycle` | 股票周期切换 |
 | `useWebSocket` | WebSocket 连接管理 |
