@@ -83,7 +83,7 @@
     {
       "path": "modules/market/pages/event-catcher",
       "style": {
-        "navigationBarTitleText": "个股情报",
+        "navigationBarTitleText": "自选股情报",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }

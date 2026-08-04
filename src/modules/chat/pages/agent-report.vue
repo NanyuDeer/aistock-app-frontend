@@ -108,6 +108,7 @@
           <Card v-if="reportSummary" class="conclusion-card conclusion-card--wind">
             <text class="section-kicker">风口结论</text>
             <text class="conclusion-text">{{ reportSummary }}</text>
+            <text class="cycle-hint">长线风口=月线多头排列且同比环比向上；短线风口=60日波段活跃但月线未确认</text>
           </Card>
 
           <Card v-if="leaderStocks.length" class="stream-section">
@@ -118,7 +119,7 @@
           </Card>
 
           <Card v-if="detailsText" class="stream-section">
-            <text class="section-title">报告详情</text>
+            <text class="section-title">风口分析（短线/长线分类）</text>
             <view class="report-text-wrap">
               <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
             </view>
@@ -951,6 +952,15 @@ onBackPress(() => {
   font-weight: 600;
   line-height: 1.5;
   color: $ink;
+}
+
+/* 风口分类提示：浅灰小字，说明短线/长线分类依据（对齐页面 $ink-mute 辅助文字） */
+.cycle-hint {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: $ink-mute;
 }
 
 /* 晨报主题色：$warning（与 AGENT_META.morning 一致） */
