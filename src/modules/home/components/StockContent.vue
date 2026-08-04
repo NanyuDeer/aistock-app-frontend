@@ -130,7 +130,7 @@ async function loadHotBurstPreview() {
   hotBurstLoading.value = true
   hotBurstError.value = ''
   try {
-    const outbreaks = await stockApi.getHotBurstHistory({ days: 3, min_resonance: 3 })
+    const outbreaks = await stockApi.getHotBurstHistory({ days: 3, min_resonance: 2 })
     uni.setStorageSync(HOT_BURST_CACHE_KEY, {
       cachedAt: Date.now(),
       outbreaks,

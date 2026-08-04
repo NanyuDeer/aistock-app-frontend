@@ -125,7 +125,7 @@ async function loadData() {
   }
   try {
     // 只按检测时间排序，不按共振等级排序，保证用户优先看到最新抓取结果。
-    signals.value = sortByDetectedAt(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 3 }))
+    signals.value = sortByDetectedAt(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 2 }))
   } catch {
     signals.value = []
   }
