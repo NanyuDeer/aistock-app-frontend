@@ -2,6 +2,20 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-05 — ChatAgent P5-fix 前端会话持久化（问题 14 session_id 回写）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\chat-agent-roadmap.md` §1 P5-fix 行 / §4 问题 14
+
+### 修复
+- `chatStore.setSessionId`（写 ref + storage 持久化，新增 `STORAGE_KEYS.CHAT_SESSION_ID`）；`useChatStream` WS 路径首轮生成 session_id 后 `setSessionId` 写回、后续轮复用；HTTP 降级路径改用 `setSessionId`；`clearHistory` 同步清 sessionId —— 此前 WS 路径每轮生成新 `app_${Date.now()}` → 后端 checkpointer 每轮新 thread → 多轮指代/纠错失效
+
+### 测试
+- `useChatStream.spec.ts` 新增"session_id 持久化 + 跨 send 复用"用例；mock 修正（getter 模拟 Pinia ref unwrap + sessionRef 状态测试间重置）；vitest 全量 21/21 + `npx tsc --noEmit` 0 errors
+
+---
+
 ## [changer] 2026-08-04 — ChatAgent P6 退役清理（市场复盘 tab 前端代码 + $success 修复）
 
 **开发者**: Aria

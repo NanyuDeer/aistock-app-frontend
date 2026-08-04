@@ -227,10 +227,14 @@ export function useChatStream() {
         }
 
         const userInfo = useUserStore().userInfo
+        // P5-fix（问题 14）：WS 路径首轮生成 session_id 后必须写回 chatStore（此前不写回，
+        // 每轮生成新 app_${Date.now()} → 后端 checkpointer 每轮新 thread → 多轮指代/纠错失效）
+        const sid = chatStore.sessionId || `app_${Date.now()}`
+        if (!chatStore.sessionId) chatStore.setSessionId(sid)
         socket!.send({
           data: JSON.stringify({
             message: content,
-            session_id: chatStore.sessionId || `app_${Date.now()}`,
+            session_id: sid,
             favorites: [],
             // D11：透传登录用户身份（chat_analysis 落库隔离用）；未登录省略
             user_id: userInfo?.id != null ? String(userInfo.id) : undefined,
@@ -246,7 +250,7 @@ export function useChatStream() {
       ]
       try {
         const result: any = await agentApi.sendMessage(content, chatStore.sessionId, options)
-        if (result.session_id) chatStore.sessionId = result.session_id
+        if (result.session_id) chatStore.setSessionId(result.session_id)
         const savedSteps = progressSteps.value.map(s => ({ ...s, status: 'done' as const }))
         progressSteps.value = []
         chatStore.appendMessage({

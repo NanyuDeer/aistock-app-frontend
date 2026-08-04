@@ -43,5 +43,7 @@ export const STORAGE_KEYS = {
   FAVORITES: 'favorites',
   APP_CONFIG: 'app_config',
   CHAT_HISTORY: 'chat_history',
+  // P5-fix（问题 14）：对话 session_id 持久化（刷新后多轮上下文不丢）
+  CHAT_SESSION_ID: 'chat_session_id',
   THEME: 'theme'
 } as const

@@ -9,7 +9,18 @@ import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>(storage.get(STORAGE_KEYS.CHAT_HISTORY) || [])
   const streaming = ref(false)
-  const sessionId = ref<string>('')
+  // P5-fix（问题 14）：sessionId 从 storage 恢复（刷新后多轮上下文不丢）
+  const sessionId = ref<string>(storage.get(STORAGE_KEYS.CHAT_SESSION_ID) || '')
+
+  /**
+   * P5-fix（问题 14）：设置并持久化 sessionId。
+   * WS 路径首轮生成 session_id 后必须回写，否则每轮生成新 id → 后端每轮新 thread → 多轮指代失效。
+   */
+  function setSessionId(id: string) {
+    if (!id) return
+    sessionId.value = id
+    storage.set(STORAGE_KEYS.CHAT_SESSION_ID, id)
+  }
 
   function appendMessage(msg: ChatMessage) {
     messages.value.push(msg)
@@ -22,7 +33,9 @@ export const useChatStore = defineStore('chat', () => {
 
   function clearHistory() {
     messages.value = []
+    sessionId.value = ''
     storage.remove(STORAGE_KEYS.CHAT_HISTORY)
+    storage.remove(STORAGE_KEYS.CHAT_SESSION_ID)
   }
 
   /**
@@ -34,7 +47,7 @@ export const useChatStore = defineStore('chat', () => {
     streaming.value = true
     try {
       const result: any = await agentApi.sendMessage(content, sessionId.value)
-      if (result.session_id) sessionId.value = result.session_id
+      if (result.session_id) setSessionId(result.session_id)
       appendMessage({
         role: 'assistant',
         content: result.content || result.message || '',
@@ -58,5 +71,5 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  return { messages, streaming, sessionId, appendMessage, clearHistory, sendMessage }
+  return { messages, streaming, sessionId, setSessionId, appendMessage, clearHistory, sendMessage }
 })
