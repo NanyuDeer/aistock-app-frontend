@@ -181,8 +181,10 @@ function formatRelativeTime(value: string): string {
 }
 
 const filteredIntelList = computed(() => {
-  if (intelSubTab.value === 'all') return intelList.value
-  return intelList.value.filter(item => item.sentiment === intelSubTab.value)
+  // 8.1 决议：中性事件不展示，只呈现重大利好/利空资讯
+  const nonNeutral = intelList.value.filter(item => item.sentiment !== 'neutral')
+  if (intelSubTab.value === 'all') return nonNeutral
+  return nonNeutral.filter(item => item.sentiment === intelSubTab.value)
 })
 
 /** 首页预览最多显示4条，其余进入详情页查看 */
