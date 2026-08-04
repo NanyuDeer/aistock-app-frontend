@@ -133,6 +133,33 @@
             <text class="conclusion-text">{{ reportSummary }}</text>
           </Card>
 
+          <Card v-if="trendConclusionHtml" class="stream-section">
+            <text class="section-title">结论摘要</text>
+            <view class="report-text-wrap">
+              <mp-html :content="trendConclusionHtml" class="report-html" />
+            </view>
+          </Card>
+
+          <Card v-if="trendDimensionsHtml" class="stream-section">
+            <text class="section-title">维度解读</text>
+            <view class="report-text-wrap">
+              <mp-html :content="trendDimensionsHtml" class="report-html" />
+            </view>
+          </Card>
+
+          <Card v-if="trendJudgmentHtml" class="stream-section">
+            <text class="section-title">趋势判断</text>
+            <view class="report-text-wrap">
+              <mp-html :content="trendJudgmentHtml" class="report-html" />
+            </view>
+          </Card>
+
+          <Card v-if="trendTrackHtml" class="stream-section">
+            <text class="section-title">赛道分析</text>
+            <view class="report-text-wrap">
+              <mp-html :content="trendTrackHtml" class="report-html" />
+            </view>
+          </Card>
           <Card v-if="leaderStocks.length" class="stream-section">
             <text class="section-title">相关个股</text>
             <view class="stock-tags">
@@ -142,6 +169,28 @@
 
           <Card v-if="detailsText" class="stream-section">
             <text class="section-title">报告详情</text>
+            <view class="report-text-wrap">
+              <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
+            </view>
+          </Card>
+
+          <Card v-if="trendAdviceHtml" class="judgment-card stream-section">
+            <text class="section-title">关注建议</text>
+            <view class="report-text-wrap">
+              <mp-html :content="trendAdviceHtml" class="report-html" />
+            </view>
+          </Card>
+
+          <Card v-if="risks.length" class="risk-card stream-section">
+            <text class="section-title">风险提示</text>
+            <view class="bullet-list">
+              <text v-for="(risk, i) in risks" :key="i" class="risk-item">{{ risk }}</text>
+            </view>
+          </Card>
+
+          <!-- 兜底：结构化解析全空时用 mp-html 渲染 details 原始 markdown -->
+          <Card v-if="!trendConclusionHtml && !trendDimensionsHtml && !trendJudgmentHtml && !trendTrackHtml && !trendAdviceHtml && detailsText" class="stream-section">
+            <text class="section-title">详细分析</text>
             <view class="report-text-wrap">
               <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
             </view>
@@ -545,6 +594,18 @@ const morningSectorHtml = computed(() => sectionHtml(detailsText.value, '第3步
 const morningFocusHtml = computed(() => sectionHtml(detailsText.value, '今日焦点板块预测'))
 const morningStrategyHtml = computed(() => sectionHtml(detailsText.value, '第4步：今日关注与策略建议'))
 
+// ===== 长线风口（wind_leader）结构化分区 =====
+interface SectorCard { title: string; body: string }
+const windOverviewHtml = computed(() => sectionHtml(detailsText.value, '风口概览'))
+const windSectors = computed<SectorCard[]>(() => extractSubSections(detailsText.value, '重点板块分析'))
+const windStocks = computed(() => sectionBullets(detailsText.value, '龙头股推荐'))
+
+// ===== 趋势股评分（trend_score）结构化分区 =====
+const trendConclusionHtml = computed(() => sectionHtml(detailsText.value, '结论摘要'))
+const trendDimensionsHtml = computed(() => sectionHtml(detailsText.value, '维度解读'))
+const trendJudgmentHtml = computed(() => sectionHtml(detailsText.value, '趋势判断'))
+const trendTrackHtml = computed(() => sectionHtml(detailsText.value, '赛道分析'))
+const trendAdviceHtml = computed(() => sectionHtml(detailsText.value, '关注建议'))
 // ===== 机构调研（hot_burst）结构化分区 =====
 interface HotStockCard {
   title: string
