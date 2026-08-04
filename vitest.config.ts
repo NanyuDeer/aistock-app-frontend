@@ -36,6 +36,8 @@ export default defineConfig({
       'tests/**/*.test.ts',
       'src/shared/utils/useChatStream.spec.ts',
       'src/pages-sub-app/chat/ReasoningCard.spec.ts',
+      'src/shared/store/modules/market.spec.ts',
+      'src/modules/home/components/StockContent.spec.ts',
     ],
   },
 })

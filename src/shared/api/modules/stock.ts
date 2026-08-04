@@ -19,6 +19,15 @@ export interface StockQuote {
   amount: number
 }
 
+/** A 股指数行情（纯数字 6 位代码，000001 语义=上证指数，与个股接口语义分离，spec §2.6） */
+export interface CnIndexQuote {
+  index: string
+  name: string
+  price: number | null
+  changePercent: number | null
+  changeAmount: number | null
+}
+
 export interface KLineItem {
   date: string
   open: number
@@ -299,6 +308,23 @@ export const stockApi = {
         limitDown: Number(quote['跌停价']) || 0,
         volumeRatio: Number(quote['量比']) || 0,
       }
+    })
+  },
+
+  /**
+   * A 股指数行情（纯数字 6 位代码；000001 语义=上证指数，与个股接口语义分离，spec §2.6）
+   */
+  getCnIndexQuotes(symbols: string[]) {
+    return request.get('/cn/index/quotes', { params: { symbols: symbols.join(',') } }).then((res: Record<string, unknown>) => {
+      const data = (res.data as Record<string, unknown>) || res
+      const list = (data['行情'] as Record<string, unknown>[]) || []
+      return list.map((q: Record<string, unknown>) => ({
+        index: String(q['指数代码'] || ''),
+        name: String(q['指数简称'] || ''),
+        price: q['最新价'] != null ? Number(q['最新价']) : null,
+        changePercent: q['涨跌幅'] != null ? Number(q['涨跌幅']) : null,
+        changeAmount: q['涨跌额'] != null ? Number(q['涨跌额']) : null,
+      }))
     })
   },
 
