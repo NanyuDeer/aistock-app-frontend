@@ -35,7 +35,7 @@
         </view>
       </view>
 
-      <!-- 个股情报模块（原StockMonitor，原异动捕手改名） -->
+      <!-- 自选股情报模块（原StockMonitor，8.1更名：个股情报→自选股情报） -->
       <view class="alert-module">
         <view class="module-card">
           <view class="module-decor module-decor--intel"></view>
@@ -44,7 +44,7 @@
               <SvgIcon name="search-eye-line" size="32rpx" color="#f0a020" />
             </view>
             <view class="module-header-text">
-              <text class="module-title">个股情报</text>
+              <text class="module-title">自选股情报</text>
             </view>
             <!-- 全部/利好/利空 切换标签 -->
             <view class="intel-tabs" @tap.stop>
@@ -127,7 +127,7 @@ async function loadCaptureList() {
   }
 }
 
-// 个股情报：接真实 API（DEV 模式下后端无数据时用 mock 兜底）
+// 自选股情报：接真实 API（DEV 模式下后端无数据时用 mock 兜底）
 const intelList = ref<IntelItem[]>([])
 
 /** DEV 模式 mock 数据 */
@@ -236,7 +236,7 @@ function goTrace(eventId: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/stock-trace?event_id=${encodeURIComponent(eventId)}` })
 }
 
-/** 个股情报（原异动捕手/event-catcher，已改名） */
+/** 自选股情报（原个股情报/event-catcher，8.1更名） */
 function goStockIntel() {
   uni.navigateTo({ url: '/modules/market/pages/event-catcher' })
 }
@@ -339,7 +339,7 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-/* ===== 异动捕手 / 个股情报 列表区域（参考 InsightListCard body） ===== */
+/* ===== 异动捕手 / 自选股情报 列表区域（参考 InsightListCard body） ===== */
 .capture-list,
 .intel-list {
   background: $bg-card;
