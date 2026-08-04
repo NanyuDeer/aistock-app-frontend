@@ -2,6 +2,25 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-04 — ChatAgent P5 大盘概览接入（工作线 C）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\2026-08-04-chat-agent-p5-capability.md`
+
+### 新增
+- `src/shared/api/modules/stock.ts`：`stockApi.getCnIndexQuotes(symbols)`（纯数字 6 位代码 → `/api/cn/index/quotes`，中文键→驼峰映射，`CnIndexQuote` 类型）
+- `src/modules/home/components/StockContent.vue`：首页行情 tab 顶部接入 `MarketOverview`（大盘三指数）+ onMounted fetch
+
+### 改进
+- `src/shared/store/modules/market.ts`：`fetchIndices` 改走 `getCnIndexQuotes(['000001','399001','399006'])`（000001 语义=上证指数，接口分离消解 `getCoreQuotes` 带前缀 400 参数歧义）；删除 `mapIndexName` 硬编码映射（服务端 CN_INDEX_NAMES 提供名称）
+
+### 测试
+- 新建 `src/shared/store/modules/market.spec.ts`（2 用例）+ `src/modules/home/components/StockContent.spec.ts`（1 用例）；vitest 全量 23/23 通过
+- `npx tsc --noEmit` 0 errors；`pnpm build:h5` 成功
+
+---
+
 ## [feat/market-trace-improvement] 2026-08-03 — 三大任务前端：播报优化 + OCR识图加自选 + 悬浮播报
 
 **开发者**: Aria
