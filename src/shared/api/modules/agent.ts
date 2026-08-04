@@ -53,19 +53,11 @@ export interface ReasoningStep {
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
-  skillResult?: SkillResult
   progressSteps?: ProgressStep[]
-  advisorTrace?: AdvisorTrace
   lastDeepReport?: DeepReportRef
   execSteps?: ExecStepNode[]
   reasoningSteps?: ReasoningStep[]   // NEW: AI 思考链
   timestamp: number
-}
-
-export interface SkillResult {
-  type: 'text' | 'card' | 'chart' | 'graph'
-  data: any
-  narrative?: string
 }
 
 export interface MarketTraceReviewDisplayReport {
@@ -272,13 +264,6 @@ export interface AdvisorSubquestionTrace {
   reports: Record<string, unknown>[]
   sources: Record<string, unknown>[]
   as_of: string | null
-  missing_sources: string[]
-  degraded: boolean
-}
-
-export interface AdvisorTrace {
-  schema_version: string
-  subquestions: AdvisorSubquestionTrace[]
   missing_sources: string[]
   degraded: boolean
 }

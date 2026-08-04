@@ -64,7 +64,7 @@ test('sendMessage 支持 forceDeep 透传（HTTP 降级对齐 WS）', async () =
 
     request.post = ((url: string, data?: unknown, config?: unknown) => {
       calls.push({ url, data, config })
-      return Promise.resolve({ content: 'ok', session_id: 's1', advisor_trace: null })
+      return Promise.resolve({ content: 'ok', session_id: 's1' })
     }) as typeof request.post
 
     try {
