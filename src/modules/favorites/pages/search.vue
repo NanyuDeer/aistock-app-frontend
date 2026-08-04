@@ -641,7 +641,7 @@ async function addSelectedStocks() {
 .ocr-result-state {
   margin-left: auto;
   font-size: 22rpx;
-  color: $success;
+  color: $success-color;
 }
 
 /* 加载/空状态 */
