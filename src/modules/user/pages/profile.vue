@@ -140,6 +140,8 @@ async function loadSettings() {
       stock_push: map.stock_push ?? false,
       outbreak_push: map.outbreak_push ?? false,
       leader_push: map.leader_push ?? false,
+      // PRD：自选股洞察推送默认开启；后端无该记录（首次进入）时回退为开启
+      watchlist_insight_push: map.watchlist_insight_push ?? true,
     }
   } catch (e) {
     // API 未实现或失败时，保持默认值
