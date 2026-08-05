@@ -2,13 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useChatStream } from './useChatStream'
 import type { ReasoningStep } from '@/shared/api/modules/agent'
 
-// Mock chatStore（避免持久化 + 隔离测试）
+// Mock chatStore（避免持久化 + 隔离测试；setSessionId 同步更新 sessionId 模拟真实行为）
 const mockAppendMessage = vi.hoisted(() => vi.fn())
+const mockSetSessionId = vi.hoisted(() => vi.fn())
+const mockSessionRef = vi.hoisted(() => ({ value: '' }))
 vi.mock('@/shared/store/modules/chat', () => ({
   useChatStore: () => ({
     messages: { value: [] },
-    sessionId: { value: '' },
+    // getter 模拟 Pinia setup store 的 ref unwrap（store 实例上访问 ref 得到原始值）
+    get sessionId() { return mockSessionRef.value },
     appendMessage: mockAppendMessage,
+    setSessionId: (id: string) => { mockSessionRef.value = id; mockSetSessionId(id) },
   }),
 }))
 
@@ -16,15 +20,16 @@ vi.mock('@/shared/store/modules/user', () => ({
   useUserStore: () => ({ userInfo: { id: 1 } }),
 }))
 
-// Mock WebSocket（连接即开；捕获 onMessage 回调供测试注入 WS 事件）
+// Mock WebSocket（连接即开；捕获 onMessage 回调供测试注入 WS 事件；捕获 send 参数）
 const mockSocketCbs = vi.hoisted(() => ({ onMessageCbs: [] as Array<(msg: any) => void> }))
+const mockSocketSend = vi.hoisted(() => vi.fn())
 vi.mock('@/shared/api/modules/agent', () => ({
   createAgentWebSocket: () => ({
     onOpen: (cb: () => void) => cb(),
     onClose: () => {},
     onError: () => {},
     onMessage: (cb: (msg: any) => void) => { mockSocketCbs.onMessageCbs.push(cb) },
-    send: () => {},
+    send: mockSocketSend,
     close: () => {},
   }),
   agentApi: { sendMessage: vi.fn() },
@@ -34,6 +39,9 @@ describe('useChatStream reasoning event', () => {
   beforeEach(() => {
     mockAppendMessage.mockClear()
     mockSocketCbs.onMessageCbs.length = 0
+    mockSocketSend.mockClear()
+    mockSetSessionId.mockClear()
+    mockSessionRef.value = ''
   })
 
   it('aggregates reasoning chunks by node and stores on DONE', () => {
@@ -113,5 +121,31 @@ describe('useChatStream reasoning event', () => {
     expect(stream.streamingReasoning.value[0].text).toBe('我先拆解')
     expect(stream.streamingReasoning.value[0].status).toBe('streaming')
     expect(stream.streamingReasoning.value[1].node).toBe('skill_executor')
+  })
+
+  it('persists session_id to chatStore and reuses it across sends (问题 14)', async () => {
+    const stream = useChatStream() as any
+
+    // 第一轮：首轮生成 session_id 并写回 chatStore
+    const send1 = stream.send('贵州茅台今天怎么样')
+    await vi.waitFor(() => { expect(mockSocketSend).toHaveBeenCalledTimes(1) })
+    const payload1 = JSON.parse(mockSocketSend.mock.calls[0][0].data)
+    expect(payload1.session_id).toMatch(/^app_\d+$/)
+    expect(mockSetSessionId).toHaveBeenCalledWith(payload1.session_id)
+
+    // 完成第一轮
+    mockSocketCbs.onMessageCbs[0]({ data: JSON.stringify({ type: 'done', content: '第一轮' }) })
+    await send1
+
+    // 第二轮（追问指代）：复用同一 session_id，不再生成新 id
+    const send2 = stream.send('它今天的成交量呢')
+    await vi.waitFor(() => { expect(mockSocketSend).toHaveBeenCalledTimes(2) })
+    const payload2 = JSON.parse(mockSocketSend.mock.calls[1][0].data)
+    expect(payload2.session_id).toBe(payload1.session_id)
+    // 已持久化后不再重复写回
+    expect(mockSetSessionId).toHaveBeenCalledTimes(1)
+
+    mockSocketCbs.onMessageCbs[0]({ data: JSON.stringify({ type: 'done', content: '第二轮' }) })
+    await send2
   })
 })

@@ -34,3 +34,10 @@ test('流式过程块渲染 ReasoningCard（streamingReasoning 绑定，dot 动�
   assert.match(pageSource, /streamingReasoning/)
   assert.match(pageSource, /<ReasoningCard\s+v-if="streamingReasoning\.length > 0"/)
 })
+
+test('P9 会话管理：标题旁会话入口 + onLoad 自动建会话 + 首次消息 upsert', () => {
+  assert.match(pageSource, /chat-history-line/)
+  assert.match(pageSource, /navigateTo\(\{ url: '\/pages-sub-app\/chat\/sessions' \}\)/)
+  assert.match(pageSource, /createSession\(\)/)
+  assert.match(pageSource, /upsertChatSession\(chatStore\.sessionId, content\)/)
+})

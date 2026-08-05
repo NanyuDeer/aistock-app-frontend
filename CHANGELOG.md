@@ -2,6 +2,44 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-05 — ChatAgent P9 会话管理（会话列表页 + 多会话 store + 会话 API 层）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\2026-08-05-chat-agent-p9-session-management.md`
+
+### 新增
+- `src/shared/api/modules/agent.ts`：`ChatSessionMeta` 接口（session_id/title/last_message_at?/created_at?）+ `agentApi.listChatSessions()`（GET /chat/sessions，失败静默返回 []）/ `upsertChatSession(sessionId, question?)`（POST /chat/sessions，fire-and-forget 静默失败）/ `deleteChatSession(sessionId)`（DELETE /chat/sessions/:id，静默失败）
+- `src/pages-sub-app/chat/sessions.vue`（pages.json 注册于 chat/index 后）：会话列表页——新建/切换/删除 + 相对时间（刚刚/N分钟前/N小时前/N天前/日期）+ 当前会话高亮 + 空态；仅登录时 onShow 拉 server 列表合并；样式走 Design Token（variables.scss）+ SvgIcon（chat-history-line/add-line/delete-bin-line）
+
+### 重构
+- `src/shared/store/modules/chat.ts`：单会话 → 多会话——新增 `sessions: ChatSessionMeta[]` + `messagesBySession: Record<string, ChatMessage[]>`（本地 storage 分桶，CHAT_SESSIONS / CHAT_HISTORY_BY_SESSION）；对外导出保持兼容（messages computed / sessionId / setSessionId / appendMessage / clearHistory / sendMessage）；新增 `createSession`（`app_${Date.now()}`，同毫秒碰撞追加自增后缀）/ `switchSession`（归档当前 + 切 id 持久化）/ `deleteSession`（清本地 + fire-and-forget server 删除，删当前会话切最近或新建）/ `syncSessionsFromServer`（server 覆盖本地同名 title/last_message_at，保留本地仅有）/ `hasUserMessage`；一次性旧数据迁移 `migrateLegacyHistory`（旧 CHAT_HISTORY → messagesBySession[旧 CHAT_SESSION_ID]，迁移后删旧 key）
+
+### 改进
+- `src/pages-sub-app/chat/index.vue`：header-right 新增「会话」入口（chat-history-line）→ 会话列表页；onLoad 无当前会话时自动 createSession；handleSend/quickAsk 前置 `upsertSessionMeta`（仅登录且 `!hasUserMessage` 时 fire-and-forget，须在 chatStream.send 之前调用）
+
+### 文档
+- 根 AGENTS.md §2 会话管理页面行 + §6.2 agent.ts 会话 API；README 模块表 AI 对话补充会话管理
+
+### 测试
+- `chatStore.spec.ts`（vitest 10 用例）+ `chatSessions.spec.ts`（node:test 6 用例）+ `sessions.spec.ts` 源码断言 + `index.spec.ts` 会话入口断言；vitest 全量 8 文件 31/31 通过 + `npx tsc --noEmit` 0 errors
+
+---
+
+## [changer] 2026-08-05 — ChatAgent P5-fix 前端会话持久化（问题 14 session_id 回写）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\chat-agent-roadmap.md` §1 P5-fix 行 / §4 问题 14
+
+### 修复
+- `chatStore.setSessionId`（写 ref + storage 持久化，新增 `STORAGE_KEYS.CHAT_SESSION_ID`）；`useChatStream` WS 路径首轮生成 session_id 后 `setSessionId` 写回、后续轮复用；HTTP 降级路径改用 `setSessionId`；`clearHistory` 同步清 sessionId —— 此前 WS 路径每轮生成新 `app_${Date.now()}` → 后端 checkpointer 每轮新 thread → 多轮指代/纠错失效
+
+### 测试
+- `useChatStream.spec.ts` 新增"session_id 持久化 + 跨 send 复用"用例；mock 修正（getter 模拟 Pinia ref unwrap + sessionRef 状态测试间重置）；vitest 全量 21/21 + `npx tsc --noEmit` 0 errors
+
+---
+
 ## [changer] 2026-08-04 — ChatAgent P6 退役清理（市场复盘 tab 前端代码 + $success 修复）
 
 **开发者**: Aria

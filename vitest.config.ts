@@ -38,6 +38,7 @@ export default defineConfig({
       'src/pages-sub-app/chat/ReasoningCard.spec.ts',
       'src/shared/store/modules/market.spec.ts',
       'src/modules/home/components/StockContent.spec.ts',
+      'src/shared/store/modules/chatStore.spec.ts',
     ],
   },
 })

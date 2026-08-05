@@ -60,6 +60,14 @@ export interface ChatMessage {
   timestamp: number
 }
 
+/** 会话元数据（P9 会话管理；对应后端 /api/chat/sessions 的 data 结构） */
+export interface ChatSessionMeta {
+  session_id: string
+  title: string
+  last_message_at?: string
+  created_at?: string
+}
+
 export interface MarketTraceReviewDisplayReport {
   summary?: unknown
   details?: unknown
@@ -331,6 +339,37 @@ export const agentApi = {
       // D4：HTTP 降级路径透传 force_deep（与 WS 路径对齐，Task 1 Python 侧支持）
       ...(options?.forceDeep ? { force_deep: true } : {})
     })
+  },
+
+  /**
+   * 会话列表（P9 会话管理）：GET /api/chat/sessions
+   * 鉴权由 request 拦截器自动注入 Authorization: Bearer token；失败静默返回 []
+   */
+  async listChatSessions(): Promise<ChatSessionMeta[]> {
+    try {
+      return await request.get<ChatSessionMeta[]>('/chat/sessions')
+    } catch (e) {
+      console.error('[agent] listChatSessions failed:', e)
+      return []
+    }
+  },
+
+  /** 会话元数据 upsert（P9）：POST /api/chat/sessions，fire-and-forget 静默失败 */
+  async upsertChatSession(sessionId: string, question?: string): Promise<void> {
+    try {
+      await request.post('/chat/sessions', { session_id: sessionId, question })
+    } catch (e) {
+      console.error('[agent] upsertChatSession failed:', e)
+    }
+  },
+
+  /** 删除会话（P9）：DELETE /api/chat/sessions/:id，fire-and-forget 静默失败 */
+  async deleteChatSession(sessionId: string): Promise<void> {
+    try {
+      await request.delete(`/chat/sessions/${sessionId}`)
+    } catch (e) {
+      console.error('[agent] deleteChatSession failed:', e)
+    }
   },
 
   /** 获取今日晨报 */
