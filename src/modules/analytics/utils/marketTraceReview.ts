@@ -112,6 +112,25 @@ export interface MarketTraceRejectedView {
   reason: string
 }
 
+export interface PredictionValidationPresentation {
+  status: 'hit' | 'partial' | 'miss' | 'no_forecast'
+  sectorHits: Array<{
+    sector: string
+    morningDirection: string
+    actualDirection: string
+    result: 'hit' | 'miss'
+    deviationNote: string
+  }>
+  eventHits: Array<{
+    eventTitle: string
+    morningDirection: string
+    actualImpact: string
+    result: 'hit' | 'miss' | 'unverifiable'
+    note: string
+  }>
+  overallNote: string
+}
+
 export interface MarketTracePresentation {
   reportTitle: string
   reportDate: string
@@ -146,6 +165,8 @@ export interface MarketTracePresentation {
     topGainers: MarketTraceSectorItemView[]
     topLosers: MarketTraceSectorItemView[]
   }
+
+  predictionValidation: PredictionValidationPresentation | null
 
   markdownDetails: string
 }
@@ -331,6 +352,29 @@ export function toMarketTracePresentation(
     topLosers: sectorItemsFromUnknown(sectorsData?.top_losers),
   }
 
+  // 预判对照（prediction_validation）
+  const pv = trace.prediction_validation
+  const predictionValidation: PredictionValidationPresentation | null = pv
+    ? {
+        status: pv.status,
+        sectorHits: (pv.sector_hits || []).map(h => ({
+          sector: h.sector,
+          morningDirection: h.morning_direction,
+          actualDirection: h.actual_direction,
+          result: h.result,
+          deviationNote: h.deviation_note || '',
+        })),
+        eventHits: (pv.event_hits || []).map(h => ({
+          eventTitle: h.event_title,
+          morningDirection: h.morning_direction,
+          actualImpact: h.actual_impact,
+          result: h.result,
+          note: h.note || '',
+        })),
+        overallNote: pv.overall_note || '',
+      }
+    : null
+
   return {
     reportTitle: `${tradeDate} A股收盘溯源`,
     reportDate: tradeDate,
@@ -351,6 +395,7 @@ export function toMarketTracePresentation(
       topGainers: phenomenon.topGainers,
       topLosers: phenomenon.topLosers,
     },
+    predictionValidation,
     markdownDetails: details,
   }
 }

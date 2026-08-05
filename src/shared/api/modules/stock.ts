@@ -19,6 +19,15 @@ export interface StockQuote {
   amount: number
 }
 
+/** A 股指数行情（纯数字 6 位代码，000001 语义=上证指数，与个股接口语义分离，spec §2.6） */
+export interface CnIndexQuote {
+  index: string
+  name: string
+  price: number | null
+  changePercent: number | null
+  changeAmount: number | null
+}
+
 export interface KLineItem {
   date: string
   open: number
@@ -121,6 +130,52 @@ export interface FavoriteStock {
   addedAt?: string | null
 }
 
+// ---- 股票列表搜索接口类型 ----
+export interface StockListItem {
+  symbol: string
+  name: string
+  market: string
+  industry: string
+}
+
+export interface StockListResult {
+  list: StockListItem[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+interface StockListPayload {
+  数据源?: string
+  当前页?: number
+  每页数量?: number
+  总数量?: number
+  总页数?: number
+  股票列表?: Array<{
+    股票代码?: string
+    股票简称?: string
+    市场代码?: string
+    所属行业?: string
+  }>
+}
+
+function normalizeStockList(payload: StockListPayload | null | undefined): StockListResult {
+  const rawList = payload?.股票列表 || []
+  return {
+    list: rawList.map((item) => ({
+      symbol: String(item.股票代码 || '').trim(),
+      name: String(item.股票简称 || ''),
+      market: String(item.市场代码 || ''),
+      industry: String(item.所属行业 || ''),
+    })).filter((item) => item.symbol),
+    total: Number(payload?.总数量) || 0,
+    page: Number(payload?.当前页) || 1,
+    pageSize: Number(payload?.每页数量) || 0,
+    totalPages: Number(payload?.总页数) || 0,
+  }
+}
+
 interface FavoriteStockPayload {
   股票代码?: string
   股票简称?: string | null
@@ -154,6 +209,15 @@ function normalizeFavorites(payload: UserFavoritesPayload | null | undefined): F
 export interface WindLeaderAiAnalysis {
   persistence?: string
   persistence_reason?: string
+  long_term_days?: number
+  long_confidence?: number
+  logic_type?: string
+  long_reason?: string
+  short_term_days?: number
+  short_heat?: number
+  heat_stage?: string
+  short_reason?: string
+  driver_type?: string
   heat_transfer?: boolean
   transfer_direction?: string
   transfer_reason?: string
@@ -201,17 +265,25 @@ export interface WindLeaderSector {
   code?: string
   name: string
   type?: string
+  /** 短线风口 / 长线风口 / 长线+短线风口（AI 八字段推导），缺省按 short 兼容存量 */
+  cycle?: 'short' | 'long' | 'both'
   frequency?: number | string
+  freq20?: number
+  freq_delta?: number
   avg_change?: number
   today_change?: number
-  amount_trend?: number
   net_inflow?: number
+  driver_type?: string
+  ma60_status?: string
+  vol_trend?: string
+  turnover?: number
+  limit_up_count?: number
+  max_boards?: number
   score?: number
   leading_stock?: string
   leading_change?: number
   up_count?: number
   down_count?: number
-  driver?: string
   ai_analysis?: WindLeaderAiAnalysis | string | null
   main_stocks?: WindLeaderStock[]
   upstream_stocks?: WindLeaderStock[]
@@ -265,10 +337,40 @@ function normalizeHotBurstHistory(records: HotBurstHistoryRecord[] | undefined):
   }))
 }
 
+/** OCR 图片输入（后端 StockOcrService.normalizeImages 支持 { data, mime } 对象） */
+export interface OcrImageInput {
+  /** 图片 base64 内容（不含 data: 前缀） */
+  data: string
+  /** MIME 类型，压缩后统一 image/jpeg */
+  mime: string
+}
+
+/** OCR 识别结果中的单只股票（后端已用 stocks 表归一化代码/名称） */
+export interface OcrStockItem {
+  '股票简称': string
+  '股票代码': string
+}
+
 export const stockApi = {
-  /** 获取股票列表 */
-  getStockList(params?: { keyword?: string; page?: number; size?: number }) {
-    return request.get('/cn/stocks', { params })
+  /** 获取股票列表（支持 keyword 模糊搜索 symbol/name/pinyin） */
+  getStockList(params?: { keyword?: string; page?: number; pageSize?: number }) {
+    return request.get<StockListPayload>('/cn/stocks', { params }).then(normalizeStockList)
+  },
+
+  /** OCR 识图识别股票（对接 POST /api/cn/stocks/ocr，返回每张图的股票数组） */
+  ocrStocksFromImages(images: OcrImageInput[], hint?: string) {
+    return request.post<OcrStockItem[][]>(
+      '/cn/stocks/ocr',
+      {
+        images,
+        hint,
+        batchConcurrency: 2,
+        maxImagesPerRequest: 4,
+        timeoutMs: 90000,
+      },
+      // 覆盖默认 15s 超时：VLM 识图较慢，单独设长超时
+      { timeout: 100000 }
+    )
   },
 
   /** 获取个股实时行情（activity 级别，含完整数据） */
@@ -299,6 +401,23 @@ export const stockApi = {
         limitDown: Number(quote['跌停价']) || 0,
         volumeRatio: Number(quote['量比']) || 0,
       }
+    })
+  },
+
+  /**
+   * A 股指数行情（纯数字 6 位代码；000001 语义=上证指数，与个股接口语义分离，spec §2.6）
+   */
+  getCnIndexQuotes(symbols: string[]) {
+    return request.get('/cn/index/quotes', { params: { symbols: symbols.join(',') } }).then((res: Record<string, unknown>) => {
+      const data = (res.data as Record<string, unknown>) || res
+      const list = (data['行情'] as Record<string, unknown>[]) || []
+      return list.map((q: Record<string, unknown>) => ({
+        index: String(q['指数代码'] || ''),
+        name: String(q['指数简称'] || ''),
+        price: q['最新价'] != null ? Number(q['最新价']) : null,
+        changePercent: q['涨跌幅'] != null ? Number(q['涨跌幅']) : null,
+        changeAmount: q['涨跌额'] != null ? Number(q['涨跌额']) : null,
+      }))
     })
   },
 

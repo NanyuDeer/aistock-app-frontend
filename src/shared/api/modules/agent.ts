@@ -2,9 +2,8 @@
  * AI 智能体相关 API（App 专属功能）
  */
 import request from '../request'
+import { useUserStore } from '@/shared/store/modules/user'
 import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
-
-export const MARKET_TRACE_QA_TIMEOUT = 120_000
 
 export interface ProgressStep {
   label: string
@@ -12,43 +11,85 @@ export interface ProgressStep {
   timestamp: number
 }
 
+/** 深度分析引用（对齐 Python DeepReportRef，P2 task-4 冻结结构；前端只读消费） */
+export interface DeepReportRef {
+  worker?: 'stock' | 'sector' | 'hot_burst'
+  report_id?: string | null
+  question?: string
+  summary?: string
+  symbols?: string[]
+  tag_codes?: string[]
+  created_at?: string
+}
+
+/** 执行细节：单个工具调用（D21 二级节点） */
+export interface ExecToolStep {
+  tool: string          // 工具名（tool_start.tool）
+  label?: string        // tool_start 下发的显示名
+  startAt: number       // 前端时间戳（ms）
+  endAt?: number        // tool_end 配对时间（ms）
+  status: 'done' | 'failed'
+}
+
+/** 执行细节：一级节点（D21 层级树） */
+export interface ExecStepNode {
+  node: string          // intermediate 的 node 名（分组 key）
+  label: string         // intermediate 下发的 label（后端生成，前端零硬编码）
+  startAt: number
+  endAt?: number        // 下一节点或 DONE 时间
+  tools: ExecToolStep[] // 二级缩进：工具调用序列
+  thinkingMs?: number   // llm_start → 首个 text
+}
+
+/** AI 思考链单步（流式聚合） */
+export interface ReasoningStep {
+  node: string           // 节点名（qa_router / skill_executor / ...）
+  text: string           // 累积的思考文本
+  status: 'streaming' | 'done' | 'failed'
+  startAt: number
+  endAt?: number
+}
+
+/** P11：DONE 事件下发的本轮 token 用量（计划 B 线 2 新增可选字段；HTTP 降级缺失） */
+export interface TokenUsage {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+}
+
+/** P11：结构化卡片负载（计划 C 产出 data，卡片组件按 card_type 消费） */
+export interface ChatCard {
+  card_type: 'market_snapshot' | 'stock_snapshot' | 'capital_flow' | 'deep' | 'comparison'
+  title: string
+  data: Record<string, unknown>
+}
+
+/** 用户累计 token 用量（GET /api/chat/usage/summary，JWT → openid；无记录全 0） */
+export interface TokenUsageSummary {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+  turn_count: number
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
-  skillResult?: SkillResult
   progressSteps?: ProgressStep[]
-  trace?: MarketTraceQaTrace
-  advisorTrace?: AdvisorTrace
+  lastDeepReport?: DeepReportRef
+  execSteps?: ExecStepNode[]
+  reasoningSteps?: ReasoningStep[]   // NEW: AI 思考链
+  cards?: ChatCard[]                 // P11: DONE 下发的结构化卡片（HTTP 降级/旧协议缺失）
+  tokenUsage?: TokenUsage            // P11: DONE 下发的本轮 token 用量（会话本地累加用）
   timestamp: number
 }
 
-export interface SkillResult {
-  type: 'text' | 'card' | 'chart' | 'graph'
-  data: any
-  narrative?: string
-}
-
-export interface MarketTraceQaSource {
-  source_id: string
-  title: string
-  kind: 'market_fact' | 'event_evidence'
-  provider: string
-}
-
-export interface MarketTraceQaTrace {
-  artifact_id: string
-  sources: MarketTraceQaSource[]
-  as_of: string
-  confidence: 'high' | 'medium' | 'low'
-  uncertainty: string[]
-  degraded: boolean
-  degraded_reason: string | null
-}
-
-export interface MarketTraceQaResponse {
-  content: string
+/** 会话元数据（P9 会话管理；对应后端 /api/chat/sessions 的 data 结构） */
+export interface ChatSessionMeta {
   session_id: string
-  trace: MarketTraceQaTrace
+  title: string
+  last_message_at?: string
+  created_at?: string
 }
 
 export interface MarketTraceReviewDisplayReport {
@@ -103,6 +144,29 @@ export interface MarketTraceCandidateExplanation {
   counter_evidence_ids?: unknown
 }
 
+export interface MarketTraceSectorHit {
+  sector: string
+  morning_direction: string
+  actual_direction: string
+  result: 'hit' | 'miss'
+  deviation_note?: string
+}
+
+export interface MarketTraceEventHit {
+  event_title: string
+  morning_direction: string
+  actual_impact: string
+  result: 'hit' | 'miss' | 'unverifiable'
+  note?: string
+}
+
+export interface MarketTracePredictionValidation {
+  status: 'hit' | 'partial' | 'miss' | 'no_forecast'
+  sector_hits?: MarketTraceSectorHit[]
+  event_hits?: MarketTraceEventHit[]
+  overall_note?: string
+}
+
 export interface MarketTraceTrace {
   schema_version?: string
   attribution_status?: MarketTraceAttributionStatus
@@ -111,6 +175,7 @@ export interface MarketTraceTrace {
   alternative_chain_id?: string | null
   confidence?: MarketTraceConfidence
   unresolved_questions?: unknown
+  prediction_validation?: MarketTracePredictionValidation | null
 }
 
 export interface MarketTraceDetectedPhenomenon {
@@ -219,7 +284,7 @@ export interface AlertReportRecord {
 }
 
 export type BriefType = 'morning' | 'evening'
-export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score'] as const
+export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review'] as const
 export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
 
 export function isPublicReportIntent(intent: string): intent is PublicReportIntent {
@@ -231,13 +296,6 @@ export interface AdvisorSubquestionTrace {
   reports: Record<string, unknown>[]
   sources: Record<string, unknown>[]
   as_of: string | null
-  missing_sources: string[]
-  degraded: boolean
-}
-
-export interface AdvisorTrace {
-  schema_version: string
-  subquestions: AdvisorSubquestionTrace[]
   missing_sources: string[]
   degraded: boolean
 }
@@ -295,23 +353,52 @@ export const agentApi = {
    * 发送对话消息（非流式，降级方案）
    * App 端推荐使用 WebSocket 流式，见 useStreamingChat
    */
-  sendMessage(message: string, sessionId?: string) {
-    return request.post('/agent/chat/message', { message, session_id: sessionId })
+  sendMessage(message: string, sessionId?: string, options?: { forceDeep?: boolean }) {
+    const userId = useUserStore().userInfo?.id
+    return request.post('/agent/chat/message', {
+      message,
+      session_id: sessionId,
+      // D11：HTTP 降级路径同样透传 user_id（与 WS 路径对齐）
+      ...(userId != null ? { user_id: String(userId) } : {}),
+      // D4：HTTP 降级路径透传 force_deep（与 WS 路径对齐，Task 1 Python 侧支持）
+      ...(options?.forceDeep ? { force_deep: true } : {})
+    })
+  },
+
+  /** 查询用户累计 token 用量（P10 线 2 端点；JWT 拦截器自动带 token；无记录全 0） */
+  getTokenUsageSummary() {
+    return request.get<TokenUsageSummary>('/chat/usage/summary')
   },
 
   /**
-   * 发送市场复盘问答消息（HTTP，非流式）
-   * 通过 Node 代理转发到 Python /api/agent/market-trace-qa/message
-   * 返回包含 trace 证据元数据的响应
+   * 会话列表（P9 会话管理）：GET /api/chat/sessions
+   * 鉴权由 request 拦截器自动注入 Authorization: Bearer token；失败静默返回 []
    */
-  async sendMarketTraceQaMessage(message: string, reportDate?: string, sessionId?: string): Promise<MarketTraceQaResponse> {
-    return request.post<MarketTraceQaResponse>('/agent/market-trace-qa/message', {
-      message,
-      report_date: reportDate,
-      session_id: sessionId,
-    }, {
-      timeout: MARKET_TRACE_QA_TIMEOUT,
-    })
+  async listChatSessions(): Promise<ChatSessionMeta[]> {
+    try {
+      return await request.get<ChatSessionMeta[]>('/chat/sessions')
+    } catch (e) {
+      console.error('[agent] listChatSessions failed:', e)
+      return []
+    }
+  },
+
+  /** 会话元数据 upsert（P9）：POST /api/chat/sessions，fire-and-forget 静默失败 */
+  async upsertChatSession(sessionId: string, question?: string): Promise<void> {
+    try {
+      await request.post('/chat/sessions', { session_id: sessionId, question })
+    } catch (e) {
+      console.error('[agent] upsertChatSession failed:', e)
+    }
+  },
+
+  /** 删除会话（P9）：DELETE /api/chat/sessions/:id，fire-and-forget 静默失败 */
+  async deleteChatSession(sessionId: string): Promise<void> {
+    try {
+      await request.delete(`/chat/sessions/${sessionId}`)
+    } catch (e) {
+      console.error('[agent] deleteChatSession failed:', e)
+    }
   },
 
   /** 获取今日晨报 */

@@ -1,5 +1,11 @@
 <template>
   <SubPageCard title="机构调研热门股">
+    <!-- 标题栏右侧播报按钮：打开悬浮播报窗 -->
+    <template #header-right>
+      <view class="header-podcast-btn" @tap="openPodcast('机构调研播报')">
+        <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
+      </view>
+    </template>
     <view class="hot-burst-content">
       <!-- 引导卡片：点击查看今日分析报告 -->
       <GuideCard title="点击查看今日分析报告" icon-name="file-line" theme="warning" @click="goAgentReport" />
@@ -67,6 +73,9 @@ import { stockApi, type HotBurstSignal } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { EmptyState, Tag, GuideCard } from '@/shared/components'
+import { useReportPodcast } from '@/shared/utils/useReportPodcast'
+
+const { loadPodcast, openPodcast } = useReportPodcast('hot_burst')
 
 function visibleTriggerTags(signal: HotBurstSignal): string[] {
   const sector = (signal.sectorInfo || signal.thsSectorName || '').trim()
@@ -125,7 +134,7 @@ async function loadData() {
   }
   try {
     // 只按检测时间排序，不按共振等级排序，保证用户优先看到最新抓取结果。
-    signals.value = sortByDetectedAt(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 3 }))
+    signals.value = sortByDetectedAt(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 2 }))
   } catch {
     signals.value = []
   }
@@ -145,10 +154,21 @@ function goAgentReport() {
 
 onShow(() => {
   loadData()
+  // 静默预拉取播报稿，保证标题栏播报按钮可即时使用
+  void loadPodcast()
 })
 </script>
 
 <style lang="scss" scoped>
+/* 标题栏右侧播报按钮 */
+.header-podcast-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .hot-burst-content {
   padding: 24rpx;
 }

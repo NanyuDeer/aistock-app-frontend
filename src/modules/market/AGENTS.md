@@ -33,6 +33,7 @@
 
 ## 开发注意事项
 - 长线风口数据通过 `stockApi.getWindLeaders(limit)` 获取，API 不可用时显示错误状态
+- 每个板块带 cycle 字段（short/long），Agent 报告内分节展示
 - `leaders.vue` 为概览入口页，板块详情在 `sector-detail.vue` 子页面展示（通过 name 参数筛选）
 - `sector-detail.vue` 调用同一 API 并按板块名称过滤，支持精确匹配和模糊匹配
 - 长线风口页面包含泡泡图可视化布局

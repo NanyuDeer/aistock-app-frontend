@@ -2,6 +2,129 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-05 — 今日分析概览页新增晚报（收盘复盘）入口与结构化展示
+
+**开发者**: Aria
+
+### 新增
+- `src/modules/chat/pages/agent-report.vue`：概览模式新增「收盘复盘」卡片（AGENT_META review：moon-line 图标 + 紫色主题，排在 trend_score 之后）；详情模式新增 review 结构化展示（参考晨报分区：收盘结论 / 确认的市场现象 / 归因结论 / 预判对照 / 候选解释与反证 / 风险提示），`conclusion-card--review` 紫色主题色
+- `src/shared/api/modules/agent.ts`：`PUBLIC_REPORT_INTENTS` 加入 `review`，支持从 URL `?intent=review` 直达详情
+
+---
+
+## [master] 2026-08-05 — 播报续播：早报/晚报退出页面移交悬浮窗续播
+
+**开发者**: Aria
+
+### 改进
+- `src/pages-sub-app/briefing/index.vue`：退出页面时把播放移交悬浮窗续播（从当前进度续播）；移除冗余条目标题，来源标签升级为标题样式
+- `src/shared/components/AudioPlayer.vue`：新增 `initialTime` 属性（自动播放时跳到指定进度，实现续播）；播放被浏览器拦截时静默
+- `src/shared/components/FloatingPodcast.vue`：收起态保持 AudioPlayer 挂载（音频持续播放，仅视觉隐藏）；播放中悬浮球图标持续旋转；新增 play/pause/ended 事件同步
+- `src/shared/store/modules/podcast.ts`：新增 `playDirect`（直接播放已有音频，跳过文本合成）、`setPlaying`/`consumeAutoplay`（同步播放状态）、`autoplay`/`startTime`/`playing` 状态字段
+
+---
+
+## [changer] 2026-08-05 — ChatAgent P9 会话管理（会话列表页 + 多会话 store + 会话 API 层）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\2026-08-05-chat-agent-p9-session-management.md`
+
+### 新增
+- `src/shared/api/modules/agent.ts`：`ChatSessionMeta` 接口（session_id/title/last_message_at?/created_at?）+ `agentApi.listChatSessions()`（GET /chat/sessions，失败静默返回 []）/ `upsertChatSession(sessionId, question?)`（POST /chat/sessions，fire-and-forget 静默失败）/ `deleteChatSession(sessionId)`（DELETE /chat/sessions/:id，静默失败）
+- `src/pages-sub-app/chat/sessions.vue`（pages.json 注册于 chat/index 后）：会话列表页——新建/切换/删除 + 相对时间（刚刚/N分钟前/N小时前/N天前/日期）+ 当前会话高亮 + 空态；仅登录时 onShow 拉 server 列表合并；样式走 Design Token（variables.scss）+ SvgIcon（chat-history-line/add-line/delete-bin-line）
+
+### 重构
+- `src/shared/store/modules/chat.ts`：单会话 → 多会话——新增 `sessions: ChatSessionMeta[]` + `messagesBySession: Record<string, ChatMessage[]>`（本地 storage 分桶，CHAT_SESSIONS / CHAT_HISTORY_BY_SESSION）；对外导出保持兼容（messages computed / sessionId / setSessionId / appendMessage / clearHistory / sendMessage）；新增 `createSession`（`app_${Date.now()}`，同毫秒碰撞追加自增后缀）/ `switchSession`（归档当前 + 切 id 持久化）/ `deleteSession`（清本地 + fire-and-forget server 删除，删当前会话切最近或新建）/ `syncSessionsFromServer`（server 覆盖本地同名 title/last_message_at，保留本地仅有）/ `hasUserMessage`；一次性旧数据迁移 `migrateLegacyHistory`（旧 CHAT_HISTORY → messagesBySession[旧 CHAT_SESSION_ID]，迁移后删旧 key）
+
+### 改进
+- `src/pages-sub-app/chat/index.vue`：header-right 新增「会话」入口（chat-history-line）→ 会话列表页；onLoad 无当前会话时自动 createSession；handleSend/quickAsk 前置 `upsertSessionMeta`（仅登录且 `!hasUserMessage` 时 fire-and-forget，须在 chatStream.send 之前调用）
+
+### 文档
+- 根 AGENTS.md §2 会话管理页面行 + §6.2 agent.ts 会话 API；README 模块表 AI 对话补充会话管理
+
+### 测试
+- `chatStore.spec.ts`（vitest 10 用例）+ `chatSessions.spec.ts`（node:test 6 用例）+ `sessions.spec.ts` 源码断言 + `index.spec.ts` 会话入口断言；vitest 全量 8 文件 31/31 通过 + `npx tsc --noEmit` 0 errors
+
+---
+
+## [changer] 2026-08-05 — ChatAgent P5-fix 前端会话持久化（问题 14 session_id 回写）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\chat-agent-roadmap.md` §1 P5-fix 行 / §4 问题 14
+
+### 修复
+- `chatStore.setSessionId`（写 ref + storage 持久化，新增 `STORAGE_KEYS.CHAT_SESSION_ID`）；`useChatStream` WS 路径首轮生成 session_id 后 `setSessionId` 写回、后续轮复用；HTTP 降级路径改用 `setSessionId`；`clearHistory` 同步清 sessionId —— 此前 WS 路径每轮生成新 `app_${Date.now()}` → 后端 checkpointer 每轮新 thread → 多轮指代/纠错失效
+
+### 测试
+- `useChatStream.spec.ts` 新增"session_id 持久化 + 跨 send 复用"用例；mock 修正（getter 模拟 Pinia ref unwrap + sessionRef 状态测试间重置）；vitest 全量 21/21 + `npx tsc --noEmit` 0 errors
+
+---
+
+## [changer] 2026-08-04 — ChatAgent P6 退役清理（市场复盘 tab 前端代码 + $success 修复）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\2026-08-04-chat-agent-p6-retirement.md`
+
+### 重构
+- 删除 `src/shared/utils/useStreamingChat.ts`（SSE 旧对话流死代码，全仓 0 消费者）+ `tests/AdvisorTraceTransport.test.ts`
+- 移除 `skillResult` / `advisorTrace` 类型字段与渲染：agent.ts（`ChatMessage.skillResult/advisorTrace` + `SkillResult`/`AdvisorTrace` 接口）、useChatStream.ts 映射、chat.ts store（`setLastAssistantAdvisorTrace` + sendMessage 两字段映射，sendMessage 本体保留）、modules/chat/pages/index.vue（skillResult 卡片渲染块 + goStockDetail/getFlowClass/formatFlowAmount 辅助函数）；`MarketTrace*` 类型族与 `getMarketTraceReview` 保留（analytics 消费）
+
+### 修复
+- `src/modules/favorites/pages/search.vue`：`$success` → `$success-color`（未定义 SCSS 变量基线错误，master 合并 4dc71be 引入，阻塞 build:h5）
+
+### 文档
+- 根 AGENTS.md 移除 2 处陈旧 useStreamingChat 引用；modules/chat/AGENTS.md 注释更新
+
+### 测试
+- vitest 20/20 + `npx tsc --noEmit` 0 errors + `pnpm build:h5` 通过
+
+---
+
+## [changer] 2026-08-04 — ChatAgent P5 大盘概览接入（工作线 C）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\2026-08-04-chat-agent-p5-capability.md`
+
+### 新增
+- `src/shared/api/modules/stock.ts`：`stockApi.getCnIndexQuotes(symbols)`（纯数字 6 位代码 → `/api/cn/index/quotes`，中文键→驼峰映射，`CnIndexQuote` 类型）
+- `src/modules/home/components/StockContent.vue`：首页行情 tab 顶部接入 `MarketOverview`（大盘三指数）+ onMounted fetch
+
+### 改进
+- `src/shared/store/modules/market.ts`：`fetchIndices` 改走 `getCnIndexQuotes(['000001','399001','399006'])`（000001 语义=上证指数，接口分离消解 `getCoreQuotes` 带前缀 400 参数歧义）；删除 `mapIndexName` 硬编码映射（服务端 CN_INDEX_NAMES 提供名称）
+
+### 测试
+- 新建 `src/shared/store/modules/market.spec.ts`（2 用例）+ `src/modules/home/components/StockContent.spec.ts`（1 用例）；vitest 全量 23/23 通过
+- `npx tsc --noEmit` 0 errors；`pnpm build:h5` 成功
+
+---
+
+## [feat/market-trace-improvement] 2026-08-03 — 三大任务前端：播报优化 + OCR识图加自选 + 悬浮播报
+
+**开发者**: Aria
+
+### 新增
+- `src/shared/components/FloatingPodcast.vue`：悬浮播报（右侧贴边、纵向 1/3、悬浮球 72rpx 可拖动吸附左右边缘、展开态仅 AudioPlayer，按钮经 #actions 插槽放标题右侧）
+- `src/shared/store/modules/podcast.ts`：Pinia 播报 store（open/generate/expand/collapse/close，跨页共享）
+- `src/shared/utils/ocrImage.ts`：OCR 选图/压缩（H5 canvas 压缩 / App uni.compressImage + base64）
+- `src/shared/utils/useReportPodcast.ts`：从 /agent/report/:intent/:date 拉取 podcast_brief，以 report_{intent}_{date} 为缓存 key 打开悬浮播报
+
+### 改进
+- `src/shared/components/PodcastCard.vue`：MAX_PODCAST_TEXT_LENGTH=250 文本裁剪（与后端校验一致）+ 音频命中缓存时 cached 提示
+- `src/shared/components/AudioPlayer.vue`：新增 `#actions` 具名插槽（标题右侧操作区）
+- `src/modules/favorites/pages/search.vue`：重写为「文字搜索 / 识图添加」双 Tab，支持选图→预览→识别→勾选→批量加自选
+- `src/shared/api/modules/stock.ts`：新增 OcrImageInput/OcrStockItem 类型 + ocrStocksFromImages（timeout 100s，batchConcurrency 2）
+- `src/shared/store/modules/favorites.ts`：新增 addMany 批量加自选（已存在跳过）
+- 报告页播报按钮接线：alert-analysis / agent-report / hot-burst / leaders / trend-score；SubPageCard/SubPageCard2/MainTabs 挂载 FloatingPodcast
+
+### 修复
+- `ai-analysis.vue` / `reports.vue`：预先存在类型错误修复（formatMetricKey String 转换、filter 参数标注），保证 type-check 全绿
+
+---
+
 ## [master] 2026-08-01 — 重磅事件跳 AI 事件分析页 + 早晚报切换 + agent-report 兜底渲染
 
 **开发者**: Aria
@@ -192,7 +315,7 @@
 - 趋势股评分 AI 分析报告页（trend-score-report.vue）+ 列表页入口
 - 早点听播报页重构为结构化早晚报（方案四：分段式布局）
 - 底部 Tab 从 4Tab 重构为 3Tab（早点听/选股/提醒）
-- 异动捕手新模块页面 + 个股情报路由改名
+- 异动捕手新模块页面 + 自选股情报（原个股情报）路由改名
 - 长线风口接入后端 API + 板块详情子页面拆分
 - H5 页面固定 9:16 长宽比
 

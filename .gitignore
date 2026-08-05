@@ -13,3 +13,6 @@ dist/
 .trae/
 changelog-pending.md
 .worktrees/
+
+# Superpowers 审查/计划文档（2026-08-02 决策：代码仓库只留代码，计划文档不跟踪）
+docs/superpowers/
