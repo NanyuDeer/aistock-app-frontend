@@ -1,12 +1,17 @@
 <template>
   <!-- 播报悬浮窗：初始位于屏幕纵向 1/3 处右侧贴边；悬浮球可拖动，松手自动吸附左右边缘 -->
   <view v-if="store.visible" class="fp-wrap" :style="wrapStyle">
-    <!-- 展开（ready）：仅 AudioPlayer，折叠/关闭按钮在标题右侧 -->
+    <!-- 展开（ready）：播放条；收起时仅视觉隐藏（组件保持挂载，音频持续播放） -->
     <AudioPlayer
-      v-if="store.expanded && store.status === 'ready' && store.audioUrl"
+      v-if="store.status === 'ready' && store.audioUrl"
       :src="fullAudioUrl"
       :title="store.title"
-      class="fp-player"
+      :autoplay="store.autoplay"
+      :initial-time="store.startTime"
+      :class="['fp-player', { 'fp-player--hidden': !store.expanded }]"
+      @play="onPlayerPlay"
+      @pause="onPlayerPause"
+      @ended="onPlayerPause"
     >
       <template #actions>
         <view class="fp-icon-btn" @tap="store.collapse">
@@ -38,10 +43,11 @@
       </view>
     </view>
 
-    <!-- 悬浮球：可拖动，松手吸附左右边缘；无拖动视为点击展开 -->
+    <!-- 悬浮球：收起时显示，可拖动，松手吸附左右边缘；播放中图标持续旋转；无拖动视为点击展开 -->
     <view
-      v-else
+      v-show="!store.expanded"
       class="fp-ball"
+      :class="{ 'fp-ball--playing': store.playing }"
       @touchstart.stop.prevent="onDragStart"
       @touchmove.stop.prevent="onDragMove"
       @touchend.stop="onDragEnd"
@@ -61,6 +67,17 @@ import SvgIcon from './SvgIcon.vue'
 import { Button, LoadingState, AudioPlayer } from './index'
 
 const store = usePodcastStore()
+
+/** AudioPlayer 开始播放：同步 store 播放状态（悬浮球旋转）+ 消费自动播放标记 */
+function onPlayerPlay() {
+  store.setPlaying(true)
+  store.consumeAutoplay()
+}
+
+/** AudioPlayer 暂停/结束：同步 store 播放状态 */
+function onPlayerPause() {
+  store.setPlaying(false)
+}
 
 /** 悬浮球尺寸（rpx）与展开面板宽度（rpx） */
 const BALL_SIZE_RPX = 72
@@ -239,6 +256,21 @@ onUnmounted(() => {
 /* 展开（ready）：仅 AudioPlayer，卡片样式由 AudioPlayer 自带 */
 .fp-player {
   width: 560rpx;
+}
+
+/* 收起态：播放条仅视觉隐藏（组件保持挂载，音频持续播放） */
+.fp-player--hidden {
+  display: none;
+}
+
+/* 播放中：悬浮球图标持续旋转 */
+.fp-ball--playing :deep(.svg-icon-wrap) {
+  animation: fp-spin 2s linear infinite;
+}
+
+@keyframes fp-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* 展开（loading / error）：轻量状态条 */

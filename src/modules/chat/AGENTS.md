@@ -1,7 +1,7 @@
 # Chat 模块 - AI 对话
 
 ## 功能范围
-AI 对话模块提供智能投顾对话功能，支持行情查询、资金流向查询、龙头股查询等 Skill、深度分析（force_deep 升级），以及 WS 流式输出。App 专属对话主页面在 `pages-sub-app/chat/index.vue`（P3 收敛为纯对话流，市场复盘 tab 已退役；P11 起气泡渲染顺序为 ReasoningPanel（AI 思考过程 + 执行细节）-> CardRenderer（cards）-> 回复内容 -> DeepSummaryCard（兼容旧字段））。
+AI 对话模块提供智能投顾对话功能，支持行情查询、资金流向查询、龙头股查询等 Skill、深度分析（force_deep 升级），以及 WS 流式输出。App 专属对话主页面在 `pages-sub-app/chat/index.vue`（P3 收敛为纯对话流，市场复盘 tab 已退役；P11 起气泡渲染顺序为 ReasoningPanel（AI 思考过程 + 执行细节）→ CardRenderer（cards）→ 回复内容 → DeepSummaryCard（兼容旧字段））。
 
 改进 14：AI 回复 markdown 分节（核心结论/行情要点/数据说明）经 `parseMarkdownSections` 识别后由 `SectionCard` 区块卡片渲染；ReasoningPanel 视觉升级为卡片风格（$bg-card + $shadow-card + $r-md）；非分节回复（寒暄/科普）保持 mp-html 渲染。
 

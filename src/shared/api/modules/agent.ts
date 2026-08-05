@@ -284,7 +284,7 @@ export interface AlertReportRecord {
 }
 
 export type BriefType = 'morning' | 'evening'
-export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score'] as const
+export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review'] as const
 export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
 
 export function isPublicReportIntent(intent: string): intent is PublicReportIntent {

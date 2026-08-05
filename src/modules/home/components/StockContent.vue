@@ -23,7 +23,7 @@
       <!-- 机构调研热门股卡片 -->
       <InsightListCard
         theme="burst"
-        title="机构调研热门股"
+        title="机构推荐热门股"
         desc="机构调研共振检测，发现潜在机会"
         icon-name="search-eye-line"
         :items="hotBurstItems"
