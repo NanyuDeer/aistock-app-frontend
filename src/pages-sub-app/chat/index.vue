@@ -1,5 +1,10 @@
 <template>
   <SubPageCard2 :title="'AI 投顾'" :no-chat-bar="true">
+    <template #header-right>
+      <view class="sessions-entry" @tap="goSessions">
+        <SvgIcon name="chat-history-line" size="36rpx" color="#0b5fff" />
+      </view>
+    </template>
     <view class="chat-content">
       <!-- 消息列表 -->
       <scroll-view scroll-y class="message-list" :scroll-top="scrollTop">
@@ -102,12 +107,19 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 import DeepSummaryCard from './DeepSummaryCard.vue'
 import ReasoningCard from './ReasoningCard.vue'
+import { useChatStore } from '@/shared/store/modules/chat'
+import { useUserStore } from '@/shared/store/modules/user'
+import { agentApi } from '@/shared/api/modules/agent'
 // ExecStepsPanel 保留以备 P9 后续可能复用（msg.execSteps 仍随消息下发），但 chat 页面不再使用
 // import ExecStepsPanel from './ExecStepsPanel.vue'
 
 const chatStream = useChatStream()
+const chatStore = useChatStore()
+const userStore = useUserStore()
 
+// P9：无当前会话时自动新建（保证 messagesBySession 有当前会话载体；切换会话返回本页不重复触发，onLoad 仅一次）
 onLoad((options: Record<string, string> | undefined) => {
+  if (!chatStore.sessionId) chatStore.createSession()
   const q = options?.q
   if (!q) return
   nextTick(() => {
@@ -115,6 +127,21 @@ onLoad((options: Record<string, string> | undefined) => {
     scrollToBottom()
   })
 })
+
+/** P9：标题旁「会话」入口 → 会话列表页 */
+function goSessions() {
+  uni.navigateTo({ url: '/pages-sub-app/chat/sessions' })
+}
+
+/**
+ * P9：首次用户消息后 fire-and-forget 通知后端建立会话元数据（仅登录）。
+ * 必须在 chatStream.send 之前调用（send 内部 appendMessage 会立即写入 user 消息，之后 hasUserMessage 变 true）。
+ */
+function upsertSessionMeta(content: string) {
+  if (userStore.isLoggedIn() && chatStore.sessionId && !chatStore.hasUserMessage) {
+    void agentApi.upsertChatSession(chatStore.sessionId, content)
+  }
+}
 
 const displayMessages = chatStream.messages
 const isStreaming = chatStream.streaming
@@ -130,12 +157,14 @@ function handleSend() {
   const content = inputText.value.trim()
   if (!content || isStreaming.value) return
   inputText.value = ''
+  upsertSessionMeta(content)
   chatStream.send(content)
   scrollToBottom()
 }
 
 function quickAsk(text: string) {
   if (isStreaming.value) return
+  upsertSessionMeta(text)
   chatStream.send(text)
   scrollToBottom()
 }
@@ -169,6 +198,17 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 @use '@/shared/styles/variables.scss' as *;
+
+/* P9：会话入口按钮（导航栏右侧） */
+.sessions-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: $r-full;
+}
+.sessions-entry:active { background: $bg-soft; }
 
 .chat-content {
   display: flex;
