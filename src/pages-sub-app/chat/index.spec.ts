@@ -18,9 +18,10 @@ test('页面保留对话流核心（流式 + 快捷技能 + 输入）', () => {
   assert.match(pageSource, /class="input-bar"/)
 })
 
-test('深度分析摘要卡片与执行面板组件已接入', () => {
+test('渲染组件已接入（ReasoningPanel/CardRenderer/DeepSummaryCard 兼容字段）', () => {
   assert.match(pageSource, /DeepSummaryCard/)
-  assert.match(pageSource, /ExecStepsPanel/)
+  assert.match(pageSource, /ReasoningPanel/)
+  assert.match(pageSource, /CardRenderer/)
   assert.match(pageSource, /lastDeepReport/)
   assert.match(pageSource, /execSteps/)
 })
@@ -30,9 +31,19 @@ test('force_deep 深度分析按钮已接入（仅非 deep 回复显示）', () 
   assert.match(pageSource, /forceDeep: true/)
 })
 
-test('流式过程块渲染 ReasoningCard（streamingReasoning 绑定，dot 动画）', () => {
+test('流式过程块渲染 ReasoningPanel（streamingReasoning 绑定，dot 动画）', () => {
   assert.match(pageSource, /streamingReasoning/)
-  assert.match(pageSource, /<ReasoningCard\s+v-if="streamingReasoning\.length > 0"/)
+  assert.match(pageSource, /<ReasoningPanel\s+v-if="streamingReasoning\.length > 0"/)
+})
+
+test('AI 气泡渲染顺序：ReasoningPanel → CardRenderer → mp-html → DeepSummaryCard', () => {
+  const order = (re: RegExp) => pageSource.search(re)
+  const reasoning = order(/<ReasoningPanel/)
+  const renderer = order(/<CardRenderer/)
+  const html = order(/<mp-html/)
+  const deep = order(/<DeepSummaryCard/)
+  assert.ok(reasoning !== -1 && renderer !== -1 && html !== -1 && deep !== -1)
+  assert.ok(reasoning < renderer && renderer < html && html < deep)
 })
 
 test('P9 会话管理：标题旁会话入口 + onLoad 自动建会话 + 首次消息 upsert', () => {
@@ -40,4 +51,27 @@ test('P9 会话管理：标题旁会话入口 + onLoad 自动建会话 + 首次�
   assert.match(pageSource, /navigateTo\(\{ url: '\/pages-sub-app\/chat\/sessions' \}\)/)
   assert.match(pageSource, /createSession\(\)/)
   assert.match(pageSource, /upsertChatSession\(chatStore\.sessionId, content\)/)
+})
+
+test('用户气泡升级为品牌渐变 + 阴影（Design Token）', () => {
+  assert.match(pageSource, /\.msg-content\.user[\s\S]*?background: \$brand-gradient/)
+  assert.match(pageSource, /\.msg-content\.user[\s\S]*?box-shadow: \$shadow-primary/)
+})
+
+test('AI 气泡升级圆角与阴影（Design Token）', () => {
+  assert.match(pageSource, /\.bubble[\s\S]*?border-radius: \$r-lg/)
+  assert.match(pageSource, /\.bubble[\s\S]*?box-shadow: \$shadow-card/)
+})
+
+test('计费条 UsageBar 接入（快捷按钮下、输入栏上）', () => {
+  assert.match(pageSource, /import UsageBar from '\.\/UsageBar\.vue'/)
+  const quickIdx = pageSource.indexOf('class="quick-skills"')
+  const usageIdx = pageSource.indexOf('<UsageBar')
+  const inputIdx = pageSource.indexOf('class="input-bar"')
+  assert.ok(quickIdx !== -1 && usageIdx !== -1 && inputIdx !== -1)
+  assert.ok(quickIdx < usageIdx && usageIdx < inputIdx)
+})
+
+test('deep 卡片经 CardRenderer 渲染时不再重复渲染 DeepSummaryCard（兼容回退守卫）', () => {
+  assert.match(pageSource, /msg\.cards\?\.some\(c => c\.card_type === 'deep'\)/)
 })

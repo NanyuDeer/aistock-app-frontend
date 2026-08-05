@@ -16,14 +16,21 @@
           <view v-else class="msg-content assistant">
             <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
             <view class="bubble">
-              <!-- AI 思考链卡片（顶部，替代原执行过程面板） -->
-              <ReasoningCard v-if="msg.reasoningSteps && msg.reasoningSteps.length > 0" :steps="msg.reasoningSteps" />
+              <!-- P11 T5：思考链 + 执行细节融合面板（问题 9；空 steps/execSteps 时组件自不渲染） -->
+              <ReasoningPanel :steps="msg.reasoningSteps || []" :execSteps="msg.execSteps || []" />
+
+              <!-- P11 T4：结构化卡片（DONE.cards；HTTP 降级/旧协议缺失时不渲染，fallback markdown） -->
+              <CardRenderer v-if="msg.cards && msg.cards.length > 0" :cards="msg.cards" />
 
               <!-- Markdown 渲染的回复内容 -->
               <mp-html v-if="msg.content" :content="markdownToHtml(msg.content)" class="bubble-html" />
 
-              <!-- D20：深度分析 summary 卡片（仅 deep 结果） -->
-              <DeepSummaryCard v-if="msg.lastDeepReport" :report="msg.lastDeepReport" />
+              <!-- D20：深度分析 summary 卡片（仅 deep 结果；保留兼容旧消息/HTTP 降级无 cards 字段） -->
+              <!-- 最终审查修复：DONE 同时返回 last_deep_report 与 deep 卡时，仅由 CardRenderer 渲染（spec §4.2/§6 主路径），DeepSummaryCard 仅在无 deep 卡时作为兼容回退 -->
+              <DeepSummaryCard
+                v-if="msg.lastDeepReport && !(msg.cards?.some(c => c.card_type === 'deep'))"
+                :report="msg.lastDeepReport"
+              />
 
               <!-- D4：force_deep「深度分析」按钮（仅非 deep / 非错误回复） -->
               <view
@@ -42,10 +49,11 @@
         <view v-if="isStreaming" class="message-item assistant streaming-message">
           <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
           <view class="bubble">
-            <!-- P3-fix-2 T2：AI 思考链（流式 dot 动画，steps 含 streaming 时自动展开） -->
-            <ReasoningCard
+            <!-- P11 T5：AI 思考链（流式 dot 动画，steps 含 streaming 时自动展开；执行细节流式中无数据） -->
+            <ReasoningPanel
               v-if="streamingReasoning.length > 0"
               :steps="streamingReasoning"
+              :execSteps="[]"
             />
             <!-- 实时进度步骤 -->
             <view v-if="progressSteps.length > 0" class="progress-card">
@@ -88,6 +96,9 @@
         </view>
       </view>
 
+      <!-- P11 T6：计费条（用户累计 + 本次会话本地累加；P10 只展示用量，不做支付） -->
+      <UsageBar />
+
       <!-- 输入框 -->
       <view class="input-bar">
         <input v-model="inputText" placeholder="输入消息..." class="input" @confirm="handleSend" />
@@ -106,12 +117,12 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 import DeepSummaryCard from './DeepSummaryCard.vue'
-import ReasoningCard from './ReasoningCard.vue'
+import ReasoningPanel from './ReasoningPanel.vue'
+import CardRenderer from './cards/CardRenderer.vue'
+import UsageBar from './UsageBar.vue'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
 import { agentApi } from '@/shared/api/modules/agent'
-// ExecStepsPanel 保留以备 P9 后续可能复用（msg.execSteps 仍随消息下发），但 chat 页面不再使用
-// import ExecStepsPanel from './ExecStepsPanel.vue'
 
 const chatStream = useChatStream()
 const chatStore = useChatStore()
@@ -220,14 +231,15 @@ onUnmounted(() => {
 .message-item { margin-bottom: 24rpx; }
 .message-item.user { display: flex; justify-content: flex-end; }
 .msg-content.user {
-  background: $primary; color: #fff; border-radius: 16rpx 16rpx 4rpx 16rpx; padding: 16rpx 24rpx;
+  background: $brand-gradient; color: #fff; border-radius: 16rpx 16rpx 4rpx 16rpx; padding: 16rpx 24rpx;
   max-width: 70%; font-size: 28rpx; line-height: 1.5;
+  box-shadow: $shadow-primary;
 }
 .msg-content.assistant { display: flex; gap: 12rpx; }
 .avatar { font-size: 40rpx; flex-shrink: 0; }
 .bubble {
-  background: #ffffff; border-radius: 16rpx 16rpx 16rpx 4rpx; padding: 16rpx 24rpx;
-  max-width: 80%; box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  background: #ffffff; border-radius: $r-lg; padding: 16rpx 24rpx;
+  max-width: 80%; box-shadow: $shadow-card;
 }
 
 /* 流式消息的头像和内容需要处于同一横向消息行，避免内容未生成时气泡换到头像下一行。 */
@@ -292,7 +304,7 @@ onUnmounted(() => {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .step-label { font-size: 24rpx; color: $ink-soft; }
-.progress-step.done .step-label { color: #9ca3af; }
+.progress-step.done .step-label { color: $ink-mute; }
 
 .quick-skills { display: flex; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; flex-shrink: 0; }
 .skill-btn {

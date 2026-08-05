@@ -1,7 +1,9 @@
 # Chat 模块 - AI 对话
 
 ## 功能范围
-AI 对话模块提供智能投顾对话功能，支持行情查询、资金流向查询、龙头股查询等 Skill、深度分析（force_deep 升级），以及 WS 流式输出。App 专属对话主页面在 `pages-sub-app/chat/index.vue`（P3 收敛为纯对话流，市场复盘 tab 已退役；P3-fix 起气泡渲染顺序为 ReasoningCard（AI 思考过程）→ 回复内容 → DeepSummaryCard）。
+AI 对话模块提供智能投顾对话功能，支持行情查询、资金流向查询、龙头股查询等 Skill、深度分析（force_deep 升级），以及 WS 流式输出。App 专属对话主页面在 `pages-sub-app/chat/index.vue`（P3 收敛为纯对话流，市场复盘 tab 已退役；P11 起气泡渲染顺序为 ReasoningPanel（AI 思考过程 + 执行细节）→ CardRenderer（cards）→ 回复内容 → DeepSummaryCard（兼容旧字段））。
+
+P11（线 5）：消费 DONE 事件 `token_usage`（会话计费本地累加，UsageBar 展示）与 `cards`（5 类卡片经 CardRenderer 渲染）两字段；WS 身份契约 `user_id`=openid（登录用户）；HTTP 降级路径保持现状。
 
 ## 页面
 - `pages/index.vue` - AI 对话主页面（主包，仅重定向到子包对话页）
@@ -11,8 +13,10 @@ AI 对话模块提供智能投顾对话功能，支持行情查询、资金流�
 
 ## 组件
 - `../pages-sub-app/chat/DeepSummaryCard.vue` - 深度分析摘要卡片（消费 `ChatMessage.lastDeepReport`，worker 标签 + summary + symbols + 生成时间）
-- `../pages-sub-app/chat/ExecStepsPanel.vue` - 执行细节面板（消费 `ChatMessage.execSteps` 层级树：一级节点 + 二级工具 + 耗时/思考时长，默认收起；**P3-fix 起对话页已退役，文件保留待 P9 复用**）
-- `../pages-sub-app/chat/ReasoningCard.vue` - AI 思考过程卡片（P3-fix 新增，消费 `ChatMessage.reasoningSteps`，渲染于回复内容上方；折叠/展开 + 流式 dot 动画）
+- `../pages-sub-app/chat/ReasoningPanel.vue` - P11 融合组件：思考链「AI 思考过程」+ 执行细节「执行细节」双折叠独立展开（消费 `ChatMessage.reasoningSteps` + `execSteps`；替代原 ReasoningCard/ExecStepsPanel）
+- `../pages-sub-app/chat/cards/CardRenderer.vue` - 卡片路由（按 `ChatMessage.cards[].card_type` 分发 5 类卡片；未知类型不渲染）
+- `../pages-sub-app/chat/cards/MarketSnapshotCard.vue` / `StockSnapshotCard.vue` / `CapitalFlowCard.vue` / `DeepAnalysisCard.vue` / `ComparisonCard.vue` - 5 类展示卡片（行情快照/个股快照/资金流向/深度分析/对比，纯展示，P11 新增）
+- `../pages-sub-app/chat/UsageBar.vue` - 计费条（P11 新增：用户累计 + 本次会话本地累加；置于快捷按钮下、输入栏上）
 - 通用气泡/流式文本组件位于 `shared/components/`（`ChatBubble.vue`/`StreamingText.vue`）；skillResult 卡片与 SkillButton 已随 P3/P6 删除
 
 ## Hooks
@@ -25,7 +29,7 @@ AI 对话模块提供智能投顾对话功能，支持行情查询、资金流�
 
 ## 依赖的 shared/ 中的类型
 - `@/shared/store/modules/chat` - 对话状态管理（P9 起多会话：`sessions` 列表 + `messagesBySession` 分桶，新增 `createSession`/`switchSession`/`deleteSession`/`syncSessionsFromServer`/`hasUserMessage`）
-- `@/shared/api/modules/agent` - AI Agent API 及 `ChatMessage` 类型（含 `lastDeepReport?: DeepReportRef` / `execSteps?: ExecStepNode[]`，P3 追加；`reasoningSteps?: ReasoningStep[]`，P3-fix 追加；大盘溯源 schema 2.0 类型族保留，MarketTraceQa 系列与 `sendMarketTraceQaMessage` 已删除）
+- `@/shared/api/modules/agent` - AI Agent API 及 `ChatMessage` 类型（含 `lastDeepReport?: DeepReportRef` / `execSteps?: ExecStepNode[]`，P3 追加；`reasoningSteps?: ReasoningStep[]`，P3-fix 追加；`cards?: ChatCard[]` / `tokenUsage?: TokenUsage`，P11 追加；大盘溯源 schema 2.0 类型族保留，MarketTraceQa 系列与 `sendMarketTraceQaMessage` 已删除）
 - `@/shared/components/SvgIcon.vue` - 图标组件
 
 ## 开发注意事项

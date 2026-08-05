@@ -50,6 +50,28 @@ export interface ReasoningStep {
   endAt?: number
 }
 
+/** P11：DONE 事件下发的本轮 token 用量（计划 B 线 2 新增可选字段；HTTP 降级缺失） */
+export interface TokenUsage {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+}
+
+/** P11：结构化卡片负载（计划 C 产出 data，卡片组件按 card_type 消费） */
+export interface ChatCard {
+  card_type: 'market_snapshot' | 'stock_snapshot' | 'capital_flow' | 'deep' | 'comparison'
+  title: string
+  data: Record<string, unknown>
+}
+
+/** 用户累计 token 用量（GET /api/chat/usage/summary，JWT → openid；无记录全 0） */
+export interface TokenUsageSummary {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+  turn_count: number
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
@@ -57,6 +79,8 @@ export interface ChatMessage {
   lastDeepReport?: DeepReportRef
   execSteps?: ExecStepNode[]
   reasoningSteps?: ReasoningStep[]   // NEW: AI 思考链
+  cards?: ChatCard[]                 // P11: DONE 下发的结构化卡片（HTTP 降级/旧协议缺失）
+  tokenUsage?: TokenUsage            // P11: DONE 下发的本轮 token 用量（会话本地累加用）
   timestamp: number
 }
 
@@ -339,6 +363,11 @@ export const agentApi = {
       // D4：HTTP 降级路径透传 force_deep（与 WS 路径对齐，Task 1 Python 侧支持）
       ...(options?.forceDeep ? { force_deep: true } : {})
     })
+  },
+
+  /** 查询用户累计 token 用量（P10 线 2 端点；JWT 拦截器自动带 token；无记录全 0） */
+  getTokenUsageSummary() {
+    return request.get<TokenUsageSummary>('/chat/usage/summary')
   },
 
   /**
