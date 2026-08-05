@@ -66,4 +66,16 @@ describe('ReasoningPanel', () => {
     const wrapper = mount(ReasoningPanel, { props: { steps: [], execSteps: [] } })
     expect(wrapper.find('.reasoning-panel').exists()).toBe(false)
   })
+
+  it('改进14：容器为卡片风格（reasoning-panel class 存在）', () => {
+    const wrapper = mount(ReasoningPanel, { props: { steps, execSteps } })
+    const panel = wrapper.find('.reasoning-panel')
+    expect(panel.exists()).toBe(true)
+  })
+
+  it('改进14：思考链头部含卡片容器结构', () => {
+    const wrapper = mount(ReasoningPanel, { props: { steps, execSteps } })
+    expect(wrapper.find('.rp-think').exists()).toBe(true)
+    expect(wrapper.find('.rp-think-header').exists()).toBe(true)
+  })
 })
