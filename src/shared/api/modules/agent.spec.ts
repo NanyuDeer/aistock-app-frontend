@@ -82,3 +82,40 @@ test('sendMessage 支持 forceDeep 透传（HTTP 降级对齐 WS）', async () =
     await server.close()
   }
 })
+
+test('getTokenUsageSummary 请求公开累计端点 /chat/usage/summary', async () => {
+  const server = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    resolve: { alias: { '@': path.resolve(process.cwd(), 'src') } },
+    server: { middlewareMode: true },
+    appType: 'custom',
+    ssr: { noExternal: ['pinia'] },
+  })
+
+  try {
+    const piniaModule = await server.ssrLoadModule('pinia')
+    piniaModule.setActivePinia(piniaModule.createPinia())
+    const requestModule = await server.ssrLoadModule('/src/shared/api/request.ts')
+    const agentModule = await server.ssrLoadModule('/src/shared/api/modules/agent.ts')
+    const request = requestModule.default
+    const originalGet = request.get
+    const calls: string[] = []
+    const summary = { prompt_tokens: 100, completion_tokens: 200, total_tokens: 300, turn_count: 5 }
+
+    request.get = ((url: string) => {
+      calls.push(url)
+      return Promise.resolve(summary)
+    }) as typeof request.get
+
+    try {
+      const res = await agentModule.agentApi.getTokenUsageSummary()
+      assert.deepEqual(calls, ['/chat/usage/summary'])
+      assert.deepEqual(res, summary)
+    } finally {
+      request.get = originalGet
+    }
+  } finally {
+    await server.close()
+  }
+})

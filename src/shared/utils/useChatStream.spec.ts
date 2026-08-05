@@ -17,7 +17,7 @@ vi.mock('@/shared/store/modules/chat', () => ({
 }))
 
 vi.mock('@/shared/store/modules/user', () => ({
-  useUserStore: () => ({ userInfo: { id: 1 } }),
+  useUserStore: () => ({ userInfo: { id: 1, openid: 'o_20260805' } }),
 }))
 
 // Mock WebSocket（连接即开；捕获 onMessage 回调供测试注入 WS 事件；捕获 send 参数）
@@ -147,5 +147,18 @@ describe('useChatStream reasoning event', () => {
 
     mockSocketCbs.onMessageCbs[0]({ data: JSON.stringify({ type: 'done', content: '第二轮' }) })
     await send2
+  })
+
+  it('WS send body 透传 openid 作为 user_id（计费身份契约）', async () => {
+    const stream = useChatStream() as any
+
+    const send1 = stream.send('你好')
+    await vi.waitFor(() => { expect(mockSocketSend).toHaveBeenCalledTimes(1) })
+    const payload = JSON.parse(mockSocketSend.mock.calls[0][0].data)
+    expect(payload.user_id).toBe('o_20260805')
+    expect(payload.user_id).not.toBe('1')
+
+    mockSocketCbs.onMessageCbs[0]({ data: JSON.stringify({ type: 'done', content: 'ok' }) })
+    await send1
   })
 })

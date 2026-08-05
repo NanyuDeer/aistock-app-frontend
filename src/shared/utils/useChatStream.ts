@@ -236,8 +236,8 @@ export function useChatStream() {
             message: content,
             session_id: sid,
             favorites: [],
-            // D11：透传登录用户身份（chat_analysis 落库隔离用）；未登录省略
-            user_id: userInfo?.id != null ? String(userInfo.id) : undefined,
+            // P11 T1：计费身份契约 user_id == openid（P2 遗留 userInfo.id 不可靠/为 "0"；未登录省略）
+            user_id: userInfo?.openid ? String(userInfo.openid) : undefined,
             // D4：force_deep 前端「深度分析」按钮（Task 6 页面接入）
             force_deep: options?.forceDeep === true
           })
