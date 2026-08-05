@@ -19,6 +19,11 @@
         <view class="session-main">
           <text class="session-title">{{ s.title }}</text>
           <text class="session-time">{{ formatTime(s.last_message_at) }}</text>
+          <!-- P10 线 6：会话维度用量徽标（无用量记录不显示；服务端聚合，非本次会话本地累加） -->
+          <view v-if="usageBySession[s.session_id]" class="session-usage">
+            <text class="session-usage-num">{{ usageBySession[s.session_id].total_tokens }}</text>
+            <text class="session-usage-unit">tokens</text>
+          </view>
         </view>
         <view v-if="s.session_id === chatStore.sessionId" class="session-badge">当前</view>
         <view class="session-delete" @tap.stop="onDeleteSession(s.session_id)">
@@ -37,20 +42,39 @@
 
 <script setup lang="ts">
 import { onShow } from '@dcloudio/uni-app'
+import { ref } from 'vue'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
+import { agentApi, type SessionUsageItem } from '@/shared/api/modules/agent'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 const chatStore = useChatStore()
 const userStore = useUserStore()
 
+// P10 线 6：会话维度用量聚合（session_id → 用量项 Map，供列表行徽标读取）
+const usageBySession = ref<Record<string, SessionUsageItem>>({})
+
 // onShow：仅登录时拉 server 列表合并（server 覆盖本地同名 title/last_message_at，保留本地仅有会话）
 onShow(() => {
   if (userStore.isLoggedIn()) {
     void chatStore.syncSessionsFromServer()
+    void loadSessionUsage() // P10 线 6：登录才拉用量（未登录不请求）
   }
 })
+
+/**
+ * P10 线 6：拉取会话维度用量聚合，按 session_id 建立 Map。
+ * 失败静默（getChatSessionUsage 内部返回空 items）→ Map 为空，列表不显示徽标。
+ */
+async function loadSessionUsage() {
+  const res = await agentApi.getChatSessionUsage()
+  const map: Record<string, SessionUsageItem> = {}
+  for (const item of res.items) {
+    map[item.session_id] = item
+  }
+  usageBySession.value = map
+}
 
 function onNewSession() {
   chatStore.createSession()
@@ -130,6 +154,25 @@ function formatTime(iso?: string): string {
   white-space: nowrap;
 }
 .session-time { font-size: $font-size-xs; color: $ink-mute; }
+/* P10 线 6：用量徽标（$primary 强调数字、$primary-50 底色、$ink-mute 弱化单位） */
+.session-usage {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4rpx;
+  align-self: flex-start;
+  padding: 2rpx 12rpx;
+  border-radius: $r-full;
+  background: $primary-50;
+}
+.session-usage-num {
+  font-size: $font-size-xs;
+  color: $primary;
+  font-weight: 600;
+}
+.session-usage-unit {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
 .session-badge {
   font-size: $font-size-xs;
   color: $primary;
