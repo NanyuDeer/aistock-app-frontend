@@ -30,7 +30,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 |------|------|---------|-----------------|
 | 首页 | `modules/home` | 早点听、市场概览、长线风口、异动捕手 | [home/AGENTS.md](./src/modules/home/AGENTS.md) |
 | 自选股 | `modules/favorites` | 自选股列表、特别提醒、股票详情、搜索、异动监控 | [favorites/AGENTS.md](./src/modules/favorites/AGENTS.md) |
-| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示 | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
+| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示、会话管理（P9 多会话） | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
 | 行情 | `modules/market` | 龙头股、重磅消息、板块标签、异动捕手、长线风口 | [market/AGENTS.md](./src/modules/market/AGENTS.md) |
 | 业绩分析 | `modules/analytics` | 业绩预测、业绩报告列表、财报详情 | — |
 | 用户 | `modules/user` | 个人中心、登录设置、更新日志 | [user/AGENTS.md](./src/modules/user/AGENTS.md) |
@@ -45,7 +45,8 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 | 事件传导链 | `event-chain/index.vue` | 事件传导链路可视化 |
 | 估值分析 | `valuation/index.vue` | 个股估值 |
 | 交易复盘 | `review/index.vue` | 复盘归因 |
-| AI 对话 | `chat/index.vue` | App 专属 AI 对话（含 AI 思考过程卡片 ReasoningCard，P3-fix；流式过程实时思考链渲染 `streamingReasoning`，P3-fix-2） |
+| AI 对话 | `chat/index.vue` | App 专属 AI 对话（含 AI 思考过程卡片 ReasoningCard，P3-fix；流式过程实时思考链渲染 `streamingReasoning`，P3-fix-2；标题旁「会话」入口 + onLoad 自动建会话 + 首次用户消息 fire-and-forget upsert，P9） |
+| 会话管理 | `chat/sessions.vue` | 会话列表页（P9，pages.json 注册于 chat/index 后）：新建/切换/删除 + 相对时间 + 当前会话高亮 + 空态；仅登录时 onShow 拉 server 列表合并（`syncSessionsFromServer`） |
 
 > 分包页面除 `briefing/index.vue`（已实现）外，其余为占位实现，待后端 Agent/Skills 完成后对接。
 > 主包 `modules/chat/pages/agent-report.vue` 为通用分析报告展示页，被 leaders.vue 和 hot-burst.vue 跳转调用。
@@ -75,7 +76,7 @@ src/
 │   │   ├── index.ts     # Store 入口
 │   │   └── modules/     # Store 模块（按功能拆分）
 │   │       ├── app.ts       # 应用状态
-│   │       ├── chat.ts      # 对话状态
+│   │       ├── chat.ts      # 对话状态（P9 多会话：sessions 列表 + messagesBySession 分桶）
 │   │       ├── favorites.ts # 自选股状态
 │   │       ├── market.ts    # 行情状态
 │   │       ├── portfolio.ts # 持仓状态
@@ -302,7 +303,7 @@ import Card from '@/shared/components/Card.vue'
 
 | 模块文件 | 说明 | 后端路径 |
 |---------|------|---------|
-| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约） | `/api/agent/*` |
+| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
 | `auth.ts` | 认证（登录、用户信息） | `/api/auth/wechat/*` |
 | `briefing.ts` | 早晚报结构化（BriefingItem/BriefingSummary 类型 + 降级解析适配器） | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |
