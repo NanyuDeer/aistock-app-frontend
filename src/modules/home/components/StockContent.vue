@@ -1,6 +1,13 @@
 <template>
   <view class="stock-content">
     <view class="content-wrap">
+      <!-- 大盘概览（MarketOverview 内部含空态兜底，纯展示组件不改动） -->
+      <MarketOverview
+        v-if="marketIndices.length"
+        :indices="marketIndices"
+        :status="marketStatus"
+      />
+
       <!-- 趋势股评分卡片 -->
       <InsightListCard
         theme="trend"
@@ -45,6 +52,13 @@ import { onMounted, ref, computed } from 'vue'
 import { InsightListCard, type InsightListItem } from '@/shared/components'
 import { stockApi, type HotBurstSignal } from '@/shared/api/modules/stock'
 import { trendScoreApi, type TrendScoreListItem } from '@/shared/api/modules/trend-score'
+import { useMarketStore } from '@/shared/store/modules/market'
+import MarketOverview from '@/modules/market/components/MarketOverview.vue'
+
+// ===== 大盘概览 =====
+const marketStore = useMarketStore()
+const marketIndices = computed(() => marketStore.indices)
+const marketStatus = computed(() => marketStore.marketStatus)
 
 // ===== 趋势股评分预览 =====
 interface TrendScorePreviewItem {
@@ -280,6 +294,7 @@ function goForecast() {
 }
 
 onMounted(() => {
+  marketStore.fetchIndices()
   loadHotBurstPreview()
   loadTrendScorePreview()
   loadForecastPreview()

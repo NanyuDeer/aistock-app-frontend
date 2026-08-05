@@ -17,18 +17,17 @@ export const useMarketStore = defineStore('market', () => {
     marketStatus.value = getMarketStatus()
   }
 
-  /** 加载大盘指数行情 */
+  /** 加载大盘指数行情（纯数字代码 → /api/cn/index/quotes，000001=上证指数） */
   async function fetchIndices() {
     loading.value = true
     try {
-      // 上证指数、深证成指、创业板指
-      const symbols = ['sh000001', 'sz399001', 'sz399006']
-      const quotes = await stockApi.getCoreQuotes(symbols)
-      indices.value = quotes.map((q: any) => ({
-        name: mapIndexName(q.symbol),
-        code: q.symbol,
-        price: q.price,
-        changePercent: q.changePercent
+      // 上证指数、深证成指、创业板指（纯数字代码，指数接口语义；服务端直接返回指数名称）
+      const quotes = await stockApi.getCnIndexQuotes(['000001', '399001', '399006'])
+      indices.value = quotes.map((q) => ({
+        name: q.name,
+        code: q.index,
+        price: q.price ?? 0,
+        changePercent: q.changePercent ?? 0,
       }))
       lastUpdate.value = Date.now()
     } catch (e) {
@@ -36,15 +35,6 @@ export const useMarketStore = defineStore('market', () => {
     } finally {
       loading.value = false
     }
-  }
-
-  function mapIndexName(code: string): string {
-    const map: Record<string, string> = {
-      'sh000001': '上证指数',
-      'sz399001': '深证成指',
-      'sz399006': '创业板指'
-    }
-    return map[code] || code
   }
 
   return {

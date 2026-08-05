@@ -26,6 +26,7 @@
       <view v-else class="report-content">
         <MarketTraceHeader :presentation="presentation" />
         <MarketTracePhenomenon :presentation="presentation" />
+        <MarketTracePredictionValidation :prediction-validation="presentation.predictionValidation" />
         <MarketTraceTimeline :presentation="presentation" :layout="timelineLayout" />
         <MarketTraceAlternatives :presentation="presentation" />
         <MarketTraceRejected :presentation="presentation" />
@@ -62,6 +63,7 @@ import MarketTracePhenomenon from '@/modules/analytics/components/MarketTracePhe
 import MarketTraceTimeline from '@/modules/analytics/components/MarketTraceTimeline.vue'
 import MarketTraceAlternatives from '@/modules/analytics/components/MarketTraceAlternatives.vue'
 import MarketTraceRejected from '@/modules/analytics/components/MarketTraceRejected.vue'
+import MarketTracePredictionValidation from '@/modules/analytics/components/MarketTracePredictionValidation.vue'
 
 const loading = ref(false)
 const error = ref(false)

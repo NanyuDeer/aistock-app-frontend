@@ -126,3 +126,47 @@ test('candidates 缺 chain.nodes 时 trigger/transmission/result 返回空字符
   assert.equal(presentation!.primaryCause!.transmission, '')
   assert.equal(presentation!.primaryCause!.result, '')
 })
+
+test('toMarketTracePresentation 映射 prediction_validation 字段', () => {
+  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
+  record.content.market_trace!.trace!.prediction_validation = {
+    status: 'partial',
+    sector_hits: [
+      { sector: '券商', morning_direction: 'bullish', actual_direction: 'bearish', result: 'miss', deviation_note: '政策未兑现' },
+      { sector: '军工', morning_direction: 'bullish', actual_direction: 'bullish', result: 'hit' },
+    ],
+    event_hits: [
+      { event_title: '政治局会议', morning_direction: 'bullish', actual_impact: '利好兑现', result: 'hit', note: '符合预期' },
+    ],
+    overall_note: '部分偏离',
+  }
+  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.ok(presentation!.predictionValidation, 'predictionValidation 不应为 null')
+  assert.equal(presentation!.predictionValidation!.status, 'partial')
+  assert.equal(presentation!.predictionValidation!.sectorHits.length, 2)
+  assert.equal(presentation!.predictionValidation!.sectorHits[0]!.sector, '券商')
+  assert.equal(presentation!.predictionValidation!.sectorHits[0]!.morningDirection, 'bullish')
+  assert.equal(presentation!.predictionValidation!.sectorHits[0]!.actualDirection, 'bearish')
+  assert.equal(presentation!.predictionValidation!.sectorHits[0]!.result, 'miss')
+  assert.equal(presentation!.predictionValidation!.sectorHits[0]!.deviationNote, '政策未兑现')
+  assert.equal(presentation!.predictionValidation!.sectorHits[1]!.result, 'hit')
+  assert.equal(presentation!.predictionValidation!.sectorHits[1]!.deviationNote, '')
+  assert.equal(presentation!.predictionValidation!.eventHits.length, 1)
+  assert.equal(presentation!.predictionValidation!.eventHits[0]!.eventTitle, '政治局会议')
+  assert.equal(presentation!.predictionValidation!.eventHits[0]!.morningDirection, 'bullish')
+  assert.equal(presentation!.predictionValidation!.eventHits[0]!.actualImpact, '利好兑现')
+  assert.equal(presentation!.predictionValidation!.eventHits[0]!.result, 'hit')
+  assert.equal(presentation!.predictionValidation!.eventHits[0]!.note, '符合预期')
+  assert.equal(presentation!.predictionValidation!.overallNote, '部分偏离')
+})
+
+test('prediction_validation 缺失时 predictionValidation 为 null', () => {
+  // record0723 fixture 不含 prediction_validation 字段
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+  )
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.equal(presentation!.predictionValidation, null)
+})

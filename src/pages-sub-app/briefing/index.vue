@@ -65,7 +65,6 @@
                 {{ sentimentLabel(entry.item.sentiment) }}
               </text>
             </view>
-            <text v-if="entry.item.source !== 'hot_burst'" class="insight-title">{{ entry.item.title }}</text>
             <text class="insight-conclusion">{{ entry.item.conclusion }}</text>
             <view v-if="entry.item.relatedTags.length" class="insight-tags">
               <text
@@ -174,6 +173,7 @@ import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { getEventList } from '@/modules/chat/event/api/eventApi'
+import { usePodcastStore } from '@/shared/store/modules/podcast'
 
 const currentDate = ref('')
 const broadcastType = ref<BriefType>('morning')
@@ -182,6 +182,8 @@ const report = ref<BroadcastV1 | null>(null)
 const items = ref<BriefingItem[]>([])
 const isPlaying = ref(false)
 const audioContext = ref<UniApp.InnerAudioContext | null>(null)
+/** 悬浮播报 store：退出页面时把播放移交悬浮窗续播 */
+const podcastStore = usePodcastStore()
 
 /** 无当日报告时最多向前回退的自然日数（覆盖周末与长假缺口）。 */
 const MAX_FALLBACK_DAYS = 7
@@ -426,6 +428,18 @@ onLoad((options) => {
 })
 
 onUnmounted(() => {
+  // 播放中退出页面：把音频移交悬浮播报继续播放（从当前进度续播），避免退出即暂停
+  if (audioContext.value && isPlaying.value) {
+    const filename = audioPath.value?.split('/').pop() || ''
+    const url = `${API_BASE_URL}/agent/audio/${filename}`
+    const label = broadcastType.value === 'morning' ? 'AI 早报' : 'AI 晚报'
+    podcastStore.playDirect(
+      url,
+      `briefing-${broadcastType.value}-${currentDate.value}`,
+      label,
+      audioContext.value.currentTime || 0,
+    )
+  }
   if (audioContext.value) {
     audioContext.value.destroy()
     audioContext.value = null
@@ -632,9 +646,11 @@ onUnmounted(() => {
 }
 
 .insight-source {
-  font-size: 24rpx;
+  /* 统一为单标题：来源标签升级为标题样式（替代原条目标题） */
+  font-size: 28rpx;
   font-weight: 600;
-  color: $ink-soft;
+  color: $ink;
+  line-height: 1.4;
 }
 
 .sentiment-badge {
@@ -657,15 +673,6 @@ onUnmounted(() => {
     background: rgba(148, 163, 184, 0.10);
     color: #64748b;
   }
-}
-
-.insight-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: $ink;
-  line-height: 1.4;
-  display: block;
-  margin-bottom: 8rpx;
 }
 
 .insight-conclusion {
