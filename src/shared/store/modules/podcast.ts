@@ -23,6 +23,17 @@ export const usePodcastStore = defineStore('podcast', () => {
   const status = ref<PodcastStatus>('idle')
   const audioUrl = ref('')
   const errorMsg = ref('')
+  /** 直接播放模式：悬浮窗挂载后自动播放（用于早报/晚报退出页面后续播） */
+  const autoplay = ref(false)
+  /** 直接播放模式的续播起点（秒），配合 autoplay 从上次进度继续 */
+  const startTime = ref(0)
+  /** 当前是否正在播放（由 FloatingPodcast 同步，用于悬浮球旋转等 UI） */
+  const playing = ref(false)
+
+  /** 同步播放状态（FloatingPodcast 的 AudioPlayer play/pause/ended 事件驱动） */
+  function setPlaying(value: boolean) {
+    playing.value = value
+  }
 
   /** 打开播报：注入文本并自动生成/复用音频 */
   async function open(nextText: string, nextKey: string, nextTitle?: string) {
@@ -42,6 +53,28 @@ export const usePodcastStore = defineStore('podcast', () => {
     visible.value = true
     expanded.value = true
     await generate()
+  }
+
+  /**
+   * 直接播放已有音频（跳过文本合成）：用于早报/晚报等页面退出时把播放移交悬浮窗。
+   * 挂载后自动播放，并从 resumeAt 处续播；默认收起为悬浮球（不展开播放条）。
+   */
+  function playDirect(url: string, nextKey: string, nextTitle: string, resumeAt = 0) {
+    if (!url || !nextKey) return
+    audioUrl.value = url
+    cacheKey.value = nextKey
+    title.value = nextTitle || 'AI 播报'
+    status.value = 'ready'
+    errorMsg.value = ''
+    visible.value = true
+    expanded.value = false
+    autoplay.value = true
+    startTime.value = Math.max(0, resumeAt)
+  }
+
+  /** 自动播放消费完成后复位（由 AudioPlayer 首次 play 事件触发，避免收起再展开时重复自动播放） */
+  function consumeAutoplay() {
+    autoplay.value = false
   }
 
   /** 生成播报音频（文本裁剪到 250 字，与后端校验一致） */
@@ -79,6 +112,9 @@ export const usePodcastStore = defineStore('podcast', () => {
     status.value = 'idle'
     audioUrl.value = ''
     errorMsg.value = ''
+    autoplay.value = false
+    startTime.value = 0
+    playing.value = false
   }
 
   return {
@@ -90,7 +126,13 @@ export const usePodcastStore = defineStore('podcast', () => {
     status,
     audioUrl,
     errorMsg,
+    autoplay,
+    startTime,
+    playing,
     open,
+    playDirect,
+    consumeAutoplay,
+    setPlaying,
     generate,
     expand,
     collapse,

@@ -122,8 +122,11 @@ const props = withDefaults(defineProps<{
   cover?: string
   /** 是否自动播放 */
   autoplay?: boolean
+  /** 自动播放时的起始进度（秒），配合 autoplay 实现退出页面后续播 */
+  initialTime?: number
 }>(), {
-  autoplay: false
+  autoplay: false,
+  initialTime: 0,
 })
 
 const emit = defineEmits<{
@@ -334,7 +337,7 @@ watch(() => props.src, (src) => {
   playing.value = false
   setupEngine(src)
   if (src && props.autoplay) {
-    nextTick(() => engine?.play())
+    nextTick(() => playFromInitial())
   }
 })
 
@@ -342,10 +345,17 @@ onMounted(() => {
   if (props.src) {
     setupEngine(props.src)
     if (props.autoplay) {
-      nextTick(() => engine?.play())
+      nextTick(() => playFromInitial())
     }
   }
 })
+
+/** 自动播放并跳到指定进度（续播场景）；播放被浏览器拦截时静默，用户可手动点击 */
+function playFromInitial() {
+  if (!engine) return
+  if (props.initialTime > 0) engine.seek(props.initialTime)
+  engine.play()
+}
 
 onUnmounted(() => {
   engine?.destroy()

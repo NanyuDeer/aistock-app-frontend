@@ -2,6 +2,18 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-05 — 播报续播：早报/晚报退出页面移交悬浮窗续播
+
+**开发者**: Aria
+
+### 改进
+- `src/pages-sub-app/briefing/index.vue`：退出页面时把播放移交悬浮窗续播（从当前进度续播）；移除冗余条目标题，来源标签升级为标题样式
+- `src/shared/components/AudioPlayer.vue`：新增 `initialTime` 属性（自动播放时跳到指定进度，实现续播）；播放被浏览器拦截时静默
+- `src/shared/components/FloatingPodcast.vue`：收起态保持 AudioPlayer 挂载（音频持续播放，仅视觉隐藏）；播放中悬浮球图标持续旋转；新增 play/pause/ended 事件同步
+- `src/shared/store/modules/podcast.ts`：新增 `playDirect`（直接播放已有音频，跳过文本合成）、`setPlaying`/`consumeAutoplay`（同步播放状态）、`autoplay`/`startTime`/`playing` 状态字段
+
+---
+
 ## [changer] 2026-08-05 — ChatAgent P9 会话管理（会话列表页 + 多会话 store + 会话 API 层）
 
 **开发者**: Aria
