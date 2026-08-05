@@ -31,7 +31,7 @@ export default defineConfig({
     // 与 Vitest 不兼容（依赖 import.meta.url + readFileSync 加载 .vue 源码），
     // 由 package.json 的 "test:node" 脚本单独运行，不在 vitest 采集范围内。
     // 例外：以下两个 vitest 风格（import from 'vitest'）spec 显式纳入，
-    // 供 Task 2 (P3-fix) 的 useChatStream / ReasoningCard 单测使用。
+    // 供 Task 2 (P3-fix) 的 useChatStream / ReasoningPanel 单测使用。
     include: [
       'tests/**/*.test.ts',
       'src/shared/utils/useChatStream.spec.ts',

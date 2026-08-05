@@ -4,7 +4,7 @@ import ReasoningPanel from './ReasoningPanel.vue'
 import type { ReasoningStep, ExecStepNode } from '@/shared/api/modules/agent'
 
 // mp-html 的 uni-app 版 SFC 无法在 vitest 的 @vue/compiler-sfc 下解析（含 uni 特有语法），
-// 单测场景仅需占位渲染 content prop，模块级 mock 替代真实组件（沿用 ReasoningCard.spec 既有做法）。
+// 单测场景仅需占位渲染 content prop，模块级 mock 替代真实组件（沿用 ReasoningPanel.spec 既有 mock 做法）。
 vi.mock('mp-html/dist/uni-app/components/mp-html/mp-html', () => ({
   default: { name: 'mp-html', props: ['content'], template: '<div><slot />{{ content }}</div>' },
 }))
