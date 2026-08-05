@@ -209,6 +209,15 @@ function normalizeFavorites(payload: UserFavoritesPayload | null | undefined): F
 export interface WindLeaderAiAnalysis {
   persistence?: string
   persistence_reason?: string
+  long_term_days?: number
+  long_confidence?: number
+  logic_type?: string
+  long_reason?: string
+  short_term_days?: number
+  short_heat?: number
+  heat_stage?: string
+  short_reason?: string
+  driver_type?: string
   heat_transfer?: boolean
   transfer_direction?: string
   transfer_reason?: string
@@ -256,17 +265,25 @@ export interface WindLeaderSector {
   code?: string
   name: string
   type?: string
+  /** 短线风口 / 长线风口 / 长线+短线风口（AI 八字段推导），缺省按 short 兼容存量 */
+  cycle?: 'short' | 'long' | 'both'
   frequency?: number | string
+  freq20?: number
+  freq_delta?: number
   avg_change?: number
   today_change?: number
-  amount_trend?: number
   net_inflow?: number
+  driver_type?: string
+  ma60_status?: string
+  vol_trend?: string
+  turnover?: number
+  limit_up_count?: number
+  max_boards?: number
   score?: number
   leading_stock?: string
   leading_change?: number
   up_count?: number
   down_count?: number
-  driver?: string
   ai_analysis?: WindLeaderAiAnalysis | string | null
   main_stocks?: WindLeaderStock[]
   upstream_stocks?: WindLeaderStock[]
