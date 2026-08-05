@@ -50,6 +50,30 @@
             <text class="insight-card-action insight-card-action--trend">查看详情 ›</text>
           </view>
         </Card>
+
+        <!-- 自选股洞察卡片 -->
+        <Card clickable class="insight-card--watchlist" @click="goWatchlistInsight">
+          <view class="insight-card-header">
+            <view class="insight-card-icon insight-card-icon--watchlist">
+              <SvgIcon name="star-line" size="32rpx" color="#ffffff" />
+            </view>
+            <view class="insight-card-header-text">
+              <text class="insight-card-title">自选股洞察</text>
+              <text class="insight-card-desc">自选股出现异动时将在此生成洞察</text>
+            </view>
+            <text class="insight-card-more">›</text>
+          </view>
+          <view v-if="watchlistPreview.length" class="insight-preview">
+            <view v-for="(item, idx) in watchlistPreview" :key="idx" class="preview-item">
+              <Badge size="sm">{{ idx + 1 }}</Badge>
+              <text class="preview-name">{{ item.name }}</text>
+              <Tag size="sm" type="neutral">{{ item.label }}</Tag>
+            </view>
+          </view>
+          <view class="insight-card-footer">
+            <text class="insight-card-action insight-card-action--watchlist">查看详情 ›</text>
+          </view>
+        </Card>
       </view>
     </PageCard>
 
@@ -65,6 +89,7 @@ import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { Card, Badge, Tag } from '@/shared/components'
 import { trendScoreApi } from '@/shared/api/modules/trend-score'
+import { watchlistInsightApi } from '@/shared/api/modules/insight'
 
 const hotBurstPreview = ref([
   { name: '舒泰神', count: 3 },
@@ -73,6 +98,8 @@ const hotBurstPreview = ref([
 ])
 
 const trendScorePreview = ref<Array<{ name: string; score: number; label: string }>>([])
+
+const watchlistPreview = ref<Array<{ name: string; label: string }>>([])
 
 async function loadTrendScorePreview() {
   try {
@@ -95,7 +122,29 @@ function goTrendScore() {
   uni.navigateTo({ url: '/modules/analytics/pages/trend-score' })
 }
 
+function goWatchlistInsight() {
+  uni.navigateTo({ url: '/modules/favorites/pages/insight' })
+}
+
+// 与 insight.vue 保持一致的置信度文案
+function confidenceText(c: string): string {
+  return { high: '高置信', medium: '中置信', low: '低置信' }[c as 'high' | 'medium' | 'low'] || c
+}
+
+async function loadWatchlistPreview() {
+  try {
+    const items = await watchlistInsightApi.getInsights()
+    watchlistPreview.value = items.slice(0, 3).map((item) => ({
+      name: item.stock_name || item.symbol,
+      label: item.confidence ? confidenceText(item.confidence) : '',
+    }))
+  } catch {
+    watchlistPreview.value = []
+  }
+}
+
 onShow(loadTrendScorePreview)
+onShow(loadWatchlistPreview)
 </script>
 
 <style lang="scss" scoped>
@@ -142,6 +191,23 @@ onShow(loadTrendScorePreview)
   }
 }
 
+/* 自选股洞察 — 顶部青色装饰条 */
+.insight-card--watchlist {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 24rpx;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4rpx;
+    background: linear-gradient(90deg, $accent, $accent-deep);
+  }
+}
+
 /* ===== 卡片头部 ===== */
 .insight-card-header {
   display: flex;
@@ -168,6 +234,11 @@ onShow(loadTrendScorePreview)
 .insight-card-icon--trend {
   background: linear-gradient(135deg, $primary, $primary-600);
   box-shadow: 0 4rpx 12rpx rgba(77, 124, 254, 0.3);
+}
+
+.insight-card-icon--watchlist {
+  background: linear-gradient(135deg, $accent, $accent-deep);
+  box-shadow: 0 4rpx 12rpx rgba(0, 184, 255, 0.3);
 }
 
 .insight-card-header-text {
@@ -240,5 +311,10 @@ onShow(loadTrendScorePreview)
 .insight-card-action--trend {
   color: $primary;
   background: $primary-50;
+}
+
+.insight-card-action--watchlist {
+  color: $accent;
+  background: $accent-50;
 }
 </style>
