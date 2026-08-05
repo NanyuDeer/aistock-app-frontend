@@ -111,6 +111,35 @@
             <text class="cycle-hint">长线风口=月线多头排列且同比环比向上；短线风口=60日波段活跃但月线未确认</text>
           </Card>
 
+          <Card v-if="effectiveIntent === 'wind_leader'" class="stream-section">
+            <view class="cycle-header">
+              <text class="section-title">风口板块</text>
+              <Segmented v-model="activeCycle" :items="CYCLE_OPTIONS" />
+            </view>
+
+            <view v-if="windSectorsError" class="sector-degraded">风口板块数据加载失败</view>
+
+            <view v-else-if="displayWindSectors.length" class="sector-card-list">
+              <view
+                v-for="(sector, idx) in displayWindSectors"
+                :key="sector.code || idx"
+                class="sector-entry-card"
+              >
+                <view class="sector-entry-top">
+                  <text class="sector-entry-name">{{ sector.name }}</text>
+                  <Tag :type="windCycleTagType(sector)" size="sm">{{ windCycleText(sector) }}</Tag>
+                </view>
+                <view class="sector-entry-stats">
+                  <text class="sector-entry-stat">今日涨幅 {{ formatPct(sector.today_change) }}</text>
+                  <text v-if="sector.frequency" class="sector-entry-stat">上榜 {{ sector.frequency }} 次</text>
+                  <text class="sector-entry-stat">龙头 {{ sector.leading_stock || '--' }}</text>
+                </view>
+              </view>
+            </view>
+
+            <view v-else-if="windSectors.length" class="sector-empty">{{ windEmptyTitle }}</view>
+          </Card>
+
           <Card v-if="leaderStocks.length" class="stream-section">
             <text class="section-title">龙头股</text>
             <view class="stock-tags">
@@ -282,13 +311,15 @@
 import { ref, computed } from 'vue'
 import { onLoad, onBackPress } from '@dcloudio/uni-app'
 import { agentApi, isPublicReportIntent } from '@/shared/api/modules/agent'
+import { stockApi } from '@/shared/api/modules/stock'
+import type { WindLeaderSector } from '@/shared/api/modules/stock'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import { formatDate, formatDateTime } from '@/shared/utils/datetime'
 import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
-import { LoadingState, EmptyState, Card, Tag, Button } from '@/shared/components'
+import { LoadingState, EmptyState, Card, Tag, Button, Segmented } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 // ===== Markdown 分区解析工具（参考 hot-burst-report 模式）=====
@@ -453,6 +484,55 @@ const canBackToOverview = computed(() => !intent.value && !!selectedIntent.value
 
 /** 当前生效的 intent */
 const effectiveIntent = computed(() => selectedIntent.value || intent.value)
+
+// ===== 风口板块区块（短/长线分类，数据驱动自 /api/cn/wind-leaders） =====
+const CYCLE_OPTIONS = [
+  { label: '全部', value: 'all' },
+  { label: '长线风口', value: 'long' },
+  { label: '短线风口', value: 'short' },
+]
+
+const windSectors = ref<WindLeaderSector[]>([])
+const windSectorsError = ref(false)
+const activeCycle = ref<'all' | 'long' | 'short'>('all')
+
+const displayWindSectors = computed(() =>
+  activeCycle.value === 'all'
+    ? windSectors.value
+    : windSectors.value.filter(s => (s.cycle ?? 'short') === activeCycle.value)
+)
+
+const windEmptyTitle = computed(() => {
+  if (activeCycle.value === 'long') return '暂无长线风口数据'
+  if (activeCycle.value === 'short') return '暂无短线风口数据'
+  return '暂无风口板块数据'
+})
+
+function windCycleText(s: WindLeaderSector): string {
+  return (s.cycle ?? 'short') === 'long' ? '长线风口' : '短线风口'
+}
+
+function windCycleTagType(s: WindLeaderSector): 'down' | 'warning' {
+  return (s.cycle ?? 'short') === 'long' ? 'down' : 'warning'
+}
+
+/** 报告页额外拉取风口板块（与 leaders.vue 同源）；失败降级不阻塞报告 */
+async function loadWindSectors() {
+  if (windSectors.value.length || windSectorsError.value) return
+  try {
+    const data = await stockApi.getWindLeaders(10)
+    windSectors.value = (Array.isArray(data?.hot_sectors) ? data.hot_sectors : []).filter(
+      (s): s is WindLeaderSector => Boolean(s && typeof s.name === 'string' && s.name.trim())
+    )
+  } catch {
+    windSectorsError.value = true
+  }
+}
+
+function formatPct(val?: number | null): string {
+  if (val === undefined || val === null) return '--'
+  return Number(val).toFixed(2) + '%'
+}
 
 const pageTitle = computed(() => {
   if (isOverview.value) return '今日分析概览'
@@ -663,6 +743,10 @@ async function loadReport() {
       isFallbackReport.value = false
     }
     report.value = data
+    // 风口龙头报告页额外拉取风口板块数据（失败降级不阻塞报告）
+    if (effectiveIntent.value === 'wind_leader') {
+      void loadWindSectors()
+    }
   } catch {
     report.value = null
     isFallbackReport.value = false
@@ -1158,5 +1242,61 @@ onBackPress(() => {
 .date-btn-text {
   font-size: 24rpx;
   color: $primary;
+}
+
+/* 风口板块区块（短/长线分类切换） */
+.cycle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.sector-degraded {
+  font-size: 24rpx;
+  color: #9ca3af;
+  padding: 16rpx 0;
+}
+
+.sector-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.sector-entry-card {
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+  padding: 20rpx 24rpx;
+}
+
+.sector-entry-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.sector-entry-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: $ink;
+}
+
+.sector-entry-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.sector-entry-stat {
+  font-size: 22rpx;
+  color: $ink-soft;
+}
+
+.sector-empty {
+  font-size: 24rpx;
+  color: #9ca3af;
+  padding: 16rpx 0;
 }
 </style>
