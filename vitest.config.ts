@@ -35,6 +35,7 @@ export default defineConfig({
     include: [
       'tests/**/*.test.ts',
       'src/shared/utils/useChatStream.spec.ts',
+      'src/shared/utils/parseMarkdownSections.spec.ts',
       'src/pages-sub-app/chat/ReasoningPanel.spec.ts',
       'src/shared/store/modules/market.spec.ts',
       'src/modules/home/components/StockContent.spec.ts',
