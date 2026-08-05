@@ -2,6 +2,16 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-05 — 今日分析概览页新增晚报（收盘复盘）入口与结构化展示
+
+**开发者**: Aria
+
+### 新增
+- `src/modules/chat/pages/agent-report.vue`：概览模式新增「收盘复盘」卡片（AGENT_META review：moon-line 图标 + 紫色主题，排在 trend_score 之后）；详情模式新增 review 结构化展示（参考晨报分区：收盘结论 / 确认的市场现象 / 归因结论 / 预判对照 / 候选解释与反证 / 风险提示），`conclusion-card--review` 紫色主题色
+- `src/shared/api/modules/agent.ts`：`PUBLIC_REPORT_INTENTS` 加入 `review`，支持从 URL `?intent=review` 直达详情
+
+---
+
 ## [master] 2026-08-05 — 播报续播：早报/晚报退出页面移交悬浮窗续播
 
 **开发者**: Aria

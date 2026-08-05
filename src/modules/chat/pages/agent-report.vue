@@ -268,6 +268,49 @@
           </Card>
         </template>
 
+        <!-- ===== 收盘复盘（review）：大盘溯源结构化（参考晨报分区） ===== -->
+        <template v-else-if="isReviewIntent && displayReport">
+          <Card v-if="reportSummary" class="conclusion-card conclusion-card--review">
+            <text class="section-kicker">收盘结论</text>
+            <text class="conclusion-text">{{ reportSummary }}</text>
+          </Card>
+
+          <Card v-if="reviewPhenomenonHtml" class="stream-section">
+            <text class="section-title">确认的市场现象</text>
+            <view class="report-text-wrap">
+              <mp-html :content="reviewPhenomenonHtml" class="report-html" />
+            </view>
+          </Card>
+
+          <Card v-if="reviewAttributionHtml" class="stream-section">
+            <text class="section-title">归因结论</text>
+            <view class="report-text-wrap">
+              <mp-html :content="reviewAttributionHtml" class="report-html" />
+            </view>
+          </Card>
+
+          <Card v-if="reviewPredictionHtml" class="stream-section">
+            <text class="section-title">预判对照</text>
+            <view class="report-text-wrap">
+              <mp-html :content="reviewPredictionHtml" class="report-html" />
+            </view>
+          </Card>
+
+          <Card v-if="reviewCandidatesHtml" class="stream-section">
+            <text class="section-title">候选解释与反证</text>
+            <view class="report-text-wrap">
+              <mp-html :content="reviewCandidatesHtml" class="report-html" />
+            </view>
+          </Card>
+
+          <Card v-if="risks.length" class="risk-card stream-section">
+            <text class="section-title">风险提示</text>
+            <view class="bullet-list">
+              <text v-for="(risk, i) in risks" :key="i" class="risk-item">{{ risk }}</text>
+            </view>
+          </Card>
+        </template>
+
         <!-- ===== 兜底：其他 intent 用 mp-html 渲染 ===== -->
         <template v-else-if="displayReport">
           <Card v-if="reportSummary" class="conclusion-card">
@@ -454,17 +497,19 @@ const AGENT_META: Record<string, AgentMeta> = {
   wind_leader: { title: '长线风口', icon: 'windy-line', color: '#0b5fff', bgColor: '#0b5fff', desc: '中长期赛道与龙头股追踪' },
   hot_burst: { title: '机构调研', icon: 'eye-line', color: '#00b8ff', bgColor: '#00b8ff', desc: '机构调研热门股分析' },
   trend_score: { title: '趋势股评分', icon: 'line-chart-line', color: '#18a058', bgColor: '#18a058', desc: '趋势形态评分排名' },
+  review: { title: '收盘复盘', icon: 'moon-line', color: '#7c5cff', bgColor: '#7c5cff', desc: '收盘后大盘归因分析' },
   broadcast: { title: '双人播报', icon: 'broadcast-line', color: '#0b5fff', bgColor: '#0b5fff', desc: 'AI 双人对话播报' },
 }
 
 /** 概览模式下的 Agent 顺序（不含 broadcast，用户不需要在概览中看到双人播报） */
-const OVERVIEW_ORDER = ['morning', 'wind_leader', 'hot_burst', 'trend_score']
+const OVERVIEW_ORDER = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review']
 
 const titleMap: Record<string, string> = {
   morning: '今日晨报',
   wind_leader: '长线风口分析',
   hot_burst: '机构调研分析',
   trend_score: '趋势股评分分析',
+  review: '收盘复盘',
   broadcast: '双人播报',
 }
 
@@ -565,6 +610,9 @@ const displayReport = computed(() => {
 /** 当前是否为晨报（晨报使用专属布局：摘要+详情+风险，不显示龙头股票） */
 const isMorningIntent = computed(() => effectiveIntent.value === 'morning')
 
+/** 当前是否为收盘复盘（复盘使用专属布局：市场现象+归因+预判对照+候选解释） */
+const isReviewIntent = computed(() => effectiveIntent.value === 'review')
+
 /** 报告摘要（display_report.summary） */
 const reportSummary = computed(() => {
   return displayReport.value?.summary || ''
@@ -593,6 +641,12 @@ const morningDomesticHtml = computed(() => sectionHtml(detailsText.value, '第2�
 const morningSectorHtml = computed(() => sectionHtml(detailsText.value, '第3步：板块与市场情绪'))
 const morningFocusHtml = computed(() => sectionHtml(detailsText.value, '今日焦点板块预测'))
 const morningStrategyHtml = computed(() => sectionHtml(detailsText.value, '第4步：今日关注与策略建议'))
+
+// ===== 收盘复盘（review）结构化分区 =====
+const reviewPhenomenonHtml = computed(() => sectionHtml(detailsText.value, '确认的市场现象'))
+const reviewAttributionHtml = computed(() => sectionHtml(detailsText.value, '归因结论'))
+const reviewPredictionHtml = computed(() => sectionHtml(detailsText.value, '预判对照'))
+const reviewCandidatesHtml = computed(() => sectionHtml(detailsText.value, '候选解释与反证'))
 
 // ===== 长线风口（wind_leader）结构化分区 =====
 interface SectorCard { title: string; body: string }
@@ -1054,6 +1108,14 @@ onBackPress(() => {
   background: linear-gradient(135deg, rgba(24, 160, 88, 0.06), rgba(24, 160, 88, 0.02));
 
   .section-kicker { color: $down; }
+}
+
+/* 收盘复盘主题色：紫（晚间报告，与晨报 sun/橙 区分） */
+.conclusion-card--review {
+  border-left: 6rpx solid #7c5cff;
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.06), rgba(124, 92, 255, 0.02));
+
+  .section-kicker { color: #7c5cff; }
 }
 
 /* 默认 conclusion-card（兜底模板）使用主品牌色 */
