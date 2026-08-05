@@ -45,5 +45,8 @@ export const STORAGE_KEYS = {
   CHAT_HISTORY: 'chat_history',
   // P5-fix（问题 14）：对话 session_id 持久化（刷新后多轮上下文不丢）
   CHAT_SESSION_ID: 'chat_session_id',
+  // P9 会话管理：会话元数据列表镜像 + 按会话分桶的消息
+  CHAT_SESSIONS: 'chat_sessions',
+  CHAT_HISTORY_BY_SESSION: 'chat_history_by_session',
   THEME: 'theme'
 } as const
