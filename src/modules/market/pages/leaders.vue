@@ -24,10 +24,15 @@
 
       <LoadingState v-else-if="loading && !sectors.length" text="正在加载风口龙头数据..." />
 
-      <EmptyState v-else-if="!sectors.length" title="暂无风口龙头数据" description="数据更新后将在这里展示" />
+      <EmptyState v-else-if="!displaySectors.length" :title="cycleEmptyTitle" description="数据更新后将在这里展示" />
+
+      <!-- 短/长线风口切换 -->
+      <view v-if="sectors.length" class="cycle-segmented">
+        <Segmented v-model="activeCycle" full-width :items="CYCLE_OPTIONS" />
+      </view>
 
       <!-- 风口概念泡泡图 -->
-      <view v-if="sectors.length" class="bubble-card">
+      <view v-if="displaySectors.length" class="bubble-card">
         <view class="bubble-title-row">
           <text class="bubble-title">风口概念</text>
           <text class="bubble-hint">泡泡越大持续性越强</text>
@@ -53,9 +58,9 @@
       </view>
 
       <!-- 板块列表（入口卡片，点击进入板块详情子页面） -->
-      <view v-if="sectors.length" class="sector-list">
+      <view v-if="displaySectors.length" class="sector-list">
       <view
-        v-for="(sector, idx) in sectors"
+        v-for="(sector, idx) in displaySectors"
         :key="sector.code || idx"
         class="stats-card sector-entry"
         @tap="goSectorDetail(sector)"
@@ -65,6 +70,11 @@
           <view class="stats-title-row">
             <Badge size="sm">No.{{ idx + 1 }}</Badge>
             <text class="stats-name">{{ sector.name }}</text>
+            <Tag
+              v-if="cycleText(sector)"
+              :type="cycleTagType(sector)"
+              size="sm"
+            >{{ cycleText(sector) }}</Tag>
             <Tag
               v-if="persistenceText(sector)"
               :type="persistenceTagType(sector)"
@@ -122,7 +132,7 @@ import type { WindLeaderAiAnalysis, WindLeaderSector, WindLeaderStock } from '@/
 import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid } from '@/shared/components'
+import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid, Segmented } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
 import { useReportPodcast } from '@/shared/utils/useReportPodcast'
 
@@ -133,6 +143,39 @@ const errorMessage = ref('')
 const sectors = ref<WindLeaderSector[]>([])
 const updateTime = ref('')
 const favoriteSet = ref<Set<string>>(new Set())
+
+// ===== 短/长线风口切换（全部/长线/短线，cycle 缺省兜底 short） =====
+const CYCLE_OPTIONS = [
+  { label: '全部', value: 'all' },
+  { label: '长线风口', value: 'long' },
+  { label: '短线风口', value: 'short' },
+] as const
+
+const activeCycle = ref<'all' | 'long' | 'short'>('all')
+
+/** 当前档位展示的板块（切换过滤；泡泡图与板块列表共用） */
+const displaySectors = computed(() =>
+  activeCycle.value === 'all'
+    ? sectors.value
+    : sectors.value.filter(s => (s.cycle ?? 'short') === activeCycle.value)
+)
+
+/** 切换档位为空时的标题 */
+const cycleEmptyTitle = computed(() => {
+  if (activeCycle.value === 'long') return '暂无长线风口数据'
+  if (activeCycle.value === 'short') return '暂无短线风口数据'
+  return '暂无风口龙头数据'
+})
+
+/** 板块 cycle 标签文案 */
+function cycleText(s: WindLeaderSector): string {
+  return (s.cycle ?? 'short') === 'long' ? '长线风口' : '短线风口'
+}
+
+/** 板块 cycle 标签颜色：长线=down(品牌色) / 短线=warning(警示色)，对齐 persistenceTagType 语义 */
+function cycleTagType(s: WindLeaderSector): 'down' | 'warning' {
+  return (s.cycle ?? 'short') === 'long' ? 'down' : 'warning'
+}
 
 // ===== 泡泡图数据 =====
 interface Bubble {
@@ -207,7 +250,7 @@ function calcRadius(persistence: string, score: number): number {
 }
 
 const bubbleData = computed<Bubble[]>(() => {
-  const source = sectors.value.slice(0, 10).map(s => ({
+  const source = displaySectors.value.slice(0, 10).map(s => ({
     name: s.name,
     change: s.today_change ?? 0,
     score: s.score ?? 50,
@@ -574,6 +617,11 @@ onShow(() => {
 
 .state-section {
   margin-bottom: 24rpx;
+}
+
+/* 短/长线风口切换 */
+.cycle-segmented {
+  margin-bottom: 20rpx;
 }
 
 /* ===== 泡泡图 ===== */
