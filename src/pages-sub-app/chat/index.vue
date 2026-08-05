@@ -16,13 +16,16 @@
           <view v-else class="msg-content assistant">
             <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
             <view class="bubble">
-              <!-- AI 思考链卡片（顶部，替代原执行过程面板） -->
-              <ReasoningCard v-if="msg.reasoningSteps && msg.reasoningSteps.length > 0" :steps="msg.reasoningSteps" />
+              <!-- P11 T5：思考链 + 执行细节融合面板（问题 9；空 steps/execSteps 时组件自不渲染） -->
+              <ReasoningPanel :steps="msg.reasoningSteps || []" :execSteps="msg.execSteps || []" />
+
+              <!-- P11 T4：结构化卡片（DONE.cards；HTTP 降级/旧协议缺失时不渲染，fallback markdown） -->
+              <CardRenderer v-if="msg.cards && msg.cards.length > 0" :cards="msg.cards" />
 
               <!-- Markdown 渲染的回复内容 -->
               <mp-html v-if="msg.content" :content="markdownToHtml(msg.content)" class="bubble-html" />
 
-              <!-- D20：深度分析 summary 卡片（仅 deep 结果） -->
+              <!-- D20：深度分析 summary 卡片（仅 deep 结果；保留兼容旧消息/HTTP 降级无 cards 字段） -->
               <DeepSummaryCard v-if="msg.lastDeepReport" :report="msg.lastDeepReport" />
 
               <!-- D4：force_deep「深度分析」按钮（仅非 deep / 非错误回复） -->
@@ -42,10 +45,11 @@
         <view v-if="isStreaming" class="message-item assistant streaming-message">
           <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
           <view class="bubble">
-            <!-- P3-fix-2 T2：AI 思考链（流式 dot 动画，steps 含 streaming 时自动展开） -->
-            <ReasoningCard
+            <!-- P11 T5：AI 思考链（流式 dot 动画，steps 含 streaming 时自动展开；执行细节流式中无数据） -->
+            <ReasoningPanel
               v-if="streamingReasoning.length > 0"
               :steps="streamingReasoning"
+              :execSteps="[]"
             />
             <!-- 实时进度步骤 -->
             <view v-if="progressSteps.length > 0" class="progress-card">
@@ -106,12 +110,11 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 import DeepSummaryCard from './DeepSummaryCard.vue'
-import ReasoningCard from './ReasoningCard.vue'
+import ReasoningPanel from './ReasoningPanel.vue'
+import CardRenderer from './cards/CardRenderer.vue'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
 import { agentApi } from '@/shared/api/modules/agent'
-// ExecStepsPanel 保留以备 P9 后续可能复用（msg.execSteps 仍随消息下发），但 chat 页面不再使用
-// import ExecStepsPanel from './ExecStepsPanel.vue'
 
 const chatStream = useChatStream()
 const chatStore = useChatStore()

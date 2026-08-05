@@ -18,9 +18,10 @@ test('页面保留对话流核心（流式 + 快捷技能 + 输入）', () => {
   assert.match(pageSource, /class="input-bar"/)
 })
 
-test('深度分析摘要卡片与执行面板组件已接入', () => {
+test('渲染组件已接入（ReasoningPanel/CardRenderer/DeepSummaryCard 兼容字段）', () => {
   assert.match(pageSource, /DeepSummaryCard/)
-  assert.match(pageSource, /ExecStepsPanel/)
+  assert.match(pageSource, /ReasoningPanel/)
+  assert.match(pageSource, /CardRenderer/)
   assert.match(pageSource, /lastDeepReport/)
   assert.match(pageSource, /execSteps/)
 })
@@ -30,9 +31,19 @@ test('force_deep 深度分析按钮已接入（仅非 deep 回复显示）', () 
   assert.match(pageSource, /forceDeep: true/)
 })
 
-test('流式过程块渲染 ReasoningCard（streamingReasoning 绑定，dot 动画）', () => {
+test('流式过程块渲染 ReasoningPanel（streamingReasoning 绑定，dot 动画）', () => {
   assert.match(pageSource, /streamingReasoning/)
-  assert.match(pageSource, /<ReasoningCard\s+v-if="streamingReasoning\.length > 0"/)
+  assert.match(pageSource, /<ReasoningPanel\s+v-if="streamingReasoning\.length > 0"/)
+})
+
+test('AI 气泡渲染顺序：ReasoningPanel → CardRenderer → mp-html → DeepSummaryCard', () => {
+  const order = (re: RegExp) => pageSource.search(re)
+  const reasoning = order(/<ReasoningPanel/)
+  const renderer = order(/<CardRenderer/)
+  const html = order(/<mp-html/)
+  const deep = order(/<DeepSummaryCard/)
+  assert.ok(reasoning !== -1 && renderer !== -1 && html !== -1 && deep !== -1)
+  assert.ok(reasoning < renderer && renderer < html && html < deep)
 })
 
 test('P9 会话管理：标题旁会话入口 + onLoad 自动建会话 + 首次消息 upsert', () => {
