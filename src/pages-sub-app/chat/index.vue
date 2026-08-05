@@ -92,6 +92,9 @@
         </view>
       </view>
 
+      <!-- P11 T6：计费条（用户累计 + 本次会话本地累加；P10 只展示用量，不做支付） -->
+      <UsageBar />
+
       <!-- 输入框 -->
       <view class="input-bar">
         <input v-model="inputText" placeholder="输入消息..." class="input" @confirm="handleSend" />
@@ -112,6 +115,7 @@ import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 import DeepSummaryCard from './DeepSummaryCard.vue'
 import ReasoningPanel from './ReasoningPanel.vue'
 import CardRenderer from './cards/CardRenderer.vue'
+import UsageBar from './UsageBar.vue'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
 import { agentApi } from '@/shared/api/modules/agent'
@@ -223,14 +227,15 @@ onUnmounted(() => {
 .message-item { margin-bottom: 24rpx; }
 .message-item.user { display: flex; justify-content: flex-end; }
 .msg-content.user {
-  background: $primary; color: #fff; border-radius: 16rpx 16rpx 4rpx 16rpx; padding: 16rpx 24rpx;
+  background: $brand-gradient; color: #fff; border-radius: 16rpx 16rpx 4rpx 16rpx; padding: 16rpx 24rpx;
   max-width: 70%; font-size: 28rpx; line-height: 1.5;
+  box-shadow: $shadow-primary;
 }
 .msg-content.assistant { display: flex; gap: 12rpx; }
 .avatar { font-size: 40rpx; flex-shrink: 0; }
 .bubble {
-  background: #ffffff; border-radius: 16rpx 16rpx 16rpx 4rpx; padding: 16rpx 24rpx;
-  max-width: 80%; box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  background: #ffffff; border-radius: $r-lg; padding: 16rpx 24rpx;
+  max-width: 80%; box-shadow: $shadow-card;
 }
 
 /* 流式消息的头像和内容需要处于同一横向消息行，避免内容未生成时气泡换到头像下一行。 */
@@ -295,7 +300,7 @@ onUnmounted(() => {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .step-label { font-size: 24rpx; color: $ink-soft; }
-.progress-step.done .step-label { color: #9ca3af; }
+.progress-step.done .step-label { color: $ink-mute; }
 
 .quick-skills { display: flex; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; flex-shrink: 0; }
 .skill-btn {

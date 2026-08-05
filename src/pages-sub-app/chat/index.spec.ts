@@ -52,3 +52,22 @@ test('P9 会话管理：标题旁会话入口 + onLoad 自动建会话 + 首次�
   assert.match(pageSource, /createSession\(\)/)
   assert.match(pageSource, /upsertChatSession\(chatStore\.sessionId, content\)/)
 })
+
+test('用户气泡升级为品牌渐变 + 阴影（Design Token）', () => {
+  assert.match(pageSource, /\.msg-content\.user[\s\S]*?background: \$brand-gradient/)
+  assert.match(pageSource, /\.msg-content\.user[\s\S]*?box-shadow: \$shadow-primary/)
+})
+
+test('AI 气泡升级圆角与阴影（Design Token）', () => {
+  assert.match(pageSource, /\.bubble[\s\S]*?border-radius: \$r-lg/)
+  assert.match(pageSource, /\.bubble[\s\S]*?box-shadow: \$shadow-card/)
+})
+
+test('计费条 UsageBar 接入（快捷按钮下、输入栏上）', () => {
+  assert.match(pageSource, /import UsageBar from '\.\/UsageBar\.vue'/)
+  const quickIdx = pageSource.indexOf('class="quick-skills"')
+  const usageIdx = pageSource.indexOf('<UsageBar')
+  const inputIdx = pageSource.indexOf('class="input-bar"')
+  assert.ok(quickIdx !== -1 && usageIdx !== -1 && inputIdx !== -1)
+  assert.ok(quickIdx < usageIdx && usageIdx < inputIdx)
+})
