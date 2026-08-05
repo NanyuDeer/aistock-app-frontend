@@ -71,3 +71,7 @@ test('计费条 UsageBar 接入（快捷按钮下、输入栏上）', () => {
   assert.ok(quickIdx !== -1 && usageIdx !== -1 && inputIdx !== -1)
   assert.ok(quickIdx < usageIdx && usageIdx < inputIdx)
 })
+
+test('deep 卡片经 CardRenderer 渲染时不再重复渲染 DeepSummaryCard（兼容回退守卫）', () => {
+  assert.match(pageSource, /msg\.cards\?\.some\(c => c\.card_type === 'deep'\)/)
+})

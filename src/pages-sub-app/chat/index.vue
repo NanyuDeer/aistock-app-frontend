@@ -26,7 +26,11 @@
               <mp-html v-if="msg.content" :content="markdownToHtml(msg.content)" class="bubble-html" />
 
               <!-- D20：深度分析 summary 卡片（仅 deep 结果；保留兼容旧消息/HTTP 降级无 cards 字段） -->
-              <DeepSummaryCard v-if="msg.lastDeepReport" :report="msg.lastDeepReport" />
+              <!-- 最终审查修复：DONE 同时返回 last_deep_report 与 deep 卡时，仅由 CardRenderer 渲染（spec §4.2/§6 主路径），DeepSummaryCard 仅在无 deep 卡时作为兼容回退 -->
+              <DeepSummaryCard
+                v-if="msg.lastDeepReport && !(msg.cards?.some(c => c.card_type === 'deep'))"
+                :report="msg.lastDeepReport"
+              />
 
               <!-- D4：force_deep「深度分析」按钮（仅非 deep / 非错误回复） -->
               <view
