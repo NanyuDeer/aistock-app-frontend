@@ -149,7 +149,7 @@ const CYCLE_OPTIONS = [
   { label: '全部', value: 'all' },
   { label: '长线风口', value: 'long' },
   { label: '短线风口', value: 'short' },
-] as const
+]
 
 const activeCycle = ref<'all' | 'long' | 'short'>('all')
 
@@ -1034,6 +1034,21 @@ onShow(() => {
   padding: 8rpx 16rpx;
   background: rgba(77, 124, 254, 0.1);
   border-radius: 8rpx;
+}
+
+/* 标题栏右侧操作区：播报图标 + 历史推送（与其他报告页保持一致，修复错位） */
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.header-podcast-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .history-btn-text {
