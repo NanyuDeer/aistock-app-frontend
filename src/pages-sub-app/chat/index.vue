@@ -22,8 +22,14 @@
               <!-- P11 T4：结构化卡片（DONE.cards；HTTP 降级/旧协议缺失时不渲染，fallback markdown） -->
               <CardRenderer v-if="msg.cards && msg.cards.length > 0" :cards="msg.cards" />
 
-              <!-- Markdown 渲染的回复内容 -->
-              <mp-html v-if="msg.content" :content="markdownToHtml(msg.content)" class="bubble-html" />
+              <!-- 改进 14：分节卡片化渲染（有分节时 SectionCard 列表，无分节时回退 mp-html） -->
+              <template v-if="msg.content">
+                <template v-for="(sec, si) in getSections(msg.content) ?? []" :key="si">
+                  <mp-html v-if="!sec.title" :content="markdownToHtml(sec.body)" class="bubble-html" />
+                  <SectionCard v-else :variant="sec.variant" :title="sec.title" :body="sec.body" />
+                </template>
+                <mp-html v-if="!getSections(msg.content)" :content="markdownToHtml(msg.content)" class="bubble-html" />
+              </template>
 
               <!-- D20：深度分析 summary 卡片（仅 deep 结果；保留兼容旧消息/HTTP 降级无 cards 字段） -->
               <!-- 最终审查修复：DONE 同时返回 last_deep_report 与 deep 卡时，仅由 CardRenderer 渲染（spec §4.2/§6 主路径），DeepSummaryCard 仅在无 deep 卡时作为兼容回退 -->
@@ -120,6 +126,8 @@ import DeepSummaryCard from './DeepSummaryCard.vue'
 import ReasoningPanel from './ReasoningPanel.vue'
 import CardRenderer from './cards/CardRenderer.vue'
 import UsageBar from './UsageBar.vue'
+import SectionCard from './cards/SectionCard.vue'
+import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
 import { agentApi } from '@/shared/api/modules/agent'
@@ -187,7 +195,19 @@ function scrollToBottom() {
 }
 
 /**
- * D4：light 误判一键升级——以 force_deep=true 重发该条回复前最近一条 user 消息。
+ * 改进 14：将 AI 回复 markdown 按分节识别为 SectionCard 列表。
+ * 无分节（寒暄/科普/无标题纯文本）时返回 null，回退 mp-html 整体渲染。
+ */
+function getSections(content: string): MarkdownSection[] | null {
+  if (!content) return null
+  const parsed = parseMarkdownSections(content)
+  if (parsed.length === 0) return null
+  if (parsed.length === 1 && !parsed[0].title) return null
+  return parsed
+}
+
+/**
+ * D4：light 误判一键升级--以 force_deep=true 重发该条回复前最近一条 user 消息。
  * 闸门短路回复也显示按钮（重复点击返回同话术，无副作用）。
  */
 function rerunDeep(idx: number) {

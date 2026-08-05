@@ -75,3 +75,12 @@ test('计费条 UsageBar 接入（快捷按钮下、输入栏上）', () => {
 test('deep 卡片经 CardRenderer 渲染时不再重复渲染 DeepSummaryCard（兼容回退守卫）', () => {
   assert.match(pageSource, /msg\.cards\?\.some\(c => c\.card_type === 'deep'\)/)
 })
+
+test('改进14：引入 parseMarkdownSections + SectionCard（分节卡片化）', () => {
+  assert.match(pageSource, /parseMarkdownSections/)
+  assert.match(pageSource, /SectionCard/)
+})
+
+test('改进14：AI 气泡内容区支持分节渲染（getSections 函数）', () => {
+  assert.match(pageSource, /getSections/)
+})
