@@ -5,7 +5,7 @@
  */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { agentApi, type ChatMessage, type ChatSessionMeta } from '@/shared/api/modules/agent'
+import { agentApi, type ChatMessage, type ChatSessionMeta, type TokenUsage } from '@/shared/api/modules/agent'
 import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 
 /** 本地标题推导：该会话首条 user 消息 content 前 20 字，空则 '新会话' */
@@ -24,6 +24,11 @@ export const useChatStore = defineStore('chat', () => {
   // P5-fix（问题 14）：sessionId 从 storage 恢复（刷新后多轮上下文不丢）；P9 起它同时是"当前会话 id"
   const sessionId = ref<string>(storage.get(STORAGE_KEYS.CHAT_SESSION_ID) || '')
   const streaming = ref(false)
+
+  // P11 T2：「本次会话」token 本地累加（key = session_id → 累计）。
+  // P9 后 createSession 生成新 session_id → 该会话天然无累计（getCurrentSessionUsage 返回 null），
+  // 无需在 createSession 内显式清空；resetSessionUsage 供全局清空（本 plan 无 UI 入口）。
+  const sessionUsage = ref<Record<string, TokenUsage>>(storage.get(STORAGE_KEYS.CHAT_SESSION_USAGE) || {})
 
   /** 当前会话消息（对外兼容 useChatStream / modules/chat/pages/index.vue 的 messages 消费） */
   const messages = computed<ChatMessage[]>(() => messagesBySession.value[sessionId.value] || [])
@@ -185,7 +190,12 @@ export const useChatStore = defineStore('chat', () => {
     messagesBySession.value = { ...messagesBySession.value, [sid]: next }
     persistHistory()
 
-    // P9：首条 user 消息 → 本地标题取 content 前 20 字
+    // P11 T2：assistant 消息带 tokenUsage 时按当前 sid 自动累加（WS DONE 路径；HTTP 降级无字段不累加）
+    if (msg.role === 'assistant' && msg.tokenUsage && sid) {
+      accumulateSessionUsage(sid, msg.tokenUsage)
+    }
+
+    // P9：首条 user 消息 → 本地标题取 content 前 20 字（保留既有逻辑）
     if (msg.role === 'user' && arr.length === 0) {
       const title = msg.content.trim().slice(0, 20) || '新会话'
       const exists = sessions.value.some((s) => s.session_id === sid)
@@ -205,6 +215,35 @@ export const useChatStore = defineStore('chat', () => {
       sessions.value = []
       persistSessions()
     }
+  }
+
+  /**
+   * P11 T2：按 sessionId 合并累加 token 用量（prompt/completion/total 分别相加）。
+   * 不做后端会话维度（计划 E/线 4 另行做后端会话聚合）。
+   */
+  function accumulateSessionUsage(sid: string, usage: TokenUsage) {
+    const prev = sessionUsage.value[sid]
+    const next: TokenUsage = prev
+      ? {
+          prompt_tokens: prev.prompt_tokens + usage.prompt_tokens,
+          completion_tokens: prev.completion_tokens + usage.completion_tokens,
+          total_tokens: prev.total_tokens + usage.total_tokens,
+        }
+      : { ...usage }
+    sessionUsage.value = { ...sessionUsage.value, [sid]: next }
+    storage.set(STORAGE_KEYS.CHAT_SESSION_USAGE, sessionUsage.value)
+  }
+
+  /** 当前 sessionId 的累计用量；无会话或无数值返回 null */
+  function getCurrentSessionUsage(): TokenUsage | null {
+    const sid = sessionId.value
+    return sid ? sessionUsage.value[sid] ?? null : null
+  }
+
+  /** 清空全部会话累加（P9 createSession 按 session_id 分桶天然清空单会话，本函数供全局清空；无 UI 入口） */
+  function resetSessionUsage() {
+    sessionUsage.value = {}
+    storage.set(STORAGE_KEYS.CHAT_SESSION_USAGE, sessionUsage.value)
   }
 
   /**
@@ -254,5 +293,6 @@ export const useChatStore = defineStore('chat', () => {
     deleteSession,
     syncSessionsFromServer,
     sendMessage,
+    sessionUsage, accumulateSessionUsage, getCurrentSessionUsage, resetSessionUsage, // P11 T2
   }
 })

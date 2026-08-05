@@ -161,4 +161,29 @@ describe('useChatStream reasoning event', () => {
     mockSocketCbs.onMessageCbs[0]({ data: JSON.stringify({ type: 'done', content: 'ok' }) })
     await send1
   })
+
+  it('DONE 解析 token_usage/cards 写入 ChatMessage（WS 新字段）', () => {
+    const stream = useChatStream() as any
+    const onDone = vi.fn()
+
+    stream._testHandleWsMessage({
+      type: 'done',
+      content: '最终回答',
+      token_usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+      cards: [{ card_type: 'market_snapshot', title: '大盘行情', data: { indices: [] } }],
+    }, onDone)
+
+    const arg = mockAppendMessage.mock.calls[0][0]
+    expect(arg.tokenUsage).toEqual({ prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 })
+    expect(arg.cards).toEqual([{ card_type: 'market_snapshot', title: '大盘行情', data: { indices: [] } }])
+  })
+
+  it('DONE 无 token_usage/cards 时字段为 undefined（HTTP 降级/旧协议兼容）', () => {
+    const stream = useChatStream() as any
+    stream._testHandleWsMessage({ type: 'done', content: 'ok' }, vi.fn())
+
+    const arg = mockAppendMessage.mock.calls[0][0]
+    expect(arg.tokenUsage).toBeUndefined()
+    expect(arg.cards).toBeUndefined()
+  })
 })

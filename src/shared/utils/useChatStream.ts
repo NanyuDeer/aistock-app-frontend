@@ -9,7 +9,7 @@
  *   - 完成后保留进度步骤（折叠显示）
  */
 import { ref } from 'vue'
-import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep, type ReasoningStep } from '@/shared/api/modules/agent'
+import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep, type ReasoningStep, type TokenUsage, type ChatCard } from '@/shared/api/modules/agent'
 import { buildExecTree, toRawWsEvent, type RawWsEvent } from './buildExecTree'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
@@ -155,6 +155,9 @@ export function useChatStream() {
           const reasoningSteps = currentRunReasoning.value.length > 0 ? [...currentRunReasoning.value] : undefined
           // D21：事件流 → 执行细节层级树（纯前端重组）
           const execSteps = buildExecTree(currentRunEvents, Date.now())
+          // P11 T2：DONE 附带 token_usage/cards（计划 B 线 2 新增可选字段；HTTP 降级/旧协议缺失时 undefined）
+          const usage = data.token_usage as TokenUsage | null | undefined
+          const cards = data.cards as ChatCard[] | null | undefined
           progressSteps.value = []
           streamingText.value = ''
           chatStore.appendMessage({
@@ -162,6 +165,8 @@ export function useChatStream() {
             content: finalText,
             // D19：deep 升级引用随 DONE 下发（light/闸门为 null，前端兼容）
             lastDeepReport: data.last_deep_report ?? undefined,
+            cards: cards ?? undefined,
+            tokenUsage: usage ?? undefined,
             execSteps,
             reasoningSteps,
             timestamp: Date.now()

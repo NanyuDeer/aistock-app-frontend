@@ -48,5 +48,7 @@ export const STORAGE_KEYS = {
   // P9 会话管理：会话元数据列表镜像 + 按会话分桶的消息
   CHAT_SESSIONS: 'chat_sessions',
   CHAT_HISTORY_BY_SESSION: 'chat_history_by_session',
+  // P11 T2：会话维度 token 本地累加（key=session_id → TokenUsage）
+  CHAT_SESSION_USAGE: 'chat_session_usage',
   THEME: 'theme'
 } as const
