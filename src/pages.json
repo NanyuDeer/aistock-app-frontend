@@ -118,7 +118,7 @@
     {
       "path": "modules/market/pages/hot-burst",
       "style": {
-        "navigationBarTitleText": "机构调研热门股",
+        "navigationBarTitleText": "机构推荐热门股",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }

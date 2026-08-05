@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard title="机构调研热门股">
+  <SubPageCard title="机构推荐热门股">
     <view class="hot-burst-content">
       <!-- 引导卡片：点击查看今日分析报告 -->
       <GuideCard title="点击查看今日分析报告" icon-name="file-line" theme="warning" @click="goAgentReport" />
@@ -55,7 +55,7 @@
       </view>
 
       <!-- 无数据 -->
-      <EmptyState v-else title="暂无机构调研热门股数据" description="数据更新后将自动显示" />
+      <EmptyState v-else title="暂无机构推荐热门股数据" description="数据更新后将自动显示" />
     </view>
   </SubPageCard>
 </template>
