@@ -9,7 +9,7 @@
               <SvgIcon name="search-eye-line" size="32rpx" color="#ffffff" />
             </view>
             <view class="insight-card-header-text">
-              <text class="insight-card-title">机构调研热门股</text>
+              <text class="insight-card-title">机构推荐热门股</text>
               <text class="insight-card-desc">机构调研共振检测，发现潜在机会</text>
             </view>
             <text class="insight-card-more">›</text>

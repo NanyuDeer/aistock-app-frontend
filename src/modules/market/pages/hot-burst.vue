@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard title="机构调研热门股">
+  <SubPageCard title="机构推荐热门股">
     <!-- 标题栏右侧播报按钮：打开悬浮播报窗 -->
     <template #header-right>
       <view class="header-podcast-btn" @tap="openPodcast('机构调研播报')">
@@ -61,7 +61,7 @@
       </view>
 
       <!-- 无数据 -->
-      <EmptyState v-else title="暂无机构调研热门股数据" description="数据更新后将自动显示" />
+      <EmptyState v-else title="暂无机构推荐热门股数据" description="数据更新后将自动显示" />
     </view>
   </SubPageCard>
 </template>
