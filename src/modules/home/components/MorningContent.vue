@@ -50,7 +50,7 @@
       <view class="feature-grid">
         <Card class="feature-card" clickable @click="goSectors">
           <view class="feature-header">
-            <text class="feature-title">长线风口</text>
+            <text class="feature-title">风口龙头</text>
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">排行前三板块</text>

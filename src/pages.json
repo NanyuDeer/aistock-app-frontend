@@ -109,7 +109,7 @@
     {
       "path": "modules/market/pages/leaders",
       "style": {
-        "navigationBarTitleText": "长线风口",
+        "navigationBarTitleText": "风口龙头",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }

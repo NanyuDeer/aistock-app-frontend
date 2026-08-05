@@ -247,6 +247,8 @@ export interface WindLeaderSector {
   code?: string
   name: string
   type?: string
+  /** 短线风口 / 长线风口（长线=月线多头确认），缺省按 short 兼容存量 */
+  cycle?: 'short' | 'long'
   frequency?: number | string
   avg_change?: number
   today_change?: number

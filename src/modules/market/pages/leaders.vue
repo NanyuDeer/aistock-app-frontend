@@ -1,8 +1,8 @@
 <template>
-  <SubPageCard title="长线风口">
+  <SubPageCard title="风口龙头">
     <template #header-right>
       <view class="header-right-actions">
-        <view class="header-podcast-btn" @tap="openPodcast('长线风口播报')">
+        <view class="header-podcast-btn" @tap="openPodcast('风口龙头播报')">
           <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
         </view>
         <view class="history-btn" @tap="goPushHistory">
@@ -22,9 +22,9 @@
         </EmptyState>
       </Card>
 
-      <LoadingState v-else-if="loading && !sectors.length" text="正在加载长线风口数据..." />
+      <LoadingState v-else-if="loading && !sectors.length" text="正在加载风口龙头数据..." />
 
-      <EmptyState v-else-if="!sectors.length" title="暂无长线风口数据" description="数据更新后将在这里展示" />
+      <EmptyState v-else-if="!sectors.length" title="暂无风口龙头数据" description="数据更新后将在这里展示" />
 
       <!-- 风口概念泡泡图 -->
       <view v-if="sectors.length" class="bubble-card">
@@ -386,7 +386,7 @@ async function loadData() {
   } catch {
     sectors.value = []
     updateTime.value = ''
-    errorMessage.value = '长线风口数据加载失败'
+    errorMessage.value = '风口龙头数据加载失败'
   } finally {
     loading.value = false
   }
