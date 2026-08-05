@@ -30,7 +30,7 @@
       v-else
       :id="chartId"
       class="kline-host"
-      style="height: 300px; min-height: 300px;"
+      style="height: 328px; min-height: 328px;"
       :chart-payload="chartPayload"
       :change:chart-payload="chartView.updateChart"
     />
@@ -89,6 +89,8 @@ interface KLineItem {
   high: number
   low: number
   volume?: number
+  change?: number
+  changePercent?: number
 }
 
 interface NormalizedKLineItem extends KLineItem {
@@ -133,7 +135,6 @@ const normalizedItems = computed<NormalizedKLineItem[]>(() => {
     const high = Number(item.high) || Math.max(open, close)
     const low = Number(item.low) || Math.min(open, close)
     if (!Number.isFinite(timestamp) || !open || !close || !high || !low) return
-    const prev = rows.get(timestamp - 1)?.close || open
     rows.set(timestamp, {
       date: item.date,
       timestamp,
@@ -142,12 +143,23 @@ const normalizedItems = computed<NormalizedKLineItem[]>(() => {
       high: Math.max(high, open, close),
       low: Math.min(low, open, close),
       volume: Number(item.volume) || 0,
-      change: close - open,
-      changePercent: open ? ((close - open) / open) * 100 : 0,
+      change: toFiniteNumber(item.change) ?? Number.NaN,
+      changePercent: toFiniteNumber(item.changePercent) ?? Number.NaN,
     })
-    void prev
   })
-  return [...rows.values()].sort((left, right) => left.timestamp - right.timestamp)
+  return [...rows.values()]
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .map((item, index, items) => {
+      const prevClose = items[index - 1]?.close || item.open
+      const fallbackChange = item.close - prevClose
+      return {
+        ...item,
+        change: Number.isFinite(item.change) ? item.change : fallbackChange,
+        changePercent: Number.isFinite(item.changePercent)
+          ? item.changePercent
+          : prevClose ? (fallbackChange / prevClose) * 100 : 0,
+      }
+    })
 })
 
 const lastPoint = computed(() => {
@@ -257,6 +269,11 @@ function formatDate(value: string): string {
   return text.length >= 8 ? `${text.slice(4, 6)}-${text.slice(6, 8)}` : value
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function formatPrice(value: number): string {
   if (!Number.isFinite(value)) return '--'
   return value.toFixed(2).replace(/\.00$/, '')
@@ -342,7 +359,7 @@ export default {
             position: 'left',
             inside: true,
             scrollZoomEnabled: false,
-            gap: { top: 0.12, bottom: 0.1 },
+            gap: { top: 0.24, bottom: 0.1 },
           },
         },
         styles: {
@@ -382,14 +399,29 @@ export default {
             tooltip: {
               showRule: 'follow_cross',
               showType: 'rect',
+              offsetTop: 4,
+              offsetLeft: 6,
+              offsetRight: 6,
+              offsetBottom: 6,
               title: { show: true, color: COLORS.text, size: 10 },
-              legend: { color: COLORS.axis, size: 10 },
+              legend: {
+                color: COLORS.axis,
+                size: 10,
+                marginTop: 2,
+                marginBottom: 2,
+                marginLeft: 0,
+                marginRight: 0,
+              },
               rect: {
-                position: 'pointer',
+                position: 'fixed',
                 color: 'rgba(255, 255, 255, 0.96)',
                 borderColor: COLORS.grid,
                 borderSize: 1,
                 borderRadius: 4,
+                offsetLeft: 8,
+                offsetRight: 8,
+                offsetTop: 8,
+                offsetBottom: 8,
                 paddingLeft: 8,
                 paddingRight: 8,
                 paddingTop: 6,
@@ -415,9 +447,20 @@ export default {
               { color: COLORS.ma20, size: 1, style: 'solid' },
             ],
             tooltip: {
-              showRule: 'follow_cross',
+              showRule: 'none',
               showType: 'standard',
+              offsetTop: 8,
+              offsetLeft: 4,
+              offsetRight: 4,
               text: { size: 10, color: COLORS.axis },
+              legend: {
+                size: 10,
+                color: COLORS.axis,
+                marginTop: 0,
+                marginBottom: 4,
+                marginLeft: 0,
+                marginRight: 10,
+              },
             },
           },
           xAxis: {
@@ -603,8 +646,8 @@ export default {
 .kline-host {
   display: block;
   width: 100%;
-  height: 300px;
-  min-height: 300px;
+  height: 328px;
+  min-height: 328px;
   overflow: hidden;
   touch-action: pan-y;
 }
