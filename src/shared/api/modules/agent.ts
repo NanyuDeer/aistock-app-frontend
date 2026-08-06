@@ -371,6 +371,9 @@ export const agentApi = {
       ...(userId != null ? { user_id: String(userId) } : {}),
       // D4：HTTP 降级路径透传 force_deep（与 WS 路径对齐，Task 1 Python 侧支持）
       ...(options?.forceDeep ? { force_deep: true } : {})
+    }, {
+      // 非流式降级路径跑完整 LangGraph 较慢（本地实测 ~50s），全局默认 15s 会超时 → 无回复
+      timeout: 120000
     })
   },
 
