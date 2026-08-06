@@ -56,7 +56,7 @@
 
       <view v-if="primaryCause.supportingEvidence.length" class="evidence-block">
         <text class="evidence-label">参考来源：</text>
-        <text class="evidence-text">{{ primaryCause.supportingEvidence.join('、') }}</text>
+        <text class="evidence-text">{{ labelEvidenceList(primaryCause.supportingEvidence).join('、') }}</text>
       </view>
     </Card>
   </view>
@@ -66,6 +66,7 @@
 import { computed } from 'vue'
 import Card from '@/shared/components/Card.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { labelEvidenceList } from '@/modules/analytics/utils/evidenceLabels'
 import type { MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 
 const props = defineProps<{

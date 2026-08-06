@@ -18,13 +18,13 @@
           <view v-if="alt.supportingEvidence.length" class="ev-col">
             <text class="ev-col-label ev-col-sup">支持证据</text>
             <view class="ev-col-chips">
-              <Tag v-for="ev in alt.supportingEvidence" :key="ev" type="neutral" size="sm">{{ ev }}</Tag>
+              <Tag v-for="ev in labelEvidenceList(alt.supportingEvidence)" :key="ev" type="neutral" size="sm">{{ ev }}</Tag>
             </view>
           </view>
           <view v-if="alt.counterEvidence.length" class="ev-col">
             <text class="ev-col-label ev-col-ctr">反证</text>
             <view class="ev-col-chips">
-              <Tag v-for="ev in alt.counterEvidence" :key="ev" type="warning" size="sm">{{ ev }}</Tag>
+              <Tag v-for="ev in labelEvidenceList(alt.counterEvidence)" :key="ev" type="warning" size="sm">{{ ev }}</Tag>
             </view>
           </view>
         </view>
@@ -37,6 +37,7 @@
 import { computed } from 'vue'
 import Card from '@/shared/components/Card.vue'
 import Tag from '@/shared/components/Tag.vue'
+import { labelEvidenceList } from '@/modules/analytics/utils/evidenceLabels'
 import type { MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 
 const props = defineProps<{ presentation: MarketTracePresentation }>()

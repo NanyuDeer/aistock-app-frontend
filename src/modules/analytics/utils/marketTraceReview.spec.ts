@@ -170,3 +170,34 @@ test('prediction_validation 缺失时 predictionValidation 为 null', () => {
   assert.ok(presentation, 'presentation 不应为 null')
   assert.equal(presentation!.predictionValidation, null)
 })
+
+test('7-23 rejected reason 输出中文关键词而非原始 ID', () => {
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+  )
+  assert.ok(presentation)
+
+  // global_risk_liquidity rejected，counter_evidence_ids=['SECTORS_ALL']
+  const rejectedGlobal = presentation!.rejected.find(r => r.categoryId === 'global_risk_liquidity')!
+  assert.equal(rejectedGlobal.status, 'rejected')
+  assert.equal(rejectedGlobal.reason, '存在反证：板块数据')
+
+  // domestic_macro_policy weak（未被 alternative 指向），counter_evidence_ids=['SECTORS_ALL']
+  const rejectedPolicy = presentation!.rejected.find(r => r.categoryId === 'domestic_macro_policy')!
+  assert.equal(rejectedPolicy.status, 'weak')
+  assert.equal(rejectedPolicy.reason, '证据较弱，反证：板块数据')
+})
+
+test('7-23 alternatives counterEvidence 输出中文关键词', () => {
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+  )
+  assert.ok(presentation)
+
+  // market_positioning_liquidity alternative，counter_evidence_ids=['MAIN_FORCE_ALL']
+  const alt = presentation!.alternatives.find(a => a.categoryId === 'market_positioning_liquidity')!
+  // counterEvidence 字段仍存原始 ID（presentation 数据层不动）
+  assert.deepEqual(alt.counterEvidence, ['MAIN_FORCE_ALL'])
+})
