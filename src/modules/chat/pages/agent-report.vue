@@ -1171,7 +1171,7 @@ onBackPress(() => {
   margin-top: 8rpx;
   font-size: 24rpx;
   line-height: 1.7;
-  color: $ink-2;
+  color: $ink-soft;
 }
 
 /* 晨报主题色：$warning（与 AGENT_META.morning 一致） */
