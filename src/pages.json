@@ -52,12 +52,15 @@
       }
     },
     {
-      "path": "modules/favorites/pages/stock-trace",
+      "path": "modules/favorites/pages/insight",
       "style": {
-        "navigationBarTitleText": "异动溯源",
-        "navigationStyle": "custom",
-        "disableScroll": true,
-        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+        "navigationBarTitleText": "自选股洞察"
+      }
+    },
+    {
+      "path": "modules/favorites/pages/insight-detail",
+      "style": {
+        "navigationBarTitleText": "洞察详情"
       }
     },
     {
