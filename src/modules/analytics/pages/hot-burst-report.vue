@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard title="机构调研热门股分析">
+  <SubPageCard title="机构推荐热门股分析">
     <view class="page-content">
       <LoadingState v-if="loading" text="报告加载中..." />
 

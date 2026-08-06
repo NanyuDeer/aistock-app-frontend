@@ -2,6 +2,16 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-06 — 修复动态模块加载失败（SCSS 未定义变量）
+
+**开发者**: Aria
+
+### 修复
+- `src/modules/chat/pages/agent-report.vue`：`$ink-2` → `$ink-soft`，修复 sass Undefined variable 导致的 Failed to fetch dynamically imported module
+- `src/modules/market/pages/leaders.vue`：`$color-primary` → `$primary-color`、`$text-secondary` → `$text-color-secondary`（3 处），同类问题
+
+---
+
 ## [master] 2026-08-05 — 今日分析概览页新增晚报（收盘复盘）入口与结构化展示
 
 **开发者**: Aria

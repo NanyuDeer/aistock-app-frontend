@@ -713,17 +713,17 @@ onShow(() => {
 }
 
 .cycle-tab.active {
-  border-color: $color-primary;
+  border-color: $primary-color;
   background: rgba(11, 95, 255, 0.06);
 }
 
 .cycle-tab-text {
   font-size: 28rpx;
-  color: $text-secondary;
+  color: $text-color-secondary;
 }
 
 .cycle-tab.active .cycle-tab-text {
-  color: $color-primary;
+  color: $primary-color;
   font-weight: 600;
 }
 

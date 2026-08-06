@@ -87,8 +87,7 @@ function changeClass(v: number | null): string {
 .perf-change.flat { color: $text-color-secondary; }
 
 .sector-list {
-  display: grid; grid-template-columns: 1fr; gap: 8rpx;
-  @include bp.respond-to-md { grid-template-columns: 1fr 1fr; }
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8rpx;
   @include bp.respond-to-lg { grid-template-columns: repeat(3, 1fr); }
 }
 .sector-item {
