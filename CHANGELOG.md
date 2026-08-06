@@ -2,6 +2,19 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-06 — agent-report wind_leader 分卡片展示 + 板块卡片 markdown 渲染修复
+
+**开发者**: Aria
+
+### 修复
+- `agent-report.vue` wind_leader 板块卡片：body 原用 `<text>` 直接输出导致 `- **上榜次数**：...` 等 markdown 语法原样显示 → 改用 `mp-html` + `markdownToHtml`（新增 `.wind-sector-body-html` 样式）
+
+### 改进
+- 按后端 prompt 章节结构分卡片展示：风口结论（summary）→ 风口概览（`## 风口概览`）→ 长线/短线研判两档切换 + 板块卡片（`###` 子节）→ 龙头股推荐（`## 龙头股推荐` + `display_report.stocks` 代码标签）→ 风险提示（`## 风险提示`）→ 关注建议（`## 关注建议`）
+- 移除原"风口分析（长短线分类）"全文卡片，改为各章节解析均失败时兜底展示原文（避免内容丢失）；新增 `windRiskHtml` / `windAdviceHtml` 章节解析
+
+---
+
 ## [master] 2026-08-06 — leaders 泡泡图：半径上限 50px + 双色阶（长线蓝系/短线橙红系）
 
 **开发者**: Aria
