@@ -24,6 +24,15 @@
 
 ---
 
+## [master] 2026-08-06 — leaders 分档逻辑按天数排序 top8（长短线各满 8 个）
+
+**开发者**: Aria
+
+### 修复
+- `leaders.vue` `displaySectors`：不再按 `cycle` 过滤，改为长线按 `long_term_days` 降序 top8、短线按 `short_term_days` 降序 top8——解决 deriveCycle 对长线不成立板块误判 short 塞入短线档（短线全是 0 天、长线不足 8 个）的问题，两榜各自取天数最高的 8 个，0 天板块自然排后补位
+
+---
+
 ## [master] 2026-08-06 — 风口龙头 leaders 页面修复（短线板块截断/次数口径/移除 cycle 标签）
 
 **开发者**: Aria

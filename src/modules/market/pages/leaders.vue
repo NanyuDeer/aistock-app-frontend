@@ -176,11 +176,13 @@ const CYCLE_OPTIONS = [
 
 const activeCycle = ref<'long' | 'short'>('long')
 
-/** 当前档位展示的板块：长线=cycle∈{long,both}；短线=cycle∈{short,both}；缺省按 short 兼容存量 */
+/** 当前档位展示的板块：长线按 long_term_days 降序 top8、短线按 short_term_days 降序 top8。
+ * 不再按 cycle 过滤（deriveCycle 对长线不成立板块会误判 short 塞入短线档，导致短线 0 天、长线不足 8 个）；
+ * 两榜各自取天数最高的 8 个，0 天板块自然排后补位。 */
 const displaySectors = computed(() =>
-  activeCycle.value === 'long'
-    ? sectors.value.filter(s => s.cycle === 'long' || s.cycle === 'both')
-    : sectors.value.filter(s => (s.cycle ?? 'short') === 'short' || s.cycle === 'both')
+  [...sectors.value]
+    .sort((a, b) => getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value))
+    .slice(0, 8)
 )
 
 /** 切换档位为空时的标题 */
