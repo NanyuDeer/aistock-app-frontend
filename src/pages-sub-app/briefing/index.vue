@@ -70,12 +70,11 @@
         </view>
 
         <!-- Agent 洞见列表 -->
-        <view v-if="insightItems.length && broadcastType !== 'evening'" class="section-label">
+        <view v-if="insightItems.length" class="section-label">
           <text class="section-label-text">Agent 洞见</text>
           <view class="section-line" />
         </view>
 
-        <template v-if="broadcastType !== 'evening'">
         <template v-for="entry in insightDisplayItems" :key="entry.id">
         <view v-if="entry.kind === 'item'" class="insight-row">
           <view class="insight-icon" :class="entry.item.source">
@@ -117,7 +116,6 @@
             </view>
           </view>
         </view>
-        </template>
         </template>
 
         <!-- 异动公告强调 -->
@@ -252,8 +250,12 @@ const headlineItem = computed(() => {
   return items.value.find((item) => item.isHeadline) || null
 })
 
-/** 洞见列表（非头条非异动） */
+/** 洞见列表（非头条非异动）
+ *  晚报场景下头条卡片不展示，所有非异动 items 均进入洞见列表 */
 const insightItems = computed(() => {
+  if (broadcastType.value === 'evening') {
+    return items.value.filter((item) => !item.isAlert)
+  }
   return items.value.filter((item) => !item.isHeadline && !item.isAlert)
 })
 
