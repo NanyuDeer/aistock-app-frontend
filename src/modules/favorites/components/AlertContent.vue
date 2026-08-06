@@ -1,7 +1,7 @@
 <template>
   <view class="alert-content">
     <view class="content-wrap">
-      <!-- 自选股洞察模块：预览自选股涨停雷达事件的归因结果，点击进入异动监控/洞察详情 -->
+      <!-- 异动捕手模块（新建模块：自选股异动监控） -->
       <view class="alert-module">
         <view class="module-card">
           <view class="module-decor"></view>
@@ -10,32 +10,34 @@
               <SvgIcon name="radar-line" size="32rpx" color="#0b5fff" />
             </view>
             <view class="module-header-text">
-              <text class="module-title">自选股洞察</text>
+              <text class="module-title">异动捕手</text>
             </view>
             <text class="module-arrow">›</text>
           </view>
           <view class="capture-list">
-            <ListCell
-              v-for="(item, idx) in displayCaptureList"
-              :key="idx"
-              :title="item.stock_name"
-              :description="captureDetail(item)"
-              clickable
-              @click="goTrace(item.event_id)"
-            >
-              <template #prefix>
-                <Tag :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
-              </template>
-              <template #value>
-                <text class="capture-time">{{ item.trade_date ? formatDate(item.trade_date) : '' }}</text>
-              </template>
-            </ListCell>
+            <template v-if="captureList.length">
+              <ListCell
+                v-for="(item, idx) in captureRows"
+                :key="idx"
+                :title="item?.stock_name || '\u3000'"
+                :description="item ? captureDetail(item) : '\u3000'"
+                :clickable="!!item"
+                @click="item && goTrace(item.event_id)"
+              >
+                <template #prefix>
+                  <Tag v-if="item" :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
+                </template>
+                <template #value>
+                  <text v-if="item" class="capture-time">{{ formatTime(item.trade_date || item.created_at || '') }}</text>
+                </template>
+              </ListCell>
+            </template>
             <EmptyState v-if="!captureList.length" title="暂无异动数据" />
           </view>
         </view>
       </view>
 
-      <!-- 自选股情报模块（原StockMonitor，8.1更名：个股情报→自选股情报） -->
+      <!-- 个股情报模块（原StockMonitor，原异动捕手改名） -->
       <view class="alert-module">
         <view class="module-card">
           <view class="module-decor module-decor--intel"></view>
@@ -44,7 +46,7 @@
               <SvgIcon name="search-eye-line" size="32rpx" color="#f0a020" />
             </view>
             <view class="module-header-text">
-              <text class="module-title">自选股情报</text>
+              <text class="module-title">个股情报</text>
             </view>
             <!-- 全部/利好/利空 切换标签 -->
             <view class="intel-tabs" @tap.stop>
@@ -79,8 +81,8 @@ import ListCell from '@/shared/components/ListCell.vue'
 import Tag from '@/shared/components/Tag.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import { stockApi } from '@/shared/api/modules/stock'
+import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -104,28 +106,20 @@ const intelTabItems = [
   { label: '利空', value: 'negative' as const },
 ]
 
-// 自选股洞察：展示自选股涨停雷达事件的归因结果（后端由 cron 周期采集 + LLM 归因）
+// 异动捕手：接自选股洞察真实 API（与异动监控页 monitor.vue 同源，有真实信息就展示）
 const captureList = ref<WatchlistInsight[]>([])
 
 async function loadCaptureList() {
   try {
-    captureList.value = await watchlistInsightApi.getInsights()
+    const data = await watchlistInsightApi.getInsights()
+    captureList.value = data
   } catch {
     captureList.value = []
   }
 }
 
-// 自选股情报：接真实 API（DEV 模式下后端无数据时用 mock 兜底）
+// 个股情报：接真实 API（无数据/失败均不 mock，展示空状态）
 const intelList = ref<IntelItem[]>([])
-
-/** DEV 模式 mock 数据 */
-const INTEL_MOCK_DATA: IntelItem[] = [
-  { sourceType: 'announce', title: '恒瑞医药：PD-1新药获FDA批准上市', meta: '利好 · 2小时前', sentiment: 'positive', symbol: '600276', cycle: 'mid' },
-  { sourceType: 'research', title: '中金上调宁德时代目标价至320元', meta: '利好 · 4小时前', sentiment: 'positive', symbol: '300750', cycle: 'mid' },
-  { sourceType: 'news', title: '比亚迪：上半年新能源汽车销量同比增长38%', meta: '利好 · 6小时前', sentiment: 'positive', symbol: '002594', cycle: 'mid' },
-  { sourceType: 'announce', title: '药明康德：美国拟扩大对华生物制造限制', meta: '利空 · 1天前', sentiment: 'negative', symbol: '603259', cycle: 'short' },
-  { sourceType: 'research', title: '某头部券商下调贵州茅台评级至"中性"', meta: '利空 · 2天前', sentiment: 'negative', symbol: '600519', cycle: 'long' },
-]
 
 /** 把后端 TrendEvent 映射成 IntelItem（推断来源类型和情感倾向） */
 function mapTrendEventToIntelItem(evt: Record<string, unknown>): IntelItem {
@@ -148,11 +142,8 @@ async function loadIntelList() {
     const res = await stockApi.getTrendEvents({ limit: 10 }) as Record<string, unknown>
     const list = (res?.events || (res?.data as Record<string, unknown>)?.events || []) as Record<string, unknown>[]
     intelList.value = list.map(mapTrendEventToIntelItem)
-    if (import.meta.env.DEV && !intelList.value.length) {
-      intelList.value = INTEL_MOCK_DATA
-    }
   } catch {
-    intelList.value = import.meta.env.DEV ? INTEL_MOCK_DATA : []
+    intelList.value = []
   }
 }
 
@@ -169,7 +160,7 @@ function formatRelativeTime(value: string): string {
 }
 
 const filteredIntelList = computed(() => {
-  // 8.1 决议：中性事件不展示，只呈现重大利好/利空资讯
+  // 默认不展示中性情报（与个股情报页 event-catcher 一致）
   const nonNeutral = intelList.value.filter(item => item.sentiment !== 'neutral')
   if (intelSubTab.value === 'all') return nonNeutral
   return nonNeutral.filter(item => item.sentiment === intelSubTab.value)
@@ -177,8 +168,18 @@ const filteredIntelList = computed(() => {
 
 /** 首页预览最多显示4条，其余进入详情页查看 */
 const MAX_PREVIEW = 4
-const displayCaptureList = computed(() => captureList.value.slice(0, MAX_PREVIEW))
 const displayIntelList = computed(() => filteredIntelList.value.slice(0, MAX_PREVIEW))
+
+/**
+ * 异动捕手列表固定渲染 4 行：数据不足时空行占位，
+ * 卡片纵向长度不随数据量变化（避免只有 1 条资讯时卡片变矮）
+ */
+const CAPTURE_ROW_COUNT = 4
+const captureRows = computed<Array<WatchlistInsight | null>>(() => {
+  const rows: Array<WatchlistInsight | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
+  while (rows.length < CAPTURE_ROW_COUNT) rows.push(null)
+  return rows
+})
 
 function badgeLabel(direction: 'up' | 'down'): string {
   return direction === 'up' ? '涨' : '跌'
@@ -199,17 +200,19 @@ function captureTagType(direction: 'up' | 'down'): 'up' | 'down' {
   return direction
 }
 
-/** 格式化洞察主因：已确认展示主因 label；unconfirmed 展示待验证；其余为归因中 */
+/** 格式化异动详情：主因归因文案（与异动监控页 monitor.vue 一致） */
 function captureDetail(item: WatchlistInsight): string {
   if (item.attribution_status === 'unconfirmed') return '主因待验证'
-  if (item.attribution_status === 'confirmed' && item.primary_driver?.label) return `主因：${item.primary_driver.label}`
+  if (item.attribution_status === 'confirmed' && item.primary_driver?.label) {
+    return `主因：${item.primary_driver.label}`
+  }
   return '归因中'
 }
 
-/** 格式化日期为 MM-DD（trade_date 为 UTC ISO，取本地月日） */
-function formatDate(value: string): string {
+function formatTime(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '--'
+  // trade_date 为日期，展示 MM-DD
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
@@ -218,17 +221,17 @@ function onIntelTabChange(val: string | number) {
   intelSubTab.value = val as 'all' | 'positive' | 'negative'
 }
 
-/** 自选股洞察（新模块：自选股异动监控） */
+/** 异动捕手（新模块：自选股异动监控） */
 function goAlertCatcher() {
   uni.navigateTo({ url: '/modules/favorites/pages/monitor' })
 }
 
-/** 洞察详情：跳转到自选股洞察详情页 */
+/** 异动详情：跳转到洞察详情页（与异动监控页 monitor.vue 一致） */
 function goTrace(eventId: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/insight-detail?event_id=${encodeURIComponent(eventId)}` })
 }
 
-/** 自选股情报（原个股情报/event-catcher，8.1更名） */
+/** 个股情报（原异动捕手/event-catcher，已改名） */
 function goStockIntel() {
   uni.navigateTo({ url: '/modules/market/pages/event-catcher' })
 }
@@ -331,7 +334,7 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-/* ===== 异动捕手 / 自选股情报 列表区域（参考 InsightListCard body） ===== */
+/* ===== 异动捕手 / 个股情报 列表区域（参考 InsightListCard body） ===== */
 .capture-list,
 .intel-list {
   background: $bg-card;
@@ -340,10 +343,10 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* 覆写 ListCell 内边距和字体：使卡片更紧凑 */
+/* 覆写 ListCell 内边距和字体：使卡片更紧凑（行距比默认 $s-4 更紧凑，但保持两列表一致） */
 .capture-list :deep(.as-list-cell),
 .intel-list :deep(.as-list-cell) {
-  padding: $s-1 $s-2;
+  padding: $s-2 $s-2;
 }
 
 .capture-list :deep(.as-list-cell__title),

@@ -199,7 +199,7 @@ const remainingCount = computed(() => {
   flex-direction: column;
   gap: 4rpx;
   min-height: 140rpx;
-  max-height: 160rpx;
+  /* 移除 max-height 固定值：行业标签换行时需自适应高度，避免截断 */
 }
 
 /* ========== AI装饰光斑 ========== */
@@ -253,9 +253,11 @@ const remainingCount = computed(() => {
   font-weight: 600;
   color: $ink;
   line-height: 1.3;
-  white-space: nowrap;
+  /* 最多两行，超出省略（uni-app H5 用 -webkit-box 多行截断） */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
   position: relative;
   z-index: 1;
 }
@@ -265,8 +267,9 @@ const remainingCount = computed(() => {
   display: flex;
   align-items: center;
   gap: 6rpx;
+  row-gap: 4rpx; /* 换行后的行间距 */
+  flex-wrap: wrap; /* 行业标签允许换行，避免长行业名挤压/溢出卡片右缘 */
   flex-shrink: 0;
-  flex-wrap: nowrap;
   position: relative;
   z-index: 1;
 }
