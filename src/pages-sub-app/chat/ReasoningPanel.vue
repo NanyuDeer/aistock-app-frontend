@@ -3,7 +3,7 @@
     <!-- 顶部：AI 思考过程（原 ReasoningCard 主体，P3-fix 起；仅 steps 非空时渲染，避免空态"0 步"头） -->
     <view v-if="steps.length > 0" class="rp-think">
       <view class="rp-think-header" @tap="thinkingExpanded = !thinkingExpanded">
-        <SvgIcon name="lightbulb-flash-line" size="28rpx" :color="inkMute" />
+        <SvgIcon name="lightbulb-flash-line" size="28rpx" :color="primaryColor" />
         <text class="rp-title">AI 思考过程</text>
         <text class="rp-stats">{{ steps.length }} 步</text>
         <SvgIcon :name="thinkingExpanded ? 'arrow-up-s-line' : 'arrow-down-s-line'" size="28rpx" :color="inkMute" />
@@ -63,6 +63,7 @@ const execExpanded = ref(false)
 
 // SvgIcon 的 color prop 是运行时字符串，无法引用 SCSS 变量；用设计令牌实值映射（同 AiThinkingHeader 做法）
 const inkMute = '#8a96b0' // $ink-mute
+const primaryColor = '#0b5fff' // $primary
 
 const _NODE_LABELS: Record<string, string> = {
   qa_router: '理解问题',
@@ -96,15 +97,17 @@ function fmtMs(ms: number): string {
 
 .reasoning-panel {
   margin-bottom: 12rpx;
-  padding: 12rpx 16rpx;
-  background: $primary-50;
-  border-radius: 12rpx;
-  border-left: 4rpx solid $primary;
+  padding: 16rpx 20rpx;
+  background: $bg-card;
+  border-radius: $r-md;
+  box-shadow: $shadow-card;
 }
 .rp-think-header {
   display: flex;
   align-items: center;
   gap: 8rpx;
+  padding-bottom: 8rpx;
+  border-bottom: 1rpx solid $line-soft;
 }
 .rp-title { flex: 1; font-size: 24rpx; color: $ink-soft; }
 .rp-stats { font-size: 22rpx; color: $ink-mute; }

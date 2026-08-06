@@ -16,3 +16,5 @@ changelog-pending.md
 
 # Superpowers 审查/计划文档（2026-08-02 决策：代码仓库只留代码，计划文档不跟踪）
 docs/superpowers/
+# SDD scratch（任务简报/报告/diff 临时文件，不入库）
+.superpowers/

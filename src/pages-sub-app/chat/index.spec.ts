@@ -63,15 +63,23 @@ test('AI 气泡升级圆角与阴影（Design Token）', () => {
   assert.match(pageSource, /\.bubble[\s\S]*?box-shadow: \$shadow-card/)
 })
 
-test('计费条 UsageBar 接入（快捷按钮下、输入栏上）', () => {
-  assert.match(pageSource, /import UsageBar from '\.\/UsageBar\.vue'/)
-  const quickIdx = pageSource.indexOf('class="quick-skills"')
-  const usageIdx = pageSource.indexOf('<UsageBar')
-  const inputIdx = pageSource.indexOf('class="input-bar"')
-  assert.ok(quickIdx !== -1 && usageIdx !== -1 && inputIdx !== -1)
-  assert.ok(quickIdx < usageIdx && usageIdx < inputIdx)
+test('单轮用量 footer 进气泡（turn-usage 与深度分析按钮同行；底部 UsageBar 已移除）', () => {
+  assert.match(pageSource, /class="msg-footer"/)
+  assert.match(pageSource, /class="turn-usage"/)
+  assert.match(pageSource, /msg\.tokenUsage\.total_tokens/)
+  assert.doesNotMatch(pageSource, /import UsageBar/)
+  assert.doesNotMatch(pageSource, /<UsageBar/)
 })
 
 test('deep 卡片经 CardRenderer 渲染时不再重复渲染 DeepSummaryCard（兼容回退守卫）', () => {
   assert.match(pageSource, /msg\.cards\?\.some\(c => c\.card_type === 'deep'\)/)
+})
+
+test('改进14：引入 parseMarkdownSections + SectionCard（分节卡片化）', () => {
+  assert.match(pageSource, /parseMarkdownSections/)
+  assert.match(pageSource, /SectionCard/)
+})
+
+test('改进14：AI 气泡内容区支持分节渲染（getSections 函数）', () => {
+  assert.match(pageSource, /getSections/)
 })

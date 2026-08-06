@@ -212,23 +212,6 @@ function getIndustryHealthPreset(industryName: string): { values: number[]; deta
   }
 }
 
-function buildFinancialMock(score: number, multiple: number): { label: string; value: string; change: string; type: string }[] {
-  const revenueGrowth = Math.round(12 + score * 0.55 + multiple * 2)
-  const profitGrowth = Math.round(revenueGrowth + 8 + multiple * 1.5)
-  const pe = Math.max(18, Math.round(62 - score * 0.22 + multiple * 1.8))
-  const pb = (2.1 + score / 55 + multiple / 8).toFixed(1)
-  const margin = (22 + score * 0.18 + multiple * 0.6).toFixed(1)
-  const roe = (10 + score * 0.13 + multiple * 0.35).toFixed(1)
-  return [
-    { label: '营收增速', value: `${revenueGrowth}%`, change: `较上季+${Math.max(2, Math.round(multiple))}%`, type: 'is-up' },
-    { label: '净利增速', value: `${profitGrowth}%`, change: '利润弹性释放', type: 'is-up' },
-    { label: 'PE(TTM)', value: `${pe}倍`, change: multiple >= 10 ? '成长估值' : '行业中枢', type: multiple >= 10 ? '' : 'is-down' },
-    { label: 'PB', value: `${pb}倍`, change: '资产质量稳定', type: '' },
-    { label: '毛利率', value: `${margin}%`, change: `+${(multiple / 2).toFixed(1)}%`, type: 'is-up' },
-    { label: 'ROE', value: `${roe}%`, change: score >= 88 ? '高于行业' : '接近行业', type: 'is-up' }
-  ]
-}
-
 function toFiniteNumber(value: any): number | null {
   if (value === null || value === undefined || value === '') return null
   if (typeof value === 'number') return Number.isFinite(value) ? value : null
@@ -355,14 +338,7 @@ function buildRealAnnualData(context: StockAiAnalysisContext, score: number) {
   ]
   const available = rows.filter(item => item.value !== '--')
   if (available.length >= 3) return rows
-  return [
-    { label: '研发投入', value: '--', note: '待财报数据', type: '' },
-    { label: '营收增速', value: '--', note: '待财报数据', type: '' },
-    { label: '净利增速', value: '--', note: '待财报数据', type: '' },
-    { label: '趋势评分', value: score ? `${score}分` : '--', note: '真实模型', type: score >= 75 ? 'is-up' : '' },
-    { label: 'PE(TTM)', value: formatMultiple(quote.peRatio), note: '实时行情估值', type: '' },
-    { label: 'PB', value: formatMultiple(quote.pbRatio), note: '实时行情估值', type: '' },
-  ]
+  return []
 }
 
 function buildMoatsFromTrend(trendApiData: TrendScoreData | null, profile: Partial<CuratedProfile>, profileName: string) {
@@ -375,12 +351,7 @@ function buildMoatsFromTrend(trendApiData: TrendScoreData | null, profile: Parti
       desc: `${Number(item.score) || 0}分`
     }))
   }
-  return [
-    { icon: 'A', title: '技术壁垒', desc: profile.longTermFocus?.[1] || '等待趋势评分返回更完整的基本面子维度。' },
-    { icon: 'C', title: '客户资源', desc: '以真实财报和趋势评分持续验证客户与订单质量。' },
-    { icon: 'S', title: '规模效应', desc: profile.investmentLogic || `${profileName}具备一定规模和产业链协同基础。` },
-    { icon: 'G', title: '成长曲线', desc: profile.longTermFocus?.[2] || '第二增长曲线需要用预测和财报继续验证。' }
-  ]
+  return []
 }
 
 export function extractTagFromText(text: string): TagItem {
@@ -429,11 +400,11 @@ export function useStockAiAnalysis(
   contextRef?: Ref<StockAiAnalysisContext | null>
 ) {
   const curatedProfile = computed(() => getCuratedStockProfile(symbolRef.value))
-  const profileScore = computed(() => Number(curatedProfile.value?.aiScore || 78))
+  const profileScore = computed(() => Number(curatedProfile.value?.aiScore || 0))
   const profileTheme = computed(() => curatedProfile.value?.theme || quoteRef.value?.industry || '成长赛道')
   const profileName = computed(() => curatedProfile.value?.name || quoteRef.value?.name || '该股')
-  const expectedMultipleText = computed(() => curatedProfile.value?.expectedMultiple || '1.5倍')
-  const expectedMultipleNumber = computed(() => Number(String(expectedMultipleText.value).replace('倍', '').trim()) || 1.5)
+  const expectedMultipleText = computed(() => '')
+  const expectedMultipleNumber = computed(() => 0)
 
   // 趋势股评分后端数据（四维：技术面/行业赛道景气/消息面催化/基本面）
   const trendApiData = computed(() => trendScoreDataRef?.value || null)
@@ -446,52 +417,10 @@ export function useStockAiAnalysis(
   const realFinancialData = computed(() => buildRealFinancialData(realDataContext.value))
 
   const midMockData = computed(() => {
-    const score = profileScore.value
-    const multiple = expectedMultipleNumber.value
     const realIndustryHealth = buildIndustryHealthFromTrend(trendApiData.value, realDataContext.value, profileTheme.value)
-    if (realFinancialData.value.rows.length || realIndustryHealth) {
-      return {
-        finance: realFinancialData.value.rows.length ? realFinancialData.value.rows : buildFinancialMock(score, multiple),
-        industryHealth: realIndustryHealth || (() => {
-          const industryPreset = getIndustryHealthPreset(profileTheme.value)
-          const trendValues = industryPreset.values.map((value, index) => ({
-            month: ['10月', '11月', '12月', '1月', '2月', '3月', '4月'][index],
-            value
-          }))
-          const healthScore = trendValues[trendValues.length - 1].value
-          return {
-            score: healthScore,
-            levelClass: getIndustryHealthClass(healthScore),
-            tags: [
-              { text: profileTheme.value, type: 'success' },
-              { text: '本地估算', type: 'success' }
-            ],
-            trend: trendValues,
-            values: trendValues.map(item => item.value),
-            details: industryPreset.details
-          }
-        })()
-      }
-    }
-    const industryPreset = getIndustryHealthPreset(profileTheme.value)
-    const trendValues = industryPreset.values.map((value, index) => ({
-      month: ['10月', '11月', '12月', '1月', '2月', '3月', '4月'][index],
-      value
-    }))
-    const healthScore = trendValues[trendValues.length - 1].value
     return {
-      finance: buildFinancialMock(score, multiple),
-      industryHealth: {
-        score: healthScore,
-        levelClass: getIndustryHealthClass(healthScore),
-        tags: [
-          { text: profileTheme.value, type: 'success' },
-          { text: '本地估算', type: 'success' }
-        ],
-        trend: trendValues,
-        values: trendValues.map(item => item.value),
-        details: industryPreset.details
-      }
+      finance: realFinancialData.value.rows,
+      industryHealth: realIndustryHealth
     }
   })
 
@@ -503,7 +432,7 @@ export function useStockAiAnalysis(
     const realScore = realTrendScore.value || score
     const conclusion = realScore >= 80 ? '持有可顺势跟踪' : realScore >= 65 ? '关注等回踩确认' : '持有者稳健观察'
     const finance = midMockData.value.finance
-    const health = midMockData.value.industryHealth as any
+    const health = (midMockData.value.industryHealth || { score: '--', tags: [], isReal: false }) as any
     const revenue = finance.find(item => item.label === '营收增速')
     const profit = finance.find(item => item.label === '净利增速')
     const pe = finance.find(item => item.label === 'PE(TTM)')
@@ -511,6 +440,18 @@ export function useStockAiAnalysis(
     const forecast = realDataContext.value.forecastData || {}
     const hasRealFinancial = realFinancialData.value.rows.length > 0
     const forecastSummary = String(forecast.summary || '').trim()
+    const hasRealForecast = Boolean(forecastSummary || forecast.netProfitYoy != null || (Array.isArray(forecast.predictions) && forecast.predictions.length))
+    const hasRealIndustry = Boolean(health?.isReal)
+    if (!hasRealFinancial && !hasRealForecast && !hasRealIndustry) {
+      return {
+        conclusion: '暂无中线真实数据',
+        badgeClass: 'is-hold',
+        logic: '暂无真实财报、业绩预测或行业趋势评分数据，中线研判暂不生成本地模拟结论。',
+        basis: [],
+        advice: [],
+        riskTips: []
+      }
+    }
     const planStatement = getFifteenthPlanStatement(profileTheme.value)
     const summary = hasRealFinancial || forecastSummary || health.isReal
       ? `${profileName.value}中线判断优先参考真实财报、预测和趋势评分：营收/利润验证盈利弹性，行业赛道评分验证景气延续。`
@@ -522,7 +463,7 @@ export function useStockAiAnalysis(
       basis: [
         { tag: '业绩拐点验证', full: `真实财报/预测显示营收增速为${revenue?.value || '--'}、净利增速为${profit?.value || '--'}。若后续预测继续上修，中线业绩拐点的可信度会提高。` },
         { tag: '估值位置校验', full: `实时行情估值显示 PE(TTM) 为${pe?.value || '--'}、PB 为${pb?.value || '--'}，需要和利润增速、行业景气度一起看，避免只看题材热度。` },
-        { tag: '赛道景气同步', full: `行业景气指数为${health.score}分，标签集中在"${health.tags.map((tag: any) => tag.text).join('、')}"，${health.isReal ? '来自趋势评分后端维度' : '当前仍为本地估算'}。` },
+        { tag: '赛道景气同步', full: health.isReal ? `行业景气指数为${health.score}分，标签集中在"${health.tags.map((tag: any) => tag.text).join('、')}"，来自趋势评分后端维度。` : '暂无真实行业趋势评分，本项不作为中线机会或风险依据。' },
         { tag: '预测数据验证', full: forecastSummary || `业绩预测净利润同比为${formatPercent(forecast.netProfitYoy)}，暂无更完整预测摘要时，先用预测列表和半年报数据交叉验证。` },
         { tag: '政策方向支撑', full: `${planStatement} 这会强化中线资金对赛道景气和订单兑现的跟踪，但仍需要用财报增速与资金承接继续验证。` },
         { tag: '跟踪条件', full: `中线关注点为"${focus.join('、')}"。当前结论由真实财报、预测、估值和趋势评分共同校验后给出：${conclusion}。` }
@@ -566,11 +507,7 @@ export function useStockAiAnalysis(
         type: 'is-good',
         text: `${String(item.name || '政策 / 产业趋势')}：${String(item.desc || item.value || '来自趋势评分后端')}`
       }))
-      : [
-        { tag: '利好', type: 'is-good', text: `${planStatement}长期需求预期因此更容易获得政策资源、产业资本和应用场景共振。` },
-        { tag: '利好', type: 'is-good', text: `${focus[0]}，公司若能维持份额或切入核心客户，估值体系有望继续抬升。` },
-        { tag: '中性', type: 'is-neutral', text: '需要关注产业节奏和订单兑现的时间差，长线逻辑不等于短期单边上涨。' }
-      ]
+      : []
     return {
       policies,
       moats: buildMoatsFromTrend(trendApiData.value, profile, profileName.value),
@@ -594,15 +531,22 @@ export function useStockAiAnalysis(
     const policies = longMockData.value.policies
     const moats = longMockData.value.moats
     const annual = longMockData.value.annual
-    const hasMultipleModel = Boolean(curatedProfile.value) && expectedMultipleNumber.value >= 1.5
     const planStatement = getFifteenthPlanStatement(profileTheme.value)
     const hasRealTrend = Boolean(trendApiData.value) && !trendVetoed.value
-    const tenxBasis = hasRealTrend
-      ? { tag: '趋势股模型高分', full: `趋势股模型给出${realTrendScore.value}分和"${realTrendLabel.value}"，当前倍数预期为${realTrendMultiple.value || multiple}，因此AI给出${conclusion}。` }
-      : hasMultipleModel
-        ? { tag: '趋势股模型高分', full: `趋势股模型给出${profileScore.value}分和"${conclusion}"，当前倍数预期为${multiple}，因此AI给出${conclusion}。` }
-        : { tag: '未入倍数池', full: '当前股票未进入精选趋势股模型池，长线判断暂以行业政策、护城河和年报质量为主，不单独给出倍数预期。' }
     const hasRealAnnual = buildRealFinancialData(realDataContext.value).rows.length > 0
+    if (!hasRealTrend && !hasRealAnnual && !trendVetoed.value) {
+      return {
+        conclusion: '暂无长线真实数据',
+        badgeClass: 'is-hold',
+        logic: '暂无真实趋势模型、年报或半年度财务数据，长线研判暂不生成本地模拟结论。',
+        basis: [],
+        advice: [],
+        riskTips: []
+      }
+    }
+    const tenxBasis = hasRealTrend
+      ? { tag: '趋势股模型评分', full: realTrendMultiple.value ? `趋势股模型给出${realTrendScore.value}分和"${realTrendLabel.value}"，后端倍数预期为${realTrendMultiple.value}，因此AI给出${conclusion}。` : `趋势股模型给出${realTrendScore.value}分和"${realTrendLabel.value}"，后端未返回倍数预期，因此不展示本地倍数。` }
+      : { tag: '暂无趋势模型', full: '后端暂无真实趋势模型数据，长线判断不生成本地倍数或模拟结论。' }
     const summary = hasRealTrend || hasRealAnnual
       ? `${profileName.value}长线判断优先看真实趋势评分、半年报和估值数据，核心是成长动能能否被盈利质量持续验证。`
       : `${profileName.value}长线核心在于${focus.slice(0, 2).join('和')}，当前真实长线数据不足，先以观察和等待验证为主。`
@@ -615,9 +559,7 @@ export function useStockAiAnalysis(
         { tag: '护城河四维支撑', full: `公司护城河卡片显示"${moats.map((item: any) => item.title).join('、')}"四个维度，${hasRealTrend ? '优先来自趋势评分基本面子维度' : '目前仍以画像和财报验证方向为主'}。` },
         { tag: '财报估值双验证', full: `年报/半年报对比中研发费用为${annual.find((item: any) => item.label === '研发费用' || item.label === '研发投入')?.value || '--'}，营收增速为${annual.find((item: any) => item.label === '营收增速')?.value || '--'}，PE(TTM) 为${annual.find((item: any) => item.label === 'PE(TTM)')?.value || '--'}。` },
         tenxBasis,
-        hasMultipleModel
-          ? { tag: '反向跟踪风险', full: `需要反向跟踪的风险是：${risks[0]}，如果这个风险兑现，长线趋势股模型会先于股价表现下修。` }
-          : { tag: '反向跟踪风险', full: `需要反向跟踪的风险是：${risks[0]}，如果这个风险兑现，长线判断会先从护城河和年报质量两项下修。` }
+        { tag: '反向跟踪风险', full: `需要反向跟踪的风险是：${risks[0]}，如果这个风险兑现，长线判断会先从真实趋势模型、护城河和财报质量下修。` }
       ],
       advice: multiple === '10倍'
         ? [
@@ -628,9 +570,9 @@ export function useStockAiAnalysis(
         ]
         : [
           { tag: '趋势龙头长期观察', full: `已持有者可按趋势龙头做长期观察，核心是验证${focus[0] || '产业空间'}能否持续兑现。` },
-          { tag: '估值业绩匹配再介入', full: '关注者不必按十倍股预期定价，更适合在估值和业绩匹配时分批跟踪。' },
-          { tag: '护城河改善提可信度', full: `若护城河、研发投入和资本回报率继续改善，${multiple}空间的可信度会提高。` },
-          { tag: '无验证降预期', full: '若长期逻辑没有新订单或新利润验证，应降低倍数预期，把它视作稳健成长而非高弹性标的。' }
+          { tag: '估值业绩匹配再介入', full: '关注者不必预设倍数空间，更适合在估值和业绩匹配时分批跟踪。' },
+          { tag: '护城河改善提可信度', full: '若护城河、研发投入和资本回报率继续改善，长线空间的可信度会提高。' },
+          { tag: '无验证降预期', full: '若长期逻辑没有新订单或新利润验证，应降低长线预期，把它视作稳健成长而非高弹性标的。' }
         ],
       riskTips: [
         { tag: '核心风险下修', full: `核心风险是${risks[0]}，一旦兑现，趋势股模型会先从成长动能和赛道景气两项下修。` },
@@ -640,7 +582,7 @@ export function useStockAiAnalysis(
     }
   })
 
-  // 趋势股模型（四维：技术面/行业赛道景气/消息面催化/基本面）：优先使用后端真实数据，无数据时使用本地 mock
+  // 趋势股模型（四维：技术面/行业赛道景气/消息面催化/基本面）：只使用后端真实数据，无数据时显示暂无数据。
   const trendModel = computed(() => {
     // 后端返回真实评分数据
     if (trendApiData.value && !trendVetoed.value) {
@@ -699,36 +641,19 @@ export function useStockAiAnalysis(
         verdict: '一票否决',
       }
     }
-    // 无后端数据：使用本地 mock（仅对7只精选股生效），采用四维结构
-    const score = profileScore.value
-    const multiple = expectedMultipleNumber.value
-    const hasModel = Boolean(curatedProfile.value)
-    const dimDefs = [
-      { key: 'technical', label: '技术面', weight: 35, question: '低点以来涨幅、60日线位置、创新高状态、最大回撤如何？' },
-      { key: 'track', label: '行业赛道景气', weight: 25, question: '市场认可度、行业渗透率、政策趋势强度如何？' },
-      { key: 'news', label: '消息面催化', weight: 20, question: '机构调研、股东户数变化、硬催化情况？' },
-      { key: 'fundamental', label: '基本面', weight: 20, question: '业绩爆发力、估值弹性、盈利质量、竞争壁垒？' },
-    ]
-    const seed = score
-    const dimensions = dimDefs.map((dim, i) => {
-      const wave = ((seed + i * 7) % 11) - 5
-      const raw = Math.max(55, Math.min(98, Math.round(score + wave + (multiple >= 10 ? 4 : 0))))
-      return { ...dim, name: dim.label, score: raw, indicators: buildDimIndicators(dim.key, raw), subDimensions: [] }
-    })
-    const totalScore = Math.round(dimensions.reduce((sum, d) => sum + d.score * d.weight, 0) / dimensions.reduce((sum, d) => sum + d.weight, 0))
     return {
-      hasModel,
+      hasModel: false,
       isReal: false,
-      score: totalScore,
-      expectedMultiple: expectedMultipleText.value,
+      score: 0,
+      expectedMultiple: '',
       label: '',
       description: '',
       aiConclusion: '',
       updatedAt: '',
       scoreDate: '',
-      dimensions,
-      dimScores: dimensions.map(d => d.score),
-      verdict: totalScore >= 80 ? '趋势确认' : totalScore >= 65 ? '观察验证' : '趋势走弱',
+      dimensions: [],
+      dimScores: [],
+      verdict: '暂无数据',
     }
   })
 

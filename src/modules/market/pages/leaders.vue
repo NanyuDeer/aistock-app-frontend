@@ -84,11 +84,6 @@
             <Badge size="sm">No.{{ idx + 1 }}</Badge>
             <text class="stats-name">{{ sector.name }}</text>
             <Tag
-              v-if="cycleText(sector)"
-              :type="cycleTagType(sector)"
-              size="sm"
-            >{{ cycleText(sector) }}</Tag>
-            <Tag
               v-if="activeCycle === 'long' && logicTypeText(sector)"
               :type="logicTypeTagType(sector)"
               size="sm"
@@ -99,7 +94,7 @@
               size="sm"
             >{{ heatStageText(sector) }}</Tag>
           </view>
-          <Badge v-if="sector.frequency" size="sm">上榜 {{ sector.frequency }} 次</Badge>
+          <Badge v-if="boardCount(sector) > 0" size="sm">上榜 {{ boardCount(sector) }} 次</Badge>
         </view>
         <!-- 统计行 -->
         <StatGrid class="leader-stat-grid" :items="sectorStatItems(sector)" :columns="4" />
@@ -181,11 +176,14 @@ const CYCLE_OPTIONS = [
 
 const activeCycle = ref<'long' | 'short'>('long')
 
-/** 当前档位展示的板块：长线=cycle∈{long,both}；短线=cycle∈{short,both}；缺省按 short 兼容存量 */
+/** 当前档位展示的板块：长线按 long_term_days 降序 top8、短线按 short_term_days 降序 top8。
+ * 先过滤掉该档位天数为 0 的板块（另一链被裁剪或长短线均不成立的板块），
+ * 再取天数最高的 8 个——宁少勿滥，避免短线档塞满 0 天补位板块。 */
 const displaySectors = computed(() =>
-  activeCycle.value === 'long'
-    ? sectors.value.filter(s => s.cycle === 'long' || s.cycle === 'both')
-    : sectors.value.filter(s => (s.cycle ?? 'short') === 'short' || s.cycle === 'both')
+  [...sectors.value]
+    .filter(s => getSectorDays(s, activeCycle.value) > 0)
+    .sort((a, b) => getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value))
+    .slice(0, 8)
 )
 
 /** 切换档位为空时的标题 */
@@ -412,7 +410,7 @@ async function loadData() {
   if (loading.value) return
   loading.value = true
   try {
-    const data = await stockApi.getWindLeaders(10)
+    const data = await stockApi.getWindLeaders(40)
     const hotSectors = Array.isArray(data?.hot_sectors) ? data.hot_sectors : []
     sectors.value = hotSectors.filter(
       (sector): sector is WindLeaderSector => Boolean(sector && typeof sector.name === 'string' && sector.name.trim())
@@ -471,17 +469,10 @@ function formatNetInflow(val?: number | null): string {
   return Math.round(val) + '万'
 }
 
-// ===== cycle 三态标签（前端打标签；理由字段 long_reason/short_reason 喂给 agent 简报） =====
-/** 板块 cycle 标签文案（both=长线+短线） */
-function cycleText(s: WindLeaderSector): string {
-  if (s.cycle === 'long') return '长线风口'
-  if (s.cycle === 'both') return '长线+短线'
-  return '短线风口'
-}
-
-/** 板块 cycle 标签颜色：长线=down(品牌色) / 短线=warning(警示色) / both=down */
-function cycleTagType(s: WindLeaderSector): 'down' | 'warning' {
-  return s.cycle === 'long' || s.cycle === 'both' ? 'down' : 'warning'
+// ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
+/** 上榜次数：短线档显示近20日 freq20，长线档显示近60日 frequency */
+function boardCount(s: WindLeaderSector): number {
+  return activeCycle.value === 'short' ? Number(s.freq20 ?? 0) : Number(s.frequency ?? 0)
 }
 
 /** 短线热度阶段标签（heat_stage：启动期/发酵期/高潮期/衰退期），高潮期用 warning 色、其余品牌色 */

@@ -84,6 +84,15 @@ export interface ChatMessage {
   timestamp: number
 }
 
+/** 会话维度 token 用量聚合项（P10 线 4/线 6；对应 GET /api/chat/usage/sessions 的 data.items 结构） */
+export interface SessionUsageItem {
+  session_id: string
+  title?: string
+  total_tokens: number
+  turn_count: number
+  last_used_at?: string
+}
+
 /** 会话元数据（P9 会话管理；对应后端 /api/chat/sessions 的 data 结构） */
 export interface ChatSessionMeta {
   session_id: string
@@ -362,6 +371,9 @@ export const agentApi = {
       ...(userId != null ? { user_id: String(userId) } : {}),
       // D4：HTTP 降级路径透传 force_deep（与 WS 路径对齐，Task 1 Python 侧支持）
       ...(options?.forceDeep ? { force_deep: true } : {})
+    }, {
+      // 非流式降级路径跑完整 LangGraph 较慢（本地实测 ~50s），全局默认 15s 会超时 → 无回复
+      timeout: 120000
     })
   },
 
@@ -494,6 +506,20 @@ export const agentApi = {
     let url = `${base}/agent/briefing/alert?symbol=${encodeURIComponent(symbol)}`
     if (cycle) url += `&cycle=${encodeURIComponent(cycle)}`
     return url
+  },
+
+  /**
+   * 会话维度用量聚合（P10 线 6）：GET /api/chat/usage/sessions
+   * 鉴权由 request 拦截器自动注入 Authorization: Bearer token；失败静默返回空 items
+   * （用量缺失只影响列表徽标，不影响会话列表主功能——与 listChatSessions 同模式）。
+   */
+  async getChatSessionUsage(): Promise<{ items: SessionUsageItem[] }> {
+    try {
+      return await request.get<{ items: SessionUsageItem[] }>('/chat/usage/sessions')
+    } catch (e) {
+      console.error('[agent] getChatSessionUsage failed:', e)
+      return { items: [] }
+    }
   }
 }
 

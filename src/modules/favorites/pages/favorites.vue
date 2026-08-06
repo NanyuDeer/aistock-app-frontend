@@ -168,11 +168,17 @@ const stocks = computed<StockItem[]>(() => {
     name: stock.name,
     price: stock.price || 0,
     changePercent: stock.changePercent || 0,
-    changeAmount: stock.price && stock.changePercent ? stock.price * stock.changePercent / 100 : 0,
+    changeAmount: calculateChangeAmount(stock.price || 0, stock.changePercent || 0),
     margin: false,
     specialAlert: false,
   }))
 })
+
+function calculateChangeAmount(price: number, changePercent: number): number {
+  if (!Number.isFinite(price) || !Number.isFinite(changePercent) || price <= 0 || changePercent <= -100) return 0
+  const prevClose = price / (1 + changePercent / 100)
+  return price - prevClose
+}
 
 const sortedStocks = computed(() => {
   const list = [...stocks.value]

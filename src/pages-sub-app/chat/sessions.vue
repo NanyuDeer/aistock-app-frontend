@@ -19,6 +19,11 @@
         <view class="session-main">
           <text class="session-title">{{ s.title }}</text>
           <text class="session-time">{{ formatTime(s.last_message_at) }}</text>
+          <!-- 会话维度用量徽标（本地优先 + 服务端补足；未登录也显示本地用量；无用量不显示） -->
+          <view v-if="usageBySession[s.session_id]" class="session-usage">
+            <text class="session-usage-num">{{ usageBySession[s.session_id].total_tokens }}</text>
+            <text class="session-usage-unit">tokens</text>
+          </view>
         </view>
         <view v-if="s.session_id === chatStore.sessionId" class="session-badge">当前</view>
         <view class="session-delete" @tap.stop="onDeleteSession(s.session_id)">
@@ -37,20 +42,52 @@
 
 <script setup lang="ts">
 import { onShow } from '@dcloudio/uni-app'
+import { ref, computed } from 'vue'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
+import { agentApi, type SessionUsageItem } from '@/shared/api/modules/agent'
+import { mergeUsageBySession } from '@/shared/utils/sessionUsageMerge'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 const chatStore = useChatStore()
 const userStore = useUserStore()
 
-// onShow：仅登录时拉 server 列表合并（server 覆盖本地同名 title/last_message_at，保留本地仅有会话）
+// 服务端聚合（登录时拉取；失败静默 → 空 Map）
+const serverUsage = ref<Record<string, SessionUsageItem>>({})
+
+// 本地 sessionUsage → 徽标形状（TokenUsage 无 turn_count/last_used_at，归一化补默认值；未登录也显示）
+const localUsage = computed<Record<string, SessionUsageItem>>(() => {
+  const map: Record<string, SessionUsageItem> = {}
+  for (const [sid, u] of Object.entries(chatStore.sessionUsage)) {
+    map[sid] = { session_id: sid, total_tokens: u.total_tokens, turn_count: 0 }
+  }
+  return map
+})
+
+// 徽标数据 = 本地优先 + 服务端补足（Task 1 纯函数，不做数值相加）
+const usageBySession = computed(() => mergeUsageBySession(localUsage.value, serverUsage.value))
+
+// onShow：本地部分随 computed 自动更新；仅登录时拉 server 合并（server 覆盖本地同名 title/last_message_at，保留本地仅有会话）
 onShow(() => {
   if (userStore.isLoggedIn()) {
     void chatStore.syncSessionsFromServer()
+    void loadSessionUsage() // 登录才拉用量（未登录不请求）
   }
 })
+
+/**
+ * 拉取会话维度用量聚合，按 session_id 建立 Map 存入 serverUsage。
+ * 失败静默（getChatSessionUsage 内部返回空 items）→ Map 为空，徽标仅显示本地部分。
+ */
+async function loadSessionUsage() {
+  const res = await agentApi.getChatSessionUsage()
+  const map: Record<string, SessionUsageItem> = {}
+  for (const item of res.items) {
+    map[item.session_id] = item
+  }
+  serverUsage.value = map
+}
 
 function onNewSession() {
   chatStore.createSession()
@@ -130,6 +167,25 @@ function formatTime(iso?: string): string {
   white-space: nowrap;
 }
 .session-time { font-size: $font-size-xs; color: $ink-mute; }
+/* P10 线 6：用量徽标（$primary 强调数字、$primary-50 底色、$ink-mute 弱化单位） */
+.session-usage {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4rpx;
+  align-self: flex-start;
+  padding: 2rpx 12rpx;
+  border-radius: $r-full;
+  background: $primary-50;
+}
+.session-usage-num {
+  font-size: $font-size-xs;
+  color: $primary;
+  font-weight: 600;
+}
+.session-usage-unit {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
 .session-badge {
   font-size: $font-size-xs;
   color: $primary;

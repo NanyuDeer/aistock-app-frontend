@@ -35,6 +35,11 @@ export interface KLineItem {
   high: number
   low: number
   volume: number
+  amount?: number
+  amplitude?: number
+  change?: number
+  changePercent?: number
+  turnoverRate?: number
 }
 
 // ---- 趋势股评分接口类型 ----
@@ -265,8 +270,8 @@ export interface WindLeaderSector {
   code?: string
   name: string
   type?: string
-  /** 短线风口 / 长线风口 / 长线+短线风口（AI 八字段推导），缺省按 short 兼容存量 */
-  cycle?: 'short' | 'long' | 'both'
+  /** 短线风口 / 长线风口 / 长线+短线风口 / 均不成立（AI 八字段推导），缺省按 short 兼容存量 */
+  cycle?: 'short' | 'long' | 'both' | 'none'
   frequency?: number | string
   freq20?: number
   freq_delta?: number
@@ -436,10 +441,11 @@ export const stockApi = {
   },
 
   /** 获取 K 线数据 */
-  getKLine(symbol: string, params?: { period?: 'daily' | 'weekly' | 'yearly' | string; count?: number }) {
+  getKLine(symbol: string, params?: { period?: 'daily' | 'weekly' | 'monthly' | string; count?: number }) {
     const kltMap: Record<string, number> = {
       daily: 101,
       weekly: 102,
+      monthly: 103,
       yearly: 103,
     }
     const klt = kltMap[params?.period || 'daily'] || 101
@@ -461,6 +467,11 @@ export const stockApi = {
         high: Number(k['最高价'] ?? k['high'] ?? 0),
         low: Number(k['最低价'] ?? k['low'] ?? 0),
         volume: Number(k['成交量'] ?? k['volume'] ?? 0),
+        amount: Number(k['成交额'] ?? k['amount'] ?? 0),
+        amplitude: Number(k['振幅'] ?? k['amplitude'] ?? 0),
+        change: Number(k['涨跌额'] ?? k['change'] ?? 0),
+        changePercent: Number(k['涨跌幅'] ?? k['changePercent'] ?? 0),
+        turnoverRate: Number(k['换手率'] ?? k['turnoverRate'] ?? 0),
       }))
       return mapped
     })
@@ -620,9 +631,12 @@ export const stockApi = {
 
   /** 获取个股异动事件（趋势风口） */
   getStockEvents(symbol: string, params?: { cycle?: string; limit?: number }) {
-    return request.get(`/cn/trend-hotspots/events/${symbol}`, { params }).then((res: Record<string, unknown>) => {
+    return request.get(`/cn/stock-monitors/events/${symbol}`, { params }).then((res: Record<string, unknown>) => {
       const data = (res.data as Record<string, unknown>) || res
-      const events = (data['events'] as unknown[]) || []
+      const events = (data['events'] as unknown[])
+        || (data.events as unknown[])
+        || (res.events as unknown[])
+        || []
       return Array.isArray(events) ? events : []
     })
   },

@@ -76,7 +76,7 @@ test('sendMessage 支持 forceDeep 透传（HTTP 降级对齐 WS）', async () =
     assert.deepEqual(calls, [{
       url: '/agent/chat/message',
       data: { message: '深度分析一下600519', session_id: 's1', force_deep: true },
-      config: undefined,
+      config: { timeout: 120000 }, // 56f631e 超时 15s→120s 后需同步断言
     }])
   } finally {
     await server.close()
@@ -112,6 +112,77 @@ test('getTokenUsageSummary 请求公开累计端点 /chat/usage/summary', async 
       const res = await agentModule.agentApi.getTokenUsageSummary()
       assert.deepEqual(calls, ['/chat/usage/summary'])
       assert.deepEqual(res, summary)
+    } finally {
+      request.get = originalGet
+    }
+  } finally {
+    await server.close()
+  }
+})
+
+// ── P10 线 6：会话维度用量 ──
+
+test('getChatSessionUsage 走 GET /chat/usage/sessions 并返回 items', async () => {
+  const server = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    resolve: { alias: { '@': path.resolve(process.cwd(), 'src') } },
+    server: { middlewareMode: true },
+    appType: 'custom',
+    // pinia 需与测试运行环境隔离，避免 Node ESM 与 vite resolver 双实例导致
+    // getActivePinia() 找不到 active pinia（agent.ts 依赖 useUserStore）
+    ssr: { noExternal: ['pinia'] },
+  })
+
+  try {
+    const piniaModule = await server.ssrLoadModule('pinia')
+    piniaModule.setActivePinia(piniaModule.createPinia())
+    const requestModule = await server.ssrLoadModule('/src/shared/api/request.ts')
+    const agentModule = await server.ssrLoadModule('/src/shared/api/modules/agent.ts')
+    const request = requestModule.default
+    const originalGet = request.get
+    const calls: string[] = []
+    const items = [
+      { session_id: 'app_1', title: '今天大盘怎么样', total_tokens: 1500, turn_count: 5, last_used_at: '2026-08-05T02:00:00.000Z' },
+    ]
+    request.get = ((url: string) => {
+      calls.push(url)
+      return Promise.resolve({ items })
+    }) as typeof request.get
+    try {
+      const res = await agentModule.agentApi.getChatSessionUsage()
+      assert.deepEqual(res, { items })
+    } finally {
+      request.get = originalGet
+    }
+    assert.deepEqual(calls, ['/chat/usage/sessions'])
+  } finally {
+    await server.close()
+  }
+})
+
+test('getChatSessionUsage 失败返回空 items（不抛）', async () => {
+  const server = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    resolve: { alias: { '@': path.resolve(process.cwd(), 'src') } },
+    server: { middlewareMode: true },
+    appType: 'custom',
+    ssr: { noExternal: ['pinia'] },
+  })
+
+  try {
+    const piniaModule = await server.ssrLoadModule('pinia')
+    piniaModule.setActivePinia(piniaModule.createPinia())
+    const requestModule = await server.ssrLoadModule('/src/shared/api/request.ts')
+    const agentModule = await server.ssrLoadModule('/src/shared/api/modules/agent.ts')
+    const request = requestModule.default
+    const originalGet = request.get
+    request.get = (() => Promise.reject(new Error('401'))) as typeof request.get
+    try {
+      // 不应 reject（内部 catch 静默返回空 items）
+      const res = await agentModule.agentApi.getChatSessionUsage()
+      assert.deepEqual(res, { items: [] })
     } finally {
       request.get = originalGet
     }

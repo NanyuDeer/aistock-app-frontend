@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { storeToRefs } from 'pinia'
 
 const getMock = vi.hoisted(() => vi.fn())
 const setMock = vi.hoisted(() => vi.fn())
@@ -99,5 +100,35 @@ describe('chat store 会话 token 本地累加（P11 T2）', () => {
     expect(store.getCurrentSessionUsage()?.total_tokens).toBe(20)
     store.createSession()
     expect(store.getCurrentSessionUsage()).toBeNull()
+  })
+
+  it('storeToRefs 暴露 messages 保持响应式（气泡消失根因回归守卫）', () => {
+    // 根因（2026-08-06 定位）：store 实例上访问 computed 被 Pinia 自动解包成普通值，
+    // `const displayMessages = chatStore.messages` 捕获的是陈旧数组快照，
+    // appendMessage 替换 messagesBySession 后 v-for 永不更新（回复需刷新才可见）。
+    // 修复：useChatStream 用 storeToRefs(chatStore) 暴露 messages（响应式 ref）。
+    const store = useChatStore()
+    const { messages } = storeToRefs(store)
+    store.setSessionId('s1')
+    store.appendMessage({ role: 'user', content: 'q', timestamp: 1 })
+    expect(messages.value).toHaveLength(1)
+    store.appendMessage(assistantMsg())
+    expect(messages.value).toHaveLength(2)
+  })
+
+  it('deleteSession 同步清理该会话的本地用量（无幽灵徽标）', () => {
+    const store = useChatStore()
+    store.setSessionId('s1')
+    store.appendMessage(assistantMsg({ tokenUsage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 } }))
+    expect(store.getCurrentSessionUsage()?.total_tokens).toBe(30)
+
+    store.deleteSession('s1')
+
+    // 删除后当前会话已切换（列表空 → 新建），原 s1 用量键不得残留
+    const { sessionUsage } = storeToRefs(store)
+    expect(sessionUsage.value['s1']).toBeUndefined()
+
+    // 持久化副作用：本地用量键同步清空（无幽灵徽标跨重启）
+    expect(setMock).toHaveBeenCalledWith('chat_session_usage', {})
   })
 })
