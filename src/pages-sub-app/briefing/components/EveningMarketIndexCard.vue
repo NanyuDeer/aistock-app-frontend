@@ -79,7 +79,7 @@ function formatClose(close: number | null): string {
   return close.toFixed(2)
 }
 
-function formatCount(count: number | null): string {
+function formatCount(count: number | null | undefined): string {
   if (count === null) return '--'
   return String(count)
 }

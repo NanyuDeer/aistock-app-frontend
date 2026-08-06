@@ -92,8 +92,9 @@ const searchResults = ref<StockListItem[]>([])
 const searchLoading = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-function onSearchInput(e: { detail?: { value?: string } }) {
-  searchKeyword.value = e?.detail?.value ?? ''
+function onSearchInput(e: unknown) {
+  const detail = (e as { detail?: { value?: string } } | null)?.detail
+  searchKeyword.value = detail?.value ?? ''
 }
 
 watch(searchKeyword, (kw) => {
