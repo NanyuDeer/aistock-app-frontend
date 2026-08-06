@@ -377,7 +377,7 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
 
 // 颜色：基于置信度/热度深浅（长线=置信度，短线=热度），从浅蓝到深蓝（匹配网页版）
 function bubbleItemStyle(b: BubbleLayout) {
-  const ratio = Math.max(0, Math.min(1, (b.opacity - 0.4) / 0.6))
+  const ratio = Math.max(0, Math.min(1, (b.opacity - 0.3) / 0.7))
   // 浅蓝 #bfdbfe → 深蓝 #1d4ed8
   const r = Math.round(191 + (29 - 191) * ratio)
   const g = Math.round(219 + (78 - 219) * ratio)

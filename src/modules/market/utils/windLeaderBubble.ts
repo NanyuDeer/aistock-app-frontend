@@ -2,16 +2,20 @@ import type { WindLeaderSector } from '@/shared/api/modules/stock'
 
 export type CycleKind = 'long' | 'short'
 
-/** 泡泡半径：长线 coef 0.6 / 短线 coef 1.2，clamp(26 + days×coef, 22, 65) */
+/** 泡泡半径：按各档位量级归一化——长线以 120 天为满格、短线以 10 天为满格，
+ * 半径 22→65px 线性，超过满格封顶。修复原 clamp(26+days×coef,22,65) 长线 75+ 天全封顶、
+ * 长短线系数不匹配各自量级的问题。 */
 export function calcBubbleRadius(kind: CycleKind, days: number): number {
-  const coef = kind === 'long' ? 0.6 : 1.2
-  return Math.min(65, Math.max(22, 26 + days * coef))
+  const fullDays = kind === 'long' ? 120 : 10
+  return Math.min(65, Math.max(22, 22 + (days / fullDays) * 43))
 }
 
-/** 泡泡颜色深浅：0.4 + 0.6 × value（value 收敛到 0~1） */
+/** 泡泡颜色深浅：0.3 + 0.7 × value（value 收敛到 0~1）。
+ * 相比 0.4+0.6×值，低强度更浅、高强度更深，对比度更强（实际 conf/heat 多集中在 0.3~0.6，
+ * 原公式映射后几乎全是浅蓝无法区分）。 */
 export function calcBubbleOpacity(kind: CycleKind, value: number): number {
   const v = Math.min(1, Math.max(0, value))
-  return 0.4 + 0.6 * v
+  return 0.3 + 0.7 * v
 }
 
 /** 取该维度持续天数（ai_analysis 缺省 0） */
