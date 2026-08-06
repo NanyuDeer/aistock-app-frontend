@@ -9,27 +9,32 @@ export function calcBubbleRadius(kind: CycleKind, days: number): number {
   return Math.min(50, Math.max(20, 20 + (days / fullDays) * 30))
 }
 
-// 双色阶：只规定最浅/最深两端，中间值在 HSL 上线性插值调整颜色深浅。
-// 长线蓝系（浅蓝→藏青）、短线橙红系（浅橙→暗红），0.5 附近即普通蓝/普通橙。
-// [色相 h, 饱和度 s%, 亮度 l%]
-const SCALE_STOPS: Record<CycleKind, { from: [number, number, number]; to: [number, number, number] }> = {
-  long: { from: [220, 88, 96], to: [225, 82, 18] },
-  short: { from: [32, 95, 96], to: [2, 75, 24] },
+/**
+ * 泡泡颜色色阶（0.1~0.9 九档，索引 = 值×10-1）。0.1/0.2 与 0.3 同色——低于 cycle 门槛
+ * （短线 heat≥0.3、长线 conf≥0.5）的板块会被筛选掉，直接用最浅色收敛。
+ * 长线蓝系：0.3 浅蓝 → 0.5 普通蓝 → 0.9 近黑蓝
+ * 短线橙红系：0.3 浅橙 → 0.5 普通橙 → 0.8 起转红 → 0.9 暗红
+ */
+const LONG_SCALE = ['#dbeafe', '#dbeafe', '#dbeafe', '#7ab1f8', '#3b82f6', '#1552d0', '#1e3a8a', '#1b2a6b', '#121a44']
+const SHORT_SCALE = ['#fed7aa', '#fed7aa', '#fed7aa', '#fdba74', '#f97316', '#c2410c', '#9a3412', '#7f1d1d', '#5b1414']
+const SCALES: Record<CycleKind, string[]> = { long: LONG_SCALE, short: SHORT_SCALE }
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
-/** 泡泡底色：值 0~1 在色阶两端（最浅→最深）间 HSL 线性插值 */
+/** 按强度值在两档色阶间线性插值，返回 rgb(...) 字符串；值收敛到 [0.1, 0.9] 档位内 */
 export function calcBubbleColor(kind: CycleKind, value: number): string {
-  const v = Math.min(1, Math.max(0, value))
-  const { from, to } = SCALE_STOPS[kind]
-  const h = from[0] + (to[0] - from[0]) * v
-  const s = from[1] + (to[1] - from[1]) * v
-  const l = from[2] + (to[2] - from[2]) * v
-  return `hsl(${h.toFixed(1)}, ${s.toFixed(1)}%, ${l.toFixed(1)}%)`
-}
-
-/** 泡泡文字颜色：底色较深（强度 ≥0.5）用白字，较浅用深色字，保证可读 */
-export function calcBubbleTextColor(value: number): string {
-  return value >= 0.5 ? '#ffffff' : '#1f2937'
+  const scale = SCALES[kind]
+  const v = Math.min(0.9, Math.max(0.1, value))
+  const pos = ((v - 0.1) / 0.8) * (scale.length - 1)
+  const i = Math.min(scale.length - 2, Math.floor(pos))
+  const t = pos - i
+  const c1 = hexToRgb(scale[i])
+  const c2 = hexToRgb(scale[i + 1])
+  const mix = (a: number, b: number) => Math.round(a + (b - a) * t)
+  return `rgb(${mix(c1[0], c2[0])}, ${mix(c1[1], c2[1])}, ${mix(c1[2], c2[2])})`
 }
 
 /** 取该维度持续天数（ai_analysis 缺省 0） */

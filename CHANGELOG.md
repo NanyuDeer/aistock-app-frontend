@@ -2,15 +2,17 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
-## [master] 2026-08-06 — leaders 泡泡图：半径 20~50px + 双色阶（长线蓝系/短线橙红系，HSL 双端插值）
+## [master] 2026-08-06 — leaders 泡泡图：半径上限 50px + 双色阶（长线蓝系/短线橙红系）
 
 **开发者**: Aria
 
 ### 改进
-- `windLeaderBubble.calcBubbleRadius`：半径上限 65→50、下限 22→20（长线满格 120 天、短线满格 10 天）
-- 新增 `calcBubbleColor`：只规定最浅/最深两端，中间值在 HSL 上线性插值——长线蓝系 `hsl(220,88%,96%)→hsl(225,82%,18%)`（浅蓝→藏青）、短线橙红系 `hsl(32,95%,96%)→hsl(2,75%,24%)`（浅橙→暗红），0.5 附近即普通蓝/普通橙，0.5~0.7 亮度差均匀可辨
-- 新增 `calcBubbleTextColor`：底色较深（强度≥0.5）白字、较浅深色字
-- `leaders.vue`：移除 opacity 透明度叠加，`bubbleItemStyle` 直接 `background: b.color`，文字颜色自适应；字号分档适配新半径（11/12/13px）
+- `windLeaderBubble.calcBubbleRadius`：半径上限 65→50px、下限 22→20px（长线满格 120 天 / 短线满格 10 天，`20 + 天数/满格×30`）
+- `windLeaderBubble` 新增双色阶 + `calcBubbleColor(kind, value)`：
+  - 长线蓝系：0.3 浅蓝 `#dbeafe` → 0.5 普通蓝 `#3b82f6` → 0.9 近黑蓝 `#121a44`（0.6 深蓝 `#1552d0`、0.7 藏青 `#1e3a8a`，相邻档亮度差 12~15%）
+  - 短线橙红系：0.3 浅橙 `#fed7aa` → 0.5 普通橙 `#f97316` → 0.8 转红 `#7f1d1d` → 0.9 暗红 `#5b1414`
+  - 0.1/0.2 与 0.3 同色（低于 cycle 门槛的板块会被筛选掉，收敛最浅色）；值在相邻档间线性插值
+- 移除 `calcBubbleOpacity` 透明度逻辑；`leaders.vue bubbleItemStyle` 改用 `calcBubbleColor` 填充色，去掉元素透明度双重叠加；提示文案更新"长线蓝系/短线橙红系"
 
 ---
 
