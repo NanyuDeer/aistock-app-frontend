@@ -421,7 +421,16 @@ async function fetchReportFor(date: string): Promise<boolean> {
       }
     } else {
       items.value = []
-      eveningViewModel.value = null
+      // brief 加载失败时，晚报分支仍尝试用 review 组装 ViewModel，
+      // 让行情卡片在 brief 不可用时能独立展示（buildEveningCardViewModel 支持 brief=null）。
+      if (broadcastType.value === 'evening') {
+        const review = reviewRes && reviewRes.status === 'fulfilled'
+          ? (reviewRes.value as MarketTraceReviewRecord)
+          : null
+        eveningViewModel.value = buildEveningCardViewModel(null, review, date)
+      } else {
+        eveningViewModel.value = null
+      }
     }
 
     return report.value !== null || items.value.length > 0
