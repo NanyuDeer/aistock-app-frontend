@@ -1,35 +1,37 @@
 <template>
-  <view class="sectors-card">
-    <view class="card-label">
-      <text class="card-dot">●</text>
-      <text class="card-label-text">板块行情</text>
+  <view class="insight-row">
+    <view class="insight-icon sector">
+      <text class="insight-icon-text">块</text>
     </view>
+    <view class="insight-body">
+      <view class="insight-top">
+        <text class="insight-source">板块行情</text>
+      </view>
 
-    <!-- 领涨板块 -->
-    <view v-if="topGainers.length" class="block">
-      <text class="block-label">领涨</text>
-      <view class="rank-list">
-        <view v-for="s in topGainers" :key="`g-${s.name}`" class="rank-item">
-          <text class="rank-name">{{ s.name }}</text>
-          <text class="rank-pct up">{{ formatPct(s.pctChange) }}</text>
+      <!-- 领涨板块 -->
+      <view v-if="topGainers.length" class="block">
+        <view class="rank-list">
+          <view v-for="s in topGainers" :key="`g-${s.name}`" class="mini-tag">
+            <text class="rank-name">{{ s.name }}</text>
+            <text class="rank-pct up">{{ formatPct(s.pctChange) }}</text>
+          </view>
         </view>
       </view>
-    </view>
 
-    <!-- 领跌板块 -->
-    <view v-if="topLosers.length" class="block">
-      <text class="block-label">领跌</text>
-      <view class="rank-list">
-        <view v-for="s in topLosers" :key="`l-${s.name}`" class="rank-item">
-          <text class="rank-name">{{ s.name }}</text>
-          <text class="rank-pct down">{{ formatPct(s.pctChange) }}</text>
+      <!-- 领跌板块 -->
+      <view v-if="topLosers.length" class="block">
+        <view class="rank-list">
+          <view v-for="s in topLosers" :key="`l-${s.name}`" class="mini-tag">
+            <text class="rank-name">{{ s.name }}</text>
+            <text class="rank-pct down">{{ formatPct(s.pctChange) }}</text>
+          </view>
         </view>
       </view>
-    </view>
 
-    <!-- 空态 -->
-    <view v-if="!topGainers.length && !topLosers.length" class="empty">
-      <text class="empty-text">本日板块数据暂无</text>
+      <!-- 空态 -->
+      <view v-if="!topGainers.length && !topLosers.length" class="empty">
+        <text class="empty-text">本日板块数据暂无</text>
+      </view>
     </view>
   </view>
 </template>
@@ -50,75 +52,94 @@ function formatPct(v: number | null): string {
 </script>
 
 <style lang="scss" scoped>
-/* 样式对齐早报头条/异动公告卡片：
-   白底 + 左侧 8rpx 强调条 + 圆角 20rpx */
-.sectors-card {
+/* 样式对齐早报 Agent 洞见行：
+   白底 + 圆角 20rpx + 左侧圆角图标 + 标题 + 内容 */
+.insight-row {
+  display: flex;
+  gap: 24rpx;
+  align-items: flex-start;
   background: #ffffff;
   border-radius: 20rpx;
-  padding: 32rpx;
-  margin-bottom: 24rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 16rpx;
   border: 1rpx solid $line;
-  border-left: 8rpx solid $primary;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
 }
 
-.card-label {
+.insight-icon {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
   display: flex;
   align-items: center;
-  gap: 8rpx;
-  margin-bottom: 20rpx;
+  justify-content: center;
+  flex-shrink: 0;
+  background: $primary;
+
+  &.sector {
+    background: #7c3aed;
+  }
 }
 
-.card-dot {
-  font-size: 20rpx;
-  color: $primary;
-}
-
-.card-label-text {
-  font-size: 22rpx;
+.insight-icon-text {
+  font-size: 28rpx;
   font-weight: 700;
-  color: $primary;
-  letter-spacing: 2rpx;
+  color: #ffffff;
+}
+
+.insight-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.insight-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.insight-source {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: $ink;
+  line-height: 1.4;
 }
 
 .block {
-  margin-bottom: 24rpx;
+  margin-bottom: 12rpx;
 
   &:last-child {
     margin-bottom: 0;
   }
 }
 
-.block-label {
-  display: block;
-  font-size: 22rpx;
-  color: #9ca3af;
-  margin-bottom: 12rpx;
-}
-
+/* 板块列表：对齐早报 mini-tag 风格（圆角胶囊 + 浅蓝底） */
 .rank-list {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8rpx;
 }
 
-.rank-item {
-  display: flex;
-  justify-content: space-between;
+.mini-tag {
+  display: inline-flex;
   align-items: center;
-  padding: 12rpx 20rpx;
+  gap: 8rpx;
+  font-size: 20rpx;
+  padding: 8rpx 16rpx;
   border-radius: 999rpx;
   background: rgba(77, 124, 254, 0.04);
+  color: $primary;
 }
 
 .rank-name {
-  font-size: 24rpx;
-  font-weight: 500;
+  font-size: 22rpx;
   color: $ink;
-  flex: 1;
+  font-weight: 500;
 }
 
 .rank-pct {
-  font-size: 26rpx;
+  font-size: 22rpx;
   font-weight: 700;
 }
 
@@ -131,7 +152,7 @@ function formatPct(v: number | null): string {
 }
 
 .empty {
-  padding: 32rpx 0;
+  padding: 16rpx 0;
   text-align: center;
 }
 
