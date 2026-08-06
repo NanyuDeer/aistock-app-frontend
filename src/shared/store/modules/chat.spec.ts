@@ -127,5 +127,8 @@ describe('chat store 会话 token 本地累加（P11 T2）', () => {
     // 删除后当前会话已切换（列表空 → 新建），原 s1 用量键不得残留
     const { sessionUsage } = storeToRefs(store)
     expect(sessionUsage.value['s1']).toBeUndefined()
+
+    // 持久化副作用：本地用量键同步清空（无幽灵徽标跨重启）
+    expect(setMock).toHaveBeenCalledWith('chat_session_usage', {})
   })
 })

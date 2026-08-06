@@ -1,20 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { reactive, ref } from 'vue'
 import { useChatStream } from './useChatStream'
-import type { ReasoningStep } from '@/shared/api/modules/agent'
+import type { ChatMessage, ReasoningStep } from '@/shared/api/modules/agent'
 
-// Mock chatStore（避免持久化 + 隔离测试；setSessionId 同步更新 sessionId 模拟真实行为）
+// Mock chatStore（避免持久化 + 隔离测试）。
+// 契约：useChatStream 用 storeToRefs(chatStore) 暴露 messages/sessionId —— storeToRefs 只收集
+// isRef/isReactive 属性，纯对象 `{ value: [] }` 会被跳过（修复前 mock 契约脱节 → 测试里
+// stream.messages/sessionId 实为 undefined）。因此 messages/sessionId 必须用真实 ref；
+// 且 mock store 用 reactive 包装，使 composable 内部 `chatStore.sessionId`（send 首轮生成 id 时
+// 读字符串判断）经代理自动解包成字符串。appendMessage 推入 messages.value 保持响应式。
 const mockAppendMessage = vi.hoisted(() => vi.fn())
 const mockSetSessionId = vi.hoisted(() => vi.fn())
-const mockSessionRef = vi.hoisted(() => ({ value: '' }))
-vi.mock('@/shared/store/modules/chat', () => ({
-  useChatStore: () => ({
-    messages: { value: [] },
-    // getter 模拟 Pinia setup store 的 ref unwrap（store 实例上访问 ref 得到原始值）
-    get sessionId() { return mockSessionRef.value },
-    appendMessage: mockAppendMessage,
-    setSessionId: (id: string) => { mockSessionRef.value = id; mockSetSessionId(id) },
-  }),
-}))
+
+vi.mock('@/shared/store/modules/chat', () => {
+  const messages = ref<ChatMessage[]>([])
+  const sessionId = ref('')
+  return {
+    useChatStore: () =>
+      reactive({
+        messages,
+        sessionId,
+        appendMessage: (msg: ChatMessage) => {
+          mockAppendMessage(msg)
+          messages.value.push(msg)
+        },
+        setSessionId: (id: string) => {
+          mockSetSessionId(id)
+          sessionId.value = id
+        },
+      }),
+  }
+})
 
 vi.mock('@/shared/store/modules/user', () => ({
   useUserStore: () => ({ userInfo: { id: 1, openid: 'o_20260805' } }),
@@ -37,11 +53,14 @@ vi.mock('@/shared/api/modules/agent', () => ({
 
 describe('useChatStream reasoning event', () => {
   beforeEach(() => {
+    // 复用 composable 的 storeToRefs 引用重置 mock store 状态（messages/sessionId 是真实 ref）
+    const stream = useChatStream() as any
+    stream.messages.value = []
+    stream.sessionId.value = ''
     mockAppendMessage.mockClear()
     mockSocketCbs.onMessageCbs.length = 0
     mockSocketSend.mockClear()
     mockSetSessionId.mockClear()
-    mockSessionRef.value = ''
   })
 
   it('aggregates reasoning chunks by node and stores on DONE', () => {
@@ -185,5 +204,21 @@ describe('useChatStream reasoning event', () => {
     const arg = mockAppendMessage.mock.calls[0][0]
     expect(arg.tokenUsage).toBeUndefined()
     expect(arg.cards).toBeUndefined()
+  })
+
+  it('DONE 后消息写入 storeToRefs 暴露的响应式 messages（气泡消失根因的 composable 级回归守卫）', () => {
+    const stream = useChatStream() as any
+    const onDone = vi.fn()
+
+    // 完整一轮 WS 消息流（reasoning 分块 + done），与既有用例同一模拟方式
+    stream._testHandleWsMessage({ type: 'reasoning', node: 'qa_router', chunk: '我先' }, onDone)
+    stream._testHandleWsMessage({ type: 'done', content: '最终回答' }, onDone)
+
+    // 修复后 messages 经 storeToRefs 暴露为响应式 ref：DONE 处理完成后 assistant 消息必须实时可见。
+    // （修复前 mock 是普通对象 `{ value: [] }`，storeToRefs 会跳过 → 此处 stream.messages 为 undefined）
+    expect(stream.messages.value).toHaveLength(1)
+    expect(stream.messages.value[0].role).toBe('assistant')
+    expect(stream.messages.value[0].content).toBe('最终回答')
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
   })
 })
