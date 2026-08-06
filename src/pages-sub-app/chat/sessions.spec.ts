@@ -39,3 +39,21 @@ test('空态提示存在', () => {
   assert.match(pageSource, /session-empty/)
   assert.match(pageSource, /暂无会话/)
 })
+
+// ── P10 线 6：会话维度用量展示（串行依赖线 4 + 线 5） ──
+
+test('P10 线 6：登录时拉取会话用量并按 session_id 合并', () => {
+  assert.match(pageSource, /getChatSessionUsage\(\)/)
+  assert.match(pageSource, /usageBySession/)
+  assert.match(pageSource, /session-usage/)
+})
+
+test('P10 线 6：未登录不请求用量（isLoggedIn 守卫）', () => {
+  assert.match(pageSource, /userStore\.isLoggedIn\(\)/)
+  // loadSessionUsage 调用必须位于登录分支内层（与 syncSessionsFromServer 并列）
+  assert.match(pageSource, /if \(userStore\.isLoggedIn\(\)\)[\s\S]{0,200}loadSessionUsage\(\)/)
+})
+
+test('P10 线 6：无用量不显示徽标（v-if 条件）', () => {
+  assert.match(pageSource, /v-if="usageBySession\[s\.session_id\]"/)
+})

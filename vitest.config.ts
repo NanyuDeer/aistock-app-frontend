@@ -35,6 +35,8 @@ export default defineConfig({
     include: [
       'tests/**/*.test.ts',
       'src/shared/utils/useChatStream.spec.ts',
+      'src/shared/utils/parseMarkdownSections.spec.ts',
+      'src/shared/utils/sessionUsageMerge.spec.ts',
       'src/pages-sub-app/chat/ReasoningPanel.spec.ts',
       'src/shared/store/modules/market.spec.ts',
       'src/modules/home/components/StockContent.spec.ts',
@@ -46,7 +48,7 @@ export default defineConfig({
       'src/pages-sub-app/chat/cards/DeepAnalysisCard.spec.ts',
       'src/pages-sub-app/chat/cards/ComparisonCard.spec.ts',
       'src/pages-sub-app/chat/cards/CardRenderer.spec.ts',
-      'src/pages-sub-app/chat/UsageBar.spec.ts',
+      'src/pages-sub-app/chat/cards/SectionCard.spec.ts',
     ],
   },
 })

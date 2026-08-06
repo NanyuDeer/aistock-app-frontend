@@ -2,6 +2,30 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-06 — ChatAgent 会话用量徽标 + 单轮用量进气泡 + 气泡消失修复 + HTTP 降级 token_usage + WS 端口对齐 8080
+
+**开发者**: Aria
+
+### 新增
+- 会话列表 token 用量徽标（`sessions.vue`）：本地 `sessionUsage` 优先 + 服务端 `getChatSessionUsage` 补足（未登录也显示本地用量）；`sessionUsageMerge.ts` 纯函数合并（本地优先，服务端仅补缺失会话，不数值相加避免翻倍）
+- 聊天气泡底部单轮用量文本（`index.vue`）：左侧「N tokens」+ 右侧深度分析按钮；移除底部 `<UsageBar />`
+- `ChatMessage` 类型扩展 `tokenUsage?`/`cards?`；`agentApi.getTokenUsageSummary()`
+
+### 修复
+- 气泡消失根因（`useChatStream.ts`）：Pinia store 实例上访问 computed 被自动解包成普通值 → 消费方捕获陈旧数组快照 → v-for 永不更新；改用 `storeToRefs(chatStore)` 暴露响应式 ref
+- HTTP 降级路径 token_usage 透出（`useChatStream.ts`）：降级分支 `appendMessage` 透出 `tokenUsage: result.token_usage`（此前恒 undefined）
+- `sendMessage` 超时 15s→120s（非流式跑完整 graph ~50s 会超时无回复）
+- `deleteSession` 同步清理 `sessionUsage` 残留（防幽灵徽标）
+
+### 改进
+- `env/.env.development` + `env/.env.example`：`VITE_AGENT_WS_BASE` 端口 `8000`→`8080` 对齐 agent-py 新端口
+
+### 验证
+- vitest 19 文件 98+ 用例全绿；vue-tsc 0 错误
+- 浏览器实测气泡用量 + 会话徽标均正常显示
+
+---
+
 ## [master] 2026-08-06 — 修复动态模块加载失败（SCSS 未定义变量）
 
 **开发者**: Aria
