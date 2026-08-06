@@ -49,7 +49,6 @@ export default defineConfig({
       'src/pages-sub-app/chat/cards/ComparisonCard.spec.ts',
       'src/pages-sub-app/chat/cards/CardRenderer.spec.ts',
       'src/pages-sub-app/chat/cards/SectionCard.spec.ts',
-      'src/pages-sub-app/chat/UsageBar.spec.ts',
     ],
   },
 })

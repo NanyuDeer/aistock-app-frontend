@@ -19,7 +19,7 @@
         <view class="session-main">
           <text class="session-title">{{ s.title }}</text>
           <text class="session-time">{{ formatTime(s.last_message_at) }}</text>
-          <!-- P10 线 6：会话维度用量徽标（无用量记录不显示；服务端聚合，非本次会话本地累加） -->
+          <!-- 会话维度用量徽标（本地优先 + 服务端补足；未登录也显示本地用量；无用量不显示） -->
           <view v-if="usageBySession[s.session_id]" class="session-usage">
             <text class="session-usage-num">{{ usageBySession[s.session_id].total_tokens }}</text>
             <text class="session-usage-unit">tokens</text>
