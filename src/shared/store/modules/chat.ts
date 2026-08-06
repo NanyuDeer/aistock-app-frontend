@@ -136,6 +136,14 @@ export const useChatStore = defineStore('chat', () => {
     persistSessions()
     persistHistory()
 
+    // 同步清理本地用量，避免删除会话后残留幽灵徽标（与 messagesBySession 同生命周期）
+    if (sessionUsage.value[id]) {
+      const usage = { ...sessionUsage.value }
+      delete usage[id]
+      sessionUsage.value = usage
+      storage.set(STORAGE_KEYS.CHAT_SESSION_USAGE, sessionUsage.value)
+    }
+
     // fire-and-forget 调 server delete；Promise.resolve 兜底（单元测试 mock 可能非 Promise 返回）
     void Promise.resolve(agentApi.deleteChatSession(id)).catch(() => {})
 

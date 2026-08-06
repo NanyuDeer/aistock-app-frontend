@@ -115,4 +115,17 @@ describe('chat store 会话 token 本地累加（P11 T2）', () => {
     store.appendMessage(assistantMsg())
     expect(messages.value).toHaveLength(2)
   })
+
+  it('deleteSession 同步清理该会话的本地用量（无幽灵徽标）', () => {
+    const store = useChatStore()
+    store.setSessionId('s1')
+    store.appendMessage(assistantMsg({ tokenUsage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 } }))
+    expect(store.getCurrentSessionUsage()?.total_tokens).toBe(30)
+
+    store.deleteSession('s1')
+
+    // 删除后当前会话已切换（列表空 → 新建），原 s1 用量键不得残留
+    const { sessionUsage } = storeToRefs(store)
+    expect(sessionUsage.value['s1']).toBeUndefined()
+  })
 })
