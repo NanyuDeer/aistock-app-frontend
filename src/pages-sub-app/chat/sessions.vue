@@ -42,30 +42,43 @@
 
 <script setup lang="ts">
 import { onShow } from '@dcloudio/uni-app'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
 import { agentApi, type SessionUsageItem } from '@/shared/api/modules/agent'
+import { mergeUsageBySession } from '@/shared/utils/sessionUsageMerge'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
 const chatStore = useChatStore()
 const userStore = useUserStore()
 
-// P10 线 6：会话维度用量聚合（session_id → 用量项 Map，供列表行徽标读取）
-const usageBySession = ref<Record<string, SessionUsageItem>>({})
+// 服务端聚合（登录时拉取；失败静默 → 空 Map）
+const serverUsage = ref<Record<string, SessionUsageItem>>({})
 
-// onShow：仅登录时拉 server 列表合并（server 覆盖本地同名 title/last_message_at，保留本地仅有会话）
+// 本地 sessionUsage → 徽标形状（TokenUsage 无 turn_count/last_used_at，归一化补默认值；未登录也显示）
+const localUsage = computed<Record<string, SessionUsageItem>>(() => {
+  const map: Record<string, SessionUsageItem> = {}
+  for (const [sid, u] of Object.entries(chatStore.sessionUsage)) {
+    map[sid] = { session_id: sid, total_tokens: u.total_tokens, turn_count: 0 }
+  }
+  return map
+})
+
+// 徽标数据 = 本地优先 + 服务端补足（Task 1 纯函数，不做数值相加）
+const usageBySession = computed(() => mergeUsageBySession(localUsage.value, serverUsage.value))
+
+// onShow：本地部分随 computed 自动更新；仅登录时拉 server 合并（server 覆盖本地同名 title/last_message_at，保留本地仅有会话）
 onShow(() => {
   if (userStore.isLoggedIn()) {
     void chatStore.syncSessionsFromServer()
-    void loadSessionUsage() // P10 线 6：登录才拉用量（未登录不请求）
+    void loadSessionUsage() // 登录才拉用量（未登录不请求）
   }
 })
 
 /**
- * P10 线 6：拉取会话维度用量聚合，按 session_id 建立 Map。
- * 失败静默（getChatSessionUsage 内部返回空 items）→ Map 为空，列表不显示徽标。
+ * 拉取会话维度用量聚合，按 session_id 建立 Map 存入 serverUsage。
+ * 失败静默（getChatSessionUsage 内部返回空 items）→ Map 为空，徽标仅显示本地部分。
  */
 async function loadSessionUsage() {
   const res = await agentApi.getChatSessionUsage()
@@ -73,7 +86,7 @@ async function loadSessionUsage() {
   for (const item of res.items) {
     map[item.session_id] = item
   }
-  usageBySession.value = map
+  serverUsage.value = map
 }
 
 function onNewSession() {
