@@ -11,6 +11,7 @@ import type {
   MarketTraceReviewRecord,
   MarketTraceSeverity,
 } from '@/shared/api/modules/agent'
+import { labelEvidenceList } from './evidenceLabels'
 
 export type { MarketTraceReviewRecord }
 
@@ -238,17 +239,17 @@ function indexPerfFromUnknown(value: unknown): MarketTraceIndexPerf[] {
 }
 
 function buildRejectedReason(candidate: MarketTraceCandidateExplanation): string {
-  const counterIds = asStringList(candidate.counter_evidence_ids)
+  const counterLabels = labelEvidenceList(asStringList(candidate.counter_evidence_ids))
   if (candidate.status === 'rejected') {
-    if (counterIds.length > 0) return `存在反证：${counterIds.join('、')}`
+    if (counterLabels.length > 0) return `存在反证：${counterLabels.join('、')}`
     return '与市场观测相悖，已排除'
   }
   if (candidate.status === 'insufficient') {
-    if (counterIds.length > 0) return `证据不足，缺失：${counterIds.join('、')}`
+    if (counterLabels.length > 0) return `证据不足，缺失：${counterLabels.join('、')}`
     return '证据不足，无法确认'
   }
   // weak 但未被 alternative_chain_id 指向
-  if (counterIds.length > 0) return `证据较弱，反证：${counterIds.join('、')}`
+  if (counterLabels.length > 0) return `证据较弱，反证：${counterLabels.join('、')}`
   return '证据较弱，未作为主因'
 }
 
