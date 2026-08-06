@@ -410,7 +410,7 @@ async function loadData() {
   if (loading.value) return
   loading.value = true
   try {
-    const data = await stockApi.getWindLeaders(20)
+    const data = await stockApi.getWindLeaders(40)
     const hotSectors = Array.isArray(data?.hot_sectors) ? data.hot_sectors : []
     sectors.value = hotSectors.filter(
       (sector): sector is WindLeaderSector => Boolean(sector && typeof sector.name === 'string' && sector.name.trim())

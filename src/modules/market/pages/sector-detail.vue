@@ -517,7 +517,7 @@ async function loadData() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const res: any = await stockApi.getWindLeaders(20)
+    const res: any = await stockApi.getWindLeaders(40)
     const data = res?.data ?? res
     const sectors: WindLeaderSector[] = data?.hot_sectors ?? []
     const found = sectors.find(s => s.name === sectorName.value)
