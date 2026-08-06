@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { reactive, ref } from 'vue'
 import { useChatStream } from './useChatStream'
+import { agentApi } from '@/shared/api/modules/agent'
 import type { ChatMessage, ReasoningStep } from '@/shared/api/modules/agent'
 
 // Mock chatStore（避免持久化 + 隔离测试）。
@@ -37,13 +38,15 @@ vi.mock('@/shared/store/modules/user', () => ({
 }))
 
 // Mock WebSocket（连接即开；捕获 onMessage 回调供测试注入 WS 事件；捕获 send 参数）
+// mockWsFail.fail=true 时 onOpen 不触发、onError 触发 → connect resolve(false) → send 走 HTTP 降级分支
 const mockSocketCbs = vi.hoisted(() => ({ onMessageCbs: [] as Array<(msg: any) => void> }))
+const mockWsFail = vi.hoisted(() => ({ fail: false }))
 const mockSocketSend = vi.hoisted(() => vi.fn())
 vi.mock('@/shared/api/modules/agent', () => ({
   createAgentWebSocket: () => ({
-    onOpen: (cb: () => void) => cb(),
+    onOpen: (cb: () => void) => { if (!mockWsFail.fail) cb() },
     onClose: () => {},
-    onError: () => {},
+    onError: (cb: () => void) => { if (mockWsFail.fail) queueMicrotask(cb) },
     onMessage: (cb: (msg: any) => void) => { mockSocketCbs.onMessageCbs.push(cb) },
     send: mockSocketSend,
     close: () => {},
@@ -61,6 +64,8 @@ describe('useChatStream reasoning event', () => {
     mockSocketCbs.onMessageCbs.length = 0
     mockSocketSend.mockClear()
     mockSetSessionId.mockClear()
+    mockWsFail.fail = false
+    vi.mocked(agentApi.sendMessage).mockReset()
   })
 
   it('aggregates reasoning chunks by node and stores on DONE', () => {
@@ -220,5 +225,25 @@ describe('useChatStream reasoning event', () => {
     expect(stream.messages.value[0].role).toBe('assistant')
     expect(stream.messages.value[0].content).toBe('最终回答')
     expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('HTTP 降级：sendMessage 返回 token_usage 时 appendMessage 携带 tokenUsage（降级路径用量链路修复）', async () => {
+    mockWsFail.fail = true // WS 连接失败 → send 走 HTTP 降级分支（当前环境实际路径）
+    const stream = useChatStream() as any
+
+    vi.mocked(agentApi.sendMessage).mockResolvedValue({
+      content: 'HTTP 回复',
+      session_id: 's1',
+      token_usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+    } as any)
+
+    await stream.send('你好')
+
+    // 用户消息 + assistant 消息
+    expect(mockAppendMessage).toHaveBeenCalledTimes(2)
+    const arg = mockAppendMessage.mock.calls[1][0]
+    expect(arg.content).toBe('HTTP 回复')
+    // P10 线 2 缺口修复前：降级分支不读 result.token_usage → arg.tokenUsage 为 undefined
+    expect(arg.tokenUsage).toEqual({ prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 })
   })
 })

@@ -267,6 +267,8 @@ export function useChatStream() {
         chatStore.appendMessage({
           role: 'assistant',
           content: result.content || result.message || '',
+          // P10 线 2 缺口修复：HTTP 降级路径同样透出 token_usage（非流式接口已补返回；缺失 undefined 兼容）
+          tokenUsage: (result.token_usage as TokenUsage | undefined) ?? undefined,
           progressSteps: savedSteps,
           timestamp: Date.now()
         })
