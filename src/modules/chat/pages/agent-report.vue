@@ -103,7 +103,7 @@
           </Card>
         </template>
 
-        <!-- ===== 风口龙头（wind_leader）：mp-html 全文渲染 + 结构化增强 ===== -->
+        <!-- ===== 风口龙头（wind_leader）：按 prompt 章节分卡片展示 ===== -->
         <template v-else-if="effectiveIntent === 'wind_leader' && displayReport">
           <Card v-if="reportSummary" class="conclusion-card conclusion-card--wind">
             <text class="section-kicker">风口结论</text>
@@ -111,10 +111,10 @@
             <text class="cycle-hint">长线风口=长线影响≥30天且置信度≥0.5（月线/MA60确认）；短线风口=短线热度≥0.3（热度捕捉+资金博弈）</text>
           </Card>
 
-          <Card v-if="leaderStocks.length" class="stream-section">
-            <text class="section-title">龙头股</text>
-            <view class="stock-tags">
-              <Tag v-for="(code, i) in leaderStocks" :key="i" size="sm">{{ code }}</Tag>
+          <Card v-if="windOverviewHtml" class="stream-section">
+            <text class="section-title">风口概览</text>
+            <view class="report-text-wrap">
+              <mp-html :content="windOverviewHtml" class="report-html" />
             </view>
           </Card>
 
@@ -137,13 +137,38 @@
             <view class="wind-sector-list">
               <view v-for="(sec, i) in windSectors" :key="i" class="wind-sector-card">
                 <text class="wind-sector-title">{{ sec.title }}</text>
-                <text class="wind-sector-body">{{ sec.body }}</text>
+                <mp-html :content="markdownToHtml(sec.body)" class="wind-sector-body-html" />
               </view>
             </view>
           </Card>
 
-          <Card v-if="detailsText" class="stream-section">
-            <text class="section-title">风口分析（长短线分类）</text>
+          <Card v-if="windStocks.length || leaderStocks.length" class="stream-section">
+            <text class="section-title">龙头股推荐</text>
+            <view v-if="leaderStocks.length" class="stock-tags wind-stock-tags">
+              <Tag v-for="(code, i) in leaderStocks" :key="i" size="sm">{{ code }}</Tag>
+            </view>
+            <view v-if="windStocks.length" class="bullet-list">
+              <text v-for="(st, i) in windStocks" :key="i" class="bullet-item">{{ st }}</text>
+            </view>
+          </Card>
+
+          <Card v-if="windRiskHtml" class="stream-section">
+            <text class="section-title">风险提示</text>
+            <view class="report-text-wrap">
+              <mp-html :content="windRiskHtml" class="report-html" />
+            </view>
+          </Card>
+
+          <Card v-if="windAdviceHtml" class="stream-section">
+            <text class="section-title">关注建议</text>
+            <view class="report-text-wrap">
+              <mp-html :content="windAdviceHtml" class="report-html" />
+            </view>
+          </Card>
+
+          <!-- 兜底：各章节解析失败时展示完整原文，避免内容丢失 -->
+          <Card v-if="detailsText && !windOverviewHtml && !windSectors.length && !windRiskHtml && !windAdviceHtml" class="stream-section">
+            <text class="section-title">风口分析（原文）</text>
             <view class="report-text-wrap">
               <mp-html :content="markdownToHtml(detailsText)" class="report-html" />
             </view>
@@ -689,6 +714,8 @@ const windSectors = computed<SectorCard[]>(() =>
   activeCycle.value === 'long' ? windLongSectors.value : windShortSectors.value
 )
 const windStocks = computed(() => sectionBullets(detailsText.value, '龙头股推荐'))
+const windRiskHtml = computed(() => sectionHtml(detailsText.value, '风险提示'))
+const windAdviceHtml = computed(() => sectionHtml(detailsText.value, '关注建议'))
 
 // ===== 趋势股评分（trend_score）结构化分区 =====
 const trendConclusionHtml = computed(() => sectionHtml(detailsText.value, '结论摘要'))
@@ -1166,12 +1193,15 @@ onBackPress(() => {
   color: $ink;
 }
 
-.wind-sector-body {
-  display: block;
+.wind-sector-body-html {
   margin-top: 8rpx;
   font-size: 24rpx;
-  line-height: 1.7;
   color: $ink-soft;
+  line-height: 1.7;
+}
+
+.wind-stock-tags {
+  margin-bottom: 12rpx;
 }
 
 /* 晨报主题色：$warning（与 AGENT_META.morning 一致） */

@@ -22,6 +22,105 @@
 ### 验证
 - `npx tsc --noEmit` 通过
 
+## [master] 2026-08-06 — agent-report wind_leader 分卡片展示 + 板块卡片 markdown 渲染修复
+
+**开发者**: Aria
+
+### 修复
+- `agent-report.vue` wind_leader 板块卡片：body 原用 `<text>` 直接输出导致 `- **上榜次数**：...` 等 markdown 语法原样显示 → 改用 `mp-html` + `markdownToHtml`（新增 `.wind-sector-body-html` 样式）
+
+### 改进
+- 按后端 prompt 章节结构分卡片展示：风口结论（summary）→ 风口概览（`## 风口概览`）→ 长线/短线研判两档切换 + 板块卡片（`###` 子节）→ 龙头股推荐（`## 龙头股推荐` + `display_report.stocks` 代码标签）→ 风险提示（`## 风险提示`）→ 关注建议（`## 关注建议`）
+- 移除原"风口分析（长短线分类）"全文卡片，改为各章节解析均失败时兜底展示原文（避免内容丢失）；新增 `windRiskHtml` / `windAdviceHtml` 章节解析
+
+---
+
+## [master] 2026-08-06 — leaders 泡泡图：半径上限 50px + 双色阶（长线蓝系/短线橙红系）
+
+**开发者**: Aria
+
+### 改进
+- `windLeaderBubble.calcBubbleRadius`：半径上限 65→50px、下限 22→20px（长线满格 120 天 / 短线满格 10 天，`20 + 天数/满格×30`）
+- `windLeaderBubble` 新增双色阶 + `calcBubbleColor(kind, value)`：
+  - 长线蓝系：0.3 浅蓝 `#dbeafe` → 0.5 普通蓝 `#3b82f6` → 0.9 近黑蓝 `#121a44`（0.6 深蓝 `#1552d0`、0.7 藏青 `#1e3a8a`，相邻档亮度差 12~15%）
+  - 短线橙红系：0.3 浅橙 `#fed7aa` → 0.5 普通橙 `#f97316` → 0.8 转红 `#7f1d1d` → 0.9 暗红 `#5b1414`
+  - 0.1/0.2 与 0.3 同色（低于 cycle 门槛的板块会被筛选掉，收敛最浅色）；值在相邻档间线性插值
+- 移除 `calcBubbleOpacity` 透明度逻辑；`leaders.vue bubbleItemStyle` 改用 `calcBubbleColor` 填充色，去掉元素透明度双重叠加；提示文案更新"长线蓝系/短线橙红系"
+
+---
+
+## [master] 2026-08-06 — leaders 泡泡图：大小按长短线各自量级归一化 + 颜色对比度加强
+
+**开发者**: Aria
+
+### 改进
+- `windLeaderBubble.calcBubbleRadius`：长线以 120 天为满格、短线以 10 天为满格，半径 22→65px 线性、超过封顶——修复原 `clamp(26+days×coef,22,65)` 长线 75+ 天全封顶、长短线系数不匹配各自量级的问题（长线 45d→38px / 75d→49px 可区分）
+- `windLeaderBubble.calcBubbleOpacity`：`0.4+0.6×值` → `0.3+0.7×值`，低强度更浅、高强度更深（原 conf/heat 多集中在 0.3~0.6，映射后几乎全是浅蓝无法区分）
+- `leaders.vue bubbleItemStyle`：ratio 反推同步改为 `(opacity-0.3)/0.7`
+
+---
+
+## [master] 2026-08-06 — 风口龙头接口 limit 20→40（配合后端双轨选板）
+
+**开发者**: Aria
+
+### 修复
+- `leaders.vue` / `sector-detail.vue`：`getWindLeaders(20)`→`(40)`——后端双轨选板后分析数约 27，limit=20 会截断短线池候选，导致前端过滤 0 天板块后长短线凑不满 8
+
+---
+
+## [master] 2026-08-06 — leaders 双榜过滤 0 天板块 + cycle 类型对齐
+
+**开发者**: Aria
+
+### 修复
+- `src/modules/market/pages/leaders.vue`：`displaySectors` 先过滤当前档位天数为 0 的板块（另一链被裁剪或长短线均不成立的 `'none'` 板块），再按天数降序取 top8——宁少勿滥，避免短线档塞满 0 天补位板块
+- `src/shared/api/modules/stock.ts`：`WindLeaderSector.cycle` 类型增加 `'none'`，与后端 deriveCycle 四态对齐
+
+---
+
+## [junliang] 2026-08-06 — pages.json 路由重构回滚：恢复被删页面路由 + 删除死文件
+
+**开发者**: Aria
+
+### 修复
+- `src/pages.json`：回滚非自选股洞察相关的路由重构——恢复被误删的页面路由（trend-score 系列 / reports / report-detail / traceability / sector-detail / hot-burst-report / briefing-detail）及原 style 配置，修复这些页面的跳转失效（如洞察页趋势股评分卡片、业绩页 redirectTo reports、长线风口板块详情、首页大盘溯源）；仅保留洞察改动（stock-trace 路由替换为 insight、新增 insight-detail）
+
+### 清理
+- 删除死文件：`src/modules/favorites/pages/stock-trace.vue`（路由已替换为 insight、无跳转引用）、`src/modules/user/pages/icon-gallery.vue`（无路由注册、无跳转引用）
+
+---
+
+## [junliang] 2026-08-06 — 异动监控接入自选股洞察 + 提醒tab更名"自选股洞察"
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/favorites/pages/monitor.vue`：异动监控数据源从已停用的 stock_trace 切换到自选股洞察 API，卡片展示主因 / 置信度（高置信/待验证）/ 日期，点击进入洞察详情页；移除"全部/大涨/大跌"筛选分栏，所有异动事件直接平铺展示；"立即检测"改为刷新列表（洞察由后端 cron 周期采集）
+- `src/modules/favorites/components/AlertContent.vue`：底部"提醒"tab 的"异动捕手"模块更名为"自选股洞察"，数据源切换为洞察 API，列表展示自选股涨停雷达归因事件（股票 + 主因 + 日期），点击事件进洞察详情、点击模块标题进异动监控页
+
+---
+
+## [master] 2026-08-06 — leaders 分档逻辑按天数排序 top8（长短线各满 8 个）
+
+**开发者**: Aria
+
+### 修复
+- `leaders.vue` `displaySectors`：不再按 `cycle` 过滤，改为长线按 `long_term_days` 降序 top8、短线按 `short_term_days` 降序 top8——解决 deriveCycle 对长线不成立板块误判 short 塞入短线档（短线全是 0 天、长线不足 8 个）的问题，两榜各自取天数最高的 8 个，0 天板块自然排后补位
+
+---
+
+## [master] 2026-08-06 — 风口龙头 leaders 页面修复（短线板块截断/次数口径/移除 cycle 标签）
+
+**开发者**: Aria
+
+### 修复
+- `leaders.vue`：`getWindLeaders(10)`→`(20)`——后端双榜（长线榜 top8 + 短线榜 top8）长线在前，limit=10 截断导致短线档只剩 2-3 个板块
+- `leaders.vue`：上榜次数按档位显示（新增 `boardCount`）——短线档显示近 20 日 `freq20`、长线档显示近 60 日 `frequency`（原先统一显示 60 日 frequency，短线次数超 30 次）
+
+### 改进
+- `leaders.vue`：删除 cycle 三态标签展示（长线风口/短线风口/长线+短线 Tag），`cycle` 字段仍用于双榜分流
+
 ---
 
 ## [changer] 2026-08-06 — ChatAgent 会话用量徽标 + 单轮用量进气泡 + 气泡消失修复 + HTTP 降级 token_usage + WS 端口对齐 8080

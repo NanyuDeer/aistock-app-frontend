@@ -37,6 +37,7 @@ export interface UserSettings {
   stock_push?: boolean
   outbreak_push?: boolean
   leader_push?: boolean
+  watchlist_insight_push?: boolean
 }
 
 export const authApi = {
