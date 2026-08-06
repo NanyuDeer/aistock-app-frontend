@@ -212,8 +212,9 @@ function getSections(content: string): MarkdownSection[] | null {
  */
 function rerunDeep(idx: number) {
   if (isStreaming.value) return
+  // displayMessages 经 useChatStream 修复后是响应式 ref（模板自动解包，脚本需 .value）
   for (let i = idx - 1; i >= 0; i--) {
-    const prev = displayMessages[i]
+    const prev = displayMessages.value[i]
     if (prev && prev.role === 'user') {
       chatStream.send(prev.content, { forceDeep: true })
       scrollToBottom()

@@ -9,6 +9,7 @@
  *   - 完成后保留进度步骤（折叠显示）
  */
 import { ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep, type ReasoningStep, type TokenUsage, type ChatCard } from '@/shared/api/modules/agent'
 import { buildExecTree, toRawWsEvent, type RawWsEvent } from './buildExecTree'
 import { useChatStore } from '@/shared/store/modules/chat'
@@ -18,6 +19,11 @@ export type { ProgressStep }
 
 export function useChatStream() {
   const chatStore = useChatStore()
+  // 修复气泡消失根因：Pinia store 实例上访问 computed 会被自动解包成普通值，
+  // 若 index.vue 用 `const displayMessages = chatStream.messages` 捕获则得到陈旧数组快照，
+  // appendMessage 替换 messagesBySession 后 v-for 永不更新（回复需刷新才可见）。
+  // 用 storeToRefs 取响应式引用暴露，消费方捕获到的是 ref（模板自动解包），消息列表实时更新。
+  const { messages, sessionId } = storeToRefs(chatStore)
   const streaming = ref(false)
   const progressSteps = ref<ProgressStep[]>([])
   const streamingText = ref('')
@@ -298,9 +304,9 @@ export function useChatStream() {
     streamingReasoning: currentRunReasoning,
     send,
     disconnect,
-    // 透传 chatStore
-    messages: chatStore.messages,
-    sessionId: chatStore.sessionId,
+    // 透传 chatStore（storeToRefs 响应式引用；index.vue 捕获后消息列表实时更新）
+    messages,
+    sessionId,
     // 测试钩子：直接暴露 handleWsMessage 供单测模拟 WS 事件序列
     _testHandleWsMessage: handleWsMessage,
   }
