@@ -2,6 +2,16 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-06 — leaders 双榜过滤 0 天板块 + cycle 类型对齐
+
+**开发者**: Aria
+
+### 修复
+- `src/modules/market/pages/leaders.vue`：`displaySectors` 先过滤当前档位天数为 0 的板块（另一链被裁剪或长短线均不成立的 `'none'` 板块），再按天数降序取 top8——宁少勿滥，避免短线档塞满 0 天补位板块
+- `src/shared/api/modules/stock.ts`：`WindLeaderSector.cycle` 类型增加 `'none'`，与后端 deriveCycle 四态对齐
+
+---
+
 ## [junliang] 2026-08-06 — pages.json 路由重构回滚：恢复被删页面路由 + 删除死文件
 
 **开发者**: Aria
