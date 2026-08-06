@@ -153,6 +153,8 @@ export async function getFocusEvents(): Promise<FocusEventViewModel[]> {
           importance,
           selectionReason: '基于 Global Importance 排序结果',
           industries: industries.map((i) => i.name),
+          // 保留完整行业对象（含涨跌方向），供顶部卡片箭头/颜色展示
+          affectedIndustries: industries,
         }
       })
   } catch (err) {
