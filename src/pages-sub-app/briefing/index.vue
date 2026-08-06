@@ -30,8 +30,30 @@
           <text class="audio-arrow">›</text>
         </view>
 
-        <!-- 头条卡片：今日最重要研判 -->
-        <view v-if="headlineItem" class="headline-card">
+        <!-- 晚报专属卡片：结论 + 大盘行情 + 板块行情（仅晚报展示） -->
+        <template v-if="broadcastType === 'evening' && eveningViewModel">
+          <!-- 有异象：结论卡片优先展示 -->
+          <EveningAnomalyCard
+            v-if="eveningViewModel.anomaly.hasAnomaly && eveningViewModel.attributionConclusion"
+            :conclusion="eveningViewModel.attributionConclusion"
+          />
+
+          <!-- 大盘行情卡片（指数 + 涨跌家数） -->
+          <EveningMarketIndexCard
+            v-if="eveningViewModel.presentation && (eveningViewModel.presentation.phenomenon.indexPerformance.length || eveningViewModel.breadth)"
+            :indexes="eveningViewModel.presentation.phenomenon.indexPerformance"
+            :breadth="eveningViewModel.breadth"
+          />
+
+          <!-- 板块行情卡片（复用 MarketTraceSectors） -->
+          <MarketTraceSectors
+            v-if="eveningViewModel.presentation && (eveningViewModel.presentation.sectorRanking.topGainers.length || eveningViewModel.presentation.sectorRanking.topLosers.length)"
+            :presentation="eveningViewModel.presentation"
+          />
+        </template>
+
+        <!-- 头条卡片：今日最重要研判（仅晨报展示） -->
+        <view v-if="headlineItem && broadcastType !== 'evening'" class="headline-card">
           <view class="headline-label">
             <text class="headline-star">★</text>
             <text class="headline-label-text">今日头条</text>
@@ -48,11 +70,12 @@
         </view>
 
         <!-- Agent 洞见列表 -->
-        <view v-if="insightItems.length" class="section-label">
+        <view v-if="insightItems.length && broadcastType !== 'evening'" class="section-label">
           <text class="section-label-text">Agent 洞见</text>
           <view class="section-line" />
         </view>
 
+        <template v-if="broadcastType !== 'evening'">
         <template v-for="entry in insightDisplayItems" :key="entry.id">
         <view v-if="entry.kind === 'item'" class="insight-row">
           <view class="insight-icon" :class="entry.item.source">
@@ -94,6 +117,7 @@
             </view>
           </view>
         </view>
+        </template>
         </template>
 
         <!-- 异动公告强调 -->
@@ -155,7 +179,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { agentApi, type BriefType, type BroadcastV1 } from '@/shared/api/modules/agent'
+import { agentApi, type BriefType, type BriefV1, type BroadcastV1, type MarketTraceReviewRecord } from '@/shared/api/modules/agent'
 import { API_BASE_URL } from '@/shared/utils/constants'
 import {
   SOURCE_LABELS,
@@ -174,6 +198,13 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { getEventList } from '@/modules/chat/event/api/eventApi'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
+import EveningAnomalyCard from './components/EveningAnomalyCard.vue'
+import EveningMarketIndexCard from './components/EveningMarketIndexCard.vue'
+import MarketTraceSectors from '@/modules/analytics/components/MarketTraceSectors.vue'
+import {
+  buildEveningCardViewModel,
+  type EveningCardViewModel,
+} from '@/shared/utils/eveningBriefCards'
 
 const currentDate = ref('')
 const broadcastType = ref<BriefType>('morning')
@@ -191,6 +222,8 @@ const MAX_FALLBACK_DAYS = 7
 const isFallback = ref(false)
 /** 用户请求的原始日期，当日无报告时用于回退提示。 */
 const requestedDate = ref('')
+/** 晚报卡片 ViewModel（仅晚报分支使用） */
+const eveningViewModel = ref<EveningCardViewModel | null>(null)
 
 const subtitleText = computed(() => {
   const typeLabel = broadcastType.value === 'morning' ? '晨报' : '晚报'
@@ -353,30 +386,49 @@ function switchType(type: BriefType) {
  */
 async function fetchReportFor(date: string): Promise<boolean> {
   try {
-    const [broadcastRes, briefRes] = await Promise.allSettled([
+    // 晚报分支：并行加载 broadcast + brief + review
+    // 晨报分支：保持原逻辑（broadcast + brief），不加载 review
+    const requests: Promise<unknown>[] = [
       agentApi.getBroadcast(broadcastType.value, date),
       agentApi.getBrief(broadcastType.value, date),
-    ])
+    ]
+    if (broadcastType.value === 'evening') {
+      requests.push(agentApi.getMarketTraceReview(date))
+    }
+
+    const [broadcastRes, briefRes, reviewRes] = await Promise.allSettled(requests)
 
     // 仅消费通过严格校验的 Broadcast v1，避免跨日期或旧结构数据混入。
     if (broadcastRes.status === 'fulfilled') {
-      report.value = parseBroadcastReport(broadcastRes.value, broadcastType.value, date)
+      report.value = parseBroadcastReport(broadcastRes.value as BroadcastV1, broadcastType.value, date)
     } else {
       report.value = null
     }
 
     // Brief v1 已是前端展示报告的事实层，校验后转换为现有卡片展示格式。
     if (briefRes.status === 'fulfilled' && briefRes.value) {
-      const brief = parseBriefingReport(briefRes.value, broadcastType.value)
+      const brief = parseBriefingReport(briefRes.value as BriefV1, broadcastType.value)
       items.value = parseBriefingItemsFromBrief(brief)
+
+      // 晚报分支：组装 eveningViewModel（异象判定 + 行情数据）
+      if (broadcastType.value === 'evening') {
+        const review = reviewRes && reviewRes.status === 'fulfilled'
+          ? (reviewRes.value as MarketTraceReviewRecord)
+          : null
+        eveningViewModel.value = buildEveningCardViewModel(brief, review, date)
+      } else {
+        eveningViewModel.value = null
+      }
     } else {
       items.value = []
+      eveningViewModel.value = null
     }
 
     return report.value !== null || items.value.length > 0
   } catch {
     report.value = null
     items.value = []
+    eveningViewModel.value = null
     return false
   }
 }
