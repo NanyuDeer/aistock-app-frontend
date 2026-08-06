@@ -38,14 +38,17 @@
                 :report="msg.lastDeepReport"
               />
 
-              <!-- D4：force_deep「深度分析」按钮（仅非 deep / 非错误回复） -->
-              <view
-                v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了')"
-                class="deep-btn"
-                @tap="rerunDeep(idx)"
-              >
-                <SvgIcon name="line-chart-line" size="24rpx" color="#0b5fff" />
-                <text class="deep-btn-text">深度分析</text>
+              <!-- 单轮用量 + D4 force_deep「深度分析」按钮（footer 行；用量灰色弱化，仅 DONE 带 tokenUsage 时显示） -->
+              <view class="msg-footer">
+                <text v-if="msg.tokenUsage" class="turn-usage">{{ msg.tokenUsage.total_tokens }} tokens</text>
+                <view
+                  v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了')"
+                  class="deep-btn"
+                  @tap="rerunDeep(idx)"
+                >
+                  <SvgIcon name="line-chart-line" size="24rpx" color="#0b5fff" />
+                  <text class="deep-btn-text">深度分析</text>
+                </view>
               </view>
             </view>
           </view>
@@ -102,9 +105,6 @@
         </view>
       </view>
 
-      <!-- P11 T6：计费条（用户累计 + 本次会话本地累加；P10 只展示用量，不做支付） -->
-      <UsageBar />
-
       <!-- 输入框 -->
       <view class="input-bar">
         <input v-model="inputText" placeholder="输入消息..." class="input" @confirm="handleSend" />
@@ -125,7 +125,6 @@ import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 import DeepSummaryCard from './DeepSummaryCard.vue'
 import ReasoningPanel from './ReasoningPanel.vue'
 import CardRenderer from './cards/CardRenderer.vue'
-import UsageBar from './UsageBar.vue'
 import SectionCard from './cards/SectionCard.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
 import { useChatStore } from '@/shared/store/modules/chat'
@@ -339,12 +338,21 @@ onUnmounted(() => {
 .input { flex: 1; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
 .send-btn { background: $primary; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
 
-/* force_deep 深度分析按钮 */
+/* 气泡 footer：左侧单轮用量（灰色弱化）+ 右侧深度分析按钮 */
+.msg-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12rpx;
+}
+.turn-usage {
+  font-size: 20rpx;
+  color: $ink-mute;
+}
 .deep-btn {
   display: inline-flex;
   align-items: center;
   gap: 6rpx;
-  margin-top: 12rpx;
   padding: 6rpx 20rpx;
   background: rgba(77, 124, 254, 0.08);
   border-radius: 20rpx;
