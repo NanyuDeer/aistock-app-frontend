@@ -10,7 +10,10 @@
         <text class="block-label">指数表现</text>
         <view class="perf-list">
           <view v-for="idx in indexes" :key="idx.name" class="perf-item">
-            <text class="perf-name">{{ idx.name }}</text>
+            <view class="perf-info">
+              <text class="perf-name">{{ idx.name }}</text>
+              <text v-if="idx.close !== null" class="perf-close">{{ formatClose(idx.close) }}</text>
+            </view>
             <text class="perf-change" :class="changeClass(idx.pctChange)">{{ formatPct(idx.pctChange) }}</text>
           </view>
         </view>
@@ -71,6 +74,12 @@ function changeClass(pct: number | null): string {
 function formatPct(pct: number | null): string {
   if (pct === null) return '--'
   return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`
+}
+
+/** 指数收盘点位：保留 2 位小点，千分位分隔 */
+function formatClose(close: number | null): string {
+  if (close === null) return '--'
+  return close.toFixed(2)
 }
 
 function formatCount(count: number | null): string {
@@ -137,13 +146,26 @@ function formatCount(count: number | null): string {
   padding: 8rpx 16rpx;
   border-radius: $r-md;
   background: $bg-soft;
-  min-width: 200rpx;
+  min-width: 240rpx;
+}
+
+.perf-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2rpx;
 }
 
 .perf-name {
   font-size: 22rpx;
   color: $text-color;
-  flex: 1;
+}
+
+.perf-close {
+  font-size: 20rpx;
+  color: $text-color-secondary;
+  font-family: $font-mono;
 }
 
 .perf-change {

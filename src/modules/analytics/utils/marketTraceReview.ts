@@ -78,6 +78,8 @@ export function toMarketTraceViewModel(
 
 export interface MarketTraceIndexPerf {
   name: string
+  /** 指数收盘点位（后端 indexes 对象的 close 字段，可能缺失） */
+  close: number | null
   pctChange: number | null
 }
 
@@ -228,12 +230,17 @@ function sectorItemsFromUnknown(value: unknown): MarketTraceSectorItemView[] {
 }
 
 function indexPerfFromUnknown(value: unknown): MarketTraceIndexPerf[] {
-  if (!Array.isArray(value)) return []
-  return value.map((item) => {
+  // 后端 indexes 可能是数组（旧 fixture）或对象（map，实际生产数据 {SH000001: {...}}）
+  const entries: unknown[] = Array.isArray(value)
+    ? value
+    : (value && typeof value === 'object' ? Object.values(value as Record<string, unknown>) : [])
+  return entries.map((item) => {
     const obj = (item ?? {}) as Record<string, unknown>
     return {
       name: asString(obj.name),
-      pctChange: asNumber(obj.pct_change),
+      close: asNumber(obj.close),
+      // 兼容两种字段名：生产数据用 change_pct，旧 fixture 用 pct_change
+      pctChange: asNumber(obj.change_pct ?? obj.pct_change),
     }
   }).filter(item => item.name.length > 0)
 }
