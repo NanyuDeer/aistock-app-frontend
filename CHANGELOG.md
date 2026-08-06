@@ -2,6 +2,28 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-07 — 晚报界面卡片重设计（Agent 洞见风格 + 异象排序）
+
+**开发者**: Aria
+
+### 新增
+- 晚报卡片 ViewModel 组装工具（`shared/utils/eveningBriefCards.ts`）：`detectMarketAnomaly` 异象判定（文本+结构化双重判定）、`extractAttributionConclusion` 归因结论提取、`extractBreadth` 涨跌家数提取
+- 晚报专属卡片组件（`pages-sub-app/briefing/components/`）：`EveningAnomalyCard`（市场异象结论）、`EveningMarketIndexCard`（大盘行情：指数+涨跌家数）、`EveningSectorsCard`（板块行情：领涨/领跌）
+
+### 改进
+- 晚报卡片样式统一为早报 Agent 洞见行风格（白底圆角 + 左侧圆角图标 + mini-tag 标签）
+- 卡片排版：Agent 洞见 → 市场异象（有才显示）→ 大盘行情 → 板块行情；晚报场景下即使 brief 无数据也保留「Agent 洞见」分区标题，保持与早报一致的页面结构
+- `marketTraceReview.ts`：`indexPerfFromUnknown` 支持后端对象（map）结构的 indexes，并兼容 `change_pct`/`pct_change` 字段名
+
+### 修复
+- 大盘行情只显示涨跌家数、无具体指数涨跌：根因是后端 indexes 为对象（map）而前端期望数组，修复后指数正常展示
+- 音频入口文案写死「AI早报音频」：新增 `audioLabelText` 根据播报类型动态显示早报/晚报音频
+
+### 验证
+- `npx tsc --noEmit` 通过
+
+---
+
 ## [changer] 2026-08-06 — ChatAgent 会话用量徽标 + 单轮用量进气泡 + 气泡消失修复 + HTTP 降级 token_usage + WS 端口对齐 8080
 
 **开发者**: Aria

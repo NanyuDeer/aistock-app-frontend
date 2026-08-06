@@ -30,28 +30,6 @@
           <text class="audio-arrow">›</text>
         </view>
 
-        <!-- 晚报专属卡片：结论 + 大盘行情 + 板块行情（仅晚报展示） -->
-        <template v-if="broadcastType === 'evening' && eveningViewModel">
-          <!-- 有异象：结论卡片优先展示 -->
-          <EveningAnomalyCard
-            v-if="eveningViewModel.anomaly.hasAnomaly && eveningViewModel.attributionConclusion"
-            :conclusion="eveningViewModel.attributionConclusion"
-          />
-
-          <!-- 大盘行情卡片（指数 + 涨跌家数） -->
-          <EveningMarketIndexCard
-            v-if="eveningViewModel.presentation && (eveningViewModel.presentation.phenomenon.indexPerformance.length || eveningViewModel.breadth)"
-            :indexes="eveningViewModel.presentation.phenomenon.indexPerformance"
-            :breadth="eveningViewModel.breadth"
-          />
-
-          <!-- 板块行情卡片（早报风格） -->
-          <EveningSectorsCard
-            v-if="eveningViewModel.presentation && (eveningViewModel.presentation.sectorRanking.topGainers.length || eveningViewModel.presentation.sectorRanking.topLosers.length)"
-            :presentation="eveningViewModel.presentation"
-          />
-        </template>
-
         <!-- 头条卡片：今日最重要研判（仅晨报展示） -->
         <view v-if="headlineItem && broadcastType !== 'evening'" class="headline-card">
           <view class="headline-label">
@@ -69,8 +47,8 @@
           </view>
         </view>
 
-        <!-- Agent 洞见列表 -->
-        <view v-if="insightItems.length" class="section-label">
+        <!-- Agent 洞见列表（晚报场景下即使无数据也保留分区标题，保持与早报一致的页面结构） -->
+        <view v-if="insightItems.length || broadcastType === 'evening'" class="section-label">
           <text class="section-label-text">Agent 洞见</text>
           <view class="section-line" />
         </view>
@@ -116,6 +94,28 @@
             </view>
           </view>
         </view>
+        </template>
+
+        <!-- 晚报专属卡片：市场异象（有才显示）+ 大盘行情 + 板块行情（仅晚报展示，排布在 Agent 洞见之后） -->
+        <template v-if="broadcastType === 'evening' && eveningViewModel">
+          <!-- 有异象：结论卡片优先展示 -->
+          <EveningAnomalyCard
+            v-if="eveningViewModel.anomaly.hasAnomaly && eveningViewModel.attributionConclusion"
+            :conclusion="eveningViewModel.attributionConclusion"
+          />
+
+          <!-- 大盘行情卡片（指数 + 涨跌家数） -->
+          <EveningMarketIndexCard
+            v-if="eveningViewModel.presentation && (eveningViewModel.presentation.phenomenon.indexPerformance.length || eveningViewModel.breadth)"
+            :indexes="eveningViewModel.presentation.phenomenon.indexPerformance"
+            :breadth="eveningViewModel.breadth"
+          />
+
+          <!-- 板块行情卡片（早报风格） -->
+          <EveningSectorsCard
+            v-if="eveningViewModel.presentation && (eveningViewModel.presentation.sectorRanking.topGainers.length || eveningViewModel.presentation.sectorRanking.topLosers.length)"
+            :presentation="eveningViewModel.presentation"
+          />
         </template>
 
         <!-- 异动公告强调 -->
