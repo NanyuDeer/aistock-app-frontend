@@ -76,7 +76,7 @@ test('sendMessage 支持 forceDeep 透传（HTTP 降级对齐 WS）', async () =
     assert.deepEqual(calls, [{
       url: '/agent/chat/message',
       data: { message: '深度分析一下600519', session_id: 's1', force_deep: true },
-      config: undefined,
+      config: { timeout: 120000 }, // 56f631e 超时 15s→120s 后需同步断言
     }])
   } finally {
     await server.close()
