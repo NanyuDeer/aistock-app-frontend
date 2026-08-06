@@ -11,6 +11,7 @@ import type {
   MarketTraceReviewRecord,
   MarketTraceSeverity,
 } from '@/shared/api/modules/agent'
+import { labelEvidenceList } from './evidenceLabels'
 
 export type { MarketTraceReviewRecord }
 
@@ -112,6 +113,25 @@ export interface MarketTraceRejectedView {
   reason: string
 }
 
+export interface PredictionValidationPresentation {
+  status: 'hit' | 'partial' | 'miss' | 'no_forecast'
+  sectorHits: Array<{
+    sector: string
+    morningDirection: string
+    actualDirection: string
+    result: 'hit' | 'miss'
+    deviationNote: string
+  }>
+  eventHits: Array<{
+    eventTitle: string
+    morningDirection: string
+    actualImpact: string
+    result: 'hit' | 'miss' | 'unverifiable'
+    note: string
+  }>
+  overallNote: string
+}
+
 export interface MarketTracePresentation {
   reportTitle: string
   reportDate: string
@@ -146,6 +166,8 @@ export interface MarketTracePresentation {
     topGainers: MarketTraceSectorItemView[]
     topLosers: MarketTraceSectorItemView[]
   }
+
+  predictionValidation: PredictionValidationPresentation | null
 
   markdownDetails: string
 }
@@ -217,17 +239,17 @@ function indexPerfFromUnknown(value: unknown): MarketTraceIndexPerf[] {
 }
 
 function buildRejectedReason(candidate: MarketTraceCandidateExplanation): string {
-  const counterIds = asStringList(candidate.counter_evidence_ids)
+  const counterLabels = labelEvidenceList(asStringList(candidate.counter_evidence_ids))
   if (candidate.status === 'rejected') {
-    if (counterIds.length > 0) return `存在反证：${counterIds.join('、')}`
+    if (counterLabels.length > 0) return `存在反证：${counterLabels.join('、')}`
     return '与市场观测相悖，已排除'
   }
   if (candidate.status === 'insufficient') {
-    if (counterIds.length > 0) return `证据不足，缺失：${counterIds.join('、')}`
+    if (counterLabels.length > 0) return `证据不足，缺失：${counterLabels.join('、')}`
     return '证据不足，无法确认'
   }
   // weak 但未被 alternative_chain_id 指向
-  if (counterIds.length > 0) return `证据较弱，反证：${counterIds.join('、')}`
+  if (counterLabels.length > 0) return `证据较弱，反证：${counterLabels.join('、')}`
   return '证据较弱，未作为主因'
 }
 
@@ -331,6 +353,29 @@ export function toMarketTracePresentation(
     topLosers: sectorItemsFromUnknown(sectorsData?.top_losers),
   }
 
+  // 预判对照（prediction_validation）
+  const pv = trace.prediction_validation
+  const predictionValidation: PredictionValidationPresentation | null = pv
+    ? {
+        status: pv.status,
+        sectorHits: (pv.sector_hits || []).map(h => ({
+          sector: h.sector,
+          morningDirection: h.morning_direction,
+          actualDirection: h.actual_direction,
+          result: h.result,
+          deviationNote: h.deviation_note || '',
+        })),
+        eventHits: (pv.event_hits || []).map(h => ({
+          eventTitle: h.event_title,
+          morningDirection: h.morning_direction,
+          actualImpact: h.actual_impact,
+          result: h.result,
+          note: h.note || '',
+        })),
+        overallNote: pv.overall_note || '',
+      }
+    : null
+
   return {
     reportTitle: `${tradeDate} A股收盘溯源`,
     reportDate: tradeDate,
@@ -351,6 +396,7 @@ export function toMarketTracePresentation(
       topGainers: phenomenon.topGainers,
       topLosers: phenomenon.topLosers,
     },
+    predictionValidation,
     markdownDetails: details,
   }
 }

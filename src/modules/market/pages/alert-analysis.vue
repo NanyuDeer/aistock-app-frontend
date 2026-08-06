@@ -1,14 +1,13 @@
 <template>
   <SubPageCard2 title="AI 异动解读" :subtitle="`${symbol} ${cycleLabel}`">
-    <view class="page-alert-analysis">
-      <!-- AI 播报卡片（最上方，有 podcast_brief 时显示） -->
-      <PodcastCard
-        v-if="podcastBrief"
-        :text="podcastBrief"
-        :cache-key="podcastCacheKey"
-        title="AI 异动播报"
-      />
+    <!-- 标题栏右侧播报按钮：打开悬浮播报窗（8.1会议决议：播报改为悬浮样式） -->
+    <template v-if="podcastBrief" #header-right>
+      <view class="header-podcast-btn" @tap="openFloatingPodcast">
+        <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
+      </view>
+    </template>
 
+    <view class="page-alert-analysis">
       <!-- 状态徽标 + 强制刷新按钮 -->
       <view class="status-row">
         <view class="status-left">
@@ -128,11 +127,14 @@ import { useAlertSSE } from '@/modules/market/utils/useAlertSSE'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import { LoadingState, EmptyState, Tag, Badge, Button, Card, PodcastCard } from '@/shared/components'
+import { usePodcastStore } from '@/shared/store/modules/podcast'
+import { LoadingState, EmptyState, Tag, Badge, Button, Card } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 const symbol = ref('')
 const cycle = ref('')
+
+const podcastStore = usePodcastStore()
 
 const { content, toolSteps, loading, error, done, result, start, stop, loadFromCache } = useAlertSSE()
 
@@ -187,6 +189,12 @@ const todayStr = computed(() => {
   return `${y}-${m}-${d}`
 })
 
+/** 打开悬浮播报窗（标题栏播报按钮） */
+function openFloatingPodcast() {
+  if (!podcastBrief.value) return
+  void podcastStore.open(podcastBrief.value, podcastCacheKey.value, 'AI 异动播报')
+}
+
 function keywordTagType(idx: number): 'neutral' | 'warning' | 'up' | 'down' {
   const types: Array<'neutral' | 'warning' | 'up' | 'down'> = ['neutral', 'warning', 'up', 'down']
   return types[idx % 4]
@@ -234,6 +242,15 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
+/* 标题栏右侧播报按钮 */
+.header-podcast-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .page-alert-analysis {
   padding: $s-3;
   background: $bg-soft;

@@ -9,8 +9,10 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:3000/ws'
 
 // Agent Python 后端 WebSocket 地址（后端路由前缀 /api/agent + /ws/chat）
-// 本地开发默认 8080，可通过 VITE_AGENT_WS_BASE 环境变量覆盖
-export const AGENT_WS_BASE_URL = import.meta.env.VITE_AGENT_WS_BASE || 'ws://localhost:8080/api/agent/ws'
+// 端口走 env 分层：本地开发默认 8000（env/.env.development 注入），
+// 生产由 env/.env.production 注入 wss://gupiao-api.yaozhineng.com/api/agent/ws；
+// 此处 fallback 仅在 env 缺失时兜底，对齐本地开发约定（服务器 8080 只存在于部署 env）
+export const AGENT_WS_BASE_URL = import.meta.env.VITE_AGENT_WS_BASE || 'ws://localhost:8000/api/agent/ws'
 
 // 平台标识
 export const PLATFORM = {
