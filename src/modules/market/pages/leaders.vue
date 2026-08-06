@@ -43,7 +43,7 @@
       <view v-if="displaySectors.length" class="bubble-card">
         <view class="bubble-title-row">
           <text class="bubble-title">{{ activeCycle === 'long' ? '长线风口概念' : '短线风口概念' }}</text>
-          <text class="bubble-hint">泡泡越大持续越久，颜色越深确定性越高（长线蓝系 / 短线橙红系）</text>
+          <text class="bubble-hint">泡泡越大持续越久，颜色越深确定性越高</text>
         </view>
         <view class="bubble-wrap" :style="{ height: bubbleHeight + 'px' }">
           <view
