@@ -32,18 +32,13 @@
         </view>
       </view>
 
-      <!-- 幅度分级筛选（借鉴 alert-catcher） -->
-      <view class="filter-bar">
-        <Segmented :items="amplitudeTabs" v-model="activeAmplitude" fullWidth />
-      </view>
-
       <view v-if="loading" class="loading-wrap">
         <text class="loading-text">加载中...</text>
       </view>
 
-      <view v-else-if="filteredAlerts.length" class="alert-list">
+      <view v-else-if="alerts.length" class="alert-list">
         <Card
-          v-for="alert in filteredAlerts"
+          v-for="alert in alerts"
           :key="alert.eventId"
           class="alert-item-card"
           clickable
@@ -58,7 +53,10 @@
           </view>
           <text class="alert-desc">{{ alert.message }}</text>
           <view class="alert-meta">
-            <text class="meta-type">{{ alert.type }}</text>
+            <view class="meta-left">
+              <text class="meta-type">{{ alert.type }}</text>
+              <Tag v-if="alert.confidence" size="sm" type="neutral">{{ confidenceLabel(alert.confidence) }}</Tag>
+            </view>
             <text class="meta-time">{{ formatTime(String(alert.time)) }}</text>
           </view>
         </Card>
@@ -87,9 +85,8 @@ import { getMarketStatus } from '@/shared/utils/tradingTime'
 import { formatTime } from '@/shared/utils/datetime'
 import Card from '@/shared/components/Card.vue'
 import Tag from '@/shared/components/Tag.vue'
-import Segmented from '@/shared/components/Segmented.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
-import { stockTraceApi } from '@/shared/api/modules/stockTrace'
+import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 
 interface AlertItem {
@@ -100,6 +97,7 @@ interface AlertItem {
   type: string
   message: string
   time: string | number
+  confidence?: 'high' | 'medium' | 'low' | 'unconfirmed'
 }
 
 const favoritesStore = useFavoritesStore()
@@ -110,18 +108,6 @@ const alerts = ref<AlertItem[]>([])
 const wsConnected = ref(false)
 const detecting = ref(false)
 let wsTask: UniApp.SocketTask | null = null
-
-/** 幅度分级筛选（借鉴 alert-catcher） */
-const amplitudeTabs = [
-  { label: '全部', value: 'all' as const },
-  { label: '大涨', value: 'up' as const },
-  { label: '大跌', value: 'down' as const },
-]
-const activeAmplitude = ref<'all' | 'up' | 'down'>('all')
-const filteredAlerts = computed(() => {
-  if (activeAmplitude.value === 'all') return alerts.value
-  return alerts.value.filter(a => a.direction === activeAmplitude.value)
-})
 
 const subscribedSymbols = computed(() => favoritesStore.stocks.map(s => s.symbol))
 const alertEnabled = computed(() => appStore.config.alertEnabled)
@@ -139,18 +125,37 @@ function alertBadgeLabel(direction: 'up' | 'down'): string {
   return direction === 'up' ? '涨' : '跌'
 }
 
+function confidenceLabel(confidence: AlertItem['confidence']): string {
+  switch (confidence) {
+    case 'high': return '高置信'
+    case 'medium': return '中置信'
+    case 'low': return '低置信'
+    case 'unconfirmed': return '待验证'
+    default: return '归因中'
+  }
+}
+
+/** 归因结果文案：已确认展示主因 label；unconfirmed 展示待验证；其余为归因中 */
+function attributionMessage(e: WatchlistInsight): string {
+  if (e.attribution_status === 'unconfirmed') return '主因待验证'
+  if (e.attribution_status === 'confirmed' && e.primary_driver?.label) return `主因：${e.primary_driver.label}`
+  return '归因中'
+}
+
 async function fetchAlerts() {
   loading.value = true
   try {
-    const data = await stockTraceApi.list(50)
-    alerts.value = data.items.map((event) => ({
-      eventId: event.event_id,
-      symbol: event.symbol,
-      name: event.stock_name,
-      direction: event.direction,
-      type: event.direction === 'up' ? '大涨' : '大跌',
-      message: `价格异动 ${event.change_pct >= 0 ? '+' : ''}${event.change_pct.toFixed(2)}%，阈值 ${event.threshold_pct.toFixed(0)}%`,
-      time: event.triggered_at,
+    // 自选股洞察数据源：展示自选股涨停雷达事件的 LLM/规则归因结果
+    const data = await watchlistInsightApi.getInsights()
+    alerts.value = data.map((e) => ({
+      eventId: e.event_id,
+      symbol: e.symbol,
+      name: e.stock_name,
+      direction: e.direction || 'up',
+      type: e.event_type === 'limit_up_radar' ? '涨停雷达' : '异动',
+      message: attributionMessage(e),
+      time: String(e.trade_date || e.created_at || ''),
+      confidence: e.confidence,
     }))
   } catch {
     // API 失败时显示空状态，不再使用 mock 数据兜底
@@ -160,20 +165,14 @@ async function fetchAlerts() {
   }
 }
 
-/** 手动触发异动检测（绕过交易时段限制），检测完刷新列表 */
+/** 手动触发检测：洞察数据由后端 cron 周期采集，此处仅刷新列表 */
 async function handleDetect() {
   if (detecting.value) return
   detecting.value = true
   try {
-    await stockTraceApi.detect()
-    // 检测完成，延迟 1 秒刷新列表（等待事件写入 DB）
-    setTimeout(() => {
-      fetchAlerts()
-      detecting.value = false
-    }, 1000)
-  } catch {
+    fetchAlerts()
+  } finally {
     detecting.value = false
-    uni.showToast({ title: '检测失败，请稍后重试', icon: 'none' })
   }
 }
 
@@ -214,7 +213,7 @@ function disconnectWs() {
 }
 
 function goTrace(eventId: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/stock-trace?event_id=${encodeURIComponent(eventId)}` })
+  uni.navigateTo({ url: `/modules/favorites/pages/insight-detail?event_id=${encodeURIComponent(eventId)}` })
 }
 
 onShow(() => {
@@ -268,8 +267,6 @@ onUnmounted(() => disconnectWs())
 .detect-text { font-size: $font-size-xs; color: #ffffff; }
 .detect-btn.detecting .detect-text { color: $ink-soft; }
 
-.filter-bar { margin-bottom: $s-2; }
-
 .loading-wrap { padding: $s-4; text-align: center; }
 .loading-text { font-size: $font-size-sm; color: $ink-soft; }
 
@@ -281,6 +278,7 @@ onUnmounted(() => disconnectWs())
 .stock-code { font-size: $font-size-xs; color: $ink-soft; }
 .alert-desc { font-size: $font-size-sm; color: $ink-soft; line-height: 1.4; }
 .alert-meta { display: flex; justify-content: space-between; align-items: center; }
+.meta-left { display: flex; align-items: center; gap: $s-2; }
 .meta-type { font-size: $font-size-xs; color: $ink-soft; }
 .meta-time { font-size: $font-size-xs; color: $ink-soft; }
 

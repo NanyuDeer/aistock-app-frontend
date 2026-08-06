@@ -1,7 +1,7 @@
 <template>
   <view class="alert-content">
     <view class="content-wrap">
-      <!-- 异动捕手模块（新建模块：自选股异动监控） -->
+      <!-- 自选股洞察模块：预览自选股涨停雷达事件的归因结果，点击进入异动监控/洞察详情 -->
       <view class="alert-module">
         <view class="module-card">
           <view class="module-decor"></view>
@@ -10,7 +10,7 @@
               <SvgIcon name="radar-line" size="32rpx" color="#0b5fff" />
             </view>
             <view class="module-header-text">
-              <text class="module-title">异动捕手</text>
+              <text class="module-title">自选股洞察</text>
             </view>
             <text class="module-arrow">›</text>
           </view>
@@ -27,7 +27,7 @@
                 <Tag :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
               </template>
               <template #value>
-                <text class="capture-time">{{ formatTime(item.triggered_at) }}</text>
+                <text class="capture-time">{{ item.trade_date ? formatDate(item.trade_date) : '' }}</text>
               </template>
             </ListCell>
             <EmptyState v-if="!captureList.length" title="暂无异动数据" />
@@ -79,7 +79,7 @@ import ListCell from '@/shared/components/ListCell.vue'
 import Tag from '@/shared/components/Tag.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
+import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import { stockApi } from '@/shared/api/modules/stock'
 
 // 情报来源类型
@@ -104,26 +104,14 @@ const intelTabItems = [
   { label: '利空', value: 'negative' as const },
 ]
 
-// 异动捕手：接真实 API（DEV 模式下后端无数据时用 mock 兜底，保留首页视觉完整性）
-const captureList = ref<StockTraceEvent[]>([])
-
-/** DEV 模式 mock 数据（结构与 StockTraceEvent 对齐） */
-const CAPTURE_MOCK_DATA: StockTraceEvent[] = [
-  { event_id: 'mock-cap-001', trigger_revision: 1, symbol: '300204', stock_name: '舒泰神', event_type: 'price', direction: 'up', triggered_at: '2026-07-31T10:15:00+08:00', latest_price: 12.34, previous_close: 11.23, change_pct: 9.84, threshold_pct: 5, severity: 'high', rule_version: 'v1', analysis_status: 'completed' },
-  { event_id: 'mock-cap-002', trigger_revision: 1, symbol: '300760', stock_name: '迈瑞医疗', event_type: 'price', direction: 'down', triggered_at: '2026-07-31T13:45:00+08:00', latest_price: 245.60, previous_close: 256.40, change_pct: -4.21, threshold_pct: 5, severity: 'medium', rule_version: 'v1', analysis_status: 'completed' },
-  { event_id: 'mock-cap-003', trigger_revision: 1, symbol: '600276', stock_name: '恒瑞医药', event_type: 'price', direction: 'up', triggered_at: '2026-07-31T13:58:00+08:00', latest_price: 48.92, previous_close: 46.20, change_pct: 5.89, threshold_pct: 5, severity: 'medium', rule_version: 'v1', analysis_status: 'processing' },
-  { event_id: 'mock-cap-004', trigger_revision: 1, symbol: '300436', stock_name: '广生堂', event_type: 'price', direction: 'up', triggered_at: '2026-07-31T14:32:00+08:00', latest_price: 23.45, previous_close: 21.60, change_pct: 8.56, threshold_pct: 5, severity: 'high', rule_version: 'v1', analysis_status: 'completed' },
-]
+// 自选股洞察：展示自选股涨停雷达事件的归因结果（后端由 cron 周期采集 + LLM 归因）
+const captureList = ref<WatchlistInsight[]>([])
 
 async function loadCaptureList() {
   try {
-    const result = await stockTraceApi.list(4)
-    captureList.value = result.items
-    if (import.meta.env.DEV && !captureList.value.length) {
-      captureList.value = CAPTURE_MOCK_DATA
-    }
+    captureList.value = await watchlistInsightApi.getInsights()
   } catch {
-    captureList.value = import.meta.env.DEV ? CAPTURE_MOCK_DATA : []
+    captureList.value = []
   }
 }
 
@@ -209,16 +197,18 @@ function captureTagType(direction: 'up' | 'down'): 'up' | 'down' {
   return direction
 }
 
-/** 格式化异动详情：价格异动 +X.XX%，阈值 X% */
-function captureDetail(item: StockTraceEvent): string {
-  const sign = item.change_pct >= 0 ? '+' : ''
-  return `价格异动 ${sign}${item.change_pct.toFixed(2)}%，阈值 ${item.threshold_pct.toFixed(0)}%`
+/** 格式化洞察主因：已确认展示主因 label；unconfirmed 展示待验证；其余为归因中 */
+function captureDetail(item: WatchlistInsight): string {
+  if (item.attribution_status === 'unconfirmed') return '主因待验证'
+  if (item.attribution_status === 'confirmed' && item.primary_driver?.label) return `主因：${item.primary_driver.label}`
+  return '归因中'
 }
 
-function formatTime(value: string): string {
+/** 格式化日期为 MM-DD（trade_date 为 UTC ISO，取本地月日） */
+function formatDate(value: string): string {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '--:--'
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  if (Number.isNaN(date.getTime())) return '--'
+  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 /** Segmented 的 change 回调（emit string|number），收敛回窄联合类型 */
@@ -226,14 +216,14 @@ function onIntelTabChange(val: string | number) {
   intelSubTab.value = val as 'all' | 'positive' | 'negative'
 }
 
-/** 异动捕手（新模块：自选股异动监控） */
+/** 自选股洞察（新模块：自选股异动监控） */
 function goAlertCatcher() {
   uni.navigateTo({ url: '/modules/favorites/pages/monitor' })
 }
 
-/** 异动详情：跳转到异动溯源页 */
+/** 洞察详情：跳转到自选股洞察详情页 */
 function goTrace(eventId: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/stock-trace?event_id=${encodeURIComponent(eventId)}` })
+  uni.navigateTo({ url: `/modules/favorites/pages/insight-detail?event_id=${encodeURIComponent(eventId)}` })
 }
 
 /** 个股情报（原异动捕手/event-catcher，已改名） */
