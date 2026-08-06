@@ -1,59 +1,57 @@
 <template>
   <view class="market-index-card">
-    <view class="section-title">
-      <text class="title-text">大盘行情</text>
+    <view class="card-label">
+      <text class="card-dot">●</text>
+      <text class="card-label-text">大盘行情</text>
     </view>
 
-    <Card class="index-card-body">
-      <!-- 指数表现：参考 MarketTracePhenomenon.vue 的 perf-list -->
-      <view v-if="indexes.length > 0" class="perf-block">
-        <text class="block-label">指数表现</text>
-        <view class="perf-list">
-          <view v-for="idx in indexes" :key="idx.name" class="perf-item">
-            <view class="perf-info">
-              <text class="perf-name">{{ idx.name }}</text>
-              <text v-if="idx.close !== null" class="perf-close">{{ formatClose(idx.close) }}</text>
-            </view>
-            <text class="perf-change" :class="changeClass(idx.pctChange)">{{ formatPct(idx.pctChange) }}</text>
+    <!-- 指数表现 -->
+    <view v-if="indexes.length > 0" class="block">
+      <text class="block-label">指数表现</text>
+      <view class="perf-list">
+        <view v-for="idx in indexes" :key="idx.name" class="perf-item">
+          <view class="perf-info">
+            <text class="perf-name">{{ idx.name }}</text>
+            <text v-if="idx.close !== null" class="perf-close">{{ formatClose(idx.close) }}</text>
           </view>
+          <text class="perf-change" :class="changeClass(idx.pctChange)">{{ formatPct(idx.pctChange) }}</text>
         </view>
       </view>
+    </view>
 
-      <!-- 涨跌家数：参考 MarketSnapshotCard.vue 的 ms-breadth 三栏布局 -->
-      <view v-if="hasBreadth" class="breadth-block">
-        <text class="block-label">涨跌家数</text>
-        <view class="breadth">
-          <view class="b-col up">
-            <text class="b-num">{{ formatCount(breadth?.advanceCount) }}</text>
-            <text class="b-label">上涨</text>
-          </view>
-          <view class="b-col flat">
-            <text class="b-num">{{ formatCount(breadth?.flatCount) }}</text>
-            <text class="b-label">平盘</text>
-          </view>
-          <view class="b-col down">
-            <text class="b-num">{{ formatCount(breadth?.declineCount) }}</text>
-            <text class="b-label">下跌</text>
-          </view>
+    <!-- 涨跌家数 -->
+    <view v-if="hasBreadth" class="block">
+      <text class="block-label">涨跌家数</text>
+      <view class="breadth">
+        <view class="b-col up">
+          <text class="b-num">{{ formatCount(breadth?.advanceCount) }}</text>
+          <text class="b-label">上涨</text>
+        </view>
+        <view class="b-col flat">
+          <text class="b-num">{{ formatCount(breadth?.flatCount) }}</text>
+          <text class="b-label">平盘</text>
+        </view>
+        <view class="b-col down">
+          <text class="b-num">{{ formatCount(breadth?.declineCount) }}</text>
+          <text class="b-label">下跌</text>
         </view>
       </view>
+    </view>
 
-      <!-- 空态：indexes 和 breadth 都没数据时 -->
-      <view v-if="indexes.length === 0 && !hasBreadth" class="empty">
-        <text class="empty-text">本日大盘数据暂无</text>
-      </view>
-    </Card>
+    <!-- 空态 -->
+    <view v-if="indexes.length === 0 && !hasBreadth" class="empty">
+      <text class="empty-text">本日大盘数据暂无</text>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import Card from '@/shared/components/Card.vue'
 import type { MarketTraceIndexPerf } from '@/modules/analytics/utils/marketTraceReview'
 import type { MarketBreadth } from '@/shared/utils/eveningBriefCards'
 
 const props = defineProps<{
-  /** 指数列表（name + pctChange） */
+  /** 指数列表（name + close + pctChange） */
   indexes: MarketTraceIndexPerf[]
   /** 涨跌家数（advanceCount / declineCount / flatCount，缺失字段为 null） */
   breadth: MarketBreadth | null
@@ -76,7 +74,7 @@ function formatPct(pct: number | null): string {
   return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`
 }
 
-/** 指数收盘点位：保留 2 位小点，千分位分隔 */
+/** 指数收盘点位：保留 2 位小数 */
 function formatClose(close: number | null): string {
   if (close === null) return '--'
   return close.toFixed(2)
@@ -89,33 +87,38 @@ function formatCount(count: number | null): string {
 </script>
 
 <style lang="scss" scoped>
-@use '@/shared/styles/variables.scss' as *;
-@use '@/shared/styles/breakpoints.scss' as bp;
-
+/* 样式对齐早报头条/异动公告卡片：
+   白底 + 左侧 8rpx 强调条 + 圆角 20rpx */
 .market-index-card {
-  padding: 0 $spacing-base;
-  margin-bottom: $spacing-sm;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid $line;
+  border-left: 8rpx solid $primary;
 }
 
-.section-title {
+.card-label {
   display: flex;
   align-items: center;
-  margin: $spacing-base 0 $spacing-sm;
+  gap: 8rpx;
+  margin-bottom: 20rpx;
 }
 
-.title-text {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: $text-color-title;
+.card-dot {
+  font-size: 20rpx;
+  color: $primary;
 }
 
-.index-card-body {
-  margin: 0;
+.card-label-text {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: $primary;
+  letter-spacing: 2rpx;
 }
 
-.perf-block,
-.breadth-block {
-  margin-bottom: $spacing-sm;
+.block {
+  margin-bottom: 24rpx;
 
   &:last-child {
     margin-bottom: 0;
@@ -125,28 +128,25 @@ function formatCount(count: number | null): string {
 .block-label {
   display: block;
   font-size: 22rpx;
-  color: $text-color-secondary;
-  margin-bottom: $spacing-xs;
+  color: #9ca3af;
+  margin-bottom: 12rpx;
 }
 
-/* 指数列表：参考 MarketTracePhenomenon.vue 的 perf-list（flex wrap） */
+/* 指数列表：与早报 mini-tag 风格一致（圆角胶囊） */
 .perf-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8rpx;
-  @include bp.respond-to-lg {
-    gap: 12rpx;
-  }
+  gap: 12rpx;
 }
 
 .perf-item {
   display: flex;
   align-items: center;
-  gap: 8rpx;
-  padding: 8rpx 16rpx;
-  border-radius: $r-md;
-  background: $bg-soft;
-  min-width: 240rpx;
+  gap: 12rpx;
+  padding: 12rpx 20rpx;
+  border-radius: 999rpx;
+  background: rgba(77, 124, 254, 0.04);
+  min-width: 220rpx;
 }
 
 .perf-info {
@@ -158,37 +158,37 @@ function formatCount(count: number | null): string {
 }
 
 .perf-name {
-  font-size: 22rpx;
-  color: $text-color;
+  font-size: 24rpx;
+  font-weight: 500;
+  color: $ink;
 }
 
 .perf-close {
   font-size: 20rpx;
-  color: $text-color-secondary;
-  font-family: $font-mono;
+  color: #9ca3af;
 }
 
 .perf-change {
-  font-size: 24rpx;
-  font-weight: 600;
-  font-family: $font-mono;
+  font-size: 26rpx;
+  font-weight: 700;
 }
 
 .perf-change.up {
-  color: $up;
+  color: #e04545;
 }
 
 .perf-change.down {
-  color: $down;
+  color: #2ba84a;
 }
 
 .perf-change.flat {
-  color: $text-color-secondary;
+  color: #9ca3af;
 }
 
-/* 涨跌家数三栏：参考 MarketSnapshotCard.vue 的 ms-breadth */
+/* 涨跌家数三栏 */
 .breadth {
   display: flex;
+  gap: 12rpx;
 }
 
 .b-col {
@@ -197,51 +197,51 @@ function formatCount(count: number | null): string {
   flex-direction: column;
   align-items: center;
   gap: 4rpx;
-  border-radius: $r-xs;
-  padding: 8rpx 0;
+  border-radius: 16rpx;
+  padding: 16rpx 0;
 }
 
 .b-col.up {
-  background: $up-bg;
+  background: rgba(224, 69, 69, 0.08);
 }
 
 .b-col.flat {
-  background: $bg-soft;
+  background: rgba(148, 163, 184, 0.10);
 }
 
 .b-col.down {
-  background: $down-bg;
+  background: rgba(43, 168, 74, 0.08);
 }
 
 .b-num {
-  font-size: 30rpx;
+  font-size: 32rpx;
   font-weight: 700;
 }
 
 .b-col.up .b-num {
-  color: $up;
+  color: #e04545;
 }
 
 .b-col.flat .b-num {
-  color: $flat;
+  color: #64748b;
 }
 
 .b-col.down .b-num {
-  color: $down;
+  color: #2ba84a;
 }
 
 .b-label {
-  font-size: 20rpx;
-  color: $ink-mute;
+  font-size: 22rpx;
+  color: #9ca3af;
 }
 
 .empty {
-  padding: $spacing-base 0;
+  padding: 32rpx 0;
   text-align: center;
 }
 
 .empty-text {
   font-size: 24rpx;
-  color: $text-color-secondary;
+  color: #9ca3af;
 }
 </style>

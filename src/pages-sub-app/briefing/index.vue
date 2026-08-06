@@ -25,7 +25,7 @@
           </view>
           <view class="audio-info">
             <text class="audio-status">{{ audioStatusText }}</text>
-            <text class="audio-meta">AI 早报音频 · 播报详情 ›</text>
+            <text class="audio-meta">{{ audioLabelText }} · 播报详情 ›</text>
           </view>
           <text class="audio-arrow">›</text>
         </view>
@@ -45,8 +45,8 @@
             :breadth="eveningViewModel.breadth"
           />
 
-          <!-- 板块行情卡片（复用 MarketTraceSectors） -->
-          <MarketTraceSectors
+          <!-- 板块行情卡片（早报风格） -->
+          <EveningSectorsCard
             v-if="eveningViewModel.presentation && (eveningViewModel.presentation.sectorRanking.topGainers.length || eveningViewModel.presentation.sectorRanking.topLosers.length)"
             :presentation="eveningViewModel.presentation"
           />
@@ -200,7 +200,7 @@ import { getEventList } from '@/modules/chat/event/api/eventApi'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
 import EveningAnomalyCard from './components/EveningAnomalyCard.vue'
 import EveningMarketIndexCard from './components/EveningMarketIndexCard.vue'
-import MarketTraceSectors from '@/modules/analytics/components/MarketTraceSectors.vue'
+import EveningSectorsCard from './components/EveningSectorsCard.vue'
 import {
   buildEveningCardViewModel,
   type EveningCardViewModel,
@@ -235,6 +235,11 @@ const subtitleText = computed(() => {
 
 const audioPath = computed(() => {
   return report.value?.audio_path || null
+})
+
+/** 音频入口文案：根据播报类型动态展示"AI 早报音频"或"AI 晚报音频" */
+const audioLabelText = computed(() => {
+  return broadcastType.value === 'morning' ? 'AI 早报音频' : 'AI 晚报音频'
 })
 
 const audioStatusText = computed(() => {

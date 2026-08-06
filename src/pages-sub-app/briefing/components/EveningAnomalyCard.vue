@@ -1,18 +1,15 @@
 <template>
-  <view class="evening-anomaly-card">
-    <view class="speaker-icon">
-      <SvgIcon name="broadcast-line" size="30rpx" color="#ffffff" />
+  <view class="anomaly-card">
+    <view class="anomaly-label">
+      <text class="anomaly-dot">★</text>
+      <text class="anomaly-label-text">市场异象</text>
     </view>
-    <view class="dialogue-copy">
-      <text class="speaker-name">市场异象</text>
-      <text class="dialogue-content">{{ conclusion }}</text>
-    </view>
+    <text class="anomaly-title">今日市场主因</text>
+    <text class="anomaly-conclusion">{{ conclusion }}</text>
   </view>
 </template>
 
 <script setup lang="ts">
-import SvgIcon from '@/shared/components/SvgIcon.vue'
-
 defineProps<{
   /** 归因结论文本（来自 brief.items[归因结论].conclusion） */
   conclusion: string
@@ -20,48 +17,49 @@ defineProps<{
 </script>
 
 <style lang="scss" scoped>
-/* 样式参考 briefing-detail/index.vue 的 analyst 对话泡：
-   左圆角 4rpx + 右圆角 16rpx + 品牌色背景 + 白色文字 */
-.evening-anomaly-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 16rpx;
+/* 样式对齐早报头条卡片 / 异动公告卡片：
+   白底 + 左侧 8rpx 品牌色强调条 + 圆角 20rpx + 轻投影 */
+.anomaly-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 32rpx;
   margin-bottom: 24rpx;
+  border: 1rpx solid rgba(77, 124, 254, 0.20);
+  border-left: 8rpx solid $primary;
 }
 
-.speaker-icon {
+.anomaly-label {
   display: flex;
-  flex: 0 0 56rpx;
   align-items: center;
-  justify-content: center;
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 50%;
-  background: $success-color;
-}
-
-.dialogue-copy {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
   gap: 8rpx;
-  min-width: 0;
-  max-width: 80%;
-  padding: 16rpx 24rpx;
-  border-radius: 16rpx 16rpx 4rpx 16rpx;
-  background: $primary;
-  text-align: left;
+  margin-bottom: 16rpx;
 }
 
-.speaker-name {
-  color: #ffffff;
-  font-size: $font-size-xs;
-  font-weight: 600;
+.anomaly-dot {
+  font-size: 24rpx;
+  color: $primary;
 }
 
-.dialogue-content {
-  color: #ffffff;
-  font-size: $font-size-base;
-  line-height: 1.75;
+.anomaly-label-text {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: $primary;
+  letter-spacing: 2rpx;
+}
+
+.anomaly-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: $ink;
+  line-height: 1.4;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.anomaly-conclusion {
+  font-size: 26rpx;
+  color: #4b5563;
+  line-height: 1.6;
+  display: block;
 }
 </style>
