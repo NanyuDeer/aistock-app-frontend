@@ -53,10 +53,10 @@
             :style="bubbleItemStyle(b)"
             @tap="selectBubble(b)"
           >
-            <text class="bubble-name" :style="{ fontSize: b.fontSize + 'px' }">{{ b.name }}</text>
+            <text class="bubble-name" :style="{ fontSize: b.fontSize + 'px', color: b.textColor }">{{ b.name }}</text>
             <text
               class="bubble-change"
-              :style="{ fontSize: (b.fontSize - 3) + 'px' }"
+              :style="{ fontSize: (b.fontSize - 3) + 'px', color: b.textColor }"
             >
               {{ b.days }}天
             </text>
@@ -148,7 +148,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
 import { useReportPodcast } from '@/shared/utils/useReportPodcast'
-import { calcBubbleOpacity, calcBubbleRadius, getSectorDays, getSectorStrength } from '@/modules/market/utils/windLeaderBubble'
+import { calcBubbleColor, calcBubbleRadius, calcBubbleTextColor, getSectorDays, getSectorStrength } from '@/modules/market/utils/windLeaderBubble'
 
 const { loadPodcast, openPodcast } = useReportPodcast('wind_leader')
 
@@ -164,7 +164,8 @@ interface Bubble {
   change: number
   days: number     // 该档位持续天数（长线=long_term_days，短线=short_term_days）
   radius: number   // px 半径
-  opacity: number  // 颜色深浅（长线=置信度，短线=热度）
+  color: string    // 泡泡底色（长线蓝系/短线橙红系，按强度深浅）
+  textColor: string // 泡泡文字颜色（底色深浅自适应）
   fontSize: number
 }
 
@@ -254,8 +255,9 @@ const bubbleData = computed<Bubble[]>(() => {
       change: s.today_change ?? 0,
       days,
       radius: r,
-      opacity: calcBubbleOpacity(kind, strength),
-      fontSize: r > 50 ? 14 : (r > 38 ? 12 : 10),
+      color: calcBubbleColor(kind, strength),
+      textColor: calcBubbleTextColor(strength),
+      fontSize: r >= 44 ? 13 : (r >= 34 ? 12 : 11),
     }
   })
 })
@@ -375,22 +377,15 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
   return nodes.map(n => ({ ...n, x: n.x, y: n.y }))
 })
 
-// 颜色：基于置信度/热度深浅（长线=置信度，短线=热度），从浅蓝到深蓝（匹配网页版）
+// 颜色：长线蓝系按置信度、短线橙红系按热度，深浅由 calcBubbleColor 双端插值决定
 function bubbleItemStyle(b: BubbleLayout) {
-  const ratio = Math.max(0, Math.min(1, (b.opacity - 0.3) / 0.7))
-  // 浅蓝 #bfdbfe → 深蓝 #1d4ed8
-  const r = Math.round(191 + (29 - 191) * ratio)
-  const g = Math.round(219 + (78 - 219) * ratio)
-  const bl = Math.round(254 + (216 - 254) * ratio)
-  const fillColor = `rgb(${r}, ${g}, ${bl})`
   return {
     width: b.radius * 2 + 'px',
     height: b.radius * 2 + 'px',
     left: b.x - b.radius + 'px',
     top: b.y - b.radius + 'px',
-    background: fillColor,
+    background: b.color,
     borderColor: '#ffffff',
-    opacity: b.opacity.toFixed(2),
   }
 }
 

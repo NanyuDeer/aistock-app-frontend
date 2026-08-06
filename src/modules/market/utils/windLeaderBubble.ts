@@ -3,19 +3,33 @@ import type { WindLeaderSector } from '@/shared/api/modules/stock'
 export type CycleKind = 'long' | 'short'
 
 /** 泡泡半径：按各档位量级归一化——长线以 120 天为满格、短线以 10 天为满格，
- * 半径 22→65px 线性，超过满格封顶。修复原 clamp(26+days×coef,22,65) 长线 75+ 天全封顶、
- * 长短线系数不匹配各自量级的问题。 */
+ * 半径 20→50px 线性，超过满格封顶。 */
 export function calcBubbleRadius(kind: CycleKind, days: number): number {
   const fullDays = kind === 'long' ? 120 : 10
-  return Math.min(65, Math.max(22, 22 + (days / fullDays) * 43))
+  return Math.min(50, Math.max(20, 20 + (days / fullDays) * 30))
 }
 
-/** 泡泡颜色深浅：0.3 + 0.7 × value（value 收敛到 0~1）。
- * 相比 0.4+0.6×值，低强度更浅、高强度更深，对比度更强（实际 conf/heat 多集中在 0.3~0.6，
- * 原公式映射后几乎全是浅蓝无法区分）。 */
-export function calcBubbleOpacity(kind: CycleKind, value: number): number {
+// 双色阶：只规定最浅/最深两端，中间值在 HSL 上线性插值调整颜色深浅。
+// 长线蓝系（浅蓝→藏青）、短线橙红系（浅橙→暗红），0.5 附近即普通蓝/普通橙。
+// [色相 h, 饱和度 s%, 亮度 l%]
+const SCALE_STOPS: Record<CycleKind, { from: [number, number, number]; to: [number, number, number] }> = {
+  long: { from: [220, 88, 96], to: [225, 82, 18] },
+  short: { from: [32, 95, 96], to: [2, 75, 24] },
+}
+
+/** 泡泡底色：值 0~1 在色阶两端（最浅→最深）间 HSL 线性插值 */
+export function calcBubbleColor(kind: CycleKind, value: number): string {
   const v = Math.min(1, Math.max(0, value))
-  return 0.3 + 0.7 * v
+  const { from, to } = SCALE_STOPS[kind]
+  const h = from[0] + (to[0] - from[0]) * v
+  const s = from[1] + (to[1] - from[1]) * v
+  const l = from[2] + (to[2] - from[2]) * v
+  return `hsl(${h.toFixed(1)}, ${s.toFixed(1)}%, ${l.toFixed(1)}%)`
+}
+
+/** 泡泡文字颜色：底色较深（强度 ≥0.5）用白字，较浅用深色字，保证可读 */
+export function calcBubbleTextColor(value: number): string {
+  return value >= 0.5 ? '#ffffff' : '#1f2937'
 }
 
 /** 取该维度持续天数（ai_analysis 缺省 0） */
