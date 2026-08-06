@@ -84,11 +84,6 @@
             <Badge size="sm">No.{{ idx + 1 }}</Badge>
             <text class="stats-name">{{ sector.name }}</text>
             <Tag
-              v-if="cycleText(sector)"
-              :type="cycleTagType(sector)"
-              size="sm"
-            >{{ cycleText(sector) }}</Tag>
-            <Tag
               v-if="activeCycle === 'long' && logicTypeText(sector)"
               :type="logicTypeTagType(sector)"
               size="sm"
@@ -99,7 +94,7 @@
               size="sm"
             >{{ heatStageText(sector) }}</Tag>
           </view>
-          <Badge v-if="sector.frequency" size="sm">上榜 {{ sector.frequency }} 次</Badge>
+          <Badge v-if="boardCount(sector) > 0" size="sm">上榜 {{ boardCount(sector) }} 次</Badge>
         </view>
         <!-- 统计行 -->
         <StatGrid class="leader-stat-grid" :items="sectorStatItems(sector)" :columns="4" />
@@ -412,7 +407,7 @@ async function loadData() {
   if (loading.value) return
   loading.value = true
   try {
-    const data = await stockApi.getWindLeaders(10)
+    const data = await stockApi.getWindLeaders(20)
     const hotSectors = Array.isArray(data?.hot_sectors) ? data.hot_sectors : []
     sectors.value = hotSectors.filter(
       (sector): sector is WindLeaderSector => Boolean(sector && typeof sector.name === 'string' && sector.name.trim())
@@ -471,17 +466,10 @@ function formatNetInflow(val?: number | null): string {
   return Math.round(val) + '万'
 }
 
-// ===== cycle 三态标签（前端打标签；理由字段 long_reason/short_reason 喂给 agent 简报） =====
-/** 板块 cycle 标签文案（both=长线+短线） */
-function cycleText(s: WindLeaderSector): string {
-  if (s.cycle === 'long') return '长线风口'
-  if (s.cycle === 'both') return '长线+短线'
-  return '短线风口'
-}
-
-/** 板块 cycle 标签颜色：长线=down(品牌色) / 短线=warning(警示色) / both=down */
-function cycleTagType(s: WindLeaderSector): 'down' | 'warning' {
-  return s.cycle === 'long' || s.cycle === 'both' ? 'down' : 'warning'
+// ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
+/** 上榜次数：短线档显示近20日 freq20，长线档显示近60日 frequency */
+function boardCount(s: WindLeaderSector): number {
+  return activeCycle.value === 'short' ? Number(s.freq20 ?? 0) : Number(s.frequency ?? 0)
 }
 
 /** 短线热度阶段标签（heat_stage：启动期/发酵期/高潮期/衰退期），高潮期用 warning 色、其余品牌色 */
