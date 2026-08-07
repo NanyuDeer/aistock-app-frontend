@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 title="洞察详情" :subtitle="subtitle">
+  <SubPageCard2 title="洞察详情">
     <LoadingState v-if="loading" />
     <EmptyState
       v-else-if="!detail"
@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import { mockWatchlistInsights, isInsightsMockForced } from '../mock-data'
@@ -26,11 +26,6 @@ import InsightDetailLayout from '@/modules/favorites/components/InsightDetailLay
 
 const detail = ref<WatchlistInsight | null>(null)
 const loading = ref(true)
-
-const subtitle = computed(() => {
-  if (!detail.value) return ''
-  return `${detail.value.symbol} · ${detail.value.trade_date}`
-})
 
 /** 原始来源跳转：H5 新窗口打开，非 H5 复制链接到剪贴板（与 stock-trace 证据跳转一致） */
 function openSource() {

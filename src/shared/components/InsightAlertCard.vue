@@ -146,18 +146,16 @@ function onClick(event: Event) {
   flex-shrink: 0;
 }
 
-/* 头部 Tag（白底白字） */
+/* 头部 Tag（涨红跌绿，A股色规） */
 .insight-alert-card__tag {
-  padding: 4rpx 16rpx;
+  padding: 4rpx 20rpx;
   border-radius: $r-xs;
-  border: 2rpx solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.15);
 
   &.is-up {
-    background: rgba(255, 255, 255, 0.15);
+    background: $stock-up-color;
   }
   &.is-down {
-    background: rgba(255, 255, 255, 0.15);
+    background: $stock-down-color;
   }
 }
 
@@ -179,7 +177,7 @@ function onClick(event: Event) {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 6rpx;
+  width: 8rpx;
 
   &.is-up {
     background: $stock-up-color;

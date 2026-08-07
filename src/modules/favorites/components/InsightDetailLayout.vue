@@ -118,6 +118,7 @@ function onOpenSource() {
   display: flex;
   flex-direction: column;
   gap: $s-3;
+  padding: $s-3;
 }
 
 /* 头部卡（品牌蓝渐变） */
@@ -159,13 +160,14 @@ function onOpenSource() {
 }
 
 .insight-detail-layout__tag {
-  padding: 4rpx 16rpx;
+  padding: 4rpx 20rpx;
   border-radius: $r-xs;
-  border: 2rpx solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.15);
 
-  &.is-up, &.is-down {
-    /* 头部蓝色背景，Tag 统一白底 */
+  &.is-up {
+    background: $stock-up-color;
+  }
+  &.is-down {
+    background: $stock-down-color;
   }
 }
 
