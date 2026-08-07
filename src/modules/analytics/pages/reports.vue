@@ -35,12 +35,18 @@
         <!-- 筛选 + 排序 单行 -->
         <view class="filter-sort-bar">
           <view class="left-section">
-            <!-- 年份筛选 -->
-            <view class="filter-section" @tap="toggleYearPicker">
-              <SvgIcon name="filter-line" size="24rpx" color="#0b5fff" />
-              <text class="filter-text">{{ selectedYear }}年</text>
-              <SvgIcon name="arrow-down-s" size="20rpx" color="#4b5a7a" />
-            </view>
+            <!-- 报告类型筛选 -->
+            <picker
+              mode="selector"
+              :range="reportTypeLabels"
+              :value="reportTypeIndex"
+              @change="onReportTypeChange"
+            >
+              <view class="type-filter-picker">
+                <text class="type-filter-text">{{ currentReportTypeLabel }}</text>
+                <SvgIcon name="arrow-down-s" size="20rpx" color="#4b5a7a" />
+              </view>
+            </picker>
 
             <!-- 排序下拉 -->
             <picker
@@ -67,24 +73,6 @@
               @tap="setOrder(true)"
             >升序</text>
           </view>
-        </view>
-      </view>
-
-      <!-- 年份下拉弹窗 -->
-      <view v-if="showYearPicker" class="industry-overlay" @tap="closeYearPicker">
-        <view class="industry-popup" @tap.stop>
-          <view class="industry-popup-header">
-            <text class="industry-popup-title">选择年份</text>
-            <text class="industry-popup-close" @tap="closeYearPicker">✕</text>
-          </view>
-          <scroll-view class="industry-list" scroll-y>
-            <view
-              v-for="yr in yearList"
-              :key="yr"
-              :class="['industry-item', selectedYear === yr ? 'active' : '']"
-              @tap="selectYear(yr)"
-            >{{ yr }}年</view>
-          </scroll-view>
         </view>
       </view>
 
@@ -125,24 +113,22 @@
           </view>
           <!-- 底部：核心财务 + 更新时间 -->
           <view class="report-bottom">
-            <view class="report-data-row">
+            <view v-if="item.isFormal" class="report-data-row">
               <view class="data-left">
                 <text class="data-label">营业总收入</text>
                 <text class="data-value">{{ item.revenue }} 亿元</text>
               </view>
               <view class="data-right">
                 <text :class="['data-yoy', yoyClass(item.revenueYoy)]">同比 {{ formatYoy(item.revenueYoy) }}</text>
-                <text :class="['data-arrow', yoyClass(item.revenueYoy)]">{{ item.revenueYoy >= 0 ? '↑' : '↓' }}</text>
               </view>
             </view>
-            <view class="report-data-row">
+            <view v-if="item.isFormal" class="report-data-row">
               <view class="data-left">
                 <text class="data-label">归母净利润</text>
                 <text class="data-value">{{ item.netProfit }} 亿元</text>
               </view>
               <view class="data-right">
                 <text :class="['data-yoy', yoyClass(item.profitYoy)]">同比 {{ formatYoy(item.profitYoy) }}</text>
-                <text :class="['data-arrow', yoyClass(item.profitYoy)]">{{ item.profitYoy >= 0 ? '↑' : '↓' }}</text>
               </view>
             </view>
             <view class="report-time-row">
@@ -174,10 +160,11 @@ interface ReportItem {
   period: string
   tag: string
   aiScore: number | null
+  isFormal: boolean
   revenue: string
-  revenueYoy: number
+  revenueYoy: number | null
   netProfit: string
-  profitYoy: number
+  profitYoy: number | null
   industry: string
   grossMargin: string
   cashFlow: string
@@ -201,9 +188,6 @@ const sortLabels = ['四维评分', '净利规模', '净利增速', '营收规�
 
 const STORAGE_KEY = 'report_filter_sort'
 
-// ===== 年份列表（10年） =====
-const yearList = ['2026', '2025', '2024', '2023', '2022', '2021', '2020']
-
 // ===== 状态 =====
 const activeTab = ref('reports')
 const keyword = ref('')
@@ -216,9 +200,11 @@ const total = ref(0)
 const error = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-// 年份筛选
-const showYearPicker = ref(false)
-const selectedYear = ref('2026')
+// 报告类型筛选（formal=正式报告 / express=快报）
+const reportType = ref<'formal' | 'express'>('formal')
+const reportTypeLabels = ['正式报告', '快报']
+const reportTypeIndex = computed(() => (reportType.value === 'formal' ? 0 : 1))
+const currentReportTypeLabel = computed(() => reportTypeLabels[reportTypeIndex.value])
 
 // 排序
 const sortFieldIndex = ref(0)        // 当前排序维度在 SORT_KEYS 中的索引
@@ -233,7 +219,7 @@ function loadPersistedState() {
       const idx = SORT_KEYS.indexOf(parsed.sortField)
       if (idx >= 0) sortFieldIndex.value = idx
       if (typeof parsed.sortAsc === 'boolean') sortAsc.value = parsed.sortAsc
-      if (typeof parsed.year === 'string') selectedYear.value = parsed.year
+      if (parsed.reportType === 'formal' || parsed.reportType === 'express') reportType.value = parsed.reportType
     }
   } catch (_) { /* ignore */ }
 }
@@ -243,7 +229,7 @@ function savePersistedState() {
     uni.setStorageSync(STORAGE_KEY, JSON.stringify({
       sortField: SORT_KEYS[sortFieldIndex.value],
       sortAsc: sortAsc.value,
-      year: selectedYear.value,
+      reportType: reportType.value,
     }))
   } catch (_) { /* ignore */ }
 }
@@ -311,8 +297,7 @@ const filteredList = computed(() => {
 // 空数据提示
 const emptyTip = computed(() => {
   if (keyword.value) return '未搜索到相关股票'
-  if (selectedYear.value) return `暂无「${selectedYear.value}」年财报数据`
-  return '暂无业绩报告数据'
+  return reportType.value === 'formal' ? '暂无正式报告数据' : '暂无快报数据'
 })
 
 // ===== API 请求 =====
@@ -334,7 +319,7 @@ async function fetchData(append = false) {
       pageSize,
       sortBy: sortFieldToApi(currentSortField.value),
       sortOrder: sortAsc.value ? 'asc' : 'desc',
-      endYear: selectedYear.value || undefined,
+      reportType: reportType.value,
     }
 
     const kw = keyword.value.trim()
@@ -433,9 +418,9 @@ function mapApiItem(item: any): ReportItem {
     return yi.toFixed(2)
   }
 
-  // 同比增速（按报告类型推算）
-  let revenueYoy = 0
-  let profitYoy = 0
+  // 同比增速（后端已计算：相对上一期报告的变动，单位 %）
+  const revenueYoy = item['营收同比(%)'] != null ? Number(item['营收同比(%)']) : null
+  const profitYoy = item['净利同比(%)'] != null ? Number(item['净利同比(%)']) : null
 
   // 根据 AI 研判标签生成经营亮点 / 风险词条
   const goodTagSet = new Set(['向好', '高增', '修复', '扭盈'])
@@ -457,6 +442,7 @@ function mapApiItem(item: any): ReportItem {
     period,
     tag: aiTag || rating || (reportType === '快报/预告' ? '预告' : ''),
     aiScore: aiScore != null ? Number(aiScore) : null,
+    isFormal: reportType === '正式报告',
     revenue: toYi(rawRevenue),
     revenueYoy,
     netProfit: toYi(rawProfit),
@@ -495,20 +481,13 @@ function retry() {
   fetchData(false)
 }
 
-// ===== 年份筛选 =====
-function toggleYearPicker() {
-  showYearPicker.value = !showYearPicker.value
-}
-
-function closeYearPicker() {
-  showYearPicker.value = false
-}
-
-function selectYear(yr: string) {
-  selectedYear.value = yr
-  showYearPicker.value = false
+// ===== 报告类型筛选 =====
+function onReportTypeChange(e: any) {
+  const idx = e.detail.value
+  const type = idx === 0 ? 'formal' : 'express'
+  if (reportType.value === type) return
+  reportType.value = type
   savePersistedState()
-  // 年份变更后重新请求数据
   fetchData(false)
 }
 
@@ -539,24 +518,27 @@ function switchTo(tab: string) {
 }
 
 // ===== 通用 =====
+/** 标签等级颜色：红=高增/扭盈（最好），蓝=向好/修复/承压/走弱（中间），绿=疲弱/转亏（最差） */
 function tagClass(tag: string): string {
-  const goodTags = ['向好', '高增', '修复', '扭盈']
-  return goodTags.includes(tag) ? 'tag-good' : 'tag-bad'
+  if (['高增', '扭盈'].includes(tag)) return 'tag-red'
+  if (['疲弱', '转亏'].includes(tag)) return 'tag-green'
+  if (['向好', '修复', '承压', '走弱'].includes(tag)) return 'tag-blue'
+  return 'tag-neutral' // 预告、评级等非等级标签
 }
 
 function scoreClass(score: number): string {
-  if (score >= 70) return 'score-high'
-  if (score >= 50) return 'score-mid'
-  return 'score-low'
+  if (score >= 70) return 'score-high' // 红
+  if (score >= 36) return 'score-mid'  // 蓝
+  return 'score-low'                   // 绿
 }
 
-function yoyClass(val: number): string {
-  if (val === 0) return ''
+function yoyClass(val: number | null): string {
+  if (val == null || val === 0) return ''
   return val > 0 ? 'up' : 'down'
 }
 
-function formatYoy(val: number): string {
-  if (val === 0) return '--'
+function formatYoy(val: number | null): string {
+  if (val == null) return '--'
   const prefix = val > 0 ? '+' : ''
   return `${prefix}${val.toFixed(2)}%`
 }
@@ -650,25 +632,20 @@ fetchData(false)
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-.filter-section {
+.type-filter-picker {
   display: flex;
   align-items: center;
-  gap: 6rpx;
+  gap: 4rpx;
   padding: 6rpx 12rpx;
-  background: #f0f4ff;
-  border-radius: 10rpx;
+  border-radius: 8rpx;
+  background: #f0f2f5;
   flex-shrink: 0;
-  max-width: 240rpx;
 }
 
-.filter-text {
+.type-filter-text {
   font-size: 24rpx;
   color: $primary;
   font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 140rpx;
 }
 
 .left-section {
@@ -716,72 +693,6 @@ fetchData(false)
 
   &:first-child {
     border-right: 1rpx solid #e0e3e8;
-  }
-}
-
-/* ===== 行业下拉弹窗 ===== */
-.industry-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 1000;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 200rpx;
-}
-
-.industry-popup {
-  width: 560rpx;
-  max-height: 70vh;
-  background: #ffffff;
-  border-radius: 24rpx;
-  overflow: hidden;
-  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.15);
-}
-
-.industry-popup-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24rpx 28rpx;
-  border-bottom: 1rpx solid #f0f2f5;
-}
-
-.industry-popup-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: $ink;
-}
-
-.industry-popup-close {
-  font-size: 28rpx;
-  color: #9ca3af;
-  padding: 8rpx;
-}
-
-.industry-list {
-  max-height: 50vh;
-  padding: 12rpx 0;
-}
-
-.industry-item {
-  font-size: 26rpx;
-  color: #374151;
-  padding: 20rpx 28rpx;
-  border-bottom: 1rpx solid #f5f5f5;
-
-  &.active {
-    color: #ffffff;
-    background: $primary;
-    font-weight: 600;
-  }
-
-  &:last-child {
-    border-bottom: none;
   }
 }
 
@@ -881,14 +792,24 @@ fetchData(false)
   margin-left: auto;
   flex-shrink: 0;
 
-  &.tag-good {
-    color: #f43f5e;
-    background: rgba(244, 63, 94, 0.1);
+  &.tag-red {
+    color: $up;
+    background: $up-soft;
   }
 
-  &.tag-bad {
-    color: #22c55e;
-    background: rgba(34, 197, 94, 0.1);
+  &.tag-blue {
+    color: $primary;
+    background: $primary-50;
+  }
+
+  &.tag-green {
+    color: $down;
+    background: $down-soft;
+  }
+
+  &.tag-neutral {
+    color: $ink-soft;
+    background: $bg-soft;
   }
 }
 
@@ -900,16 +821,16 @@ fetchData(false)
   flex-shrink: 0;
 
   &.score-high {
-    color: #059669;
-    background: rgba(5, 150, 105, 0.1);
+    color: $up;
+    background: $up-soft;
   }
   &.score-mid {
-    color: #d97706;
-    background: rgba(217, 119, 6, 0.1);
+    color: $primary;
+    background: $primary-50;
   }
   &.score-low {
-    color: #dc2626;
-    background: rgba(220, 38, 38, 0.1);
+    color: $down;
+    background: $down-soft;
   }
 }
 
@@ -1003,13 +924,6 @@ fetchData(false)
 .data-yoy {
   font-size: 20rpx;
   font-weight: 500;
-  &.up { color: #f43f5e; }
-  &.down { color: #22c55e; }
-}
-
-.data-arrow {
-  font-size: 20rpx;
-  font-weight: 700;
   &.up { color: #f43f5e; }
   &.down { color: #22c55e; }
 }
