@@ -2,6 +2,32 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-07 — 异动捕手卡片视觉重构 + mock 数据移除
+
+**开发者**: 37588
+
+### 新增
+- 共享组件 `src/shared/components/InsightAlertCard.vue`：异动提醒卡片（品牌蓝渐变头部 + 左侧涨跌色条 + 置信度 Tag，含 compact 模式供首页预览卡使用）
+- 模块组件 `src/modules/favorites/components/InsightDetailLayout.vue`：洞察详情布局（头部卡 + 主因/次因/详情/来源多段卡片，条件渲染）
+- 5 个 vitest 测试：`InsightAlertCard.spec.ts`、`InsightDetailLayout.spec.ts`、`monitor.spec.ts`、`insight-detail.spec.ts`、`AlertContent.spec.ts`
+
+### 重构
+- `monitor.vue` 异动列表：`Card` → `InsightAlertCard`，头部 Tag 红涨绿跌实色，左侧色条加宽
+- `AlertContent.vue` 异动捕手模块：`ListCell` → `InsightAlertCard compact`（4 行占位稳定）
+- `insight-detail.vue`：改用 `SubPageCard2` 容器 + `InsightDetailLayout`，移除重复 subtitle
+- 头部渐变：从左到右 `$primary` → `$bg-soft`（蓝 → 浅灰）
+
+### 移除
+- `src/modules/favorites/mock-data.ts`：异动捕手 mock 数据不再进仓库（仅本地开发用）
+- 三个页面 mock 回退逻辑：改走真实 API，接口失败/空数据展示空状态
+- `VITE_USE_INSIGHTS_MOCK` 环境开关（env 三文件 + `src/env.d.ts`）
+- `AGENTS.md` mock-data 说明
+
+### 验证
+- vitest：26 个测试全绿（favorites 模块）
+- `npx tsc --noEmit` 通过
+- `pnpm build:h5` 构建成功
+
 ## [changer] 2026-08-07 — 晚报界面卡片重设计（Agent 洞见风格 + 异象排序）
 
 **开发者**: Aria
