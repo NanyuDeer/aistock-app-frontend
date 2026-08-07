@@ -16,21 +16,20 @@
           </view>
           <view class="capture-list">
             <template v-if="captureList.length">
-              <ListCell
+              <InsightAlertCard
                 v-for="(item, idx) in captureRows"
                 :key="idx"
-                :title="item?.stock_name || '\u3000'"
-                :description="item ? captureDetail(item) : '\u3000'"
+                :name="item?.stock_name || '\u3000'"
+                :symbol="item?.symbol || ''"
+                :direction="item?.direction || 'up'"
+                :message="item ? captureDetail(item) : '\u3000'"
+                :type="item?.event_type === 'limit_up_radar' ? '涨停雷达' : '异动'"
+                :time="item ? formatTime(item.trade_date || item.created_at || '') : ''"
+                :confidence="item?.confidence"
+                :compact="true"
                 :clickable="!!item"
                 @click="item && goTrace(item.event_id)"
-              >
-                <template #prefix>
-                  <Tag v-if="item" :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
-                </template>
-                <template #value>
-                  <text v-if="item" class="capture-time">{{ formatTime(item.trade_date || item.created_at || '') }}</text>
-                </template>
-              </ListCell>
+              />
             </template>
             <EmptyState v-if="!captureList.length" title="暂无异动数据" />
           </view>
@@ -79,10 +78,12 @@ import { ref, computed, onMounted } from 'vue'
 import Segmented from '@/shared/components/Segmented.vue'
 import ListCell from '@/shared/components/ListCell.vue'
 import Tag from '@/shared/components/Tag.vue'
+import InsightAlertCard from '@/shared/components/InsightAlertCard.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
+import { mockWatchlistInsights, isInsightsMockForced } from '../mock-data'
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -107,14 +108,20 @@ const intelTabItems = [
 ]
 
 // 异动捕手：接自选股洞察真实 API（与异动监控页 monitor.vue 同源，有真实信息就展示）
+// 降级：演示开关开启时强制 mock；接口失败或返回空数据时回退 mock（产品演示用）
 const captureList = ref<WatchlistInsight[]>([])
 
 async function loadCaptureList() {
+  // 演示开关：VITE_USE_INSIGHTS_MOCK=true 时无条件使用 mock（思维链逻辑未就绪前不展示真实数据）
+  if (isInsightsMockForced()) {
+    captureList.value = mockWatchlistInsights
+    return
+  }
   try {
     const data = await watchlistInsightApi.getInsights()
-    captureList.value = data
+    captureList.value = data.length ? data : mockWatchlistInsights
   } catch {
-    captureList.value = []
+    captureList.value = mockWatchlistInsights
   }
 }
 
@@ -181,10 +188,6 @@ const captureRows = computed<Array<WatchlistInsight | null>>(() => {
   return rows
 })
 
-function badgeLabel(direction: 'up' | 'down'): string {
-  return direction === 'up' ? '涨' : '跌'
-}
-
 /** 情感 → 标签文案：利好→好，利空→空，中性→中（与 event-catcher 风格一致） */
 function impactLabel(sentiment: IntelItem['sentiment']): string {
   return sentiment === 'positive' ? '好' : sentiment === 'negative' ? '空' : '中'
@@ -193,11 +196,6 @@ function impactLabel(sentiment: IntelItem['sentiment']): string {
 /** 情感 → Tag type：利好→up(红)，利空→down(绿)，中性→neutral(蓝) */
 function impactTagType(sentiment: IntelItem['sentiment']): 'up' | 'down' | 'neutral' {
   return sentiment === 'positive' ? 'up' : sentiment === 'negative' ? 'down' : 'neutral'
-}
-
-/** 异动方向 → Tag type：涨→up(红)，跌→down(绿) */
-function captureTagType(direction: 'up' | 'down'): 'up' | 'down' {
-  return direction
 }
 
 /** 格式化异动详情：主因归因文案（与异动监控页 monitor.vue 一致） */
@@ -334,8 +332,18 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-/* ===== 异动捕手 / 个股情报 列表区域（参考 InsightListCard body） ===== */
-.capture-list,
+/* ===== 异动捕手列表区域（InsightAlertCard compact） ===== */
+.capture-list {
+  background: $bg-card;
+  border-radius: $r-sm;
+  padding: $s-2;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: $s-1;
+}
+
+/* ===== 个股情报列表区域（仍用 ListCell） ===== */
 .intel-list {
   background: $bg-card;
   border-radius: $r-sm;
@@ -343,52 +351,31 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* 覆写 ListCell 内边距和字体：使卡片更紧凑（行距比默认 $s-4 更紧凑，但保持两列表一致） */
-.capture-list :deep(.as-list-cell),
+/* 覆写 ListCell 内边距和字体：使卡片更紧凑（仅个股情报模块仍用 ListCell） */
 .intel-list :deep(.as-list-cell) {
   padding: $s-2 $s-2;
 }
 
-.capture-list :deep(.as-list-cell__title),
 .intel-list :deep(.as-list-cell__title) {
   font-size: $font-size-sm;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.capture-list :deep(.as-list-cell__desc),
 .intel-list :deep(.as-list-cell__desc) {
   font-size: $font-size-xs;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.capture-list :deep(.as-list-cell__prefix),
 .intel-list :deep(.as-list-cell__prefix) {
   margin-right: $s-2;
 }
 
-.capture-list :deep(.as-list-cell__right),
 .intel-list :deep(.as-list-cell__right) {
   margin-left: $s-2;
-}
-
-/* 标题和描述单行截断，防止文字撑宽卡片 */
-.capture-list :deep(.as-list-cell__title),
-.intel-list :deep(.as-list-cell__title) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.capture-list :deep(.as-list-cell__desc),
-.intel-list :deep(.as-list-cell__desc) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.capture-time {
-  font-size: $font-size-sm;
-  color: $ink-mute;
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
 }
 
 .intel-tabs {

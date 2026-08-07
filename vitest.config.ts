@@ -54,6 +54,7 @@ export default defineConfig({
       'src/modules/favorites/components/InsightDetailLayout.spec.ts',
       'src/modules/favorites/pages/monitor.spec.ts',
       'src/modules/favorites/pages/insight-detail.spec.ts',
+      'src/modules/favorites/components/AlertContent.spec.ts',
     ],
   },
 })
