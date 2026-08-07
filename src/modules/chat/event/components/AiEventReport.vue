@@ -16,6 +16,10 @@
           <text v-else class="meta-unverified">暂不可验证</text>
           <text class="meta-dot">·</text>
           <text class="meta-time">{{ detail.event.publishTime }}</text>
+          <template v-if="detail.event.eventType">
+            <text class="meta-dot">·</text>
+            <text class="meta-type">{{ detail.event.eventType }}</text>
+          </template>
         </view>
         <!-- 评级徽章：Step 1 完成后展示 -->
         <view
@@ -53,7 +57,7 @@
         v-for="(step, index) in analysisSteps"
         :key="step.id"
         :id="'step-' + step.id"
-        :step-number="step.id"
+        :step-number="step.displayNumber"
         :title="step.title"
         :status="step.status"
         :explanation="(step.content.explanation as string) || ''"
@@ -151,8 +155,10 @@ const mainSteps = computed(() => visibleSteps.value.filter(s => s.id === 1))
 /** Step 2: 投资逻辑解析（过渡） */
 const logicStep = computed(() => visibleSteps.value.find(s => s.id === 2))
 
-/** Step 3~5: 深度分析 */
-const analysisSteps = computed(() => visibleSteps.value.filter(s => s.id >= 3))
+/** Step 3~5: 深度分析（显示序号连续化：02/03/04 —— 因 02 为无编号的过渡模块投资逻辑解析） */
+const analysisSteps = computed(() => visibleSteps.value
+  .filter(s => s.id >= 3)
+  .map(s => ({ ...s, displayNumber: s.id - 1 })))
 
 // ===== 自动滚动到当前步骤（仅滚动 scroll-view 容器，避免触发外层页面滚动导致 fixed 导航栏移位） =====
 watch(currentStep, async (stepId) => {
@@ -257,6 +263,12 @@ watch(currentStep, async (stepId) => {
 .meta-time {
   font-size: 22rpx;
   color: $ink-mute;
+}
+
+/* 事件类型标签：与卡片 EVENT_TYPE_COLORS 语义一致，使用中性色 */
+.meta-type {
+  font-size: 22rpx;
+  color: $primary;
 }
 
 /* 评级徽章：复用 InvestmentSummaryCard 的语义色（A股：positive=绿/跌，negative=红/涨） */
