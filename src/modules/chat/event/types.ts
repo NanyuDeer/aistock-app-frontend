@@ -53,6 +53,8 @@ export interface EventItem {
   publishTime: string
   /** 来源 */
   source: string
+  /** 来源名称（Agent 生成的媒体名，如搜狐/财联社；可为空回退 URL 解析） */
+  sourceName?: string
   /** 来源信息（用于展示） */
   sourceInfo?: {
     name: string
@@ -338,4 +340,6 @@ export interface FocusEventViewModel {
   importance: FocusImportance
   selectionReason: string
   industries: string[]
+  /** 影响行业完整对象（含涨跌方向，供顶部卡片箭头/颜色展示） */
+  affectedIndustries?: AffectedIndustry[]
 }

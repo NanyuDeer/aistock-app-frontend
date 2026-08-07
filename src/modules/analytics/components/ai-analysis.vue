@@ -41,7 +41,7 @@
       <view class="score-card">
         <view class="score-left">
           <view class="score-number-row">
-            <text class="score-number">{{ data.score }}</text>
+            <text class="score-number" :class="scoreColorClass">{{ data.score }}</text>
             <text class="score-total">/100</text>
           </view>
           <view class="rating-badge" :style="{ background: data.ratingColor }">
@@ -136,6 +136,15 @@ const dataPeriod = computed(() => {
   return props.data?.dataPeriod || ''
 })
 
+/** 分数颜色：70-100 红 / 36-69 蓝 / 0-35 绿 */
+const scoreColorClass = computed(() => {
+  const score = props.data?.score
+  if (score == null) return ''
+  if (score >= 70) return 'score-high'
+  if (score >= 36) return 'score-mid'
+  return 'score-low'
+})
+
 function formatMetricKey(key: string): string {
   const map: Record<string, string> = {
     roe: 'ROE',
@@ -220,8 +229,19 @@ function formatMetricKey(key: string): string {
   .score-number {
     font-size: 36px;
     font-weight: 700;
-    color: $primary;
     line-height: 1;
+
+    &.score-high {
+      color: $up;
+    }
+
+    &.score-mid {
+      color: $primary;
+    }
+
+    &.score-low {
+      color: $down;
+    }
   }
 
   .score-total {

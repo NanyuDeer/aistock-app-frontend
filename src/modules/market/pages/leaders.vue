@@ -176,13 +176,23 @@ const CYCLE_OPTIONS = [
 
 const activeCycle = ref<'long' | 'short'>('long')
 
-/** 当前档位展示的板块：长线按 long_term_days 降序 top8、短线按 short_term_days 降序 top8。
+/** 当前档位展示的板块：长线按 long_term_days 降序、短线按 short_term_days 降序 top8。
  * 先过滤掉该档位天数为 0 的板块（另一链被裁剪或长短线均不成立的板块），
- * 再取天数最高的 8 个——宁少勿滥，避免短线档塞满 0 天补位板块。 */
+ * 再取天数最高的 8 个——宁少勿滥，避免短线档塞满 0 天补位板块。
+ * 同影响天数时按上榜次数降序（短线 freq20 / 长线 frequency），
+ * 与后端 applyDualRankings 口径一致，不依赖后端返回顺序。 */
 const displaySectors = computed(() =>
   [...sectors.value]
     .filter(s => getSectorDays(s, activeCycle.value) > 0)
-    .sort((a, b) => getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value))
+    .sort((a, b) => {
+      const daysDiff = getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value)
+      if (daysDiff !== 0) return daysDiff
+      // 同影响天数：短线按近10日上榜次数 freq20、长线按近120日上榜次数 frequency 降序
+      const freqDiff = activeCycle.value === 'short'
+        ? Number(b.freq20 ?? 0) - Number(a.freq20 ?? 0)
+        : Number(b.frequency ?? 0) - Number(a.frequency ?? 0)
+      return freqDiff
+    })
     .slice(0, 8)
 )
 
@@ -463,7 +473,7 @@ function formatNetInflow(val?: number | null): string {
 }
 
 // ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
-/** 上榜次数：短线档显示近20日 freq20，长线档显示近120日 frequency */
+/** 上榜次数：短线档显示近10日 freq20，长线档显示近120日 frequency */
 function boardCount(s: WindLeaderSector): number {
   return activeCycle.value === 'short' ? Number(s.freq20 ?? 0) : Number(s.frequency ?? 0)
 }

@@ -27,6 +27,7 @@ import type {
   GraphNodeType,
   EventType,  // 用于 historyEvents 类型断言
 } from '../types'
+import { EVENT_TYPES } from '../constants'
 
 // ==================== 后端响应类型定义 ====================
 
@@ -43,6 +44,8 @@ export interface BackendEventListData {
     eventId: string
     title: string
     source: string
+    source_name?: string
+    event_type?: string
     publishTime: string
     summary: string
     conclusion: string
@@ -66,6 +69,8 @@ export interface BackendEventDetailData {
     eventId: string
     title: string
     source: string
+    source_name?: string
+    event_type?: string
     publishTime: string
     event: string
     analysis_reports: {
@@ -178,6 +183,29 @@ function buildSourceInfo(source: string): { name: string; url?: string } | undef
 }
 
 /**
+ * 构建来源展示信息（source_name 优先）。
+ *
+ * 新数据：后端返回真实 source_name（如"搜狐"）→ 直接展示，并保留原始链接供点击；
+ * 旧数据：source_name 为空 → 回退到旧的 URL/domain 解析逻辑。
+ */
+function buildSourceInfoWithName(
+  sourceName: string | undefined,
+  source: string,
+): { name: string; url?: string } | undefined {
+  if (sourceName) {
+    const info: { name: string; url?: string } = { name: sourceName }
+    if (/^https?:\/\//i.test(source)) info.url = source
+    return info
+  }
+  return buildSourceInfo(source)
+}
+
+/** 事件类型白名单兜底：非法/缺失值回退到默认类型，保证旧数据正常展示。 */
+function normalizeEventType(raw: string | undefined): EventType {
+  return EVENT_TYPES.includes(raw as EventType) ? (raw as EventType) : '产业政策'
+}
+
+/**
  * 单个事件适配
  * 将后端事件字段转换为前端 EventItem
  *
@@ -193,17 +221,17 @@ function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventI
     eventId: backendEvent.eventId,
     title: backendEvent.title,
     source: backendEvent.source,
+    sourceName: backendEvent.source_name,
     publishTime: backendEvent.publishTime,
 
-    // 来源信息：从后端 source 构建真实 sourceInfo
-    sourceInfo: buildSourceInfo(backendEvent.source),
+    // 来源信息：优先 source_name，缺失时回退 URL/domain 解析
+    sourceInfo: buildSourceInfoWithName(backendEvent.source_name, backendEvent.source),
 
     // 字段名映射
     aiSummary: backendEvent.summary,
 
-    // 降级字段（后端暂不返回）
-    // 注意：使用默认值可能误导用户，后续应与后端协商新增字段
-    eventType: '产业政策' as EventType,  // 降级默认值，无法真实反映事件类型
+    // 事件类型：真实值（白名单校验），缺失/非法回退默认
+    eventType: normalizeEventType(backendEvent.event_type),
     importance: 3,          // 降级默认值，无法真实反映事件重要性
     affectedIndustries: [], // 列表接口无 chain，无法生成
     isFollowed: false,      // 功能暂不实现
@@ -244,12 +272,12 @@ export function adaptEventDetail(backend: BackendEventDetailData): EventDetailRe
       eventId: content.eventId,
       title: content.title,
       source: content.source,
-      sourceInfo: buildSourceInfo(content.source),
+      sourceName: content.source_name,
+      sourceInfo: buildSourceInfoWithName(content.source_name, content.source),
       publishTime: content.publishTime,
 
-      // 降级字段（后端暂不返回）
-      // 注意：使用默认值可能误导用户，后续应与后端协商新增字段
-      eventType: '产业政策' as EventType,  // 降级默认值，无法真实反映事件类型
+      // 事件类型：真实值（白名单校验），缺失/非法回退默认
+      eventType: normalizeEventType(content.event_type),
       importance: 3,          // 降级默认值，无法真实反映事件重要性
       affectedIndustries: extractAffectedIndustries(analysis.event_transmission),
       aiSummary: analysis.event_understanding?.summary || '',

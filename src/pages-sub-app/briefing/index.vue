@@ -251,10 +251,13 @@ const headlineItem = computed(() => {
 })
 
 /** 洞见列表（非头条非异动）
- *  晚报场景下头条卡片不展示，所有非异动 items 均进入洞见列表 */
+ *  晚报场景下头条卡片不展示，且为避免与下方「市场异象/大盘行情/板块行情」
+ *  专属卡片内容重复，洞见列表仅保留「收盘复盘」摘要；归因结论与市场快照
+ *  分别由 EveningAnomalyCard / EveningMarketIndexCard + EveningSectorsCard 展示。 */
+const REVIEW_SUMMARY_TITLE = '收盘复盘'
 const insightItems = computed(() => {
   if (broadcastType.value === 'evening') {
-    return items.value.filter((item) => !item.isAlert)
+    return items.value.filter((item) => !item.isAlert && item.title === REVIEW_SUMMARY_TITLE)
   }
   return items.value.filter((item) => !item.isHeadline && !item.isAlert)
 })

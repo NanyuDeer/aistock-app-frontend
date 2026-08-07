@@ -519,6 +519,11 @@ export const stockApi = {
     return request.get('/cn/stock-monitors/events', { params }).then((res: Record<string, unknown>) => res)
   },
 
+  /** 获取登录用户自选股的个股资讯（需登录，未登录调 getTrendEvents 看全市场） */
+  getFavoritesNews(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
+    return request.get('/cn/favorites/news', { params }).then((res: Record<string, unknown>) => res)
+  },
+
   /** 获取财联社头条新闻 */
   getNewsHeadlines() {
     return request.get('/news/headlines').then((res: Record<string, unknown>) => res)

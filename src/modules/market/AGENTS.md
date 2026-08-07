@@ -24,7 +24,7 @@
 - 其他模块通过 navigateTo 跳转到异动捕手或长线风口页面
 
 ## 依赖的 shared/ 中的类型
-- `@/shared/api/modules/stock` - 股票 API（含 getTrendEvents、getWindLeaders）
+- `@/shared/api/modules/stock` - 股票 API（含 getTrendEvents、getFavoritesNews、getWindLeaders）
 - `@/shared/utils/stock` - 股票格式化工具
 - `@/shared/utils/datetime` - 日期时间格式化
 - `@/shared/components/SubPageCard.vue` - 子页面容器
