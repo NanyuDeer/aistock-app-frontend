@@ -81,7 +81,7 @@ describe('StockContent 股票搜索框', () => {
     await vi.advanceTimersByTimeAsync(300)
     await flushPromises()
 
-    expect(stockApiMock.getStockList).toHaveBeenCalledWith({ keyword: '茅台', page: 1, pageSize: 20 })
+    expect(stockApiMock.getStockList).toHaveBeenCalledWith({ keyword: '茅台', page: 1, pageSize: 5 })
     const resultItem = wrapper.find('.search-result-item')
     expect(resultItem.exists()).toBe(true)
     expect(resultItem.text()).toContain('贵州茅台')

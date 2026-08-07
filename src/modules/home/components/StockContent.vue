@@ -115,7 +115,8 @@ watch(searchKeyword, (kw) => {
 
 async function doSearch(kw: string) {
   try {
-    const res = await stockApi.getStockList({ keyword: kw, page: 1, pageSize: 20 })
+    // 悬浮联想仅展示前 5 条最匹配结果（接口层限制，避免下拉列表过长）
+    const res = await stockApi.getStockList({ keyword: kw, page: 1, pageSize: 5 })
     searchResults.value = res?.list || []
   } catch {
     searchResults.value = []

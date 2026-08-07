@@ -17,18 +17,18 @@
           <view class="capture-list">
             <template v-if="captureList.length">
               <ListCell
-                v-for="(item, idx) in captureRows"
+                v-for="(row, idx) in captureRows"
                 :key="idx"
-                :title="item?.stock_name || '\u3000'"
-                :description="item ? captureDetail(item) : '\u3000'"
-                :clickable="!!item"
-                @click="item && goTrace(item.event_id)"
+                :title="row?.title || '\u3000'"
+                :description="row ? row.detail : '\u3000'"
+                :clickable="!!row?.onClick"
+                @click="row?.onClick"
               >
                 <template #prefix>
-                  <Tag v-if="item" :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
+                  <Tag v-if="row?.tag" :type="row.tag.type" size="sm">{{ row.tag.label }}</Tag>
                 </template>
                 <template #value>
-                  <text v-if="item" class="capture-time">{{ formatTime(item.trade_date || item.created_at || '') }}</text>
+                  <text v-if="row?.time" class="capture-time">{{ row.time }}</text>
                 </template>
               </ListCell>
             </template>
@@ -54,18 +54,20 @@
             </view>
           </view>
           <view class="intel-list">
-            <ListCell
-              v-for="(item, idx) in displayIntelList"
-              :key="idx"
-              :title="item.title"
-              :description="item.meta"
-              clickable
-              @click="goAlertAnalysis(item.symbol, item.cycle)"
-            >
-              <template #prefix>
-                <Tag :type="impactTagType(item.sentiment)" size="sm">{{ impactLabel(item.sentiment) }}</Tag>
-              </template>
-            </ListCell>
+            <template v-if="filteredIntelList.length">
+              <ListCell
+                v-for="(item, idx) in intelRows"
+                :key="idx"
+                :title="item?.title || '\u3000'"
+                :description="item ? item.meta : '\u3000'"
+                :clickable="!!item"
+                @click="item && goAlertAnalysis(item.symbol, item.cycle)"
+              >
+                <template #prefix>
+                  <Tag v-if="item" :type="impactTagType(item.sentiment)" size="sm">{{ impactLabel(item.sentiment) }}</Tag>
+                </template>
+              </ListCell>
+            </template>
             <EmptyState v-if="!filteredIntelList.length" title="暂无情报数据" />
           </view>
         </view>
@@ -75,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Segmented from '@/shared/components/Segmented.vue'
 import ListCell from '@/shared/components/ListCell.vue'
 import Tag from '@/shared/components/Tag.vue'
@@ -83,6 +85,7 @@ import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
+import { useUserStore } from '@/shared/store/modules/user'
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -106,13 +109,36 @@ const intelTabItems = [
   { label: '利空', value: 'negative' as const },
 ]
 
-// 异动捕手：接自选股洞察真实 API（与异动监控页 monitor.vue 同源，有真实信息就展示）
-const captureList = ref<WatchlistInsight[]>([])
+/** 异动捕手统一行结构：自选股洞察优先，不足 4 条时用个股情报补齐 */
+interface CaptureRowData {
+  id: string
+  title: string
+  detail: string
+  tag?: { label: string; type: 'up' | 'down' }
+  time?: string
+  onClick?: () => void
+}
+
+/** 自选股洞察 → 行数据（主因归因文案，与异动监控页 monitor.vue 一致） */
+function insightToRow(item: WatchlistInsight): CaptureRowData {
+  const direction: 'up' | 'down' = item.direction === 'down' ? 'down' : 'up'
+  return {
+    id: item.event_id,
+    title: item.stock_name || item.symbol,
+    detail: captureDetail(item),
+    tag: { label: direction === 'up' ? '涨' : '跌', type: direction },
+    time: formatTime(item.trade_date || item.created_at || ''),
+    onClick: () => goTrace(item.event_id),
+  }
+}
+
+// 异动捕手：仅展示自选股洞察（涨停雷达异动 + AI 归因），不混入个股情报（研判资讯）内容
+const captureList = ref<CaptureRowData[]>([])
 
 async function loadCaptureList() {
   try {
-    const data = await watchlistInsightApi.getInsights()
-    captureList.value = data
+    const insights = await watchlistInsightApi.getInsights()
+    captureList.value = insights.map(insightToRow)
   } catch {
     captureList.value = []
   }
@@ -139,7 +165,13 @@ function mapTrendEventToIntelItem(evt: Record<string, unknown>): IntelItem {
 
 async function loadIntelList() {
   try {
-    const res = await stockApi.getTrendEvents({ limit: 10 }) as Record<string, unknown>
+    // limit 需 ≥20：接口按发布时间倒序，前 10 条多为中性事件（实测仅 3 条非中性），
+    // 取 20 条过滤中性后仍有 13 条，足以填满 4 行预览
+    // 登录后仅展示自选股资讯（/favorites/news 按 user_stocks 过滤），未登录展示全市场
+    const userStore = useUserStore()
+    const res = userStore.isLoggedIn()
+      ? await stockApi.getFavoritesNews({ limit: 20 }) as Record<string, unknown>
+      : await stockApi.getTrendEvents({ limit: 20 }) as Record<string, unknown>
     const list = (res?.events || (res?.data as Record<string, unknown>)?.events || []) as Record<string, unknown>[]
     intelList.value = list.map(mapTrendEventToIntelItem)
   } catch {
@@ -168,22 +200,27 @@ const filteredIntelList = computed(() => {
 
 /** 首页预览最多显示4条，其余进入详情页查看 */
 const MAX_PREVIEW = 4
-const displayIntelList = computed(() => filteredIntelList.value.slice(0, MAX_PREVIEW))
+
+/**
+ * 个股情报列表固定渲染 4 行：数据不足时空行占位，
+ * 卡片纵向长度不随数据量变化（与异动捕手列表一致）
+ */
+const intelRows = computed<Array<IntelItem | null>>(() => {
+  const rows: Array<IntelItem | null> = filteredIntelList.value.slice(0, MAX_PREVIEW)
+  while (rows.length < MAX_PREVIEW) rows.push(null)
+  return rows
+})
 
 /**
  * 异动捕手列表固定渲染 4 行：数据不足时空行占位，
  * 卡片纵向长度不随数据量变化（避免只有 1 条资讯时卡片变矮）
  */
 const CAPTURE_ROW_COUNT = 4
-const captureRows = computed<Array<WatchlistInsight | null>>(() => {
-  const rows: Array<WatchlistInsight | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
+const captureRows = computed<Array<CaptureRowData | null>>(() => {
+  const rows: Array<CaptureRowData | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
   while (rows.length < CAPTURE_ROW_COUNT) rows.push(null)
   return rows
 })
-
-function badgeLabel(direction: 'up' | 'down'): string {
-  return direction === 'up' ? '涨' : '跌'
-}
 
 /** 情感 → 标签文案：利好→好，利空→空，中性→中（与 event-catcher 风格一致） */
 function impactLabel(sentiment: IntelItem['sentiment']): string {
@@ -193,11 +230,6 @@ function impactLabel(sentiment: IntelItem['sentiment']): string {
 /** 情感 → Tag type：利好→up(红)，利空→down(绿)，中性→neutral(蓝) */
 function impactTagType(sentiment: IntelItem['sentiment']): 'up' | 'down' | 'neutral' {
   return sentiment === 'positive' ? 'up' : sentiment === 'negative' ? 'down' : 'neutral'
-}
-
-/** 异动方向 → Tag type：涨→up(红)，跌→down(绿) */
-function captureTagType(direction: 'up' | 'down'): 'up' | 'down' {
-  return direction
 }
 
 /** 格式化异动详情：主因归因文案（与异动监控页 monitor.vue 一致） */
@@ -252,6 +284,14 @@ onMounted(() => {
   void loadCaptureList()
   void loadIntelList()
 })
+
+// 登录/登出后，个股情报数据源会在全市场与自选股之间切换，需重新加载
+watch(
+  () => useUserStore().token,
+  () => {
+    void loadIntelList()
+  },
+)
 </script>
 
 <style lang="scss" scoped>
@@ -347,6 +387,8 @@ onMounted(() => {
 .capture-list :deep(.as-list-cell),
 .intel-list :deep(.as-list-cell) {
   padding: $s-2 $s-2;
+  /* 空行占位（\u3000）与真实行等高，保证两个卡片纵向长度一致 */
+  min-height: 104rpx;
 }
 
 .capture-list :deep(.as-list-cell__title),

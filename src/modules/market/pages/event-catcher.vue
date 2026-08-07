@@ -66,6 +66,7 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
+import { useUserStore } from '@/shared/store/modules/user'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { LoadingState, Tag, Badge, Button, Card, Segmented, EmptyState } from '@/shared/components'
 
@@ -118,11 +119,19 @@ async function loadEvents(append = false) {
   }
   try {
     const offset = page.value * pageSize
-    const res: any = await stockApi.getTrendEvents({
-      cycle: activeCycle.value,
-      limit: pageSize,
-      offset,
-    })
+    // 登录后仅展示自选股资讯（/favorites/news 按 user_stocks 过滤），未登录展示全市场
+    const userStore = useUserStore()
+    const res: any = userStore.isLoggedIn()
+      ? await stockApi.getFavoritesNews({
+          cycle: activeCycle.value,
+          limit: pageSize,
+          offset,
+        })
+      : await stockApi.getTrendEvents({
+          cycle: activeCycle.value,
+          limit: pageSize,
+          offset,
+        })
     const rawList = res?.events || res?.data?.events || []
     // 过滤中性消息：仅保留利好/利空事件（登录前后行为一致）
     const list = rawList.filter((evt: Record<string, unknown>) => {
