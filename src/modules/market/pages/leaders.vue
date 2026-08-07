@@ -463,7 +463,7 @@ function formatNetInflow(val?: number | null): string {
 }
 
 // ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
-/** 上榜次数：短线档显示近20日 freq20，长线档显示近120日 frequency */
+/** 上榜次数：短线档显示近10日 freq20，长线档显示近120日 frequency */
 function boardCount(s: WindLeaderSector): number {
   return activeCycle.value === 'short' ? Number(s.freq20 ?? 0) : Number(s.frequency ?? 0)
 }
