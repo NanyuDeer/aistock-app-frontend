@@ -30,6 +30,14 @@
           <text class="audio-arrow">›</text>
         </view>
 
+        <!-- 市场异象卡片：参考早报「今日头条」卡片设计，紧跟音频播报下方（仅晚报展示，有异象时显示） -->
+        <template v-if="broadcastType === 'evening' && eveningViewModel">
+          <EveningAnomalyCard
+            v-if="eveningViewModel.anomaly.hasAnomaly && eveningViewModel.attributionConclusion"
+            :conclusion="eveningViewModel.attributionConclusion"
+          />
+        </template>
+
         <!-- 头条卡片：今日最重要研判（仅晨报展示） -->
         <view v-if="headlineItem && broadcastType !== 'evening'" class="headline-card">
           <view class="headline-label">
@@ -96,14 +104,8 @@
         </view>
         </template>
 
-        <!-- 晚报专属卡片：市场异象（有才显示）+ 大盘行情 + 板块行情（仅晚报展示，排布在 Agent 洞见之后） -->
+        <!-- 晚报专属卡片：大盘行情 + 板块行情（仅晚报展示，排布在 Agent 洞见之后；市场异象卡片已移至音频下方） -->
         <template v-if="broadcastType === 'evening' && eveningViewModel">
-          <!-- 有异象：结论卡片优先展示 -->
-          <EveningAnomalyCard
-            v-if="eveningViewModel.anomaly.hasAnomaly && eveningViewModel.attributionConclusion"
-            :conclusion="eveningViewModel.attributionConclusion"
-          />
-
           <!-- 大盘行情卡片（指数 + 涨跌家数） -->
           <EveningMarketIndexCard
             v-if="eveningViewModel.presentation && (eveningViewModel.presentation.phenomenon.indexPerformance.length || eveningViewModel.breadth)"
