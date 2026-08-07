@@ -148,7 +148,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
 import { useReportPodcast } from '@/shared/utils/useReportPodcast'
-import { calcBubbleOpacity, calcBubbleRadius, getSectorDays, getSectorStrength } from '@/modules/market/utils/windLeaderBubble'
+import { calcBubbleColor, calcBubbleRadius, getSectorDays, getSectorStrength } from '@/modules/market/utils/windLeaderBubble'
 
 const { loadPodcast, openPodcast } = useReportPodcast('wind_leader')
 
@@ -164,7 +164,7 @@ interface Bubble {
   change: number
   days: number     // 该档位持续天数（长线=long_term_days，短线=short_term_days）
   radius: number   // px 半径
-  opacity: number  // 颜色深浅（长线=置信度，短线=热度）
+  color: string    // 泡泡填充色（长线蓝系=置信度，短线橙红系=热度）
   fontSize: number
 }
 
@@ -254,7 +254,7 @@ const bubbleData = computed<Bubble[]>(() => {
       change: s.today_change ?? 0,
       days,
       radius: r,
-      opacity: calcBubbleOpacity(kind, strength),
+      color: calcBubbleColor(kind, strength),
       fontSize: r > 50 ? 14 : (r > 38 ? 12 : 10),
     }
   })
@@ -375,22 +375,15 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
   return nodes.map(n => ({ ...n, x: n.x, y: n.y }))
 })
 
-// 颜色：基于置信度/热度深浅（长线=置信度，短线=热度），从浅蓝到深蓝（匹配网页版）
+// 颜色：长线蓝系（置信度）/ 短线橙红系（热度），深浅由 calcBubbleColor 按强度色阶插值
 function bubbleItemStyle(b: BubbleLayout) {
-  const ratio = Math.max(0, Math.min(1, (b.opacity - 0.4) / 0.6))
-  // 浅蓝 #bfdbfe → 深蓝 #1d4ed8
-  const r = Math.round(191 + (29 - 191) * ratio)
-  const g = Math.round(219 + (78 - 219) * ratio)
-  const bl = Math.round(254 + (216 - 254) * ratio)
-  const fillColor = `rgb(${r}, ${g}, ${bl})`
   return {
     width: b.radius * 2 + 'px',
     height: b.radius * 2 + 'px',
     left: b.x - b.radius + 'px',
     top: b.y - b.radius + 'px',
-    background: fillColor,
+    background: b.color,
     borderColor: '#ffffff',
-    opacity: b.opacity.toFixed(2),
   }
 }
 
@@ -470,7 +463,7 @@ function formatNetInflow(val?: number | null): string {
 }
 
 // ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
-/** 上榜次数：短线档显示近20日 freq20，长线档显示近60日 frequency */
+/** 上榜次数：短线档显示近10日 freq20，长线档显示近120日 frequency */
 function boardCount(s: WindLeaderSector): number {
   return activeCycle.value === 'short' ? Number(s.freq20 ?? 0) : Number(s.frequency ?? 0)
 }

@@ -23,7 +23,7 @@
               <text class="stats-name">{{ sector.name }}</text>
               <Tag v-if="persistenceTag" :type="persistenceTagType" size="sm">{{ persistenceTag }}</Tag>
             </view>
-            <Badge v-if="sector.frequency" size="sm">上榜 {{ sector.frequency }} 次</Badge>
+            <Badge v-if="sector.frequency" size="sm">近120日上榜 {{ sector.frequency }} 次</Badge>
           </view>
           <StatGrid :items="sectorStatItems" :columns="4" />
         </Card>

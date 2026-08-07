@@ -2,6 +2,64 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-07 — 晚报界面卡片重设计（Agent 洞见风格 + 异象排序）
+
+**开发者**: Aria
+
+### 新增
+- 晚报卡片 ViewModel 组装工具（`shared/utils/eveningBriefCards.ts`）：`detectMarketAnomaly` 异象判定（文本+结构化双重判定）、`extractAttributionConclusion` 归因结论提取、`extractBreadth` 涨跌家数提取
+- 晚报专属卡片组件（`pages-sub-app/briefing/components/`）：`EveningAnomalyCard`（市场异象结论）、`EveningMarketIndexCard`（大盘行情：指数+涨跌家数）、`EveningSectorsCard`（板块行情：领涨/领跌）
+
+### 改进
+- 晚报卡片样式统一为早报 Agent 洞见行风格（白底圆角 + 左侧圆角图标 + mini-tag 标签）
+- 卡片排版：Agent 洞见 → 市场异象（有才显示）→ 大盘行情 → 板块行情；晚报场景下即使 brief 无数据也保留「Agent 洞见」分区标题，保持与早报一致的页面结构
+- `marketTraceReview.ts`：`indexPerfFromUnknown` 支持后端对象（map）结构的 indexes，并兼容 `change_pct`/`pct_change` 字段名
+
+### 修复
+- 大盘行情只显示涨跌家数、无具体指数涨跌：根因是后端 indexes 为对象（map）而前端期望数组，修复后指数正常展示
+- 音频入口文案写死「AI早报音频」：新增 `audioLabelText` 根据播报类型动态显示早报/晚报音频
+
+### 验证
+- `npx tsc --noEmit` 通过
+
+## [master] 2026-08-06 — agent-report wind_leader 分卡片展示 + 板块卡片 markdown 渲染修复
+
+**开发者**: Aria
+
+### 修复
+- `agent-report.vue` wind_leader 板块卡片：body 原用 `<text>` 直接输出导致 `- **上榜次数**：...` 等 markdown 语法原样显示 → 改用 `mp-html` + `markdownToHtml`（新增 `.wind-sector-body-html` 样式）
+
+### 改进
+- 按后端 prompt 章节结构分卡片展示：风口结论（summary）→ 风口概览（`## 风口概览`）→ 长线/短线研判两档切换 + 板块卡片（`###` 子节）→ 龙头股推荐（`## 龙头股推荐` + `display_report.stocks` 代码标签）→ 风险提示（`## 风险提示`）→ 关注建议（`## 关注建议`）
+- 移除原"风口分析（长短线分类）"全文卡片，改为各章节解析均失败时兜底展示原文（避免内容丢失）；新增 `windRiskHtml` / `windAdviceHtml` 章节解析
+
+---
+
+## [master] 2026-08-06 — leaders 泡泡图：半径上限 50px + 双色阶（长线蓝系/短线橙红系）
+
+**开发者**: Aria
+
+### 改进
+- `windLeaderBubble.calcBubbleRadius`：半径上限 65→50px、下限 22→20px（长线满格 120 天 / 短线满格 10 天，`20 + 天数/满格×30`）
+- `windLeaderBubble` 新增双色阶 + `calcBubbleColor(kind, value)`：
+  - 长线蓝系：0.3 浅蓝 `#dbeafe` → 0.5 普通蓝 `#3b82f6` → 0.9 近黑蓝 `#121a44`（0.6 深蓝 `#1552d0`、0.7 藏青 `#1e3a8a`，相邻档亮度差 12~15%）
+  - 短线橙红系：0.3 浅橙 `#fed7aa` → 0.5 普通橙 `#f97316` → 0.8 转红 `#7f1d1d` → 0.9 暗红 `#5b1414`
+  - 0.1/0.2 与 0.3 同色（低于 cycle 门槛的板块会被筛选掉，收敛最浅色）；值在相邻档间线性插值
+- 移除 `calcBubbleOpacity` 透明度逻辑；`leaders.vue bubbleItemStyle` 改用 `calcBubbleColor` 填充色，去掉元素透明度双重叠加；提示文案更新"长线蓝系/短线橙红系"
+
+---
+
+## [master] 2026-08-06 — leaders 泡泡图：大小按长短线各自量级归一化 + 颜色对比度加强
+
+**开发者**: Aria
+
+### 改进
+- `windLeaderBubble.calcBubbleRadius`：长线以 120 天为满格、短线以 10 天为满格，半径 22→65px 线性、超过封顶——修复原 `clamp(26+days×coef,22,65)` 长线 75+ 天全封顶、长短线系数不匹配各自量级的问题（长线 45d→38px / 75d→49px 可区分）
+- `windLeaderBubble.calcBubbleOpacity`：`0.4+0.6×值` → `0.3+0.7×值`，低强度更浅、高强度更深（原 conf/heat 多集中在 0.3~0.6，映射后几乎全是浅蓝无法区分）
+- `leaders.vue bubbleItemStyle`：ratio 反推同步改为 `(opacity-0.3)/0.7`
+
+---
+
 ## [master] 2026-08-06 — 风口龙头接口 limit 20→40（配合后端双轨选板）
 
 **开发者**: Aria
