@@ -83,7 +83,6 @@ import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
-import { mockWatchlistInsights, isInsightsMockForced } from '../mock-data'
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -107,21 +106,16 @@ const intelTabItems = [
   { label: '利空', value: 'negative' as const },
 ]
 
-// 异动捕手：接自选股洞察真实 API（与异动监控页 monitor.vue 同源，有真实信息就展示）
-// 降级：演示开关开启时强制 mock；接口失败或返回空数据时回退 mock（产品演示用）
+// 异动捕手：接自选股洞察真实 API（与异动监控页 monitor.vue 同源）
 const captureList = ref<WatchlistInsight[]>([])
 
 async function loadCaptureList() {
-  // 演示开关：VITE_USE_INSIGHTS_MOCK=true 时无条件使用 mock（思维链逻辑未就绪前不展示真实数据）
-  if (isInsightsMockForced()) {
-    captureList.value = mockWatchlistInsights
-    return
-  }
+  // 自选股洞察真实数据：接口失败/空数据时展示空状态（EmptyState 兜底）
   try {
     const data = await watchlistInsightApi.getInsights()
-    captureList.value = data.length ? data : mockWatchlistInsights
+    captureList.value = data
   } catch {
-    captureList.value = mockWatchlistInsights
+    captureList.value = []
   }
 }
 

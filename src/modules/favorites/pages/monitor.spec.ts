@@ -28,26 +28,22 @@ vi.mock('@/shared/store/modules/app', () => ({
   }),
 }))
 
-// mock mock-data
-const mockDataMock = vi.hoisted(() => ({
-  mockWatchlistInsights: [
-    {
-      event_id: 'm1', symbol: '600519', stock_name: '贵州茅台',
-      trade_date: '2026-08-07', event_type: 'limit_up_radar',
-      direction: 'up', attribution_status: 'confirmed', confidence: 'high',
-      primary_driver: { label: '白酒板块', category: 'industry_theme', confidence: 'high' },
-      created_at: '2026-08-07T10:00:00+08:00',
-    },
-    {
-      event_id: 'm2', symbol: '000001', stock_name: '平安银行',
-      trade_date: '2026-08-07', event_type: 'limit_up_radar',
-      direction: 'down', attribution_status: 'unconfirmed', confidence: 'unconfirmed',
-      created_at: '2026-08-07T11:00:00+08:00',
-    },
-  ],
-  isInsightsMockForced: vi.fn(() => false),
-}))
-vi.mock('../mock-data', () => mockDataMock)
+// 测试数据：本地内联，不依赖 mock-data.ts（已移除）
+const testInsights = [
+  {
+    event_id: 'm1', symbol: '600519', stock_name: '贵州茅台',
+    trade_date: '2026-08-07', event_type: 'limit_up_radar',
+    direction: 'up', attribution_status: 'confirmed', confidence: 'high',
+    primary_driver: { label: '白酒板块', category: 'industry_theme', confidence: 'high' },
+    created_at: '2026-08-07T10:00:00+08:00',
+  },
+  {
+    event_id: 'm2', symbol: '000001', stock_name: '平安银行',
+    trade_date: '2026-08-07', event_type: 'limit_up_radar',
+    direction: 'down', attribution_status: 'unconfirmed', confidence: 'unconfirmed',
+    created_at: '2026-08-07T11:00:00+08:00',
+  },
+]
 
 // SvgIcon 桩
 vi.mock('@/shared/components/SvgIcon.vue', () => ({
@@ -82,13 +78,11 @@ describe('monitor.vue 异动监控页', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     insightApiMock.getInsights.mockReset()
-    mockDataMock.isInsightsMockForced.mockReset()
-    mockDataMock.isInsightsMockForced.mockReturnValue(false)
     vi.mocked(uni.navigateTo).mockClear()
   })
 
   it('接口成功 → 渲染 InsightAlertCard 列表', async () => {
-    insightApiMock.getInsights.mockResolvedValue(mockDataMock.mockWatchlistInsights)
+    insightApiMock.getInsights.mockResolvedValue(testInsights)
     const wrapper = mount(monitor)
     await flushPromises()
     // 验证 InsightAlertCard 渲染数量
@@ -96,16 +90,16 @@ describe('monitor.vue 异动监控页', () => {
     expect(cards.length).toBe(2)
   })
 
-  it('接口失败 → 回退 mock 数据', async () => {
+  it('接口失败 → 展示空状态（不渲染卡片）', async () => {
     insightApiMock.getInsights.mockRejectedValue(new Error('network'))
     const wrapper = mount(monitor)
     await flushPromises()
     const cards = wrapper.findAllComponents({ name: 'InsightAlertCard' })
-    expect(cards.length).toBe(mockDataMock.mockWatchlistInsights.length)
+    expect(cards.length).toBe(0)
   })
 
   it('点击 InsightAlertCard → navigateTo 跳转 insight-detail', async () => {
-    insightApiMock.getInsights.mockResolvedValue(mockDataMock.mockWatchlistInsights)
+    insightApiMock.getInsights.mockResolvedValue(testInsights)
     const wrapper = mount(monitor)
     await flushPromises()
     const firstCard = wrapper.findAllComponents({ name: 'InsightAlertCard' })[0]

@@ -3,7 +3,7 @@
     :class="['insight-alert-card', { 'is-compact': compact, 'is-clickable': clickable }]"
     @tap="onClick"
   >
-    <!-- 非 compact：品牌蓝渐变头部 -->
+    <!-- 非紧凑模式头部（品牌蓝横向渐变） -->
     <view v-if="!compact" class="insight-alert-card__header">
       <view class="insight-alert-card__stock">
         <text class="insight-alert-card__name">{{ name }}</text>
@@ -115,13 +115,13 @@ function onClick(event: Event) {
   }
 }
 
-/* 非紧凑模式头部（品牌蓝渐变） */
+/* 非紧凑模式头部（品牌蓝横向渐变：左蓝右白） */
 .insight-alert-card__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16rpx 24rpx;
-  background: $brand-gradient;
+  background: linear-gradient(to right, $primary 0%, $bg-soft 100%);
 }
 
 .insight-alert-card__stock {

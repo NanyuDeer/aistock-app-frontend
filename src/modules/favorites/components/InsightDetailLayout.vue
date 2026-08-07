@@ -1,6 +1,6 @@
 <template>
   <view class="insight-detail-layout">
-    <!-- 头部卡（品牌蓝渐变） -->
+    <!-- 头部卡（品牌蓝横向渐变：左深右浅） -->
     <view class="insight-detail-layout__header">
       <view class="insight-detail-layout__header-row">
         <view class="insight-detail-layout__stock">
@@ -121,14 +121,14 @@ function onOpenSource() {
   padding: $s-3;
 }
 
-/* 头部卡（品牌蓝渐变） */
+/* 头部卡（品牌蓝横向渐变：左蓝右白） */
 .insight-detail-layout__header {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
   padding: 24rpx;
-  background: $brand-gradient;
   border-radius: $r-xl;
+  background: linear-gradient(to right, $primary 0%, $bg-soft 100%);
 }
 
 .insight-detail-layout__header-row {

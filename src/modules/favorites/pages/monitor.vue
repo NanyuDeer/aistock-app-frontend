@@ -76,7 +76,6 @@ import { formatTime } from '@/shared/utils/datetime'
 import InsightAlertCard from '@/shared/components/InsightAlertCard.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
-import { mockWatchlistInsights, isInsightsMockForced } from '../mock-data'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 
 interface AlertItem {
@@ -136,18 +135,11 @@ async function fetchAlerts() {
   loading.value = true
   try {
     // 自选股洞察数据源：展示自选股涨停雷达事件的 LLM/规则归因结果
-    // 降级：演示开关开启时强制 mock；接口失败或返回空数据时回退 mock（产品演示用）
-    let list: WatchlistInsight[]
-    if (isInsightsMockForced()) {
-      list = mockWatchlistInsights
-    } else {
-      const data = await watchlistInsightApi.getInsights()
-      list = data.length ? data : mockWatchlistInsights
-    }
+    const list = await watchlistInsightApi.getInsights()
     alerts.value = list.map(toAlertItem)
   } catch {
-    // API 失败时回退 mock 数据兜底
-    alerts.value = mockWatchlistInsights.map(toAlertItem)
+    // API 失败时展示空状态
+    alerts.value = []
   } finally {
     loading.value = false
   }

@@ -18,7 +18,6 @@
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
-import { mockWatchlistInsights, isInsightsMockForced } from '../mock-data'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
@@ -49,17 +48,10 @@ onLoad(async (query) => {
     return
   }
   try {
-    // 演示开关：VITE_USE_INSIGHTS_MOCK=true 时优先取 mock（思维链逻辑未就绪前不展示真实数据）
-    if (isInsightsMockForced()) {
-      detail.value = mockWatchlistInsights.find((i) => i.event_id === eventId) || null
-    } else {
-      detail.value = await watchlistInsightApi.getInsightDetail(eventId)
-      // 接口返回空时回退 mock 数据兜底（产品演示用）
-      if (!detail.value) detail.value = mockWatchlistInsights.find((i) => i.event_id === eventId) || null
-    }
+    // 自选股洞察详情：接口返回空/失败时展示空状态（EmptyState 兜底）
+    detail.value = await watchlistInsightApi.getInsightDetail(eventId)
   } catch {
-    // 接口失败时回退 mock 数据兜底（产品演示用）
-    detail.value = mockWatchlistInsights.find((i) => i.event_id === eventId) || null
+    detail.value = null
   } finally {
     loading.value = false
   }
