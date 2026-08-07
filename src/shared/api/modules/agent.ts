@@ -184,6 +184,8 @@ export interface MarketTraceTrace {
   alternative_chain_id?: string | null
   confidence?: MarketTraceConfidence
   unresolved_questions?: unknown
+  /** 综合主因的一句话结论（30-40 字），供晚报页异象卡片直接展示；旧报告可能缺失 */
+  attribution_summary?: string | null
   prediction_validation?: MarketTracePredictionValidation | null
 }
 

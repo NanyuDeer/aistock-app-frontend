@@ -2,6 +2,18 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-07 — 晚报页归因结论：优先展示 review 综合主因一句话摘要
+
+**开发者**: Aria
+
+### 改进
+- `shared/api/modules/agent.ts`：`MarketTraceTrace` 新增 `attribution_summary?: string | null`（综合主因的一句话结论，旧报告可能缺失）
+- `shared/utils/eveningBriefCards.ts`：新增 `extractAttributionSummary()`（读 `content.market_trace.trace.attribution_summary`，空值返回空串）；`buildEveningCardViewModel` 结论文本优先取 review 短摘要，缺失时回退 brief 归因结论（主因链拼接长文本）——解决晚报「归因结论」条目超长问题
+
+### 测试
+- `shared/utils/eveningBriefCards.spec.ts`：makeReview 的 trace 增加 attribution_summary 字段（默认 null），新增优先展示/回退/空值 4 个用例（23 passed）
+
+---
 ## [master] 2026-08-07 — 晚报页去重：洞见列表仅保留收盘复盘，行情归卡片展示
 
 **开发者**: Aria

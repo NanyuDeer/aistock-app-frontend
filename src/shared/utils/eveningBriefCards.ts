@@ -60,6 +60,16 @@ export function extractAttributionConclusion(brief: BriefV1 | null): string {
 }
 
 /**
+ * 从 review 报告提取综合主因一句话结论（attribution_summary）。
+ * 优先使用该字段作为晚报异象卡片的结论文本；旧报告缺失时返回空串，
+ * 由调用方回退到 brief 归因结论。
+ */
+export function extractAttributionSummary(review: MarketTraceReviewRecord | null): string {
+  const summary = review?.content?.market_trace?.trace?.attribution_summary
+  return typeof summary === 'string' && summary.trim() ? summary.trim() : ''
+}
+
+/**
  * 异象判定（文本 + 结构化双重判定）
  *
  * 优先级见模块顶部注释。
@@ -138,7 +148,9 @@ export function buildEveningCardViewModel(
   requestedDate: string,
 ): EveningCardViewModel {
   const anomaly = detectMarketAnomaly(brief, review)
-  const attributionConclusion = extractAttributionConclusion(brief)
+  // 结论文本优先使用 review 的综合主因一句话结论（attribution_summary，
+  // 供前端展示）；旧报告缺失该字段时回退到 brief 归因结论（主因链拼接）。
+  const attributionConclusion = extractAttributionSummary(review) || extractAttributionConclusion(brief)
   const presentation = review && review.status === 'completed'
     ? toMarketTracePresentation(review, requestedDate)
     : null
