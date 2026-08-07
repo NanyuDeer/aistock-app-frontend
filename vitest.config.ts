@@ -50,6 +50,11 @@ export default defineConfig({
       'src/pages-sub-app/chat/cards/ComparisonCard.spec.ts',
       'src/pages-sub-app/chat/cards/CardRenderer.spec.ts',
       'src/pages-sub-app/chat/cards/SectionCard.spec.ts',
+      'src/shared/components/InsightAlertCard.spec.ts',
+      'src/modules/favorites/components/InsightDetailLayout.spec.ts',
+      'src/modules/favorites/pages/monitor.spec.ts',
+      'src/modules/favorites/pages/insight-detail.spec.ts',
+      'src/modules/favorites/components/AlertContent.spec.ts',
     ],
   },
 })
