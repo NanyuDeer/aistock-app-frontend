@@ -19,7 +19,7 @@ export type BriefingSource =
   | 'trend' // 趋势评分
   | 'hot_burst' // 机构调研
   | 'alert' // 异动公告
-  | 'review' // 复盘Agent
+  | 'review' // 市场异象（复盘归因）
   | 'wind_leader' // 风口龙头
 
 /** 利空利好标记 */
@@ -73,7 +73,7 @@ export const SOURCE_LABELS: Record<BriefingSource, string> = {
   trend: '趋势评分',
   hot_burst: '机构调研',
   alert: '异动公告',
-  review: '复盘Agent',
+  review: '市场异象',
   wind_leader: '风口龙头',
 }
 
@@ -84,7 +84,7 @@ export const SOURCE_ICONS: Record<BriefingSource, string> = {
   trend: '势',
   hot_burst: '研',
   alert: '异',
-  review: '复',
+  review: '市',
   wind_leader: '风',
 }
 

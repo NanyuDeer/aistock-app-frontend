@@ -16,7 +16,7 @@ withDefaults(defineProps<{
   /** 页脚文案 */
   text?: string
 }>(), {
-  text: 'AI Stock · 智能投顾'
+  text: '洞见 · 智能投顾'
 })
 </script>
 

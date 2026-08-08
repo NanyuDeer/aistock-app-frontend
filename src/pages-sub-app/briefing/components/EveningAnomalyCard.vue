@@ -2,7 +2,7 @@
   <view class="anomaly-card">
     <view class="anomaly-label">
       <text class="anomaly-star">★</text>
-      <text class="anomaly-label-text">市场异象</text>
+      <text class="anomaly-label-text">大盘洞见</text>
     </view>
     <text class="anomaly-title">今日主因</text>
     <text class="anomaly-conclusion">{{ conclusion }}</text>

@@ -30,7 +30,7 @@
           <text class="audio-arrow">›</text>
         </view>
 
-        <!-- 市场异象卡片：参考早报「今日头条」卡片设计，紧跟音频播报下方（仅晚报展示，有异象时显示） -->
+        <!-- 大盘洞见卡片（原市场异象）：参考早报「今日头条」卡片设计，紧跟音频播报下方（仅晚报展示，有异象时显示） -->
         <template v-if="broadcastType === 'evening' && eveningViewModel">
           <EveningAnomalyCard
             v-if="eveningViewModel.anomaly.hasAnomaly && eveningViewModel.attributionConclusion"
@@ -104,7 +104,7 @@
         </view>
         </template>
 
-        <!-- 晚报专属卡片：大盘行情 + 板块行情（仅晚报展示，排布在 Agent 洞见之后；市场异象卡片已移至音频下方） -->
+        <!-- 晚报专属卡片：大盘行情 + 板块行情（仅晚报展示，排布在 Agent 洞见之后；大盘洞见卡片已移至音频下方） -->
         <template v-if="broadcastType === 'evening' && eveningViewModel">
           <!-- 大盘行情卡片（指数 + 涨跌家数） -->
           <EveningMarketIndexCard
@@ -253,7 +253,7 @@ const headlineItem = computed(() => {
 })
 
 /** 洞见列表（非头条非异动）
- *  晚报场景下头条卡片不展示，且为避免与下方「市场异象/大盘行情/板块行情」
+ *  晚报场景下头条卡片不展示，且为避免与下方「大盘洞见/大盘行情/板块行情」
  *  专属卡片内容重复，洞见列表仅保留「收盘复盘」摘要；归因结论与市场快照
  *  分别由 EveningAnomalyCard / EveningMarketIndexCard + EveningSectorsCard 展示。 */
 const REVIEW_SUMMARY_TITLE = '收盘复盘'
@@ -695,7 +695,7 @@ onUnmounted(() => {
   &.event { background: #d97706; }
   &.trend { background: #7c3aed; }
   &.alert { background: #e04545; }
-  &.review { background: #64748b; }
+  &.review { background: #e04545; }
   &.hot_burst { background: #0891b2; }
   &.wind_leader { background: $primary; }
 }

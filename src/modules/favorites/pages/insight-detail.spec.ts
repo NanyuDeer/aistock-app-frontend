@@ -9,6 +9,13 @@ vi.mock('@/shared/api/modules/insight', () => ({
   watchlistInsightApi: insightApiMock,
 }))
 
+// mock 演示开关（默认关闭，测试走真实 API 路径）
+const mockInsightsModule = vi.hoisted(() => ({
+  isInsightsMockForced: vi.fn(() => false),
+  findMockInsightById: vi.fn(),
+}))
+vi.mock('@/modules/favorites/mock-insights', () => mockInsightsModule)
+
 // 测试数据：本地内联，不依赖 mock-data.ts（已移除）
 const testDetail = {
   event_id: 'd1', symbol: '600519', stock_name: '贵州茅台',

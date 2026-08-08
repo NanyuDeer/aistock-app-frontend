@@ -76,6 +76,7 @@ import { formatTime } from '@/shared/utils/datetime'
 import InsightAlertCard from '@/shared/components/InsightAlertCard.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
+import { isInsightsMockForced, buildMockInsights } from '@/modules/favorites/mock-insights'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 
 interface AlertItem {
@@ -133,6 +134,12 @@ function toAlertItem(e: WatchlistInsight): AlertItem {
 
 async function fetchAlerts() {
   loading.value = true
+  // 演示阶段：异动监控暂时显示自选股 mock（isInsightsMockForced 关闭后走真实 API）
+  if (isInsightsMockForced()) {
+    alerts.value = buildMockInsights(favoritesStore.stocks).map(toAlertItem)
+    loading.value = false
+    return
+  }
   try {
     // 自选股洞察数据源：展示自选股涨停雷达事件的 LLM/规则归因结果
     const list = await watchlistInsightApi.getInsights()
