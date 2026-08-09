@@ -18,8 +18,6 @@
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
-import { useFavoritesStore } from '@/shared/store/modules/favorites'
-import { isInsightsMockForced, findMockInsightById } from '@/modules/favorites/mock-insights'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
@@ -50,14 +48,8 @@ onLoad(async (query) => {
     return
   }
   try {
-    // 演示阶段：mock 事件按 event_id 从 mock 数据中匹配（点击列表卡片进入）；
-    // 非 mock 事件走真实 API
-    if (isInsightsMockForced()) {
-      detail.value = findMockInsightById(eventId, useFavoritesStore().stocks)
-    } else {
-      // 自选股洞察详情：接口返回空/失败时展示空状态（EmptyState 兜底）
-      detail.value = await watchlistInsightApi.getInsightDetail(eventId)
-    }
+    // 自选股洞察详情：接口返回空/失败时展示空状态（EmptyState 兜底）
+    detail.value = await watchlistInsightApi.getInsightDetail(eventId)
   } catch {
     detail.value = null
   } finally {

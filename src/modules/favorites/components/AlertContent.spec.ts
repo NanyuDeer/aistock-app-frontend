@@ -10,16 +10,8 @@ vi.mock('@/shared/api/modules/insight', () => ({
   watchlistInsightApi: insightApiMock,
 }))
 
-// mock 演示开关（默认关闭，测试走真实 API 路径；mock 开关用例单独开启）
-const mockInsightsModule = vi.hoisted(() => ({
-  isInsightsMockForced: vi.fn(() => false),
-  buildMockInsights: vi.fn(),
-}))
-vi.mock('@/modules/favorites/mock-insights', () => mockInsightsModule)
-
 const stockApiMock = vi.hoisted(() => ({
   getTrendEvents: vi.fn(),
-  getFavoritesNews: vi.fn(),
 }))
 vi.mock('@/shared/api/modules/stock', () => ({ stockApi: stockApiMock }))
 
@@ -45,6 +37,15 @@ vi.mock('@/shared/components/SvgIcon.vue', () => ({
   default: { name: 'SvgIcon', props: ['name', 'size', 'color'], template: '<view class="svg-stub" />' },
 }))
 
+// InsightAlertCard 桩（避免渲染真实组件，专注验证传入 props）
+vi.mock('@/shared/components/InsightAlertCard.vue', () => ({
+  default: {
+    name: 'InsightAlertCard',
+    props: ['name', 'symbol', 'direction', 'message', 'type', 'time', 'confidence', 'compact', 'clickable'],
+    template: '<view class="insight-alert-card-stub" :data-compact="compact" :data-name="name" :data-direction="direction" />',
+  },
+}))
+
 // uni 全局
 vi.stubGlobal('uni', {
   navigateTo: vi.fn(),
@@ -57,64 +58,48 @@ describe('AlertContent.vue 首页特别提醒', () => {
     setActivePinia(createPinia())
     insightApiMock.getInsights.mockReset()
     stockApiMock.getTrendEvents.mockReset()
-    stockApiMock.getFavoritesNews.mockReset()
-    mockInsightsModule.isInsightsMockForced.mockReset()
-    mockInsightsModule.isInsightsMockForced.mockReturnValue(false)
-    mockInsightsModule.buildMockInsights.mockReset()
     vi.mocked(uni.navigateTo).mockClear()
     // 个股情报 API 默认返回空（本测试只关注异动捕手模块）
     stockApiMock.getTrendEvents.mockResolvedValue({ events: [] })
   })
 
-  it('接口成功 → 异动捕手模块渲染 ListCell 列表（固定 4 行，含占位）', async () => {
+  it('接口成功 → 异动捕手模块渲染 InsightAlertCard compact 列表', async () => {
     insightApiMock.getInsights.mockResolvedValue(testInsights)
     const wrapper = mount(AlertContent)
     await flushPromises()
-    const cells = wrapper.findAllComponents({ name: 'ListCell' })
+    const cards = wrapper.findAllComponents({ name: 'InsightAlertCard' })
     // captureRows 固定 pad 到 CAPTURE_ROW_COUNT=4 行：2 条真实 + 2 条占位
-    expect(cells.length).toBe(4)
-    // 首行标题为股票名，描述为主因归因文案
-    expect(cells[0].props('title')).toBe('贵州茅台')
-    expect(cells[0].props('description')).toBe('主因：白酒板块')
+    expect(cards.length).toBe(4)
+    // 验证传入 compact=true
+    expect(cards[0].props('compact')).toBe(true)
+    expect(cards[1].props('compact')).toBe(true)
   })
 
-  it('接口失败 → 展示空状态（不渲染列表）', async () => {
+  it('接口失败 → 展示空状态（不渲染卡片）', async () => {
     insightApiMock.getInsights.mockRejectedValue(new Error('network'))
     const wrapper = mount(AlertContent)
     await flushPromises()
-    const cells = wrapper.findAllComponents({ name: 'ListCell' })
-    expect(cells.length).toBe(0)
+    const cards = wrapper.findAllComponents({ name: 'InsightAlertCard' })
+    expect(cards.length).toBe(0)
   })
 
-  it('点击 ListCell → navigateTo 跳转 insight-detail', async () => {
+  it('点击 InsightAlertCard → navigateTo 跳转 insight-detail', async () => {
     insightApiMock.getInsights.mockResolvedValue(testInsights)
     const wrapper = mount(AlertContent)
     await flushPromises()
-    const firstCell = wrapper.findAllComponents({ name: 'ListCell' })[0]
-    await firstCell.vm.$emit('click', new Event('click'))
+    const firstCard = wrapper.findAllComponents({ name: 'InsightAlertCard' })[0]
+    await firstCard.vm.$emit('click', new Event('click'))
     expect(uni.navigateTo).toHaveBeenCalledWith({
       url: '/modules/favorites/pages/insight-detail?event_id=c1',
     })
   })
 
-  it('数据不足 4 行 → 用占位行填充（保持卡片高度稳定）', async () => {
+  it('数据不足 4 行 → 用占位卡填充（保持卡片高度稳定）', async () => {
     insightApiMock.getInsights.mockResolvedValue([testInsights[0]])
     const wrapper = mount(AlertContent)
     await flushPromises()
-    const cells = wrapper.findAllComponents({ name: 'ListCell' })
-    // 固定 4 行，不足补占位（占位行 title 为空字符串显示为全角空格）
-    expect(cells.length).toBe(4)
-  })
-
-  it('演示开关开启 → 渲染 buildMockInsights 返回的自选股 mock（不请求真实 API）', async () => {
-    mockInsightsModule.isInsightsMockForced.mockReturnValue(true)
-    mockInsightsModule.buildMockInsights.mockReturnValue(testInsights)
-    const wrapper = mount(AlertContent)
-    await flushPromises()
-    const cells = wrapper.findAllComponents({ name: 'ListCell' })
-    // mock 数据 2 条 + 占位 2 行，共 4 行
-    expect(cells.length).toBe(4)
-    expect(cells[0].props('title')).toBe('贵州茅台')
-    expect(insightApiMock.getInsights).not.toHaveBeenCalled()
+    const cards = wrapper.findAllComponents({ name: 'InsightAlertCard' })
+    // 固定 4 行，不足补占位（占位卡也用 InsightAlertCard，name 为空）
+    expect(cards.length).toBe(4)
   })
 })

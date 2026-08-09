@@ -11,13 +11,6 @@ vi.mock('@/shared/api/modules/insight', () => ({
   // 类型导出占位（Vue SFC 内 import type 不实际调用）
 }))
 
-// mock 演示开关（默认关闭，测试走真实 API 路径）
-const mockInsightsModule = vi.hoisted(() => ({
-  isInsightsMockForced: vi.fn(() => false),
-  buildMockInsights: vi.fn(),
-}))
-vi.mock('@/modules/favorites/mock-insights', () => mockInsightsModule)
-
 // mock favorites store：stocks 置空、fetchFavorites no-op，
 // 隔离 refreshQuotes / uni.showToast 等真实 store 副作用
 vi.mock('@/shared/store/modules/favorites', () => ({
