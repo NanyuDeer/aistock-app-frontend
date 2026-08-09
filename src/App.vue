@@ -6,7 +6,7 @@ import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { initH5Scale } from '@/shared/utils/h5-scale'
 
 onLaunch(() => {
-  console.log('App Launch - AI Stock')
+  console.log('App Launch - 洞见')
   // #ifdef APP-PLUS
   // App 端初始化推送
   usePushNotification()

@@ -1,6 +1,6 @@
 <template>
   <view class="page-traceability">
-    <SubPageCard title="大盘溯源">
+    <SubPageCard title="市场洞见">
       <LoadingState v-if="loading" />
 
       <Card v-else-if="error" class="error-state">

@@ -1,92 +1,65 @@
 <template>
-  <view class="insight-row">
-    <view class="insight-icon review">
-      <text class="insight-icon-text">异</text>
+  <view class="anomaly-card">
+    <view class="anomaly-label">
+      <text class="anomaly-star">★</text>
+      <text class="anomaly-label-text">大盘洞见</text>
     </view>
-    <view class="insight-body">
-      <view class="insight-top">
-        <text class="insight-source">市场异象</text>
-        <text class="sentiment-badge sentiment-mixed">今日主因</text>
-      </view>
-      <text class="insight-conclusion">{{ conclusion }}</text>
-    </view>
+    <text class="anomaly-title">今日主因</text>
+    <text class="anomaly-conclusion">{{ conclusion }}</text>
   </view>
 </template>
 
 <script setup lang="ts">
 defineProps<{
-  /** 归因结论文本（来自 brief.items[归因结论].conclusion） */
+  /** 归因结论文本（来自 review.attribution_summary，旧报告回退 brief.items[归因结论].conclusion） */
   conclusion: string
 }>()
 </script>
 
 <style lang="scss" scoped>
-/* 样式对齐早报 Agent 洞见行：
-   白底 + 圆角 20rpx + 左侧圆角图标 + 标题 + 情绪badge + 结论 */
-.insight-row {
-  display: flex;
-  gap: 24rpx;
-  align-items: flex-start;
+/* 样式对齐早报「今日头条」卡片：
+   白底圆角 + 左侧主题色竖条 + 顶部 ★ 标签 + 标题 + 结论 */
+.anomaly-card {
   background: #ffffff;
   border-radius: 20rpx;
-  padding: 24rpx 28rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid rgba(77, 124, 254, 0.20);
+  border-left: 8rpx solid $primary;
+}
+
+.anomaly-label {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
   margin-bottom: 16rpx;
-  border: 1rpx solid $line;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
 }
 
-.insight-icon {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: #e04545;
+.anomaly-star {
+  font-size: 24rpx;
+  color: $primary;
 }
 
-.insight-icon-text {
-  font-size: 28rpx;
+.anomaly-label-text {
+  font-size: 22rpx;
   font-weight: 700;
-  color: #ffffff;
+  color: $primary;
+  letter-spacing: 2rpx;
 }
 
-.insight-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.insight-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8rpx;
-}
-
-.insight-source {
-  font-size: 28rpx;
-  font-weight: 600;
+.anomaly-title {
+  font-size: 34rpx;
+  font-weight: 700;
   color: $ink;
   line-height: 1.4;
+  display: block;
+  margin-bottom: 16rpx;
 }
 
-.sentiment-badge {
-  font-size: 22rpx;
-  font-weight: 600;
-  padding: 4rpx 16rpx;
-  border-radius: 999rpx;
-}
-
-.sentiment-badge.sentiment-mixed {
-  background: rgba(148, 163, 184, 0.10);
-  color: #64748b;
-}
-
-.insight-conclusion {
-  font-size: 24rpx;
+.anomaly-conclusion {
+  font-size: 26rpx;
   color: #4b5563;
-  line-height: 1.5;
+  line-height: 1.6;
   display: block;
 }
 </style>

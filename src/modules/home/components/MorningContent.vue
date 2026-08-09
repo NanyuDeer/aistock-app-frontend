@@ -50,7 +50,7 @@
       <view class="feature-grid">
         <Card class="feature-card" clickable @click="goSectors">
           <view class="feature-header">
-            <text class="feature-title">长线风口</text>
+            <text class="feature-title">风口龙头</text>
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">排行前三板块</text>
@@ -83,7 +83,7 @@
 
         <Card class="feature-card" clickable @click="goTraceability">
           <view class="feature-header">
-            <text class="feature-title">大盘溯源</text>
+            <text class="feature-title">市场洞见</text>
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">市场异动溯源分析</text>
