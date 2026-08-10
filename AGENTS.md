@@ -69,6 +69,7 @@ src/
 │   │       ├── event.ts    # 事件传导链
 │   │       ├── news.ts     # 新闻资讯
 │   │       ├── portfolio.ts # 持仓
+│   │       ├── prediction.ts # 历史预测跟踪（B2.1）
 │   │       ├── push.ts     # 推送
 │   │       ├── stock.ts    # 股票行情
 │   │       └── valuation.ts # 估值
@@ -309,6 +310,7 @@ import Card from '@/shared/components/Card.vue'
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |
 | `news.ts` | 新闻资讯 | `/api/news/*` |
 | `portfolio.ts` | 持仓管理 | `/api/portfolio/*` |
+| `prediction.ts` | 历史预测跟踪（B2.1：列表+统计/详情） | `/api/predictions`、`/api/predictions/:id` |
 | `push.ts` | 推送 | `/api/push/*` |
 | `stock.ts` | 股票行情 | `/api/cn/stock-quote/*` |
 | `valuation.ts` | 估值分析 | `/api/valuation/*` |
