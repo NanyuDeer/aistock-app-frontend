@@ -347,6 +347,7 @@ import Card from '@/shared/components/Card.vue'
 | `RelationGraph.vue` | [组件库] | 关系图谱（径向布局 + 上下游/关联节点） |
 | `TheNavbar.vue` | [组件库] | 导航栏（对应组件库 `NavBar.vue`） |
 | `TheFooter.vue` | [组件库] | 页脚（对应组件库 `Footer.vue`） |
+| `KLineChart.vue` | [组件库] 无对应，从 analytics 提升 | 通用 K 线渲染（H5/APP-PLUS renderjs+klinecharts，MP-WEIXIN uCharts 画布），Props `{ title: string; data: TrendKLineData }` |
 
 **已引入但尚未在生产页面使用的组件**（已存在于 `shared/components/` 并通过 barrel export 导出，需要时直接 `import { ... } from '@/shared/components'`）：
 `Switch` `Rate` `Progress` `Skeleton` `Toast` `ActionSheet` `Modal` `Steps` `StatCard` `ListCell` `QuoteHeader` `Gauge` `Sparkline` `DataTable` `IndexCard` `Timeline` `ChatBubble` `StreamingText` `AudioPlayer` `InsightListCard` `StockItem`
