@@ -2,6 +2,185 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-10 — B2.1 历史预测跟踪页面（列表/详情/入口）
+
+**开发者**: 37588
+
+### 新增
+- `src/shared/api/modules/prediction.ts`：`predictionApi.list/detail` + `PredictionRecord/PredictionStats/PredictionListResponse` 等类型
+- `src/modules/analytics/utils/predictionHistory.ts` + `predictionHistory.spec.ts`：状态纯函数（单档/整体/命中率口径，6 测试）
+- `src/modules/analytics/pages/prediction-history.vue`：预测验证列表页（命中率统计栏 + 全部/进行中/已结束筛选 + 预测卡片含 prediction_status 与三档进度）
+- `src/modules/analytics/pages/prediction-detail.vue`：预测详情页（复用 MarketTracePrediction + 新增验证结果区）
+- `src/modules/analytics/components/PredictionVerification.vue`：逐档位验证结果组件
+
+### 改进
+- `src/modules/analytics/pages/traceability.vue`：右上角「预测验证」入口（#header-right 插槽）
+- `src/pages.json`：注册 prediction-history / prediction-detail 路由
+- `src/modules/analytics/utils/marketTraceReview.ts`：导出 `toPredictionPresentation`（详情页复用）
+
+### 测试
+- analytics node:test 38/38；tsc/vue-tsc 0 错误；build:h5 成功
+
+---
+
+
+## [master] 2026-08-08 — 首页异动捕手模块恢复列表展示（日期并入描述行）
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/favorites/components/AlertContent.vue`：异动捕手列表由 `InsightAlertCard compact` 卡片换回 `ListCell` 列表（与个股情报模块同款）：标题=股票名、描述=主因归因文案、prefix=涨跌 Tag（涨红/跌绿）
+- 日期（MM-DD）并入描述行（"主因：xxx · 08-07"），移除右侧独立 value 与 `.capture-time` 样式；`.capture-list` 与 `.intel-list` 样式合并统一（紧凑行距 + 单行截断 + 空行占位等高）
+
+### 测试
+- `src/modules/favorites/components/AlertContent.spec.ts`：断言由 InsightAlertCard 改为 ListCell（标题/描述/涨跌 Tag type/点击跳转），4 用例通过
+
+---
+
+## [changer] 2026-08-10 — 市场洞见页新增影响持续性预判卡片
+
+**开发者**: 37588
+
+### 新增
+- `src/modules/analytics/components/MarketTracePrediction.vue`：影响持续性预判卡片（预测状态 → 三档预判气泡标签 → 演化路径时间轴 → 风险因素），样式对齐同页 MarketTracePredictionValidation.vue
+- `src/shared/api/modules/agent.ts`：`MarketTracePredictionHorizon/Risk/Step/Prediction` 类型 + `MarketTraceTrace.prediction`
+- `src/modules/analytics/utils/marketTraceReview.ts`：`toPredictionPresentation` 防御性提取（prediction/evolutionSteps/horizons 校验，非法返回 null）
+
+### 改进
+- `src/modules/analytics/pages/traceability.vue`：预判对照卡片后插入预测卡片（prediction 为 null 时不渲染，兼容旧报告）
+- 演化路径时间轴优先后端结构化 `evolution_steps`（含档位标签），旧记录回退 narrative 按标点拆分
+- 三档预判气泡化：方向（看多红/看空绿/中性蓝）+ 置信度（置信高/中/低）胶囊标签，对齐个股详情关键词气泡
+
+### 测试
+- `marketTraceReview.spec.ts` 新增 5 用例（prediction 提取三态 + evolution_steps 映射 + 旧记录兼容），15 通过
+
+### 文档
+- `src/modules/analytics/AGENTS.md`：补 traceability 页面与 MarketTracePrediction 组件记录
+
+---
+
+## [changer] 2026-08-09 — 清理合并带入的 mock 环境开关残留
+
+**开发者**: 37588
+
+### 修复
+- `env/.env.production`：移除 `VITE_USE_INSIGHTS_MOCK=true`（合入 master 时被重新带回，与「mock 数据移除」策略不符）
+
+---
+## [master] 2026-08-07 — 晚报市场异象卡片改版为头条风格并移至音频播报下方
+
+**开发者**: Aria
+
+### 改进
+- `pages-sub-app/briefing/components/EveningAnomalyCard.vue`：样式由洞见行改为参考早报「今日头条」卡片——白底圆角 + 左侧主题色竖条 + 顶部 ★ 标签 + 标题 + 结论；label 为「市场异象」、标题为「今日主因」
+- `pages-sub-app/briefing/index.vue`：晚报市场异象卡片从 Agent 洞见之后移到音频播报正下方（与晨报头条卡片位置对齐）；大盘行情/板块行情卡片保持在 Agent 洞见之后
+
+---
+## [changer] 2026-08-07 — 异动捕手卡片视觉重构 + mock 数据移除
+
+**开发者**: 37588
+
+### 新增
+- 共享组件 `src/shared/components/InsightAlertCard.vue`：异动提醒卡片（品牌蓝渐变头部 + 左侧涨跌色条 + 置信度 Tag，含 compact 模式供首页预览卡使用）
+- 模块组件 `src/modules/favorites/components/InsightDetailLayout.vue`：洞察详情布局（头部卡 + 主因/次因/详情/来源多段卡片，条件渲染）
+- 5 个 vitest 测试：`InsightAlertCard.spec.ts`、`InsightDetailLayout.spec.ts`、`monitor.spec.ts`、`insight-detail.spec.ts`、`AlertContent.spec.ts`
+
+### 重构
+- `monitor.vue` 异动列表：`Card` → `InsightAlertCard`，头部 Tag 红涨绿跌实色，左侧色条加宽
+- `AlertContent.vue` 异动捕手模块：`ListCell` → `InsightAlertCard compact`（4 行占位稳定）
+- `insight-detail.vue`：改用 `SubPageCard2` 容器 + `InsightDetailLayout`，移除重复 subtitle
+- 头部渐变：从左到右 `$primary` → `$bg-soft`（蓝 → 浅灰）
+
+### 移除
+- `src/modules/favorites/mock-data.ts`：异动捕手 mock 数据不再进仓库（仅本地开发用）
+- 三个页面 mock 回退逻辑：改走真实 API，接口失败/空数据展示空状态
+- `VITE_USE_INSIGHTS_MOCK` 环境开关（env 三文件 + `src/env.d.ts`）
+- `AGENTS.md` mock-data 说明
+
+### 验证
+- vitest：26 个测试全绿（favorites 模块）
+- `npx tsc --noEmit` 通过
+- `pnpm build:h5` 构建成功
+
+## [master] 2026-08-07 — 晚报页归因结论：优先展示 review 综合主因一句话摘要
+
+**开发者**: Aria
+
+### 改进
+- `shared/api/modules/agent.ts`：`MarketTraceTrace` 新增 `attribution_summary?: string | null`（综合主因的一句话结论，旧报告可能缺失）
+- `shared/utils/eveningBriefCards.ts`：新增 `extractAttributionSummary()`（读 `content.market_trace.trace.attribution_summary`，空值返回空串）；`buildEveningCardViewModel` 结论文本优先取 review 短摘要，缺失时回退 brief 归因结论（主因链拼接长文本）——解决晚报「归因结论」条目超长问题
+
+### 测试
+- `shared/utils/eveningBriefCards.spec.ts`：makeReview 的 trace 增加 attribution_summary 字段（默认 null），新增优先展示/回退/空值 4 个用例（23 passed）
+
+---
+## [master] 2026-08-07 — 晚报页去重：洞见列表仅保留收盘复盘，行情归卡片展示
+
+**开发者**: Aria
+
+### 修复
+- `pages-sub-app/briefing/index.vue`：晚报（type=review）场景下 Agent 洞见列表仅保留「收盘复盘」摘要，不再重复展示「归因结论」与「市场快照」
+  - 背景：此前三条文本全部进入洞见列表，同时 EveningAnomalyCard / EveningMarketIndexCard / EveningSectorsCard 又分别展示归因结论、大盘、板块，导致「归因结论」与「板块行情」内容重复出现
+  - 现在的展示分工：洞见列表 = 收盘复盘摘要；卡片区 = 市场异象（归因结论）+ 大盘行情 + 板块行情，逻辑顺序为现象 → 行情数据 → 归因原因
+
+## [changer] 2026-08-07 — 晚报界面卡片重设计（Agent 洞见风格 + 异象排序）
+
+**开发者**: Aria
+
+### 新增
+- 晚报卡片 ViewModel 组装工具（`shared/utils/eveningBriefCards.ts`）：`detectMarketAnomaly` 异象判定（文本+结构化双重判定）、`extractAttributionConclusion` 归因结论提取、`extractBreadth` 涨跌家数提取
+- 晚报专属卡片组件（`pages-sub-app/briefing/components/`）：`EveningAnomalyCard`（市场异象结论）、`EveningMarketIndexCard`（大盘行情：指数+涨跌家数）、`EveningSectorsCard`（板块行情：领涨/领跌）
+
+### 改进
+- 晚报卡片样式统一为早报 Agent 洞见行风格（白底圆角 + 左侧圆角图标 + mini-tag 标签）
+- 卡片排版：Agent 洞见 → 市场异象（有才显示）→ 大盘行情 → 板块行情；晚报场景下即使 brief 无数据也保留「Agent 洞见」分区标题，保持与早报一致的页面结构
+- `marketTraceReview.ts`：`indexPerfFromUnknown` 支持后端对象（map）结构的 indexes，并兼容 `change_pct`/`pct_change` 字段名
+
+### 修复
+- 大盘行情只显示涨跌家数、无具体指数涨跌：根因是后端 indexes 为对象（map）而前端期望数组，修复后指数正常展示
+- 音频入口文案写死「AI早报音频」：新增 `audioLabelText` 根据播报类型动态显示早报/晚报音频
+
+### 验证
+- `npx tsc --noEmit` 通过
+
+## [master] 2026-08-06 — agent-report wind_leader 分卡片展示 + 板块卡片 markdown 渲染修复
+
+**开发者**: Aria
+
+### 修复
+- `agent-report.vue` wind_leader 板块卡片：body 原用 `<text>` 直接输出导致 `- **上榜次数**：...` 等 markdown 语法原样显示 → 改用 `mp-html` + `markdownToHtml`（新增 `.wind-sector-body-html` 样式）
+
+### 改进
+- 按后端 prompt 章节结构分卡片展示：风口结论（summary）→ 风口概览（`## 风口概览`）→ 长线/短线研判两档切换 + 板块卡片（`###` 子节）→ 龙头股推荐（`## 龙头股推荐` + `display_report.stocks` 代码标签）→ 风险提示（`## 风险提示`）→ 关注建议（`## 关注建议`）
+- 移除原"风口分析（长短线分类）"全文卡片，改为各章节解析均失败时兜底展示原文（避免内容丢失）；新增 `windRiskHtml` / `windAdviceHtml` 章节解析
+
+---
+
+## [master] 2026-08-06 — leaders 泡泡图：半径上限 50px + 双色阶（长线蓝系/短线橙红系）
+
+**开发者**: Aria
+
+### 改进
+- `windLeaderBubble.calcBubbleRadius`：半径上限 65→50px、下限 22→20px（长线满格 120 天 / 短线满格 10 天，`20 + 天数/满格×30`）
+- `windLeaderBubble` 新增双色阶 + `calcBubbleColor(kind, value)`：
+  - 长线蓝系：0.3 浅蓝 `#dbeafe` → 0.5 普通蓝 `#3b82f6` → 0.9 近黑蓝 `#121a44`（0.6 深蓝 `#1552d0`、0.7 藏青 `#1e3a8a`，相邻档亮度差 12~15%）
+  - 短线橙红系：0.3 浅橙 `#fed7aa` → 0.5 普通橙 `#f97316` → 0.8 转红 `#7f1d1d` → 0.9 暗红 `#5b1414`
+  - 0.1/0.2 与 0.3 同色（低于 cycle 门槛的板块会被筛选掉，收敛最浅色）；值在相邻档间线性插值
+- 移除 `calcBubbleOpacity` 透明度逻辑；`leaders.vue bubbleItemStyle` 改用 `calcBubbleColor` 填充色，去掉元素透明度双重叠加；提示文案更新"长线蓝系/短线橙红系"
+
+---
+
+## [master] 2026-08-06 — leaders 泡泡图：大小按长短线各自量级归一化 + 颜色对比度加强
+
+**开发者**: Aria
+
+### 改进
+- `windLeaderBubble.calcBubbleRadius`：长线以 120 天为满格、短线以 10 天为满格，半径 22→65px 线性、超过封顶——修复原 `clamp(26+days×coef,22,65)` 长线 75+ 天全封顶、长短线系数不匹配各自量级的问题（长线 45d→38px / 75d→49px 可区分）
+- `windLeaderBubble.calcBubbleOpacity`：`0.4+0.6×值` → `0.3+0.7×值`，低强度更浅、高强度更深（原 conf/heat 多集中在 0.3~0.6，映射后几乎全是浅蓝无法区分）
+- `leaders.vue bubbleItemStyle`：ratio 反推同步改为 `(opacity-0.3)/0.7`
+
+---
+
 ## [master] 2026-08-06 — 风口龙头接口 limit 20→40（配合后端双轨选板）
 
 **开发者**: Aria

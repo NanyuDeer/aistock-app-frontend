@@ -4,7 +4,7 @@
       <text class="da-title">{{ card.title }}</text>
       <text v-if="workerLabel" class="da-tag">{{ workerLabel }}</text>
     </view>
-    <text v-if="summary" class="da-summary">{{ summary }}</text>
+    <mp-html v-if="summaryHtml" :content="summaryHtml" class="da-summary" />
     <view v-if="symbols.length > 0" class="da-symbols">
       <text v-for="s in symbols" :key="s" class="da-symbol">{{ s }}</text>
     </view>
@@ -18,6 +18,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import dayjs from 'dayjs'
+import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
+import { markdownToHtml } from '@/shared/utils/markdown'
 import type { ChatCard } from '@/shared/api/modules/agent'
 import type { DeepReportRef } from '@/shared/api/modules/agent'
 
@@ -37,6 +39,8 @@ const workerLabel = computed(() => {
   return w ? WORKER_LABELS[w] ?? w : ''
 })
 const summary = computed(() => data.value.summary ?? '')
+/** 摘要为 markdown（标题/表格/加粗），经 markdownToHtml 转 HTML 后用 mp-html 渲染 */
+const summaryHtml = computed(() => (summary.value ? markdownToHtml(summary.value) : ''))
 const symbols = computed(() => data.value.symbols ?? [])
 const tagCodes = computed(() => data.value.tag_codes ?? [])
 const createdText = computed(() => {
@@ -74,12 +78,30 @@ const hasData = computed(() => !!workerLabel.value || !!summary.value || symbols
   padding: 2rpx 10rpx;
 }
 .da-summary {
-  display: block;
   padding: 14rpx 20rpx 0;
   font-size: 24rpx;
   color: $ink-soft;
   line-height: 1.6;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
+/* ===== markdown 渲染样式（mp-html 内容） ===== */
+:deep(.da-summary strong),
+:deep(.da-summary b) {
+  display: inline;
+  font-weight: 700;
+}
+:deep(.da-summary .md-h2) { font-size: 30rpx; font-weight: 700; color: $ink; margin: 12rpx 0 6rpx; }
+:deep(.da-summary .md-h3) { font-size: 28rpx; font-weight: 600; color: $ink; margin: 10rpx 0 6rpx; }
+:deep(.da-summary .md-h4) { font-size: 26rpx; font-weight: 600; color: $ink; margin: 8rpx 0 4rpx; }
+:deep(.da-summary .md-hr) { border: none; border-top: 1rpx solid $line; margin: 10rpx 0; }
+:deep(.da-summary .md-ul) { padding-left: 20rpx; margin: 6rpx 0; }
+:deep(.da-summary .md-ol) { padding-left: 20rpx; margin: 6rpx 0; }
+:deep(.da-summary .md-ul-li) { font-size: 24rpx; color: $ink-soft; line-height: 1.7; }
+:deep(.da-summary .md-ol-li) { font-size: 24rpx; color: $ink-soft; line-height: 1.7; }
+:deep(.da-summary .md-table) { width: 100%; border-collapse: collapse; margin: 8rpx 0; }
+:deep(.da-summary .md-table th) { background: $bg-soft; font-size: 22rpx; font-weight: 600; color: $ink; padding: 6rpx 8rpx; border: 1rpx solid $line; }
+:deep(.da-summary .md-table td) { font-size: 22rpx; color: $ink-soft; padding: 6rpx 8rpx; border: 1rpx solid $line; }
 .da-symbols {
   display: flex;
   flex-wrap: wrap;

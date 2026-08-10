@@ -11,9 +11,21 @@
       :class="['fp-player', { 'fp-player--hidden': !store.expanded }]"
       @play="onPlayerPlay"
       @pause="onPlayerPause"
-      @ended="onPlayerPause"
+      @ended="onPlayerEnded"
     >
       <template #actions>
+        <view class="fp-queue-badge" v-if="store.queue.length || store.pendingExternal">
+          <text class="fp-queue-badge-text">队列 {{ store.queue.length + (store.pendingExternal ? 1 : 0) }}</text>
+        </view>
+        <view class="fp-switch-row">
+          <text class="fp-switch-label">连续播放</text>
+          <Switch
+            :checked="store.continuousPlay"
+            :color="SWITCH_COLOR"
+            style="transform: scale(0.7)"
+            @change="onContinuousToggle"
+          />
+        </view>
         <view class="fp-icon-btn" @tap="store.collapse">
           <SvgIcon name="arrow-right-s-line" size="26rpx" color="#0b5fff" />
         </view>
@@ -68,6 +80,9 @@ import { Button, LoadingState, AudioPlayer } from './index'
 
 const store = usePodcastStore()
 
+/** Switch 开启色（模板环境无 SCSS 变量，按本组件 SvgIcon color="#0b5fff" 惯例取品牌色） */
+const SWITCH_COLOR = '#0b5fff'
+
 /** AudioPlayer 开始播放：同步 store 播放状态（悬浮球旋转）+ 消费自动播放标记 */
 function onPlayerPlay() {
   store.setPlaying(true)
@@ -77,6 +92,18 @@ function onPlayerPlay() {
 /** AudioPlayer 暂停/结束：同步 store 播放状态 */
 function onPlayerPause() {
   store.setPlaying(false)
+}
+
+/** AudioPlayer 结束：消费队列下一项（若队列为空则复位播放态） */
+function onPlayerEnded() {
+  store.onAudioEnded()
+}
+
+/** 连续播放开关切换：仅当状态变化时同步 store（避免 Switch 双向回写循环） */
+function onContinuousToggle(e: { detail: { value: boolean } }) {
+  if (store.continuousPlay !== e.detail.value) {
+    store.toggleContinuous()
+  }
 }
 
 /** 悬浮球尺寸（rpx）与展开面板宽度（rpx） */
@@ -322,5 +349,28 @@ onUnmounted(() => {
   flex: 1;
   font-size: 22rpx;
   color: $up;
+}
+
+/* 播放条 actions 区：队列徽标 + 连续播放开关 */
+.fp-queue-badge {
+  padding: 0 10rpx;
+  height: 32rpx;
+  display: flex;
+  align-items: center;
+  background: rgba(11, 95, 255, 0.1);
+  border-radius: 16rpx;
+}
+.fp-queue-badge-text {
+  font-size: 20rpx;
+  color: $primary;
+}
+.fp-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+.fp-switch-label {
+  font-size: 20rpx;
+  color: $ink;
 }
 </style>

@@ -22,8 +22,16 @@
               <!-- P11 T4：结构化卡片（DONE.cards；HTTP 降级/旧协议缺失时不渲染，fallback markdown） -->
               <CardRenderer v-if="msg.cards && msg.cards.length > 0" :cards="msg.cards" />
 
+              <!-- light 分支结论打字机：synth_answer 结构化输出仅 DONE 一次性下发，前端模拟逐字
+                   （deep 分支真流式内容走上方 streaming-message 渲染，不经过此分支） -->
+              <mp-html
+                v-if="isTypingFor(msg)"
+                :content="markdownToHtml(typedText + ' ▊')"
+                class="bubble-html streaming-blink"
+              />
+
               <!-- 改进 14：分节卡片化渲染（有分节时 SectionCard 列表，无分节时回退 mp-html） -->
-              <template v-if="msg.content">
+              <template v-else-if="msg.content">
                 <template v-for="(sec, si) in getSections(msg.content) ?? []" :key="si">
                   <mp-html v-if="!sec.title" :content="markdownToHtml(sec.body)" class="bubble-html" />
                   <SectionCard v-else :variant="sec.variant" :title="sec.title" :body="sec.body" />
@@ -115,8 +123,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onUnmounted } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { ref, nextTick, watch, onUnmounted } from 'vue'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { useChatStream } from '@/shared/utils/useChatStream'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
@@ -129,7 +137,7 @@ import SectionCard from './cards/SectionCard.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
-import { agentApi } from '@/shared/api/modules/agent'
+import { agentApi, type ChatMessage } from '@/shared/api/modules/agent'
 
 const chatStream = useChatStream()
 const chatStore = useChatStore()
@@ -171,6 +179,84 @@ const streamingReasoning = chatStream.streamingReasoning
 const inputText = ref('')
 const scrollTop = ref(0)
 
+// 每次进入页面（含从会话列表返回、切会话）默认停留在对话最下方
+onShow(() => scrollToBottom())
+
+// 对话期间始终跟随最下方：流式开始时立即滚动，之后定时跟随。
+// 根因：mp-html 渲染异步（先清空再解析），仅靠 streamingText watch + nextTick 设置 scroll-top
+// 时内容尚未渲染完成 → 停在上方；只有 done 重建消息列表时才真正滚到底。
+// 用 setInterval 兜底：无论内容何时渲染完成，150ms 内必被钉回底部，实现逐字跟随观感。
+let followTimer: ReturnType<typeof setInterval> | null = null
+
+// ===== 结论打字机（light 分支结论非流式，DONE 后前端模拟逐字输出） =====
+// 后端 synth_answer 是结构化输出（SynthOutput JSON），最终回复仅 DONE 一次性下发；
+// deep 分支（escalate→worker）有真流式 text 事件。用 hadStreamText 区分：
+// 本轮流式期间出现过真流式文本 → 内容已逐字显示，不再启动打字机。
+let hadStreamText = false
+watch(streamingText, (t) => {
+  if (t) hadStreamText = true
+})
+
+const typingMsgKey = ref<number | null>(null)
+const typedText = ref('')
+let typeTimer: ReturnType<typeof setInterval> | null = null
+
+function stopTypewriter() {
+  if (typeTimer) {
+    clearInterval(typeTimer)
+    typeTimer = null
+  }
+}
+
+/** 当前消息是否正在打字机播放（用 timestamp 定位消息，v-for 的 idx 会随列表增删漂移） */
+function isTypingFor(msg: ChatMessage) {
+  return typingMsgKey.value !== null && typingMsgKey.value === msg.timestamp
+}
+
+/** DONE 后对本轮回复启动打字机：仅 light 分支（无真流式文本）触发 */
+function startTypewriterIfNeeded() {
+  if (hadStreamText) return
+  const msgs = displayMessages.value
+  const last = msgs[msgs.length - 1]
+  if (!last || last.role !== 'assistant') return
+  const content = last.content
+  // 错误/空回复直接静态展示，不打字机
+  if (!content || content.startsWith('抱歉，出错了')) return
+  stopTypewriter()
+  typingMsgKey.value = last.timestamp
+  typedText.value = ''
+  let i = 0
+  typeTimer = setInterval(() => {
+    i += 2
+    typedText.value = content.slice(0, i)
+    // 打字机期间内容逐字增长，保持钉在对话最下方
+    scrollToBottom()
+    if (i >= content.length) {
+      stopTypewriter()
+      typingMsgKey.value = null
+    }
+  }, 30)
+}
+
+watch(isStreaming, (v) => {
+  scrollToBottom()
+  if (v) {
+    // 新一轮开始：重置"本轮是否出现过真流式文本"，并停掉上一条未播完的打字机
+    hadStreamText = false
+    stopTypewriter()
+    typingMsgKey.value = null
+    if (followTimer) clearInterval(followTimer)
+    followTimer = setInterval(scrollToBottom, 150)
+  } else {
+    if (followTimer) {
+      clearInterval(followTimer)
+      followTimer = null
+    }
+    // 本轮结束：无真流式文本时用打字机逐字呈现结论
+    startTypewriterIfNeeded()
+  }
+})
+
 function handleSend() {
   const content = inputText.value.trim()
   if (!content || isStreaming.value) return
@@ -187,9 +273,13 @@ function quickAsk(text: string) {
   scrollToBottom()
 }
 
+// 交替两个超大值：流式 token 逐字增长时内容底部持续下移，scroll-top 值不变 Vue 不会重新触发滚动
+// （仅把 scrollTop 钉在 99999 只能滚一次）；99999/99998 均超出内容高度被钳制到底部，无视觉跳动
+let scrollFlip = false
 function scrollToBottom() {
   nextTick(() => {
-    scrollTop.value = 99999
+    scrollFlip = !scrollFlip
+    scrollTop.value = scrollFlip ? 99999 : 99998
   })
 }
 
@@ -223,6 +313,11 @@ function rerunDeep(idx: number) {
 }
 
 onUnmounted(() => {
+  if (followTimer) {
+    clearInterval(followTimer)
+    followTimer = null
+  }
+  stopTypewriter()
   chatStream.disconnect()
 })
 </script>

@@ -23,9 +23,16 @@
               <text class="stats-name">{{ sector.name }}</text>
               <Tag v-if="persistenceTag" :type="persistenceTagType" size="sm">{{ persistenceTag }}</Tag>
             </view>
-            <Badge v-if="sector.frequency" size="sm">上榜 {{ sector.frequency }} 次</Badge>
+            <Badge v-if="sector.frequency" size="sm">近120日上榜 {{ sector.frequency }} 次</Badge>
           </view>
           <StatGrid :items="sectorStatItems" :columns="4" />
+        </Card>
+
+        <!-- 板块K线（近120日，同花顺板块指数日线）；加载失败(数据为null)时整卡隐藏 -->
+        <Card v-if="sector.code && (klineLoading || boardKline)" class="kline-card">
+          <text class="section-title">板块K线 · 近120日</text>
+          <LoadingState v-if="klineLoading" size="sm" text="正在加载K线数据..." />
+          <KLineChart v-else-if="boardKline" :title="sector.name" :data="boardKline" />
         </Card>
 
         <!-- 涨跌家数 -->
@@ -125,7 +132,10 @@
               <text :class="['td-pnl', (stock.change_pct ?? 0) > 0 ? 'pnl-up' : (stock.change_pct ?? 0) < 0 ? 'pnl-down' : 'pnl-flat']">
                 {{ stock.change_pct != null ? ((stock.change_pct ?? 0) >= 0 ? '+' : '') + formatPct(stock.change_pct) : '--' }}
               </text>
-              <text class="td-reason">{{ stock.reason || '' }}</text>
+              <!-- 理由列整列可点击（view 块级占满单元格，含空理由/空白区域），点击弹完整理由弹窗 -->
+              <view class="td-reason" @click.stop="openStockModal(stock)">
+                <text class="td-reason-text">{{ stock.reason || '--' }}</text>
+              </view>
             </view>
           </view>
         </Card>
@@ -158,7 +168,10 @@
               <text :class="['td-pnl', (stock.change_pct ?? 0) > 0 ? 'pnl-up' : (stock.change_pct ?? 0) < 0 ? 'pnl-down' : 'pnl-flat']">
                 {{ stock.change_pct != null ? ((stock.change_pct ?? 0) >= 0 ? '+' : '') + formatPct(stock.change_pct) : '--' }}
               </text>
-              <text class="td-reason">{{ stock.reason || '' }}</text>
+              <!-- 理由列整列可点击（view 块级占满单元格，含空理由/空白区域），点击弹完整理由弹窗 -->
+              <view class="td-reason" @click.stop="openStockModal(stock)">
+                <text class="td-reason-text">{{ stock.reason || '--' }}</text>
+              </view>
             </view>
           </view>
         </Card>
@@ -191,11 +204,51 @@
               <text :class="['td-pnl', (stock.change_pct ?? 0) > 0 ? 'pnl-up' : (stock.change_pct ?? 0) < 0 ? 'pnl-down' : 'pnl-flat']">
                 {{ stock.change_pct != null ? ((stock.change_pct ?? 0) >= 0 ? '+' : '') + formatPct(stock.change_pct) : '--' }}
               </text>
-              <text class="td-reason">{{ stock.reason || '' }}</text>
+              <!-- 理由列整列可点击（view 块级占满单元格，含空理由/空白区域），点击弹完整理由弹窗 -->
+              <view class="td-reason" @click.stop="openStockModal(stock)">
+                <text class="td-reason-text">{{ stock.reason || '--' }}</text>
+              </view>
             </view>
           </view>
         </Card>
       </template>
+
+      <!-- 理由详情弹窗：点击表格"理由"列（单行截断）查看完整理由 -->
+      <Modal v-model:visible="modalVisible" :title="modalStock?.name || '个股详情'" width="640rpx">
+        <view v-if="modalStock" class="stock-detail-modal">
+          <view class="modal-row">
+            <text class="modal-label">名称</text>
+            <view class="modal-value">
+              <text class="modal-stock-name">{{ modalStock.name }}</text>
+              <text v-if="modalStock.code" class="modal-code">{{ modalStock.code }}</text>
+            </view>
+          </view>
+          <view class="modal-row">
+            <text class="modal-label">行业</text>
+            <view class="modal-value">
+              <Tag v-if="modalStock.industry" :type="modalStock.in_concept ? 'up' : 'neutral'" size="sm">{{ modalStock.industry }}</Tag>
+              <text v-else class="modal-placeholder">--</text>
+            </view>
+          </view>
+          <view class="modal-row">
+            <text class="modal-label">价格</text>
+            <view class="modal-value">
+              <text v-if="modalStock.price != null" class="modal-price">{{ toFiniteNumber(modalStock.price)?.toFixed(2) }}</text>
+              <text v-else class="modal-placeholder">--</text>
+              <text
+                v-if="modalStock.change_pct != null"
+                :class="['modal-change', (modalStock.change_pct ?? 0) >= 0 ? 'up' : 'down']"
+              >
+                {{ (modalStock.change_pct ?? 0) >= 0 ? '+' : '' }}{{ formatPct(modalStock.change_pct) }}
+              </text>
+            </view>
+          </view>
+          <view class="modal-row modal-reason-row">
+            <text class="modal-label">理由</text>
+            <text class="modal-reason">{{ modalStock.reason || '--' }}</text>
+          </view>
+        </view>
+      </Modal>
     </view>
   </SubPageCard>
 </template>
@@ -205,14 +258,19 @@ import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderSector, WindLeaderAiAnalysis, WindLeaderFlowData, WindLeaderStock } from '@/shared/api/modules/stock'
+import type { TrendKLineData } from '@/shared/api/modules/trend-score'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
-import { LoadingState, EmptyState, Tag, Badge, Button, Card, StatGrid } from '@/shared/components'
+import { LoadingState, EmptyState, Tag, Badge, Button, Card, StatGrid, Modal, KLineChart } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
 
 const loading = ref(false)
 const errorMessage = ref('')
 const sector = ref<WindLeaderSector | null>(null)
 const sectorName = ref('')
+
+/** 板块 K 线（近120日） */
+const boardKline = ref<TrendKLineData | null>(null)
+const klineLoading = ref(false)
 
 function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
@@ -509,6 +567,15 @@ function goStockDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
 }
 
+// ===== 理由详情弹窗：理由列单行截断，点击查看完整信息（名称/行业/价格/理由） =====
+const modalVisible = ref(false)
+const modalStock = ref<WindLeaderStock | null>(null)
+
+function openStockModal(stock: WindLeaderStock) {
+  modalStock.value = stock
+  modalVisible.value = true
+}
+
 async function loadData() {
   if (!sectorName.value) {
     errorMessage.value = '缺少板块名称参数'
@@ -524,6 +591,15 @@ async function loadData() {
       || sectors.find(s => s.name?.includes(sectorName.value) || sectorName.value.includes(s.name || ''))
       || null
     sector.value = found
+    // 板块 K 线（按需拉取，失败返回 null → 卡片隐藏）
+    boardKline.value = null
+    if (found?.code) {
+      klineLoading.value = true
+      void stockApi.getBoardKline(found.code, 120).then((data) => {
+        boardKline.value = data
+        klineLoading.value = false
+      })
+    }
     if (!found) {
       errorMessage.value = '未找到该板块数据'
     }
@@ -549,6 +625,11 @@ onLoad((options) => {
 
 /* ===== 统计卡片（Card 提供 bg/border/shadow，仅保留间距） ===== */
 .stats-card {
+  margin-bottom: 20rpx;
+}
+
+/* ===== 板块K线卡片（Card 提供 bg/border/shadow，仅保留间距） ===== */
+.kline-card {
   margin-bottom: 20rpx;
 }
 
@@ -856,11 +937,108 @@ onLoad((options) => {
   &.pnl-flat { color: #9ca3af; }
 }
 
+/* 理由列：整列可点击（view 块级占满单元格，含空理由/空白区域），点击弹出完整理由弹窗 */
 .td-reason {
+  min-width: 0;
   color: $ink-soft;
   font-size: 20rpx;
+  display: flex;
+  align-items: center;
+  min-height: 32rpx;
+  transition: background $t-fast;
+
+  &:active {
+    background: $bg-soft;
+  }
+}
+
+.td-reason-text {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ===== 理由详情弹窗 ===== */
+.stock-detail-modal {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-row {
+  display: flex;
+  align-items: flex-start;
+  padding: 16rpx 0;
+  border-bottom: 2rpx solid $line-soft;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.modal-label {
+  flex-shrink: 0;
+  width: 96rpx;
+  font-size: $font-size-sm;
+  color: $ink-mute;
+  line-height: 1.5;
+}
+
+.modal-value {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.modal-stock-name {
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: $ink;
+}
+
+.modal-code {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+  background: $bg-soft;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+}
+
+.modal-price {
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: $ink;
+  font-family: $font-mono;
+}
+
+.modal-change {
+  font-size: $font-size-xs;
+  font-weight: 600;
+  font-family: $font-mono;
+
+  &.up { color: #dc2626; }
+  &.down { color: #16a34a; }
+}
+
+.modal-placeholder {
+  font-size: $font-size-sm;
+  color: $ink-mute;
+}
+
+/* 理由为重点展示：完整换行显示 */
+.modal-reason-row {
+  align-items: flex-start;
+}
+
+.modal-reason {
+  flex: 1;
+  font-size: $font-size-sm;
+  color: $ink;
+  line-height: 1.6;
+  word-break: break-all;
 }
 </style>

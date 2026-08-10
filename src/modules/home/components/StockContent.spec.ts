@@ -3,13 +3,15 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 // ===== mock 依赖 =====
-// stockApi：大盘指数接口 + 首页其它卡片接口（组件 onMounted 会全部触发）
+// stockApi：首页搜索联想接口 + 其它卡片接口（组件 onMounted 会全部触发）
 const stockApiMock = vi.hoisted(() => ({
-  getCnIndexQuotes: vi.fn(async () => [
-    { index: '000001', name: '上证指数', price: 3832.26, changePercent: 0.72, changeAmount: 27 },
-    { index: '399001', name: '深证成指', price: 12000, changePercent: -0.5, changeAmount: -60 },
-    { index: '399006', name: '创业板指', price: 2600, changePercent: 1.1, changeAmount: 28 },
-  ]),
+  getStockList: vi.fn(async () => ({
+    list: [{ symbol: '600519', name: '贵州茅台', market: 'SH', industry: '白酒' }],
+    total: 1,
+    page: 1,
+    pageSize: 20,
+    totalPages: 1,
+  })),
   getHotBurstHistory: vi.fn(async () => []),
   getProfitForecastList: vi.fn(async () => ({})),
 }))
@@ -24,28 +26,26 @@ vi.mock('@/shared/api/modules/trend-score', () => ({
   trendScoreApi: trendScoreApiMock,
 }))
 
-vi.mock('@/shared/utils/tradingTime', () => ({
-  getMarketStatus: () => '交易中',
-}))
-
-// InsightListCard 桩（来自 shared barrel；仅验证大盘概览接线，无需真实渲染）
+// InsightListCard 桩（来自 shared barrel；避免真实渲染）
 vi.mock('@/shared/components', () => ({
   InsightListCard: {
     name: 'InsightListCard',
     props: ['title', 'desc', 'iconName', 'items', 'status', 'statusText'],
     template: '<div class="insight-stub"><slot /></div>',
   },
+  LoadingState: {
+    name: 'LoadingState',
+    props: ['text', 'size', 'layout'],
+    template: '<div class="loading-stub" />',
+  },
 }))
 
-// MarketOverview 桩：记录接收到的 indices/status props，验证 StockContent 接线
-vi.mock('@/modules/market/components/MarketOverview.vue', () => ({
+// SvgIcon 桩：测试环境无真实 SVG 资源
+vi.mock('@/shared/components/SvgIcon.vue', () => ({
   default: {
-    name: 'MarketOverview',
-    props: {
-      indices: { type: Array, default: () => [] },
-      status: { type: String, default: '' },
-    },
-    template: '<div class="mo-stub" />',
+    name: 'SvgIcon',
+    props: ['name', 'size', 'color'],
+    template: '<view class="svg-stub" />',
   },
 }))
 
@@ -58,25 +58,55 @@ vi.stubGlobal('uni', {
 
 import StockContent from './StockContent.vue'
 
-describe('StockContent 大盘概览接线', () => {
+describe('StockContent 股票搜索框', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    stockApiMock.getCnIndexQuotes.mockClear()
+    vi.useRealTimers()
+    stockApiMock.getStockList.mockClear()
+    stockApiMock.getHotBurstHistory.mockClear()
+    stockApiMock.getProfitForecastList.mockClear()
+    vi.mocked(uni.navigateTo).mockClear()
   })
 
-  it('onMounted 拉取指数后，MarketOverview 收到 store 的 indices/status', async () => {
+  it('渲染股票搜索框，输入关键词实时搜索并展示匹配股票', async () => {
+    vi.useFakeTimers()
     const wrapper = mount(StockContent)
     await flushPromises()
 
-    // onMounted 触发 fetchIndices → getCnIndexQuotes（纯数字代码）
-    expect(stockApiMock.getCnIndexQuotes).toHaveBeenCalledWith(['000001', '399001', '399006'])
+    expect(wrapper.find('.stock-search').exists()).toBe(true)
 
-    const overview = wrapper.findComponent({ name: 'MarketOverview' })
-    expect(overview.exists()).toBe(true)
-    expect(overview.props('status')).toBe('交易中')
-    const indices = overview.props('indices') as Array<{ code: string; name: string }>
-    expect(indices).toHaveLength(3)
-    expect(indices[0]).toMatchObject({ code: '000001', name: '上证指数' })
-    expect(indices[1]).toMatchObject({ code: '399001', name: '深证成指' })
+    const input = wrapper.find('.stock-search__input')
+    await input.trigger('input', { detail: { value: '茅台' } })
+    // 推进 300ms 防抖后执行搜索
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    expect(stockApiMock.getStockList).toHaveBeenCalledWith({ keyword: '茅台', page: 1, pageSize: 5 })
+    const resultItem = wrapper.find('.search-result-item')
+    expect(resultItem.exists()).toBe(true)
+    expect(resultItem.text()).toContain('贵州茅台')
+    vi.useRealTimers()
+  })
+
+  it('点击搜索结果跳转个股详情页', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(StockContent)
+    await flushPromises()
+
+    const input = wrapper.find('.stock-search__input')
+    await input.trigger('input', { detail: { value: '茅台' } })
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    await wrapper.find('.search-result-item').trigger('tap')
+    expect(uni.navigateTo).toHaveBeenCalledWith({ url: '/modules/favorites/pages/detail?symbol=600519' })
+    vi.useRealTimers()
+  })
+
+  it('不再渲染大盘概览（MarketOverview 已由搜索框替代）', async () => {
+    const wrapper = mount(StockContent)
+    await flushPromises()
+
+    expect(wrapper.find('.as-market-overview').exists()).toBe(false)
   })
 })

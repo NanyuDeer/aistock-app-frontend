@@ -1,6 +1,10 @@
 <template>
   <SubPageCard title="自选" active-panel="favorites">
-    <view class="favorites-content">
+    <!-- 当前登录状态下数据未就绪时显示 loading，避免闪现残留的 mock/过期数据 -->
+    <view v-if="!favoritesStore.hasCurrentData()" class="favorites-loading">
+      <LoadingState text="加载自选股中..." />
+    </view>
+    <view v-else class="favorites-content">
       <view v-if="favoritesStore.syncError" class="sync-error" @tap="retrySync">
         <text>同步失败，点击重试</text>
       </view>
@@ -126,6 +130,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import LoadingState from '@/shared/components/LoadingState.vue'
 
 /* ===== 类型定义 ===== */
 interface StockItem {
@@ -282,6 +287,10 @@ function goSearch() {
 
 <style lang="scss" scoped>
 @import '@/shared/styles/variables.scss';
+
+.favorites-loading {
+  padding: 160rpx 0;
+}
 
 .favorites-content {
   padding: 0 24rpx 24rpx;

@@ -193,7 +193,7 @@ function goFavorites() {
 }
 
 function goAbout() {
-  uni.showToast({ title: 'AI Stock v2.1', icon: 'none' })
+  uni.showToast({ title: '洞见 v2.1', icon: 'none' })
 }
 
 function goStockDetail(symbol: string) {

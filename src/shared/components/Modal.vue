@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = withDefaults(defineProps<{
   visible: boolean
@@ -60,6 +60,12 @@ const emit = defineEmits<{
   close: []
 }>()
 
+/** 最近一次打开时间戳：用于忽略打开瞬间穿透到遮罩的点击 */
+const openedAt = ref(0)
+watch(() => props.visible, (v) => {
+  if (v) openedAt.value = Date.now()
+})
+
 const close = () => {
   emit('update:visible', false)
   emit('close')
@@ -70,9 +76,12 @@ const handleClose = () => {
 }
 
 const handleOverlayClick = () => {
-  if (props.maskClosable) {
-    close()
-  }
+  if (!props.maskClosable) return
+  // 防"打开即关闭"：H5 上弹窗渲染瞬间，触发打开的同一物理点击的 click 事件
+  // 可能落在新渲染的全屏遮罩上，导致弹窗刚打开就被关闭（用户感知为"点击没反应"）。
+  // 打开后 300ms 内的遮罩点击直接忽略。
+  if (Date.now() - openedAt.value < 300) return
+  close()
 }
 
 const dialogStyle = computed(() => ({ width: props.width }))

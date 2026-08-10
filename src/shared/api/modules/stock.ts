@@ -4,6 +4,7 @@
  */
 import request from '../request'
 import { isInvalidValue } from '@/shared/utils/format'
+import type { TrendKLineData } from './trend-score'
 
 export interface StockQuote {
   symbol: string
@@ -502,6 +503,13 @@ export const stockApi = {
     return request.get<WindLeaderResponse>('/cn/wind-leaders', { params: { limit } })
   },
 
+  /** 板块日 K 线（同花顺板块指数，近 N 日默认 120）；无数据/失败返回 null */
+  getBoardKline(code: string, days = 120) {
+    return request
+      .get<TrendKLineData>('/cn/wind-leaders/board-kline', { params: { code, days } })
+      .catch(() => null)
+  },
+
   /** 获取机构调研热门股（共振检测） */
   getHotBursts(params?: { hours?: number; min_resonance?: number; limit?: number }) {
     return request.get('/cn/institution-research', { params })
@@ -517,6 +525,11 @@ export const stockApi = {
   /** 获取个股异动事件（重磅消息） */
   getTrendEvents(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
     return request.get('/cn/stock-monitors/events', { params }).then((res: Record<string, unknown>) => res)
+  },
+
+  /** 获取登录用户自选股的个股资讯（需登录，未登录调 getTrendEvents 看全市场） */
+  getFavoritesNews(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
+    return request.get('/cn/favorites/news', { params }).then((res: Record<string, unknown>) => res)
   },
 
   /** 获取财联社头条新闻 */

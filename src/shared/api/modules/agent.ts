@@ -176,6 +176,39 @@ export interface MarketTracePredictionValidation {
   overall_note?: string
 }
 
+export interface MarketTracePredictionHorizon {
+  horizon: 'short' | 'mid' | 'long'
+  remaining_estimate: string
+  phase: 'building' | 'peaking' | 'decaying' | 'returning'
+  direction: 'bullish' | 'bearish' | 'neutral'
+  target: string
+  metric_projection: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export interface MarketTracePredictionRisk {
+  factor: string
+  invalidation: string
+}
+
+/** 演化路径单步（B2 结构化；label=档位标签 短/中/长，text=该档演化描述） */
+export interface MarketTracePredictionStep {
+  label: string
+  text: string
+}
+
+export interface MarketTracePrediction {
+  schema_version?: string
+  prediction_status: 'confirmed' | 'hypothesis' | 'insufficient'
+  horizons?: MarketTracePredictionHorizon[]
+  evolution_narrative?: string
+  /** 结构化演化步骤（前端时间轴渲染）；旧记录可能缺失 */
+  evolution_steps?: MarketTracePredictionStep[]
+  risks?: MarketTracePredictionRisk[]
+  evidence_ids?: unknown
+  attribution_summary?: string | null
+}
+
 export interface MarketTraceTrace {
   schema_version?: string
   attribution_status?: MarketTraceAttributionStatus
@@ -184,7 +217,11 @@ export interface MarketTraceTrace {
   alternative_chain_id?: string | null
   confidence?: MarketTraceConfidence
   unresolved_questions?: unknown
+  /** 综合主因的一句话结论（30-40 字），供晚报页异象卡片直接展示；旧报告可能缺失 */
+  attribution_summary?: string | null
   prediction_validation?: MarketTracePredictionValidation | null
+  /** 影响持续性预判（B2 预测能力）；旧报告可能缺失 */
+  prediction?: MarketTracePrediction | null
 }
 
 export interface MarketTraceDetectedPhenomenon {

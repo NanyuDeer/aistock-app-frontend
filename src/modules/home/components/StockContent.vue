@@ -1,12 +1,44 @@
 <template>
   <view class="stock-content">
     <view class="content-wrap">
-      <!-- 大盘概览（MarketOverview 内部含空态兜底，纯展示组件不改动） -->
-      <MarketOverview
-        v-if="marketIndices.length"
-        :indices="marketIndices"
-        :status="marketStatus"
-      />
+      <!-- 股票搜索框（替代大盘概览卡片，输入实时匹配股票，与 Web 端一致） -->
+      <view class="stock-search">
+        <SvgIcon name="search-line" size="32rpx" color="#9ca3af" />
+        <input
+          :value="searchKeyword"
+          class="stock-search__input"
+          type="text"
+          placeholder="输入股票代码或名称"
+          confirm-type="search"
+          @input="onSearchInput"
+        />
+        <SvgIcon v-if="searchKeyword" name="close-line" size="32rpx" color="#9ca3af" @tap="clearSearch" />
+
+        <!-- 实时搜索结果（悬浮快速菜单：贴搜索框下边缘，覆盖在下方组件之上，不挤占布局） -->
+        <view v-if="searchKeyword.trim()" class="search-result-list">
+          <view v-if="searchLoading" class="search-result-loading">
+            <LoadingState size="sm" text="搜索中..." />
+          </view>
+          <template v-else>
+            <view
+              v-for="item in searchResults"
+              :key="item.symbol"
+              class="search-result-item"
+              @tap="goStockDetail(item.symbol)"
+            >
+              <view class="search-result-info">
+                <text class="search-result-name">{{ item.name }}</text>
+                <text class="search-result-code">{{ item.symbol }}</text>
+                <text v-if="item.industry" class="search-result-industry">{{ item.industry }}</text>
+              </view>
+              <text class="search-result-arrow">›</text>
+            </view>
+            <view v-if="!searchResults.length" class="search-result-empty">
+              <text class="search-result-empty-text">未找到相关股票</text>
+            </view>
+          </template>
+        </view>
+      </view>
 
       <!-- 趋势股评分卡片 -->
       <InsightListCard
@@ -48,17 +80,60 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
-import { InsightListCard, type InsightListItem } from '@/shared/components'
-import { stockApi, type HotBurstSignal } from '@/shared/api/modules/stock'
+import { onMounted, ref, computed, watch } from 'vue'
+import { InsightListCard, LoadingState, type InsightListItem } from '@/shared/components'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { stockApi, type StockListItem, type HotBurstSignal } from '@/shared/api/modules/stock'
 import { trendScoreApi, type TrendScoreListItem } from '@/shared/api/modules/trend-score'
-import { useMarketStore } from '@/shared/store/modules/market'
-import MarketOverview from '@/modules/market/components/MarketOverview.vue'
 
-// ===== 大盘概览 =====
-const marketStore = useMarketStore()
-const marketIndices = computed(() => marketStore.indices)
-const marketStatus = computed(() => marketStore.marketStatus)
+// ===== 股票搜索（实时联想，与 Web 端一致） =====
+const searchKeyword = ref('')
+const searchResults = ref<StockListItem[]>([])
+const searchLoading = ref(false)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+function onSearchInput(e: unknown) {
+  const detail = (e as { detail?: { value?: string } } | null)?.detail
+  searchKeyword.value = detail?.value ?? ''
+}
+
+watch(searchKeyword, (kw) => {
+  const value = (kw ?? '').trim()
+  if (!value) {
+    searchResults.value = []
+    searchLoading.value = false
+    if (searchTimer) clearTimeout(searchTimer)
+    return
+  }
+  searchLoading.value = true
+  if (searchTimer) clearTimeout(searchTimer)
+  // 300ms 防抖：输入停顿后再请求，避免每敲一个字都打接口
+  searchTimer = setTimeout(() => {
+    void doSearch(value)
+  }, 300)
+})
+
+async function doSearch(kw: string) {
+  try {
+    // 悬浮联想仅展示前 5 条最匹配结果（接口层限制，避免下拉列表过长）
+    const res = await stockApi.getStockList({ keyword: kw, page: 1, pageSize: 5 })
+    searchResults.value = res?.list || []
+  } catch {
+    searchResults.value = []
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+function clearSearch() {
+  searchKeyword.value = ''
+  searchResults.value = []
+  if (searchTimer) clearTimeout(searchTimer)
+}
+
+function goStockDetail(symbol: string) {
+  uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
+}
 
 // ===== 趋势股评分预览 =====
 interface TrendScorePreviewItem {
@@ -294,7 +369,6 @@ function goForecast() {
 }
 
 onMounted(() => {
-  marketStore.fetchIndices()
   loadHotBurstPreview()
   loadTrendScorePreview()
   loadForecastPreview()
@@ -308,5 +382,97 @@ onMounted(() => {
 
 .content-wrap {
   padding: $s-3;
+}
+
+/* ===== 股票搜索框 ===== */
+.stock-search {
+  position: relative; /* 悬浮结果菜单的定位基准 */
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+  height: 80rpx;
+  padding: 0 $s-3;
+  background: $bg-soft;
+  border-radius: $r-full;
+  margin-bottom: $s-3;
+}
+
+.stock-search__input {
+  flex: 1;
+  height: 100%;
+  font-size: $font-size-sm;
+  color: $ink;
+}
+
+/* ===== 实时搜索结果（悬浮快速菜单） ===== */
+.search-result-list {
+  position: absolute;
+  top: calc(100% + 8rpx);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: $bg-card;
+  border-radius: $r-lg;
+  padding: $s-1 0;
+  box-shadow: $shadow-hover;
+  overflow: hidden;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $s-2 $s-3;
+  border-bottom: 1rpx solid $line-soft;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.search-result-info {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+  min-width: 0;
+}
+
+.search-result-name {
+  font-size: $font-size-md;
+  color: $ink;
+  font-weight: 600;
+}
+
+.search-result-code {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
+
+.search-result-industry {
+  font-size: $font-size-xs;
+  color: $primary;
+  background: $primary-50;
+  padding: 2rpx 10rpx;
+  border-radius: $r-full;
+}
+
+.search-result-arrow {
+  font-size: $font-size-lg;
+  color: $ink-faint;
+}
+
+.search-result-loading {
+  padding: $s-3 0;
+}
+
+.search-result-empty {
+  padding: $s-3 0;
+  text-align: center;
+}
+
+.search-result-empty-text {
+  font-size: $font-size-sm;
+  color: $ink-mute;
 }
 </style>

@@ -50,5 +50,7 @@ export const STORAGE_KEYS = {
   CHAT_HISTORY_BY_SESSION: 'chat_history_by_session',
   // P11 T2：会话维度 token 本地累加（key=session_id → TokenUsage）
   CHAT_SESSION_USAGE: 'chat_session_usage',
-  THEME: 'theme'
+  THEME: 'theme',
+  // 播报连续播放开关（持久化；true=连续排队，false/缺省=互斥）
+  PODCAST_CONTINUOUS: 'podcast_continuous'
 } as const
