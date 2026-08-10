@@ -68,6 +68,12 @@ export const usePodcastStore = defineStore('podcast', () => {
   /** 切换连续播放开关并持久化 */
   function toggleContinuous() {
     continuousPlay.value = !continuousPlay.value
+    if (!continuousPlay.value) {
+      // 切回互斥模式（不排队）：清空残留队列与挂起外部音频，
+      // 避免 releaseExternal 消费残留队列抢占已就绪播报
+      queue.value = []
+      pendingExternal.value = null
+    }
     storage.set(STORAGE_KEYS.PODCAST_CONTINUOUS, continuousPlay.value)
   }
 
@@ -156,6 +162,8 @@ export const usePodcastStore = defineStore('podcast', () => {
 
   /** 外部音频注销 */
   function releaseExternal(key: string) {
+    // 先清理同名挂起注册：页面卸载/用户取消时，挂起项一并取消，避免 onAudioEnded 激活残留 play()
+    if (pendingExternal.value?.key === key) pendingExternal.value = null
     if (externalActive.value?.key !== key) return
     externalActive.value = null
     // 外部音频结束：消费播报队列下一项（若有）

@@ -100,4 +100,18 @@ describe('podcast store 互斥 + 排队', () => {
     }
     await vi.waitFor(() => expect(store.queue).toHaveLength(10))
   })
+
+  it('挂起外部音频：release 清除挂起，避免页面卸载后激活断链', () => {
+    const store = usePodcastStore()
+    store.toggleContinuous()
+    store.status = 'ready'
+    store.audioUrl = '/api/agent/audio/podcast-test.mp3'
+    store.setPlaying(true)
+    const play = vi.fn()
+    const release = store.acquireExternal('briefing', play, vi.fn())
+    expect(play).not.toHaveBeenCalled() // 挂起
+    release() // 模拟页面卸载/用户取消
+    store.onAudioEnded()
+    expect(play).not.toHaveBeenCalled() // 挂起已清除，不会激活断链 play
+  })
 })
