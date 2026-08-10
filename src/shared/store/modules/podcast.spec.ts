@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
 import { usePodcastStore } from './podcast'
 import { agentApi } from '@/shared/api/modules/agent'
@@ -113,5 +114,84 @@ describe('podcast store 互斥 + 排队', () => {
     store.releaseExternal('briefing') // briefing onUnmounted 真实路径：直接调用
     store.onAudioEnded()
     expect(play).not.toHaveBeenCalled() // 挂起已清除，不会激活断链 play
+  })
+
+  it('playDirect 默认收起为悬浮球（不展开播放条）', () => {
+    const store = usePodcastStore()
+    store.playDirect('/api/agent/audio/podcast-test.mp3', 'key-a', 'AI 早报', 0)
+    expect(store.visible).toBe(true)
+    expect(store.expanded).toBe(false) // 默认悬浮球，用户点击才展开
+    expect(store.autoplay).toBe(true)
+    expect(store.audioUrl).toBe('/api/agent/audio/podcast-test.mp3')
+  })
+
+  it('跨页续播点：播放中卸载记录，暂停态不记录；consumeResume 消费清除', () => {
+    const store = usePodcastStore()
+    // 播放中 AudioPlayer 卸载 → 记录续播点
+    store.suspendPlayback({ playing: true, currentTime: 42 })
+    expect(store.resumePending).toBe(true)
+    expect(store.playbackTime).toBe(42)
+    store.consumeResume()
+    expect(store.resumePending).toBe(false)
+    expect(store.playbackTime).toBe(0)
+
+    // 暂停态卸载 → 不置续播点，也不覆盖进度（多实例切换时非播放实例不上报）
+    store.suspendPlayback({ playing: false, currentTime: 10 })
+    expect(store.resumePending).toBe(false)
+    expect(store.playbackTime).toBe(0)
+  })
+
+  it('渲染权：activePage 标记当前前台页面（页面根容器 onShow/onHide 维护）', () => {
+    const store = usePodcastStore()
+    expect(store.activePage).toBe('')
+    store.setActivePage('sub2-1')
+    expect(store.activePage).toBe('sub2-1')
+    store.setActivePage('') // 页面 onHide
+    expect(store.activePage).toBe('')
+  })
+
+  it('clearActivePage 仅清空本页渲染权：旧页失活事件晚于新页激活时不误清新页', () => {
+    const store = usePodcastStore()
+    store.setActivePage('sub2-2') // 新页已激活
+    store.clearActivePage('sub2-1') // 旧页失活事件迟到 → 不覆盖新页
+    expect(store.activePage).toBe('sub2-2')
+    store.clearActivePage('sub2-2') // 本页真正失活 → 清空
+    expect(store.activePage).toBe('')
+  })
+
+  it('多实例切换：新页播放器已注册时旧页卸载直接续播（nextTick 后），不等重建', async () => {
+    const store = usePodcastStore()
+    const ctrlB = { pause: vi.fn(), play: vi.fn(), togglePlay: vi.fn(), seekTo: vi.fn() }
+    store.registerPlayer('inst-b', ctrlB) // 新页播放器已注册
+    store.suspendPlayback({ playing: true, currentTime: 33 }, 'inst-a') // 旧页卸载上报
+    expect(store.resumePending).toBe(false) // 续播点已被直接消费
+    await nextTick()
+    expect(ctrlB.seekTo).toHaveBeenCalledWith(33)
+    expect(ctrlB.play).toHaveBeenCalledTimes(1)
+  })
+
+  it('多实例切换：卸载实例本身仍持有播放器时不直接续播，仅记录续播点', async () => {
+    const store = usePodcastStore()
+    const ctrlA = { pause: vi.fn(), play: vi.fn(), togglePlay: vi.fn(), seekTo: vi.fn() }
+    store.registerPlayer('inst-a', ctrlA)
+    store.suspendPlayback({ playing: true, currentTime: 20 }, 'inst-a') // 卸载的正是自己
+    expect(store.resumePending).toBe(true) // 记录续播点，等待新页重建
+    expect(ctrlA.play).not.toHaveBeenCalled()
+    await nextTick()
+    expect(ctrlA.play).not.toHaveBeenCalled() // 不误播正在销毁的旧播放器
+  })
+
+  it('播放器控制注销校验实例归属：失活实例不误清新实例注册', () => {
+    const store = usePodcastStore()
+    const ctrlA = { pause: vi.fn(), play: vi.fn(), togglePlay: vi.fn() }
+    const ctrlB = { pause: vi.fn(), play: vi.fn(), togglePlay: vi.fn() }
+    store.registerPlayer('inst-a', ctrlA)
+    store.registerPlayer('inst-b', ctrlB) // B 后注册 → 持有控制
+    store.unregisterPlayer('inst-a') // A 失活注销 → 不影响 B
+    store.pause()
+    expect(ctrlB.pause).toHaveBeenCalledTimes(1)
+    store.unregisterPlayer('inst-b')
+    store.pause() // 无控制句柄 → 静默
+    expect(ctrlB.pause).toHaveBeenCalledTimes(1)
   })
 })
