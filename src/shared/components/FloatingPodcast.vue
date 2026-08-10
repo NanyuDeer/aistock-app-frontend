@@ -21,7 +21,7 @@
           <text class="fp-switch-label">连续播放</text>
           <Switch
             :checked="store.continuousPlay"
-            :color="$primary"
+            :color="SWITCH_COLOR"
             style="transform: scale(0.7)"
             @change="onContinuousToggle"
           />
@@ -79,6 +79,9 @@ import SvgIcon from './SvgIcon.vue'
 import { Button, LoadingState, AudioPlayer } from './index'
 
 const store = usePodcastStore()
+
+/** Switch 开启色（模板环境无 SCSS 变量，按本组件 SvgIcon color="#0b5fff" 惯例取品牌色） */
+const SWITCH_COLOR = '#0b5fff'
 
 /** AudioPlayer 开始播放：同步 store 播放状态（悬浮球旋转）+ 消费自动播放标记 */
 function onPlayerPlay() {
