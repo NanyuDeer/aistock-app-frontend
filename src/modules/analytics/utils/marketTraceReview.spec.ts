@@ -201,3 +201,100 @@ test('7-23 alternatives counterEvidence 输出中文关键词', () => {
   // counterEvidence 字段仍存原始 ID（presentation 数据层不动）
   assert.deepEqual(alt.counterEvidence, ['MAIN_FORCE_ALL'])
 })
+
+test('prediction 提取：有预测时生成 PredictionPresentation', () => {
+  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
+  record.content.market_trace!.trace!.prediction = {
+    schema_version: '1.0',
+    prediction_status: 'confirmed',
+    horizons: [
+      { horizon: 'short', remaining_estimate: '1-3 日', phase: 'decaying', direction: 'bearish', target: '上证指数', metric_projection: '短期弱震荡', confidence: 'high' },
+      { horizon: 'mid', remaining_estimate: '2-4 周', phase: 'peaking', direction: 'bearish', target: '上证指数', metric_projection: '指数区间下移', confidence: 'medium' },
+    ],
+    evolution_narrative: '短线已兑现大半，中线延续，长线回归',
+    risks: [{ factor: '政策对冲', invalidation: '超预期政策落地则失效' }],
+    evidence_ids: ['SEARCH_007'],
+    attribution_summary: '利空影响短线衰减、中线延续',
+  }
+  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.ok(presentation!.prediction, 'prediction 不应为 null')
+  assert.equal(presentation!.prediction!.status, 'confirmed')
+  assert.equal(presentation!.prediction!.horizons.length, 2)
+  assert.equal(presentation!.prediction!.horizons[0]!.horizon, 'short')
+  assert.equal(presentation!.prediction!.horizons[0]!.remainingEstimate, '1-3 日')
+  assert.equal(presentation!.prediction!.horizons[0]!.phase, 'decaying')
+  assert.equal(presentation!.prediction!.horizons[0]!.metricProjection, '短期弱震荡')
+  assert.equal(presentation!.prediction!.horizons[1]!.metricProjection, '指数区间下移')
+  assert.equal(presentation!.prediction!.evolutionNarrative, '短线已兑现大半，中线延续，长线回归')
+  assert.equal(presentation!.prediction!.risks.length, 1)
+  assert.equal(presentation!.prediction!.risks[0]!.factor, '政策对冲')
+  assert.equal(presentation!.prediction!.risks[0]!.invalidation, '超预期政策落地则失效')
+  assert.equal(presentation!.prediction!.attributionSummary, '利空影响短线衰减、中线延续')
+})
+
+test('prediction 提取：evolution_steps 结构化输出时映射为 evolutionSteps', () => {
+  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
+  record.content.market_trace!.trace!.prediction = {
+    schema_version: '1.0',
+    prediction_status: 'confirmed',
+    horizons: [
+      { horizon: 'short', remaining_estimate: '1-3 日', phase: 'decaying', direction: 'bearish', target: '上证指数', metric_projection: '短期弱震荡', confidence: 'high' },
+    ],
+    evolution_narrative: '短线情绪宣泄后，市场转向关注财政补贴',
+    evolution_steps: [
+      { label: '短线', text: '情绪宣泄后弱势震荡' },
+      { label: '中线', text: '市场转向关注财政补贴实际到账' },
+    ],
+    risks: [],
+    evidence_ids: ['SEARCH_007'],
+  }
+  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.ok(presentation!.prediction, 'prediction 不应为 null')
+  assert.equal(presentation!.prediction!.evolutionSteps.length, 2)
+  assert.equal(presentation!.prediction!.evolutionSteps[0]!.label, '短线')
+  assert.equal(presentation!.prediction!.evolutionSteps[0]!.text, '情绪宣泄后弱势震荡')
+  assert.equal(presentation!.prediction!.evolutionSteps[1]!.label, '中线')
+  assert.equal(presentation!.prediction!.evolutionSteps[1]!.text, '市场转向关注财政补贴实际到账')
+  assert.equal(presentation!.prediction!.evolutionNarrative, '短线情绪宣泄后，市场转向关注财政补贴')
+})
+
+test('prediction 提取：旧记录无 evolution_steps 时 evolutionSteps 为空数组', () => {
+  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
+  record.content.market_trace!.trace!.prediction = {
+    schema_version: '1.0',
+    prediction_status: 'confirmed',
+    horizons: [
+      { horizon: 'short', remaining_estimate: '1-3 日', phase: 'decaying', direction: 'bearish', target: '上证指数', metric_projection: '短期弱震荡', confidence: 'high' },
+    ],
+    evolution_narrative: '短线已兑现大半，中线延续，长线回归',
+    risks: [],
+    evidence_ids: ['SEARCH_007'],
+  }
+  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.deepEqual(presentation!.prediction!.evolutionSteps, [])
+  assert.equal(presentation!.prediction!.evolutionNarrative, '短线已兑现大半，中线延续，长线回归')
+})
+
+test('prediction 提取：无预测字段时为 null（兼容旧报告）', () => {
+  // record0731 fixture 不含 prediction 字段
+  const presentation = toMarketTracePresentation(
+    record0731 as unknown as MarketTraceReviewRecord,
+    '2026-07-31',
+  )
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.equal(presentation!.prediction, null)
+})
+
+test('prediction 提取：非法 shape（horizons 为空）时为 null', () => {
+  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
+  record.content.market_trace!.trace!.prediction = {
+    prediction_status: 'confirmed',
+    horizons: [],
+  }
+  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.equal(presentation!.prediction, null)
+})

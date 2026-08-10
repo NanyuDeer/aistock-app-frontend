@@ -10,10 +10,12 @@
 - `pages/forecast.vue`：业绩预测。
 - `pages/trend-score.vue`：趋势评分排行榜与本地搜索。
 - `pages/trend-score-detail.vue`：单股技术面、赛道景气、消息面、基本面四维详情。
+- `pages/traceability.vue`：大盘溯源报告（与大盘洞见同页展示）。
 
 ## 组件
 
 - `components/TrendKLineChart.vue`：趋势评分专用 K 线图，支持 H5、App 和小程序画布。
+- `components/MarketTracePrediction.vue`：影响持续性预判卡片（B2 预测能力），样式对齐同页 `MarketTracePredictionValidation.vue`。
 
 ## API
 
