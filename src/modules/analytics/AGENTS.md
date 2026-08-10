@@ -19,6 +19,7 @@
 - `components/TrendKLineChart.vue`：趋势评分专用 K 线图，支持 H5、App 和小程序画布。
 - `components/MarketTracePrediction.vue`：影响持续性预判卡片（B2 预测能力），样式对齐同页 `MarketTracePredictionValidation.vue`。
 - `components/PredictionVerification.vue`：预测验证结果组件（B2.1），逐档位渲染到期日/结果徽标/实际涨跌幅/验证时间/reason。
+- `KLineChart` 已提升至 `shared/components/`（`shared/components/KLineChart.vue`），此处引用共享组件。
 
 ## API
 

@@ -43,6 +43,7 @@ export default defineConfig({
       'src/modules/home/components/StockContent.spec.ts',
       'src/shared/store/modules/chatStore.spec.ts',
       'src/shared/store/modules/chat.spec.ts',
+      'src/shared/store/modules/podcast.spec.ts',
       'src/pages-sub-app/chat/cards/MarketSnapshotCard.spec.ts',
       'src/pages-sub-app/chat/cards/StockSnapshotCard.spec.ts',
       'src/pages-sub-app/chat/cards/CapitalFlowCard.spec.ts',

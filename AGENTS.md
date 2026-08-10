@@ -40,7 +40,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 
 | 页面 | 文件 | 说明 |
 |------|------|------|
-| 早点听 | `briefing/index.vue` | 结构化早晚报（音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期 |
+| 早点听 | `briefing/index.vue` | 结构化早晚报（音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期。音频纳入全局播报互斥（podcast store acquireExternal）：播放前注册、暂停/结束/卸载注销 |
 | 持仓管理 | `portfolio/index.vue` | 持仓分析 |
 | 事件传导链 | `event-chain/index.vue` | 事件传导链路可视化 |
 | 估值分析 | `valuation/index.vue` | 个股估值 |
@@ -349,9 +349,11 @@ import Card from '@/shared/components/Card.vue'
 | `RelationGraph.vue` | [组件库] | 关系图谱（径向布局 + 上下游/关联节点） |
 | `TheNavbar.vue` | [组件库] | 导航栏（对应组件库 `NavBar.vue`） |
 | `TheFooter.vue` | [组件库] | 页脚（对应组件库 `Footer.vue`） |
+| `KLineChart.vue` | [组件库] 无对应，从 analytics 提升 | 通用 K 线渲染（H5/APP-PLUS renderjs+klinecharts，MP-WEIXIN uCharts 画布），Props `{ title: string; data: TrendKLineData }` |
+| `AudioPlayer.vue` | [组件库] | 通用音频播放器（H5 HTMLAudioElement / App+小程序 InnerAudioContext 运行时分流），Props `{ src; title?; cover?; autoplay?; initialTime? }`，Emits `play`/`pause`/`ended`/`timeupdate`；卸载/换源时先 stop 再 destroy 确保音频立即停止（全局互斥抢占依赖此行为） |
 
 **已引入但尚未在生产页面使用的组件**（已存在于 `shared/components/` 并通过 barrel export 导出，需要时直接 `import { ... } from '@/shared/components'`）：
-`Switch` `Rate` `Progress` `Skeleton` `Toast` `ActionSheet` `Modal` `Steps` `StatCard` `ListCell` `QuoteHeader` `Gauge` `Sparkline` `DataTable` `IndexCard` `Timeline` `ChatBubble` `StreamingText` `AudioPlayer` `InsightListCard` `StockItem`
+`Switch` `Rate` `Progress` `Skeleton` `Toast` `ActionSheet` `Modal` `Steps` `StatCard` `ListCell` `QuoteHeader` `Gauge` `Sparkline` `DataTable` `IndexCard` `Timeline` `ChatBubble` `StreamingText` `InsightListCard` `StockItem`
 
 > **布局约束**: 所有需要预留底部空间的组件必须使用 `@/shared/utils/layout.ts` 中的函数（`getChatBarHeightPx` / `getBottomFixedHeightPx` / `getTabBarBottomPx`），禁止硬编码 rpx 值，以避免刘海屏设备底部内容被遮挡。
 

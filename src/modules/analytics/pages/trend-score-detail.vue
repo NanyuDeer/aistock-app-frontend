@@ -83,8 +83,8 @@
 
           <view v-if="isDimensionExpanded(index)" class="dimension-body">
             <template v-if="index === 0 && technicalDetail">
-              <TrendKLineChart :title="`个股K线 · ${stockName}`" :data="technicalDetail.kline" />
-              <TrendKLineChart
+              <KLineChart :title="`个股K线 · ${stockName}`" :data="technicalDetail.kline" />
+              <KLineChart
                 :title="`概念指数 · ${technicalDetail.conceptKline.name || '所属概念'}`"
                 :data="technicalDetail.conceptKline"
               />
@@ -263,7 +263,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { formatDateTime, formatDate } from '@/shared/utils/datetime'
-import TrendKLineChart from '@/modules/analytics/components/TrendKLineChart.vue'
+import KLineChart from '@/shared/components/KLineChart.vue'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 
 const symbol = ref('')
