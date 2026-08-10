@@ -16,20 +16,18 @@
           </view>
           <view class="capture-list">
             <template v-if="captureList.length">
-              <InsightAlertCard
+              <ListCell
                 v-for="(item, idx) in captureRows"
                 :key="idx"
-                :name="item?.stock_name || '\u3000'"
-                :symbol="item?.symbol || ''"
-                :direction="item?.direction || 'up'"
-                :message="item ? captureDetail(item) : '\u3000'"
-                :type="item?.event_type === 'limit_up_radar' ? '涨停雷达' : '异动'"
-                :time="item ? formatTime(item.trade_date || item.created_at || '') : ''"
-                :confidence="item?.confidence"
-                :compact="true"
+                :title="item?.stock_name || '\u3000'"
+                :description="item ? `${captureDetail(item)} · ${formatTime(item.trade_date || item.created_at || '')}` : '\u3000'"
                 :clickable="!!item"
                 @click="item && goTrace(item.event_id)"
-              />
+              >
+                <template #prefix>
+                  <Tag v-if="item" :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
+                </template>
+              </ListCell>
             </template>
             <EmptyState v-if="!captureList.length" title="暂无异动数据" />
           </view>
@@ -80,7 +78,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import Segmented from '@/shared/components/Segmented.vue'
 import ListCell from '@/shared/components/ListCell.vue'
 import Tag from '@/shared/components/Tag.vue'
-import InsightAlertCard from '@/shared/components/InsightAlertCard.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
@@ -208,6 +205,16 @@ function impactLabel(sentiment: IntelItem['sentiment']): string {
 /** 情感 → Tag type：利好→up(红)，利空→down(绿)，中性→neutral(蓝) */
 function impactTagType(sentiment: IntelItem['sentiment']): 'up' | 'down' | 'neutral' {
   return sentiment === 'positive' ? 'up' : sentiment === 'negative' ? 'down' : 'neutral'
+}
+
+/** 异动方向 → 涨跌徽标：涨→涨，跌→跌 */
+function badgeLabel(direction: 'up' | 'down'): string {
+  return direction === 'up' ? '涨' : '跌'
+}
+
+/** 异动方向 → Tag type：涨→up(红)，跌→down(绿) */
+function captureTagType(direction: 'up' | 'down'): 'up' | 'down' {
+  return direction
 }
 
 /** 格式化异动详情：主因归因文案（与异动监控页 monitor.vue 一致） */
@@ -352,18 +359,8 @@ watch(
   flex-shrink: 0;
 }
 
-/* ===== 异动捕手列表区域（InsightAlertCard compact） ===== */
-.capture-list {
-  background: $bg-card;
-  border-radius: $r-sm;
-  padding: $s-2;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: $s-1;
-}
-
-/* ===== 个股情报列表区域（仍用 ListCell） ===== */
+/* ===== 异动捕手 / 个股情报 列表区域（ListCell，样式一致） ===== */
+.capture-list,
 .intel-list {
   background: $bg-card;
   border-radius: $r-sm;
@@ -371,13 +368,15 @@ watch(
   overflow: hidden;
 }
 
-/* 覆写 ListCell 内边距和字体：使卡片更紧凑（仅个股情报模块仍用 ListCell） */
+/* 覆写 ListCell 内边距和字体：使列表更紧凑（行距比默认 $s-4 更紧凑，两列表保持一致） */
+.capture-list :deep(.as-list-cell),
 .intel-list :deep(.as-list-cell) {
   padding: $s-2 $s-2;
-  /* 空行占位（\u3000）与真实行等高，保证两个卡片纵向长度一致 */
+  /* 空行占位（\u3000）与真实行等高，保证两个模块纵向长度一致 */
   min-height: 104rpx;
 }
 
+.capture-list :deep(.as-list-cell__title),
 .intel-list :deep(.as-list-cell__title) {
   font-size: $font-size-sm;
   overflow: hidden;
@@ -385,6 +384,7 @@ watch(
   white-space: nowrap;
 }
 
+.capture-list :deep(.as-list-cell__desc),
 .intel-list :deep(.as-list-cell__desc) {
   font-size: $font-size-xs;
   overflow: hidden;
@@ -392,10 +392,12 @@ watch(
   white-space: nowrap;
 }
 
+.capture-list :deep(.as-list-cell__prefix),
 .intel-list :deep(.as-list-cell__prefix) {
   margin-right: $s-2;
 }
 
+.capture-list :deep(.as-list-cell__right),
 .intel-list :deep(.as-list-cell__right) {
   margin-left: $s-2;
 }
