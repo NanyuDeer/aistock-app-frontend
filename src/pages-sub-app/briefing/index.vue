@@ -363,6 +363,7 @@ function togglePlay() {
     audioContext.value.src = audioUrl
     audioContext.value.onEnded(() => {
       isPlaying.value = false
+      podcastStore.releaseExternal('briefing')
     })
     audioContext.value.onError(() => {
       isPlaying.value = false
@@ -373,7 +374,13 @@ function togglePlay() {
   if (isPlaying.value) {
     audioContext.value.pause()
     isPlaying.value = false
+    podcastStore.releaseExternal('briefing')
   } else {
+    // 纳入全局互斥：互斥模式下注册会先停止悬浮窗当前播放
+    podcastStore.acquireExternal('briefing', () => {
+      audioContext.value?.stop()
+      isPlaying.value = false
+    })
     audioContext.value.play()
     isPlaying.value = true
   }
@@ -461,6 +468,7 @@ async function loadReport() {
   if (audioContext.value && isPlaying.value) {
     audioContext.value.stop()
     isPlaying.value = false
+    podcastStore.releaseExternal('briefing')
   }
 
   const requested = currentDate.value
@@ -513,6 +521,8 @@ onUnmounted(() => {
       audioContext.value.currentTime || 0,
     )
   }
+  // 释放全局互斥注册（handoff playDirect 已开始悬浮窗播放，release 不打断已就绪的悬浮窗）
+  podcastStore.releaseExternal('briefing')
   if (audioContext.value) {
     audioContext.value.destroy()
     audioContext.value = null
