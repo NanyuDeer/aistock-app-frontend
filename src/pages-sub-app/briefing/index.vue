@@ -376,13 +376,18 @@ function togglePlay() {
     isPlaying.value = false
     podcastStore.releaseExternal('briefing')
   } else {
-    // 纳入全局互斥：互斥模式下注册会先停止悬浮窗当前播放
-    podcastStore.acquireExternal('briefing', () => {
-      audioContext.value?.stop()
-      isPlaying.value = false
-    })
-    audioContext.value.play()
-    isPlaying.value = true
+    // 纳入全局互斥：互斥模式下注册会先停止悬浮窗当前播放；play 回调由 store 在适当时机触发
+    podcastStore.acquireExternal(
+      'briefing',
+      () => {
+        audioContext.value?.play()
+        isPlaying.value = true
+      },
+      () => {
+        audioContext.value?.stop()
+        isPlaying.value = false
+      },
+    )
   }
 }
 

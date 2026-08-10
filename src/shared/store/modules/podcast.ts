@@ -57,6 +57,8 @@ export const usePodcastStore = defineStore('podcast', () => {
   const queue = ref<QueuedItem[]>([])
   /** 外部注册的音频（如 briefing 页面 innerAudioContext） */
   const externalActive = ref<{ key: string; stop: () => void } | null>(null)
+  /** 挂起的外部音频（连续模式且悬浮窗占用时暂存，空闲后按请求先后激活） */
+  const pendingExternal = ref<{ key: string; play: () => void; stop: () => void } | null>(null)
 
   /** 同步播放状态（FloatingPodcast 的 AudioPlayer play/pause/ended 事件驱动） */
   function setPlaying(value: boolean) {
@@ -131,14 +133,24 @@ export const usePodcastStore = defineStore('podcast', () => {
 
   /**
    * 外部页面音频注册（晚报/早报等页面内 innerAudioContext 播放前调用）
-   * 互斥模式下：外部音频开始前先停止悬浮窗当前播放。
+   * 互斥模式：停止悬浮窗当前播放后立即 play()。
+   * 连续模式：悬浮窗占用时挂起（pendingExternal，不立即播，避免叠音），
+   *           由 onAudioEnded/释放时在播报队列之前优先激活。
    * @returns release 函数（音频结束/页面卸载时调用）
    */
-  function acquireExternal(key: string, stop: () => void): () => void {
+  function acquireExternal(key: string, play: () => void, stop: () => void): () => void {
+    if (continuousPlay.value && isBusy()) {
+      pendingExternal.value = { key, play, stop }
+      return () => {
+        if (pendingExternal.value?.key === key) pendingExternal.value = null
+        releaseExternal(key)
+      }
+    }
     if (!continuousPlay.value) {
       resetPlayer()
     }
     externalActive.value = { key, stop }
+    play()
     return () => releaseExternal(key)
   }
 
@@ -146,9 +158,9 @@ export const usePodcastStore = defineStore('podcast', () => {
   function releaseExternal(key: string) {
     if (externalActive.value?.key !== key) return
     externalActive.value = null
-    // 外部音频结束且有排队项 → 悬浮窗接手播放
-    if (queue.value.length > 0 && !playing.value && status.value !== 'ready') {
-      const next = queue.value.shift()!
+    // 外部音频结束：消费播报队列下一项（若有）
+    const next = queue.value.shift()
+    if (next) {
       startPlayback({ key: next.key, title: next.title, url: next.url })
     }
   }
@@ -156,6 +168,14 @@ export const usePodcastStore = defineStore('podcast', () => {
   /** FloatingPodcast AudioPlayer ended：消费队列下一项 */
   function onAudioEnded() {
     playing.value = false
+    // 连续模式：先激活挂起的外部音频（按请求先后），再消费播报队列
+    if (pendingExternal.value) {
+      const p = pendingExternal.value
+      pendingExternal.value = null
+      externalActive.value = { key: p.key, stop: p.stop }
+      p.play()
+      return
+    }
     const next = queue.value.shift()
     if (next) {
       startPlayback({ key: next.key, title: next.title, url: next.url })
@@ -227,14 +247,17 @@ export const usePodcastStore = defineStore('podcast', () => {
     if (!text.value || !cacheKey.value) return
     status.value = 'loading'
     errorMsg.value = ''
+    const key = cacheKey.value // 生成期间可能被新请求覆盖，用于丢弃迟到结果
     try {
       const trimmed = text.value.length > MAX_PODCAST_TEXT_LENGTH
         ? text.value.slice(0, MAX_PODCAST_TEXT_LENGTH)
         : text.value
-      const res = await agentApi.generatePodcast(trimmed, cacheKey.value)
+      const res = await agentApi.generatePodcast(trimmed, key)
+      if (cacheKey.value !== key) return // 迟到结果：key 已被新请求占用，丢弃
       audioUrl.value = res.audio_url
       status.value = 'ready'
     } catch (e: unknown) {
+      if (cacheKey.value !== key) return
       errorMsg.value = e instanceof Error ? e.message : '播报生成失败，请稍后重试'
       status.value = 'error'
     }
@@ -254,6 +277,7 @@ export const usePodcastStore = defineStore('podcast', () => {
   function close() {
     queue.value = []
     externalActive.value = null
+    pendingExternal.value = null
     visible.value = false
     expanded.value = false
     status.value = 'idle'
@@ -278,6 +302,7 @@ export const usePodcastStore = defineStore('podcast', () => {
     playing,
     continuousPlay,
     queue,
+    pendingExternal,
     open,
     playDirect,
     consumeAutoplay,

@@ -31,9 +31,10 @@ describe('podcast store 互斥 + 排队', () => {
 
   it('互斥模式：open 新播报停止外部注册音频', async () => {
     const store = usePodcastStore()
+    const play = vi.fn()
     const stop = vi.fn()
-    const release = store.acquireExternal('briefing', stop)
-    // 连续开关默认关（互斥）
+    const release = store.acquireExternal('briefing', play, stop)
+    expect(play).toHaveBeenCalledTimes(1) // 互斥模式：注册即立即播放
     expect(store.continuousPlay).toBe(false)
     await store.open('播报文本', 'key-a', '标题A')
     expect(stop).toHaveBeenCalledTimes(1)
@@ -41,6 +42,22 @@ describe('podcast store 互斥 + 排队', () => {
     expect(store.status).toBe('ready')
     release()
     expect(store.queue).toHaveLength(0)
+  })
+
+  it('连续模式：悬浮窗占用时 acquireExternal 挂起，ended 后激活播放', () => {
+    const store = usePodcastStore()
+    store.toggleContinuous()
+    // 模拟悬浮窗正在播放（已就绪 + 播放中）
+    store.status = 'ready'
+    store.audioUrl = '/api/agent/audio/podcast-test.mp3'
+    store.setPlaying(true)
+    const play = vi.fn()
+    const stop = vi.fn()
+    store.acquireExternal('briefing', play, stop)
+    expect(play).not.toHaveBeenCalled() // 挂起，不叠音
+    expect(store.queue).toHaveLength(0)
+    store.onAudioEnded() // 悬浮窗结束 → 激活外部音频
+    expect(play).toHaveBeenCalledTimes(1)
   })
 
   it('连续模式：当前播放中 open 新播报入队，不打断', async () => {

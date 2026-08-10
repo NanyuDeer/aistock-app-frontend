@@ -14,8 +14,8 @@
       @ended="onPlayerEnded"
     >
       <template #actions>
-        <view class="fp-queue-badge" v-if="store.queue.length">
-          <text class="fp-queue-badge-text">队列 {{ store.queue.length }}</text>
+        <view class="fp-queue-badge" v-if="store.queue.length || store.pendingExternal">
+          <text class="fp-queue-badge-text">队列 {{ store.queue.length + (store.pendingExternal ? 1 : 0) }}</text>
         </view>
         <view class="fp-switch-row">
           <text class="fp-switch-label">连续播放</text>
