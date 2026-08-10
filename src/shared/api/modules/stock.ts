@@ -4,6 +4,7 @@
  */
 import request from '../request'
 import { isInvalidValue } from '@/shared/utils/format'
+import type { TrendKLineData } from './trend-score'
 
 export interface StockQuote {
   symbol: string
@@ -500,6 +501,13 @@ export const stockApi = {
   /** 获取风口龙头（长线风口，返回 hot_sectors 数组） */
   getWindLeaders(limit = 8) {
     return request.get<WindLeaderResponse>('/cn/wind-leaders', { params: { limit } })
+  },
+
+  /** 板块日 K 线（同花顺板块指数，近 N 日默认 120）；无数据/失败返回 null */
+  getBoardKline(code: string, days = 120) {
+    return request
+      .get<TrendKLineData>('/cn/wind-leaders/board-kline', { params: { code, days } })
+      .catch(() => null)
   },
 
   /** 获取机构调研热门股（共振检测） */

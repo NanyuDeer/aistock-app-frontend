@@ -28,6 +28,13 @@
           <StatGrid :items="sectorStatItems" :columns="4" />
         </Card>
 
+        <!-- 板块K线（近120日，同花顺板块指数日线）；加载失败(数据为null)时整卡隐藏 -->
+        <Card v-if="sector.code && (klineLoading || boardKline)" class="kline-card">
+          <text class="section-title">板块K线 · 近120日</text>
+          <LoadingState v-if="klineLoading" size="sm" text="正在加载K线数据..." />
+          <KLineChart v-else-if="boardKline" :title="sector.name" :data="boardKline" />
+        </Card>
+
         <!-- 涨跌家数 -->
         <view v-if="sector.up_count || sector.down_count" class="count-bar">
           <view class="count-section up">
@@ -251,14 +258,19 @@ import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderSector, WindLeaderAiAnalysis, WindLeaderFlowData, WindLeaderStock } from '@/shared/api/modules/stock'
+import type { TrendKLineData } from '@/shared/api/modules/trend-score'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
-import { LoadingState, EmptyState, Tag, Badge, Button, Card, StatGrid, Modal } from '@/shared/components'
+import { LoadingState, EmptyState, Tag, Badge, Button, Card, StatGrid, Modal, KLineChart } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
 
 const loading = ref(false)
 const errorMessage = ref('')
 const sector = ref<WindLeaderSector | null>(null)
 const sectorName = ref('')
+
+/** 板块 K 线（近120日） */
+const boardKline = ref<TrendKLineData | null>(null)
+const klineLoading = ref(false)
 
 function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
@@ -579,6 +591,15 @@ async function loadData() {
       || sectors.find(s => s.name?.includes(sectorName.value) || sectorName.value.includes(s.name || ''))
       || null
     sector.value = found
+    // 板块 K 线（按需拉取，失败返回 null → 卡片隐藏）
+    boardKline.value = null
+    if (found?.code) {
+      klineLoading.value = true
+      void stockApi.getBoardKline(found.code, 120).then((data) => {
+        boardKline.value = data
+        klineLoading.value = false
+      })
+    }
     if (!found) {
       errorMessage.value = '未找到该板块数据'
     }
@@ -604,6 +625,11 @@ onLoad((options) => {
 
 /* ===== 统计卡片（Card 提供 bg/border/shadow，仅保留间距） ===== */
 .stats-card {
+  margin-bottom: 20rpx;
+}
+
+/* ===== 板块K线卡片（Card 提供 bg/border/shadow，仅保留间距） ===== */
+.kline-card {
   margin-bottom: 20rpx;
 }
 
