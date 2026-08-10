@@ -257,7 +257,7 @@ const DIRECTION_KEYS: ReadonlySet<string> = new Set(['bullish', 'bearish', 'neut
 const CONFIDENCE_KEYS: ReadonlySet<string> = new Set(['high', 'medium', 'low'])
 const PREDICTION_STATUS_KEYS: ReadonlySet<string> = new Set(['confirmed', 'hypothesis', 'insufficient'])
 
-function toPredictionPresentation(raw: MarketTracePrediction | null | undefined): PredictionPresentation | null {
+export function toPredictionPresentation(raw: MarketTracePrediction | null | undefined): PredictionPresentation | null {
   if (!raw || typeof raw !== 'object' || !PREDICTION_STATUS_KEYS.has(raw.prediction_status)) return null
   const horizons = Array.isArray(raw.horizons)
     ? raw.horizons

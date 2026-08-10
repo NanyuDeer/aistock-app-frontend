@@ -249,6 +249,22 @@
       }
     },
     {
+      "path": "modules/analytics/pages/prediction-history",
+      "style": {
+        "navigationBarTitleText": "预测验证",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "modules/analytics/pages/prediction-detail",
+      "style": {
+        "navigationBarTitleText": "预测详情",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "modules/analytics/pages/report-detail",
       "style": {
         "navigationBarTitleText": "财报详情",

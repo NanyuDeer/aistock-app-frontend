@@ -2,6 +2,28 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-10 — B2.1 历史预测跟踪页面（列表/详情/入口）
+
+**开发者**: 37588
+
+### 新增
+- `src/shared/api/modules/prediction.ts`：`predictionApi.list/detail` + `PredictionRecord/PredictionStats/PredictionListResponse` 等类型
+- `src/modules/analytics/utils/predictionHistory.ts` + `predictionHistory.spec.ts`：状态纯函数（单档/整体/命中率口径，6 测试）
+- `src/modules/analytics/pages/prediction-history.vue`：预测验证列表页（命中率统计栏 + 全部/进行中/已结束筛选 + 预测卡片含 prediction_status 与三档进度）
+- `src/modules/analytics/pages/prediction-detail.vue`：预测详情页（复用 MarketTracePrediction + 新增验证结果区）
+- `src/modules/analytics/components/PredictionVerification.vue`：逐档位验证结果组件
+
+### 改进
+- `src/modules/analytics/pages/traceability.vue`：右上角「预测验证」入口（#header-right 插槽）
+- `src/pages.json`：注册 prediction-history / prediction-detail 路由
+- `src/modules/analytics/utils/marketTraceReview.ts`：导出 `toPredictionPresentation`（详情页复用）
+
+### 测试
+- analytics node:test 38/38；tsc/vue-tsc 0 错误；build:h5 成功
+
+---
+
+
 ## [master] 2026-08-08 — 首页异动捕手模块恢复列表展示（日期并入描述行）
 
 **开发者**: Aria
