@@ -120,7 +120,7 @@ const headlineCount = computed(() => (positiveEvent.value ? 1 : 0) + (negativeEv
 
 /**
  * 加载重大事件：调用 getFocusEvents() 获取 rank=1（当前焦点）和 rank=2（持续影响）的事件
- * 数据流：getEventList → 筛选 globalImportanceRank → 获取详情 → 转换为 FocusEventViewModel
+ * 数据流（第三阶段）：getEventList（直出 chain_summary）→ adapter 生成 affectedIndustries → getFocusEvents 直接消费，不再请求详情
  */
 async function loadFocusEvents() {
   try {

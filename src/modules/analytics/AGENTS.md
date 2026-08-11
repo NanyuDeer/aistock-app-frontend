@@ -25,6 +25,7 @@
 
 - `GET /api/cn/stocks/trend-score/top`：最新趋势评分榜单。
 - `GET /api/cn/stocks/:symbol/trend-score/detail`：单股四维评分详情。
+- 前端封装位于 `shared/api/modules/trend-score.ts`，页面中禁止直接发起 HTTP 请求。
 - `GET /api/predictions`：历史预测列表（B2.1，含命中率统计）。
 - `GET /api/predictions/:id`：历史预测详情（B2.1）。
 - 前端封装位于 `shared/api/modules/prediction.ts`（predictionApi.list/detail）与 `shared/api/modules/trend-score.ts`，页面中禁止直接发起 HTTP 请求。

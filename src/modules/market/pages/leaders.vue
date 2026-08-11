@@ -1054,6 +1054,21 @@ onShow(() => {
   color: #9ca3af;
 }
 
+/* 标题栏右侧按钮容器 + 播报按钮（与趋势股评分页一致，横向排列） */
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.header-podcast-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .history-btn {
   padding: 8rpx 16rpx;
   background: rgba(77, 124, 254, 0.1);

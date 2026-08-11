@@ -488,6 +488,11 @@ export const stockApi = {
     return request.get(`/cn/stocks/${symbol}/news`, { params })
   },
 
+  /** 获取自选股资讯（异动捕手/个股情报列表） */
+  getFavoritesNews(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
+    return request.get('/cn/favorites/news', { params }).then((res: Record<string, unknown>) => res)
+  },
+
   /** 获取趋势股评分（四维：技术面/行业赛道景气/消息面催化/基本面，含一票否决检查） */
   getTrendScore(symbol: string) {
     return request.get(`/cn/stocks/${symbol}/trend-score`).then((res: Record<string, unknown>) => normalizeTrendScore(res))
@@ -498,16 +503,18 @@ export const stockApi = {
     return request.get(`/cn/tags/${tagCode}/leaders`)
   },
 
-  /** 获取风口龙头（长线风口，返回 hot_sectors 数组） */
+  /** 获取风口龙头（长线风口，返回 hot_sectors 数组）
+   *  timeout 放宽到 30s：服务器 getAnalysis 缓存 miss 时会实时抓取成分股行情，响应可达 8s+ */
   getWindLeaders(limit = 8) {
-    return request.get<WindLeaderResponse>('/cn/wind-leaders', { params: { limit } })
+    return request.get<WindLeaderResponse>('/cn/wind-leaders', { params: { limit }, timeout: 30000 })
   },
 
-  /** 板块日 K 线（同花顺板块指数，近 N 日默认 120）；无数据/失败返回 null */
+  /** 获取板块日 K 线（同花顺 bk_ 源，近 N 日，默认 120；服务器需抓取同花顺，放宽超时） */
   getBoardKline(code: string, days = 120) {
-    return request
-      .get<TrendKLineData>('/cn/wind-leaders/board-kline', { params: { code, days } })
-      .catch(() => null)
+    return request.get<TrendKLineData>('/cn/wind-leaders/board-kline', {
+      params: { code, days },
+      timeout: 30000,
+    })
   },
 
   /** 获取机构调研热门股（共振检测） */
@@ -525,11 +532,6 @@ export const stockApi = {
   /** 获取个股异动事件（重磅消息） */
   getTrendEvents(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
     return request.get('/cn/stock-monitors/events', { params }).then((res: Record<string, unknown>) => res)
-  },
-
-  /** 获取登录用户自选股的个股资讯（需登录，未登录调 getTrendEvents 看全市场） */
-  getFavoritesNews(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
-    return request.get('/cn/favorites/news', { params }).then((res: Record<string, unknown>) => res)
   },
 
   /** 获取财联社头条新闻 */
