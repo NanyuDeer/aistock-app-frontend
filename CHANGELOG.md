@@ -2,6 +2,24 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-11 — Phase 2 断点续传（问题 15）+ 打断/停止/重试 + 遗留补丁
+**开发者**: 37588
+
+### 新增
+- `src/shared/utils/useChatStream.ts`：socket 模块级单例（页面 onUnmounted 不再 disconnect，后台生成继续）；`hasPendingRun()` / `resume()` / `isConnected()`（onShow 回页自动续跑，resume_status none 自动重发最后一条 user 消息兜底）；`stop()` / `retry()` / `hasStoppedRun()`；handleWsMessage 新增 resume_status / stop_status / cancelled 分支（本地兜底落消息 + 去重）
+- 遗留补丁：stop_status 置 doneReceived（防后端 stop 后迟发残留 text/done）；resume 轮断连结算（模块级 resumeInFlight 标记——断连只结算 streaming、不落错误消息，保留 pending 供 onShow 再 resume）
+
+### 改进
+- `src/pages-sub-app/chat/index.vue`：onShow 自动 resume 续跑；生成中「发送」替换为「停止」（isStreaming 联动）；error/cancelled 终态气泡显示「重试」；deep-btn 守卫排除 '已停止生成'（cancelled 不渲染深度分析按钮）
+- 跨仓库契约：agent-py 同批新增 resume/stop 控制消息（WS 事件协议/DONE 负载字节不变，纯增量）
+
+### 文档
+- AGENTS.md / src/modules/chat/AGENTS.md：useChatStream 断点续传 + 打断/停止/重试说明
+
+> 验证：useChatStream.spec 24/24 + vue-tsc 0 + build:h5 ok；vitest 全量 A/B 失败集一致（FloatingPodcast flake 重跑 2/2）；整分支 review Ready to merge。
+
+---
+
 ## [changer] 2026-08-11 — P0 身份鉴权（Phase 1a）
 **开发者**: 37588
 
