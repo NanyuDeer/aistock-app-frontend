@@ -75,6 +75,8 @@ describe('useChatStream reasoning event', () => {
     mockSetSessionId.mockClear()
     mockWsFail.fail = false
     vi.mocked(agentApi.sendMessage).mockReset()
+    // 单例化后：重置模块级 socket 状态（问题 15），避免用例间共享连接污染
+    stream._testReset()
   })
 
   it('aggregates reasoning chunks by node and stores on DONE', () => {
@@ -272,5 +274,65 @@ describe('useChatStream reasoning event', () => {
     const last = mockAppendMessage.mock.calls.at(-1)?.[0]
     expect(last.role).toBe('assistant')
     expect(last.content).toContain('连接已断开')
+  })
+})
+
+describe('useChatStream resume（问题 15 断点续传）', () => {
+  it('hasPendingRun：最后一条是 user 消息时返回 true', () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '你好', timestamp: 1 })
+    expect(stream.hasPendingRun()).toBe(true)
+    stream.messages.value.push({ role: 'assistant', content: '回复', timestamp: 2 })
+    expect(stream.hasPendingRun()).toBe(false)
+  })
+
+  it('resume：连接在线时发送 resume 控制消息（不重复 connect）', async () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '你好', timestamp: 1 })
+    // 模拟已连接：先 send 一次触发 connect（onOpen 同步触发 → wsConnected=true）
+    stream.send('第一条')
+    mockSocketSend.mockClear()
+    const p = stream.resume()
+    // resume_status running → 不结束；后续 done 结束
+    const sent = mockSocketSend.mock.calls[0][0]
+    const payload = JSON.parse(sent.data)
+    expect(payload.type).toBe('resume')
+    expect(payload.session_id).toBeTruthy()
+    stream._testHandleWsMessage({ type: 'resume_status', status: 'running' }, () => {})
+    stream._testHandleWsMessage({ type: 'done', content: '完整回答' }, () => {})
+    await p
+    expect(mockAppendMessage).toHaveBeenCalledWith(expect.objectContaining({ content: '完整回答', role: 'assistant' }))
+  })
+
+  it('resume：none 时自动重发最后一条 user 消息（不重复 append 用户消息）', async () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '查一下大盘', timestamp: 1 })
+    // 先触发一次连接
+    stream.send('查一下大盘')
+    const userCountBefore = stream.messages.value.length
+    mockSocketSend.mockClear()
+    const p = stream.resume()
+    stream._testHandleWsMessage({ type: 'resume_status', status: 'none' }, () => {})
+    // none 分支触发自动重发 → 重新走 WS send（不发 resume）
+    await p
+    // 用户消息不应重复 append
+    expect(stream.messages.value.length).toBe(userCountBefore)
+    // calls[0] 是 resume 控制消息；calls[1] 是 none 兜底自动重发的普通消息
+    const sent = mockSocketSend.mock.calls[1][0]
+    const payload = JSON.parse(sent.data)
+    expect(payload.type).toBeUndefined()
+    expect(payload.message).toBe('查一下大盘')
+    // 收 done 正常落 assistant
+    stream._testHandleWsMessage({ type: 'done', content: '回答', }, () => {})
+    expect(mockAppendMessage).toHaveBeenCalledWith(expect.objectContaining({ content: '回答' }))
+  })
+
+  it('resume：无 pending 轮时直接返回 false 不发送', async () => {
+    const stream = useChatStream() as any
+    stream.messages.value.length = 0
+    mockSocketSend.mockClear()
+    const ok = await stream.resume()
+    expect(ok).toBe(false)
+    expect(mockSocketSend).not.toHaveBeenCalled()
   })
 })
