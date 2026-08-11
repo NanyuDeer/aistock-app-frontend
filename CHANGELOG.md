@@ -2,6 +2,405 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-10 — B2.1 历史预测跟踪页面（列表/详情/入口）
+
+**开发者**: 37588
+
+### 新增
+- `src/shared/api/modules/prediction.ts`：`predictionApi.list/detail` + `PredictionRecord/PredictionStats/PredictionListResponse` 等类型
+- `src/modules/analytics/utils/predictionHistory.ts` + `predictionHistory.spec.ts`：状态纯函数（单档/整体/命中率口径，6 测试）
+- `src/modules/analytics/pages/prediction-history.vue`：预测验证列表页（命中率统计栏 + 全部/进行中/已结束筛选 + 预测卡片含 prediction_status 与三档进度）
+- `src/modules/analytics/pages/prediction-detail.vue`：预测详情页（复用 MarketTracePrediction + 新增验证结果区）
+- `src/modules/analytics/components/PredictionVerification.vue`：逐档位验证结果组件
+
+### 改进
+- `src/modules/analytics/pages/traceability.vue`：右上角「预测验证」入口（#header-right 插槽）
+- `src/pages.json`：注册 prediction-history / prediction-detail 路由
+- `src/modules/analytics/utils/marketTraceReview.ts`：导出 `toPredictionPresentation`（详情页复用）
+
+### 测试
+- analytics node:test 38/38；tsc/vue-tsc 0 错误；build:h5 成功
+
+---
+
+
+## [master] 2026-08-08 — 首页异动捕手模块恢复列表展示（日期并入描述行）
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/favorites/components/AlertContent.vue`：异动捕手列表由 `InsightAlertCard compact` 卡片换回 `ListCell` 列表（与个股情报模块同款）：标题=股票名、描述=主因归因文案、prefix=涨跌 Tag（涨红/跌绿）
+- 日期（MM-DD）并入描述行（"主因：xxx · 08-07"），移除右侧独立 value 与 `.capture-time` 样式；`.capture-list` 与 `.intel-list` 样式合并统一（紧凑行距 + 单行截断 + 空行占位等高）
+
+### 测试
+- `src/modules/favorites/components/AlertContent.spec.ts`：断言由 InsightAlertCard 改为 ListCell（标题/描述/涨跌 Tag type/点击跳转），4 用例通过
+
+---
+
+## [changer] 2026-08-10 — 市场洞见页新增影响持续性预判卡片
+
+**开发者**: 37588
+
+### 新增
+- `src/modules/analytics/components/MarketTracePrediction.vue`：影响持续性预判卡片（预测状态 → 三档预判气泡标签 → 演化路径时间轴 → 风险因素），样式对齐同页 MarketTracePredictionValidation.vue
+- `src/shared/api/modules/agent.ts`：`MarketTracePredictionHorizon/Risk/Step/Prediction` 类型 + `MarketTraceTrace.prediction`
+- `src/modules/analytics/utils/marketTraceReview.ts`：`toPredictionPresentation` 防御性提取（prediction/evolutionSteps/horizons 校验，非法返回 null）
+
+### 改进
+- `src/modules/analytics/pages/traceability.vue`：预判对照卡片后插入预测卡片（prediction 为 null 时不渲染，兼容旧报告）
+- 演化路径时间轴优先后端结构化 `evolution_steps`（含档位标签），旧记录回退 narrative 按标点拆分
+- 三档预判气泡化：方向（看多红/看空绿/中性蓝）+ 置信度（置信高/中/低）胶囊标签，对齐个股详情关键词气泡
+
+### 测试
+- `marketTraceReview.spec.ts` 新增 5 用例（prediction 提取三态 + evolution_steps 映射 + 旧记录兼容），15 通过
+
+### 文档
+- `src/modules/analytics/AGENTS.md`：补 traceability 页面与 MarketTracePrediction 组件记录
+
+---
+
+## [changer] 2026-08-09 — 清理合并带入的 mock 环境开关残留
+
+**开发者**: 37588
+
+### 修复
+- `env/.env.production`：移除 `VITE_USE_INSIGHTS_MOCK=true`（合入 master 时被重新带回，与「mock 数据移除」策略不符）
+
+---
+## [master] 2026-08-07 — 晚报市场异象卡片改版为头条风格并移至音频播报下方
+
+**开发者**: Aria
+
+### 改进
+- `pages-sub-app/briefing/components/EveningAnomalyCard.vue`：样式由洞见行改为参考早报「今日头条」卡片——白底圆角 + 左侧主题色竖条 + 顶部 ★ 标签 + 标题 + 结论；label 为「市场异象」、标题为「今日主因」
+- `pages-sub-app/briefing/index.vue`：晚报市场异象卡片从 Agent 洞见之后移到音频播报正下方（与晨报头条卡片位置对齐）；大盘行情/板块行情卡片保持在 Agent 洞见之后
+
+---
+## [changer] 2026-08-07 — 异动捕手卡片视觉重构 + mock 数据移除
+
+**开发者**: 37588
+
+### 新增
+- 共享组件 `src/shared/components/InsightAlertCard.vue`：异动提醒卡片（品牌蓝渐变头部 + 左侧涨跌色条 + 置信度 Tag，含 compact 模式供首页预览卡使用）
+- 模块组件 `src/modules/favorites/components/InsightDetailLayout.vue`：洞察详情布局（头部卡 + 主因/次因/详情/来源多段卡片，条件渲染）
+- 5 个 vitest 测试：`InsightAlertCard.spec.ts`、`InsightDetailLayout.spec.ts`、`monitor.spec.ts`、`insight-detail.spec.ts`、`AlertContent.spec.ts`
+
+### 重构
+- `monitor.vue` 异动列表：`Card` → `InsightAlertCard`，头部 Tag 红涨绿跌实色，左侧色条加宽
+- `AlertContent.vue` 异动捕手模块：`ListCell` → `InsightAlertCard compact`（4 行占位稳定）
+- `insight-detail.vue`：改用 `SubPageCard2` 容器 + `InsightDetailLayout`，移除重复 subtitle
+- 头部渐变：从左到右 `$primary` → `$bg-soft`（蓝 → 浅灰）
+
+### 移除
+- `src/modules/favorites/mock-data.ts`：异动捕手 mock 数据不再进仓库（仅本地开发用）
+- 三个页面 mock 回退逻辑：改走真实 API，接口失败/空数据展示空状态
+- `VITE_USE_INSIGHTS_MOCK` 环境开关（env 三文件 + `src/env.d.ts`）
+- `AGENTS.md` mock-data 说明
+
+### 验证
+- vitest：26 个测试全绿（favorites 模块）
+- `npx tsc --noEmit` 通过
+- `pnpm build:h5` 构建成功
+
+## [master] 2026-08-07 — 晚报页归因结论：优先展示 review 综合主因一句话摘要
+
+**开发者**: Aria
+
+### 改进
+- `shared/api/modules/agent.ts`：`MarketTraceTrace` 新增 `attribution_summary?: string | null`（综合主因的一句话结论，旧报告可能缺失）
+- `shared/utils/eveningBriefCards.ts`：新增 `extractAttributionSummary()`（读 `content.market_trace.trace.attribution_summary`，空值返回空串）；`buildEveningCardViewModel` 结论文本优先取 review 短摘要，缺失时回退 brief 归因结论（主因链拼接长文本）——解决晚报「归因结论」条目超长问题
+
+### 测试
+- `shared/utils/eveningBriefCards.spec.ts`：makeReview 的 trace 增加 attribution_summary 字段（默认 null），新增优先展示/回退/空值 4 个用例（23 passed）
+
+---
+## [master] 2026-08-07 — 晚报页去重：洞见列表仅保留收盘复盘，行情归卡片展示
+
+**开发者**: Aria
+
+### 修复
+- `pages-sub-app/briefing/index.vue`：晚报（type=review）场景下 Agent 洞见列表仅保留「收盘复盘」摘要，不再重复展示「归因结论」与「市场快照」
+  - 背景：此前三条文本全部进入洞见列表，同时 EveningAnomalyCard / EveningMarketIndexCard / EveningSectorsCard 又分别展示归因结论、大盘、板块，导致「归因结论」与「板块行情」内容重复出现
+  - 现在的展示分工：洞见列表 = 收盘复盘摘要；卡片区 = 市场异象（归因结论）+ 大盘行情 + 板块行情，逻辑顺序为现象 → 行情数据 → 归因原因
+
+## [changer] 2026-08-07 — 晚报界面卡片重设计（Agent 洞见风格 + 异象排序）
+
+**开发者**: Aria
+
+### 新增
+- 晚报卡片 ViewModel 组装工具（`shared/utils/eveningBriefCards.ts`）：`detectMarketAnomaly` 异象判定（文本+结构化双重判定）、`extractAttributionConclusion` 归因结论提取、`extractBreadth` 涨跌家数提取
+- 晚报专属卡片组件（`pages-sub-app/briefing/components/`）：`EveningAnomalyCard`（市场异象结论）、`EveningMarketIndexCard`（大盘行情：指数+涨跌家数）、`EveningSectorsCard`（板块行情：领涨/领跌）
+
+### 改进
+- 晚报卡片样式统一为早报 Agent 洞见行风格（白底圆角 + 左侧圆角图标 + mini-tag 标签）
+- 卡片排版：Agent 洞见 → 市场异象（有才显示）→ 大盘行情 → 板块行情；晚报场景下即使 brief 无数据也保留「Agent 洞见」分区标题，保持与早报一致的页面结构
+- `marketTraceReview.ts`：`indexPerfFromUnknown` 支持后端对象（map）结构的 indexes，并兼容 `change_pct`/`pct_change` 字段名
+
+### 修复
+- 大盘行情只显示涨跌家数、无具体指数涨跌：根因是后端 indexes 为对象（map）而前端期望数组，修复后指数正常展示
+- 音频入口文案写死「AI早报音频」：新增 `audioLabelText` 根据播报类型动态显示早报/晚报音频
+
+### 验证
+- `npx tsc --noEmit` 通过
+
+## [master] 2026-08-06 — agent-report wind_leader 分卡片展示 + 板块卡片 markdown 渲染修复
+
+**开发者**: Aria
+
+### 修复
+- `agent-report.vue` wind_leader 板块卡片：body 原用 `<text>` 直接输出导致 `- **上榜次数**：...` 等 markdown 语法原样显示 → 改用 `mp-html` + `markdownToHtml`（新增 `.wind-sector-body-html` 样式）
+
+### 改进
+- 按后端 prompt 章节结构分卡片展示：风口结论（summary）→ 风口概览（`## 风口概览`）→ 长线/短线研判两档切换 + 板块卡片（`###` 子节）→ 龙头股推荐（`## 龙头股推荐` + `display_report.stocks` 代码标签）→ 风险提示（`## 风险提示`）→ 关注建议（`## 关注建议`）
+- 移除原"风口分析（长短线分类）"全文卡片，改为各章节解析均失败时兜底展示原文（避免内容丢失）；新增 `windRiskHtml` / `windAdviceHtml` 章节解析
+
+---
+
+## [master] 2026-08-06 — leaders 泡泡图：半径上限 50px + 双色阶（长线蓝系/短线橙红系）
+
+**开发者**: Aria
+
+### 改进
+- `windLeaderBubble.calcBubbleRadius`：半径上限 65→50px、下限 22→20px（长线满格 120 天 / 短线满格 10 天，`20 + 天数/满格×30`）
+- `windLeaderBubble` 新增双色阶 + `calcBubbleColor(kind, value)`：
+  - 长线蓝系：0.3 浅蓝 `#dbeafe` → 0.5 普通蓝 `#3b82f6` → 0.9 近黑蓝 `#121a44`（0.6 深蓝 `#1552d0`、0.7 藏青 `#1e3a8a`，相邻档亮度差 12~15%）
+  - 短线橙红系：0.3 浅橙 `#fed7aa` → 0.5 普通橙 `#f97316` → 0.8 转红 `#7f1d1d` → 0.9 暗红 `#5b1414`
+  - 0.1/0.2 与 0.3 同色（低于 cycle 门槛的板块会被筛选掉，收敛最浅色）；值在相邻档间线性插值
+- 移除 `calcBubbleOpacity` 透明度逻辑；`leaders.vue bubbleItemStyle` 改用 `calcBubbleColor` 填充色，去掉元素透明度双重叠加；提示文案更新"长线蓝系/短线橙红系"
+
+---
+
+## [master] 2026-08-06 — leaders 泡泡图：大小按长短线各自量级归一化 + 颜色对比度加强
+
+**开发者**: Aria
+
+### 改进
+- `windLeaderBubble.calcBubbleRadius`：长线以 120 天为满格、短线以 10 天为满格，半径 22→65px 线性、超过封顶——修复原 `clamp(26+days×coef,22,65)` 长线 75+ 天全封顶、长短线系数不匹配各自量级的问题（长线 45d→38px / 75d→49px 可区分）
+- `windLeaderBubble.calcBubbleOpacity`：`0.4+0.6×值` → `0.3+0.7×值`，低强度更浅、高强度更深（原 conf/heat 多集中在 0.3~0.6，映射后几乎全是浅蓝无法区分）
+- `leaders.vue bubbleItemStyle`：ratio 反推同步改为 `(opacity-0.3)/0.7`
+
+---
+
+## [master] 2026-08-06 — 风口龙头接口 limit 20→40（配合后端双轨选板）
+
+**开发者**: Aria
+
+### 修复
+- `leaders.vue` / `sector-detail.vue`：`getWindLeaders(20)`→`(40)`——后端双轨选板后分析数约 27，limit=20 会截断短线池候选，导致前端过滤 0 天板块后长短线凑不满 8
+
+---
+
+## [master] 2026-08-06 — leaders 双榜过滤 0 天板块 + cycle 类型对齐
+
+**开发者**: Aria
+
+### 修复
+- `src/modules/market/pages/leaders.vue`：`displaySectors` 先过滤当前档位天数为 0 的板块（另一链被裁剪或长短线均不成立的 `'none'` 板块），再按天数降序取 top8——宁少勿滥，避免短线档塞满 0 天补位板块
+- `src/shared/api/modules/stock.ts`：`WindLeaderSector.cycle` 类型增加 `'none'`，与后端 deriveCycle 四态对齐
+
+---
+
+## [junliang] 2026-08-06 — pages.json 路由重构回滚：恢复被删页面路由 + 删除死文件
+
+**开发者**: Aria
+
+### 修复
+- `src/pages.json`：回滚非自选股洞察相关的路由重构——恢复被误删的页面路由（trend-score 系列 / reports / report-detail / traceability / sector-detail / hot-burst-report / briefing-detail）及原 style 配置，修复这些页面的跳转失效（如洞察页趋势股评分卡片、业绩页 redirectTo reports、长线风口板块详情、首页大盘溯源）；仅保留洞察改动（stock-trace 路由替换为 insight、新增 insight-detail）
+
+### 清理
+- 删除死文件：`src/modules/favorites/pages/stock-trace.vue`（路由已替换为 insight、无跳转引用）、`src/modules/user/pages/icon-gallery.vue`（无路由注册、无跳转引用）
+
+---
+
+## [junliang] 2026-08-06 — 异动监控接入自选股洞察 + 提醒tab更名"自选股洞察"
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/favorites/pages/monitor.vue`：异动监控数据源从已停用的 stock_trace 切换到自选股洞察 API，卡片展示主因 / 置信度（高置信/待验证）/ 日期，点击进入洞察详情页；移除"全部/大涨/大跌"筛选分栏，所有异动事件直接平铺展示；"立即检测"改为刷新列表（洞察由后端 cron 周期采集）
+- `src/modules/favorites/components/AlertContent.vue`：底部"提醒"tab 的"异动捕手"模块更名为"自选股洞察"，数据源切换为洞察 API，列表展示自选股涨停雷达归因事件（股票 + 主因 + 日期），点击事件进洞察详情、点击模块标题进异动监控页
+
+---
+
+## [master] 2026-08-06 — leaders 分档逻辑按天数排序 top8（长短线各满 8 个）
+
+**开发者**: Aria
+
+### 修复
+- `leaders.vue` `displaySectors`：不再按 `cycle` 过滤，改为长线按 `long_term_days` 降序 top8、短线按 `short_term_days` 降序 top8——解决 deriveCycle 对长线不成立板块误判 short 塞入短线档（短线全是 0 天、长线不足 8 个）的问题，两榜各自取天数最高的 8 个，0 天板块自然排后补位
+
+---
+
+## [master] 2026-08-06 — 风口龙头 leaders 页面修复（短线板块截断/次数口径/移除 cycle 标签）
+
+**开发者**: Aria
+
+### 修复
+- `leaders.vue`：`getWindLeaders(10)`→`(20)`——后端双榜（长线榜 top8 + 短线榜 top8）长线在前，limit=10 截断导致短线档只剩 2-3 个板块
+- `leaders.vue`：上榜次数按档位显示（新增 `boardCount`）——短线档显示近 20 日 `freq20`、长线档显示近 60 日 `frequency`（原先统一显示 60 日 frequency，短线次数超 30 次）
+
+### 改进
+- `leaders.vue`：删除 cycle 三态标签展示（长线风口/短线风口/长线+短线 Tag），`cycle` 字段仍用于双榜分流
+
+---
+
+## [changer] 2026-08-06 — ChatAgent 会话用量徽标 + 单轮用量进气泡 + 气泡消失修复 + HTTP 降级 token_usage + WS 端口对齐 8080
+
+**开发者**: Aria
+
+### 新增
+- 会话列表 token 用量徽标（`sessions.vue`）：本地 `sessionUsage` 优先 + 服务端 `getChatSessionUsage` 补足（未登录也显示本地用量）；`sessionUsageMerge.ts` 纯函数合并（本地优先，服务端仅补缺失会话，不数值相加避免翻倍）
+- 聊天气泡底部单轮用量文本（`index.vue`）：左侧「N tokens」+ 右侧深度分析按钮；移除底部 `<UsageBar />`
+- `ChatMessage` 类型扩展 `tokenUsage?`/`cards?`；`agentApi.getTokenUsageSummary()`
+
+### 修复
+- 气泡消失根因（`useChatStream.ts`）：Pinia store 实例上访问 computed 被自动解包成普通值 → 消费方捕获陈旧数组快照 → v-for 永不更新；改用 `storeToRefs(chatStore)` 暴露响应式 ref
+- HTTP 降级路径 token_usage 透出（`useChatStream.ts`）：降级分支 `appendMessage` 透出 `tokenUsage: result.token_usage`（此前恒 undefined）
+- `sendMessage` 超时 15s→120s（非流式跑完整 graph ~50s 会超时无回复）
+- `deleteSession` 同步清理 `sessionUsage` 残留（防幽灵徽标）
+
+### 改进
+- `env/.env.development` + `env/.env.example`：`VITE_AGENT_WS_BASE` 端口 `8000`→`8080` 对齐 agent-py 新端口
+
+### 验证
+- vitest 19 文件 98+ 用例全绿；vue-tsc 0 错误
+- 浏览器实测气泡用量 + 会话徽标均正常显示
+
+---
+
+## [master] 2026-08-06 — 修复动态模块加载失败（SCSS 未定义变量）
+
+**开发者**: Aria
+
+### 修复
+- `src/modules/chat/pages/agent-report.vue`：`$ink-2` → `$ink-soft`，修复 sass Undefined variable 导致的 Failed to fetch dynamically imported module
+- `src/modules/market/pages/leaders.vue`：`$color-primary` → `$primary-color`、`$text-secondary` → `$text-color-secondary`（3 处），同类问题
+
+---
+
+## [master] 2026-08-05 — 今日分析概览页新增晚报（收盘复盘）入口与结构化展示
+
+**开发者**: Aria
+
+### 新增
+- `src/modules/chat/pages/agent-report.vue`：概览模式新增「收盘复盘」卡片（AGENT_META review：moon-line 图标 + 紫色主题，排在 trend_score 之后）；详情模式新增 review 结构化展示（参考晨报分区：收盘结论 / 确认的市场现象 / 归因结论 / 预判对照 / 候选解释与反证 / 风险提示），`conclusion-card--review` 紫色主题色
+- `src/shared/api/modules/agent.ts`：`PUBLIC_REPORT_INTENTS` 加入 `review`，支持从 URL `?intent=review` 直达详情
+
+---
+
+## [master] 2026-08-05 — 播报续播：早报/晚报退出页面移交悬浮窗续播
+
+**开发者**: Aria
+
+### 改进
+- `src/pages-sub-app/briefing/index.vue`：退出页面时把播放移交悬浮窗续播（从当前进度续播）；移除冗余条目标题，来源标签升级为标题样式
+- `src/shared/components/AudioPlayer.vue`：新增 `initialTime` 属性（自动播放时跳到指定进度，实现续播）；播放被浏览器拦截时静默
+- `src/shared/components/FloatingPodcast.vue`：收起态保持 AudioPlayer 挂载（音频持续播放，仅视觉隐藏）；播放中悬浮球图标持续旋转；新增 play/pause/ended 事件同步
+- `src/shared/store/modules/podcast.ts`：新增 `playDirect`（直接播放已有音频，跳过文本合成）、`setPlaying`/`consumeAutoplay`（同步播放状态）、`autoplay`/`startTime`/`playing` 状态字段
+
+---
+
+## [changer] 2026-08-05 — ChatAgent P9 会话管理（会话列表页 + 多会话 store + 会话 API 层）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\2026-08-05-chat-agent-p9-session-management.md`
+
+### 新增
+- `src/shared/api/modules/agent.ts`：`ChatSessionMeta` 接口（session_id/title/last_message_at?/created_at?）+ `agentApi.listChatSessions()`（GET /chat/sessions，失败静默返回 []）/ `upsertChatSession(sessionId, question?)`（POST /chat/sessions，fire-and-forget 静默失败）/ `deleteChatSession(sessionId)`（DELETE /chat/sessions/:id，静默失败）
+- `src/pages-sub-app/chat/sessions.vue`（pages.json 注册于 chat/index 后）：会话列表页——新建/切换/删除 + 相对时间（刚刚/N分钟前/N小时前/N天前/日期）+ 当前会话高亮 + 空态；仅登录时 onShow 拉 server 列表合并；样式走 Design Token（variables.scss）+ SvgIcon（chat-history-line/add-line/delete-bin-line）
+
+### 重构
+- `src/shared/store/modules/chat.ts`：单会话 → 多会话——新增 `sessions: ChatSessionMeta[]` + `messagesBySession: Record<string, ChatMessage[]>`（本地 storage 分桶，CHAT_SESSIONS / CHAT_HISTORY_BY_SESSION）；对外导出保持兼容（messages computed / sessionId / setSessionId / appendMessage / clearHistory / sendMessage）；新增 `createSession`（`app_${Date.now()}`，同毫秒碰撞追加自增后缀）/ `switchSession`（归档当前 + 切 id 持久化）/ `deleteSession`（清本地 + fire-and-forget server 删除，删当前会话切最近或新建）/ `syncSessionsFromServer`（server 覆盖本地同名 title/last_message_at，保留本地仅有）/ `hasUserMessage`；一次性旧数据迁移 `migrateLegacyHistory`（旧 CHAT_HISTORY → messagesBySession[旧 CHAT_SESSION_ID]，迁移后删旧 key）
+
+### 改进
+- `src/pages-sub-app/chat/index.vue`：header-right 新增「会话」入口（chat-history-line）→ 会话列表页；onLoad 无当前会话时自动 createSession；handleSend/quickAsk 前置 `upsertSessionMeta`（仅登录且 `!hasUserMessage` 时 fire-and-forget，须在 chatStream.send 之前调用）
+
+### 文档
+- 根 AGENTS.md §2 会话管理页面行 + §6.2 agent.ts 会话 API；README 模块表 AI 对话补充会话管理
+
+### 测试
+- `chatStore.spec.ts`（vitest 10 用例）+ `chatSessions.spec.ts`（node:test 6 用例）+ `sessions.spec.ts` 源码断言 + `index.spec.ts` 会话入口断言；vitest 全量 8 文件 31/31 通过 + `npx tsc --noEmit` 0 errors
+
+---
+
+## [changer] 2026-08-05 — ChatAgent P5-fix 前端会话持久化（问题 14 session_id 回写）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\chat-agent-roadmap.md` §1 P5-fix 行 / §4 问题 14
+
+### 修复
+- `chatStore.setSessionId`（写 ref + storage 持久化，新增 `STORAGE_KEYS.CHAT_SESSION_ID`）；`useChatStream` WS 路径首轮生成 session_id 后 `setSessionId` 写回、后续轮复用；HTTP 降级路径改用 `setSessionId`；`clearHistory` 同步清 sessionId —— 此前 WS 路径每轮生成新 `app_${Date.now()}` → 后端 checkpointer 每轮新 thread → 多轮指代/纠错失效
+
+### 测试
+- `useChatStream.spec.ts` 新增"session_id 持久化 + 跨 send 复用"用例；mock 修正（getter 模拟 Pinia ref unwrap + sessionRef 状态测试间重置）；vitest 全量 21/21 + `npx tsc --noEmit` 0 errors
+
+---
+
+## [changer] 2026-08-04 — ChatAgent P6 退役清理（市场复盘 tab 前端代码 + $success 修复）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\2026-08-04-chat-agent-p6-retirement.md`
+
+### 重构
+- 删除 `src/shared/utils/useStreamingChat.ts`（SSE 旧对话流死代码，全仓 0 消费者）+ `tests/AdvisorTraceTransport.test.ts`
+- 移除 `skillResult` / `advisorTrace` 类型字段与渲染：agent.ts（`ChatMessage.skillResult/advisorTrace` + `SkillResult`/`AdvisorTrace` 接口）、useChatStream.ts 映射、chat.ts store（`setLastAssistantAdvisorTrace` + sendMessage 两字段映射，sendMessage 本体保留）、modules/chat/pages/index.vue（skillResult 卡片渲染块 + goStockDetail/getFlowClass/formatFlowAmount 辅助函数）；`MarketTrace*` 类型族与 `getMarketTraceReview` 保留（analytics 消费）
+
+### 修复
+- `src/modules/favorites/pages/search.vue`：`$success` → `$success-color`（未定义 SCSS 变量基线错误，master 合并 4dc71be 引入，阻塞 build:h5）
+
+### 文档
+- 根 AGENTS.md 移除 2 处陈旧 useStreamingChat 引用；modules/chat/AGENTS.md 注释更新
+
+### 测试
+- vitest 20/20 + `npx tsc --noEmit` 0 errors + `pnpm build:h5` 通过
+
+---
+
+## [changer] 2026-08-04 — ChatAgent P5 大盘概览接入（工作线 C）
+
+**开发者**: Aria
+
+计划：`D:\ai_stock_app\docs\superpowers\plans\2026-08-04-chat-agent-p5-capability.md`
+
+### 新增
+- `src/shared/api/modules/stock.ts`：`stockApi.getCnIndexQuotes(symbols)`（纯数字 6 位代码 → `/api/cn/index/quotes`，中文键→驼峰映射，`CnIndexQuote` 类型）
+- `src/modules/home/components/StockContent.vue`：首页行情 tab 顶部接入 `MarketOverview`（大盘三指数）+ onMounted fetch
+
+### 改进
+- `src/shared/store/modules/market.ts`：`fetchIndices` 改走 `getCnIndexQuotes(['000001','399001','399006'])`（000001 语义=上证指数，接口分离消解 `getCoreQuotes` 带前缀 400 参数歧义）；删除 `mapIndexName` 硬编码映射（服务端 CN_INDEX_NAMES 提供名称）
+
+### 测试
+- 新建 `src/shared/store/modules/market.spec.ts`（2 用例）+ `src/modules/home/components/StockContent.spec.ts`（1 用例）；vitest 全量 23/23 通过
+- `npx tsc --noEmit` 0 errors；`pnpm build:h5` 成功
+
+---
+
+## [feat/market-trace-improvement] 2026-08-03 — 三大任务前端：播报优化 + OCR识图加自选 + 悬浮播报
+
+**开发者**: Aria
+
+### 新增
+- `src/shared/components/FloatingPodcast.vue`：悬浮播报（右侧贴边、纵向 1/3、悬浮球 72rpx 可拖动吸附左右边缘、展开态仅 AudioPlayer，按钮经 #actions 插槽放标题右侧）
+- `src/shared/store/modules/podcast.ts`：Pinia 播报 store（open/generate/expand/collapse/close，跨页共享）
+- `src/shared/utils/ocrImage.ts`：OCR 选图/压缩（H5 canvas 压缩 / App uni.compressImage + base64）
+- `src/shared/utils/useReportPodcast.ts`：从 /agent/report/:intent/:date 拉取 podcast_brief，以 report_{intent}_{date} 为缓存 key 打开悬浮播报
+
+### 改进
+- `src/shared/components/PodcastCard.vue`：MAX_PODCAST_TEXT_LENGTH=250 文本裁剪（与后端校验一致）+ 音频命中缓存时 cached 提示
+- `src/shared/components/AudioPlayer.vue`：新增 `#actions` 具名插槽（标题右侧操作区）
+- `src/modules/favorites/pages/search.vue`：重写为「文字搜索 / 识图添加」双 Tab，支持选图→预览→识别→勾选→批量加自选
+- `src/shared/api/modules/stock.ts`：新增 OcrImageInput/OcrStockItem 类型 + ocrStocksFromImages（timeout 100s，batchConcurrency 2）
+- `src/shared/store/modules/favorites.ts`：新增 addMany 批量加自选（已存在跳过）
+- 报告页播报按钮接线：alert-analysis / agent-report / hot-burst / leaders / trend-score；SubPageCard/SubPageCard2/MainTabs 挂载 FloatingPodcast
+
+### 修复
+- `ai-analysis.vue` / `reports.vue`：预先存在类型错误修复（formatMetricKey String 转换、filter 参数标注），保证 type-check 全绿
+
+---
+
 ## [master] 2026-08-01 — 重磅事件跳 AI 事件分析页 + 早晚报切换 + agent-report 兜底渲染
 
 **开发者**: Aria
@@ -192,7 +591,7 @@
 - 趋势股评分 AI 分析报告页（trend-score-report.vue）+ 列表页入口
 - 早点听播报页重构为结构化早晚报（方案四：分段式布局）
 - 底部 Tab 从 4Tab 重构为 3Tab（早点听/选股/提醒）
-- 异动捕手新模块页面 + 个股情报路由改名
+- 异动捕手新模块页面 + 自选股情报（原个股情报）路由改名
 - 长线风口接入后端 API + 板块详情子页面拆分
 - H5 页面固定 9:16 长宽比
 

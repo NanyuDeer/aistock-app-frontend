@@ -43,5 +43,14 @@ export const STORAGE_KEYS = {
   FAVORITES: 'favorites',
   APP_CONFIG: 'app_config',
   CHAT_HISTORY: 'chat_history',
-  THEME: 'theme'
+  // P5-fix（问题 14）：对话 session_id 持久化（刷新后多轮上下文不丢）
+  CHAT_SESSION_ID: 'chat_session_id',
+  // P9 会话管理：会话元数据列表镜像 + 按会话分桶的消息
+  CHAT_SESSIONS: 'chat_sessions',
+  CHAT_HISTORY_BY_SESSION: 'chat_history_by_session',
+  // P11 T2：会话维度 token 本地累加（key=session_id → TokenUsage）
+  CHAT_SESSION_USAGE: 'chat_session_usage',
+  THEME: 'theme',
+  // 播报连续播放开关（持久化；true=连续排队，false/缺省=互斥）
+  PODCAST_CONTINUOUS: 'podcast_continuous'
 } as const

@@ -1,7 +1,7 @@
 <template>
   <view class="as-audio-player">
-    <!-- 头部：封面 + 标题（标题位于按钮上方） -->
-    <view v-if="title || cover" class="as-audio-player__header">
+    <!-- 头部：封面 + 标题（标题左侧，右侧可注入操作按钮） -->
+    <view v-if="title || cover || $slots.actions" class="as-audio-player__header">
       <image
         v-if="cover"
         class="as-audio-player__cover"
@@ -9,6 +9,9 @@
         mode="aspectFill"
       />
       <text v-if="title" class="as-audio-player__title">{{ title }}</text>
+      <view v-if="$slots.actions" class="as-audio-player__actions">
+        <slot name="actions" />
+      </view>
     </view>
 
     <!-- 播放控制：快退 -10s / 播放暂停 / 快进 +10s -->
@@ -67,6 +70,7 @@ interface InnerAudioContextLike {
   duration: number
   play(): void
   pause(): void
+  stop(): void
   seek(time: number): void
   destroy(): void
   onTimeUpdate(cb: () => void): void
@@ -119,8 +123,11 @@ const props = withDefaults(defineProps<{
   cover?: string
   /** 是否自动播放 */
   autoplay?: boolean
+  /** 自动播放时的起始进度（秒），配合 autoplay 实现退出页面后续播 */
+  initialTime?: number
 }>(), {
-  autoplay: false
+  autoplay: false,
+  initialTime: 0,
 })
 
 const emit = defineEmits<{
@@ -132,6 +139,8 @@ const emit = defineEmits<{
   ended: []
   /** 播放进度更新 */
   timeupdate: [currentTime: number]
+  /** 组件卸载（引擎销毁前）：上报播放状态，供悬浮窗记录跨页续播点 */
+  unmount: [{ playing: boolean; currentTime: number }]
 }>()
 
 const playing = ref(false)
@@ -220,7 +229,9 @@ function createUniEngine(src: string): AudioEngine {
     pause: () => ctx.pause(),
     seek: (t: number) => { ctx.seek(t); currentTime.value = t },
     setSrc: (s: string) => { ctx.src = s },
-    destroy: () => ctx.destroy()
+    // 卸载/换源时先 stop 再 destroy：保证音频立即停止（全局互斥抢占时，
+    // FloatingPodcast 通过清空 src 卸载本组件，必须停掉正在播放的音频）
+    destroy: () => { ctx.stop(); ctx.destroy() }
   }
 }
 
@@ -331,7 +342,7 @@ watch(() => props.src, (src) => {
   playing.value = false
   setupEngine(src)
   if (src && props.autoplay) {
-    nextTick(() => engine?.play())
+    nextTick(() => playFromInitial())
   }
 })
 
@@ -339,14 +350,32 @@ onMounted(() => {
   if (props.src) {
     setupEngine(props.src)
     if (props.autoplay) {
-      nextTick(() => engine?.play())
+      nextTick(() => playFromInitial())
     }
   }
 })
 
+/** 自动播放并跳到指定进度（续播场景）；播放被浏览器拦截时静默，用户可手动点击 */
+function playFromInitial() {
+  if (!engine) return
+  if (props.initialTime > 0) engine.seek(props.initialTime)
+  engine.play()
+}
+
 onUnmounted(() => {
+  // 先上报播放状态（引擎销毁后 currentTime 归零/事件失效），再销毁引擎
+  emit('unmount', { playing: playing.value, currentTime: currentTime.value })
   engine?.destroy()
   engine = null
+})
+
+/** 暴露控制方法：FloatingPodcast 注册到 podcast store，供页面播放按钮暂停/继续 */
+defineExpose({
+  pause: () => engine?.pause(),
+  play: () => engine?.play(),
+  togglePlay,
+  /** 跳转到指定进度（秒） */
+  seekTo: (t: number) => engine?.seek(t),
 })
 </script>
 
@@ -383,6 +412,14 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 头部右侧操作区（由父组件注入） */
+.as-audio-player__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: $s-1;
 }
 
 /* 控制按钮 */

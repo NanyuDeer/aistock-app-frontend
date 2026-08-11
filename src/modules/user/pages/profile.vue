@@ -42,6 +42,11 @@
               <Switch v-model="settings.leader_push" @change="(val) => onSettingChange('leader_push', val)" />
             </template>
           </ListCell>
+          <ListCell title="自选股洞察推送" description="自选股触发涨停雷达时推送洞察" :border="true">
+            <template #value>
+              <Switch v-model="settings.watchlist_insight_push" @change="(val) => onSettingChange('watchlist_insight_push', val)" />
+            </template>
+          </ListCell>
         </Card>
       </view>
 
@@ -107,11 +112,12 @@ const userStore = useUserStore()
 const favoritesStore = useFavoritesStore()
 const isLoggedIn = computed(() => userStore.isLoggedIn())
 const userInfo = computed(() => userStore.userInfo)
-// 默认全部关闭，由 API 返回值覆盖
+// 自选股洞察推送默认开启，其余默认关闭（区分策略）；由 API 返回值覆盖
 const DEFAULT_SETTINGS: UserSettings = {
   stock_push: false,
   outbreak_push: false,
   leader_push: false,
+  watchlist_insight_push: true,
 }
 const settings = ref<UserSettings>({ ...DEFAULT_SETTINGS })
 const favoriteStocks = computed(() => favoritesStore.stocks)
@@ -140,6 +146,8 @@ async function loadSettings() {
       stock_push: map.stock_push ?? false,
       outbreak_push: map.outbreak_push ?? false,
       leader_push: map.leader_push ?? false,
+      // PRD：自选股洞察推送默认开启；后端无该记录（首次进入）时回退为开启
+      watchlist_insight_push: map.watchlist_insight_push ?? true,
     }
   } catch (e) {
     // API 未实现或失败时，保持默认值
@@ -185,7 +193,7 @@ function goFavorites() {
 }
 
 function goAbout() {
-  uni.showToast({ title: 'AI Stock v2.1', icon: 'none' })
+  uni.showToast({ title: '洞见 v2.1', icon: 'none' })
 }
 
 function goStockDetail(symbol: string) {

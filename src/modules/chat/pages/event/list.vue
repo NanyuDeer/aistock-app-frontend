@@ -3,16 +3,25 @@
     <view class="event-list-content">
       <!-- AI关注焦点区域 -->
       <view v-if="focusEvents.length > 0" class="ai-focus-section">
-        <text class="section-title">焦点事件</text>
-        <view class="headline-cards">
+        <text class="section-title">重大事件</text>
+        <!-- 固定左利好/右利空；单一时单卡全宽，不保留空白卡位 -->
+        <view :class="headlineCount === 1 ? 'headline-single' : 'headline-cards'">
           <EventHeadlineCard
-            v-for="event in focusEvents"
-            :key="event.eventId"
-            :type="event.direction"
-            :title="event.title"
-            :importance="event.importance"
-            :industries="event.industries"
-            :event-id="event.eventId"
+            v-if="positiveEvent"
+            type="positive"
+            :title="positiveEvent.title"
+            :importance="positiveEvent.importance"
+            :industries="positiveEvent.affectedIndustries ?? []"
+            :event-id="positiveEvent.eventId"
+            @click="handleHeadlineClick"
+          />
+          <EventHeadlineCard
+            v-if="negativeEvent"
+            type="negative"
+            :title="negativeEvent.title"
+            :importance="negativeEvent.importance"
+            :industries="negativeEvent.affectedIndustries ?? []"
+            :event-id="negativeEvent.eventId"
             @click="handleHeadlineClick"
           />
         </view>
@@ -65,7 +74,7 @@
             <text class="load-more-text">加载中...</text>
           </view>
           <view v-else-if="hasMore" class="load-more-btn" @tap="loadMore">
-            <text class="load-more-text">加载更多 ({{ total - events.length }} 条)</text>
+            <text class="load-more-text">加载更多</text>
           </view>
           <view v-else-if="events.length > 0" class="load-more-btn">
             <text class="load-more-text done-text">— 已加载全部 {{ total }} 条事件 —</text>
@@ -83,7 +92,7 @@
  * 从早点听卡片入口进入，展示 AI 事件影响链分析。
  * 支持分类筛选、分页加载、关注事件。
  */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { EventItem } from '@/modules/chat/event/types'
 import type { FocusEventViewModel } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
@@ -99,18 +108,25 @@ import { EVENT_TYPES } from '@/modules/chat/event/constants'
 // ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
 const tabItems = [{ label: '全部', value: '全部' }, ...EVENT_TYPES.map(v => ({ label: v, value: v }))]
 
-// ========== 焦点事件（基于 Global Importance 排序，由 eventService 提供） ==========
+// ========== 重大事件（基于 Global Importance 排序，由 eventService 提供） ==========
 const focusEvents = ref<FocusEventViewModel[]>([])
 
+/** 左卡 = 利好事件（positive），右卡 = 利空事件（negative）；忽略 mixed */
+const positiveEvent = computed(() => focusEvents.value.find(e => e.direction === 'positive') ?? null)
+const negativeEvent = computed(() => focusEvents.value.find(e => e.direction === 'negative') ?? null)
+
+/** 重大事件卡片数量（0/1/2），驱动单卡全宽 / 双卡布局 */
+const headlineCount = computed(() => (positiveEvent.value ? 1 : 0) + (negativeEvent.value ? 1 : 0))
+
 /**
- * 加载焦点事件：调用 getFocusEvents() 获取 rank=1（当前焦点）和 rank=2（持续影响）的事件
- * 数据流：getEventList → 筛选 globalImportanceRank → 获取详情 → 转换为 FocusEventViewModel
+ * 加载重大事件：调用 getFocusEvents() 获取 rank=1（当前焦点）和 rank=2（持续影响）的事件
+ * 数据流（第三阶段）：getEventList（直出 chain_summary）→ adapter 生成 affectedIndustries → getFocusEvents 直接消费，不再请求详情
  */
 async function loadFocusEvents() {
   try {
     focusEvents.value = await getFocusEvents()
   } catch (error) {
-    console.error('加载焦点事件失败:', error)
+    console.error('加载重大事件失败:', error)
   }
 }
 
@@ -215,8 +231,13 @@ async function handleFollow(event: EventItem) {
 .headline-cards {
   display: flex;
   flex-direction: row;
-  gap: 12rpx;
+  gap: 8rpx;
   align-items: stretch;
+}
+
+/* 单个重大事件：单卡占满内容宽度（EventHeadlineCard 根节点 flex:1 自动填充） */
+.headline-single {
+  display: flex;
 }
 
 .event-list {

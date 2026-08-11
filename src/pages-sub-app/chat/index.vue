@@ -1,5 +1,10 @@
 <template>
   <SubPageCard2 :title="'AI 投顾'" :no-chat-bar="true">
+    <template #header-right>
+      <view class="sessions-entry" @tap="goSessions">
+        <SvgIcon name="chat-history-line" size="36rpx" color="#0b5fff" />
+      </view>
+    </template>
     <view class="chat-content">
       <!-- 消息列表 -->
       <scroll-view scroll-y class="message-list" :scroll-top="scrollTop">
@@ -11,96 +16,63 @@
           <view v-else class="msg-content assistant">
             <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
             <view class="bubble">
-              <!-- 折叠的进度步骤（完成后保留，仅 general 模式） -->
-              <view
-                v-if="chatMode === 'general' && msg.progressSteps && msg.progressSteps.length > 0"
-                class="progress-collapse"
-                @tap="toggleProgress(idx)"
-              >
-                <text class="progress-collapse-title">运行过程 ({{ msg.progressSteps.length }})</text>
-                <SvgIcon
-                  :name="expandedProgress[idx] ? 'arrow-up-s-line' : 'arrow-down-s-line'"
-                  size="24rpx"
-                  color="#9ca3af"
-                />
-              </view>
-              <view v-if="chatMode === 'general' && msg.progressSteps && expandedProgress[idx]" class="progress-card static">
-                <view
-                  v-for="(step, sIdx) in msg.progressSteps"
-                  :key="sIdx"
-                  class="progress-step done"
-                >
-                  <view class="step-icon">
-                    <text class="step-check">✓</text>
-                  </view>
-                  <text class="step-label">{{ step.label }}</text>
-                </view>
-              </view>
+              <!-- P11 T5：思考链 + 执行细节融合面板（问题 9；空 steps/execSteps 时组件自不渲染） -->
+              <ReasoningPanel :steps="msg.reasoningSteps || []" :execSteps="msg.execSteps || []" />
 
-              <!-- Markdown 渲染的回复内容 -->
-              <mp-html v-if="msg.content" :content="markdownToHtml(msg.content)" class="bubble-html" />
-              <AdvisorTraceStatus v-if="chatMode === 'general'" :trace="msg.advisorTrace" />
+              <!-- P11 T4：结构化卡片（DONE.cards；HTTP 降级/旧协议缺失时不渲染，fallback markdown） -->
+              <CardRenderer v-if="msg.cards && msg.cards.length > 0" :cards="msg.cards" />
 
-              <!-- General 模式：Skill 结果卡片 -->
-              <template v-if="chatMode === 'general'">
-                <!-- 股票行情卡片 -->
-                <view
-                  v-if="msg.skillResult?.data?.symbol && msg.skillResult?.data?.price !== undefined"
-                  class="quote-card"
-                  @tap="goStockDetail(msg.skillResult.data.symbol)"
-                >
-                  <view class="quote-card-top">
-                    <view class="quote-card-info">
-                      <text class="quote-card-name">{{ msg.skillResult.data.name }}</text>
-                      <text class="quote-card-code">{{ msg.skillResult.data.symbol }}</text>
-                    </view>
-                    <view class="quote-card-price-wrap">
-                      <text :class="['quote-card-price', (msg.skillResult.data.changePercent ?? 0) >= 0 ? 'up' : 'down']">
-                        {{ Number(msg.skillResult.data.price).toFixed(2) }}
-                      </text>
-                      <text :class="['quote-card-change', (msg.skillResult.data.changePercent ?? 0) >= 0 ? 'up' : 'down']">
-                        {{ (msg.skillResult.data.changePercent ?? 0) >= 0 ? '+' : '' }}{{ Number(msg.skillResult.data.changePercent).toFixed(2) }}%
-                      </text>
-                    </view>
-                  </view>
-                  <view v-if="msg.skillResult.data.high !== undefined" class="quote-card-detail">
-                    <text class="detail-item">高 {{ Number(msg.skillResult.data.high).toFixed(2) }}</text>
-                    <text class="detail-item">低 {{ Number(msg.skillResult.data.low).toFixed(2) }}</text>
-                    <text class="detail-item">开 {{ Number(msg.skillResult.data.open).toFixed(2) }}</text>
-                  </view>
-                </view>
+              <!-- light 分支结论打字机：synth_answer 结构化输出仅 DONE 一次性下发，前端模拟逐字
+                   （deep 分支真流式内容走上方 streaming-message 渲染，不经过此分支） -->
+              <mp-html
+                v-if="isTypingFor(msg)"
+                :content="markdownToHtml(typedText + ' ▊')"
+                class="bubble-html streaming-blink"
+              />
 
-                <!-- 资金流向卡片 -->
-                <view
-                  v-else-if="msg.skillResult?.data?.netAmount !== undefined || msg.skillResult?.data?.net_amount !== undefined"
-                  class="flow-card"
-                >
-                  <text class="flow-card-title">资金流向</text>
-                  <view class="flow-card-row">
-                    <text class="flow-label">主力净流入</text>
-                    <text :class="['flow-value', getFlowClass(msg.skillResult.data)]">
-                      {{ formatFlowAmount(msg.skillResult.data) }}
-                    </text>
-                  </view>
-                </view>
-
-                <!-- 纯文本 Skill 结果 -->
-                <view v-else-if="msg.skillResult?.narrative && msg.skillResult.type === 'text'" class="skill-text-card">
-                  <text class="skill-text">{{ msg.skillResult.narrative }}</text>
-                </view>
+              <!-- 改进 14：分节卡片化渲染（有分节时 SectionCard 列表，无分节时回退 mp-html） -->
+              <template v-else-if="msg.content">
+                <template v-for="(sec, si) in getSections(msg.content) ?? []" :key="si">
+                  <mp-html v-if="!sec.title" :content="markdownToHtml(sec.body)" class="bubble-html" />
+                  <SectionCard v-else :variant="sec.variant" :title="sec.title" :body="sec.body" />
+                </template>
+                <mp-html v-if="!getSections(msg.content)" :content="markdownToHtml(msg.content)" class="bubble-html" />
               </template>
 
-              <!-- Market review 模式：证据溯源区域（组件化，逻辑在 MarketTraceEvidence.vue） -->
-              <MarketTraceEvidence v-if="chatMode === 'market_review' && msg.trace" :trace="msg.trace" />
+              <!-- D20：深度分析 summary 卡片（仅 deep 结果；保留兼容旧消息/HTTP 降级无 cards 字段） -->
+              <!-- 最终审查修复：DONE 同时返回 last_deep_report 与 deep 卡时，仅由 CardRenderer 渲染（spec §4.2/§6 主路径），DeepSummaryCard 仅在无 deep 卡时作为兼容回退 -->
+              <DeepSummaryCard
+                v-if="msg.lastDeepReport && !(msg.cards?.some(c => c.card_type === 'deep'))"
+                :report="msg.lastDeepReport"
+              />
+
+              <!-- 单轮用量 + D4 force_deep「深度分析」按钮（footer 行；用量灰色弱化，仅 DONE 带 tokenUsage 时显示） -->
+              <view class="msg-footer">
+                <text v-if="msg.tokenUsage" class="turn-usage">{{ msg.tokenUsage.total_tokens }} tokens</text>
+                <view
+                  v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了')"
+                  class="deep-btn"
+                  @tap="rerunDeep(idx)"
+                >
+                  <SvgIcon name="line-chart-line" size="24rpx" color="#0b5fff" />
+                  <text class="deep-btn-text">深度分析</text>
+                </view>
+              </view>
             </view>
           </view>
         </view>
 
-        <!-- 流式进度卡片（general 模式，当前正在生成） -->
-        <view v-if="isStreaming && chatMode === 'general'" class="message-item assistant streaming-message">
+        <!-- 流式进度卡片（当前正在生成） -->
+        <view v-if="isStreaming" class="message-item assistant streaming-message">
           <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
           <view class="bubble">
-            <!-- 进度步骤 -->
+            <!-- P11 T5：AI 思考链（流式 dot 动画，steps 含 streaming 时自动展开；执行细节流式中无数据） -->
+            <ReasoningPanel
+              v-if="streamingReasoning.length > 0"
+              :steps="streamingReasoning"
+              :execSteps="[]"
+            />
+            <!-- 实时进度步骤 -->
             <view v-if="progressSteps.length > 0" class="progress-card">
               <view
                 v-for="(step, sIdx) in progressSteps"
@@ -123,68 +95,22 @@
             />
           </view>
         </view>
-
-        <!-- 加载指示器（market_review 模式） -->
-        <view v-if="isStreaming && chatMode === 'market_review'" class="message-item assistant streaming-message">
-          <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
-          <view class="bubble">
-            <view class="loading-dots">
-              <view class="loading-dot" />
-              <view class="loading-dot" />
-              <view class="loading-dot" />
-            </view>
-          </view>
-        </view>
       </scroll-view>
-
-      <!-- 模式切换 -->
-      <view class="mode-toggle">
-        <view
-          :class="['mode-btn', chatMode === 'general' ? 'active' : '']"
-          @tap="switchMode('general')"
-        >
-          <text class="mode-btn-text">对话</text>
-        </view>
-        <view
-          :class="['mode-btn', chatMode === 'market_review' ? 'active' : '']"
-          @tap="switchMode('market_review')"
-        >
-          <text class="mode-btn-text">市场复盘</text>
-        </view>
-      </view>
 
       <!-- 快捷 Skills -->
       <view class="quick-skills">
-        <!-- General 模式快捷技能 -->
-        <template v-if="chatMode === 'general'">
-          <view class="skill-btn" @tap="quickAsk('查一下 600519 的行情')">
-            <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">行情</text>
-          </view>
-          <view class="skill-btn" @tap="quickAsk('查一下 600519 的资金流向')">
-            <SvgIcon name="money-cny-circle-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">资金</text>
-          </view>
-          <view class="skill-btn" @tap="quickAsk('今天的龙头股有哪些')">
-            <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">龙头</text>
-          </view>
-        </template>
-        <!-- Market review 模式快捷问题 -->
-        <template v-else>
-          <view class="skill-btn" @tap="quickAsk('大盘为何涨跌')">
-            <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">大盘为何涨跌</text>
-          </view>
-          <view class="skill-btn" @tap="quickAsk('主导板块是什么')">
-            <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">主导板块</text>
-          </view>
-          <view class="skill-btn" @tap="quickAsk('海外因素有何影响')">
-            <SvgIcon name="global-line" size="28rpx" color="#0b5fff" />
-            <text class="skill-btn-text">海外影响</text>
-          </view>
-        </template>
+        <view class="skill-btn" @tap="quickAsk('今日大盘怎么样')">
+          <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
+          <text class="skill-btn-text">大盘</text>
+        </view>
+        <view class="skill-btn" @tap="quickAsk('今日板块资金流向如何')">
+          <SvgIcon name="money-cny-circle-line" size="28rpx" color="#0b5fff" />
+          <text class="skill-btn-text">资金</text>
+        </view>
+        <view class="skill-btn" @tap="quickAsk('今天的龙头股有哪些')">
+          <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
+          <text class="skill-btn-text">龙头</text>
+        </view>
       </view>
 
       <!-- 输入框 -->
@@ -197,111 +123,218 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, nextTick, onUnmounted } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { ref, nextTick, watch, onUnmounted } from 'vue'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { useChatStream } from '@/shared/utils/useChatStream'
-import { useMarketTraceQa } from '@/shared/utils/useMarketTraceQa'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import MarketTraceEvidence from './MarketTraceEvidence.vue'
-import AdvisorTraceStatus from './AdvisorTraceStatus.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
+import DeepSummaryCard from './DeepSummaryCard.vue'
+import ReasoningPanel from './ReasoningPanel.vue'
+import CardRenderer from './cards/CardRenderer.vue'
+import SectionCard from './cards/SectionCard.vue'
+import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
+import { useChatStore } from '@/shared/store/modules/chat'
+import { useUserStore } from '@/shared/store/modules/user'
+import { agentApi, type ChatMessage } from '@/shared/api/modules/agent'
 
 const chatStream = useChatStream()
-const marketQa = useMarketTraceQa()
+const chatStore = useChatStore()
+const userStore = useUserStore()
 
-const chatMode = ref<'general' | 'market_review'>('general')
-
+// P9：无当前会话时自动新建（保证 messagesBySession 有当前会话载体；切换会话返回本页不重复触发，onLoad 仅一次）
 onLoad((options: Record<string, string> | undefined) => {
+  if (!chatStore.sessionId) chatStore.createSession()
   const q = options?.q
   if (!q) return
-  chatMode.value = 'general'
   nextTick(() => {
     void chatStream.send(q)
     scrollToBottom()
   })
 })
 
-const displayMessages = computed(() =>
-  chatMode.value === 'market_review' ? marketQa.messages.value : chatStream.messages
-)
-const isStreaming = computed(() =>
-  chatMode.value === 'market_review' ? marketQa.loading.value : chatStream.streaming.value
-)
+/** P9：标题旁「会话」入口 → 会话列表页 */
+function goSessions() {
+  uni.navigateTo({ url: '/pages-sub-app/chat/sessions' })
+}
+
+/**
+ * P9：首次用户消息后 fire-and-forget 通知后端建立会话元数据（仅登录）。
+ * 必须在 chatStream.send 之前调用（send 内部 appendMessage 会立即写入 user 消息，之后 hasUserMessage 变 true）。
+ */
+function upsertSessionMeta(content: string) {
+  if (userStore.isLoggedIn() && chatStore.sessionId && !chatStore.hasUserMessage) {
+    void agentApi.upsertChatSession(chatStore.sessionId, content)
+  }
+}
+
+const displayMessages = chatStream.messages
+const isStreaming = chatStream.streaming
 const progressSteps = chatStream.progressSteps
 const streamingText = chatStream.streamingText
+// P3-fix-2 T2：流式过程中的实时思考链（ref 自动解包，模板直接读数组）
+const streamingReasoning = chatStream.streamingReasoning
 
 const inputText = ref('')
 const scrollTop = ref(0)
-const expandedProgress = reactive<Record<number, boolean>>({})
 
-function toggleProgress(idx: number) {
-  expandedProgress[idx] = !expandedProgress[idx]
-}
+// 每次进入页面（含从会话列表返回、切会话）默认停留在对话最下方
+onShow(() => scrollToBottom())
 
-function switchMode(mode: 'general' | 'market_review') {
-  if (chatMode.value === mode) return
-  if (chatStream.streaming.value || marketQa.loading.value) return
-  if (mode === 'market_review') {
-    chatStream.disconnect()
+// 对话期间始终跟随最下方：流式开始时立即滚动，之后定时跟随。
+// 根因：mp-html 渲染异步（先清空再解析），仅靠 streamingText watch + nextTick 设置 scroll-top
+// 时内容尚未渲染完成 → 停在上方；只有 done 重建消息列表时才真正滚到底。
+// 用 setInterval 兜底：无论内容何时渲染完成，150ms 内必被钉回底部，实现逐字跟随观感。
+let followTimer: ReturnType<typeof setInterval> | null = null
+
+// ===== 结论打字机（light 分支结论非流式，DONE 后前端模拟逐字输出） =====
+// 后端 synth_answer 是结构化输出（SynthOutput JSON），最终回复仅 DONE 一次性下发；
+// deep 分支（escalate→worker）有真流式 text 事件。用 hadStreamText 区分：
+// 本轮流式期间出现过真流式文本 → 内容已逐字显示，不再启动打字机。
+let hadStreamText = false
+watch(streamingText, (t) => {
+  if (t) hadStreamText = true
+})
+
+const typingMsgKey = ref<number | null>(null)
+const typedText = ref('')
+let typeTimer: ReturnType<typeof setInterval> | null = null
+
+function stopTypewriter() {
+  if (typeTimer) {
+    clearInterval(typeTimer)
+    typeTimer = null
   }
-  chatMode.value = mode
 }
+
+/** 当前消息是否正在打字机播放（用 timestamp 定位消息，v-for 的 idx 会随列表增删漂移） */
+function isTypingFor(msg: ChatMessage) {
+  return typingMsgKey.value !== null && typingMsgKey.value === msg.timestamp
+}
+
+/** DONE 后对本轮回复启动打字机：仅 light 分支（无真流式文本）触发 */
+function startTypewriterIfNeeded() {
+  if (hadStreamText) return
+  const msgs = displayMessages.value
+  const last = msgs[msgs.length - 1]
+  if (!last || last.role !== 'assistant') return
+  const content = last.content
+  // 错误/空回复直接静态展示，不打字机
+  if (!content || content.startsWith('抱歉，出错了')) return
+  stopTypewriter()
+  typingMsgKey.value = last.timestamp
+  typedText.value = ''
+  let i = 0
+  typeTimer = setInterval(() => {
+    i += 2
+    typedText.value = content.slice(0, i)
+    // 打字机期间内容逐字增长，保持钉在对话最下方
+    scrollToBottom()
+    if (i >= content.length) {
+      stopTypewriter()
+      typingMsgKey.value = null
+    }
+  }, 30)
+}
+
+watch(isStreaming, (v) => {
+  scrollToBottom()
+  if (v) {
+    // 新一轮开始：重置"本轮是否出现过真流式文本"，并停掉上一条未播完的打字机
+    hadStreamText = false
+    stopTypewriter()
+    typingMsgKey.value = null
+    if (followTimer) clearInterval(followTimer)
+    followTimer = setInterval(scrollToBottom, 150)
+  } else {
+    if (followTimer) {
+      clearInterval(followTimer)
+      followTimer = null
+    }
+    // 本轮结束：无真流式文本时用打字机逐字呈现结论
+    startTypewriterIfNeeded()
+  }
+})
 
 function handleSend() {
   const content = inputText.value.trim()
   if (!content || isStreaming.value) return
   inputText.value = ''
-  if (chatMode.value === 'market_review') {
-    marketQa.send(content)
-  } else {
-    chatStream.send(content)
-  }
+  upsertSessionMeta(content)
+  chatStream.send(content)
   scrollToBottom()
 }
 
 function quickAsk(text: string) {
   if (isStreaming.value) return
-  if (chatMode.value === 'market_review') {
-    marketQa.send(text)
-  } else {
-    chatStream.send(text)
-  }
+  upsertSessionMeta(text)
+  chatStream.send(text)
   scrollToBottom()
 }
 
-function goStockDetail(symbol: string) {
-  if (!symbol) return
-  uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
-}
-
-function getFlowClass(data: any): string {
-  const net = data?.netAmount ?? data?.net_amount ?? 0
-  return net >= 0 ? 'up' : 'down'
-}
-
-function formatFlowAmount(data: any): string {
-  const net = data?.netAmount ?? data?.net_amount ?? 0
-  const abs = Math.abs(net)
-  if (abs >= 100000000) return (net / 100000000).toFixed(2) + '亿'
-  if (abs >= 10000) return (net / 10000).toFixed(2) + '万'
-  return net.toFixed(2) + '元'
-}
-
+// 交替两个超大值：流式 token 逐字增长时内容底部持续下移，scroll-top 值不变 Vue 不会重新触发滚动
+// （仅把 scrollTop 钉在 99999 只能滚一次）；99999/99998 均超出内容高度被钳制到底部，无视觉跳动
+let scrollFlip = false
 function scrollToBottom() {
   nextTick(() => {
-    scrollTop.value = 99999
+    scrollFlip = !scrollFlip
+    scrollTop.value = scrollFlip ? 99999 : 99998
   })
 }
 
+/**
+ * 改进 14：将 AI 回复 markdown 按分节识别为 SectionCard 列表。
+ * 无分节（寒暄/科普/无标题纯文本）时返回 null，回退 mp-html 整体渲染。
+ */
+function getSections(content: string): MarkdownSection[] | null {
+  if (!content) return null
+  const parsed = parseMarkdownSections(content)
+  if (parsed.length === 0) return null
+  if (parsed.length === 1 && !parsed[0].title) return null
+  return parsed
+}
+
+/**
+ * D4：light 误判一键升级--以 force_deep=true 重发该条回复前最近一条 user 消息。
+ * 闸门短路回复也显示按钮（重复点击返回同话术，无副作用）。
+ */
+function rerunDeep(idx: number) {
+  if (isStreaming.value) return
+  // displayMessages 经 useChatStream 修复后是响应式 ref（模板自动解包，脚本需 .value）
+  for (let i = idx - 1; i >= 0; i--) {
+    const prev = displayMessages.value[i]
+    if (prev && prev.role === 'user') {
+      chatStream.send(prev.content, { forceDeep: true })
+      scrollToBottom()
+      return
+    }
+  }
+}
+
 onUnmounted(() => {
+  if (followTimer) {
+    clearInterval(followTimer)
+    followTimer = null
+  }
+  stopTypewriter()
   chatStream.disconnect()
 })
 </script>
 
 <style lang="scss" scoped>
 @use '@/shared/styles/variables.scss' as *;
+
+/* P9：会话入口按钮（导航栏右侧） */
+.sessions-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: $r-full;
+}
+.sessions-entry:active { background: $bg-soft; }
 
 .chat-content {
   display: flex;
@@ -313,14 +346,15 @@ onUnmounted(() => {
 .message-item { margin-bottom: 24rpx; }
 .message-item.user { display: flex; justify-content: flex-end; }
 .msg-content.user {
-  background: $primary; color: #fff; border-radius: 16rpx 16rpx 4rpx 16rpx; padding: 16rpx 24rpx;
+  background: $brand-gradient; color: #fff; border-radius: 16rpx 16rpx 4rpx 16rpx; padding: 16rpx 24rpx;
   max-width: 70%; font-size: 28rpx; line-height: 1.5;
+  box-shadow: $shadow-primary;
 }
 .msg-content.assistant { display: flex; gap: 12rpx; }
 .avatar { font-size: 40rpx; flex-shrink: 0; }
 .bubble {
-  background: #ffffff; border-radius: 16rpx 16rpx 16rpx 4rpx; padding: 16rpx 24rpx;
-  max-width: 80%; box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  background: #ffffff; border-radius: $r-lg; padding: 16rpx 24rpx;
+  max-width: 80%; box-shadow: $shadow-card;
 }
 
 /* 流式消息的头像和内容需要处于同一横向消息行，避免内容未生成时气泡换到头像下一行。 */
@@ -369,27 +403,8 @@ onUnmounted(() => {
 }
 @keyframes blink { 50% { opacity: 0.6; } }
 
-/* 涨跌色 */
-.up { color: #f43f5e; }
-.down { color: #22c55e; }
-
-/* 折叠的进度步骤 */
-.progress-collapse {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8rpx 0;
-  margin-bottom: 4rpx;
-  border-bottom: 1rpx solid #f0f0f0;
-}
-.progress-collapse-title {
-  font-size: 22rpx;
-  color: #9ca3af;
-}
-
-/* 进度卡片 */
+/* 实时进度步骤 */
 .progress-card { padding: 4rpx 0 12rpx; }
-.progress-card.static { padding-top: 8rpx; }
 .progress-step {
   display: flex; align-items: center; gap: 12rpx; padding: 6rpx 0;
 }
@@ -404,89 +419,7 @@ onUnmounted(() => {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .step-label { font-size: 24rpx; color: $ink-soft; }
-.progress-step.done .step-label { color: #9ca3af; }
-
-/* 行情卡片 */
-.quote-card {
-  margin-top: 16rpx; padding: 20rpx; background: $bg-soft; border-radius: 12rpx;
-}
-.quote-card-top {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 12rpx;
-}
-.quote-card-info { display: flex; align-items: center; gap: 12rpx; }
-.quote-card-name { font-size: 28rpx; font-weight: 600; color: $ink; }
-.quote-card-code { font-size: 22rpx; color: $ink-soft; padding: 2rpx 10rpx; background: $line; border-radius: 6rpx; }
-.quote-card-price-wrap { display: flex; flex-direction: column; align-items: flex-end; }
-.quote-card-price { font-size: 32rpx; font-weight: 700; }
-.quote-card-change { font-size: 24rpx; margin-top: 2rpx; }
-.quote-card-detail {
-  display: flex; gap: 24rpx; padding-top: 12rpx; border-top: 1rpx solid $line;
-}
-.detail-item { font-size: 22rpx; color: $ink-soft; }
-
-/* 资金流向卡片 */
-.flow-card {
-  margin-top: 16rpx; padding: 20rpx; background: $bg-soft; border-radius: 12rpx;
-}
-.flow-card-title { font-size: 26rpx; font-weight: 500; color: $ink; display: block; margin-bottom: 12rpx; }
-.flow-card-row { display: flex; justify-content: space-between; align-items: center; }
-.flow-label { font-size: 24rpx; color: $ink-soft; }
-.flow-value { font-size: 28rpx; font-weight: 600; }
-
-/* 纯文本 Skill 结果 */
-.skill-text-card {
-  margin-top: 16rpx; padding: 20rpx; background: rgba(77, 124, 254, 0.06); border-radius: 12rpx;
-}
-.skill-text { font-size: 26rpx; color: $ink-soft; line-height: 1.5; }
-
-/* 模式切换 */
-.mode-toggle {
-  display: flex;
-  gap: 8rpx;
-  padding: 8rpx 20rpx;
-  background: #ffffff;
-  flex-shrink: 0;
-}
-.mode-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10rpx 0;
-  border-radius: $radius-pill;
-  background: $bg-color-muted;
-}
-.mode-btn.active {
-  background: $brand-color;
-}
-.mode-btn-text {
-  font-size: $font-size-base;
-  color: $text-color-secondary;
-}
-.mode-btn.active .mode-btn-text {
-  color: #ffffff;
-  font-weight: 600;
-}
-
-/* 加载指示器 */
-.loading-dots {
-  display: flex;
-  gap: 8rpx;
-  padding: 8rpx 0;
-}
-.loading-dot {
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 50%;
-  background: #9ca3af;
-  animation: loading-pulse 1.4s ease-in-out infinite;
-}
-.loading-dot:nth-child(2) { animation-delay: 0.2s; }
-.loading-dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes loading-pulse {
-  0%, 80%, 100% { opacity: 0.3; }
-  40% { opacity: 1; }
-}
+.progress-step.done .step-label { color: $ink-mute; }
 
 .quick-skills { display: flex; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; flex-shrink: 0; }
 .skill-btn {
@@ -499,4 +432,28 @@ onUnmounted(() => {
 .input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
 .input { flex: 1; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
 .send-btn { background: $primary; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
+
+/* 气泡 footer：左侧单轮用量（灰色弱化）+ 右侧深度分析按钮 */
+.msg-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12rpx;
+}
+.turn-usage {
+  font-size: 20rpx;
+  color: $ink-mute;
+}
+.deep-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 6rpx 20rpx;
+  background: rgba(77, 124, 254, 0.08);
+  border-radius: 20rpx;
+}
+.deep-btn-text {
+  font-size: 22rpx;
+  color: #0b5fff;
+}
 </style>

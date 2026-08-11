@@ -27,6 +27,18 @@ export type EventCategory = 'driving' | 'hot'
 
 // ==================== 事件列表 ====================
 
+/** 前端展示专用：行业影响摘要（后端 chain_summary 生成，impactStrength 降序 Top5） */
+export interface ChainSummary {
+  /** 行业名称 */
+  industry: string
+  /** 影响方向 */
+  direction: string
+  /** 影响强度 0-1 */
+  impactStrength: number
+  /** AI 推理原因（可选） */
+  reason?: string
+}
+
 /** 受影响的行业（列表页与详情页通用） */
 export interface AffectedIndustry {
   /** 行业名称 */
@@ -53,6 +65,8 @@ export interface EventItem {
   publishTime: string
   /** 来源 */
   source: string
+  /** 来源名称（Agent 生成的媒体名，如搜狐/财联社；可为空回退 URL 解析） */
+  sourceName?: string
   /** 来源信息（用于展示） */
   sourceInfo?: {
     name: string
@@ -68,6 +82,8 @@ export interface EventItem {
   importance: number
   /** 受影响的行业列表 */
   affectedIndustries: AffectedIndustry[]
+  /** 前端展示专用：行业影响摘要（列表接口直出，旧数据缺失） */
+  chain_summary?: ChainSummary[]
   /** AI 摘要（≤40字） */
   aiSummary: string
   /** 是否已关注 */
@@ -130,6 +146,8 @@ export interface EventGraph {
   nodes: GraphNode[]
   /** 连线列表 */
   connections: GraphConnection[]
+  /** 图谱状态：empty=chain 为空（前端展示降级，不渲染空白图） */
+  status?: 'empty'
 }
 
 // ==================== AI 影响传导分析 ====================
@@ -338,4 +356,6 @@ export interface FocusEventViewModel {
   importance: FocusImportance
   selectionReason: string
   industries: string[]
+  /** 影响行业完整对象（含涨跌方向，供顶部卡片箭头/颜色展示） */
+  affectedIndustries?: AffectedIndustry[]
 }

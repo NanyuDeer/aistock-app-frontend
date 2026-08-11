@@ -63,8 +63,8 @@ http.interceptors.response.use(
  * 支持泛型：request.get<T>(url, { params })
  */
 const request = {
-  get<T = any>(url: string, config: { params?: any; headers?: any } = {}): Promise<T> {
-    return http.get(url, { params: config.params, header: config.headers }) as unknown as Promise<T>
+  get<T = any>(url: string, config: { params?: any; headers?: any; timeout?: number } = {}): Promise<T> {
+    return http.get(url, { params: config.params, header: config.headers, timeout: config.timeout }) as unknown as Promise<T>
   },
   post<T = any>(url: string, data?: any, config: { headers?: any; timeout?: number } = {}): Promise<T> {
     return http.post(url, data, { header: config.headers, timeout: config.timeout }) as unknown as Promise<T>

@@ -72,13 +72,12 @@ function changeClass(v: number | null): string {
 .block-label { display: block; font-size: 22rpx; color: $text-color-secondary; margin-bottom: $spacing-xs; }
 
 .perf-list {
-  display: flex; flex-wrap: wrap; gap: 8rpx;
-  @include bp.respond-to-lg { gap: 12rpx; }
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8rpx;
+  @include bp.respond-to-lg { grid-template-columns: repeat(3, 1fr); }
 }
 .perf-item {
-  display: flex; align-items: center; gap: 8rpx;
-  padding: 8rpx 16rpx; border-radius: $r-md;
-  background: $bg-soft; min-width: 200rpx;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8rpx 16rpx; border-radius: $r-md; background: $bg-soft;
 }
 .perf-name { font-size: 22rpx; color: $text-color; flex: 1; }
 .perf-change { font-size: 24rpx; font-weight: 600; font-family: $font-mono; }
@@ -87,8 +86,7 @@ function changeClass(v: number | null): string {
 .perf-change.flat { color: $text-color-secondary; }
 
 .sector-list {
-  display: grid; grid-template-columns: 1fr; gap: 8rpx;
-  @include bp.respond-to-md { grid-template-columns: 1fr 1fr; }
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8rpx;
   @include bp.respond-to-lg { grid-template-columns: repeat(3, 1fr); }
 }
 .sector-item {

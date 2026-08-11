@@ -89,12 +89,18 @@
             {{ latestMajorEvent.ai_impact || latestMajorEvent.level || latestMajorEvent.change_type_name }}
           </text>
         </view>
-        <template>
+        <template v-if="latestMajorEvent">
           <text class="major-event-title">{{ latestMajorEvent.summary || latestMajorEvent.title || latestMajorEvent.change_type_name }}</text>
           <view class="major-event-meta">
             <text>{{ latestMajorEvent.ai_horizon || latestMajorEvent.cycle || '周期待判' }}</text>
             <text>{{ latestMajorEvent.change_type_name || latestMajorEvent.info_type || '资讯研判' }}</text>
             <text>{{ latestMajorEvent.event_time_display || formatEventTime(latestMajorEvent.event_time) }}</text>
+          </view>
+        </template>
+        <template v-else>
+          <text class="major-event-title">暂无数据</text>
+          <view class="major-event-meta">
+            <text>暂无真实异动来源</text>
           </view>
         </template>
       </view>
@@ -231,6 +237,12 @@
             :narrative="capitalFlowInfo.narrative"
             :summary="capitalFlowInfo.summary"
           />
+        </view>
+        <view v-else class="section-card">
+          <text class="section-title">资金流向</text>
+          <view class="ai-empty">
+            <text class="ai-empty-text">暂无资金流数据</text>
+          </view>
         </view>
         <!-- 交易数据 -->
         <view v-if="hasTradingData" class="section-card">
