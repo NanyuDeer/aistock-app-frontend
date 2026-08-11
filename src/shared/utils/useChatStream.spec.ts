@@ -39,14 +39,21 @@ vi.mock('@/shared/store/modules/user', () => ({
 
 // Mock WebSocket（连接即开；捕获 onMessage 回调供测试注入 WS 事件；捕获 send 参数）
 // mockWsFail.fail=true 时 onOpen 不触发、onError 触发 → connect resolve(false) → send 走 HTTP 降级分支
-const mockSocketCbs = vi.hoisted(() => ({ onMessageCbs: [] as Array<(msg: any) => void> }))
+const mockSocketCbs = vi.hoisted(() => ({
+  onMessageCbs: [] as Array<(msg: any) => void>,
+  onCloseCbs: [] as Array<(res?: any) => void>,
+  onErrorCbs: [] as Array<(res?: any) => void>,
+}))
 const mockWsFail = vi.hoisted(() => ({ fail: false }))
 const mockSocketSend = vi.hoisted(() => vi.fn())
 vi.mock('@/shared/api/modules/agent', () => ({
   createAgentWebSocket: () => ({
     onOpen: (cb: () => void) => { if (!mockWsFail.fail) cb() },
-    onClose: () => {},
-    onError: (cb: () => void) => { if (mockWsFail.fail) queueMicrotask(cb) },
+    onClose: (cb: (res?: any) => void) => { mockSocketCbs.onCloseCbs.push(cb) },
+    onError: (cb: (res?: any) => void) => {
+      mockSocketCbs.onErrorCbs.push(cb)
+      if (mockWsFail.fail) queueMicrotask(cb)
+    },
     onMessage: (cb: (msg: any) => void) => { mockSocketCbs.onMessageCbs.push(cb) },
     send: mockSocketSend,
     close: () => {},
@@ -62,6 +69,8 @@ describe('useChatStream reasoning event', () => {
     stream.sessionId.value = ''
     mockAppendMessage.mockClear()
     mockSocketCbs.onMessageCbs.length = 0
+    mockSocketCbs.onCloseCbs.length = 0
+    mockSocketCbs.onErrorCbs.length = 0
     mockSocketSend.mockClear()
     mockSetSessionId.mockClear()
     mockWsFail.fail = false
@@ -173,14 +182,15 @@ describe('useChatStream reasoning event', () => {
     await send2
   })
 
-  it('WS send body 透传 openid 作为 user_id（计费身份契约）', async () => {
+  it('WS send body 不再携带 user_id（P0：user_id 由服务端注入）', async () => {
     const stream = useChatStream() as any
 
     const send1 = stream.send('你好')
     await vi.waitFor(() => { expect(mockSocketSend).toHaveBeenCalledTimes(1) })
     const payload = JSON.parse(mockSocketSend.mock.calls[0][0].data)
-    expect(payload.user_id).toBe('o_20260805')
-    expect(payload.user_id).not.toBe('1')
+    // 即便 useUserStore 有 openid，客户端也不再自报 user_id
+    expect(payload.user_id).toBeUndefined()
+    expect(payload.message).toBe('你好')
 
     mockSocketCbs.onMessageCbs[0]({ data: JSON.stringify({ type: 'done', content: 'ok' }) })
     await send1
@@ -245,5 +255,22 @@ describe('useChatStream reasoning event', () => {
     expect(arg.content).toBe('HTTP 回复')
     // P10 线 2 缺口修复前：降级分支不读 result.token_usage → arg.tokenUsage 为 undefined
     expect(arg.tokenUsage).toEqual({ prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 })
+  })
+
+  it('服务端 open 后立即 close（4401）→ 本轮 send 结算不挂起（P0）', async () => {
+    const stream = useChatStream() as any
+
+    const send1 = stream.send('你好')
+    await vi.waitFor(() => { expect(mockSocketSend).toHaveBeenCalledTimes(1) })
+    // 模拟桥接 upgrade 完成后立即 close(4401)（token 非法/过期）
+    mockSocketCbs.onCloseCbs[0]?.({ code: 4401, reason: 'unauthorized' })
+
+    // send 必须结算（否则该测试超时挂死）——await 能返回即证明不挂起
+    await send1
+    expect(stream.streaming.value).toBe(false)
+    expect(mockAppendMessage).toHaveBeenCalled()
+    const last = mockAppendMessage.mock.calls.at(-1)?.[0]
+    expect(last.role).toBe('assistant')
+    expect(last.content).toContain('连接已断开')
   })
 })
