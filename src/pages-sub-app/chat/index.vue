@@ -180,7 +180,13 @@ const inputText = ref('')
 const scrollTop = ref(0)
 
 // 每次进入页面（含从会话列表返回、切会话）默认停留在对话最下方
-onShow(() => scrollToBottom())
+onShow(() => {
+  scrollToBottom()
+  // 问题 15：回页时若存在未完成轮（最后一条是 user）且连接已断开 → 自动 resume 续跑
+  if (chatStream.hasPendingRun() && !chatStream.isConnected()) {
+    void chatStream.resume()
+  }
+})
 
 // 对话期间始终跟随最下方：流式开始时立即滚动，之后定时跟随。
 // 根因：mp-html 渲染异步（先清空再解析），仅靠 streamingText watch + nextTick 设置 scroll-top
@@ -318,7 +324,8 @@ onUnmounted(() => {
     followTimer = null
   }
   stopTypewriter()
-  chatStream.disconnect()
+  // 问题 15：不再 disconnect —— socket 为模块级单例，跨页面存活，
+  // 后台任务继续生成，回页经 onShow resume 补全
 })
 </script>
 
