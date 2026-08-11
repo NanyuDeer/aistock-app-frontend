@@ -50,7 +50,7 @@
               <view class="msg-footer">
                 <text v-if="msg.tokenUsage" class="turn-usage">{{ msg.tokenUsage.total_tokens }} tokens</text>
                 <view
-                  v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了')"
+                  v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了') && !msg.content.startsWith('已停止生成')"
                   class="deep-btn"
                   @tap="rerunDeep(idx)"
                 >
