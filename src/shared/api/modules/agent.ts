@@ -2,7 +2,6 @@
  * AI 智能体相关 API（App 专属功能）
  */
 import request from '../request'
-import { useUserStore } from '@/shared/store/modules/user'
 import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
 
 export interface ProgressStep {
@@ -400,12 +399,10 @@ export const agentApi = {
    * App 端推荐使用 WebSocket 流式，见 useStreamingChat
    */
   sendMessage(message: string, sessionId?: string, options?: { forceDeep?: boolean }) {
-    const userId = useUserStore().userInfo?.id
+    // P0：user_id 改由服务端注入（app-api 验签 JWT 后覆写），客户端不再自报
     return request.post('/agent/chat/message', {
       message,
       session_id: sessionId,
-      // D11：HTTP 降级路径同样透传 user_id（与 WS 路径对齐）
-      ...(userId != null ? { user_id: String(userId) } : {}),
       // D4：HTTP 降级路径透传 force_deep（与 WS 路径对齐，Task 1 Python 侧支持）
       ...(options?.forceDeep ? { force_deep: true } : {})
     }, {
@@ -579,7 +576,9 @@ export function createWebSocket() {
  * 连接地址: {AGENT_WS_BASE_URL}/chat
  */
 export function createAgentWebSocket() {
-  const url = `${AGENT_WS_BASE_URL}/chat`
+  // P0：WS 握手鉴权（uni-app 小程序端 WS 不能自定义 header，走 query——与 createWebSocket 同模式）
+  const token = uni.getStorageSync('token')
+  const url = `${AGENT_WS_BASE_URL}/chat?token=${token || ''}`
   return uni.connectSocket({
     url,
     success: () => console.log('[AgentWS] connecting...'),

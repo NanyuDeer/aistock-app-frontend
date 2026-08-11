@@ -304,7 +304,7 @@ import Card from '@/shared/components/Card.vue'
 
 | 模块文件 | 说明 | 后端路径 |
 |---------|------|---------|
-| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
+| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`；**P0 身份鉴权：`createAgentWebSocket` URL 带 `?token=`（app-api 桥接验签）、`sendMessage` 不再携带 `user_id`（服务端注入）**） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
 | `auth.ts` | 认证（登录、用户信息） | `/api/auth/wechat/*` |
 | `briefing.ts` | 早晚报结构化（BriefingItem/BriefingSummary 类型 + 降级解析适配器） | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |
@@ -320,6 +320,7 @@ import Card from '@/shared/components/Card.vue'
 - 通过 `shared/utils/useWebSocket.ts` hook 使用
 - 频道按功能拆分：quote（行情）、alert（异动）、chat（对话）
 - 连接管理和事件分发在后端 `core/ws/` 处理
+- **P0 身份鉴权（chat 频道）**：`createAgentWebSocket` 连接 `{AGENT_WS_BASE_URL}/chat`（路径不变）时带 `?token=`（`uni.getStorageSync('token')`）；app-api 桥接验签——非法/过期 token 服务端拒绝（close 4401），未登录（无 token）放行但 `user_id=None`；`user_id` 由服务端注入，客户端消息体不再携带
 
 ## 7. 共享组件速查
 
@@ -364,7 +365,7 @@ import Card from '@/shared/components/Card.vue'
 |------|------|
 | `useAuth` | 认证状态和登录/登出 |
 | `useFavorites` | 自选股增删改查 |
-| `useChatStream` | 对话流（WS 为主，HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`，P3；订阅 reasoning 聚合 `reasoningSteps` + `_testHandleWsMessage` 测试钩子，P3-fix；return `streamingReasoning` 流式实时思考链，P3-fix-2） |
+| `useChatStream` | 对话流（WS 为主，HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`，P3；订阅 reasoning 聚合 `reasoningSteps` + `_testHandleWsMessage` 测试钩子，P3-fix；return `streamingReasoning` 流式实时思考链，P3-fix-2；**P0：send 不再携带 user_id（服务端注入）；连接断开/4401 时结算挂起 send（不卡死 streaming）**） |
 | `useStockCycle` | 股票周期切换 |
 | `useWebSocket` | WebSocket 连接管理 |
 | `useTimer` | 定时器管理 |

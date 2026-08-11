@@ -13,9 +13,14 @@ import { storeToRefs } from 'pinia'
 import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep, type ReasoningStep, type TokenUsage, type ChatCard } from '@/shared/api/modules/agent'
 import { buildExecTree, toRawWsEvent, type RawWsEvent } from './buildExecTree'
 import { useChatStore } from '@/shared/store/modules/chat'
-import { useUserStore } from '@/shared/store/modules/user'
 
 export type { ProgressStep }
+
+// P0-fix：connect() 当前 pending 的 resolve。onOpen 结算 true；onClose/onError 在连接尚未
+// 建立成功时结算 false（让 send 走 HTTP 降级）——否则 token 非法/过期时桥接在 upgrade 完成后
+// 立即 close(4401)，事件序为 onOpen（connect 已 resolve true）→ onClose 尚未派发，
+// send 已走 WS 分支并等 done 事件，而连接已死 → send 挂起、streaming 卡死、用户永远无回复。
+let connectResolve: ((ok: boolean) => void) | null = null
 
 export function useChatStream() {
   const chatStore = useChatStore()
@@ -41,26 +46,59 @@ export function useChatStream() {
   //  第 2 条消息起每个 WS 事件会被处理 N 遍 → reasoning 文本逐字翻倍）。
   let resolveSend: (() => void) | null = null
 
+  /**
+   * P0-fix：连接断开/出错时结算挂起的本轮 send。
+   * 仅当本轮 send 已进入 WS 分支（resolveSend 已挂起）才结算；结算后清空流式状态
+   * 并向用户追加一条明确的原因消息——否则 send promise 永不 resolve（streaming 卡死）。
+   */
+  function handleSendAbort(reason: string) {
+    if (resolveSend) {
+      const r = resolveSend
+      resolveSend = null
+      doneReceived = true
+      streaming.value = false
+      progressSteps.value = []
+      streamingText.value = ''
+      chatStore.appendMessage({ role: 'assistant', content: reason, timestamp: Date.now() })
+      r()
+    }
+  }
+
   function connect(): Promise<boolean> {
     return new Promise((resolve) => {
       try {
+        connectResolve = resolve
         socket = createAgentWebSocket()
 
         socket.onOpen(() => {
           wsConnected = true
-          resolve(true)
+          connectResolve?.(true)
+          connectResolve = null
         })
 
         socket.onClose(() => {
+          // P0：4401（token 非法/过期）在 onOpen 之后、onClose 派发之前送达——
+          // 连接已建（connectResolve 已清空）→ 结算本轮挂起的 send；连接未建成 → 结算 connect 为
+          // false 走 HTTP 降级
+          const wasConnected = wsConnected
           wsConnected = false
           socket = null
+          if (connectResolve) {
+            connectResolve(false)
+            connectResolve = null
+          } else if (wasConnected) {
+            handleSendAbort('连接已断开，请重试')
+          }
         })
 
         socket.onError(() => {
-          if (!wsConnected) {
-            resolve(false)
+          if (connectResolve) {
+            connectResolve(false)
+            connectResolve = null
           }
           wsConnected = false
+          // 统一结算挂起的 send（原逻辑只在未连接时 resolve(false)，streaming 中出错会挂起）
+          handleSendAbort('连接失败，请重试')
         })
 
         // 单次注册 WS 消息处理（每次 send 不再重复注册）
@@ -77,7 +115,10 @@ export function useChatStream() {
 
         // 超时降级
         setTimeout(() => {
-          if (!wsConnected) resolve(false)
+          if (!wsConnected) {
+            connectResolve = null
+            resolve(false)
+          }
         }, 3000)
       } catch {
         resolve(false)
@@ -237,7 +278,6 @@ export function useChatStream() {
           resolve()
         }
 
-        const userInfo = useUserStore().userInfo
         // P5-fix（问题 14）：WS 路径首轮生成 session_id 后必须写回 chatStore（此前不写回，
         // 每轮生成新 app_${Date.now()} → 后端 checkpointer 每轮新 thread → 多轮指代/纠错失效）
         const sid = chatStore.sessionId || `app_${Date.now()}`
@@ -247,9 +287,7 @@ export function useChatStream() {
             message: content,
             session_id: sid,
             favorites: [],
-            // P11 T1：计费身份契约 user_id == openid（P2 遗留 userInfo.id 不可靠/为 "0"；未登录省略）
-            user_id: userInfo?.openid ? String(userInfo.openid) : undefined,
-            // D4：force_deep 前端「深度分析」按钮（Task 6 页面接入）
+            // P0：user_id 改由服务端注入（app-api 验签 JWT 后覆写），客户端不再自报
             force_deep: options?.forceDeep === true
           })
         })
