@@ -8,7 +8,7 @@
 - `pages/alert-analysis.vue` - AI 异动解读
 - `pages/hot-burst.vue` - 机构调研热门股
 - `pages/leaders.vue` - 长线风口（概览入口页：泡泡图 + 板块入口卡片列表，点击板块跳转详情）
-- `pages/sector-detail.vue` - 板块详情子页面（板块统计、龙头股、AI 分析、主线/上游/下游个股列表）
+- `pages/sector-detail.vue` - 板块详情子页面（板块统计、龙头股、AI 分析、主线/上游/下游个股列表）；板块详情页含近120日板块K线图（KLineChart + getBoardKline）
 - `pages/push-history.vue` - 历史推送
 
 ## 组件

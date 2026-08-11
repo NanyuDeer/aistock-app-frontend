@@ -70,6 +70,7 @@ interface InnerAudioContextLike {
   duration: number
   play(): void
   pause(): void
+  stop(): void
   seek(time: number): void
   destroy(): void
   onTimeUpdate(cb: () => void): void
@@ -226,7 +227,9 @@ function createUniEngine(src: string): AudioEngine {
     pause: () => ctx.pause(),
     seek: (t: number) => { ctx.seek(t); currentTime.value = t },
     setSrc: (s: string) => { ctx.src = s },
-    destroy: () => ctx.destroy()
+    // 卸载/换源时先 stop 再 destroy：保证音频立即停止（全局互斥抢占时，
+    // FloatingPodcast 通过清空 src 卸载本组件，必须停掉正在播放的音频）
+    destroy: () => { ctx.stop(); ctx.destroy() }
   }
 }
 

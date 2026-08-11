@@ -1,16 +1,36 @@
 /**
- * 播报悬浮窗状态管理
+ * 播报悬浮窗状态管理（含全局互斥 + 连续播放排队）
  * 跨页面共享播报文本/音频状态：报告页标题右侧播报按钮调用 open()，
- * FloatingPodcast 组件消费本 store 渲染悬浮球/播放条。
+ * FloatingPodcast 组件消费本 store 渲染悬浮球/播放条；
+ * briefing 等页面内音频经 acquireExternal/releaseExternal 注册，纳入全局互斥。
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { agentApi } from '@/shared/api/modules/agent'
+import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 
 type PodcastStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 /** 播报文本最大长度（约1分钟播报时长），与后端 generate-podcast 校验一致 */
 const MAX_PODCAST_TEXT_LENGTH = 250
+/** 连续播放排队上限 */
+const MAX_QUEUE = 10
+
+/** 排队项（连续模式） */
+interface QueuedItem {
+  key: string
+  title: string
+  url: string
+}
+
+/** 播放会话（统一播放入口载荷） */
+interface PlaySession {
+  key: string
+  title: string
+  url: string
+  autoplay?: boolean
+  startTime?: number
+}
 
 export const usePodcastStore = defineStore('podcast', () => {
   /** 悬浮球是否显示（页面调用 open() 后显示） */
@@ -30,9 +50,144 @@ export const usePodcastStore = defineStore('podcast', () => {
   /** 当前是否正在播放（由 FloatingPodcast 同步，用于悬浮球旋转等 UI） */
   const playing = ref(false)
 
+  // ===== 8.10 新增：全局互斥 + 连续播放排队 =====
+  /** 连续播放开关（持久化；关=互斥默认，开=排队顺序播放） */
+  const continuousPlay = ref<boolean>(storage.get(STORAGE_KEYS.PODCAST_CONTINUOUS) === true)
+  /** 排队队列（连续模式下使用） */
+  const queue = ref<QueuedItem[]>([])
+  /** 外部注册的音频（如 briefing 页面 innerAudioContext） */
+  const externalActive = ref<{ key: string; stop: () => void } | null>(null)
+  /** 挂起的外部音频（连续模式且悬浮窗占用时暂存，空闲后按请求先后激活） */
+  const pendingExternal = ref<{ key: string; play: () => void; stop: () => void } | null>(null)
+
   /** 同步播放状态（FloatingPodcast 的 AudioPlayer play/pause/ended 事件驱动） */
   function setPlaying(value: boolean) {
     playing.value = value
+  }
+
+  /** 切换连续播放开关并持久化 */
+  function toggleContinuous() {
+    continuousPlay.value = !continuousPlay.value
+    if (!continuousPlay.value) {
+      // 切回互斥模式（不排队）：清空残留队列与挂起外部音频，
+      // 避免 releaseExternal 消费残留队列抢占已就绪播报
+      queue.value = []
+      pendingExternal.value = null
+    }
+    storage.set(STORAGE_KEYS.PODCAST_CONTINUOUS, continuousPlay.value)
+  }
+
+  /** 当前是否被音频占用（播放中或已就绪待播） */
+  function isBusy(): boolean {
+    return playing.value || (status.value === 'ready' && !!audioUrl.value)
+  }
+
+  /** 停止外部注册音频（互斥语义） */
+  function stopExternal() {
+    if (externalActive.value) {
+      try {
+        externalActive.value.stop()
+      } catch {
+        // 忽略外部 stop 异常
+      }
+    }
+  }
+
+  /** 复位悬浮窗播放器（用于外部音频抢占时让 AudioPlayer 卸载/停止） */
+  function resetPlayer() {
+    status.value = 'idle'
+    audioUrl.value = ''
+    errorMsg.value = ''
+    playing.value = false
+    autoplay.value = false
+    startTime.value = 0
+    expanded.value = false
+  }
+
+  /** 加载并播放一个会话（直接替换当前播放器内容） */
+  function startPlayback(session: PlaySession) {
+    stopExternal()
+    text.value = ''
+    cacheKey.value = session.key
+    title.value = session.title || 'AI 播报'
+    status.value = 'ready'
+    audioUrl.value = session.url
+    errorMsg.value = ''
+    visible.value = true
+    expanded.value = true
+    autoplay.value = session.autoplay ?? true
+    startTime.value = Math.max(0, session.startTime ?? 0)
+  }
+
+  /** 统一播放入口：互斥模式停止旧音频立即播；连续模式当前占用则入队 */
+  function requestPlay(session: PlaySession) {
+    if (!session.url || !session.key) return
+    if (continuousPlay.value && isBusy()) {
+      if (queue.value.length >= MAX_QUEUE) {
+        uni.showToast({ title: '播报队列已满', icon: 'none' })
+        return
+      }
+      queue.value.push({ key: session.key, title: session.title, url: session.url })
+      // 保证悬浮球/播放条可见，展示队列等待态（球不旋转）
+      visible.value = true
+      expanded.value = false
+      uni.showToast({ title: '已加入播报队列', icon: 'none' })
+      return
+    }
+    startPlayback(session)
+  }
+
+  /**
+   * 外部页面音频注册（晚报/早报等页面内 innerAudioContext 播放前调用）
+   * 互斥模式：停止悬浮窗当前播放后立即 play()。
+   * 连续模式：悬浮窗占用时挂起（pendingExternal，不立即播，避免叠音），
+   *           由 onAudioEnded/释放时在播报队列之前优先激活。
+   * @returns release 函数（音频结束/页面卸载时调用）
+   */
+  function acquireExternal(key: string, play: () => void, stop: () => void): () => void {
+    if (continuousPlay.value && isBusy()) {
+      pendingExternal.value = { key, play, stop }
+      return () => {
+        if (pendingExternal.value?.key === key) pendingExternal.value = null
+        releaseExternal(key)
+      }
+    }
+    if (!continuousPlay.value) {
+      resetPlayer()
+    }
+    externalActive.value = { key, stop }
+    play()
+    return () => releaseExternal(key)
+  }
+
+  /** 外部音频注销 */
+  function releaseExternal(key: string) {
+    // 先清理同名挂起注册：页面卸载/用户取消时，挂起项一并取消，避免 onAudioEnded 激活残留 play()
+    if (pendingExternal.value?.key === key) pendingExternal.value = null
+    if (externalActive.value?.key !== key) return
+    externalActive.value = null
+    // 外部音频结束：消费播报队列下一项（若有）
+    const next = queue.value.shift()
+    if (next) {
+      startPlayback({ key: next.key, title: next.title, url: next.url })
+    }
+  }
+
+  /** FloatingPodcast AudioPlayer ended：消费队列下一项 */
+  function onAudioEnded() {
+    playing.value = false
+    // 连续模式：先激活挂起的外部音频（按请求先后），再消费播报队列
+    if (pendingExternal.value) {
+      const p = pendingExternal.value
+      pendingExternal.value = null
+      externalActive.value = { key: p.key, stop: p.stop }
+      p.play()
+      return
+    }
+    const next = queue.value.shift()
+    if (next) {
+      startPlayback({ key: next.key, title: next.title, url: next.url })
+    }
   }
 
   /** 打开播报：注入文本并自动生成/复用音频 */
@@ -44,15 +199,41 @@ export const usePodcastStore = defineStore('podcast', () => {
       expanded.value = true
       return
     }
+    // 连续模式：当前被音频占用 → 后台生成并入队，不触碰当前播放状态
+    if (continuousPlay.value && isBusy()) {
+      void buildAndEnqueue(nextText, nextKey, nextTitle || 'AI 播报')
+      return
+    }
+    // 互斥模式：新播报请求即停止外部音频，避免生成期间叠音
+    stopExternal()
     text.value = nextText
     cacheKey.value = nextKey
     title.value = nextTitle || 'AI 播报'
-    status.value = 'idle'
+    status.value = 'loading'
     audioUrl.value = ''
     errorMsg.value = ''
     visible.value = true
     expanded.value = true
     await generate()
+  }
+
+  /** 连续模式后台生成：完成拿到 url 后入队（不写共享播放状态，避免打断当前音频） */
+  async function buildAndEnqueue(text: string, key: string, title: string) {
+    try {
+      const trimmed = text.length > MAX_PODCAST_TEXT_LENGTH
+        ? text.slice(0, MAX_PODCAST_TEXT_LENGTH)
+        : text
+      const res = await agentApi.generatePodcast(trimmed, key)
+      if (queue.value.length >= MAX_QUEUE) {
+        uni.showToast({ title: '播报队列已满', icon: 'none' })
+        return
+      }
+      queue.value.push({ key, title, url: res.audio_url })
+      visible.value = true
+      uni.showToast({ title: '已加入播报队列', icon: 'none' })
+    } catch {
+      uni.showToast({ title: '播报生成失败', icon: 'none' })
+    }
   }
 
   /**
@@ -61,15 +242,7 @@ export const usePodcastStore = defineStore('podcast', () => {
    */
   function playDirect(url: string, nextKey: string, nextTitle: string, resumeAt = 0) {
     if (!url || !nextKey) return
-    audioUrl.value = url
-    cacheKey.value = nextKey
-    title.value = nextTitle || 'AI 播报'
-    status.value = 'ready'
-    errorMsg.value = ''
-    visible.value = true
-    expanded.value = false
-    autoplay.value = true
-    startTime.value = Math.max(0, resumeAt)
+    requestPlay({ key: nextKey, title: nextTitle, url, autoplay: true, startTime: resumeAt })
   }
 
   /** 自动播放消费完成后复位（由 AudioPlayer 首次 play 事件触发，避免收起再展开时重复自动播放） */
@@ -77,19 +250,22 @@ export const usePodcastStore = defineStore('podcast', () => {
     autoplay.value = false
   }
 
-  /** 生成播报音频（文本裁剪到 250 字，与后端校验一致） */
+  /** 生成播报音频（文本裁剪到 250 字，与后端校验一致）；互斥模式下 open 已先行 stopExternal */
   async function generate() {
     if (!text.value || !cacheKey.value) return
     status.value = 'loading'
     errorMsg.value = ''
+    const key = cacheKey.value // 生成期间可能被新请求覆盖，用于丢弃迟到结果
     try {
       const trimmed = text.value.length > MAX_PODCAST_TEXT_LENGTH
         ? text.value.slice(0, MAX_PODCAST_TEXT_LENGTH)
         : text.value
-      const res = await agentApi.generatePodcast(trimmed, cacheKey.value)
+      const res = await agentApi.generatePodcast(trimmed, key)
+      if (cacheKey.value !== key) return // 迟到结果：key 已被新请求占用，丢弃
       audioUrl.value = res.audio_url
       status.value = 'ready'
     } catch (e: unknown) {
+      if (cacheKey.value !== key) return
       errorMsg.value = e instanceof Error ? e.message : '播报生成失败，请稍后重试'
       status.value = 'error'
     }
@@ -107,6 +283,9 @@ export const usePodcastStore = defineStore('podcast', () => {
 
   /** 关闭并清除状态 */
   function close() {
+    queue.value = []
+    externalActive.value = null
+    pendingExternal.value = null
     visible.value = false
     expanded.value = false
     status.value = 'idle'
@@ -129,6 +308,9 @@ export const usePodcastStore = defineStore('podcast', () => {
     autoplay,
     startTime,
     playing,
+    continuousPlay,
+    queue,
+    pendingExternal,
     open,
     playDirect,
     consumeAutoplay,
@@ -137,5 +319,9 @@ export const usePodcastStore = defineStore('podcast', () => {
     expand,
     collapse,
     close,
+    toggleContinuous,
+    acquireExternal,
+    releaseExternal,
+    onAudioEnded,
   }
 })
