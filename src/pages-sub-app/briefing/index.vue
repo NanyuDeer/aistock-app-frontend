@@ -177,10 +177,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { agentApi, type BriefType, type BriefV1, type BroadcastV1, type MarketTraceReviewRecord } from '@/shared/api/modules/agent'
-import { API_BASE_URL } from '@/shared/utils/constants'
 import {
   SOURCE_LABELS,
   SOURCE_ICONS,
@@ -211,9 +210,9 @@ const broadcastType = ref<BriefType>('morning')
 const loading = ref(true)
 const report = ref<BroadcastV1 | null>(null)
 const items = ref<BriefingItem[]>([])
-const isPlaying = ref(false)
-const audioContext = ref<UniApp.InnerAudioContext | null>(null)
-/** 悬浮播报 store：退出页面时把播放移交悬浮窗续播 */
+/** 播放状态来自悬浮窗 store（FloatingPodcast AudioPlayer 事件同步），页面内按钮与悬浮球状态一致 */
+const isPlaying = computed(() => podcastStore.playing)
+/** 悬浮播报 store：音频统一由全局悬浮窗承载，跨页切换状态不丢 */
 const podcastStore = usePodcastStore()
 
 /** 无当日报告时最多向前回退的自然日数（覆盖周末与长假缺口）。 */
@@ -349,46 +348,29 @@ function goDetail() {
   })
 }
 
+/**
+ * 播放/暂停：音频统一由全局悬浮窗（FloatingPodcast）承载。
+ * 播放状态、进度、暂停/继续都在悬浮窗内，页面切到详情/返回后状态不丢。
+ */
 function togglePlay() {
   if (!audioPath.value) {
     uni.showToast({ title: '语音生成中', icon: 'none' })
     return
   }
-
-  if (!audioContext.value) {
-    // 从 audio_path 提取文件名
-    const filename = audioPath.value.split('/').pop() || ''
-    const audioUrl = `${API_BASE_URL}/agent/audio/${filename}`
-    audioContext.value = uni.createInnerAudioContext()
-    audioContext.value.src = audioUrl
-    audioContext.value.onEnded(() => {
-      isPlaying.value = false
-      podcastStore.releaseExternal('briefing')
-    })
-    audioContext.value.onError(() => {
-      isPlaying.value = false
-      uni.showToast({ title: '音频播放失败', icon: 'none' })
-    })
+  const filename = audioPath.value.split('/').pop() || ''
+  const key = `briefing-${broadcastType.value}-${currentDate.value}`
+  if (podcastStore.playing) {
+    podcastStore.pause()
+    return
   }
-
-  if (isPlaying.value) {
-    audioContext.value.pause()
-    isPlaying.value = false
-    podcastStore.releaseExternal('briefing')
-  } else {
-    // 纳入全局互斥：互斥模式下注册会先停止悬浮窗当前播放；play 回调由 store 在适当时机触发
-    podcastStore.acquireExternal(
-      'briefing',
-      () => {
-        audioContext.value?.play()
-        isPlaying.value = true
-      },
-      () => {
-        audioContext.value?.stop()
-        isPlaying.value = false
-      },
-    )
+  // 已就绪同源音频 → 续播（不重置 src）；否则重新开始播放
+  if (podcastStore.status === 'ready' && podcastStore.cacheKey === key) {
+    podcastStore.resume()
+    return
   }
+  const label = broadcastType.value === 'morning' ? 'AI 早报' : 'AI 晚报'
+  // 传相对路径：FloatingPodcast 按 API 前缀（/api）拼接完整地址，与 generatePodcast 返回格式一致
+  podcastStore.playDirect(`/api/agent/audio/${filename}`, key, label, 0)
 }
 
 function changeDate(delta: number) {
@@ -469,12 +451,8 @@ async function fetchReportFor(date: string): Promise<boolean> {
 async function loadReport() {
   if (!currentDate.value) return
   loading.value = true
-  // 停止当前播放
-  if (audioContext.value && isPlaying.value) {
-    audioContext.value.stop()
-    isPlaying.value = false
-    podcastStore.releaseExternal('briefing')
-  }
+  // 切换日期/类型：暂停悬浮窗播放（避免旧报告音频继续，用户可手动续播）
+  podcastStore.pause()
 
   const requested = currentDate.value
   isFallback.value = false
@@ -511,27 +489,6 @@ onLoad((options) => {
   // （上海时间）期间 UTC 仍是前一天，会取到错误的播报。
   currentDate.value = opts.date || shanghaiDateString()
   loadReport()
-})
-
-onUnmounted(() => {
-  // 播放中退出页面：把音频移交悬浮播报继续播放（从当前进度续播），避免退出即暂停
-  if (audioContext.value && isPlaying.value) {
-    const filename = audioPath.value?.split('/').pop() || ''
-    const url = `${API_BASE_URL}/agent/audio/${filename}`
-    const label = broadcastType.value === 'morning' ? 'AI 早报' : 'AI 晚报'
-    podcastStore.playDirect(
-      url,
-      `briefing-${broadcastType.value}-${currentDate.value}`,
-      label,
-      audioContext.value.currentTime || 0,
-    )
-  }
-  // 释放全局互斥注册（handoff playDirect 已开始悬浮窗播放，release 不打断已就绪的悬浮窗）
-  podcastStore.releaseExternal('briefing')
-  if (audioContext.value) {
-    audioContext.value.destroy()
-    audioContext.value = null
-  }
 })
 </script>
 

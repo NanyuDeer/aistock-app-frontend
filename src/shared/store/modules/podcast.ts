@@ -5,7 +5,7 @@
  * briefing 等页面内音频经 acquireExternal/releaseExternal 注册，纳入全局互斥。
  */
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { agentApi } from '@/shared/api/modules/agent'
 import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 
@@ -49,6 +49,99 @@ export const usePodcastStore = defineStore('podcast', () => {
   const startTime = ref(0)
   /** 当前是否正在播放（由 FloatingPodcast 同步，用于悬浮球旋转等 UI） */
   const playing = ref(false)
+  /** 未消费的跨页续播点：播放中切页时 AudioPlayer 卸载上报，返回后重建自动续播 */
+  const resumePending = ref(false)
+  /** 续播起点（秒） */
+  const playbackTime = ref(0)
+
+  /** FloatingPodcast 的 AudioPlayer 控制句柄（供页面播放按钮暂停/继续悬浮窗播放） */
+  interface PlayerControls {
+    pause(): void
+    play(): void
+    togglePlay(): void
+    /** 跳转进度（秒）：跨页续播用；可选，兼容无 seek 能力的控制对象 */
+    seekTo?(t: number): void
+  }
+  const playerControls = ref<PlayerControls | null>(null)
+  /** 控制句柄的注册实例 id：注销时校验归属，防止失活实例误清新实例的注册 */
+  const playerOwnerId = ref<string | null>(null)
+
+  /** FloatingPodcast 挂载时注册播放器控制（携带实例 id 归属）；卸载时注销 */
+  function registerPlayer(id: string, controls: PlayerControls) {
+    playerOwnerId.value = id
+    playerControls.value = controls
+  }
+  function unregisterPlayer(id: string) {
+    if (playerOwnerId.value !== id) return
+    playerOwnerId.value = null
+    playerControls.value = null
+  }
+
+  /** 暂停悬浮窗播放（无挂载播放器时静默，播放态同步关闭） */
+  function pause() {
+    playerControls.value?.pause()
+    playing.value = false
+  }
+
+  /** 继续悬浮窗播放（AudioPlayer play 事件会再次同步 playing） */
+  function resume() {
+    playerControls.value?.play()
+  }
+
+  /** 播放/暂停切换：转发给悬浮窗 AudioPlayer（暂停后再次调用即续播，不会重置 src） */
+  function togglePlay() {
+    playerControls.value?.togglePlay()
+  }
+
+  /**
+   * AudioPlayer 卸载上报：仅播放中记录续播点（跨页返回后重建自动续播）。
+   * suspendingId 为卸载实例 id：若当前注册的播放器属于「其他实例」（多实例切换时序中
+   * 新页播放器先挂载、旧页后卸载），直接把续播点消费到新播放器，避免播报停止；
+   * 非播放实例卸载（playing=false）不得覆盖真实进度。
+   */
+  function suspendPlayback(
+    state: { playing: boolean; currentTime: number },
+    suspendingId = '',
+  ) {
+    if (!state.playing) return
+    playbackTime.value = state.currentTime
+    const ctrl = playerOwnerId.value && playerOwnerId.value !== suspendingId
+      ? playerControls.value
+      : null
+    if (ctrl) {
+      // 新页面播放器已就绪：nextTick 延迟一拍续播，保证同轮刷新中旧引擎销毁完成后再启动，避免双音
+      const t = state.currentTime
+      resumePending.value = false
+      playbackTime.value = 0
+      void nextTick(() => {
+        if (t > 0) ctrl.seekTo?.(t)
+        ctrl.play()
+      })
+    } else {
+      resumePending.value = true
+    }
+  }
+
+  /** 消费续播点（FloatingPodcast 重建 AudioPlayer 并续播后调用） */
+  function consumeResume() {
+    resumePending.value = false
+    playbackTime.value = 0
+  }
+
+  // ===== FloatingPodcast 渲染权：当前前台页面唯一渲染 =====
+  // uni-h5 所有页面被 KeepAlive 缓存（切换不卸载），首页 tab 页常驻 + 子页面实例并存；
+  // 渲染权必须跟随「页面可见性」。注意：uni-app 的 onShow/onHide 是页面实例级钩子
+  // （uni-h5 只在页面实例的 onBeforeActivate/onBeforeDeactivate 中调用），子组件注册的
+  // onShow/onHide 永不触发，必须由页面容器改用 Vue 的 onActivated/onDeactivated 维护。
+  const activePage = ref('')
+  function setActivePage(key: string) {
+    activePage.value = key
+  }
+  /** 页面失活（onHide/onDeactivated）：仅当本页仍持有渲染权时清空，
+   *  防止旧页失活事件晚于新页激活事件时把新页渲染权一并抹掉 */
+  function clearActivePage(key: string) {
+    if (activePage.value === key) activePage.value = ''
+  }
 
   // ===== 8.10 新增：全局互斥 + 连续播放排队 =====
   /** 连续播放开关（持久化；关=互斥默认，开=排队顺序播放） */
@@ -104,9 +197,12 @@ export const usePodcastStore = defineStore('podcast', () => {
     expanded.value = false
   }
 
-  /** 加载并播放一个会话（直接替换当前播放器内容） */
+  /** 加载并播放一个会话（直接替换当前播放器内容）；默认收起为悬浮球，不展开播放条 */
   function startPlayback(session: PlaySession) {
     stopExternal()
+    // 新会话开始：清掉未消费的跨页续播点（防止旧音频续播残留）
+    resumePending.value = false
+    playbackTime.value = 0
     text.value = ''
     cacheKey.value = session.key
     title.value = session.title || 'AI 播报'
@@ -114,7 +210,7 @@ export const usePodcastStore = defineStore('podcast', () => {
     audioUrl.value = session.url
     errorMsg.value = ''
     visible.value = true
-    expanded.value = true
+    expanded.value = false
     autoplay.value = session.autoplay ?? true
     startTime.value = Math.max(0, session.startTime ?? 0)
   }
@@ -193,10 +289,9 @@ export const usePodcastStore = defineStore('podcast', () => {
   /** 打开播报：注入文本并自动生成/复用音频 */
   async function open(nextText: string, nextKey: string, nextTitle?: string) {
     if (!nextText || !nextKey) return
-    // 同一 key 复用：已 ready 直接展开，不重复请求
+    // 同一 key 复用：已 ready 直接显示（保持收起/展开现状），不重复请求
     if (cacheKey.value === nextKey && status.value === 'ready' && audioUrl.value) {
       visible.value = true
-      expanded.value = true
       return
     }
     // 连续模式：当前被音频占用 → 后台生成并入队，不触碰当前播放状态
@@ -213,7 +308,7 @@ export const usePodcastStore = defineStore('podcast', () => {
     audioUrl.value = ''
     errorMsg.value = ''
     visible.value = true
-    expanded.value = true
+    expanded.value = false
     await generate()
   }
 
@@ -283,6 +378,9 @@ export const usePodcastStore = defineStore('podcast', () => {
 
   /** 关闭并清除状态 */
   function close() {
+    playerControls.value?.pause()
+    resumePending.value = false
+    playbackTime.value = 0
     queue.value = []
     externalActive.value = null
     pendingExternal.value = null
@@ -315,6 +413,18 @@ export const usePodcastStore = defineStore('podcast', () => {
     playDirect,
     consumeAutoplay,
     setPlaying,
+    registerPlayer,
+    unregisterPlayer,
+    pause,
+    resume,
+    togglePlay,
+    suspendPlayback,
+    consumeResume,
+    resumePending,
+    playbackTime,
+    activePage,
+    setActivePage,
+    clearActivePage,
     generate,
     expand,
     collapse,

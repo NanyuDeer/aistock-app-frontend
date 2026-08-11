@@ -139,6 +139,8 @@ const emit = defineEmits<{
   ended: []
   /** 播放进度更新 */
   timeupdate: [currentTime: number]
+  /** 组件卸载（引擎销毁前）：上报播放状态，供悬浮窗记录跨页续播点 */
+  unmount: [{ playing: boolean; currentTime: number }]
 }>()
 
 const playing = ref(false)
@@ -361,8 +363,19 @@ function playFromInitial() {
 }
 
 onUnmounted(() => {
+  // 先上报播放状态（引擎销毁后 currentTime 归零/事件失效），再销毁引擎
+  emit('unmount', { playing: playing.value, currentTime: currentTime.value })
   engine?.destroy()
   engine = null
+})
+
+/** 暴露控制方法：FloatingPodcast 注册到 podcast store，供页面播放按钮暂停/继续 */
+defineExpose({
+  pause: () => engine?.pause(),
+  play: () => engine?.play(),
+  togglePlay,
+  /** 跳转到指定进度（秒） */
+  seekTo: (t: number) => engine?.seek(t),
 })
 </script>
 
