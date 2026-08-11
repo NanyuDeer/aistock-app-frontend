@@ -438,4 +438,35 @@ describe('useChatStream 打断/停止/重试（Phase 2 Part 2）', () => {
     stream.messages.value.push({ role: 'assistant', content: '正常回答', timestamp: 3 })
     expect(stream.hasStoppedRun()).toBe(false)
   })
+
+  it('stop_status 后迟发残留 text/done 不再处理（doneReceived 关闭本轮）', () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '查一下大盘', timestamp: 1 })
+    stream._testHandleWsMessage({ type: 'stop_status', status: 'cancelled' }, () => {})
+    // stop_status 兜底已落「已停止生成」；清空记录后模拟后端迟发的残留事件
+    mockAppendMessage.mockClear()
+    stream._testHandleWsMessage({ type: 'text', content: '残留' }, () => {})
+    stream._testHandleWsMessage({ type: 'done', content: '残留回答' }, () => {})
+    // doneReceived 已置位 → 顶部早退，残留事件不得再追加/结算
+    expect(mockAppendMessage).not.toHaveBeenCalled()
+    expect(stream.streaming.value).toBe(false)
+  })
+
+  it('resume 轮连接断开：streaming 结算不卡死且保留 pending 轮（不落错误消息）', async () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '查一下大盘', timestamp: 1 })
+    mockAppendMessage.mockClear() // 清掉 beforeEach 预连 send('__connect__') 产生的用户消息
+    const p = stream.resume()
+    // 已连接 → resume 同步发控制消息，streaming=true（resume 轮进行中）
+    expect(stream.streaming.value).toBe(true)
+    stream._testHandleWsMessage({ type: 'resume_status', status: 'running' }, () => {})
+    // 模拟续流中连接断开（已连接后断 → currentAbortHandler 结算 resume 轮）
+    mockSocketCbs.onCloseCbs[0]?.({})
+    await p
+    expect(stream.streaming.value).toBe(false)
+    // 不追加「连接已断开」错误消息——resume 轮断连保留 pending（末条仍是 user），
+    // 回页 onShow 可再次 resume 续跑（区别于 send 轮断连的明确报错落消息）
+    expect(mockAppendMessage).not.toHaveBeenCalled()
+    expect(stream.messages.value.at(-1)?.role).toBe('user')
+  })
 })

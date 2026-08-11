@@ -28,6 +28,10 @@ let currentHandler: ((data: any) => void) | null = null
 let currentAbortHandler: ((reason: string) => void) | null = null
 // 当前发送/续跑轮的 resolve（单槽：同一时刻只有一个活动轮）
 let currentResolve: (() => void) | null = null
+// resume 轮进行中标记（问题 15 遗留修复：resume 不占 currentResolve 单槽，
+// 断连时需单独结算 streaming——否则 abortPendingSend 因 currentResolve 为 null 直接
+// return → streaming 卡 true。running 续流期置位，终态/abort/新 send 轮清位）
+let resumeInFlight = false
 
 function connectOnce(): Promise<boolean> {
   if (sharedSocket && sharedWsConnected) return Promise.resolve(true)
@@ -197,6 +201,8 @@ export function useChatStream() {
         // 停止回包：cancelled / not_found 均结束本轮。
         // spec §8.5 兜底：若转发协程已断、cancelled 终态不达，本地将 pending 轮
         // （末条为 user）落为「已停止生成」，UI 不悬空；随后到达的 cancelled 终态去重跳过。
+        // 遗留修复：置 doneReceived 关闭本轮，防后端 stop 后迟发的残留 text/done 被追加。
+        doneReceived = true
         finishRun()
         {
           const last = messages.value[messages.value.length - 1]
@@ -289,6 +295,7 @@ export function useChatStream() {
   function finishRun() {
     const r = currentResolve
     currentResolve = null
+    resumeInFlight = false
     streaming.value = false
     r?.()
   }
@@ -297,8 +304,21 @@ export function useChatStream() {
    * P0-fix（单例版）：连接断开/出错时结算挂起的本轮 send，并追加明确的原因消息——
    * 否则 send promise 永不 resolve → streaming 卡死、用户无回复。
    * 由模块级 onClose/onError 经 currentAbortHandler 单槽调用（对应原 connect() 内 handleSendAbort）。
+   *
+   * 问题 15 遗留修复：resume 轮（resumeInFlight）断连时只结算 streaming、不落错误消息——
+   * 保留 pending 轮（末条仍为 user），回页 onShow 可再次 resume 续跑；
+   * send 轮（currentResolve）断连维持原语义（明确报错落消息，防用户无回复）。
    */
   function abortPendingSend(reason: string) {
+    if (resumeInFlight) {
+      resumeInFlight = false
+      doneReceived = true
+      streaming.value = false
+      progressSteps.value = []
+      streamingText.value = ''
+      currentRunReasoning.value = []
+      return
+    }
     if (!currentResolve) return
     const r = currentResolve
     currentResolve = null
@@ -347,6 +367,8 @@ export function useChatStream() {
     doneReceived = false
     currentRunEvents.length = 0
     currentRunReasoning.value = []
+    // 遗留修复：标记 resume 轮进行中（断连时由 abortPendingSend 结算 streaming，不落错误消息）
+    resumeInFlight = true
     const sid = chatStore.sessionId || `app_${Date.now()}`
     if (!chatStore.sessionId) chatStore.setSessionId(sid)
     sharedSocket.send({
@@ -412,6 +434,9 @@ export function useChatStream() {
     currentRunEvents.length = 0
     // 每轮重置 reasoning 累积
     currentRunReasoning.value = []
+    // 遗留修复：_stream 是新发送轮（占 currentResolve 结算），清掉 resume 轮标记——
+    // resume_status none 兜底重发即走此路径，断连按 send 语义明确报错
+    resumeInFlight = false
 
     // 尝试 WebSocket 流式
     if (!sharedWsConnected) {
@@ -499,6 +524,7 @@ export function useChatStream() {
     currentHandler = null
     currentAbortHandler = null
     currentResolve = null
+    resumeInFlight = false
   }
 
   register()
