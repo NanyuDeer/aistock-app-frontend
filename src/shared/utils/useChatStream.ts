@@ -193,6 +193,38 @@ export function useChatStream() {
         // status === 'running'：无需动作，后续事件正常流入
         break
 
+      case 'stop_status':
+        // 停止回包：cancelled / not_found 均结束本轮。
+        // spec §8.5 兜底：若转发协程已断、cancelled 终态不达，本地将 pending 轮
+        // （末条为 user）落为「已停止生成」，UI 不悬空；随后到达的 cancelled 终态去重跳过。
+        finishRun()
+        {
+          const last = messages.value[messages.value.length - 1]
+          if (last && last.role === 'user') {
+            chatStore.appendMessage({ role: 'assistant', content: '已停止生成', timestamp: Date.now() })
+          }
+        }
+        break
+
+      case 'cancelled':
+        {
+          doneReceived = true
+          progressSteps.value = []
+          streamingText.value = ''
+          currentRunReasoning.value = []
+          const last = messages.value[messages.value.length - 1]
+          // 去重：stop_status 兜底已落过「已停止生成」时不再重复 append
+          if (!(last && last.role === 'assistant' && last.content === '已停止生成')) {
+            chatStore.appendMessage({
+              role: 'assistant',
+              content: data.content || '已停止生成',
+              timestamp: Date.now()
+            })
+          }
+          finishRun()
+        }
+        break
+
       case 'done':
         {
           doneReceived = true
@@ -323,6 +355,43 @@ export function useChatStream() {
     return true
   }
 
+  /** 生成中停止：发 stop 控制消息 + 本地立即清流式状态（UI 不悬空；
+   *  终态处理由 stop_status（兜底落消息）与 cancelled（去重落消息）分支完成）。 */
+  function stop(): void {
+    if (!streaming.value) return
+    if (sharedSocket && sharedWsConnected) {
+      const sid = chatStore.sessionId || `app_${Date.now()}`
+      sharedSocket.send({
+        data: JSON.stringify({ type: 'stop', session_id: sid })
+      })
+    }
+    progressSteps.value = []
+    streamingText.value = ''
+    currentRunReasoning.value = []
+    finishRun()
+  }
+
+  /** 最后一条 assistant 为 error/cancelled 终态 → 供重试按钮显隐 */
+  function hasStoppedRun(): boolean {
+    const arr = messages.value
+    if (arr.length === 0) return false
+    const last = arr[arr.length - 1]
+    return (
+      last.role === 'assistant' &&
+      (last.content.startsWith('抱歉，出错了') || last.content.startsWith('已停止生成'))
+    )
+  }
+
+  /** 重试：重发最后一条 user 消息（复用 _stream 不重复 append 用户消息）。
+   *  streaming 进行中拒绝（防抢占单槽 currentResolve，与 rerunDeep 守卫一致）。 */
+  async function retry(): Promise<boolean> {
+    if (streaming.value) return false
+    const last = lastUserMessage()
+    if (!last) return false
+    await _stream(last.content)
+    return true
+  }
+
   /**
    * 发送消息（优先 WebSocket 流式，降级 HTTP 非流式）。
    * send 负责 append 用户消息；_stream 只负责传输（resume none 兜底复用 _stream 不重复 append）。
@@ -448,6 +517,9 @@ export function useChatStream() {
     isConnected,
     hasPendingRun,
     resume,
+    stop,
+    retry,
+    hasStoppedRun,
     // 测试钩子：直接暴露 handleWsMessage 供单测模拟 WS 事件序列
     _testHandleWsMessage: handleWsMessage,
     _testReset,

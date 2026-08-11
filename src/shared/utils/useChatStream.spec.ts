@@ -336,3 +336,106 @@ describe('useChatStream resume（问题 15 断点续传）', () => {
     expect(mockSocketSend).not.toHaveBeenCalled()
   })
 })
+
+describe('useChatStream 打断/停止/重试（Phase 2 Part 2）', () => {
+  beforeEach(() => {
+    // 模块级状态隔离：本 describe 是 reasoning describe 的兄弟块，不继承其 beforeEach。
+    // 重置单例 socket / mock store 消息数组 / mock 调用记录，避免用例间共享连接与消息污染
+    // （无隔离时 cancelled 用例会因前序 stop_status 残留的「已停止生成」而空转通过）。
+    const stream = useChatStream() as any
+    stream.messages.value = []
+    stream.sessionId.value = ''
+    mockAppendMessage.mockClear()
+    mockSocketCbs.onMessageCbs.length = 0
+    mockSocketCbs.onCloseCbs.length = 0
+    mockSocketCbs.onErrorCbs.length = 0
+    mockSocketSend.mockClear()
+    mockSetSessionId.mockClear()
+    mockWsFail.fail = false
+    vi.mocked(agentApi.sendMessage).mockReset()
+    stream._testReset()
+    // 预建连接：mock onOpen 同步触发 → connectOnce 内已连接，_stream 的 WS send 同步执行
+    // （用例在 retry()/send() 返回后同步断言 calls[0]；若连接未就绪，await connectOnce
+    //  会把发送推迟到微任务，calls[0] 为 undefined）。等效于 resume describe 遗留的连接态，
+    //  但不依赖跨 describe 的用例顺序。
+    stream.send('__connect__')
+    mockSocketSend.mockClear()
+  })
+
+  it('stop：isStreaming 时发送 {type:"stop"} 并清流式状态', async () => {
+    const stream = useChatStream() as any
+    stream.send('第一条')
+    mockSocketSend.mockClear()
+    stream.stop()
+    expect(stream.streaming.value).toBe(false)
+    const sent = mockSocketSend.mock.calls[0][0]
+    const payload = JSON.parse(sent.data)
+    expect(payload.type).toBe('stop')
+    expect(payload.session_id).toBeTruthy()
+  })
+
+  it('stop_status cancelled → streaming=false；pending 轮（末条为 user）落「已停止生成」', () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '查一下大盘', timestamp: 1 })
+    stream._testHandleWsMessage({ type: 'stop_status', status: 'cancelled' }, () => {})
+    expect(stream.streaming.value).toBe(false)
+    // spec §8.5：转发协程可能已断、cancelled 终态不达 → 本地兜底落消息，UI 不悬空
+    expect(mockAppendMessage).toHaveBeenCalledWith(expect.objectContaining({ role: 'assistant', content: '已停止生成' }))
+  })
+
+  it('cancelled 终态 → append assistant "已停止生成" + streaming=false', () => {
+    const stream = useChatStream() as any
+    stream._testHandleWsMessage({ type: 'cancelled', content: '已停止生成' }, () => {})
+    expect(mockAppendMessage).toHaveBeenCalledWith(expect.objectContaining({ role: 'assistant', content: '已停止生成' }))
+    expect(stream.streaming.value).toBe(false)
+  })
+
+  it('cancelled 终态去重：末条已是「已停止生成」时不重复 append', () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'assistant', content: '已停止生成', timestamp: 1 })
+    mockAppendMessage.mockClear()
+    stream._testHandleWsMessage({ type: 'cancelled', content: '已停止生成' }, () => {})
+    expect(mockAppendMessage).not.toHaveBeenCalled()
+    expect(stream.streaming.value).toBe(false)
+  })
+
+  it('retry：重发最后一条 user 消息且不重复 append 用户消息', async () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '查一下大盘', timestamp: 1 })
+    stream.messages.value.push({ role: 'assistant', content: '已停止生成', timestamp: 2 })
+    const userCountBefore = stream.messages.value.length
+    mockSocketSend.mockClear()
+    const p = stream.retry()
+    // 重发走 _stream → WS send 普通消息（无 type 字段）
+    const sent = mockSocketSend.mock.calls[0][0]
+    const payload = JSON.parse(sent.data)
+    expect(payload.type).toBeUndefined()
+    expect(payload.message).toBe('查一下大盘')
+    // 用户消息不重复 append
+    expect(stream.messages.value.length).toBe(userCountBefore)
+    stream._testHandleWsMessage({ type: 'done', content: '回答' }, () => {})
+    await p
+    expect(mockAppendMessage).toHaveBeenCalledWith(expect.objectContaining({ content: '回答' }))
+  })
+
+  it('retry：流式进行中（streaming=true）时拒绝（防抢占单槽 currentResolve）', async () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '问', timestamp: 1 })
+    stream.messages.value.push({ role: 'assistant', content: '已停止生成', timestamp: 2 })
+    stream.streaming.value = true
+    mockSocketSend.mockClear()
+    const ok = await stream.retry()
+    expect(ok).toBe(false)
+    expect(mockSocketSend).not.toHaveBeenCalled()
+  })
+
+  it('hasStoppedRun：最后一条为 error/cancelled 终态时 true', () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'assistant', content: '抱歉，出错了：x', timestamp: 1 })
+    expect(stream.hasStoppedRun()).toBe(true)
+    stream.messages.value.push({ role: 'assistant', content: '已停止生成', timestamp: 2 })
+    expect(stream.hasStoppedRun()).toBe(true)
+    stream.messages.value.push({ role: 'assistant', content: '正常回答', timestamp: 3 })
+    expect(stream.hasStoppedRun()).toBe(false)
+  })
+})
