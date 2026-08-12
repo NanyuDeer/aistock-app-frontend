@@ -45,7 +45,10 @@ class FakeMpManager implements MpSpeechRecognitionManagerLike {
   onError: MpSpeechRecognitionManagerLike['onError'] = null
   startedLang = ''
   stopped = false
+  /** 为 true 时 start() 同步抛错（模拟录音冲突/权限边缘） */
+  startThrows = false
   start(options: { lang: string }): void {
+    if (this.startThrows) throw new Error('recording conflict')
     this.startedLang = options.lang
   }
   stop(): void {
@@ -155,6 +158,18 @@ describe('speechInput 状态机基线', () => {
     const p = mpRecognize(mpDepsWith(mgr))
     mgr.onError?.({ msg: 'user deny' })
     await expect(p).resolves.toEqual({ ok: false, error: '语音识别失败（user deny）' })
+  })
+
+  it('MP start 同步抛错（录音冲突/权限边缘）：Promise 不 reject，返回错误态', async () => {
+    const mgr = new FakeMpManager()
+    mgr.startThrows = true
+    const p = mpRecognize(mpDepsWith(mgr))
+    // 判别联合契约：同步异常也必须 resolve 错误态，绝不 reject（页面 await 不会 unhandled rejection）
+    await expect(p).resolves.toEqual({ ok: false, error: '语音输入暂不可用' })
+    expect(speechRecognitionState.value).toBe('error')
+    // 同步失败后 activeStop 已清空：stopSpeechRecognition 为 no-op，不触发 manager.stop
+    stopSpeechRecognition()
+    expect(mgr.stopped).toBe(false)
   })
 
   it('MP 空文本：onStop 无 result → 「未识别到语音」错误态', async () => {

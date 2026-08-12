@@ -165,7 +165,15 @@ export function mpRecognize(deps: MpSpeechDeps): Promise<SpeechRecognitionResult
       setState('recognizing')
       manager.stop()
     }
-    manager.start({ lang: 'zh_CN' })
+    try {
+      // start() 可能同步抛错（录音冲突/权限边缘）：与 H5 分支一致的 try/catch 防护，
+      // 保证 Promise 永不 reject（判别联合契约），页面 await 不会得到 unhandled rejection
+      manager.start({ lang: 'zh_CN' })
+    } catch {
+      activeStop = null
+      setState('error')
+      resolve({ ok: false, error: MP_UNAVAILABLE_HINT })
+    }
   })
 }
 

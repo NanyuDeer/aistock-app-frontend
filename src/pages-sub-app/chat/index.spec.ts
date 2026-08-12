@@ -106,3 +106,11 @@ test('Phase 4-2 语音输入：识别失败轻提示（toast），不阻塞文�
   assert.match(pageSource, /uni\.hideToast\(\)/)
   assert.doesNotMatch(pageSource, /speechSynthesis|SpeechSynthesis|playVoice|tts/i)
 })
+
+test('Phase 4-2 语音输入：await pending 防御 try/catch（意外 reject 复位聆听状态 + 回退 toast）', () => {
+  // 核心函数保证 Promise 永不 reject，但页面仍须防御：await 包在 try 内，
+  // catch 中复位 isListening 并回退轻提示，避免麦克风按钮卡在 active / toast 悬挂
+  assert.match(pageSource, /try \{[\s\S]*?const result = await pending/)
+  assert.match(pageSource, /catch \{[\s\S]*?isListening\.value = false/)
+  assert.match(pageSource, /语音识别失败，请重试/)
+})

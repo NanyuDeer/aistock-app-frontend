@@ -325,13 +325,21 @@ async function handleMicTap() {
   // 不直接 await：startSpeechRecognition 内部已同步执行 recognition.start()（手势上下文内）
   const pending = startSpeechRecognition()
   showListeningToast()
-  const result = await pending
-  isListening.value = false
-  uni.hideToast()
-  if (result.ok) {
-    inputText.value = result.text
-  } else {
-    uni.showToast({ title: result.error, icon: 'none' })
+  try {
+    const result = await pending
+    isListening.value = false
+    uni.hideToast()
+    if (result.ok) {
+      inputText.value = result.text
+    } else {
+      uni.showToast({ title: result.error, icon: 'none' })
+    }
+  } catch {
+    // 防御：speechInput 保证 Promise 永不 reject，但平台壳层/未来扩展若意外 reject，
+    // 也必须复位聆听状态并回退轻提示，避免麦克风按钮卡在 active、toast 悬挂
+    isListening.value = false
+    uni.hideToast()
+    uni.showToast({ title: '语音识别失败，请重试', icon: 'none' })
   }
 }
 
