@@ -50,12 +50,21 @@
               <view class="msg-footer">
                 <text v-if="msg.tokenUsage" class="turn-usage">{{ msg.tokenUsage.total_tokens }} tokens</text>
                 <view
-                  v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了')"
+                  v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了') && !msg.content.startsWith('已停止生成')"
                   class="deep-btn"
                   @tap="rerunDeep(idx)"
                 >
                   <SvgIcon name="line-chart-line" size="24rpx" color="#0b5fff" />
                   <text class="deep-btn-text">深度分析</text>
+                </view>
+                <!-- Phase 2 Part 2：error/cancelled 终态消息「重试」按钮（重发最近一轮 user 消息） -->
+                <view
+                  v-if="msg.role === 'assistant' && (msg.content.startsWith('抱歉，出错了') || msg.content.startsWith('已停止生成'))"
+                  class="retry-btn"
+                  @tap="chatStream.retry()"
+                >
+                  <SvgIcon name="refresh-line" size="24rpx" color="#0b5fff" />
+                  <text class="retry-btn-text">重试</text>
                 </view>
               </view>
             </view>
@@ -116,7 +125,9 @@
       <!-- 输入框 -->
       <view class="input-bar">
         <input v-model="inputText" placeholder="输入消息..." class="input" @confirm="handleSend" />
-        <button @tap="handleSend" :disabled="isStreaming" class="send-btn">发送</button>
+        <!-- Phase 2 Part 2：生成中「发送」替换为「停止」（与 isStreaming 联动） -->
+        <button v-if="isStreaming" @tap="chatStream.stop()" class="stop-btn">停止</button>
+        <button v-else @tap="handleSend" :disabled="isStreaming" class="send-btn">发送</button>
       </view>
     </view>
   </SubPageCard2>
@@ -180,7 +191,13 @@ const inputText = ref('')
 const scrollTop = ref(0)
 
 // 每次进入页面（含从会话列表返回、切会话）默认停留在对话最下方
-onShow(() => scrollToBottom())
+onShow(() => {
+  scrollToBottom()
+  // 问题 15：回页时若存在未完成轮（最后一条是 user）且连接已断开 → 自动 resume 续跑
+  if (chatStream.hasPendingRun() && !chatStream.isConnected()) {
+    void chatStream.resume()
+  }
+})
 
 // 对话期间始终跟随最下方：流式开始时立即滚动，之后定时跟随。
 // 根因：mp-html 渲染异步（先清空再解析），仅靠 streamingText watch + nextTick 设置 scroll-top
@@ -318,7 +335,8 @@ onUnmounted(() => {
     followTimer = null
   }
   stopTypewriter()
-  chatStream.disconnect()
+  // 问题 15：不再 disconnect —— socket 为模块级单例，跨页面存活，
+  // 后台任务继续生成，回页经 onShow resume 补全
 })
 </script>
 
@@ -455,5 +473,35 @@ onUnmounted(() => {
 .deep-btn-text {
   font-size: 22rpx;
   color: #0b5fff;
+}
+
+/* Phase 2 Part 2：生成中「停止」按钮（输入栏；$primary-50 底色 + $primary 文字） */
+.stop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64rpx;
+  padding: 0 32rpx;
+  border-radius: 32rpx;
+  background-color: $primary-50;
+  color: $primary;
+  font-size: 28rpx;
+  margin-left: 16rpx;
+}
+
+/* Phase 2 Part 2：error/cancelled 终态消息「重试」按钮（气泡 footer；沿用 deep-btn 视觉） */
+.retry-btn {
+  display: flex;
+  align-items: center;
+  margin-left: 24rpx;
+  padding: 8rpx 16rpx;
+  border-radius: $r-md;
+  background-color: $primary-50;
+}
+
+.retry-btn-text {
+  margin-left: 8rpx;
+  color: $primary;
+  font-size: 24rpx;
 }
 </style>
