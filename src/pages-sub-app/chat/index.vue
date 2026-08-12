@@ -240,13 +240,42 @@ const confirmWaiting = ref(false)
 const confirmQuestion = ref('')
 const confirmOptions = ref<ConfirmOption[]>([])
 
+// Phase 4-2 改进 13（final review I-1）：确认框展示期间启动 60s 计时器（对齐后端
+// `_wait_confirm_response` 的 `_CONFIRM_TIMEOUT_SEC`）。后端超时后 confirm_timeout 重跑
+// 回退既有澄清，若前端不及时 re-arm，回退事件流会被 doneReceived=true 丢弃（对话悬空）。
+// 到期若弹框仍开 → abandonConfirm()（发送「都不是」或软 re-arm）让回退事件正常渲染。
+const CONFIRM_TIMEOUT_MS = 60_000
+let confirmTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearConfirmTimer() {
+  if (confirmTimer) {
+    clearTimeout(confirmTimer)
+    confirmTimer = null
+  }
+}
+
+function startConfirmTimer() {
+  clearConfirmTimer()
+  confirmTimer = setTimeout(() => {
+    confirmTimer = null
+    if (confirmVisible.value) {
+      chatStream.abandonConfirm()
+      confirmVisible.value = false
+      confirmWaiting.value = false
+    }
+  }, CONFIRM_TIMEOUT_MS)
+}
+
 watch(pendingConfirm, (v) => {
   if (v) {
     confirmQuestion.value = v.question
     confirmOptions.value = v.options
     confirmVisible.value = true
     confirmWaiting.value = false
+    startConfirmTimer()
     scrollToBottom()
+  } else {
+    clearConfirmTimer()
   }
 })
 
@@ -259,15 +288,23 @@ function handleConfirmSelect(key: string, label: string) {
   const pc = pendingConfirm.value
   if (confirmWaiting.value || !pc) return
   confirmWaiting.value = true
+  clearConfirmTimer()
   if (!chatStream.sendConfirmResponse(pc.request_id, key)) {
     confirmVisible.value = false
     confirmWaiting.value = false
   }
 }
 
-/** 用户主动关框 → 不发送（等后端 60s 超时回退澄清，spec：不猜测用户意图） */
+/**
+ * 用户主动关框（overlay 点击）→ 语义 =「都不是」：abandonConfirm 发送 confirm_response(choice='none')
+ * 让后端立即 confirm_timeout 重跑回退既有澄清（等 60s 空窗口期间发新消息会被后端忽略）。
+ * WS 不可用则软 re-arm，由后端 60s 超时自动回退（final review I-1 修复）。
+ */
 function handleConfirmClose() {
+  clearConfirmTimer()
+  chatStream.abandonConfirm()
   confirmVisible.value = false
+  confirmWaiting.value = false
 }
 
 const inputText = ref('')
@@ -487,6 +524,7 @@ onUnmounted(() => {
     followTimer = null
   }
   stopTypewriter()
+  clearConfirmTimer()
   // 问题 15：不再 disconnect —— socket 为模块级单例，跨页面存活，
   // 后台任务继续生成，回页经 onShow resume 补全
 })

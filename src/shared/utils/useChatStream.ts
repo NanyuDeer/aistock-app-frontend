@@ -467,6 +467,38 @@ export function useChatStream() {
     return true
   }
 
+  /**
+   * 交互式确认（改进 13，final review I-1）：用户关框或 60s 超时放弃点选。
+   *
+   * 语义 = 「都不是」：发送 confirm_response(choice='none') → 后端 `_wait_confirm_response`
+   * 对 choice=='none' 返回 None → confirm_timeout 重跑 → qa_router 回退既有澄清。
+   * 相比"什么都不做等 60s"：立即触发回退，避免前端已关框但后端仍挂 60s
+   * 等待期间用户发新消息被 `_wait_confirm_response` 忽略的竞态。
+   *
+   * WS 不可用（发送失败）→ 软 re-arm（doneReceived=false + 清残留、streaming 保持 false）：
+   * 后端 60s 超时同样自动 confirm_timeout 重跑回退澄清，事件流入正常渲染。
+   *
+   * 注意：点选路径（sendConfirmResponse）re-arm 后 streaming=true 供页面显示续跑流式；
+   * 放弃路径回退澄清同样是新事件流，但页面不应展示流式态（done 分支照常 appendMessage）。
+   */
+  function abandonConfirm(): void {
+    const pc = pendingConfirm.value
+    if (!pc) return
+    const ok = sendConfirmResponse(pc.request_id, 'none')
+    // sendConfirmResponse 已清 pendingConfirm 并 re-arm（doneReceived=false + 清残留）；
+    // 放弃路径不展示流式态：恢复 streaming=false，回退澄清经 done 分支正常渲染。
+    streaming.value = false
+    if (!ok) {
+      // WS 不可用：无法通知后端 → 软 re-arm 接收事件，后端 60s 超时自动回退澄清。
+      pendingConfirm.value = null
+      doneReceived = false
+      progressSteps.value = []
+      streamingText.value = ''
+      currentRunEvents.length = 0
+      currentRunReasoning.value = []
+    }
+  }
+
   /** 最后一条 assistant 为 error/cancelled 终态 → 供重试按钮显隐 */
   function hasStoppedRun(): boolean {
     const arr = messages.value
@@ -623,6 +655,7 @@ export function useChatStream() {
     // 交互式确认（改进 13）：待确认负载（ref，页面 watch 后弹确认框）+ 点选回传控制消息
     pendingConfirm,
     sendConfirmResponse,
+    abandonConfirm,
     // 测试钩子：直接暴露 handleWsMessage 供单测模拟 WS 事件序列
     _testHandleWsMessage: handleWsMessage,
     _testReset,

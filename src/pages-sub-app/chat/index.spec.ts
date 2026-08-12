@@ -124,7 +124,7 @@ test('Phase 4-2 交互式确认：ConfirmSheet 渲染 + pendingConfirm watch + s
   assert.match(pageSource, /@close="handleConfirmClose"/)
 })
 
-test('Phase 4-2 交互式确认：点选后本地 waiting 态（已确认 XX 由 ConfirmSheet 呈现）；关框不发送（等后端超时回退澄清）', () => {
+test('Phase 4-2 交互式确认：点选后本地 waiting 态（已确认 XX 由 ConfirmSheet 呈现）；关框=「都不是」→ abandonConfirm 发送 none 让后端立即回退澄清', () => {
   assert.match(pageSource, /confirmWaiting/)
   assert.match(pageSource, /handleConfirmClose/)
   assert.match(pageSource, /:waiting="confirmWaiting"/)
@@ -132,6 +132,12 @@ test('Phase 4-2 交互式确认：点选后本地 waiting 态（已确认 XX 由
   // （否则 waiting 态弹框只剩「已确认…」行，问题/选项瞬时清空）
   assert.match(pageSource, /:question="confirmQuestion"/)
   assert.match(pageSource, /:options="confirmOptions"/)
+  // final review I-1：关框/超时放弃 → abandonConfirm（发送 choice="none"，后端立即 confirm_timeout
+  // 重跑回退既有澄清；WS 不可用则软 re-arm 由后端 60s 超时自动回退）——修复前 doneReceived 未复位，
+  // 后端回退澄清的事件流被前端静默丢弃 → 澄清永不渲染（对话悬空）
+  assert.match(pageSource, /chatStream\.abandonConfirm\(\)/)
+  assert.match(pageSource, /CONFIRM_TIMEOUT_MS/)
+  assert.match(pageSource, /clearConfirmTimer\(\)/)
 })
 
 test('Phase 4-2 交互式确认：pendingConfirm 到达时快照 question/options 到本地 ref（防清空）', () => {
