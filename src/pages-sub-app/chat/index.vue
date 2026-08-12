@@ -152,8 +152,8 @@
          点选后 waiting 态显示「已确认 XX，继续回答…」；关框不发送 → 后端 60s 超时回退澄清） -->
     <ConfirmSheet
       :visible="confirmVisible"
-      :question="pendingConfirm?.question || ''"
-      :options="pendingConfirm?.options || []"
+      :question="confirmQuestion"
+      :options="confirmOptions"
       :waiting="confirmWaiting"
       @select="handleConfirmSelect"
       @close="handleConfirmClose"
@@ -164,7 +164,7 @@
 <script setup lang="ts">
 import { ref, nextTick, watch, onUnmounted } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { useChatStream } from '@/shared/utils/useChatStream'
+import { useChatStream, type ConfirmOption } from '@/shared/utils/useChatStream'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
@@ -234,9 +234,16 @@ const streamingReasoning = chatStream.streamingReasoning
 const pendingConfirm = chatStream.pendingConfirm
 const confirmVisible = ref(false)
 const confirmWaiting = ref(false)
+// 改进 13 review 修复：pendingConfirm 到达时把 question/options 快照到本地 ref——
+// sendConfirmResponse 发送成功即同步清 pendingConfirm，若弹框内容仍从 pendingConfirm 派生，
+// waiting 态弹框会只剩「已确认…」行（问题/选项瞬时清空）。快照晚于清除，内容保持完整
+const confirmQuestion = ref('')
+const confirmOptions = ref<ConfirmOption[]>([])
 
 watch(pendingConfirm, (v) => {
   if (v) {
+    confirmQuestion.value = v.question
+    confirmOptions.value = v.options
     confirmVisible.value = true
     confirmWaiting.value = false
     scrollToBottom()

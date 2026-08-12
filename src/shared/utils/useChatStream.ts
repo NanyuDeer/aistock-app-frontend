@@ -449,7 +449,21 @@ export function useChatStream() {
     sharedSocket.send({
       data: JSON.stringify({ type: 'confirm_response', request_id: requestId, choice, session_id: sid })
     })
+    // 阶段 2 re-arm（改进 13 review 修复）：confirm_response 已发送 → 后端在同一 WS 上对同一
+    // session fresh run，事件流与阶段 1 完全同构（intermediate→text→done，无"新一轮"标记）。
+    // confirm_request 分支已置 doneReceived=true 关闭阶段 1，若不复位，handleWsMessage 顶部
+    // `if (doneReceived) return` 会把阶段 2 全部事件静默丢弃 → 回答永不出现、streaming 恒 false。
+    // 复刻 _stream 开头的复位逻辑：doneReceived=false 打开新一轮、streaming=true 供页面
+    // watch(isStreaming) 接管（关弹框 waiting 态 + 渲染流式卡片）、清阶段 1 流式残留。
+    // 单槽说明：confirm_request 分支已 finishRun() 结算 send promise（currentResolve=null），
+    // re-arm 只恢复流式标记，不占用 currentResolve 单槽；DONE/error 分支照常处理阶段 2。
     pendingConfirm.value = null
+    doneReceived = false
+    streaming.value = true
+    progressSteps.value = []
+    streamingText.value = ''
+    currentRunEvents.length = 0
+    currentRunReasoning.value = []
     return true
   }
 

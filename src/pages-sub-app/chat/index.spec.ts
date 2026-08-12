@@ -128,5 +128,16 @@ test('Phase 4-2 交互式确认：点选后本地 waiting 态（已确认 XX 由
   assert.match(pageSource, /confirmWaiting/)
   assert.match(pageSource, /handleConfirmClose/)
   assert.match(pageSource, /:waiting="confirmWaiting"/)
-  assert.match(pageSource, /:question="pendingConfirm\?\.question \|\| ''"/)
+  // 点选后 sendConfirmResponse 同步清 pendingConfirm → 弹框内容改为本地快照 ref 呈现
+  // （否则 waiting 态弹框只剩「已确认…」行，问题/选项瞬时清空）
+  assert.match(pageSource, /:question="confirmQuestion"/)
+  assert.match(pageSource, /:options="confirmOptions"/)
+})
+
+test('Phase 4-2 交互式确认：pendingConfirm 到达时快照 question/options 到本地 ref（防清空）', () => {
+  assert.match(pageSource, /const confirmQuestion = ref\(''\)/)
+  assert.match(pageSource, /const confirmOptions = ref<ConfirmOption\[]>\(\[\]\)/)
+  // watch 内快照赋值（晚于 sendConfirmResponse 清 pendingConfirm，弹框内容在 waiting 态仍完整）
+  assert.match(pageSource, /confirmQuestion\.value = v\.question/)
+  assert.match(pageSource, /confirmOptions\.value = v\.options/)
 })
