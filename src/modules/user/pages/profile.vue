@@ -74,6 +74,17 @@
         </Card>
       </view>
 
+      <!-- B8：AI 个性化服务说明 + 删除权（2026-08-12 验收裁决） -->
+      <view v-if="isLoggedIn" class="section">
+        <text class="section-title">AI 个性化服务</text>
+        <Card>
+          <view class="ai-personal-section">
+            <text class="as-desc">AI 对话可能参考您的投资偏好与风险偏好进行个性化回答（昵称/投资偏好/风险偏好）。您可随时删除上述个性化信息，删除后 AI 将按通用方式回答。</text>
+            <Button type="danger" block @click="handleDeleteProfile">删除我的个性化信息</Button>
+          </view>
+        </Card>
+      </view>
+
       <!-- 菜单项 -->
       <view class="section">
         <Card flush>
@@ -104,6 +115,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { authApi, type UserSettings } from '@/shared/api/modules/auth'
+import { deleteUserProfile } from '@/shared/api/modules/profile'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { Switch, ListCell, Card, Tag, Button } from '@/shared/components'
@@ -179,6 +191,23 @@ function handleLogout() {
         setTimeout(() => {
           uni.redirectTo({ url: '/modules/home/pages/index' })
         }, 500)
+      }
+    }
+  })
+}
+
+// B8：PIPL 删除权——确认后删除用户画像，删除后 AI 按通用方式回答
+function handleDeleteProfile() {
+  uni.showModal({
+    title: '确认删除',
+    content: '删除后 AI 将按通用方式回答，且不可恢复',
+    success: async (res) => {
+      if (!res.confirm) return
+      try {
+        await deleteUserProfile()
+        uni.showToast({ title: '已删除', icon: 'success' })
+      } catch {
+        uni.showToast({ title: '删除失败，请重试', icon: 'none' })
       }
     }
   })
@@ -296,6 +325,19 @@ function formatDate(dateStr: string): string {
 .section-count {
   font-size: 24rpx;
   color: #9ca3af;
+}
+
+/* ===== AI 个性化服务 ===== */
+.ai-personal-section {
+  display: flex;
+  flex-direction: column;
+  gap: $s-3;
+}
+
+.as-desc {
+  font-size: $font-size-sm;
+  line-height: $lh-loose;
+  color: $ink-soft;
 }
 
 /* ===== 设置卡片 ===== */

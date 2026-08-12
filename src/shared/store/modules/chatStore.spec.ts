@@ -23,6 +23,7 @@ vi.mock('@/shared/utils/storage', () => ({
     CHAT_SESSION_ID: 'chat_session_id',
     CHAT_SESSIONS: 'chat_sessions',
     CHAT_HISTORY_BY_SESSION: 'chat_history_by_session',
+    CHAT_FEEDBACK: 'chat_feedback',
     THEME: 'theme',
   },
 }))
@@ -204,5 +205,107 @@ describe('chatStore 会话管理（P9）', () => {
     expect(store.hasUserMessage).toBe(true)
     store.createSession()
     expect(store.hasUserMessage).toBe(false)
+  })
+})
+
+describe('chatStore 消息反馈（Phase 4-2 Task 3：本地赞/踩，按 message_id 索引，不落库）', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    mockStorage._reset()
+    mockAgentApi.listChatSessions.mockReset()
+    mockAgentApi.deleteChatSession.mockReset()
+    mockAgentApi.sendMessage.mockReset()
+  })
+
+  /** 建一条 assistant 回复（timestamp 即消息 id，与页面 isTypingFor 定位方式一致） */
+  function asstWithId(id: number) {
+    return asstMsg('回答内容', id)
+  }
+
+  it('setFeedback 写入消息字段 + CHAT_FEEDBACK 记录（session_id/message_id/timestamp）', () => {
+    const store = useChatStore()
+    store.setSessionId('s1')
+    store.appendMessage(userMsg('问题', 100))
+    store.appendMessage(asstWithId(101))
+    store.setFeedback(101, 'up')
+
+    // UI 读取源：消息字段（响应式，随 messagesBySession 替换更新）
+    expect(store.messages[1].feedback).toBe('up')
+    // 持久化：消息字段随 messagesBySession 落盘（刷新恢复）
+    const savedHistory = mockStorage._dump().get('chat_history_by_session')
+    expect(savedHistory['s1'][1].feedback).toBe('up')
+    // 记录表：按 message_id 索引，含 session_id + 时间戳
+    const rec = store.feedbackRecords[101]
+    expect(rec).toEqual(expect.objectContaining({ session_id: 's1', message_id: 101, value: 'up' }))
+    expect(typeof rec.timestamp).toBe('number')
+    // 记录表持久化：CHAT_FEEDBACK 键落盘
+    const savedRecords = mockStorage._dump().get('chat_feedback')
+    expect(savedRecords[101].value).toBe('up')
+    expect(savedRecords[101].session_id).toBe('s1')
+  })
+
+  it('同一值再点 → 取消（清除语义；消息字段与记录表同步清空）', () => {
+    const store = useChatStore()
+    store.setSessionId('s1')
+    store.appendMessage(userMsg('问题', 100))
+    store.appendMessage(asstWithId(101))
+    store.setFeedback(101, 'up')
+    store.setFeedback(101, 'up')
+
+    expect(store.messages[1].feedback).toBeUndefined()
+    expect(store.feedbackRecords[101]).toBeUndefined()
+    expect(mockStorage._dump().get('chat_feedback')[101]).toBeUndefined()
+  })
+
+  it('up ↔ down 改选（同一消息可改选）', () => {
+    const store = useChatStore()
+    store.setSessionId('s1')
+    store.appendMessage(userMsg('问题', 100))
+    store.appendMessage(asstWithId(101))
+    store.setFeedback(101, 'up')
+    store.setFeedback(101, 'down')
+
+    expect(store.messages[1].feedback).toBe('down')
+    expect(store.feedbackRecords[101].value).toBe('down')
+    expect(mockStorage._dump().get('chat_feedback')[101].value).toBe('down')
+  })
+
+  it('刷新恢复：重新初始化 store 后 feedback 仍在（消息字段 + 记录表）', () => {
+    const store = useChatStore()
+    store.setSessionId('s1')
+    store.appendMessage(userMsg('问题', 100))
+    store.appendMessage(asstWithId(101))
+    store.setFeedback(101, 'down')
+
+    // 模拟刷新：重建 pinia → store 从 storage 重新初始化（feedbackRecords 从 CHAT_FEEDBACK 恢复）
+    setActivePinia(createPinia())
+    const reloaded = useChatStore()
+    reloaded.switchSession('s1')
+    expect(reloaded.messages[1].feedback).toBe('down')
+    expect(reloaded.feedbackRecords[101]?.value).toBe('down')
+  })
+
+  it('user 消息 / 不存在的 messageId → no-op（只允许 assistant 回复反馈）', () => {
+    const store = useChatStore()
+    store.setSessionId('s1')
+    store.appendMessage(userMsg('问题', 100))
+    store.setFeedback(100, 'up') // user 消息不允许
+    expect(store.messages[0].feedback).toBeUndefined()
+    store.setFeedback(999, 'up') // 不存在
+    expect(store.feedbackRecords[999]).toBeUndefined()
+    expect(mockStorage._dump().get('chat_feedback')).toBeUndefined()
+  })
+
+  it('deleteSession 同步清理该会话消息的反馈记录（与 messagesBySession 同生命周期）', () => {
+    const store = useChatStore()
+    store.setSessionId('s1')
+    store.appendMessage(userMsg('问题', 100))
+    store.appendMessage(asstWithId(101))
+    store.setFeedback(101, 'up')
+
+    store.deleteSession('s1')
+
+    expect(store.feedbackRecords[101]).toBeUndefined()
+    expect(mockStorage._dump().get('chat_feedback')[101]).toBeUndefined()
   })
 })

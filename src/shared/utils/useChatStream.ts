@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AI 对话流式输出 composable — 接入 Python 后端 WebSocket
  *
  * 功能：
@@ -16,6 +16,19 @@ import { buildExecTree, toRawWsEvent, type RawWsEvent } from './buildExecTree'
 import { useChatStore } from '@/shared/store/modules/chat'
 
 export type { ProgressStep }
+
+/** 交互式确认（改进 13）：确认选项（服务端 confirm_request 下发，key 原样带回） */
+export interface ConfirmOption {
+  key: string
+  label: string
+}
+
+/** 交互式确认（改进 13）：confirm_request 终态负载（阶段 1 图产出，替代 DONE） */
+export interface ConfirmRequest {
+  request_id: string
+  question: string
+  options: ConfirmOption[]
+}
 
 // ===== 模块级单例 socket（问题 15：跨页面实例存活，页面生命周期不销毁连接）=====
 let sharedSocket: UniApp.SocketTask | null = null
@@ -112,6 +125,8 @@ export function useChatStream() {
   // 本轮 reasoning 步骤累积器（每轮 send 重置；DONE/error 时存入 message）
   // P3-fix-2 T2：改为 ref 并整体替换，保证流式过程中 ReasoningCard 实时重渲染
   const currentRunReasoning = ref<ReasoningStep[]>([])
+  // 交互式确认（改进 13）：confirm_request 终态待确认负载（用户点选前保持；发送 confirm_response 后清空）
+  const pendingConfirm = ref<ConfirmRequest | null>(null)
 
   // 单例化后每实例仅保留本轮 done 标记（模块级状态见文件头）
   let doneReceived = false
@@ -229,6 +244,33 @@ export function useChatStream() {
           }
           finishRun()
         }
+        break
+
+      case 'confirm_request':
+        // 交互式确认（改进 13）：阶段 1 图终态负载（替代 DONE）——多解问句需用户点选确认。
+        // 不 appendMessage（尚无回答）：清流式状态 → 记录待确认负载 → finishRun 结算本轮
+        // send promise（round 已"处理"，等用户点选后由 confirm_response 触发后端 fresh run 续跑）。
+        doneReceived = true
+        progressSteps.value = []
+        streamingText.value = ''
+        currentRunReasoning.value = []
+        {
+          // options 防御性过滤：仅保留 { key: string, label: string } 结构（数据来自服务端）
+          const rawOptions: unknown = data.options
+          pendingConfirm.value = {
+            request_id: String(data.request_id ?? ''),
+            question: String(data.question ?? ''),
+            options: Array.isArray(rawOptions)
+              ? rawOptions
+                  .filter((o): o is ConfirmOption => {
+                    const opt = o as { key?: unknown; label?: unknown } | null
+                    return !!opt && typeof opt.key === 'string' && typeof opt.label === 'string'
+                  })
+                  .map((o) => ({ key: o.key, label: o.label }))
+              : [],
+          }
+        }
+        finishRun()
         break
 
       case 'done':
@@ -393,6 +435,70 @@ export function useChatStream() {
     finishRun()
   }
 
+  /**
+   * 交互式确认（改进 13）：用户点选后回传控制消息（对齐 stop 控制消息协议）。
+   * 后端收到后携带 confirm_choice 对同一 session 重跑（fresh run）→ 正常 DONE；
+   * 超时/「都不是」（choice='none'）→ 后端 confirm_timeout 重跑 → 回退既有澄清。
+   * 发送成功即清掉 pendingConfirm（本轮确认已处理）；WS 不可用时返回 false——
+   * 前端不再发送（后端 60s 超时同样回退澄清），由调用方决定弹框去留。
+   */
+  function sendConfirmResponse(requestId: string, choice: string): boolean {
+    if (!sharedSocket || !sharedWsConnected) return false
+    const sid = chatStore.sessionId || `app_${Date.now()}`
+    if (!chatStore.sessionId) chatStore.setSessionId(sid)
+    sharedSocket.send({
+      data: JSON.stringify({ type: 'confirm_response', request_id: requestId, choice, session_id: sid })
+    })
+    // 阶段 2 re-arm（改进 13 review 修复）：confirm_response 已发送 → 后端在同一 WS 上对同一
+    // session fresh run，事件流与阶段 1 完全同构（intermediate→text→done，无"新一轮"标记）。
+    // confirm_request 分支已置 doneReceived=true 关闭阶段 1，若不复位，handleWsMessage 顶部
+    // `if (doneReceived) return` 会把阶段 2 全部事件静默丢弃 → 回答永不出现、streaming 恒 false。
+    // 复刻 _stream 开头的复位逻辑：doneReceived=false 打开新一轮、streaming=true 供页面
+    // watch(isStreaming) 接管（关弹框 waiting 态 + 渲染流式卡片）、清阶段 1 流式残留。
+    // 单槽说明：confirm_request 分支已 finishRun() 结算 send promise（currentResolve=null），
+    // re-arm 只恢复流式标记，不占用 currentResolve 单槽；DONE/error 分支照常处理阶段 2。
+    pendingConfirm.value = null
+    doneReceived = false
+    streaming.value = true
+    progressSteps.value = []
+    streamingText.value = ''
+    currentRunEvents.length = 0
+    currentRunReasoning.value = []
+    return true
+  }
+
+  /**
+   * 交互式确认（改进 13，final review I-1）：用户关框或 60s 超时放弃点选。
+   *
+   * 语义 = 「都不是」：发送 confirm_response(choice='none') → 后端 `_wait_confirm_response`
+   * 对 choice=='none' 返回 None → confirm_timeout 重跑 → qa_router 回退既有澄清。
+   * 相比"什么都不做等 60s"：立即触发回退，避免前端已关框但后端仍挂 60s
+   * 等待期间用户发新消息被 `_wait_confirm_response` 忽略的竞态。
+   *
+   * WS 不可用（发送失败）→ 软 re-arm（doneReceived=false + 清残留、streaming 保持 false）：
+   * 后端 60s 超时同样自动 confirm_timeout 重跑回退澄清，事件流入正常渲染。
+   *
+   * 注意：点选路径（sendConfirmResponse）re-arm 后 streaming=true 供页面显示续跑流式；
+   * 放弃路径回退澄清同样是新事件流，但页面不应展示流式态（done 分支照常 appendMessage）。
+   */
+  function abandonConfirm(): void {
+    const pc = pendingConfirm.value
+    if (!pc) return
+    const ok = sendConfirmResponse(pc.request_id, 'none')
+    // sendConfirmResponse 已清 pendingConfirm 并 re-arm（doneReceived=false + 清残留）；
+    // 放弃路径不展示流式态：恢复 streaming=false，回退澄清经 done 分支正常渲染。
+    streaming.value = false
+    if (!ok) {
+      // WS 不可用：无法通知后端 → 软 re-arm 接收事件，后端 60s 超时自动回退澄清。
+      pendingConfirm.value = null
+      doneReceived = false
+      progressSteps.value = []
+      streamingText.value = ''
+      currentRunEvents.length = 0
+      currentRunReasoning.value = []
+    }
+  }
+
   /** 最后一条 assistant 为 error/cancelled 终态 → 供重试按钮显隐 */
   function hasStoppedRun(): boolean {
     const arr = messages.value
@@ -546,6 +652,10 @@ export function useChatStream() {
     stop,
     retry,
     hasStoppedRun,
+    // 交互式确认（改进 13）：待确认负载（ref，页面 watch 后弹确认框）+ 点选回传控制消息
+    pendingConfirm,
+    sendConfirmResponse,
+    abandonConfirm,
     // 测试钩子：直接暴露 handleWsMessage 供单测模拟 WS 事件序列
     _testHandleWsMessage: handleWsMessage,
     _testReset,

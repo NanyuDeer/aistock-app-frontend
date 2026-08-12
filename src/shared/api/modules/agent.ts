@@ -81,6 +81,8 @@ export interface ChatMessage {
   cards?: ChatCard[]                 // P11: DONE 下发的结构化卡片（HTTP 降级/旧协议缺失）
   tokenUsage?: TokenUsage            // P11: DONE 下发的本轮 token 用量（会话本地累加用）
   timestamp: number
+  /** Phase 4-2 Task 3：本地赞/踩反馈（v1 纯前端本地、按 message_id 持久化，不落库；同消息可改选/取消） */
+  feedback?: 'up' | 'down'
 }
 
 /** 会话维度 token 用量聚合项（P10 线 4/线 6；对应 GET /api/chat/usage/sessions 的 data.items 结构） */

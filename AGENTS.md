@@ -365,7 +365,9 @@ import Card from '@/shared/components/Card.vue'
 |------|------|
 | `useAuth` | 认证状态和登录/登出 |
 | `useFavorites` | 自选股增删改查 |
-| `useChatStream` | 对话流（WS 为主，HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`，P3；订阅 reasoning 聚合 `reasoningSteps` + `_testHandleWsMessage` 测试钩子，P3-fix；return `streamingReasoning` 流式实时思考链，P3-fix-2；**P0：send 不再携带 user_id（服务端注入）；连接断开/4401 时结算挂起 send（不卡死 streaming）**） |
+| `useChatStream` | 对话流（WS 为主，HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`，P3；订阅 reasoning 聚合 `reasoningSteps` + `_testHandleWsMessage` 测试钩子，P3-fix；return `streamingReasoning` 流式实时思考链，P3-fix-2；**P0：send 不再携带 user_id（服务端注入）；连接断开/4401 时结算挂起 send（不卡死 streaming）**；**Phase 4-2：`confirm_request` 终态处理（doneReceived 置位 + pendingConfirm ref + 结算 send promise）+ `sendConfirmResponse(request_id, choice)` 发送成功后 re-arm（doneReceived=false/streaming=true/清 progressSteps/streamingText/currentRunReasoning/currentRunEvents）**） |
+| `chatSuggestions` | 自选股联动（Phase 4-2）：`buildFavoritesQuestion`（≤5 只拼接「我的自选股里 XX、YY 怎么样」/ >5 截断提示「仅展示前 5 只」/ 空列表回退）+ `buildStockQuestion` 问 AI 跳转预填 |
+| `speechInput` | 语音容错输入侧（Phase 4-2）：`#ifdef` 平台分流（H5=Web Speech API 仅 Chrome/Edge、MP=WechatSI 插件代码就绪待真机、APP=降级提示）、判别联合 `SpeechRecognitionResult`、`isSpeechInputSupported()`、依赖注入核心供单测 |
 | `useStockCycle` | 股票周期切换 |
 | `useWebSocket` | WebSocket 连接管理 |
 | `useTimer` | 定时器管理 |

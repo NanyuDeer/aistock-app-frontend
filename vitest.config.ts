@@ -35,9 +35,11 @@ export default defineConfig({
     include: [
       'tests/**/*.test.ts',
       'src/shared/utils/useChatStream.spec.ts',
+      'src/shared/utils/chatSuggestions.spec.ts',
       'src/shared/utils/parseMarkdownSections.spec.ts',
       'src/shared/utils/sessionUsageMerge.spec.ts',
       'src/shared/utils/eveningBriefCards.spec.ts',
+      'src/shared/utils/speechInput.spec.ts',
       'src/pages-sub-app/chat/ReasoningPanel.spec.ts',
       'src/shared/store/modules/market.spec.ts',
       'src/modules/home/components/StockContent.spec.ts',
@@ -57,6 +59,7 @@ export default defineConfig({
       'src/modules/favorites/pages/monitor.spec.ts',
       'src/modules/favorites/pages/insight-detail.spec.ts',
       'src/modules/favorites/components/AlertContent.spec.ts',
+      'src/shared/components/ConfirmSheet.spec.ts',
     ],
   },
 })

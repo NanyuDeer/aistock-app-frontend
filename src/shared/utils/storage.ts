@@ -50,6 +50,8 @@ export const STORAGE_KEYS = {
   CHAT_HISTORY_BY_SESSION: 'chat_history_by_session',
   // P11 T2：会话维度 token 本地累加（key=session_id → TokenUsage）
   CHAT_SESSION_USAGE: 'chat_session_usage',
+  // Phase 4-2 Task 3：消息赞/踩反馈记录（key=message_id → ChatFeedbackRecord，v1 纯前端本地不落库）
+  CHAT_FEEDBACK: 'chat_feedback',
   THEME: 'theme',
   // 播报连续播放开关（持久化；true=连续排队，false/缺省=互斥）
   PODCAST_CONTINUOUS: 'podcast_continuous'

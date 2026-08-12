@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { reactive, ref } from 'vue'
 import { useChatStream } from './useChatStream'
 import { agentApi } from '@/shared/api/modules/agent'
@@ -468,5 +468,237 @@ describe('useChatStream 打断/停止/重试（Phase 2 Part 2）', () => {
     // 回页 onShow 可再次 resume 续跑（区别于 send 轮断连的明确报错落消息）
     expect(mockAppendMessage).not.toHaveBeenCalled()
     expect(stream.messages.value.at(-1)?.role).toBe('user')
+  })
+})
+
+describe('useChatStream 交互式确认（改进 13，Phase 4-2）', () => {
+  beforeEach(() => {
+    const stream = useChatStream() as any
+    stream.messages.value = []
+    stream.sessionId.value = ''
+    mockAppendMessage.mockClear()
+    mockSocketCbs.onMessageCbs.length = 0
+    mockSocketCbs.onCloseCbs.length = 0
+    mockSocketCbs.onErrorCbs.length = 0
+    mockSocketSend.mockClear()
+    mockSetSessionId.mockClear()
+    mockWsFail.fail = false
+    vi.mocked(agentApi.sendMessage).mockReset()
+    stream._testReset()
+    // 预建连接：mock onOpen 同步触发 → connectOnce 内已连接，后续 WS send 同步执行
+    stream.send('__connect__')
+    mockSocketSend.mockClear()
+    mockAppendMessage.mockClear()
+  })
+
+  it('confirm_request 终态：设置 pendingConfirm、清流式状态、结算 send promise（不 append 回答、不触发 onDone）', async () => {
+    const stream = useChatStream() as any
+    const onDone = vi.fn()
+    const p = stream.send('贵州茅台和五粮液哪个好')
+    // 先流入正常流式事件（验证 confirm_request 终态会清掉这些状态）
+    stream._testHandleWsMessage({ type: 'intermediate', label: '正在理解你的问题' }, onDone)
+    stream._testHandleWsMessage({ type: 'reasoning', node: 'qa_router', chunk: '多候选拆解' }, onDone)
+    stream._testHandleWsMessage({ type: 'text', content: '部分文本' }, onDone)
+    // confirm_request 终态（替代 DONE）
+    stream._testHandleWsMessage({
+      type: 'confirm_request',
+      request_id: 'run_123',
+      question: '你想问哪个？',
+      options: [
+        { key: '600519', label: '贵州茅台' },
+        { key: '000858', label: '五粮液' },
+      ],
+      context: { session_id: 'app_123' },
+    }, onDone)
+
+    // send promise 必须结算（本轮已"处理"，等待用户点选，不挂起 streaming）
+    await p
+    expect(stream.pendingConfirm.value).toEqual({
+      request_id: 'run_123',
+      question: '你想问哪个？',
+      options: [
+        { key: '600519', label: '贵州茅台' },
+        { key: '000858', label: '五粮液' },
+      ],
+    })
+    expect(stream.streaming.value).toBe(false)
+    // 无回答可 append：仅 send 内 append 的用户消息，不含 assistant 回复
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+    expect(mockAppendMessage.mock.calls[0][0].role).toBe('user')
+    // 流式状态已清空
+    expect(stream.progressSteps.value).toHaveLength(0)
+    expect(stream.streamingText.value).toBe('')
+    expect(stream.streamingReasoning.value).toHaveLength(0)
+    // 终态语义：round 仅"已处理"，未真正完成 → onDone 不触发（区别于 done/error）
+    expect(onDone).not.toHaveBeenCalled()
+  })
+
+  it('confirm_request 后未点选：doneReceived 仍关闭本轮，残留 text/done 丢弃（原语义）', async () => {
+    const stream = useChatStream() as any
+    const onDone = vi.fn()
+    const p = stream.send('贵州茅台和五粮液哪个好')
+    stream._testHandleWsMessage({
+      type: 'confirm_request', request_id: 'r1', question: 'q',
+      options: [{ key: 'a', label: 'A' }],
+    }, onDone)
+    await p
+    mockAppendMessage.mockClear()
+    // 未点选（未调用 sendConfirmResponse）→ 阶段 2 尚未启动，doneReceived 仍置位：
+    // 迟发残留事件不得追加/结算（防 streaming 卡死/重复追加）。
+    // 注意与「点选后」的区别：点选后 doneReceived 会复位，阶段 2 事件流（同构 intermediate→text→done）
+    // 必须被处理（见下方集成用例）——本用例仅锁定未点选时的原语义。
+    stream._testHandleWsMessage({ type: 'text', content: '残留' }, onDone)
+    stream._testHandleWsMessage({ type: 'done', content: '残留回答' }, onDone)
+    expect(mockAppendMessage).not.toHaveBeenCalled()
+    expect(stream.streaming.value).toBe(false)
+  })
+
+  it('sendConfirmResponse：发送 {type:"confirm_response", request_id, choice, session_id}、清 pendingConfirm 并 re-arm 阶段 2', () => {
+    const stream = useChatStream() as any
+    stream.sessionId.value = 'app_123'
+    stream.pendingConfirm.value = { request_id: 'run_1', question: 'q', options: [{ key: 'a', label: 'A' }] }
+    // 模拟阶段 1 流式残留（confirm_request 终态前已累积的状态）
+    stream.progressSteps.value = [{ label: '旧步骤', status: 'pending', timestamp: 1 }]
+    stream.streamingText.value = '阶段1残留文本'
+    stream.streamingReasoning.value = [{ node: 'qa_router', text: '残留', status: 'streaming', startAt: 1 }]
+    mockSocketSend.mockClear()
+    const ok = stream.sendConfirmResponse('run_1', 'a')
+    expect(ok).toBe(true)
+    expect(mockSocketSend).toHaveBeenCalledTimes(1)
+    const payload = JSON.parse(mockSocketSend.mock.calls[0][0].data)
+    expect(payload.type).toBe('confirm_response')
+    expect(payload.request_id).toBe('run_1')
+    expect(payload.choice).toBe('a')
+    expect(payload.session_id).toBe('app_123')
+    // 本轮确认已处理 → pendingConfirm 清除（页面进入 waiting 态等续跑）
+    expect(stream.pendingConfirm.value).toBeNull()
+    // 阶段 2 re-arm（review 修复）：doneReceived 复位 + streaming 恢复 + 清空阶段 1 流式残留。
+    // confirm_request 已 finishRun() 结算 send promise → re-arm 不占单槽；
+    // doneReceived 为闭包不可直接观察，由下方集成用例的行为断言验证复位效果
+    expect(stream.streaming.value).toBe(true)
+    expect(stream.progressSteps.value).toHaveLength(0)
+    expect(stream.streamingText.value).toBe('')
+    expect(stream.streamingReasoning.value).toHaveLength(0)
+  })
+
+  it('集成：confirm_request → sendConfirmResponse → 阶段 2 事件流（intermediate/text/done）→ DONE 渲染 + doneReceived 复位', async () => {
+    const stream = useChatStream() as any
+    const onDone = vi.fn()
+    const p = stream.send('贵州茅台和五粮液哪个好')
+    // 阶段 1：confirm_request 终态（替代 DONE）
+    stream._testHandleWsMessage({
+      type: 'confirm_request',
+      request_id: 'run_1',
+      question: '你想问哪个？',
+      options: [
+        { key: '600519', label: '贵州茅台' },
+        { key: '000858', label: '五粮液' },
+      ],
+    }, onDone)
+    await p
+    mockAppendMessage.mockClear()
+    mockSocketSend.mockClear()
+
+    // 点选 → confirm_response 发送成功 → re-arm 新一轮（doneReceived=false、streaming=true）
+    expect(stream.sendConfirmResponse('run_1', '600519')).toBe(true)
+    expect(stream.streaming.value).toBe(true)
+    expect(stream.pendingConfirm.value).toBeNull()
+
+    // 阶段 2 fresh run：后端在同一 WS 上重跑，事件流与阶段 1 完全同构
+    // （intermediate→text→done，无"新一轮"标记）。修复前 doneReceived 未复位 →
+    // handleWsMessage 顶部 `if (doneReceived) return` 将这些事件全部静默丢弃 → 回答永不出现
+    stream._testHandleWsMessage({ type: 'intermediate', label: '正在查阅分析报告' }, onDone)
+    stream._testHandleWsMessage({ type: 'text', content: '综合来看，' }, onDone)
+    stream._testHandleWsMessage({ type: 'text', content: '贵州茅台更优' }, onDone)
+    stream._testHandleWsMessage({ type: 'done', content: '综合来看，贵州茅台更优' }, onDone)
+
+    // DONE 渲染：appendMessage 被调用且内容非空（阶段 2 事件流流入 = doneReceived 已复位）
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+    const arg = mockAppendMessage.mock.calls[0][0]
+    expect(arg.role).toBe('assistant')
+    expect(arg.content).toBe('综合来看，贵州茅台更优')
+    expect(arg.content.length).toBeGreaterThan(0)
+    // 结算：流式关闭、流式残留清空、阶段 2 DONE 触发 onDone（阶段 1 confirm_request 不触发）
+    expect(stream.streaming.value).toBe(false)
+    expect(stream.streamingText.value).toBe('')
+    expect(onDone).toHaveBeenCalledTimes(1)
+  })
+
+  it('sendConfirmResponse：WS 未连接时返回 false 且不发送（等后端 60s 超时回退澄清）', () => {
+    const stream = useChatStream() as any
+    stream._testReset() // 断开连接（sharedSocket=null / wsConnected=false）
+    mockSocketSend.mockClear()
+    const ok = stream.sendConfirmResponse('run_1', 'a')
+    expect(ok).toBe(false)
+    expect(mockSocketSend).not.toHaveBeenCalled()
+  })
+
+  it('abandonConfirm：关框/超时放弃 → 发送 choice="none"（后端立即回退澄清）+ re-arm 接收回退事件流', async () => {
+    const stream = useChatStream() as any
+    const onDone = vi.fn()
+    const p = stream.send('贵州茅台和五粮液哪个好')
+    stream._testHandleWsMessage({
+      type: 'confirm_request',
+      request_id: 'run_1',
+      question: '你想问哪个？',
+      options: [
+        { key: '600519', label: '贵州茅台' },
+        { key: '000858', label: '五粮液' },
+      ],
+    }, onDone)
+    await p
+    mockAppendMessage.mockClear()
+    mockSocketSend.mockClear()
+
+    // 用户关框 → abandonConfirm：发送 {type:"confirm_response", choice:"none"}
+    stream.abandonConfirm()
+    expect(mockSocketSend).toHaveBeenCalledTimes(1)
+    const payload = JSON.parse(mockSocketSend.mock.calls[0][0].data)
+    expect(payload.type).toBe('confirm_response')
+    expect(payload.choice).toBe('none')
+    expect(payload.request_id).toBe('run_1')
+    // pendingConfirm 已清；放弃路径不展示流式态（区别于点选路径 streaming=true）
+    expect(stream.pendingConfirm.value).toBeNull()
+    expect(stream.streaming.value).toBe(false)
+
+    // 后端 choice='none' → confirm_timeout 重跑回退既有澄清 → 事件流与阶段 1 同构。
+    // 修复前（关框不 re-arm）doneReceived=true 会把回退事件静默丢弃 → 澄清永不渲染（对话悬空）。
+    stream._testHandleWsMessage({ type: 'intermediate', label: '正在查阅分析报告' }, onDone)
+    stream._testHandleWsMessage({ type: 'text', content: '请提供 6 位股票代码后重试。' }, onDone)
+    stream._testHandleWsMessage({ type: 'done', content: '请提供 6 位股票代码后重试。' }, onDone)
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+    const arg = mockAppendMessage.mock.calls[0][0]
+    expect(arg.role).toBe('assistant')
+    expect(arg.content).toBe('请提供 6 位股票代码后重试。')
+    expect(stream.streaming.value).toBe(false)
+    expect(onDone).toHaveBeenCalledTimes(1)
+  })
+
+  it('abandonConfirm：WS 不可用时软 re-arm（不发送 none、doneReceived 复位、streaming 保持 false）', async () => {
+    const stream = useChatStream() as any
+    const onDone = vi.fn()
+    const p = stream.send('贵州茅台和五粮液哪个好')
+    stream._testHandleWsMessage({
+      type: 'confirm_request',
+      request_id: 'run_1',
+      question: '你想问哪个？',
+      options: [{ key: '600519', label: '贵州茅台' }],
+    }, onDone)
+    await p
+    mockAppendMessage.mockClear()
+    mockSocketSend.mockClear()
+
+    stream._testReset() // 断开连接：发送 none 必然失败
+    stream.abandonConfirm()
+    expect(mockSocketSend).not.toHaveBeenCalled()
+    expect(stream.pendingConfirm.value).toBeNull()
+    expect(stream.streaming.value).toBe(false)
+
+    // 软 re-arm 后，后端 60s 超时自动 confirm_timeout 重跑 → 回退澄清事件正常流入渲染
+    stream._testHandleWsMessage({ type: 'text', content: '请提供 6 位股票代码后重试。' }, onDone)
+    stream._testHandleWsMessage({ type: 'done', content: '请提供 6 位股票代码后重试。' }, onDone)
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+    const arg = mockAppendMessage.mock.calls[0][0]
+    expect(arg.content).toBe('请提供 6 位股票代码后重试。')
   })
 })
