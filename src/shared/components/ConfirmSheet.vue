@@ -37,7 +37,8 @@
  * Phase 4-2 改进 13：交互式确认弹框（纯 UI 组件，props/events 驱动，不含业务逻辑）。
  * 流程：confirm_request 终态 → 页面传入 question/options → 用户点选 emit select(key, label) →
  * 页面发 confirm_response 续跑并置 waiting=true → 本组件显示「已确认 XX，继续回答…」并禁用选项；
- * 弹框关闭（overlay 点击）→ emit close → 页面不发送（后端 60s 超时回退澄清）。
+ * 关框 → 发送 confirm_response(choice='none')（语义=「都不是」）→ 后端立即回退澄清；
+ * WS 不可用则软 re-arm，由后端 60s 超时自动回退（abandonConfirm，useChatStream）。
  */
 import { ref, watch } from 'vue'
 import BottomSheet from './BottomSheet.vue'
