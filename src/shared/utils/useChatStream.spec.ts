@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { reactive, ref } from 'vue'
 import { useChatStream } from './useChatStream'
 import { agentApi } from '@/shared/api/modules/agent'

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AI 对话流式输出 composable — 接入 Python 后端 WebSocket
  *
  * 功能：

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <SubPageCard2 :title="'AI 投顾'" :no-chat-bar="true">
     <template #header-right>
       <view class="sessions-entry" @tap="goSessions">
