@@ -114,3 +114,19 @@ test('Phase 4-2 语音输入：await pending 防御 try/catch（意外 reject �
   assert.match(pageSource, /catch \{[\s\S]*?isListening\.value = false/)
   assert.match(pageSource, /语音识别失败，请重试/)
 })
+
+test('Phase 4-2 交互式确认：ConfirmSheet 渲染 + pendingConfirm watch + sendConfirmResponse 调用', () => {
+  assert.match(pageSource, /import ConfirmSheet from '@\/shared\/components\/ConfirmSheet\.vue'/)
+  assert.match(pageSource, /<ConfirmSheet/)
+  assert.match(pageSource, /const pendingConfirm = chatStream\.pendingConfirm/)
+  assert.match(pageSource, /chatStream\.sendConfirmResponse\(/)
+  assert.match(pageSource, /@select="handleConfirmSelect"/)
+  assert.match(pageSource, /@close="handleConfirmClose"/)
+})
+
+test('Phase 4-2 交互式确认：点选后本地 waiting 态（已确认 XX 由 ConfirmSheet 呈现）；关框不发送（等后端超时回退澄清）', () => {
+  assert.match(pageSource, /confirmWaiting/)
+  assert.match(pageSource, /handleConfirmClose/)
+  assert.match(pageSource, /:waiting="confirmWaiting"/)
+  assert.match(pageSource, /:question="pendingConfirm\?\.question \|\| ''"/)
+})

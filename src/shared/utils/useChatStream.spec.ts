@@ -470,3 +470,109 @@ describe('useChatStream 打断/停止/重试（Phase 2 Part 2）', () => {
     expect(stream.messages.value.at(-1)?.role).toBe('user')
   })
 })
+
+describe('useChatStream 交互式确认（改进 13，Phase 4-2）', () => {
+  beforeEach(() => {
+    const stream = useChatStream() as any
+    stream.messages.value = []
+    stream.sessionId.value = ''
+    mockAppendMessage.mockClear()
+    mockSocketCbs.onMessageCbs.length = 0
+    mockSocketCbs.onCloseCbs.length = 0
+    mockSocketCbs.onErrorCbs.length = 0
+    mockSocketSend.mockClear()
+    mockSetSessionId.mockClear()
+    mockWsFail.fail = false
+    vi.mocked(agentApi.sendMessage).mockReset()
+    stream._testReset()
+    // 预建连接：mock onOpen 同步触发 → connectOnce 内已连接，后续 WS send 同步执行
+    stream.send('__connect__')
+    mockSocketSend.mockClear()
+    mockAppendMessage.mockClear()
+  })
+
+  it('confirm_request 终态：设置 pendingConfirm、清流式状态、结算 send promise（不 append 回答、不触发 onDone）', async () => {
+    const stream = useChatStream() as any
+    const onDone = vi.fn()
+    const p = stream.send('贵州茅台和五粮液哪个好')
+    // 先流入正常流式事件（验证 confirm_request 终态会清掉这些状态）
+    stream._testHandleWsMessage({ type: 'intermediate', label: '正在理解你的问题' }, onDone)
+    stream._testHandleWsMessage({ type: 'reasoning', node: 'qa_router', chunk: '多候选拆解' }, onDone)
+    stream._testHandleWsMessage({ type: 'text', content: '部分文本' }, onDone)
+    // confirm_request 终态（替代 DONE）
+    stream._testHandleWsMessage({
+      type: 'confirm_request',
+      request_id: 'run_123',
+      question: '你想问哪个？',
+      options: [
+        { key: '600519', label: '贵州茅台' },
+        { key: '000858', label: '五粮液' },
+      ],
+      context: { session_id: 'app_123' },
+    }, onDone)
+
+    // send promise 必须结算（本轮已"处理"，等待用户点选，不挂起 streaming）
+    await p
+    expect(stream.pendingConfirm.value).toEqual({
+      request_id: 'run_123',
+      question: '你想问哪个？',
+      options: [
+        { key: '600519', label: '贵州茅台' },
+        { key: '000858', label: '五粮液' },
+      ],
+    })
+    expect(stream.streaming.value).toBe(false)
+    // 无回答可 append：仅 send 内 append 的用户消息，不含 assistant 回复
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+    expect(mockAppendMessage.mock.calls[0][0].role).toBe('user')
+    // 流式状态已清空
+    expect(stream.progressSteps.value).toHaveLength(0)
+    expect(stream.streamingText.value).toBe('')
+    expect(stream.streamingReasoning.value).toHaveLength(0)
+    // 终态语义：round 仅"已处理"，未真正完成 → onDone 不触发（区别于 done/error）
+    expect(onDone).not.toHaveBeenCalled()
+  })
+
+  it('confirm_request 后 doneReceived 关闭本轮：残留 text/done 不再处理', async () => {
+    const stream = useChatStream() as any
+    const onDone = vi.fn()
+    const p = stream.send('贵州茅台和五粮液哪个好')
+    stream._testHandleWsMessage({
+      type: 'confirm_request', request_id: 'r1', question: 'q',
+      options: [{ key: 'a', label: 'A' }],
+    }, onDone)
+    await p
+    mockAppendMessage.mockClear()
+    // 模拟后端迟发的残留事件（防 streaming 卡死/重复追加）
+    stream._testHandleWsMessage({ type: 'text', content: '残留' }, onDone)
+    stream._testHandleWsMessage({ type: 'done', content: '残留回答' }, onDone)
+    expect(mockAppendMessage).not.toHaveBeenCalled()
+    expect(stream.streaming.value).toBe(false)
+  })
+
+  it('sendConfirmResponse：发送 {type:"confirm_response", request_id, choice, session_id} 并清除 pendingConfirm', () => {
+    const stream = useChatStream() as any
+    stream.sessionId.value = 'app_123'
+    stream.pendingConfirm.value = { request_id: 'run_1', question: 'q', options: [{ key: 'a', label: 'A' }] }
+    mockSocketSend.mockClear()
+    const ok = stream.sendConfirmResponse('run_1', 'a')
+    expect(ok).toBe(true)
+    expect(mockSocketSend).toHaveBeenCalledTimes(1)
+    const payload = JSON.parse(mockSocketSend.mock.calls[0][0].data)
+    expect(payload.type).toBe('confirm_response')
+    expect(payload.request_id).toBe('run_1')
+    expect(payload.choice).toBe('a')
+    expect(payload.session_id).toBe('app_123')
+    // 本轮确认已处理 → pendingConfirm 清除（页面进入 waiting 态等续跑）
+    expect(stream.pendingConfirm.value).toBeNull()
+  })
+
+  it('sendConfirmResponse：WS 未连接时返回 false 且不发送（等后端 60s 超时回退澄清）', () => {
+    const stream = useChatStream() as any
+    stream._testReset() // 断开连接（sharedSocket=null / wsConnected=false）
+    mockSocketSend.mockClear()
+    const ok = stream.sendConfirmResponse('run_1', 'a')
+    expect(ok).toBe(false)
+    expect(mockSocketSend).not.toHaveBeenCalled()
+  })
+})

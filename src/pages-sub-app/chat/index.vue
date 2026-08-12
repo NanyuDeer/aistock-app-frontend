@@ -147,6 +147,17 @@
         <button v-else @tap="handleSend" :disabled="isStreaming" class="send-btn">发送</button>
       </view>
     </view>
+
+    <!-- Phase 4-2 改进 13：交互式确认弹框（confirm_request 终态 → 点选 → confirm_response 续跑；
+         点选后 waiting 态显示「已确认 XX，继续回答…」；关框不发送 → 后端 60s 超时回退澄清） -->
+    <ConfirmSheet
+      :visible="confirmVisible"
+      :question="pendingConfirm?.question || ''"
+      :options="pendingConfirm?.options || []"
+      :waiting="confirmWaiting"
+      @select="handleConfirmSelect"
+      @close="handleConfirmClose"
+    />
   </SubPageCard2>
 </template>
 
@@ -163,6 +174,7 @@ import ReasoningPanel from './ReasoningPanel.vue'
 import CardRenderer from './cards/CardRenderer.vue'
 import SectionCard from './cards/SectionCard.vue'
 import FeedbackBar from '@/shared/components/FeedbackBar.vue'
+import ConfirmSheet from '@/shared/components/ConfirmSheet.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
@@ -218,6 +230,38 @@ const progressSteps = chatStream.progressSteps
 const streamingText = chatStream.streamingText
 // P3-fix-2 T2：流式过程中的实时思考链（ref 自动解包，模板直接读数组）
 const streamingReasoning = chatStream.streamingReasoning
+// Phase 4-2 改进 13：confirm_request 终态待确认负载（ref；watch 到非空即弹确认框）
+const pendingConfirm = chatStream.pendingConfirm
+const confirmVisible = ref(false)
+const confirmWaiting = ref(false)
+
+watch(pendingConfirm, (v) => {
+  if (v) {
+    confirmVisible.value = true
+    confirmWaiting.value = false
+    scrollToBottom()
+  }
+})
+
+/**
+ * Phase 4-2 改进 13：用户点选确认选项 → 回传 confirm_response（后端携带 confirm_choice
+ * 对同一 session fresh run 续跑）→ 本地置 waiting 态（ConfirmSheet 显示「已确认 XX，继续回答…」）。
+ * WS 不可用时返回 false：不再发送（后端 60s 超时同样回退澄清），直接关闭弹框。
+ */
+function handleConfirmSelect(key: string, label: string) {
+  const pc = pendingConfirm.value
+  if (confirmWaiting.value || !pc) return
+  confirmWaiting.value = true
+  if (!chatStream.sendConfirmResponse(pc.request_id, key)) {
+    confirmVisible.value = false
+    confirmWaiting.value = false
+  }
+}
+
+/** 用户主动关框 → 不发送（等后端 60s 超时回退澄清，spec：不猜测用户意图） */
+function handleConfirmClose() {
+  confirmVisible.value = false
+}
 
 const inputText = ref('')
 const scrollTop = ref(0)
@@ -294,6 +338,8 @@ function startTypewriterIfNeeded() {
 watch(isStreaming, (v) => {
   scrollToBottom()
   if (v) {
+    // Phase 4-2 改进 13：confirm_response 后后端 fresh run 开始流式 → 弹框完成使命（waiting 态结束），关闭
+    confirmVisible.value = false
     // 新一轮开始：重置"本轮是否出现过真流式文本"，并停掉上一条未播完的打字机
     hadStreamText = false
     stopTypewriter()
