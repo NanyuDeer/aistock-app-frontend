@@ -14,6 +14,12 @@
         @tap="goDetail(item.event_id)"
       >
         <view class="card-title">{{ item.stock_name }}（{{ item.symbol }}）</view>
+        <view v-if="item.event_type !== 'limit_up_radar'" class="card-move">
+          <text :class="['tag', item.direction === 'up' ? 'tag-up' : 'tag-down']">{{ item.direction === 'up' ? '上涨异动' : '下跌异动' }}</text>
+          <text v-if="item.move_bps !== undefined" :class="item.move_bps >= 0 ? 'up' : 'down'">
+            {{ (item.move_bps / 100).toFixed(2) }}%
+          </text>
+        </view>
         <view class="card-sub">
           <text class="meta-date">{{ item.trade_date }}</text>
           <text class="tag" :class="{ 'tag--unconfirmed': item.attribution_status === 'unconfirmed' }">
@@ -95,6 +101,34 @@ onShow(async () => {
   font-size: $font-size-base;
   font-weight: 600;
   color: $ink;
+}
+
+.card-move {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+}
+
+.tag-up {
+  color: $up;
+  background: $up-bg;
+}
+
+.tag-down {
+  color: $down;
+  background: $down-bg;
+}
+
+.up {
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: $up;
+}
+
+.down {
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: $down;
 }
 
 .card-sub {

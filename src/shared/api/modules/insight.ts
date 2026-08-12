@@ -14,8 +14,12 @@ export interface WatchlistInsight {
   symbol: string
   stock_name: string
   trade_date: string
-  event_type: 'limit_up_radar'
+  event_type: 'limit_up_radar' | 'midday_price_move' | 'close_price_move'
   direction: 'up' | 'down'
+  move_bps?: number
+  open_price?: number
+  latest_price?: number
+  price_source?: 'realtime_snapshot' | 'kline_backfill'
   attribution_status: 'confirmed' | 'unconfirmed' | null
   confidence?: 'high' | 'medium' | 'low' | 'unconfirmed'
   primary_driver?: InsightDriver | null

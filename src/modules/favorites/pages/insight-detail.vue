@@ -4,6 +4,11 @@
     <view v-else-if="!detail" class="state"><text>洞察不存在或已过期</text></view>
     <block v-else>
       <view class="sec-title">{{ detail.stock_name }}（{{ detail.symbol }}）· {{ detail.trade_date }}</view>
+      <view v-if="detail.event_type !== 'limit_up_radar'" class="move-box">
+        <text :class="['move', detail.direction === 'up' ? 'move-up' : 'move-down']">{{ detail.direction === 'up' ? '上涨' : '下跌' }}</text>
+        <text class="move-pct" v-if="detail.move_bps !== undefined" :class="detail.direction === 'up' ? 'up' : 'down'">{{ (detail.move_bps / 100).toFixed(2) }}%</text>
+        <text class="move-meta">相对开盘 · {{ detail.price_source === 'kline_backfill' ? 'K线回溯' : '实时快照' }}</text>
+      </view>
       <view v-if="detail.primary_driver" class="driver">
         <text class="label">主导因素</text>
         <text class="value">{{ detail.primary_driver.label }}</text>
@@ -93,6 +98,44 @@ onLoad(async (query) => {
   font-size: $font-size-base;
   font-weight: 600;
   color: $ink;
+}
+
+.move-box {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+  padding: $s-3;
+  margin-bottom: $s-2;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+}
+
+.move {
+  padding: 2rpx 12rpx;
+  border-radius: $r-xs;
+  font-size: $font-size-xs;
+  font-weight: 600;
+}
+
+.move-up {
+  color: $up;
+  background: $up-bg;
+}
+
+.move-down {
+  color: $down;
+  background: $down-bg;
+}
+
+.move-pct {
+  font-size: $font-size-lg;
+  font-weight: 700;
+}
+
+.move-meta {
+  font-size: $font-size-xs;
+  color: $ink-soft;
 }
 
 .driver {
