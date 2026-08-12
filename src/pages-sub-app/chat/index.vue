@@ -112,6 +112,11 @@
           <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
           <text class="skill-btn-text">大盘</text>
         </view>
+        <!-- Phase 4-2：自选股入口 → 我的自选股批量问句 -->
+        <view class="skill-btn" @tap="quickAskFavorites">
+          <SvgIcon name="star-line" size="28rpx" color="#0b5fff" />
+          <text class="skill-btn-text">自选股</text>
+        </view>
         <view class="skill-btn" @tap="quickAsk('今日板块资金流向如何')">
           <SvgIcon name="money-cny-circle-line" size="28rpx" color="#0b5fff" />
           <text class="skill-btn-text">资金</text>
@@ -148,11 +153,14 @@ import SectionCard from './cards/SectionCard.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
+import { useFavoritesStore } from '@/shared/store/modules/favorites'
+import { buildFavoritesQuestion } from '@/shared/utils/chatSuggestions'
 import { agentApi, type ChatMessage } from '@/shared/api/modules/agent'
 
 const chatStream = useChatStream()
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const favoritesStore = useFavoritesStore()
 
 // P9：无当前会话时自动新建（保证 messagesBySession 有当前会话载体；切换会话返回本页不重复触发，onLoad 仅一次）
 onLoad((options: Record<string, string> | undefined) => {
@@ -160,7 +168,13 @@ onLoad((options: Record<string, string> | undefined) => {
   const q = options?.q
   if (!q) return
   nextTick(() => {
-    void chatStream.send(q)
+    // Phase 4-2：自选页「问 AI」跳转带 q 参数。仅新会话（尚无 user 消息）自动发送，
+    // 已有会话历史时改为预填输入框，避免把 q 注入既有对话上下文
+    if (!chatStore.hasUserMessage) {
+      void chatStream.send(q)
+    } else {
+      inputText.value = q
+    }
     scrollToBottom()
   })
 })
@@ -288,6 +302,19 @@ function quickAsk(text: string) {
   upsertSessionMeta(text)
   chatStream.send(text)
   scrollToBottom()
+}
+
+/**
+ * Phase 4-2：自选股快捷入口 → 生成"我的自选股"批量问句后发送。
+ * 自选数据与自选页一致：数据未就绪（含未登录 mock 5 股）时先静默同步一次再取数，
+ * 保证与自选页同源（未登录 mock 5 股可问）。
+ */
+async function quickAskFavorites() {
+  if (isStreaming.value) return
+  if (!favoritesStore.hasCurrentData()) {
+    await favoritesStore.fetchFavorites({ silent: true })
+  }
+  quickAsk(buildFavoritesQuestion(favoritesStore.stocks))
 }
 
 // 交替两个超大值：流式 token 逐字增长时内容底部持续下移，scroll-top 值不变 Vue 不会重新触发滚动
@@ -439,7 +466,7 @@ onUnmounted(() => {
 .step-label { font-size: 24rpx; color: $ink-soft; }
 .progress-step.done .step-label { color: $ink-mute; }
 
-.quick-skills { display: flex; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; flex-shrink: 0; }
+.quick-skills { display: flex; flex-wrap: wrap; gap: 12rpx; padding: 12rpx 20rpx; background: #ffffff; flex-shrink: 0; }
 .skill-btn {
   display: inline-flex; align-items: center; gap: 6rpx;
   background: rgba(77, 124, 254, 0.08); color: $primary; border-radius: 20rpx;

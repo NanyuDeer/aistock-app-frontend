@@ -35,6 +35,7 @@ export default defineConfig({
     include: [
       'tests/**/*.test.ts',
       'src/shared/utils/useChatStream.spec.ts',
+      'src/shared/utils/chatSuggestions.spec.ts',
       'src/shared/utils/parseMarkdownSections.spec.ts',
       'src/shared/utils/sessionUsageMerge.spec.ts',
       'src/shared/utils/eveningBriefCards.spec.ts',
