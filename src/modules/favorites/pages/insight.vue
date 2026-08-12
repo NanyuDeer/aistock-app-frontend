@@ -109,12 +109,12 @@ onShow(async () => {
   gap: $s-2;
 }
 
-.tag-up {
+.tag.tag-up {
   color: $up;
   background: $up-bg;
 }
 
-.tag-down {
+.tag.tag-down {
   color: $down;
   background: $down-bg;
 }

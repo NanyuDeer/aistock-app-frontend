@@ -6,7 +6,7 @@
       <view class="sec-title">{{ detail.stock_name }}（{{ detail.symbol }}）· {{ detail.trade_date }}</view>
       <view v-if="detail.event_type !== 'limit_up_radar'" class="move-box">
         <text :class="['move', detail.direction === 'up' ? 'move-up' : 'move-down']">{{ detail.direction === 'up' ? '上涨' : '下跌' }}</text>
-        <text class="move-pct" v-if="detail.move_bps !== undefined" :class="detail.direction === 'up' ? 'up' : 'down'">{{ (detail.move_bps / 100).toFixed(2) }}%</text>
+        <text class="move-pct" v-if="detail.move_bps !== undefined" :class="detail.move_bps >= 0 ? 'pct-up' : 'pct-down'">{{ (detail.move_bps / 100).toFixed(2) }}%</text>
         <text class="move-meta">相对开盘 · {{ detail.price_source === 'kline_backfill' ? 'K线回溯' : '实时快照' }}</text>
       </view>
       <view v-if="detail.primary_driver" class="driver">
@@ -131,6 +131,14 @@ onLoad(async (query) => {
 .move-pct {
   font-size: $font-size-lg;
   font-weight: 700;
+}
+
+.pct-up {
+  color: $up;
+}
+
+.pct-down {
+  color: $down;
 }
 
 .move-meta {
