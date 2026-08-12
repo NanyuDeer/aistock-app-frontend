@@ -1,0 +1,173 @@
+/**
+ * speechInput 语音容错输入侧单测（Phase 4-2 Task 2）
+ *
+ * 测试对象是「依赖注入核心」h5Recognize / mpRecognize / appRecognize：
+ * uni 条件编译壳层（startSpeechRecognition / isSpeechInputSupported）只做平台分发，
+ * 单测中直接替换注入工厂（fake 识别实例 / fake 插件管理器），不依赖平台全局。
+ *
+ * 不用 vi.mock：用纯手工 fake（记录调用 + 手动触发事件回调），同一文件在
+ * node:test 下也能安全加载（vitest describe/it 在 node:test 运行时为空操作）。
+ */
+import { describe, it, expect, beforeEach } from 'vitest'
+import {
+  h5Recognize,
+  mpRecognize,
+  appRecognize,
+  stopSpeechRecognition,
+  speechRecognitionState,
+  type H5SpeechDeps,
+  type H5SpeechRecognitionLike,
+  type MpSpeechDeps,
+  type MpSpeechRecognitionManagerLike,
+} from './speechInput'
+
+/** H5 Web Speech API fake：记录 start/stop 调用，事件回调由测试手动触发 */
+class FakeRecognition implements H5SpeechRecognitionLike {
+  lang = ''
+  interimResults = false
+  continuous = false
+  onresult: H5SpeechRecognitionLike['onresult'] = null
+  onerror: H5SpeechRecognitionLike['onerror'] = null
+  onend: H5SpeechRecognitionLike['onend'] = null
+  started = false
+  stopped = false
+  start(): void {
+    this.started = true
+  }
+  stop(): void {
+    this.stopped = true
+  }
+}
+
+/** 微信同声传译识别管理器 fake：记录 start/stop，onStop/onError 手动触发 */
+class FakeMpManager implements MpSpeechRecognitionManagerLike {
+  onStop: MpSpeechRecognitionManagerLike['onStop'] = null
+  onError: MpSpeechRecognitionManagerLike['onError'] = null
+  startedLang = ''
+  stopped = false
+  start(options: { lang: string }): void {
+    this.startedLang = options.lang
+  }
+  stop(): void {
+    this.stopped = true
+  }
+}
+
+function h5DepsWith(inst: FakeRecognition): H5SpeechDeps {
+  return { getSpeechRecognition: () => inst }
+}
+
+function mpDepsWith(mgr: FakeMpManager): MpSpeechDeps {
+  return { getRecognitionManager: () => mgr }
+}
+
+describe('speechInput 状态机基线', () => {
+  beforeEach(() => {
+    speechRecognitionState.value = 'idle'
+  })
+
+  it('H5 成功：同步 start + onresult + onend → 返回文本，状态 idle', async () => {
+    const inst = new FakeRecognition()
+    const p = h5Recognize(h5DepsWith(inst))
+
+    // 必须在用户手势同步阶段调用 start（壳层在 tap 回调中调用本函数）
+    expect(inst.started).toBe(true)
+    expect(inst.lang).toBe('zh-CN')
+    expect(inst.interimResults).toBe(false)
+    expect(inst.continuous).toBe(false)
+    expect(speechRecognitionState.value).toBe('recording')
+
+    inst.onresult?.({ results: [[{ transcript: ' 贵州茅台今天怎么样 ' }]] })
+    inst.onend?.()
+    await expect(p).resolves.toEqual({ ok: true, text: '贵州茅台今天怎么样' })
+    expect(speechRecognitionState.value).toBe('idle')
+  })
+
+  it('H5 不支持（Firefox/Safari）：返回「仅支持 Chrome」错误态，不阻塞', async () => {
+    const p = h5Recognize({ getSpeechRecognition: () => null })
+    await expect(p).resolves.toEqual({ ok: false, error: '语音输入仅支持 Chrome 浏览器' })
+    expect(speechRecognitionState.value).toBe('error')
+  })
+
+  it('H5 onerror(no-speech)：降级「未识别到语音」错误态', async () => {
+    const inst = new FakeRecognition()
+    const p = h5Recognize(h5DepsWith(inst))
+    inst.onerror?.({ error: 'no-speech' })
+    await expect(p).resolves.toEqual({ ok: false, error: '未识别到语音' })
+    expect(speechRecognitionState.value).toBe('error')
+  })
+
+  it('H5 onerror(其他)：透出平台错误信息', async () => {
+    const inst = new FakeRecognition()
+    const p = h5Recognize(h5DepsWith(inst))
+    inst.onerror?.({ error: 'not-allowed' })
+    await expect(p).resolves.toEqual({ ok: false, error: '语音识别失败（not-allowed）' })
+  })
+
+  it('H5 空文本：onend 无 onresult → 「未识别到语音」错误态', async () => {
+    const inst = new FakeRecognition()
+    const p = h5Recognize(h5DepsWith(inst))
+    inst.onend?.()
+    await expect(p).resolves.toEqual({ ok: false, error: '未识别到语音' })
+    expect(speechRecognitionState.value).toBe('error')
+  })
+
+  it('H5 stopSpeechRecognition：提前结束并回填已识别文本', async () => {
+    const inst = new FakeRecognition()
+    const p = h5Recognize(h5DepsWith(inst))
+    stopSpeechRecognition()
+    expect(inst.stopped).toBe(true)
+    inst.onresult?.({ results: [[{ transcript: '茅台' }]] })
+    inst.onend?.()
+    await expect(p).resolves.toEqual({ ok: true, text: '茅台' })
+  })
+
+  it('MP 成功：start(zh_CN) + onStop(result) → 返回文本，状态 idle', async () => {
+    const mgr = new FakeMpManager()
+    const p = mpRecognize(mpDepsWith(mgr))
+    expect(mgr.startedLang).toBe('zh_CN')
+    expect(speechRecognitionState.value).toBe('recording')
+    mgr.onStop?.({ result: ' 今天大盘怎么样 ' })
+    await expect(p).resolves.toEqual({ ok: true, text: '今天大盘怎么样' })
+    expect(speechRecognitionState.value).toBe('idle')
+  })
+
+  it('MP 插件不可用：返回「语音输入暂不可用」错误态', async () => {
+    const p = mpRecognize({ getRecognitionManager: () => null })
+    await expect(p).resolves.toEqual({ ok: false, error: '语音输入暂不可用' })
+    expect(speechRecognitionState.value).toBe('error')
+  })
+
+  it('MP tap 切换：stopSpeechRecognition → recognizing + manager.stop() + onStop 结算', async () => {
+    const mgr = new FakeMpManager()
+    const p = mpRecognize(mpDepsWith(mgr))
+    expect(mgr.stopped).toBe(false)
+    stopSpeechRecognition()
+    expect(mgr.stopped).toBe(true)
+    expect(speechRecognitionState.value).toBe('recognizing')
+    mgr.onStop?.({ result: '茅台' })
+    await expect(p).resolves.toEqual({ ok: true, text: '茅台' })
+    expect(speechRecognitionState.value).toBe('idle')
+  })
+
+  it('MP onError：返回错误态', async () => {
+    const mgr = new FakeMpManager()
+    const p = mpRecognize(mpDepsWith(mgr))
+    mgr.onError?.({ msg: 'user deny' })
+    await expect(p).resolves.toEqual({ ok: false, error: '语音识别失败（user deny）' })
+  })
+
+  it('MP 空文本：onStop 无 result → 「未识别到语音」错误态', async () => {
+    const mgr = new FakeMpManager()
+    const p = mpRecognize(mpDepsWith(mgr))
+    mgr.onStop?.({})
+    await expect(p).resolves.toEqual({ ok: false, error: '未识别到语音' })
+    expect(speechRecognitionState.value).toBe('error')
+  })
+
+  it('APP v1 降级：返回「当前版本暂不支持语音输入」错误态', async () => {
+    const p = appRecognize()
+    await expect(p).resolves.toEqual({ ok: false, error: '当前版本暂不支持语音输入' })
+    expect(speechRecognitionState.value).toBe('error')
+  })
+})

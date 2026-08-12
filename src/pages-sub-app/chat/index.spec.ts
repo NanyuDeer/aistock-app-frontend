@@ -83,3 +83,26 @@ test('改进14：引入 parseMarkdownSections + SectionCard（分节卡片化）
 test('改进14：AI 气泡内容区支持分节渲染（getSections 函数）', () => {
   assert.match(pageSource, /getSections/)
 })
+
+test('Phase 4-2 语音输入：麦克风按钮仅支持平台显示（speechInput 接入）', () => {
+  assert.match(pageSource, /import \{\s*isSpeechInputSupported,\s*startSpeechRecognition,\s*stopSpeechRecognition,\s*\} from '@\/shared\/utils\/speechInput'/)
+  assert.match(pageSource, /const speechSupported = isSpeechInputSupported\(\)/)
+  assert.match(pageSource, /v-if="speechSupported"/)
+  assert.match(pageSource, /name="mic-line"/)
+})
+
+test('Phase 4-2 语音输入：识别文本回填 inputText（可编辑），不自动发送', () => {
+  // tap 切换：isListening 时结束识别，否则开始识别并回填
+  assert.match(pageSource, /@tap="handleMicTap"/)
+  assert.match(pageSource, /stopSpeechRecognition\(\)/)
+  assert.match(pageSource, /inputText\.value = result\.text/)
+  // 回填后必须走用户手动发送（handleSend 只被发送按钮/确认键触发），识别回调内禁止直接 chatStream.send
+  assert.doesNotMatch(pageSource, /handleMicTap[\s\S]{0,600}chatStream\.send/)
+})
+
+test('Phase 4-2 语音输入：识别失败轻提示（toast），不阻塞文本输入；无 TTS', () => {
+  assert.match(pageSource, /正在聆听…/)
+  assert.match(pageSource, /uni\.showToast\(\{ title: result\.error/)
+  assert.match(pageSource, /uni\.hideToast\(\)/)
+  assert.doesNotMatch(pageSource, /speechSynthesis|SpeechSynthesis|playVoice|tts/i)
+})

@@ -39,6 +39,7 @@ export default defineConfig({
       'src/shared/utils/parseMarkdownSections.spec.ts',
       'src/shared/utils/sessionUsageMerge.spec.ts',
       'src/shared/utils/eveningBriefCards.spec.ts',
+      'src/shared/utils/speechInput.spec.ts',
       'src/pages-sub-app/chat/ReasoningPanel.spec.ts',
       'src/shared/store/modules/market.spec.ts',
       'src/modules/home/components/StockContent.spec.ts',

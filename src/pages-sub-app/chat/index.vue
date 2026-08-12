@@ -130,6 +130,10 @@
       <!-- 输入框 -->
       <view class="input-bar">
         <input v-model="inputText" placeholder="输入消息..." class="input" @confirm="handleSend" />
+        <!-- Phase 4-2 Task 2：语音输入（仅支持平台显示；tap 切换：点击开始聆听，再点结束） -->
+        <view v-if="speechSupported" class="mic-btn" :class="{ active: isListening }" @tap="handleMicTap">
+          <SvgIcon name="mic-line" size="40rpx" :color="isListening ? '#ffffff' : '#0b5fff'" />
+        </view>
         <!-- Phase 2 Part 2：生成中「发送」替换为「停止」（与 isStreaming 联动） -->
         <button v-if="isStreaming" @tap="chatStream.stop()" class="stop-btn">停止</button>
         <button v-else @tap="handleSend" :disabled="isStreaming" class="send-btn">发送</button>
@@ -156,6 +160,11 @@ import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { buildFavoritesQuestion } from '@/shared/utils/chatSuggestions'
 import { agentApi, type ChatMessage } from '@/shared/api/modules/agent'
+import {
+  isSpeechInputSupported,
+  startSpeechRecognition,
+  stopSpeechRecognition,
+} from '@/shared/utils/speechInput'
 
 const chatStream = useChatStream()
 const chatStore = useChatStore()
@@ -203,6 +212,10 @@ const streamingReasoning = chatStream.streamingReasoning
 
 const inputText = ref('')
 const scrollTop = ref(0)
+
+// Phase 4-2 Task 2：语音输入（平台支持才显示麦克风按钮；isListening 为 UI 镜像，模块状态见 speechInput）
+const speechSupported = isSpeechInputSupported()
+const isListening = ref(false)
 
 // 每次进入页面（含从会话列表返回、切会话）默认停留在对话最下方
 onShow(() => {
@@ -295,6 +308,39 @@ function handleSend() {
   upsertSessionMeta(content)
   chatStream.send(content)
   scrollToBottom()
+}
+
+/**
+ * Phase 4-2 Task 2：语音输入 tap 切换（点击开始聆听，再点结束）。
+ * 识别文本仅回填输入框（v-model 可编辑、不自动发送），由用户点「发送」走 handleSend；
+ * 识别失败 toast 轻提示，不阻塞文本输入。
+ */
+async function handleMicTap() {
+  if (isListening.value) {
+    stopSpeechRecognition()
+    return
+  }
+  isListening.value = true
+  // 先同步启动识别（H5 要求 start() 在用户手势回调内同步调用），再给聆听提示；
+  // 不直接 await：startSpeechRecognition 内部已同步执行 recognition.start()（手势上下文内）
+  const pending = startSpeechRecognition()
+  showListeningToast()
+  const result = await pending
+  isListening.value = false
+  uni.hideToast()
+  if (result.ok) {
+    inputText.value = result.text
+  } else {
+    uni.showToast({ title: result.error, icon: 'none' })
+  }
+}
+
+/**
+ * Phase 4-2 Task 2：开始聆听提示（H5 单次识别自动结束；小程序需再次点击结束，
+ * toast 为 10s 长提示，麦克风按钮 active 高亮是持续指示，结算后 hideToast）。
+ */
+function showListeningToast() {
+  uni.showToast({ title: '正在聆听…，再次点击结束', icon: 'none', duration: 10000 })
 }
 
 function quickAsk(text: string) {
@@ -476,6 +522,15 @@ onUnmounted(() => {
 
 .input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
 .input { flex: 1; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
+
+/* Phase 4-2 Task 2：语音输入麦克风按钮（与输入框等高；active=聆听中，品牌色高亮） */
+.mic-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 72rpx; min-height: 72rpx; border-radius: 12rpx;
+  background: $bg-soft; flex-shrink: 0;
+}
+.mic-btn.active { background: $primary; }
+
 .send-btn { background: $primary; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
 
 /* 气泡 footer：左侧单轮用量（灰色弱化）+ 右侧深度分析按钮 */
