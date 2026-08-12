@@ -67,6 +67,14 @@
                   <text class="retry-btn-text">重试</text>
                 </view>
               </view>
+
+              <!-- Phase 4-2 Task 3：回答反馈入口（赞/踩本地持久化；error/cancelled/空回复不显示；
+                   位于 msg-footer 计费行下方、border-top 视觉分离，与 P10/P11 互不影响） -->
+              <FeedbackBar
+                v-if="showFeedbackBar(msg)"
+                :value="msg.feedback"
+                @select="(v) => chatStore.setFeedback(msg.timestamp, v)"
+              />
             </view>
           </view>
         </view>
@@ -154,6 +162,7 @@ import DeepSummaryCard from './DeepSummaryCard.vue'
 import ReasoningPanel from './ReasoningPanel.vue'
 import CardRenderer from './cards/CardRenderer.vue'
 import SectionCard from './cards/SectionCard.vue'
+import FeedbackBar from '@/shared/components/FeedbackBar.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
@@ -391,6 +400,15 @@ function getSections(content: string): MarkdownSection[] | null {
   if (parsed.length === 0) return null
   if (parsed.length === 1 && !parsed[0].title) return null
   return parsed
+}
+
+/**
+ * Phase 4-2 Task 3：回答气泡尾部反馈入口显隐——仅 assistant 真实回复
+ * （error/cancelled/空内容无反馈价值，且与「重试」按钮互斥不重叠展示）。
+ */
+function showFeedbackBar(msg: ChatMessage): boolean {
+  if (msg.role !== 'assistant' || !msg.content) return false
+  return !msg.content.startsWith('抱歉，出错了') && !msg.content.startsWith('已停止生成')
 }
 
 /**
