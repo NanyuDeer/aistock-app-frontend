@@ -64,6 +64,12 @@
       }
     },
     {
+      "path": "modules/favorites/pages/insight-detail-move",
+      "style": {
+        "navigationBarTitleText": "洞察详情"
+      }
+    },
+    {
       "path": "modules/favorites/pages/favorites",
       "style": {
         "navigationBarTitleText": "自选",

@@ -21,7 +21,7 @@
               :title="item.stock_name"
               :description="captureDetail(item)"
               clickable
-              @click="goTrace(item.event_id)"
+              @click="goTrace(item.event_id, item.event_type)"
             >
               <template #prefix>
                 <Tag :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
@@ -81,6 +81,7 @@ import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import { stockApi } from '@/shared/api/modules/stock'
+import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -221,9 +222,9 @@ function goAlertCatcher() {
   uni.navigateTo({ url: '/modules/favorites/pages/monitor' })
 }
 
-/** 洞察详情：跳转到自选股洞察详情页 */
-function goTrace(eventId: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/insight-detail?event_id=${encodeURIComponent(eventId)}` })
+/** 洞察详情：按事件类型分流（涨停雷达 → insight-detail，价格异动 → insight-detail-move） */
+function goTrace(eventId: string, eventType?: string) {
+  navigateToInsightDetail(eventId, eventType)
 }
 
 /** 个股情报（原异动捕手/event-catcher，已改名） */

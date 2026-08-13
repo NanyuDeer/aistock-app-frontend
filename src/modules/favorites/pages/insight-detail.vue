@@ -1,40 +1,16 @@
+<!--
+  涨停雷达洞察详情页（limit_up_radar 专用）：
+  归因结果公共区块（InsightResultBlock） + 原始来源（来源文章/关键词/发布时间）。
+  价格异动洞察见 insight-detail-move.vue（两页独立，列表按 event_type 分流）。
+-->
 <template>
   <view class="page-insight-detail">
     <view v-if="loading" class="state"><text>加载中</text></view>
     <view v-else-if="!detail" class="state"><text>洞察不存在或已过期</text></view>
     <block v-else>
-      <view class="sec-title">{{ detail.stock_name }}（{{ detail.symbol }}）· {{ detail.trade_date }}</view>
-      <view v-if="detail.event_type !== 'limit_up_radar'" class="move-box">
-        <text :class="['move', detail.direction === 'up' ? 'move-up' : 'move-down']">{{ detail.direction === 'up' ? '上涨' : '下跌' }}</text>
-        <text class="move-pct" v-if="detail.move_bps !== undefined" :class="detail.move_bps >= 0 ? 'pct-up' : 'pct-down'">{{ (detail.move_bps / 100).toFixed(2) }}%</text>
-        <text class="move-meta">相对开盘 · {{ detail.price_source === 'kline_backfill' ? 'K线回溯' : '实时快照' }}</text>
-      </view>
-      <!-- 事件原因：价格异动事件的证据包事件列表（带时间，类似涨停雷达正文原因格式） -->
-      <view v-if="detail.event_type !== 'limit_up_radar' && detail.evidence_package?.length" class="evi-box">
-        <view class="evi-title">事件原因</view>
-        <view v-for="(e, i) in detail.evidence_package" :key="e.source_id || `evi-${i}`" class="evi-item">
-          <text class="evi-no">{{ i + 1 }}</text>
-          <view class="evi-body">
-            <text class="evi-text">{{ e.title || e.excerpt || e.source_id }}</text>
-            <text class="evi-meta">据 {{ fmtTime(e.published_at) }} · {{ sourceTypeText(e.source_type) }}</text>
-            <text v-if="e.excerpt && e.title" class="evi-excerpt">{{ e.excerpt }}</text>
-          </view>
-        </view>
-      </view>
-      <view v-if="detail.primary_driver" class="driver">
-        <text class="label">主导因素</text>
-        <text class="value">{{ detail.primary_driver.label }}</text>
-        <text class="cat">{{ categoryText(detail.primary_driver.category) }}</text>
-        <text v-if="detail.primary_driver.confidence" class="conf">{{ confidenceText(detail.primary_driver.confidence) }}</text>
-      </view>
-      <view v-if="detail.secondary_drivers?.length" class="subs">
-        <view v-for="d in detail.secondary_drivers" :key="d.label" class="sub">
-          {{ d.label }} · {{ categoryText(d.category) }}
-        </view>
-      </view>
-      <view v-if="detail.attribution_status === 'unconfirmed'" class="unconfirmed">主因待验证</view>
-      <view v-if="detail.display_report?.details" class="detail-text">{{ detail.display_report.details }}</view>
-      <!-- 原始来源：仅一期事件（limit_up_radar 有来源文章）展示；价格异动事件由上方"事件原因"替代 -->
+      <view class="sec-title">{{ detail.stock_name }}（{{ detail.symbol }}）· {{ fmtDate(detail.trade_date) }}</view>
+      <InsightResultBlock :insight="detail" />
+      <!-- 原始来源：仅一期事件（limit_up_radar 有来源文章）展示；价格异动事件由 insight-detail-move 的"事件原因"替代 -->
       <block v-if="detail.source_id">
         <view class="sec-title">原始来源</view>
         <view class="src" @tap="openSource">{{ detail.title }}</view>
@@ -49,34 +25,16 @@
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
+import InsightResultBlock from '@/shared/components/InsightResultBlock.vue'
 
 const detail = ref<WatchlistInsight | null>(null)
 const loading = ref(true)
 
-function categoryText(c: string): string {
-  return { industry_theme: '行业题材', company_event: '公司事件', earnings: '业绩', market: '市场', trading_sentiment: '交易情绪' }[c] || c
-}
-
-function confidenceText(c: string): string {
-  return { high: '高置信', medium: '中置信', low: '低置信' }[c as 'high' | 'medium' | 'low'] || c
-}
-
-const SOURCE_TYPE_TEXT: Record<string, string> = {
-  announcement: '公告', news: '新闻', earnings: '业绩', rating: '研报',
-  radar_article: '涨停雷达', quant: '量化联动',
-}
-
-function sourceTypeText(t?: string): string {
-  return SOURCE_TYPE_TEXT[t || ''] || t || '来源'
-}
-
-/** 证据发布时间格式化：ISO/日期串 → "YYYY-MM-DD HH:mm" */
-function fmtTime(v?: string): string {
+/** trade_date（DATE/ISO）→ "YYYY-MM-DD" */
+function fmtDate(v?: string | Date): string {
   if (!v) return ''
-  const m = String(v).match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/)
-  return m ? `${m[1]} ${m[2]}` : String(v).slice(0, 16)
+  return String(v).slice(0, 10)
 }
-
 
 /** 原始来源跳转：H5 新窗口打开，非 H5 复制链接到剪贴板（与 stock-trace 证据跳转一致） */
 function openSource() {
@@ -130,181 +88,6 @@ onLoad(async (query) => {
   font-size: $font-size-base;
   font-weight: 600;
   color: $ink;
-}
-
-.move-box {
-  display: flex;
-  align-items: center;
-  gap: $s-2;
-  padding: $s-3;
-  margin-bottom: $s-2;
-  background: $bg-card;
-  border: 2rpx solid $line;
-  border-radius: $r-md;
-}
-
-.move {
-  padding: 2rpx 12rpx;
-  border-radius: $r-xs;
-  font-size: $font-size-xs;
-  font-weight: 600;
-}
-
-.move-up {
-  color: $up;
-  background: $up-bg;
-}
-
-.move-down {
-  color: $down;
-  background: $down-bg;
-}
-
-.move-pct {
-  font-size: $font-size-lg;
-  font-weight: 700;
-}
-
-.pct-up {
-  color: $up;
-}
-
-.pct-down {
-  color: $down;
-}
-
-.move-meta {
-  font-size: $font-size-xs;
-  color: $ink-soft;
-}
-
-.evi-box {
-  padding: $s-3;
-  margin-bottom: $s-2;
-  background: $bg-card;
-  border: 2rpx solid $line;
-  border-radius: $r-md;
-}
-
-.evi-title {
-  margin-bottom: $s-2;
-  font-size: $font-size-sm;
-  font-weight: 600;
-  color: $ink;
-}
-
-.evi-item {
-  display: flex;
-  align-items: flex-start;
-  gap: $s-2;
-  padding: $s-2 0;
-  border-bottom: 2rpx solid $line;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.evi-no {
-  flex-shrink: 0;
-  width: 36rpx;
-  line-height: 1.6;
-  font-size: $font-size-sm;
-  font-weight: 600;
-  color: $primary;
-  text-align: center;
-}
-
-.evi-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4rpx;
-}
-
-.evi-text {
-  font-size: $font-size-sm;
-  color: $ink;
-  line-height: 1.5;
-}
-
-.evi-meta {
-  font-size: $font-size-xs;
-  color: $ink-soft;
-  line-height: 1.5;
-}
-
-.evi-excerpt {
-  font-size: $font-size-xs;
-  color: $ink-soft;
-  line-height: 1.5;
-}
-
-.driver {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: $s-2;
-  padding: $s-3;
-  background: $bg-card;
-  border: 2rpx solid $line;
-  border-radius: $r-md;
-}
-
-.label {
-  padding: 2rpx 12rpx;
-  border-radius: $r-xs;
-  font-size: $font-size-xs;
-  color: $primary;
-  background: $primary-50;
-}
-
-.value {
-  font-size: $font-size-base;
-  font-weight: 600;
-  color: $ink;
-}
-
-.cat,
-.conf {
-  font-size: $font-size-xs;
-  color: $ink-soft;
-}
-
-.subs {
-  display: flex;
-  flex-direction: column;
-  gap: $s-2;
-  padding: $s-3;
-  margin-top: $s-2;
-  background: $bg-card;
-  border: 2rpx solid $line;
-  border-radius: $r-md;
-}
-
-.sub {
-  font-size: $font-size-sm;
-  color: $ink-soft;
-}
-
-.unconfirmed {
-  margin-top: $s-2;
-  padding: $s-2 $s-3;
-  border-radius: $r-sm;
-  font-size: $font-size-sm;
-  color: $warning;
-  background: $warning-bg;
-}
-
-.detail-text {
-  margin-top: $s-2;
-  padding: $s-3;
-  background: $bg-card;
-  border: 2rpx solid $line;
-  border-radius: $r-md;
-  font-size: $font-size-sm;
-  color: $ink-soft;
-  line-height: 1.6;
 }
 
 .src {

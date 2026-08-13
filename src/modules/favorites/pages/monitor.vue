@@ -42,7 +42,7 @@
           :key="alert.eventId"
           class="alert-item-card"
           clickable
-          @click="goTrace(alert.eventId)"
+          @click="goTrace(alert.eventId, alert.eventType)"
         >
           <view class="alert-card-header">
             <view class="alert-stock">
@@ -88,6 +88,7 @@ import Tag from '@/shared/components/Tag.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
 interface AlertItem {
   eventId: string
@@ -95,6 +96,7 @@ interface AlertItem {
   name?: string
   direction: 'up' | 'down'
   type: string
+  eventType?: string
   message: string
   time: string | number
   confidence?: 'high' | 'medium' | 'low' | 'unconfirmed'
@@ -153,6 +155,7 @@ async function fetchAlerts() {
       name: e.stock_name,
       direction: e.direction || 'up',
       type: e.event_type === 'limit_up_radar' ? '涨停雷达' : '异动',
+      eventType: e.event_type,
       message: attributionMessage(e),
       time: String(e.trade_date || e.created_at || ''),
       confidence: e.confidence,
@@ -212,8 +215,9 @@ function disconnectWs() {
   wsConnected.value = false
 }
 
-function goTrace(eventId: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/insight-detail?event_id=${encodeURIComponent(eventId)}` })
+/** 洞察详情：按事件类型分流（涨停雷达 → insight-detail，价格异动 → insight-detail-move） */
+function goTrace(eventId: string, eventType?: string) {
+  navigateToInsightDetail(eventId, eventType)
 }
 
 onShow(() => {
