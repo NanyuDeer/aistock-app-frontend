@@ -44,6 +44,10 @@
               <SvgIcon name="arrow-down-s" size="24rpx" color="#4b5a7a" />
             </view>
           </picker>
+          <text
+            :class="['fav-btn', favoritesOnly ? 'active' : '']"
+            @tap="toggleFavoritesOnly"
+          >自选股</text>
           <view class="sort-order">
             <text
               :class="['order-btn', sortOrder === 'desc' ? 'active' : '']"
@@ -72,7 +76,7 @@
 
       <!-- 搜索无结果 -->
       <view v-else-if="!list.length" class="empty-state">
-        <EmptyState :text="keyword ? '未搜索到相关股票' : '暂无业绩预测数据'" />
+        <EmptyState :text="emptyText" />
       </view>
 
       <!-- 列表 -->
@@ -126,6 +130,7 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import { formatShanghaiClock } from '@/shared/utils/datetime'
+import { useFavoritesStore, useUserStore } from '@/shared/store'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
@@ -170,6 +175,16 @@ const list = ref<ForecastItem[]>([])
 const page = ref(1)
 const pageSize = 20
 const total = ref(0)
+
+// 自选股筛选
+const favoritesStore = useFavoritesStore()
+const favoritesOnly = ref(false)
+const favoritesSymbols = computed(() => favoritesStore.stocks.map(s => s.symbol).filter(Boolean))
+
+const emptyText = computed(() => {
+  if (keyword.value) return '未搜索到相关股票'
+  return favoritesOnly.value ? '自选股中暂无业绩预测数据' : '暂无业绩预测数据'
+})
 
 const sortFields = [
   { key: 'net_profit_forecast', label: '净利润预测' },
@@ -235,6 +250,9 @@ async function fetchData(append = false) {
       pageSize,
       sortBy: activeSort.value,
       sortOrder: sortOrder.value,
+    }
+    if (favoritesOnly.value) {
+      params.symbols = favoritesSymbols.value.join(',')
     }
     const kw = keyword.value.trim()
     const res: any = kw
@@ -302,6 +320,22 @@ function loadMore() {
 
 function retry() {
   error.value = false
+  fetchData(false)
+}
+
+/** 切换自选股筛选：未登录时提示登录；已登录先确保自选股已加载，再带 symbols 参数重新拉取 */
+async function toggleFavoritesOnly() {
+  if (favoritesOnly.value) {
+    favoritesOnly.value = false
+    fetchData(false)
+    return
+  }
+  if (!useUserStore().isLoggedIn()) {
+    uni.showToast({ title: '登录后查看自选股信息', icon: 'none' })
+    return
+  }
+  await favoritesStore.fetchFavorites({ silent: true })
+  favoritesOnly.value = true
   fetchData(false)
 }
 
@@ -394,7 +428,6 @@ onShow(() => {
 .sort-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12rpx;
   margin-bottom: 24rpx;
   padding: 12rpx 16rpx;
@@ -423,6 +456,7 @@ onShow(() => {
   display: flex;
   gap: 0;
   flex-shrink: 0;
+  margin-left: auto;
   border-radius: 10rpx;
   overflow: hidden;
   border: 1rpx solid #e0e3e8;
@@ -442,6 +476,23 @@ onShow(() => {
 
   &:first-child {
     border-right: 1rpx solid #e0e3e8;
+  }
+}
+
+.fav-btn {
+  font-size: 22rpx;
+  color: $ink-soft;
+  padding: 8rpx 16rpx;
+  border-radius: 10rpx;
+  border: 1rpx solid #e0e3e8;
+  background: #f9fafb;
+  font-weight: 500;
+  flex-shrink: 0;
+
+  &.active {
+    color: #fff;
+    background: $primary;
+    border-color: $primary;
   }
 }
 
