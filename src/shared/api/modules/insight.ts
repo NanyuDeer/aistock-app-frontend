@@ -45,6 +45,7 @@ export interface WatchlistInsight {
   title?: string
   keywords?: string[]
   source_url?: string
+  source_id?: string | null
   published_at?: string
 }
 

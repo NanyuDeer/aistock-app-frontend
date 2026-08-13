@@ -9,12 +9,16 @@
         <text class="move-pct" v-if="detail.move_bps !== undefined" :class="detail.move_bps >= 0 ? 'pct-up' : 'pct-down'">{{ (detail.move_bps / 100).toFixed(2) }}%</text>
         <text class="move-meta">相对开盘 · {{ detail.price_source === 'kline_backfill' ? 'K线回溯' : '实时快照' }}</text>
       </view>
-      <!-- 归因依据：价格异动事件的证据包（替代一期"原始来源"文章区块） -->
+      <!-- 事件原因：价格异动事件的证据包事件列表（带时间，类似涨停雷达正文原因格式） -->
       <view v-if="detail.event_type !== 'limit_up_radar' && detail.evidence_package?.length" class="evi-box">
-        <view class="evi-title">归因依据</view>
+        <view class="evi-title">事件原因</view>
         <view v-for="(e, i) in detail.evidence_package" :key="e.source_id || `evi-${i}`" class="evi-item">
-          <text class="evi-tag">{{ sourceTypeText(e.source_type) }}</text>
-          <text class="evi-text">{{ e.title || e.excerpt || e.source_id }}</text>
+          <text class="evi-no">{{ i + 1 }}</text>
+          <view class="evi-body">
+            <text class="evi-text">{{ e.title || e.excerpt || e.source_id }}</text>
+            <text class="evi-meta">据 {{ fmtTime(e.published_at) }} · {{ sourceTypeText(e.source_type) }}</text>
+            <text v-if="e.excerpt && e.title" class="evi-excerpt">{{ e.excerpt }}</text>
+          </view>
         </view>
       </view>
       <view v-if="detail.primary_driver" class="driver">
@@ -30,10 +34,13 @@
       </view>
       <view v-if="detail.attribution_status === 'unconfirmed'" class="unconfirmed">主因待验证</view>
       <view v-if="detail.display_report?.details" class="detail-text">{{ detail.display_report.details }}</view>
-      <view class="sec-title">原始来源</view>
-      <view class="src" @tap="openSource">{{ detail.title }}</view>
-      <view v-if="detail.keywords?.length" class="keywords">原始关键词：{{ detail.keywords.join(' / ') }}</view>
-      <view class="meta">发布时间：{{ detail.published_at }}</view>
+      <!-- 原始来源：仅一期事件（limit_up_radar 有来源文章）展示；价格异动事件由上方"事件原因"替代 -->
+      <block v-if="detail.source_id">
+        <view class="sec-title">原始来源</view>
+        <view class="src" @tap="openSource">{{ detail.title }}</view>
+        <view v-if="detail.keywords?.length" class="keywords">原始关键词：{{ detail.keywords.join(' / ') }}</view>
+        <view class="meta">发布时间：{{ detail.published_at }}</view>
+      </block>
     </block>
   </view>
 </template>
@@ -61,6 +68,13 @@ const SOURCE_TYPE_TEXT: Record<string, string> = {
 
 function sourceTypeText(t?: string): string {
   return SOURCE_TYPE_TEXT[t || ''] || t || '来源'
+}
+
+/** 证据发布时间格式化：ISO/日期串 → "YYYY-MM-DD HH:mm" */
+function fmtTime(v?: string): string {
+  if (!v) return ''
+  const m = String(v).match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/)
+  return m ? `${m[1]} ${m[2]}` : String(v).slice(0, 16)
 }
 
 
@@ -191,13 +205,14 @@ onLoad(async (query) => {
   }
 }
 
-.evi-tag {
+.evi-no {
   flex-shrink: 0;
-  padding: 2rpx 12rpx;
-  border-radius: $r-xs;
-  font-size: $font-size-xs;
+  width: 36rpx;
+  line-height: 1.6;
+  font-size: $font-size-sm;
+  font-weight: 600;
   color: $primary;
-  background: $primary-50;
+  text-align: center;
 }
 
 .evi-body {
@@ -210,6 +225,12 @@ onLoad(async (query) => {
 .evi-text {
   font-size: $font-size-sm;
   color: $ink;
+  line-height: 1.5;
+}
+
+.evi-meta {
+  font-size: $font-size-xs;
+  color: $ink-soft;
   line-height: 1.5;
 }
 
