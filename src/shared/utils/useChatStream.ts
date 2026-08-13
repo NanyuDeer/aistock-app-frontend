@@ -195,6 +195,17 @@ export function useChatStream() {
         streamingText.value += data.content || ''
         break
 
+      case 'content_delta':
+        // 改进 17（D9 节级伪流式）：文本增量累积，与 'text' 分支同构
+        // （deltas 是字节前缀链，最终由 done 前缀补尾拼接为全文）
+        streamingText.value += data.content || ''
+        break
+
+      case 'content_reset':
+        // 改进 17（D9 节级伪流式）：失败兜底显式整段替换（覆盖既有累积）
+        streamingText.value = data.content || ''
+        break
+
       case 'resume_status':
         // 断线续跑回包：none → 后端无记录，自动重发最后一条 user 消息兜底
         if (data.status === 'none') {
@@ -222,7 +233,12 @@ export function useChatStream() {
         {
           const last = messages.value[messages.value.length - 1]
           if (last && last.role === 'user') {
-            chatStore.appendMessage({ role: 'assistant', content: '已停止生成', timestamp: Date.now() })
+            // 改进 17（G8）：保留半截——半截 + 「已停止生成」合并落消息
+            chatStore.appendMessage({
+              role: 'assistant',
+              content: `${streamingText.value}已停止生成`,
+              timestamp: Date.now()
+            })
           }
         }
         break
@@ -231,14 +247,18 @@ export function useChatStream() {
         {
           doneReceived = true
           progressSteps.value = []
+          // 改进 17（G8）：先取半截再清流式状态——半截 + 「已停止生成」合并落消息
+          // （流式预览容器 v-if=isStreaming 消失后 index.vue 不自动合并，必须显式 append）
+          const halfText = streamingText.value
           streamingText.value = ''
           currentRunReasoning.value = []
           const last = messages.value[messages.value.length - 1]
-          // 去重：stop_status 兜底已落过「已停止生成」时不再重复 append
-          if (!(last && last.role === 'assistant' && last.content === '已停止生成')) {
+          // 去重（改进 17 修订）：stop_status 兜底已落过「半截+已停止生成」时不再重复 append——
+          // 内容变「半截+标记」后 === 判据失效，改按后缀匹配
+          if (!(last && last.role === 'assistant' && last.content.endsWith('已停止生成'))) {
             chatStore.appendMessage({
               role: 'assistant',
-              content: data.content || '已停止生成',
+              content: `${halfText}${data.content || '已停止生成'}`,
               timestamp: Date.now()
             })
           }
@@ -276,7 +296,14 @@ export function useChatStream() {
       case 'done':
         {
           doneReceived = true
-          const finalText = data.content || streamingText.value
+          // 硬约束 2（改进 17）：D9 节级伪流式下 DONE 全文 = 增量字节前缀链的总和——
+          // data.content 以 streamingText 为前缀时只补尾部（防「写完跳变」）；
+          // deep/general 未走 delta 路径（前缀不成立）→ 整体覆盖，维持既有行为
+          const streamed = streamingText.value
+          const doneContent = data.content || ''
+          const finalText = streamed && doneContent.startsWith(streamed)
+            ? streamed + doneContent.slice(streamed.length)
+            : (doneContent || streamed)
           // 标记 reasoning 步骤完成
           for (const step of currentRunReasoning.value) {
             step.status = 'done'
@@ -430,7 +457,8 @@ export function useChatStream() {
       })
     }
     progressSteps.value = []
-    streamingText.value = ''
+    // G8 裁决（改进 17）：保留已流式半截——流式预览容器（v-if=isStreaming）消失后，
+    // 半截由 stop_status/cancelled 分支合并「已停止生成」落进 displayMessages
     currentRunReasoning.value = []
     finishRun()
   }
