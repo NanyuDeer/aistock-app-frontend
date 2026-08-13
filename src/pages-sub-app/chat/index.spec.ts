@@ -147,3 +147,28 @@ test('Phase 4-2 交互式确认：pendingConfirm 到达时快照 question/option
   assert.match(pageSource, /confirmQuestion\.value = v\.question/)
   assert.match(pageSource, /confirmOptions\.value = v\.options/)
 })
+
+// ─── 改进 18（批次 1，2026-08-13）：新会话空态引导 ───
+
+test('改进18：空态欢迎页渲染 + 示例问题点击即发（复用 quickAsk）', () => {
+  assert.match(pageSource, /empty-guide/)
+  assert.match(pageSource, /emptyGuideQuestions/)
+  assert.match(pageSource, /v-for="q in emptyGuideQuestions"/)
+  assert.match(pageSource, /@tap="quickAsk\(q\.text\)"/)
+})
+
+test('改进18：显示条件 = 当前会话消息为空 且 未被用户关闭（storage 持久化）；可关闭', () => {
+  assert.match(pageSource, /showEmptyGuide/)
+  assert.match(pageSource, /displayMessages\.value\.length === 0/)
+  assert.match(pageSource, /CHAT_EMPTY_GUIDE_CLOSED/)
+  assert.match(pageSource, /closeEmptyGuide/)
+})
+
+test('改进18：示例问题覆盖六大类（大盘/个股/资金/对比/新闻/科普）', () => {
+  assert.match(pageSource, /今日大盘怎么样/)
+  assert.match(pageSource, /贵州茅台现在怎么样/)
+  assert.match(pageSource, /今日板块资金流向如何/)
+  assert.match(pageSource, /贵州茅台和五粮液哪个更好/)
+  assert.match(pageSource, /宁德时代最近有什么新闻/)
+  assert.match(pageSource, /市盈率是什么/)
+})

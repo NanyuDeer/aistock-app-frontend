@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <SubPageCard2 :title="'AI 投顾'" :no-chat-bar="true">
     <template #header-right>
       <view class="sessions-entry" @tap="goSessions">
@@ -8,6 +8,30 @@
     <view class="chat-content">
       <!-- 消息列表 -->
       <scroll-view scroll-y class="message-list" :scroll-top="scrollTop">
+        <!-- 改进 18（批次 1）：新会话空态引导——当前会话消息为空且用户未关闭（storage 持久化）时显示；
+             示例问题点击即发（复用 quickAsk）；「不再显示」写入全局标记，新建会话也不再现 -->
+        <view v-if="showEmptyGuide" class="empty-guide">
+          <view class="empty-guide-header">
+            <SvgIcon name="robot-line" size="72rpx" color="#0b5fff" />
+            <text class="empty-guide-title">你好，我是 AI 投顾</text>
+            <text class="empty-guide-sub">大盘 · 个股 · 资金 · 对比 · 新闻 · 科普，都可以问我</text>
+          </view>
+          <view class="empty-guide-items">
+            <view
+              v-for="q in emptyGuideQuestions"
+              :key="q.text"
+              class="empty-guide-item"
+              @tap="quickAsk(q.text)"
+            >
+              <text class="empty-guide-item-label">{{ q.label }}</text>
+              <text class="empty-guide-item-text">{{ q.text }}</text>
+            </view>
+          </view>
+          <view class="empty-guide-close" @tap="closeEmptyGuide">
+            <SvgIcon name="close-line" size="24rpx" color="#9aa3b2" />
+            <text class="empty-guide-close-text">不再显示</text>
+          </view>
+        </view>
         <view v-for="(msg, idx) in displayMessages" :key="idx" class="message-item" :class="msg.role">
           <!-- 用户消息 -->
           <text v-if="msg.role === 'user'" class="msg-content user">{{ msg.content }}</text>
@@ -162,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch, onUnmounted } from 'vue'
+import { ref, nextTick, watch, computed, onUnmounted } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { useChatStream, type ConfirmOption } from '@/shared/utils/useChatStream'
 import { markdownToHtml } from '@/shared/utils/markdown'
@@ -180,6 +204,7 @@ import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { buildFavoritesQuestion } from '@/shared/utils/chatSuggestions'
+import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 import { agentApi, type ChatMessage } from '@/shared/api/modules/agent'
 import {
   isSpeechInputSupported,
@@ -225,6 +250,25 @@ function upsertSessionMeta(content: string) {
 }
 
 const displayMessages = chatStream.messages
+
+// 改进 18（批次 1）：新会话空态引导——当前会话消息为空 且 未被用户关闭（storage 持久化）时显示。
+// 用户点「不再显示」写入全局标记，即使新建会话也不再现（消解老用户噪音，roadmap 改进 18）。
+// 示例问题点击即发（复用 quickAsk），覆盖大盘/个股/资金/对比/新闻/科普六大类。
+const emptyGuideClosed = ref(storage.get(STORAGE_KEYS.CHAT_EMPTY_GUIDE_CLOSED) === true)
+const showEmptyGuide = computed(() => !emptyGuideClosed.value && displayMessages.value.length === 0)
+const emptyGuideQuestions = [
+  { label: '大盘', text: '今日大盘怎么样' },
+  { label: '个股', text: '贵州茅台现在怎么样' },
+  { label: '资金', text: '今日板块资金流向如何' },
+  { label: '对比', text: '贵州茅台和五粮液哪个更好' },
+  { label: '新闻', text: '宁德时代最近有什么新闻' },
+  { label: '科普', text: '市盈率是什么' },
+]
+
+function closeEmptyGuide() {
+  emptyGuideClosed.value = true
+  storage.set(STORAGE_KEYS.CHAT_EMPTY_GUIDE_CLOSED, true)
+}
 const isStreaming = chatStream.streaming
 const progressSteps = chatStream.progressSteps
 const streamingText = chatStream.streamingText
@@ -551,6 +595,31 @@ onUnmounted(() => {
 }
 
 .message-list { flex: 1; min-height: 0; padding: 20rpx; overflow: hidden; }
+
+/* 改进 18：新会话空态引导（欢迎页 + 示例问题 + 关闭） */
+.empty-guide {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 96rpx 40rpx 40rpx; text-align: center;
+}
+.empty-guide-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 40rpx; }
+.empty-guide-title { font-size: 34rpx; font-weight: 600; color: $ink; margin-top: 20rpx; }
+.empty-guide-sub { font-size: 24rpx; color: $ink-mute; margin-top: 12rpx; }
+.empty-guide-items { width: 100%; display: flex; flex-direction: column; gap: 16rpx; }
+.empty-guide-item {
+  display: flex; align-items: center; gap: 12rpx;
+  background: #ffffff; border-radius: $r-lg; padding: 20rpx 24rpx;
+  box-shadow: $shadow-card;
+}
+.empty-guide-item-label {
+  flex-shrink: 0; font-size: 22rpx; color: $primary;
+  background: $primary-50; border-radius: $r-sm; padding: 4rpx 12rpx;
+}
+.empty-guide-item-text { flex: 1; min-width: 0; font-size: 26rpx; color: $ink; text-align: left; }
+.empty-guide-close {
+  display: flex; align-items: center; gap: 6rpx; margin-top: 32rpx;
+  padding: 8rpx 20rpx;
+}
+.empty-guide-close-text { font-size: 22rpx; color: $ink-mute; }
 .message-item { margin-bottom: 24rpx; }
 .message-item.user { display: flex; justify-content: flex-end; }
 .msg-content.user {
