@@ -534,7 +534,7 @@ export function useChatStream() {
     const last = arr[arr.length - 1]
     return (
       last.role === 'assistant' &&
-      (last.content.startsWith('抱歉，出错了') || last.content.startsWith('已停止生成'))
+      (last.content.startsWith('抱歉，出错了') || last.content.endsWith('已停止生成'))
     )
   }
 
