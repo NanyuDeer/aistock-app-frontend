@@ -1,6 +1,13 @@
 <template>
   <view class="page-traceability">
-    <SubPageCard title="大盘溯源">
+    <SubPageCard title="市场洞见">
+      <template #header-right>
+        <view class="header-right-actions">
+          <view class="history-btn" @tap="goPredictionHistory">
+            <text class="history-btn-text">预测验证</text>
+          </view>
+        </view>
+      </template>
       <LoadingState v-if="loading" />
 
       <Card v-else-if="error" class="error-state">
@@ -30,6 +37,7 @@
         <MarketTraceAlternatives :presentation="presentation" />
         <MarketTraceRejected :presentation="presentation" />
         <MarketTracePendingRisks :presentation="presentation" />
+        <MarketTracePrediction :prediction="presentation.prediction" />
 
         <!-- 折叠兜底：完整 markdown -->
         <view class="markdown-section">
@@ -61,6 +69,7 @@ import MarketTracePhenomenon from '@/modules/analytics/components/MarketTracePhe
 import MarketTraceTimeline from '@/modules/analytics/components/MarketTraceTimeline.vue'
 import MarketTraceAlternatives from '@/modules/analytics/components/MarketTraceAlternatives.vue'
 import MarketTraceRejected from '@/modules/analytics/components/MarketTraceRejected.vue'
+import MarketTracePrediction from '@/modules/analytics/components/MarketTracePrediction.vue'
 
 const loading = ref(false)
 const error = ref(false)
@@ -107,6 +116,10 @@ function toggleMarkdown() {
   showMarkdown.value = !showMarkdown.value
 }
 
+function goPredictionHistory() {
+  uni.navigateTo({ url: '/modules/analytics/pages/prediction-history' })
+}
+
 onShow(() => {
   void fetchData()
 })
@@ -118,6 +131,24 @@ onShow(() => {
 .page-traceability { height: 100%; }
 .report-content { display: flex; flex-direction: column; gap: 0; padding: 0 0 $spacing-base 0; }
 .error-state { margin: $spacing-base; }
+
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.history-btn {
+  padding: 8rpx 16rpx;
+  background: $primary-50;
+  border-radius: $r-xs;
+}
+
+.history-btn-text {
+  font-size: $font-size-sm;
+  color: $primary;
+  font-weight: 500;
+}
 
 .markdown-section { padding: 0 $spacing-base; margin-top: $spacing-base; }
 .markdown-section .section-title {

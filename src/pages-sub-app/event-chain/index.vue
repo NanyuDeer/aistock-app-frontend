@@ -3,14 +3,15 @@
     <view class="event-chain-page">
       <!-- AI 关注焦点区域 -->
       <view class="ai-focus-section">
-        <text class="section-title">焦点事件</text>
-        <view class="headline-cards">
+        <text class="section-title">重大事件</text>
+        <!-- 动态布局：1 个重大事件 → 单卡全宽；>= 2 个 → 左右双卡 -->
+        <view :class="headlineCount === 1 ? 'headline-single' : 'headline-cards'">
           <EventHeadlineCard
             v-if="headlinePositive"
             type="positive"
             :title="headlinePositive.title"
             :importance="headlinePositive.importance >= 4 ? 'major' : 'normal'"
-            :industries="headlinePositive.affectedIndustries.map((i) => i.name)"
+            :industries="headlinePositive.affectedIndustries"
             :event-id="headlinePositive.eventId"
             @click="handleHeadlineClick"
           />
@@ -19,7 +20,7 @@
             type="negative"
             :title="headlineNegative.title"
             :importance="headlineNegative.importance >= 4 ? 'major' : 'normal'"
-            :industries="headlineNegative.affectedIndustries.map((i) => i.name)"
+            :industries="headlineNegative.affectedIndustries"
             :event-id="headlineNegative.eventId"
             @click="handleHeadlineClick"
           />
@@ -80,7 +81,7 @@
               <text class="load-more-text">加载中...</text>
             </view>
             <view v-else-if="hasMore" class="load-more-btn" @tap="loadMore">
-              <text class="load-more-text">加载更多 ({{ total - events.length }} 条)</text>
+              <text class="load-more-text">加载更多</text>
             </view>
             <view v-else-if="events.length > 0" class="load-more-btn">
               <text class="load-more-text done-text">— 已加载全部 {{ total }} 条事件 —</text>
@@ -131,7 +132,7 @@ const {
 
 const { toggleFollow } = useEventFollow()
 
-// ========== 焦点事件（从真实事件列表派生） ==========
+// ========== 重大事件（从真实事件列表派生） ==========
 
 /** 判断事件整体方向：利好行业占比高 → positive，利空占比高 → negative */
 function eventDirection(event: EventItem): 'positive' | 'negative' | null {
@@ -144,7 +145,7 @@ function eventDirection(event: EventItem): 'positive' | 'negative' | null {
   return null
 }
 
-/** 从事件列表派生焦点事件：取 importance >= 4 的事件，按方向分组取第一条 */
+/** 从事件列表派生重大事件：取 importance >= 4 的事件，按方向分组取第一条 */
 const headlinePositive = computed<EventItem | null>(() => {
   return (
     events.value
@@ -161,6 +162,11 @@ const headlineNegative = computed<EventItem | null>(() => {
   )
 })
 
+/** 重大事件卡片数量（0/1/2），驱动单卡全宽 / 双卡布局 */
+const headlineCount = computed(() => {
+  return (headlinePositive.value ? 1 : 0) + (headlineNegative.value ? 1 : 0)
+})
+
 // ========== 生命周期 ==========
 onMounted(() => {
   refresh()
@@ -168,7 +174,7 @@ onMounted(() => {
 
 // ========== 事件处理 ==========
 
-/** 焦点事件卡片点击 - 跳转到新闻详情页（事件原文） */
+/** 重大事件卡片点击 - 跳转到新闻详情页（事件原文） */
 function handleHeadlineClick(eventId: string) {
   // 从真实事件列表中查找对应的 newsId
   const event = events.value.find((e) => e.eventId === eventId)
@@ -244,8 +250,13 @@ async function handleFollow(event: EventItem) {
 .headline-cards {
   display: flex;
   flex-direction: row;
-  gap: 12rpx;
+  gap: 8rpx;
   align-items: stretch;
+}
+
+/* 单个重大事件：单卡占满内容宽度（EventHeadlineCard 根节点 flex:1 自动填充） */
+.headline-single {
+  display: flex;
 }
 
 // ========== 分隔线 ==========

@@ -5,7 +5,9 @@ AI 对话模块提供智能投顾对话功能，支持行情查询、资金流�
 
 改进 14：AI 回复 markdown 分节（核心结论/行情要点/数据说明）经 `parseMarkdownSections` 识别后由 `SectionCard` 区块卡片渲染；ReasoningPanel 视觉升级为卡片风格（$bg-card + $shadow-card + $r-md）；非分节回复（寒暄/科普）保持 mp-html 渲染。
 
-P11（线 5）：消费 DONE 事件 `token_usage`（会话计费本地累加：单轮用量进回复气泡 footer 与「深度分析」按钮同行、灰色弱化；会话列表徽标本地优先 + 服务端补足，未登录也显示本地用量）与 `cards`（5 类卡片经 CardRenderer 渲染）两字段；WS 身份契约 `user_id`=openid（登录用户）；HTTP 降级路径保持现状。
+P11（线 5）：消费 DONE 事件 `token_usage`（会话计费本地累加：单轮用量进回复气泡 footer 与「深度分析」按钮同行、灰色弱化；会话列表徽标本地优先 + 服务端补足，未登录也显示本地用量）与 `cards`（5 类卡片经 CardRenderer 渲染）两字段；HTTP 降级路径保持现状。
+
+P0 身份鉴权（2026-08-11）：WS 握手改经 app-api 桥接（`createAgentWebSocket` URL 带 `?token=`，服务端验签；非法/过期 token 拒绝 4401），`user_id` 改由服务端注入（客户端 WS/HTTP 消息体一律不再携带，未登录为 null）——计费/落库身份从此可信。
 
 ## 页面
 - `pages/index.vue` - AI 对话主页面（主包，仅重定向到子包对话页）
@@ -23,6 +25,8 @@ P11（线 5）：消费 DONE 事件 `token_usage`（会话计费本地累加：�
 
 ## Hooks
 - 使用 `shared/utils/useChatStream.ts`（对话流主 hook：WS 为主、HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`；P3-fix 起订阅 reasoning 事件按节点聚合 `reasoningSteps`）
+- `useChatStream` 问题 15 断点续传：socket 模块级单例（页面 onUnmounted 不再 disconnect）；`isConnected()` / `hasPendingRun()` / `resume()`（回页自动补全 + none 兜底自动重发）
+- `useChatStream` 打断/停止/重试（Phase 2 Part 2）：`stop()`（发 stop 控制消息 + 清流式）/ `retry()`（重发最后 user 消息）/ `hasStoppedRun()`（error/cancelled 终态判定）；handleWsMessage 新增 `stop_status` 与 `cancelled` 分支；聊天页「发送」在 isStreaming 时替换为「停止」，error/cancelled 消息气泡显示「重试」
 - 事件树重组纯函数 `shared/utils/buildExecTree.ts`
 - `shared/utils/parseMarkdownSections.ts` - 改进 14：markdown 分节识别纯函数（按 ## / ### 标题切分 + 变体分类，供 index.vue SectionCard 渲染）
 

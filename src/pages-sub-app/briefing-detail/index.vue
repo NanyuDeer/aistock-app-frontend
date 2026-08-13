@@ -11,11 +11,18 @@
       </view>
 
       <template v-else>
-        <AudioPlayer
-          v-if="audioUrl"
-          class="broadcast-audio-player"
-          :src="audioUrl"
-        />
+        <!-- 音频入口条：音频统一由全局悬浮窗（FloatingPodcast）承载，与列表页同一会话，
+             详情→列表/列表→详情切换时悬浮球持续播放不中断（独立 AudioPlayer 已移除——
+             两套音频引擎并存会导致返回列表时内嵌播放器卸载即停止） -->
+        <view v-if="audioPath" class="audio-bar">
+          <view class="play-btn" @tap.stop="togglePlay">
+            <SvgIcon :name="isPlaying ? 'pause-fill' : 'play-fill'" size="40rpx" color="#ffffff" />
+          </view>
+          <view class="audio-info">
+            <text class="audio-status">{{ audioStatusText }}</text>
+            <text class="audio-meta">{{ typeLabel }}播报 · 由悬浮球承载</text>
+          </view>
+        </view>
 
         <view class="dialogue-list">
           <view
@@ -60,10 +67,9 @@ import { onLoad } from '@dcloudio/uni-app'
 import { agentApi, type BriefType, type BroadcastV1 } from '@/shared/api/modules/agent'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import AudioPlayer from '@/shared/components/AudioPlayer.vue'
+import { usePodcastStore } from '@/shared/store/modules/podcast'
 import { parseBroadcastReport } from '@/shared/utils/broadcastReport'
 import { normalizeBriefingType } from '@/shared/utils/briefingDetail'
-import { API_BASE_URL } from '@/shared/utils/constants'
 import { addCalendarDays, shanghaiDateString } from '@/shared/utils/tradingTime'
 
 const currentDate = ref('')
@@ -74,12 +80,40 @@ const loading = ref(true)
 const typeLabel = computed(() => briefType.value === 'morning' ? '晨报' : '晚报')
 const pageTitle = computed(() => `${typeLabel.value}双人播报`)
 const subtitle = computed(() => `${currentDate.value} · AI 生成内容，仅供参考`)
-const audioUrl = computed(() => {
-  const audioPath = broadcast.value?.audio_path
-  if (!audioPath) return ''
-  const filename = audioPath.split('/').pop() || ''
-  return `${API_BASE_URL}/agent/audio/${filename}`
+const audioPath = computed(() => broadcast.value?.audio_path || '')
+
+/** 播放状态来自悬浮窗 store（FloatingPodcast AudioPlayer 事件同步），页面内按钮与悬浮球状态一致 */
+const podcastStore = usePodcastStore()
+const isPlaying = computed(() => podcastStore.playing)
+const audioStatusText = computed(() => {
+  if (!audioPath.value) return '语音生成中...'
+  return isPlaying.value ? '播放中' : '点击播放'
 })
+
+/**
+ * 播放/暂停：音频统一由全局悬浮窗（FloatingPodcast）承载，与列表页同一会话。
+ * 播放状态、进度、暂停/继续都在悬浮窗内，页面切到列表/返回后状态不丢。
+ */
+function togglePlay() {
+  if (!audioPath.value) {
+    uni.showToast({ title: '语音生成中', icon: 'none' })
+    return
+  }
+  const filename = audioPath.value.split('/').pop() || ''
+  // 与列表页（briefing/index.vue）同一缓存 key：同一音频视为同一会话，不重置进度
+  const key = `briefing-${briefType.value}-${currentDate.value}`
+  if (podcastStore.playing) {
+    podcastStore.pause()
+    return
+  }
+  if (podcastStore.status === 'ready' && podcastStore.cacheKey === key) {
+    podcastStore.resume()
+    return
+  }
+  const label = briefType.value === 'morning' ? 'AI 早报' : 'AI 晚报'
+  // 传相对路径：FloatingPodcast 按 API 前缀（/api）拼接完整地址，与 generatePodcast 返回格式一致
+  podcastStore.playDirect(`/api/agent/audio/${filename}`, key, label, 0)
+}
 
 async function loadBroadcast() {
   loading.value = true
@@ -124,38 +158,47 @@ onLoad((options) => {
   font-size: $font-size-sm;
 }
 
-/* 详情页只保留播放控制：去掉标题行，并收紧三个圆形按钮，避免抢占对话内容空间。 */
-:deep(.broadcast-audio-player) {
-  margin-bottom: 28rpx;
+/* 音频入口条：点击播放/暂停（音频由全局悬浮球承载） */
+.audio-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 28rpx 32rpx;
+  background: #ffffff;
+  margin-bottom: 24rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid $line;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-:deep(.broadcast-audio-player .as-audio-player__controls) {
-  gap: 36rpx;
-  margin-bottom: 12rpx;
+.play-btn {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: $primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-:deep(.broadcast-audio-player .as-audio-player__btn--side) {
-  width: 64rpx;
-  height: 64rpx;
+.audio-info {
+  flex: 1;
+  min-width: 0;
 }
 
-:deep(.broadcast-audio-player .as-audio-player__btn--main) {
-  width: 88rpx;
-  height: 88rpx;
+.audio-status {
+  font-size: 28rpx;
+  color: $ink;
+  font-weight: 600;
+  display: block;
 }
 
-:deep(.broadcast-audio-player .as-audio-player__btn-icon) {
-  width: 30rpx;
-  height: 30rpx;
-}
-
-:deep(.broadcast-audio-player .as-audio-player__btn-icon--main) {
-  width: 38rpx;
-  height: 38rpx;
-}
-
-:deep(.broadcast-audio-player .as-audio-player__progress) {
-  height: 32rpx;
+.audio-meta {
+  font-size: 22rpx;
+  color: #9ca3af;
+  margin-top: 4rpx;
+  display: block;
 }
 
 .dialogue-list {

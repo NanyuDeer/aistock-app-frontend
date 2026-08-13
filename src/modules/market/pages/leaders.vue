@@ -176,13 +176,23 @@ const CYCLE_OPTIONS = [
 
 const activeCycle = ref<'long' | 'short'>('long')
 
-/** 当前档位展示的板块：长线按 long_term_days 降序 top8、短线按 short_term_days 降序 top8。
+/** 当前档位展示的板块：长线按 long_term_days 降序、短线按 short_term_days 降序 top8。
  * 先过滤掉该档位天数为 0 的板块（另一链被裁剪或长短线均不成立的板块），
- * 再取天数最高的 8 个——宁少勿滥，避免短线档塞满 0 天补位板块。 */
+ * 再取天数最高的 8 个——宁少勿滥，避免短线档塞满 0 天补位板块。
+ * 同影响天数时按上榜次数降序（短线 freq20 / 长线 frequency），
+ * 与后端 applyDualRankings 口径一致，不依赖后端返回顺序。 */
 const displaySectors = computed(() =>
   [...sectors.value]
     .filter(s => getSectorDays(s, activeCycle.value) > 0)
-    .sort((a, b) => getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value))
+    .sort((a, b) => {
+      const daysDiff = getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value)
+      if (daysDiff !== 0) return daysDiff
+      // 同影响天数：短线按近10日上榜次数 freq20、长线按近120日上榜次数 frequency 降序
+      const freqDiff = activeCycle.value === 'short'
+        ? Number(b.freq20 ?? 0) - Number(a.freq20 ?? 0)
+        : Number(b.frequency ?? 0) - Number(a.frequency ?? 0)
+      return freqDiff
+    })
     .slice(0, 8)
 )
 
@@ -1042,6 +1052,21 @@ onShow(() => {
 .update-time-text {
   font-size: 22rpx;
   color: #9ca3af;
+}
+
+/* 标题栏右侧按钮容器 + 播报按钮（与趋势股评分页一致，横向排列） */
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.header-podcast-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .history-btn {

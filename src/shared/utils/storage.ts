@@ -50,5 +50,11 @@ export const STORAGE_KEYS = {
   CHAT_HISTORY_BY_SESSION: 'chat_history_by_session',
   // P11 T2：会话维度 token 本地累加（key=session_id → TokenUsage）
   CHAT_SESSION_USAGE: 'chat_session_usage',
-  THEME: 'theme'
+  // Phase 4-2 Task 3：消息赞/踩反馈记录（key=message_id → ChatFeedbackRecord，v1 纯前端本地不落库）
+  CHAT_FEEDBACK: 'chat_feedback',
+  // 改进 18（批次 1）：新会话空态引导关闭标记（true=用户点「不再显示」，持久化；全局生效）
+  CHAT_EMPTY_GUIDE_CLOSED: 'chat_empty_guide_closed',
+  THEME: 'theme',
+  // 播报连续播放开关（持久化；true=连续排队，false/缺省=互斥）
+  PODCAST_CONTINUOUS: 'podcast_continuous'
 } as const

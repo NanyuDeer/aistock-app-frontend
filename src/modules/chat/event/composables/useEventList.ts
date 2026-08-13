@@ -12,7 +12,6 @@
 import { ref, computed } from 'vue'
 import type { EventItem, EventListParams } from '../types'
 import { getEventList } from '../api/eventApi'
-import { enrichAffectedIndustries } from '../api/eventService'
 import { DEFAULT_PAGE_SIZE } from '../constants'
 
 export function useEventList() {
@@ -71,18 +70,9 @@ export function useEventList() {
         filtered = filtered.filter(e => e.isFollowed)
       }
 
-      // 【临时方案】补充 Top5 受影响行业数据
-      // 未来删除：当后端列表接口直接返回 affectedIndustries 后删除此段代码
-      let enrichedEvents: EventItem[]
-      try {
-        // 【关键】enrichAffectedIndustries 返回全新的数组
-        // 每个事件对象也是新的引用，确保 Vue 响应式系统检测到变化
-        enrichedEvents = await enrichAffectedIndustries(filtered)
-      } catch (err) {
-        // 异常处理：补充失败时使用原数据
-        console.warn('[useEventList] 补充 affectedIndustries 失败:', err)
-        enrichedEvents = filtered
-      }
+      // 第三阶段：列表接口已直出 chain_summary，adapter 已生成 affectedIndustries，
+      // 不再调用 enrichAffectedIndustries（N+1 补数）。旧兼容逻辑保留在 eventService 中备用。
+      const enrichedEvents = filtered
 
       // 根据页码判断是覆盖还是追加
       if (page === 1) {

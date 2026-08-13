@@ -8,7 +8,7 @@
 - `pages/alert-analysis.vue` - AI 异动解读
 - `pages/hot-burst.vue` - 机构调研热门股
 - `pages/leaders.vue` - 长线风口（概览入口页：泡泡图 + 板块入口卡片列表，点击板块跳转详情）
-- `pages/sector-detail.vue` - 板块详情子页面（板块统计、龙头股、AI 分析、主线/上游/下游个股列表）
+- `pages/sector-detail.vue` - 板块详情子页面（板块统计、龙头股、AI 分析、主线/上游/下游个股列表）；板块详情页含近120日板块K线图（KLineChart + getBoardKline）
 - `pages/push-history.vue` - 历史推送
 
 ## 组件
@@ -24,7 +24,7 @@
 - 其他模块通过 navigateTo 跳转到异动捕手或长线风口页面
 
 ## 依赖的 shared/ 中的类型
-- `@/shared/api/modules/stock` - 股票 API（含 getTrendEvents、getWindLeaders）
+- `@/shared/api/modules/stock` - 股票 API（含 getTrendEvents、getFavoritesNews、getWindLeaders）
 - `@/shared/utils/stock` - 股票格式化工具
 - `@/shared/utils/datetime` - 日期时间格式化
 - `@/shared/components/SubPageCard.vue` - 子页面容器

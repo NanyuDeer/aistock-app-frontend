@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-type TagType = 'up' | 'down' | 'neutral' | 'warning' | 'gold'
+type TagType = 'up' | 'down' | 'neutral' | 'warning' | 'gold' | 'gray'
 type TagSize = 'sm' | 'md' | 'lg'
 
 withDefaults(defineProps<{
@@ -66,6 +66,11 @@ withDefaults(defineProps<{
 .as-tag--gold {
   background: $gold-soft;
   color: $gold-deep;
+}
+
+.as-tag--gray {
+  background: $bg-soft;
+  color: $ink-soft;
 }
 
 /* ===== Sizes ===== */

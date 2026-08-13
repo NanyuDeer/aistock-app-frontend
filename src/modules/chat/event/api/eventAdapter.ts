@@ -26,7 +26,9 @@ import type {
   GraphPosition,
   GraphNodeType,
   EventType,  // 用于 historyEvents 类型断言
+  MarketSentiment,  // 用于 direction → sentiment 转换
 } from '../types'
+import { EVENT_TYPES } from '../constants'
 
 // ==================== 后端响应类型定义 ====================
 
@@ -43,12 +45,21 @@ export interface BackendEventListData {
     eventId: string
     title: string
     source: string
+    source_name?: string
+    event_type?: string
     publishTime: string
     summary: string
     conclusion: string
     globalImportanceRank?: number | null
     globalImportanceDirection?: string | null
     globalImportanceLevel?: string | null
+    /** 前端展示专用：行业影响摘要（后端直出，旧数据缺失） */
+    chain_summary?: Array<{
+      industry: string
+      direction: string
+      impactStrength: number
+      reason?: string
+    }>
   }>
   total: number
   page: number
@@ -62,10 +73,19 @@ export interface BackendEventDetailData {
   report_type: string
   report_date: string
   user_id: string
+  /** 顶层前端展示专用行业摘要（后端直出，旧数据缺失） */
+  chain_summary?: Array<{
+    industry: string
+    direction: string
+    impactStrength: number
+    reason?: string
+  }>
   content: {
     eventId: string
     title: string
     source: string
+    source_name?: string
+    event_type?: string
     publishTime: string
     event: string
     analysis_reports: {
@@ -178,6 +198,29 @@ function buildSourceInfo(source: string): { name: string; url?: string } | undef
 }
 
 /**
+ * 构建来源展示信息（source_name 优先）。
+ *
+ * 新数据：后端返回真实 source_name（如"搜狐"）→ 直接展示，并保留原始链接供点击；
+ * 旧数据：source_name 为空 → 回退到旧的 URL/domain 解析逻辑。
+ */
+function buildSourceInfoWithName(
+  sourceName: string | undefined,
+  source: string,
+): { name: string; url?: string } | undefined {
+  if (sourceName) {
+    const info: { name: string; url?: string } = { name: sourceName }
+    if (/^https?:\/\//i.test(source)) info.url = source
+    return info
+  }
+  return buildSourceInfo(source)
+}
+
+/** 事件类型白名单兜底：非法/缺失值回退到默认类型，保证旧数据正常展示。 */
+function normalizeEventType(raw: string | undefined): EventType {
+  return EVENT_TYPES.includes(raw as EventType) ? (raw as EventType) : '产业政策'
+}
+
+/**
  * 单个事件适配
  * 将后端事件字段转换为前端 EventItem
  *
@@ -193,19 +236,21 @@ function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventI
     eventId: backendEvent.eventId,
     title: backendEvent.title,
     source: backendEvent.source,
+    sourceName: backendEvent.source_name,
     publishTime: backendEvent.publishTime,
 
-    // 来源信息：从后端 source 构建真实 sourceInfo
-    sourceInfo: buildSourceInfo(backendEvent.source),
+    // 来源信息：优先 source_name，缺失时回退 URL/domain 解析
+    sourceInfo: buildSourceInfoWithName(backendEvent.source_name, backendEvent.source),
 
     // 字段名映射
     aiSummary: backendEvent.summary,
 
-    // 降级字段（后端暂不返回）
-    // 注意：使用默认值可能误导用户，后续应与后端协商新增字段
-    eventType: '产业政策' as EventType,  // 降级默认值，无法真实反映事件类型
+    // 事件类型：真实值（白名单校验），缺失/非法回退默认
+    eventType: normalizeEventType(backendEvent.event_type),
     importance: 3,          // 降级默认值，无法真实反映事件重要性
-    affectedIndustries: [], // 列表接口无 chain，无法生成
+    // 第三阶段：优先消费后端直出的 chain_summary（旧数据缺失时回退 []）
+    affectedIndustries: extractAffectedIndustriesFromSummary(backendEvent.chain_summary),
+    chain_summary: backendEvent.chain_summary,
     isFollowed: false,      // 功能暂不实现
 
     // 透传字段
@@ -234,6 +279,11 @@ function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventI
 export function adaptEventDetail(backend: BackendEventDetailData): EventDetailResponse {
   const content = backend.content
   const analysis = content.analysis_reports
+  // 第三阶段：优先消费顶层 chain_summary（详情接口已直出），旧数据缺失回退 chain 解析
+  const chainSummary = backend.chain_summary
+  const affectedIndustries = chainSummary && chainSummary.length > 0
+    ? extractAffectedIndustriesFromSummary(chainSummary)
+    : extractAffectedIndustries(analysis.event_transmission)
 
   return {
     // 事件ID
@@ -244,14 +294,14 @@ export function adaptEventDetail(backend: BackendEventDetailData): EventDetailRe
       eventId: content.eventId,
       title: content.title,
       source: content.source,
-      sourceInfo: buildSourceInfo(content.source),
+      sourceName: content.source_name,
+      sourceInfo: buildSourceInfoWithName(content.source_name, content.source),
       publishTime: content.publishTime,
 
-      // 降级字段（后端暂不返回）
-      // 注意：使用默认值可能误导用户，后续应与后端协商新增字段
-      eventType: '产业政策' as EventType,  // 降级默认值，无法真实反映事件类型
+      // 事件类型：真实值（白名单校验），缺失/非法回退默认
+      eventType: normalizeEventType(content.event_type),
       importance: 3,          // 降级默认值，无法真实反映事件重要性
-      affectedIndustries: extractAffectedIndustries(analysis.event_transmission),
+      affectedIndustries,
       aiSummary: analysis.event_understanding?.summary || '',
       isFollowed: false,      // 功能暂不实现
     },
@@ -276,6 +326,45 @@ export function adaptEventDetail(backend: BackendEventDetailData): EventDetailRe
 }
 
 // ==================== 复杂字段生成函数 ====================
+
+/**
+ * 从 chain_summary 提取 affectedIndustries（列表接口直出路径）。
+ *
+ * chain_summary 结构（后端已降序 + Top5）：
+ *  [ { industry, direction, impactStrength, reason } ]
+ *
+ * 转换为前端 AffectedIndustry：
+ *  - industry → name
+ *  - impactStrength (0-1) → impactLevel (1-5): Math.round(impactStrength * 5)
+ *  - direction → sentiment
+ *  - impactStrength * 15 → impactPercentage（估算值）
+ *  - reason → reason
+ */
+function extractAffectedIndustriesFromSummary(
+  summary?: Array<{
+    industry: string
+    direction: string
+    impactStrength: number
+    reason?: string
+  }>,
+): AffectedIndustry[] {
+  if (!Array.isArray(summary) || summary.length === 0) return []
+
+  return summary
+    .filter((item) => item && typeof item.industry === 'string' && item.industry.trim() !== '')
+    .map((item): AffectedIndustry => ({
+      name: item.industry,
+      impactLevel: Math.round(item.impactStrength * 5),
+      sentiment: (item.direction === 'bullish' || item.direction === 'bearish')
+        ? item.direction as MarketSentiment
+        : 'neutral',
+      impactStrength: item.impactStrength,
+      impactPercentage: item.impactStrength * 15,  // 估算值
+      reason: item.reason || '',
+    }))
+    .sort((a, b) => b.impactStrength - a.impactStrength)
+    .slice(0, 5)
+}
 
 /**
  * 从 transmissionAnalysis.chain[] 提取 affectedIndustries
@@ -338,7 +427,8 @@ type TransmissionChainNodeType = {
 
 function generateGraphFromChain(chain: TransmissionChainNodeType[]): EventGraph {
   if (!chain || chain.length === 0) {
-    return { nodes: [], connections: [] }
+    // 第三阶段：chain 为空时返回带 status 标记的空图，前端展示降级文案而非空白图
+    return { nodes: [], connections: [], status: 'empty' }
   }
 
   const nodes: GraphNode[] = []

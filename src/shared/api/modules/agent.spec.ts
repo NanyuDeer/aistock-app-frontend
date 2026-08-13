@@ -190,3 +190,31 @@ test('getChatSessionUsage 失败返回空 items（不抛）', async () => {
     await server.close()
   }
 })
+
+test('createAgentWebSocket URL 携带 token query（P0 WS 握手鉴权）', async () => {
+  const server = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    resolve: { alias: { '@': path.resolve(process.cwd(), 'src') } },
+    server: { middlewareMode: true },
+    appType: 'custom',
+  })
+
+  try {
+    const savedUni = (globalThis as Record<string, unknown>).uni
+    let capturedUrl = ''
+    ;(globalThis as Record<string, unknown>).uni = {
+      getStorageSync: () => 'tok_abc',
+      connectSocket: (opts: { url: string }) => { capturedUrl = opts.url; return {} },
+    }
+    try {
+      const agentModule = await server.ssrLoadModule('/src/shared/api/modules/agent.ts')
+      agentModule.createAgentWebSocket()
+    } finally {
+      ;(globalThis as Record<string, unknown>).uni = savedUni
+    }
+    assert.match(capturedUrl, /\/chat\?token=tok_abc$/)
+  } finally {
+    await server.close()
+  }
+})

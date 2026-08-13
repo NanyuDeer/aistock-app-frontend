@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { detectMarketAnomaly, extractBreadth, buildEveningCardViewModel } from './eveningBriefCards'
+import {
+  detectMarketAnomaly,
+  extractBreadth,
+  extractAttributionSummary,
+  buildEveningCardViewModel,
+} from './eveningBriefCards'
 import type { BriefV1, MarketTraceReviewRecord } from '@/shared/api/modules/agent'
 
 function makeBrief(overrides: Partial<BriefV1> = {}): BriefV1 {
@@ -55,6 +60,8 @@ function makeReview(overrides: Partial<MarketTraceReviewRecord> = {}): MarketTra
           confidence: 'high',
           primary_chain_id: null,
           alternative_chain_id: null,
+          // 旧报告可能缺失；默认 null 保持既有用例回退到 brief 归因结论
+          attribution_summary: null,
         },
       },
     },
@@ -230,5 +237,40 @@ describe('buildEveningCardViewModel', () => {
     expect(vm.anomaly.reason).toBe('confirmed')
     expect(vm.presentation).toBeNull()
     expect(vm.breadth).toBeNull()
+  })
+
+  it('review 含 attribution_summary → 结论文本优先使用短摘要（非 brief 拼接长文本）', () => {
+    const review = makeReview()
+    review.content!.market_trace!.trace!.attribution_summary = 'AI算力与创新药业绩驱动板块领涨'
+    const vm = buildEveningCardViewModel(makeBrief(), review, '2026-08-06')
+    expect(vm.attributionConclusion).toBe('AI算力与创新药业绩驱动板块领涨')
+  })
+
+  it('review 缺失 attribution_summary → 结论文本回退到 brief 归因结论', () => {
+    const review = makeReview() // attribution_summary 默认 null
+    const vm = buildEveningCardViewModel(makeBrief(), review, '2026-08-06')
+    expect(vm.attributionConclusion).toBe('今日市场主因是科技股回调')
+  })
+})
+
+describe('extractAttributionSummary', () => {
+  it('review 含有效 attribution_summary → 返回去除首尾空白后的文本', () => {
+    const review = makeReview()
+    review.content!.market_trace!.trace!.attribution_summary = '  货币政策边际转松驱动大盘反弹  '
+    expect(extractAttributionSummary(review)).toBe('货币政策边际转松驱动大盘反弹')
+  })
+
+  it('attribution_summary 为 null → 返回空串', () => {
+    expect(extractAttributionSummary(makeReview())).toBe('')
+  })
+
+  it('attribution_summary 仅空白 → 返回空串', () => {
+    const review = makeReview()
+    review.content!.market_trace!.trace!.attribution_summary = '   '
+    expect(extractAttributionSummary(review)).toBe('')
+  })
+
+  it('review 为 null → 返回空串', () => {
+    expect(extractAttributionSummary(null)).toBe('')
   })
 })

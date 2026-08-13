@@ -11,7 +11,7 @@
     <view class="login-top">
       <view class="logo-wrap">
         <SvgIcon name="bear-smile-line" size="56rpx" color="#0b5fff" />
-        <text class="logo-text">AI Stock</text>
+        <text class="logo-text">洞见</text>
       </view>
       <text class="logo-desc">AI 智能体驱动的中长线投资助手</text>
     </view>
