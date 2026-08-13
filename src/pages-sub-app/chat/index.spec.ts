@@ -185,3 +185,23 @@ test('改进20：解析失败回退纯文本（followupOf 返回 null 时走既�
   assert.match(pageSource, /function followupOf\(msg: ChatMessage\)/)
   assert.match(pageSource, /v-else-if="msg\.content"/)
 })
+
+// ─── 改进 16（批次 1，2026-08-13）：对话滚动交互（豆包式） ───
+
+test('改进16：scroll-view 上滑检测接入（@scroll + isNearBottom 距底判定）', () => {
+  assert.match(pageSource, /@scroll="onScroll"/)
+  assert.match(pageSource, /isNearBottom/)
+  assert.match(pageSource, /followPaused/)
+})
+
+test('改进16：「回到最新」悬浮按钮（上滑暂停后显示，点击回底 + 恢复跟随）', () => {
+  assert.match(pageSource, /back-to-latest/)
+  assert.match(pageSource, /v-if="followPaused"/)
+  assert.match(pageSource, /backToLatest/)
+})
+
+test('改进16：暂停跟随期间不钉底（定时器/打字机滚动均走 scrollToBottomIfFollowing 守卫）', () => {
+  assert.match(pageSource, /scrollToBottomIfFollowing/)
+  assert.match(pageSource, /if \(followPaused\.value\) return/)
+  assert.match(pageSource, /followPaused\.value = false/)
+})

@@ -6,8 +6,8 @@
       </view>
     </template>
     <view class="chat-content">
-      <!-- 消息列表 -->
-      <scroll-view scroll-y class="message-list" :scroll-top="scrollTop">
+      <!-- 消息列表（改进 16：@scroll 上滑检测 → 距底超过阈值暂停跟随，豆包式） -->
+      <scroll-view scroll-y class="message-list" :scroll-top="scrollTop" @scroll="onScroll">
         <!-- 改进 18（批次 1）：新会话空态引导——当前会话消息为空且用户未关闭（storage 持久化）时显示；
              示例问题点击即发（复用 quickAsk）；「不再显示」写入全局标记，新建会话也不再现 -->
         <view v-if="showEmptyGuide" class="empty-guide">
@@ -163,6 +163,12 @@
         </view>
       </scroll-view>
 
+      <!-- 改进 16：上滑暂停跟随后出现的「回到最新」悬浮按钮（点击回底 + 恢复跟随） -->
+      <view v-if="followPaused" class="back-to-latest" @tap="backToLatest">
+        <SvgIcon name="arrow-down-line" size="28rpx" color="#0b5fff" />
+        <text class="back-to-latest-text">回到最新</text>
+      </view>
+
       <!-- 快捷 Skills -->
       <view class="quick-skills">
         <view class="skill-btn" @tap="quickAsk('今日大盘怎么样')">
@@ -212,9 +218,10 @@
 
 <script setup lang="ts">
 import { ref, nextTick, watch, computed, onUnmounted } from 'vue'
-import { onLoad, onShow } from '@dcloudio/uni-app'
+import { onLoad, onShow, onReady } from '@dcloudio/uni-app'
 import { useChatStream, type ConfirmOption } from '@/shared/utils/useChatStream'
 import { markdownToHtml } from '@/shared/utils/markdown'
+import { isNearBottom } from '@/shared/utils/scrollFollow'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
@@ -386,10 +393,25 @@ const isListening = ref(false)
 
 // 每次进入页面（含从会话列表返回、切会话）默认停留在对话最下方
 onShow(() => {
+  // 改进 16：进入页面默认贴底跟随（重置上滑暂停态，防旧会话残留暂停状态）
+  followPaused.value = false
   scrollToBottom()
   // 问题 15：回页时若存在未完成轮（最后一条是 user）且连接已断开 → 自动 resume 续跑
   if (chatStream.hasPendingRun() && !chatStream.isConnected()) {
     void chatStream.resume()
+  }
+})
+
+// 改进 16：测量 scroll-view 视口高度（App/H5 环境；vitest 无 uni 则跳过，判定走默认值）
+onReady(() => {
+  if (typeof uni === 'undefined') return
+  try {
+    uni.createSelectorQuery().select('.message-list').boundingClientRect((rect: unknown) => {
+      const r = rect as { height?: number } | null
+      if (r && r.height) viewportH.value = r.height
+    }).exec()
+  } catch {
+    // 测量失败保持默认值，距底判定仍可用（稍保守）
   }
 })
 
@@ -398,6 +420,62 @@ onShow(() => {
 // 时内容尚未渲染完成 → 停在上方；只有 done 重建消息列表时才真正滚到底。
 // 用 setInterval 兜底：无论内容何时渲染完成，150ms 内必被钉回底部，实现逐字跟随观感。
 let followTimer: ReturnType<typeof setInterval> | null = null
+
+// 改进 16（批次 1）：上滑检测 → 暂停跟随（豆包式）。followPaused=true 时不再钉底——
+// 150ms 定时器已停、打字机滚动被 scrollToBottomIfFollowing 守卫（内容仍生长、位置不动）；
+// 「回到最新」按钮点击后恢复跟随。
+const followPaused = ref(false)
+// scroll-view 视口高度（onReady 测量；测量失败/测试环境用默认值兜底，判定仍可用）
+const viewportH = ref(0)
+const DEFAULT_VIEWPORT_PX = 600
+
+function onScroll(e: unknown) {
+  const detail = ((e as { detail?: unknown } | null)?.detail ?? {}) as {
+    scrollTop?: unknown
+    scrollHeight?: unknown
+  }
+  const scrollTop = Number(detail.scrollTop) || 0
+  const scrollHeight = Number(detail.scrollHeight) || 0
+  const viewport = viewportH.value || DEFAULT_VIEWPORT_PX
+  if (isNearBottom(scrollTop, scrollHeight, viewport)) {
+    if (followPaused.value) resumeFollow()
+  } else if (!followPaused.value) {
+    pauseFollow()
+  }
+}
+
+function pauseFollow() {
+  followPaused.value = true
+  // 暂停跟随：停掉 150ms 钉底定时器（打字机滚动由 scrollToBottomIfFollowing 守卫）
+  if (followTimer) {
+    clearInterval(followTimer)
+    followTimer = null
+  }
+}
+
+function resumeFollow() {
+  followPaused.value = false
+  scrollToBottom()
+}
+
+/** 「回到最新」：回底 + 恢复跟随（生成中重启 150ms 钉底定时器） */
+function backToLatest() {
+  resumeFollow()
+  if (isStreaming.value) {
+    if (followTimer) clearInterval(followTimer)
+    followTimer = setInterval(scrollToBottomIfFollowing, 150)
+  }
+}
+
+// 生成节奏放缓（改进 16）：仅内容增长才滚（streamingText 长度或消息数任一变化才触发）
+let lastFollowSig = ''
+function scrollToBottomIfFollowing() {
+  if (followPaused.value) return
+  const sig = `${streamingText.value.length}:${displayMessages.value.length}`
+  if (sig === lastFollowSig) return
+  lastFollowSig = sig
+  scrollToBottom()
+}
 
 // ===== 结论打字机（light 分支结论非流式，DONE 后前端模拟逐字输出） =====
 // 后端 synth_answer 是结构化输出（SynthOutput JSON），最终回复仅 DONE 一次性下发；
@@ -440,8 +518,8 @@ function startTypewriterIfNeeded() {
   typeTimer = setInterval(() => {
     i += 2
     typedText.value = content.slice(0, i)
-    // 打字机期间内容逐字增长，保持钉在对话最下方
-    scrollToBottom()
+    // 打字机期间内容逐字增长，保持钉在对话最下方；改进 16：上滑暂停跟随时不钉底
+    scrollToBottomIfFollowing()
     if (i >= content.length) {
       stopTypewriter()
       typingMsgKey.value = null
@@ -450,7 +528,6 @@ function startTypewriterIfNeeded() {
 }
 
 watch(isStreaming, (v) => {
-  scrollToBottom()
   if (v) {
     // Phase 4-2 改进 13：confirm_response 后后端 fresh run 开始流式 → 弹框完成使命（waiting 态结束），关闭
     confirmVisible.value = false
@@ -458,14 +535,19 @@ watch(isStreaming, (v) => {
     hadStreamText = false
     stopTypewriter()
     typingMsgKey.value = null
+    // 改进 16：上滑暂停跟随后新一轮不强制钉底（等待「回到最新」按钮恢复）；
+    // 恢复跟随态时立即滚底并重启 150ms 定时器
+    if (followPaused.value) return
+    scrollToBottom()
     if (followTimer) clearInterval(followTimer)
-    followTimer = setInterval(scrollToBottom, 150)
+    followTimer = setInterval(scrollToBottomIfFollowing, 150)
   } else {
     if (followTimer) {
       clearInterval(followTimer)
       followTimer = null
     }
-    // 本轮结束：无真流式文本时用打字机逐字呈现结论
+    // 本轮结束：无真流式文本时用打字机逐字呈现结论。
+    // 改进 16：暂停跟随时打字机照常启动，但其滚动被 scrollToBottomIfFollowing 守卫（不钉底）
     startTypewriterIfNeeded()
   }
 })
@@ -637,7 +719,17 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  position: relative; /* 改进 16：容纳「回到最新」悬浮按钮的绝对定位 */
 }
+
+/* 改进 16：上滑暂停跟随后出现的「回到最新」悬浮按钮（点击回底 + 恢复跟随） */
+.back-to-latest {
+  position: absolute; right: 24rpx; bottom: 200rpx; z-index: 10;
+  display: inline-flex; align-items: center; gap: 6rpx;
+  background: #ffffff; border-radius: 32rpx; padding: 10rpx 24rpx;
+  box-shadow: $shadow-card;
+}
+.back-to-latest-text { font-size: 24rpx; color: $primary; }
 
 .message-list { flex: 1; min-height: 0; padding: 20rpx; overflow: hidden; }
 
