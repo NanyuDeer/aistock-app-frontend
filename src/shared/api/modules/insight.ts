@@ -9,6 +9,20 @@ export interface InsightDriver {
   source_ids?: string[]
 }
 
+export interface InsightEvidenceItem {
+  source_id: string
+  source_type: 'announcement' | 'news' | 'earnings' | 'rating' | 'radar_article' | 'quant'
+  provider?: string
+  title?: string
+  excerpt?: string
+  published_at?: string
+  symbol?: string
+  url?: string
+  strength?: number
+  days_offset?: number
+  time_bucket?: 'T0' | 'T1' | 'T2' | 'earnings'
+}
+
 export interface WatchlistInsight {
   event_id: string
   symbol: string
@@ -25,6 +39,8 @@ export interface WatchlistInsight {
   primary_driver?: InsightDriver | null
   secondary_drivers?: InsightDriver[]
   display_report?: { summary?: string; details?: string }
+  /** 归因依据（价格异动事件的最新证据包） */
+  evidence_package?: InsightEvidenceItem[]
   created_at?: string
   title?: string
   keywords?: string[]

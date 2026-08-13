@@ -9,6 +9,14 @@
         <text class="move-pct" v-if="detail.move_bps !== undefined" :class="detail.move_bps >= 0 ? 'pct-up' : 'pct-down'">{{ (detail.move_bps / 100).toFixed(2) }}%</text>
         <text class="move-meta">相对开盘 · {{ detail.price_source === 'kline_backfill' ? 'K线回溯' : '实时快照' }}</text>
       </view>
+      <!-- 归因依据：价格异动事件的证据包（替代一期"原始来源"文章区块） -->
+      <view v-if="detail.event_type !== 'limit_up_radar' && detail.evidence_package?.length" class="evi-box">
+        <view class="evi-title">归因依据</view>
+        <view v-for="(e, i) in detail.evidence_package" :key="e.source_id || `evi-${i}`" class="evi-item">
+          <text class="evi-tag">{{ sourceTypeText(e.source_type) }}</text>
+          <text class="evi-text">{{ e.title || e.excerpt || e.source_id }}</text>
+        </view>
+      </view>
       <view v-if="detail.primary_driver" class="driver">
         <text class="label">主导因素</text>
         <text class="value">{{ detail.primary_driver.label }}</text>
@@ -45,6 +53,16 @@ function categoryText(c: string): string {
 function confidenceText(c: string): string {
   return { high: '高置信', medium: '中置信', low: '低置信' }[c as 'high' | 'medium' | 'low'] || c
 }
+
+const SOURCE_TYPE_TEXT: Record<string, string> = {
+  announcement: '公告', news: '新闻', earnings: '业绩', rating: '研报',
+  radar_article: '涨停雷达', quant: '量化联动',
+}
+
+function sourceTypeText(t?: string): string {
+  return SOURCE_TYPE_TEXT[t || ''] || t || '来源'
+}
+
 
 /** 原始来源跳转：H5 新窗口打开，非 H5 复制链接到剪贴板（与 stock-trace 证据跳转一致） */
 function openSource() {
@@ -144,6 +162,61 @@ onLoad(async (query) => {
 .move-meta {
   font-size: $font-size-xs;
   color: $ink-soft;
+}
+
+.evi-box {
+  padding: $s-3;
+  margin-bottom: $s-2;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+}
+
+.evi-title {
+  margin-bottom: $s-2;
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: $ink;
+}
+
+.evi-item {
+  display: flex;
+  align-items: flex-start;
+  gap: $s-2;
+  padding: $s-2 0;
+  border-bottom: 2rpx solid $line;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.evi-tag {
+  flex-shrink: 0;
+  padding: 2rpx 12rpx;
+  border-radius: $r-xs;
+  font-size: $font-size-xs;
+  color: $primary;
+  background: $primary-50;
+}
+
+.evi-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.evi-text {
+  font-size: $font-size-sm;
+  color: $ink;
+  line-height: 1.5;
+}
+
+.evi-excerpt {
+  font-size: $font-size-xs;
+  color: $ink-soft;
+  line-height: 1.5;
 }
 
 .driver {
