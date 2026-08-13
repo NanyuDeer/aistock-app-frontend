@@ -1,7 +1,7 @@
 <template>
   <view class="as-audio-player">
-    <!-- 头部：封面 + 标题（标题位于按钮上方） -->
-    <view v-if="title || cover" class="as-audio-player__header">
+    <!-- 头部：封面 + 标题（标题左侧，右侧可注入操作按钮） -->
+    <view v-if="title || cover || $slots.actions" class="as-audio-player__header">
       <image
         v-if="cover"
         class="as-audio-player__cover"
@@ -9,6 +9,9 @@
         mode="aspectFill"
       />
       <text v-if="title" class="as-audio-player__title">{{ title }}</text>
+      <view v-if="$slots.actions" class="as-audio-player__actions">
+        <slot name="actions" />
+      </view>
     </view>
 
     <!-- 播放控制：快退 -10s / 播放暂停 / 快进 +10s -->
@@ -119,8 +122,11 @@ const props = withDefaults(defineProps<{
   cover?: string
   /** 是否自动播放 */
   autoplay?: boolean
+  /** 自动播放时的起始进度（秒），配合 autoplay 实现退出页面后续播 */
+  initialTime?: number
 }>(), {
-  autoplay: false
+  autoplay: false,
+  initialTime: 0,
 })
 
 const emit = defineEmits<{
@@ -331,7 +337,7 @@ watch(() => props.src, (src) => {
   playing.value = false
   setupEngine(src)
   if (src && props.autoplay) {
-    nextTick(() => engine?.play())
+    nextTick(() => playFromInitial())
   }
 })
 
@@ -339,10 +345,17 @@ onMounted(() => {
   if (props.src) {
     setupEngine(props.src)
     if (props.autoplay) {
-      nextTick(() => engine?.play())
+      nextTick(() => playFromInitial())
     }
   }
 })
+
+/** 自动播放并跳到指定进度（续播场景）；播放被浏览器拦截时静默，用户可手动点击 */
+function playFromInitial() {
+  if (!engine) return
+  if (props.initialTime > 0) engine.seek(props.initialTime)
+  engine.play()
+}
 
 onUnmounted(() => {
   engine?.destroy()
@@ -383,6 +396,14 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 头部右侧操作区（由父组件注入） */
+.as-audio-player__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: $s-1;
 }
 
 /* 控制按钮 */

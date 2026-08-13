@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard title="个股情报">
+  <SubPageCard title="自选股情报">
     <view class="event-catcher-content">
       <!-- 周期筛选 -->
       <view class="filter-bar">

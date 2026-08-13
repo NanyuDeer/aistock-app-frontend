@@ -81,7 +81,7 @@
           </view>
           <view class="dim-metrics">
             <text v-for="(value, key) in dim.keyMetrics" :key="key" class="metric-item">
-              {{ formatMetricKey(key) }}: {{ value }}
+              {{ formatMetricKey(String(key)) }}: {{ value }}
             </text>
           </view>
         </view>

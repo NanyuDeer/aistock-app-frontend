@@ -92,7 +92,7 @@
     {
       "path": "modules/market/pages/event-catcher",
       "style": {
-        "navigationBarTitleText": "个股情报",
+        "navigationBarTitleText": "自选股情报",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
@@ -127,7 +127,7 @@
     {
       "path": "modules/market/pages/hot-burst",
       "style": {
-        "navigationBarTitleText": "机构调研热门股",
+        "navigationBarTitleText": "机构推荐热门股",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
@@ -293,6 +293,15 @@
             "navigationStyle": "custom",
             "disableScroll": true,
             "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
+          }
+        },
+        {
+          "path": "chat/sessions",
+          "style": {
+            "navigationBarTitleText": "会话",
+            "navigationStyle": "custom",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
           }
         },
         {

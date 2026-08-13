@@ -126,3 +126,78 @@ test('candidates 缺 chain.nodes 时 trigger/transmission/result 返回空字符
   assert.equal(presentation!.primaryCause!.transmission, '')
   assert.equal(presentation!.primaryCause!.result, '')
 })
+
+test('toMarketTracePresentation 映射 prediction_validation 字段', () => {
+  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
+  record.content.market_trace!.trace!.prediction_validation = {
+    status: 'partial',
+    sector_hits: [
+      { sector: '券商', morning_direction: 'bullish', actual_direction: 'bearish', result: 'miss', deviation_note: '政策未兑现' },
+      { sector: '军工', morning_direction: 'bullish', actual_direction: 'bullish', result: 'hit' },
+    ],
+    event_hits: [
+      { event_title: '政治局会议', morning_direction: 'bullish', actual_impact: '利好兑现', result: 'hit', note: '符合预期' },
+    ],
+    overall_note: '部分偏离',
+  }
+  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.ok(presentation!.predictionValidation, 'predictionValidation 不应为 null')
+  assert.equal(presentation!.predictionValidation!.status, 'partial')
+  assert.equal(presentation!.predictionValidation!.sectorHits.length, 2)
+  assert.equal(presentation!.predictionValidation!.sectorHits[0]!.sector, '券商')
+  assert.equal(presentation!.predictionValidation!.sectorHits[0]!.morningDirection, 'bullish')
+  assert.equal(presentation!.predictionValidation!.sectorHits[0]!.actualDirection, 'bearish')
+  assert.equal(presentation!.predictionValidation!.sectorHits[0]!.result, 'miss')
+  assert.equal(presentation!.predictionValidation!.sectorHits[0]!.deviationNote, '政策未兑现')
+  assert.equal(presentation!.predictionValidation!.sectorHits[1]!.result, 'hit')
+  assert.equal(presentation!.predictionValidation!.sectorHits[1]!.deviationNote, '')
+  assert.equal(presentation!.predictionValidation!.eventHits.length, 1)
+  assert.equal(presentation!.predictionValidation!.eventHits[0]!.eventTitle, '政治局会议')
+  assert.equal(presentation!.predictionValidation!.eventHits[0]!.morningDirection, 'bullish')
+  assert.equal(presentation!.predictionValidation!.eventHits[0]!.actualImpact, '利好兑现')
+  assert.equal(presentation!.predictionValidation!.eventHits[0]!.result, 'hit')
+  assert.equal(presentation!.predictionValidation!.eventHits[0]!.note, '符合预期')
+  assert.equal(presentation!.predictionValidation!.overallNote, '部分偏离')
+})
+
+test('prediction_validation 缺失时 predictionValidation 为 null', () => {
+  // record0723 fixture 不含 prediction_validation 字段
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+  )
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.equal(presentation!.predictionValidation, null)
+})
+
+test('7-23 rejected reason 输出中文关键词而非原始 ID', () => {
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+  )
+  assert.ok(presentation)
+
+  // global_risk_liquidity rejected，counter_evidence_ids=['SECTORS_ALL']
+  const rejectedGlobal = presentation!.rejected.find(r => r.categoryId === 'global_risk_liquidity')!
+  assert.equal(rejectedGlobal.status, 'rejected')
+  assert.equal(rejectedGlobal.reason, '存在反证：板块数据')
+
+  // domestic_macro_policy weak（未被 alternative 指向），counter_evidence_ids=['SECTORS_ALL']
+  const rejectedPolicy = presentation!.rejected.find(r => r.categoryId === 'domestic_macro_policy')!
+  assert.equal(rejectedPolicy.status, 'weak')
+  assert.equal(rejectedPolicy.reason, '证据较弱，反证：板块数据')
+})
+
+test('7-23 alternatives counterEvidence 输出中文关键词', () => {
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+  )
+  assert.ok(presentation)
+
+  // market_positioning_liquidity alternative，counter_evidence_ids=['MAIN_FORCE_ALL']
+  const alt = presentation!.alternatives.find(a => a.categoryId === 'market_positioning_liquidity')!
+  // counterEvidence 字段仍存原始 ID（presentation 数据层不动）
+  assert.deepEqual(alt.counterEvidence, ['MAIN_FORCE_ALL'])
+})

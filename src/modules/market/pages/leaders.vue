@@ -1,13 +1,31 @@
 <template>
-  <SubPageCard title="长线风口">
+  <SubPageCard title="风口龙头">
     <template #header-right>
-      <view class="history-btn" @tap="goPushHistory">
-        <text class="history-btn-text">历史推送</text>
+      <view class="header-right-actions">
+        <view class="header-podcast-btn" @tap="openPodcast('风口龙头播报')">
+          <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
+        </view>
+        <view class="history-btn" @tap="goPushHistory">
+          <text class="history-btn-text">历史推送</text>
+        </view>
       </view>
     </template>
     <view class="leaders-content">
       <!-- 引导卡片：点击查看今日分析报告 -->
       <GuideCard title="点击查看今日分析报告" icon-name="file-line" theme="brand" @click="goAgentReport" />
+
+      <!-- 长线/短线风口两档切换 -->
+      <view v-if="sectors.length" class="cycle-tabs">
+        <view
+          v-for="opt in CYCLE_OPTIONS"
+          :key="opt.value"
+          class="cycle-tab"
+          :class="{ active: activeCycle === opt.value }"
+          @tap="activeCycle = opt.value as 'long' | 'short'"
+        >
+          <text class="cycle-tab-text">{{ opt.label }}</text>
+        </view>
+      </view>
 
       <Card v-if="errorMessage" class="state-section">
         <EmptyState :title="errorMessage" description="请检查网络连接后重新加载">
@@ -17,15 +35,15 @@
         </EmptyState>
       </Card>
 
-      <LoadingState v-else-if="loading && !sectors.length" text="正在加载长线风口数据..." />
+      <LoadingState v-else-if="loading && !sectors.length" text="正在加载风口龙头数据..." />
 
-      <EmptyState v-else-if="!sectors.length" title="暂无长线风口数据" description="数据更新后将在这里展示" />
+      <EmptyState v-else-if="!sectors.length" title="暂无风口龙头数据" description="数据更新后将在这里展示" />
 
       <!-- 风口概念泡泡图 -->
-      <view v-if="sectors.length" class="bubble-card">
+      <view v-if="displaySectors.length" class="bubble-card">
         <view class="bubble-title-row">
-          <text class="bubble-title">风口概念</text>
-          <text class="bubble-hint">泡泡越大持续性越强</text>
+          <text class="bubble-title">{{ activeCycle === 'long' ? '长线风口概念' : '短线风口概念' }}</text>
+          <text class="bubble-hint">泡泡越大持续越久，颜色越深确定性越高</text>
         </view>
         <view class="bubble-wrap" :style="{ height: bubbleHeight + 'px' }">
           <view
@@ -39,18 +57,23 @@
             <text
               class="bubble-change"
               :style="{ fontSize: (b.fontSize - 3) + 'px' }"
-              :class="b.change >= 0 ? 'up' : 'down'"
             >
-              {{ b.change >= 0 ? '+' : '' }}{{ b.change.toFixed(2) }}%
+              {{ b.days }}天
             </text>
           </view>
         </view>
       </view>
 
+      <EmptyState
+        v-else-if="sectors.length"
+        :title="cycleEmptyTitle"
+        description="该档位暂无板块数据"
+      />
+
       <!-- 板块列表（入口卡片，点击进入板块详情子页面） -->
-      <view v-if="sectors.length" class="sector-list">
+      <view v-if="displaySectors.length" class="sector-list">
       <view
-        v-for="(sector, idx) in sectors"
+        v-for="(sector, idx) in displaySectors"
         :key="sector.code || idx"
         class="stats-card sector-entry"
         @tap="goSectorDetail(sector)"
@@ -61,12 +84,17 @@
             <Badge size="sm">No.{{ idx + 1 }}</Badge>
             <text class="stats-name">{{ sector.name }}</text>
             <Tag
-              v-if="persistenceText(sector)"
-              :type="persistenceTagType(sector)"
+              v-if="activeCycle === 'long' && logicTypeText(sector)"
+              :type="logicTypeTagType(sector)"
               size="sm"
-            >{{ persistenceText(sector) }}</Tag>
+            >{{ logicTypeText(sector) }}</Tag>
+            <Tag
+              v-if="activeCycle === 'short' && heatStageText(sector)"
+              :type="heatStageTagType(sector)"
+              size="sm"
+            >{{ heatStageText(sector) }}</Tag>
           </view>
-          <Badge v-if="sector.frequency" size="sm">上榜 {{ sector.frequency }} 次</Badge>
+          <Badge v-if="boardCount(sector) > 0" size="sm">上榜 {{ boardCount(sector) }} 次</Badge>
         </view>
         <!-- 统计行 -->
         <StatGrid class="leader-stat-grid" :items="sectorStatItems(sector)" :columns="4" />
@@ -110,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, getCurrentInstance } from 'vue'
+import { ref, computed, getCurrentInstance, watch, nextTick } from 'vue'
 import { onShow, onReady } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderAiAnalysis, WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
@@ -119,6 +147,10 @@ import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
+import { useReportPodcast } from '@/shared/utils/useReportPodcast'
+import { calcBubbleOpacity, calcBubbleRadius, getSectorDays, getSectorStrength } from '@/modules/market/utils/windLeaderBubble'
+
+const { loadPodcast, openPodcast } = useReportPodcast('wind_leader')
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -130,11 +162,31 @@ const favoriteSet = ref<Set<string>>(new Set())
 interface Bubble {
   name: string
   change: number
-  score: number
-  persistence: string
-  radius: number  // px 半径
+  days: number     // 该档位持续天数（长线=long_term_days，短线=short_term_days）
+  radius: number   // px 半径
+  opacity: number  // 颜色深浅（长线=置信度，短线=热度）
   fontSize: number
 }
+
+// ===== 长线/短线风口两档切换（无"全部"档；both 同时归属两档） =====
+const CYCLE_OPTIONS = [
+  { label: '长线风口榜', value: 'long' },
+  { label: '短线风口榜', value: 'short' },
+]
+
+const activeCycle = ref<'long' | 'short'>('long')
+
+/** 当前档位展示的板块：长线=cycle∈{long,both}；短线=cycle∈{short,both}；缺省按 short 兼容存量 */
+const displaySectors = computed(() =>
+  activeCycle.value === 'long'
+    ? sectors.value.filter(s => s.cycle === 'long' || s.cycle === 'both')
+    : sectors.value.filter(s => (s.cycle ?? 'short') === 'short' || s.cycle === 'both')
+)
+
+/** 切换档位为空时的标题 */
+const cycleEmptyTitle = computed(() =>
+  activeCycle.value === 'long' ? '暂无长线风口数据' : '暂无短线风口数据'
+)
 
 // 泡泡布局结果
 interface BubbleLayout extends Bubble {
@@ -159,7 +211,7 @@ try {
 // onReady 中测量 .bubble-wrap 的实际渲染宽度并修正 containerWidth。
 // 上面 getSystemInfoSync() 只能拿到 windowWidth，无法感知 App 端 zoom:1.2 缩放等
 // 导致的实际容器宽度差异，这里用 boundingClientRect 拿到真实渲染宽度兜底。
-onReady(() => {
+function measureBubbleWidth() {
   const instance = getCurrentInstance()
   const query = uni.createSelectorQuery()
   if (instance?.proxy) {
@@ -176,32 +228,30 @@ onReady(() => {
       }
     })
     .exec()
-})
-
-// 根据持续性决定半径，放大泡泡尺寸
-function calcRadius(persistence: string, score: number): number {
-  let base = 26 // 短期
-  if (persistence.includes('长期')) base = 58
-  else if (persistence.includes('中期')) base = 42
-  // score 微调
-  base += (score - 50) * 0.08
-  return Math.max(22, Math.min(65, Math.round(base)))
 }
 
+onReady(measureBubbleWidth)
+
+// sectors 异步加载完成后，.bubble-wrap 才进入 DOM（v-if="sectors.length"），
+// onReady 时测量不到，需在数据首次到达后重新测量。
+watch(sectors, (val) => {
+  if (val.length) {
+    nextTick(measureBubbleWidth)
+  }
+})
+
 const bubbleData = computed<Bubble[]>(() => {
-  const source = sectors.value.slice(0, 10).map(s => ({
-    name: s.name,
-    change: s.today_change ?? 0,
-    score: s.score ?? 50,
-    persistence: typeof s.ai_analysis === 'object'
-      ? s.ai_analysis?.persistence || '短期'
-      : '短期',
-  }))
-  return source.map(s => {
-    const r = calcRadius(s.persistence, s.score)
+  const kind = activeCycle.value
+  return displaySectors.value.slice(0, 10).map(s => {
+    const days = getSectorDays(s, kind)
+    const strength = getSectorStrength(s, kind)
+    const r = calcBubbleRadius(kind, days)
     return {
-      ...s,
+      name: s.name,
+      change: s.today_change ?? 0,
+      days,
       radius: r,
+      opacity: calcBubbleOpacity(kind, strength),
       fontSize: r > 50 ? 14 : (r > 38 ? 12 : 10),
     }
   })
@@ -322,9 +372,9 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
   return nodes.map(n => ({ ...n, x: n.x, y: n.y }))
 })
 
-// 颜色：基于score，从浅蓝到深蓝（匹配网页版）
+// 颜色：基于置信度/热度深浅（长线=置信度，短线=热度），从浅蓝到深蓝（匹配网页版）
 function bubbleItemStyle(b: BubbleLayout) {
-  const ratio = Math.max(0, Math.min(1, (b.score - 40) / 60))
+  const ratio = Math.max(0, Math.min(1, (b.opacity - 0.4) / 0.6))
   // 浅蓝 #bfdbfe → 深蓝 #1d4ed8
   const r = Math.round(191 + (29 - 191) * ratio)
   const g = Math.round(219 + (78 - 219) * ratio)
@@ -337,7 +387,7 @@ function bubbleItemStyle(b: BubbleLayout) {
     top: b.y - b.radius + 'px',
     background: fillColor,
     borderColor: '#ffffff',
-    opacity: '0.9',
+    opacity: b.opacity.toFixed(2),
   }
 }
 
@@ -357,7 +407,7 @@ async function loadData() {
   if (loading.value) return
   loading.value = true
   try {
-    const data = await stockApi.getWindLeaders(10)
+    const data = await stockApi.getWindLeaders(20)
     const hotSectors = Array.isArray(data?.hot_sectors) ? data.hot_sectors : []
     sectors.value = hotSectors.filter(
       (sector): sector is WindLeaderSector => Boolean(sector && typeof sector.name === 'string' && sector.name.trim())
@@ -416,31 +466,32 @@ function formatNetInflow(val?: number | null): string {
   return Math.round(val) + '万'
 }
 
-// 持续性标签提取（只显示"短期"/"中期"/"长期"）
-function persistenceText(sector: WindLeaderSector): string {
-  const ai = sector.ai_analysis
+// ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
+/** 上榜次数：短线档显示近20日 freq20，长线档显示近60日 frequency */
+function boardCount(s: WindLeaderSector): number {
+  return activeCycle.value === 'short' ? Number(s.freq20 ?? 0) : Number(s.frequency ?? 0)
+}
+
+/** 短线热度阶段标签（heat_stage：启动期/发酵期/高潮期/衰退期），高潮期用 warning 色、其余品牌色 */
+function heatStageText(s: WindLeaderSector): string {
+  const ai = s.ai_analysis
   if (!ai || typeof ai === 'string') return ''
-  const raw = (ai as WindLeaderAiAnalysis).persistence || ''
-  if (raw.includes('长期')) return '长期'
-  if (raw.includes('中期')) return '中期'
-  if (raw.includes('短期')) return '短期'
-  return raw
+  return ai.heat_stage || ''
 }
 
-function persistenceClass(sector: WindLeaderSector): string {
-  const tag = persistenceText(sector)
-  if (tag.includes('长期')) return 'long-term'
-  if (tag.includes('中期')) return 'mid-term'
-  if (tag.includes('短期')) return 'short-term'
-  return ''
+function heatStageTagType(s: WindLeaderSector): 'down' | 'warning' {
+  return heatStageText(s) === '高潮期' ? 'warning' : 'down'
 }
 
-function persistenceTagType(sector: WindLeaderSector): 'down' | 'neutral' | 'warning' {
-  const tag = persistenceText(sector)
-  if (tag.includes('长期')) return 'down'
-  if (tag.includes('中期')) return 'neutral'
-  if (tag.includes('短期')) return 'warning'
-  return 'neutral'
+/** 长线逻辑类型标签（logic_type：政策/业绩/资金/无支撑），无支撑用 warning 色、其余品牌色 */
+function logicTypeText(s: WindLeaderSector): string {
+  const ai = s.ai_analysis
+  if (!ai || typeof ai === 'string') return ''
+  return ai.logic_type || ''
+}
+
+function logicTypeTagType(s: WindLeaderSector): 'down' | 'warning' {
+  return logicTypeText(s) === '无支撑' ? 'warning' : 'down'
 }
 
 function sectorStatItems(sector: WindLeaderSector): StatGridItem[] {
@@ -539,6 +590,8 @@ function goSectorDetail(sector: WindLeaderSector) {
 
 onShow(() => {
   loadData()
+  // 静默预拉取播报稿，保证标题栏播报按钮可即时使用
+  void loadPodcast()
 })
 </script>
 
@@ -627,6 +680,39 @@ onShow(() => {
   display: flex;
   flex-direction: column;
   gap: 20rpx;
+}
+
+/* 长线/短线风口两档切换 */
+.cycle-tabs {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.cycle-tab {
+  flex: 1;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+  background: $bg-card;
+}
+
+.cycle-tab.active {
+  border-color: $primary-color;
+  background: rgba(11, 95, 255, 0.06);
+}
+
+.cycle-tab-text {
+  font-size: 28rpx;
+  color: $text-color-secondary;
+}
+
+.cycle-tab.active .cycle-tab-text {
+  color: $primary-color;
+  font-weight: 600;
 }
 
 /* stats-card 卡片（与板块详情页一致） */

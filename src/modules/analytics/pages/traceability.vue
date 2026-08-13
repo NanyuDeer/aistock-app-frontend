@@ -26,7 +26,7 @@
       <view v-else class="report-content">
         <MarketTraceHeader :presentation="presentation" />
         <MarketTracePhenomenon :presentation="presentation" />
-        <MarketTraceTimeline :presentation="presentation" :layout="timelineLayout" />
+        <MarketTraceTimeline :presentation="presentation" />
         <MarketTraceAlternatives :presentation="presentation" />
         <MarketTraceRejected :presentation="presentation" />
         <MarketTracePendingRisks :presentation="presentation" />
@@ -54,7 +54,6 @@ import { LoadingState, EmptyState, Button, Card } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
 import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import { markdownToHtml } from '@/shared/utils/markdown'
-import { useResponsive } from '@/shared/utils/useResponsive'
 import { toMarketTracePresentation, type MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 import MarketTraceHeader from '@/modules/analytics/components/MarketTraceHeader.vue'
 import MarketTracePendingRisks from '@/modules/analytics/components/MarketTracePendingRisks.vue'
@@ -68,11 +67,6 @@ const error = ref(false)
 const presentation = ref<MarketTracePresentation | null>(null)
 const reportAvailability = ref<'pending' | 'failed' | null>(null)
 const showMarkdown = ref(false)
-
-const { breakpoint } = useResponsive()
-const timelineLayout = computed<'vertical' | 'horizontal'>(() => {
-  return breakpoint.value === 'sm' ? 'vertical' : 'horizontal'
-})
 
 const markdownHtml = computed(() => {
   return presentation.value ? markdownToHtml(presentation.value.markdownDetails) : ''
