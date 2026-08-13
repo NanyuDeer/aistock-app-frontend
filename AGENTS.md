@@ -103,7 +103,7 @@ src/
 │   │   ├── useWebSocket.ts    # WebSocket hook
 │   │   ├── useTimer.ts        # 定时器 hook
 │   │   ├── usePushNotification.ts # 推送通知 hook
-│   │   ├── constants.ts       # 常量（AGENT_WS_BASE_URL fallback 本地 8000，P3-fix-2）
+│   │   ├── constants.ts       # 常量（AGENT_WS_BASE_URL 本地开发 fallback，P3-fix-2）
 │   │   ├── stock.ts           # 股票工具
 │   │   ├── tradingTime.ts     # 交易时间
 │   │   ├── datetime.ts        # 日期时间
