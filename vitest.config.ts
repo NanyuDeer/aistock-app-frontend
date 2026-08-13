@@ -62,6 +62,7 @@ export default defineConfig({
       'src/modules/favorites/pages/insight-detail.spec.ts',
       'src/modules/favorites/components/AlertContent.spec.ts',
       'src/shared/components/ConfirmSheet.spec.ts',
+      'src/modules/chat/pages/chat-report-detail.spec.ts',
     ],
   },
 })
