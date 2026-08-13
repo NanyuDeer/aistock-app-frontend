@@ -330,6 +330,26 @@ export interface AlertReportRecord {
   }
 }
 
+/** 深度分析报告 DB 记录（GET /api/agent/report/chat/:reportId 返回；不存在/非本人/过期 → null） */
+export interface ChatAnalysisReport {
+  /** API 返回的数据库主键（后端 BIGSERIAL 归一为 Number，兼容旧字符串格式） */
+  id: string | number
+  report_type: string
+  report_date: string
+  status?: string
+  data_source?: string | null
+  created_at?: string
+  content: {
+    display_report?: {
+      summary?: string
+      details?: string
+      stocks?: string[]
+      risks?: string[]
+    }
+    schema_version?: string
+  }
+}
+
 export type BriefType = 'morning' | 'evening'
 export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review'] as const
 export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
@@ -520,6 +540,17 @@ export const agentApi = {
   /** 读取分析报告（broadcast/morning/review/wind_leader/hot_burst 等）。 */
   getReport(intent: string, date: string) {
     return request.get(`/agent/report/${intent}/${date}`)
+  },
+
+  /**
+   * 读取深度分析报告详情（B2 议题 2）：GET /api/agent/report/chat/:reportId
+   * 鉴权由 request 拦截器自动注入 Bearer token；不存在/非本人/过期 → data: null。
+   * 显式解包 res.data：request.ts 拦截器对 {code:0, data:null} 会走 `data ?? response.data`
+   * 右侧返回整个对象，不显式解包则空态判断（=== null）失效。
+   */
+  async getChatAnalysisReport(reportId: string | number): Promise<ChatAnalysisReport | null> {
+    const res = await request.get<{ data: ChatAnalysisReport | null }>(`/agent/report/chat/${reportId}`)
+    return res?.data ?? null
   },
 
   /**
