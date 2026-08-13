@@ -571,12 +571,12 @@ export const stockApi = {
   },
 
   /** 获取业绩预测列表 */
-  getProfitForecastList(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
+  getProfitForecastList(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; symbols?: string }) {
     return request.get('/cn/stocks/profit-forecast', { params })
   },
 
   /** 搜索业绩预测 */
-  searchProfitForecast(params?: { keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
+  searchProfitForecast(params?: { keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; symbols?: string }) {
     return request.get('/cn/stocks/profit-forecast/search', { params })
   },
 
