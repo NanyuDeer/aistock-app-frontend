@@ -7,6 +7,7 @@
   <view class="as-main-tabs" :style="{ paddingTop: statusBarHeight + 'px' }">
     <!-- 透明导航区域（共享，不闪烁） -->
     <view class="as-main-tabs__nav">
+      <NotificationDropdown />
       <view class="as-main-tabs__avatar" @tap="goProfile">
         <SvgIcon name="bear-smile-line" size="30rpx" color="#ffffff" />
       </view>
@@ -49,6 +50,7 @@ import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import FloatingPodcast from '@/shared/components/FloatingPodcast.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import NotificationDropdown from '@/shared/components/NotificationDropdown.vue'
 import { px2rpx, getBottomFixedHeightPx } from '@/shared/utils/layout'
 import MorningContent from '@/modules/home/components/MorningContent.vue'
 import StockContent from '@/modules/home/components/StockContent.vue'
@@ -132,7 +134,7 @@ function goProfile() {
   height: 88rpx;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 0 $s-3;
   background: transparent;
 }
