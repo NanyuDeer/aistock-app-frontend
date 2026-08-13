@@ -545,12 +545,13 @@ export const agentApi = {
   /**
    * 读取深度分析报告详情（B2 议题 2）：GET /api/agent/report/chat/:reportId
    * 鉴权由 request 拦截器自动注入 Bearer token；不存在/非本人/过期 → data: null。
-   * 显式解包 res.data：request.ts 拦截器对 {code:0, data:null} 会走 `data ?? response.data`
-   * 右侧返回整个对象，不显式解包则空态判断（=== null）失效。
+   * 拦截器语义（request.ts）：{code:0, data: report} → 解包返回 report body；
+   * {code:0, data:null} → `data ?? response.data` 走右侧，返回整个信封 {code:0, data:null}。
+   * 故判断信封（对象且含 code 键）→ 空态 null；否则返回值即报告体本身。
    */
   async getChatAnalysisReport(reportId: string | number): Promise<ChatAnalysisReport | null> {
-    const res = await request.get<{ data: ChatAnalysisReport | null }>(`/agent/report/chat/${reportId}`)
-    return res?.data ?? null
+    const res = await request.get<ChatAnalysisReport | { data: ChatAnalysisReport | null }>(`/agent/report/chat/${reportId}`)
+    return res && typeof res === 'object' && 'code' in res ? null : (res as ChatAnalysisReport)
   },
 
   /**
