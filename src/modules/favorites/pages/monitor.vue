@@ -144,13 +144,6 @@ function confidenceLabel(confidence: AlertItem['confidence']): string {
   }
 }
 
-/** 归因结果文案：已确认展示主因 label；unconfirmed 展示待验证；其余为归因中 */
-function attributionMessage(e: WatchlistInsight): string {
-  if (e.attribution_status === 'unconfirmed') return '主因待验证'
-  if (e.attribution_status === 'confirmed' && e.primary_driver?.label) return `主因：${e.primary_driver.label}`
-  return '归因中'
-}
-
 async function fetchAlerts() {
   loading.value = true
   try {
