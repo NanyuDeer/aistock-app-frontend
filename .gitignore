@@ -6,6 +6,9 @@ dist/
 *.local
 .env.local
 .env.*.local
+# env 文件不上传（仅保留 .env.example 模板）
+env/.env.development
+env/.env.production
 .idea/
 .vscode/*
 !.vscode/extensions.json
