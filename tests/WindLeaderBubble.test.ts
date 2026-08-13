@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  calcBubbleOpacity,
+  calcBubbleColor,
   calcBubbleRadius,
   getSectorDays,
   getSectorStrength,
@@ -8,19 +8,20 @@ import {
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
 
 describe('calcBubbleRadius', () => {
-  it('长线 30 天 → 44', () => expect(calcBubbleRadius('long', 30)).toBe(44))
-  it('长线 0 天 → 26', () => expect(calcBubbleRadius('long', 0)).toBe(26))
-  it('长线 90 天 → 封顶 65', () => expect(calcBubbleRadius('long', 90)).toBe(65))
-  it('短线 5 天 → 32', () => expect(calcBubbleRadius('short', 5)).toBe(32))
-  it('短线 30 天 → 62', () => expect(calcBubbleRadius('short', 30)).toBe(62))
+  it('长线 30 天 → 27.5（120 天满格线性）', () => expect(calcBubbleRadius('long', 30)).toBe(27.5))
+  it('长线 0 天 → 20（下限）', () => expect(calcBubbleRadius('long', 0)).toBe(20))
+  it('长线 120 天 → 50（满格上限）', () => expect(calcBubbleRadius('long', 120)).toBe(50))
+  it('长线 90 天 → 42.5', () => expect(calcBubbleRadius('long', 90)).toBe(42.5))
+  it('短线 5 天 → 35（10 天满格）', () => expect(calcBubbleRadius('short', 5)).toBe(35))
+  it('短线 30 天 → 50（封顶）', () => expect(calcBubbleRadius('short', 30)).toBe(50))
 })
 
-describe('calcBubbleOpacity', () => {
-  it('置信度 0.8 → 0.88', () => expect(calcBubbleOpacity('long', 0.8)).toBeCloseTo(0.88))
-  it('热度 0.5 → 0.7', () => expect(calcBubbleOpacity('short', 0.5)).toBeCloseTo(0.7))
-  it('越界值收敛到 0~1', () => {
-    expect(calcBubbleOpacity('long', 2)).toBe(1)
-    expect(calcBubbleOpacity('long', -1)).toBe(0.4)
+describe('calcBubbleColor', () => {
+  it('长线 0.5 → 普通蓝', () => expect(calcBubbleColor('long', 0.5)).toBe('rgb(59, 130, 246)'))
+  it('长线 0.3 → 最浅蓝', () => expect(calcBubbleColor('long', 0.3)).toBe('rgb(219, 234, 254)'))
+  it('越界值收敛到 0.1~0.9 档位内', () => {
+    expect(calcBubbleColor('long', 2)).toBe('rgb(18, 26, 68)')
+    expect(calcBubbleColor('long', -1)).toBe('rgb(219, 234, 254)')
   })
 })
 

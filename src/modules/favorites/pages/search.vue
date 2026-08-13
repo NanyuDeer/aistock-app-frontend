@@ -146,7 +146,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockApi, type StockListItem } from '@/shared/api/modules/stock'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
@@ -161,6 +161,37 @@ const results = ref<StockListItem[]>([])
 const loading = ref(false)
 const searched = ref(false)
 const favoritesStore = useFavoritesStore()
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+// 输入实时联想：300ms 防抖后请求，展示全部匹配结果（pageSize 20）
+watch(keyword, (kw) => {
+  const value = (kw ?? '').trim()
+  if (!value) {
+    results.value = []
+    searched.value = false
+    loading.value = false
+    if (searchTimer) clearTimeout(searchTimer)
+    return
+  }
+  loading.value = true
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    void doSearch(value)
+  }, 300)
+})
+
+async function doSearch(kw: string) {
+  searched.value = true
+  try {
+    const res = await stockApi.getStockList({ keyword: kw, page: 1, pageSize: 20 })
+    results.value = res.list
+  } catch (err) {
+    console.error('[Search] error:', err)
+    results.value = []
+  } finally {
+    loading.value = false
+  }
+}
 
 // ============ 识图添加 ============
 const tab = ref<'text' | 'ocr'>('text')
@@ -190,31 +221,24 @@ const hotStocks: StockListItem[] = [
   { symbol: '601899', name: '紫金矿业', market: 'SH', industry: '有色' },
 ]
 
-async function onSearch() {
+function onSearch() {
   const kw = keyword.value.trim()
   if (!kw) {
     results.value = []
     searched.value = false
     return
   }
-
+  // 回车确认：跳过防抖立即搜索
+  if (searchTimer) clearTimeout(searchTimer)
   loading.value = true
-  searched.value = true
-  try {
-    const res = await stockApi.getStockList({ keyword: kw, page: 1, pageSize: 20 })
-    results.value = res.list
-  } catch (err) {
-    console.error('[Search] error:', err)
-    results.value = []
-  } finally {
-    loading.value = false
-  }
+  void doSearch(kw)
 }
 
 function clearKeyword() {
   keyword.value = ''
   results.value = []
   searched.value = false
+  if (searchTimer) clearTimeout(searchTimer)
 }
 
 function goDetail(symbol: string) {
@@ -329,7 +353,7 @@ async function addSelectedStocks() {
   min-height: 100%;
 }
 
-/* 文字 / 识图 Tab */
+/* 文字 / 识图 Tab（样式与风口龙头页 cycle-tab 一致） */
 .search-tabs {
   display: flex;
   gap: 16rpx;
@@ -338,18 +362,21 @@ async function addSelectedStocks() {
 
 .search-tab {
   flex: 1;
-  padding: 16rpx 0;
-  text-align: center;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+  background: $bg-card;
   font-size: 28rpx;
-  color: $ink-soft;
-  background: #ffffff;
-  border-radius: 16rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  color: $text-color-secondary;
 
   &.active {
-    color: $primary;
+    border-color: $primary-color;
+    background: rgba(11, 95, 255, 0.06);
+    color: $primary-color;
     font-weight: 600;
-    background: $primary-50;
   }
 }
 

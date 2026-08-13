@@ -148,7 +148,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
 import { useReportPodcast } from '@/shared/utils/useReportPodcast'
-import { calcBubbleOpacity, calcBubbleRadius, getSectorDays, getSectorStrength } from '@/modules/market/utils/windLeaderBubble'
+import { calcBubbleColor, calcBubbleRadius, getSectorDays, getSectorStrength } from '@/modules/market/utils/windLeaderBubble'
 
 const { loadPodcast, openPodcast } = useReportPodcast('wind_leader')
 
@@ -164,7 +164,7 @@ interface Bubble {
   change: number
   days: number     // 该档位持续天数（长线=long_term_days，短线=short_term_days）
   radius: number   // px 半径
-  opacity: number  // 颜色深浅（长线=置信度，短线=热度）
+  color: string    // 泡泡填充色（长线蓝系=置信度，短线橙红系=热度）
   fontSize: number
 }
 
@@ -176,11 +176,24 @@ const CYCLE_OPTIONS = [
 
 const activeCycle = ref<'long' | 'short'>('long')
 
-/** 当前档位展示的板块：长线=cycle∈{long,both}；短线=cycle∈{short,both}；缺省按 short 兼容存量 */
+/** 当前档位展示的板块：长线按 long_term_days 降序、短线按 short_term_days 降序 top8。
+ * 先过滤掉该档位天数为 0 的板块（另一链被裁剪或长短线均不成立的板块），
+ * 再取天数最高的 8 个——宁少勿滥，避免短线档塞满 0 天补位板块。
+ * 同影响天数时按上榜次数降序（短线 freq20 / 长线 frequency），
+ * 与后端 applyDualRankings 口径一致，不依赖后端返回顺序。 */
 const displaySectors = computed(() =>
-  activeCycle.value === 'long'
-    ? sectors.value.filter(s => s.cycle === 'long' || s.cycle === 'both')
-    : sectors.value.filter(s => (s.cycle ?? 'short') === 'short' || s.cycle === 'both')
+  [...sectors.value]
+    .filter(s => getSectorDays(s, activeCycle.value) > 0)
+    .sort((a, b) => {
+      const daysDiff = getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value)
+      if (daysDiff !== 0) return daysDiff
+      // 同影响天数：短线按近10日上榜次数 freq20、长线按近120日上榜次数 frequency 降序
+      const freqDiff = activeCycle.value === 'short'
+        ? Number(b.freq20 ?? 0) - Number(a.freq20 ?? 0)
+        : Number(b.frequency ?? 0) - Number(a.frequency ?? 0)
+      return freqDiff
+    })
+    .slice(0, 8)
 )
 
 /** 切换档位为空时的标题 */
@@ -251,7 +264,7 @@ const bubbleData = computed<Bubble[]>(() => {
       change: s.today_change ?? 0,
       days,
       radius: r,
-      opacity: calcBubbleOpacity(kind, strength),
+      color: calcBubbleColor(kind, strength),
       fontSize: r > 50 ? 14 : (r > 38 ? 12 : 10),
     }
   })
@@ -372,22 +385,15 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
   return nodes.map(n => ({ ...n, x: n.x, y: n.y }))
 })
 
-// 颜色：基于置信度/热度深浅（长线=置信度，短线=热度），从浅蓝到深蓝（匹配网页版）
+// 颜色：长线蓝系（置信度）/ 短线橙红系（热度），深浅由 calcBubbleColor 按强度色阶插值
 function bubbleItemStyle(b: BubbleLayout) {
-  const ratio = Math.max(0, Math.min(1, (b.opacity - 0.4) / 0.6))
-  // 浅蓝 #bfdbfe → 深蓝 #1d4ed8
-  const r = Math.round(191 + (29 - 191) * ratio)
-  const g = Math.round(219 + (78 - 219) * ratio)
-  const bl = Math.round(254 + (216 - 254) * ratio)
-  const fillColor = `rgb(${r}, ${g}, ${bl})`
   return {
     width: b.radius * 2 + 'px',
     height: b.radius * 2 + 'px',
     left: b.x - b.radius + 'px',
     top: b.y - b.radius + 'px',
-    background: fillColor,
+    background: b.color,
     borderColor: '#ffffff',
-    opacity: b.opacity.toFixed(2),
   }
 }
 
@@ -407,7 +413,7 @@ async function loadData() {
   if (loading.value) return
   loading.value = true
   try {
-    const data = await stockApi.getWindLeaders(20)
+    const data = await stockApi.getWindLeaders(40)
     const hotSectors = Array.isArray(data?.hot_sectors) ? data.hot_sectors : []
     sectors.value = hotSectors.filter(
       (sector): sector is WindLeaderSector => Boolean(sector && typeof sector.name === 'string' && sector.name.trim())
@@ -467,7 +473,7 @@ function formatNetInflow(val?: number | null): string {
 }
 
 // ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
-/** 上榜次数：短线档显示近20日 freq20，长线档显示近60日 frequency */
+/** 上榜次数：短线档显示近10日 freq20，长线档显示近120日 frequency */
 function boardCount(s: WindLeaderSector): number {
   return activeCycle.value === 'short' ? Number(s.freq20 ?? 0) : Number(s.frequency ?? 0)
 }
@@ -1046,6 +1052,21 @@ onShow(() => {
 .update-time-text {
   font-size: 22rpx;
   color: #9ca3af;
+}
+
+/* 标题栏右侧按钮容器 + 播报按钮（与趋势股评分页一致，横向排列） */
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.header-podcast-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .history-btn {

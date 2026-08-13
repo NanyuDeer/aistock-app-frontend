@@ -40,7 +40,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 
 | 页面 | 文件 | 说明 |
 |------|------|------|
-| 早点听 | `briefing/index.vue` | 结构化早晚报（音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期 |
+| 早点听 | `briefing/index.vue` | 结构化早晚报（音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期。音频纳入全局播报互斥（podcast store acquireExternal）：播放前注册、暂停/结束/卸载注销 |
 | 持仓管理 | `portfolio/index.vue` | 持仓分析 |
 | 事件传导链 | `event-chain/index.vue` | 事件传导链路可视化 |
 | 估值分析 | `valuation/index.vue` | 个股估值 |
@@ -69,6 +69,7 @@ src/
 │   │       ├── event.ts    # 事件传导链
 │   │       ├── news.ts     # 新闻资讯
 │   │       ├── portfolio.ts # 持仓
+│   │       ├── prediction.ts # 历史预测跟踪（B2.1）
 │   │       ├── push.ts     # 推送
 │   │       ├── stock.ts    # 股票行情
 │   │       └── valuation.ts # 估值
@@ -102,7 +103,7 @@ src/
 │   │   ├── useWebSocket.ts    # WebSocket hook
 │   │   ├── useTimer.ts        # 定时器 hook
 │   │   ├── usePushNotification.ts # 推送通知 hook
-│   │   ├── constants.ts       # 常量（AGENT_WS_BASE_URL fallback 本地 8000，P3-fix-2）
+│   │   ├── constants.ts       # 常量（AGENT_WS_BASE_URL 本地开发 fallback，P3-fix-2）
 │   │   ├── stock.ts           # 股票工具
 │   │   ├── tradingTime.ts     # 交易时间
 │   │   ├── datetime.ts        # 日期时间
@@ -303,12 +304,13 @@ import Card from '@/shared/components/Card.vue'
 
 | 模块文件 | 说明 | 后端路径 |
 |---------|------|---------|
-| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
+| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`；**P0 身份鉴权：`createAgentWebSocket` URL 带 `?token=`（app-api 桥接验签）、`sendMessage` 不再携带 `user_id`（服务端注入）**） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
 | `auth.ts` | 认证（登录、用户信息） | `/api/auth/wechat/*` |
 | `briefing.ts` | 早晚报结构化（BriefingItem/BriefingSummary 类型 + 降级解析适配器） | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |
 | `news.ts` | 新闻资讯 | `/api/news/*` |
 | `portfolio.ts` | 持仓管理 | `/api/portfolio/*` |
+| `prediction.ts` | 历史预测跟踪（B2.1：列表+统计/详情） | `/api/predictions`、`/api/predictions/:id` |
 | `push.ts` | 推送 | `/api/push/*` |
 | `stock.ts` | 股票行情 | `/api/cn/stock-quote/*` |
 | `valuation.ts` | 估值分析 | `/api/valuation/*` |
@@ -318,6 +320,7 @@ import Card from '@/shared/components/Card.vue'
 - 通过 `shared/utils/useWebSocket.ts` hook 使用
 - 频道按功能拆分：quote（行情）、alert（异动）、chat（对话）
 - 连接管理和事件分发在后端 `core/ws/` 处理
+- **P0 身份鉴权（chat 频道）**：`createAgentWebSocket` 连接 `{AGENT_WS_BASE_URL}/chat`（路径不变）时带 `?token=`（`uni.getStorageSync('token')`）；app-api 桥接验签——非法/过期 token 服务端拒绝（close 4401），未登录（无 token）放行但 `user_id=None`；`user_id` 由服务端注入，客户端消息体不再携带
 
 ## 7. 共享组件速查
 
@@ -347,9 +350,12 @@ import Card from '@/shared/components/Card.vue'
 | `RelationGraph.vue` | [组件库] | 关系图谱（径向布局 + 上下游/关联节点） |
 | `TheNavbar.vue` | [组件库] | 导航栏（对应组件库 `NavBar.vue`） |
 | `TheFooter.vue` | [组件库] | 页脚（对应组件库 `Footer.vue`） |
+| `KLineChart.vue` | [组件库] 无对应，从 analytics 提升 | 通用 K 线渲染（H5/APP-PLUS renderjs+klinecharts，MP-WEIXIN uCharts 画布），Props `{ title: string; data: TrendKLineData }` |
+| `AudioPlayer.vue` | [组件库] | 通用音频播放器（H5 HTMLAudioElement / App+小程序 InnerAudioContext 运行时分流），Props `{ src; title?; cover?; autoplay?; initialTime? }`，Emits `play`/`pause`/`ended`/`timeupdate`；卸载/换源时先 stop 再 destroy 确保音频立即停止（全局互斥抢占依赖此行为） |
+| `FloatingPodcast.vue` | App 专属 | 播报悬浮球/播放条（页面容器 MainTabs/SubPageCard/SubPageCard2 内渲染），消费 podcast store；渲染权跟随 `store.activePage === pageKey`（仅当前前台页面实例渲染 AudioPlayer，避免多实例双播放）。**注意：uni-app 的 onShow/onHide 是页面实例级钩子，子组件注册的永不触发——页面容器必须用 Vue 的 `onActivated`/`onDeactivated`（KeepAlive 缓存树内子组件可触发）维护 activePage，失活用 `clearActivePage(pageKey)` 防止旧页事件覆盖新页** |
 
 **已引入但尚未在生产页面使用的组件**（已存在于 `shared/components/` 并通过 barrel export 导出，需要时直接 `import { ... } from '@/shared/components'`）：
-`Switch` `Rate` `Progress` `Skeleton` `Toast` `ActionSheet` `Modal` `Steps` `StatCard` `ListCell` `QuoteHeader` `Gauge` `Sparkline` `DataTable` `IndexCard` `Timeline` `ChatBubble` `StreamingText` `AudioPlayer` `InsightListCard` `StockItem`
+`Switch` `Rate` `Progress` `Skeleton` `Toast` `ActionSheet` `Modal` `Steps` `StatCard` `ListCell` `QuoteHeader` `Gauge` `Sparkline` `DataTable` `IndexCard` `Timeline` `ChatBubble` `StreamingText` `InsightListCard` `StockItem`
 
 > **布局约束**: 所有需要预留底部空间的组件必须使用 `@/shared/utils/layout.ts` 中的函数（`getChatBarHeightPx` / `getBottomFixedHeightPx` / `getTabBarBottomPx`），禁止硬编码 rpx 值，以避免刘海屏设备底部内容被遮挡。
 
@@ -359,7 +365,9 @@ import Card from '@/shared/components/Card.vue'
 |------|------|
 | `useAuth` | 认证状态和登录/登出 |
 | `useFavorites` | 自选股增删改查 |
-| `useChatStream` | 对话流（WS 为主，HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`，P3；订阅 reasoning 聚合 `reasoningSteps` + `_testHandleWsMessage` 测试钩子，P3-fix；return `streamingReasoning` 流式实时思考链，P3-fix-2） |
+| `useChatStream` | 对话流（WS 为主，HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`，P3；订阅 reasoning 聚合 `reasoningSteps` + `_testHandleWsMessage` 测试钩子，P3-fix；return `streamingReasoning` 流式实时思考链，P3-fix-2；**P0：send 不再携带 user_id（服务端注入）；连接断开/4401 时结算挂起 send（不卡死 streaming）**；**Phase 4-2：`confirm_request` 终态处理（doneReceived 置位 + pendingConfirm ref + 结算 send promise）+ `sendConfirmResponse(request_id, choice)` 发送成功后 re-arm（doneReceived=false/streaming=true/清 progressSteps/streamingText/currentRunReasoning/currentRunEvents）**） |
+| `chatSuggestions` | 自选股联动（Phase 4-2）：`buildFavoritesQuestion`（≤5 只拼接「我的自选股里 XX、YY 怎么样」/ >5 截断提示「仅展示前 5 只」/ 空列表回退）+ `buildStockQuestion` 问 AI 跳转预填 |
+| `speechInput` | 语音容错输入侧（Phase 4-2）：`#ifdef` 平台分流（H5=Web Speech API 仅 Chrome/Edge、MP=WechatSI 插件代码就绪待真机、APP=降级提示）、判别联合 `SpeechRecognitionResult`、`isSpeechInputSupported()`、依赖注入核心供单测 |
 | `useStockCycle` | 股票周期切换 |
 | `useWebSocket` | WebSocket 连接管理 |
 | `useTimer` | 定时器管理 |

@@ -1,9 +1,12 @@
 <template>
   <!-- 播报悬浮窗：初始位于屏幕纵向 1/3 处右侧贴边；悬浮球可拖动，松手自动吸附左右边缘 -->
-  <view v-if="store.visible" class="fp-wrap" :style="wrapStyle">
+  <!-- 仅"当前前台页面"的实例渲染（页面根容器 onShow/onHide 维护 store.activePage）：
+       uni-h5 页面被 KeepAlive 缓存不卸载，多实例并存时必须避免双播放/渲染到隐藏页 -->
+  <view v-if="store.visible && store.activePage === pageKey" class="fp-wrap" :style="wrapStyle">
     <!-- 展开（ready）：播放条；收起时仅视觉隐藏（组件保持挂载，音频持续播放） -->
     <AudioPlayer
       v-if="store.status === 'ready' && store.audioUrl"
+      ref="playerRef"
       :src="fullAudioUrl"
       :title="store.title"
       :autoplay="store.autoplay"
@@ -11,9 +14,22 @@
       :class="['fp-player', { 'fp-player--hidden': !store.expanded }]"
       @play="onPlayerPlay"
       @pause="onPlayerPause"
-      @ended="onPlayerPause"
+      @ended="onPlayerEnded"
+      @unmount="onPlayerUnmount"
     >
       <template #actions>
+        <view class="fp-queue-badge" v-if="store.queue.length || store.pendingExternal">
+          <text class="fp-queue-badge-text">队列 {{ store.queue.length + (store.pendingExternal ? 1 : 0) }}</text>
+        </view>
+        <view class="fp-switch-row">
+          <text class="fp-switch-label">连续播放</text>
+          <Switch
+            :checked="store.continuousPlay"
+            :color="SWITCH_COLOR"
+            style="transform: scale(0.7)"
+            @change="onContinuousToggle"
+          />
+        </view>
         <view class="fp-icon-btn" @tap="store.collapse">
           <SvgIcon name="arrow-right-s-line" size="26rpx" color="#0b5fff" />
         </view>
@@ -60,13 +76,54 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, getCurrentInstance, onMounted, onUnmounted } from 'vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
 import { isH5 } from '@/shared/utils/platform'
 import SvgIcon from './SvgIcon.vue'
 import { Button, LoadingState, AudioPlayer } from './index'
 
 const store = usePodcastStore()
+
+/** 所属页面标识（由页面根容器 SubPageCard/SubPageCard2/MainTabs 传入）：
+ *  仅当 store.activePage === pageKey（本页面处于前台）时渲染，避免多实例双播放 */
+const props = withDefaults(defineProps<{ pageKey?: string }>(), { pageKey: '' })
+
+/** 本组件实例唯一标识：用于播放器控制句柄的归属校验（防止失活实例误清新实例注册） */
+const myId = String(getCurrentInstance()?.uid ?? '')
+
+/** AudioPlayer 实例引用：挂载后注册控制句柄到 store，供页面播放按钮暂停/继续 */
+const playerRef = ref<InstanceType<typeof AudioPlayer> | null>(null)
+
+/** AudioPlayer 挂载/卸载时同步注册播放器控制（flush:post 保证 ref 已赋值；携带实例 id 归属） */
+watch(playerRef, () => {
+  const ctrl = playerRef.value
+  if (ctrl) {
+    store.registerPlayer(myId, {
+      pause: () => ctrl.pause(),
+      play: () => ctrl.play(),
+      togglePlay: () => ctrl.togglePlay(),
+      seekTo: (t: number) => ctrl.seekTo(t),
+    })
+    // 跨页返回：AudioPlayer 重建，若存在未消费的续播点（切页前正在播放）则从记录进度自动续播。
+    // play 延迟到 nextTick：同轮刷新中旧页面播放器销毁完成后才启动，避免新旧引擎短暂并存造成双音
+    if (store.resumePending) {
+      const t = store.playbackTime
+      store.consumeResume()
+      if (t > 0) ctrl.seekTo(t)
+      nextTick(() => ctrl.play())
+    }
+  } else {
+    store.unregisterPlayer(myId)
+  }
+}, { flush: 'post' })
+
+/** AudioPlayer 卸载（页面切换/换源）前上报播放状态：记录跨页续播点（携带本实例 id 防误续播） */
+function onPlayerUnmount(state: { playing: boolean; currentTime: number }) {
+  store.suspendPlayback(state, myId)
+}
+
+/** Switch 开启色（模板环境无 SCSS 变量，按本组件 SvgIcon color="#0b5fff" 惯例取品牌色） */
+const SWITCH_COLOR = '#0b5fff'
 
 /** AudioPlayer 开始播放：同步 store 播放状态（悬浮球旋转）+ 消费自动播放标记 */
 function onPlayerPlay() {
@@ -77,6 +134,18 @@ function onPlayerPlay() {
 /** AudioPlayer 暂停/结束：同步 store 播放状态 */
 function onPlayerPause() {
   store.setPlaying(false)
+}
+
+/** AudioPlayer 结束：消费队列下一项（若队列为空则复位播放态） */
+function onPlayerEnded() {
+  store.onAudioEnded()
+}
+
+/** 连续播放开关切换：仅当状态变化时同步 store（避免 Switch 双向回写循环） */
+function onContinuousToggle(e: { detail: { value: boolean } }) {
+  if (store.continuousPlay !== e.detail.value) {
+    store.toggleContinuous()
+  }
 }
 
 /** 悬浮球尺寸（rpx）与展开面板宽度（rpx） */
@@ -131,15 +200,23 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))
 }
 
-/** H5 端 #app 等比缩放比例（视口 px → 画布 px 换算，见 h5-scale.ts）；非 H5 为 1 */
+/**
+ * 坐标空间说明：
+ * - H5：#app 有 transform（translateZ(0) scale(s)，见 h5-scale.ts），transform 创建包含块，
+ *   position:fixed 子元素相对 390×693 画布定位（非视口）。因此 winW/winH 用画布尺寸 390×693，
+ *   rpx 按 390 基准换算（1rpx = 390/750）。拖动位移需按缩放比例换算回画布空间：
+ *   屏幕位移 ÷ scale = 画布位移。用视口坐标会在大视口（>390px）时把悬浮球定位到画布外，
+ *   被 #app 的 overflow:hidden 裁剪（"跑到页面外部"）。
+ * - App/小程序：无缩放，fixed 相对屏幕，用系统 windowWidth/windowHeight，scale 恒 1。
+ */
 function getScale(): number {
-  if (!isH5) return 1
-  const s = Math.min(
+  if (!isH5 || typeof window === 'undefined') return 1
+  // 与 h5-scale.ts applyScale 同公式：scale = min(1, 视口宽/390, 视口高/693)
+  return Math.min(
     1,
     window.innerWidth / DESIGN_WIDTH,
     window.innerHeight / DESIGN_HEIGHT,
   )
-  return s > 0 ? s : 1
 }
 
 /** 统一取触点坐标（touch / mouse） */
@@ -202,7 +279,15 @@ function onMouseUp() {
 }
 
 onMounted(() => {
-  if (!isH5) {
+  if (isH5) {
+    // H5：fixed 相对 #app 画布（transform 包含块），winW/winH 用画布尺寸 390×693，
+    // rpx 按 390 基准换算（见 getScale 注释：视口坐标在宽视口会超出画布被 overflow:hidden 裁剪）
+    winW.value = DESIGN_WIDTH
+    winH.value = DESIGN_HEIGHT
+    const factor = DESIGN_WIDTH / 750
+    ballSizePx.value = Math.round(BALL_SIZE_RPX * factor)
+    panelWidthPx.value = Math.round(PANEL_WIDTH_RPX * factor)
+  } else {
     // App / 小程序：以屏幕尺寸为坐标空间
     try {
       const sys = uni.getSystemInfoSync()
@@ -215,12 +300,13 @@ onMounted(() => {
     ballSizePx.value = Math.round(BALL_SIZE_RPX * factor)
     panelWidthPx.value = Math.round(PANEL_WIDTH_RPX * factor)
   }
-  // 初始位置：右侧贴边、屏幕纵向 1/3 处
-  posX.value = winW.value - ballSizePx.value - EDGE_MARGIN_PX
-  posY.value = Math.round(winH.value / 3 - ballSizePx.value / 2)
+  // 初始位置：右侧贴边、屏幕纵向 1/3 处（clamp 防止小屏/异常尺寸时跑到屏外）
+  posX.value = Math.max(0, winW.value - ballSizePx.value - EDGE_MARGIN_PX)
+  posY.value = Math.max(0, Math.round(winH.value / 3 - ballSizePx.value / 2))
 })
 
 onUnmounted(() => {
+  store.unregisterPlayer(myId)
   if (typeof window !== 'undefined') {
     window.removeEventListener('mousemove', onMouseMove)
     window.removeEventListener('mouseup', onMouseUp)
@@ -237,6 +323,8 @@ onUnmounted(() => {
   z-index: $z-fixed + 50;
   display: flex;
   justify-content: flex-end;
+  /* 防御：任何设备下面板/悬浮球不超出画布（H5 相对 #app 画布，App/小程序相对屏幕） */
+  max-width: 100%;
 }
 
 /* 悬浮球：可拖动 */
@@ -256,6 +344,8 @@ onUnmounted(() => {
 /* 展开（ready）：仅 AudioPlayer，卡片样式由 AudioPlayer 自带 */
 .fp-player {
   width: 560rpx;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* 收起态：播放条仅视觉隐藏（组件保持挂载，音频持续播放） */
@@ -276,6 +366,8 @@ onUnmounted(() => {
 /* 展开（loading / error）：轻量状态条 */
 .fp-mini {
   width: 560rpx;
+  max-width: 100%;
+  box-sizing: border-box;
   background: $bg-card;
   border: 2rpx solid $line;
   border-radius: $r-lg;
@@ -322,5 +414,34 @@ onUnmounted(() => {
   flex: 1;
   font-size: 22rpx;
   color: $up;
+}
+
+/* 播放条 actions 区：队列徽标 + 连续播放开关 */
+.fp-queue-badge {
+  padding: 0 10rpx;
+  height: 32rpx;
+  display: flex;
+  align-items: center;
+  background: rgba(11, 95, 255, 0.1);
+  border-radius: 16rpx;
+}
+.fp-queue-badge-text {
+  font-size: 20rpx;
+  color: $primary;
+}
+.fp-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+.fp-switch-label {
+  font-size: 20rpx;
+  color: $primary;
+  /* 浅蓝背景 + 蓝色边框：连续播放开关的胶囊按钮标签 */
+  background: rgba(11, 95, 255, 0.08);
+  border: 1rpx solid rgba(11, 95, 255, 0.4);
+  border-radius: 999rpx;
+  padding: 2rpx 14rpx;
+  line-height: 1.5;
 }
 </style>

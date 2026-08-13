@@ -2,7 +2,6 @@
  * AI 智能体相关 API（App 专属功能）
  */
 import request from '../request'
-import { useUserStore } from '@/shared/store/modules/user'
 import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
 
 export interface ProgressStep {
@@ -82,6 +81,8 @@ export interface ChatMessage {
   cards?: ChatCard[]                 // P11: DONE 下发的结构化卡片（HTTP 降级/旧协议缺失）
   tokenUsage?: TokenUsage            // P11: DONE 下发的本轮 token 用量（会话本地累加用）
   timestamp: number
+  /** Phase 4-2 Task 3：本地赞/踩反馈（v1 纯前端本地、按 message_id 持久化，不落库；同消息可改选/取消） */
+  feedback?: 'up' | 'down'
 }
 
 /** 会话维度 token 用量聚合项（P10 线 4/线 6；对应 GET /api/chat/usage/sessions 的 data.items 结构） */
@@ -176,6 +177,39 @@ export interface MarketTracePredictionValidation {
   overall_note?: string
 }
 
+export interface MarketTracePredictionHorizon {
+  horizon: 'short' | 'mid' | 'long'
+  remaining_estimate: string
+  phase: 'building' | 'peaking' | 'decaying' | 'returning'
+  direction: 'bullish' | 'bearish' | 'neutral'
+  target: string
+  metric_projection: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export interface MarketTracePredictionRisk {
+  factor: string
+  invalidation: string
+}
+
+/** 演化路径单步（B2 结构化；label=档位标签 短/中/长，text=该档演化描述） */
+export interface MarketTracePredictionStep {
+  label: string
+  text: string
+}
+
+export interface MarketTracePrediction {
+  schema_version?: string
+  prediction_status: 'confirmed' | 'hypothesis' | 'insufficient'
+  horizons?: MarketTracePredictionHorizon[]
+  evolution_narrative?: string
+  /** 结构化演化步骤（前端时间轴渲染）；旧记录可能缺失 */
+  evolution_steps?: MarketTracePredictionStep[]
+  risks?: MarketTracePredictionRisk[]
+  evidence_ids?: unknown
+  attribution_summary?: string | null
+}
+
 export interface MarketTraceTrace {
   schema_version?: string
   attribution_status?: MarketTraceAttributionStatus
@@ -184,7 +218,11 @@ export interface MarketTraceTrace {
   alternative_chain_id?: string | null
   confidence?: MarketTraceConfidence
   unresolved_questions?: unknown
+  /** 综合主因的一句话结论（30-40 字），供晚报页异象卡片直接展示；旧报告可能缺失 */
+  attribution_summary?: string | null
   prediction_validation?: MarketTracePredictionValidation | null
+  /** 影响持续性预判（B2 预测能力）；旧报告可能缺失 */
+  prediction?: MarketTracePrediction | null
 }
 
 export interface MarketTraceDetectedPhenomenon {
@@ -363,12 +401,10 @@ export const agentApi = {
    * App 端推荐使用 WebSocket 流式，见 useStreamingChat
    */
   sendMessage(message: string, sessionId?: string, options?: { forceDeep?: boolean }) {
-    const userId = useUserStore().userInfo?.id
+    // P0：user_id 改由服务端注入（app-api 验签 JWT 后覆写），客户端不再自报
     return request.post('/agent/chat/message', {
       message,
       session_id: sessionId,
-      // D11：HTTP 降级路径同样透传 user_id（与 WS 路径对齐）
-      ...(userId != null ? { user_id: String(userId) } : {}),
       // D4：HTTP 降级路径透传 force_deep（与 WS 路径对齐，Task 1 Python 侧支持）
       ...(options?.forceDeep ? { force_deep: true } : {})
     }, {
@@ -542,7 +578,9 @@ export function createWebSocket() {
  * 连接地址: {AGENT_WS_BASE_URL}/chat
  */
 export function createAgentWebSocket() {
-  const url = `${AGENT_WS_BASE_URL}/chat`
+  // P0：WS 握手鉴权（uni-app 小程序端 WS 不能自定义 header，走 query——与 createWebSocket 同模式）
+  const token = uni.getStorageSync('token')
+  const url = `${AGENT_WS_BASE_URL}/chat?token=${token || ''}`
   return uni.connectSocket({
     url,
     success: () => console.log('[AgentWS] connecting...'),

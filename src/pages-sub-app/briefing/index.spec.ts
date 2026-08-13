@@ -5,7 +5,7 @@ import { test } from 'node:test'
 const source = readFileSync(new URL('./index.vue', import.meta.url), 'utf8')
 
 test('播报页只消费通过严格 parser 的 dialogue 与音频路径', () => {
-  assert.match(source, /parseBroadcastReport\(broadcastRes\.value, broadcastType\.value, date\)/)
+  assert.match(source, /parseBroadcastReport\(broadcastRes\.value(?: as BroadcastV1)?, broadcastType\.value, date\)/)
   assert.match(source, /agentApi\.getBrief\(broadcastType\.value, date\)/)
   assert.doesNotMatch(source, /agentApi\.getReport\(reportType, currentDate\.value\)/)
   assert.doesNotMatch(source, /reportText/)
