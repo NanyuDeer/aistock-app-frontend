@@ -12,7 +12,64 @@
 - 引导追问按钮化：AI 回复末尾的「你可以问我：…」引导句渲染为可点击快捷追问，点击直接发送；无法可靠解析时保持纯文本展示
 - 对话滚动交互优化：AI 生成期间用户上滑可自由翻看历史（自动暂停滚动跟随），底部「回到最新」按钮一键回到最新内容并恢复跟随
 
-> 代码验收通过（待生产验证）。
+---
+
+## [junliang] 2026-08-06 — pages.json 路由重构回滚：恢复被删页面路由 + 删除死文件
+
+**开发者**: Aria
+
+### 修复
+- `src/pages.json`：回滚非自选股洞察相关的路由重构——恢复被误删的页面路由（trend-score 系列 / reports / report-detail / traceability / sector-detail / hot-burst-report / briefing-detail）及原 style 配置，修复这些页面的跳转失效（如洞察页趋势股评分卡片、业绩页 redirectTo reports、长线风口板块详情、首页大盘溯源）；仅保留洞察改动（stock-trace 路由替换为 insight、新增 insight-detail）
+
+### 清理
+- 删除死文件：`src/modules/favorites/pages/stock-trace.vue`（路由已替换为 insight、无跳转引用）、`src/modules/user/pages/icon-gallery.vue`（无路由注册、无跳转引用）
+
+---
+
+## [junliang] 2026-08-06 — 异动监控接入自选股洞察 + 提醒tab更名"自选股洞察"
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/favorites/pages/monitor.vue`：异动监控数据源从已停用的 stock_trace 切换到自选股洞察 API，卡片展示主因 / 置信度（高置信/待验证）/ 日期，点击进入洞察详情页；移除"全部/大涨/大跌"筛选分栏，所有异动事件直接平铺展示；"立即检测"改为刷新列表（洞察由后端 cron 周期采集）
+- `src/modules/favorites/components/AlertContent.vue`：底部"提醒"tab 的"异动捕手"模块更名为"自选股洞察"，数据源切换为洞察 API，列表展示自选股涨停雷达归因事件（股票 + 主因 + 日期），点击事件进洞察详情、点击模块标题进异动监控页
+
+---
+
+## [master] 2026-08-06 — 风口龙头 leaders 页面修复（短线板块截断/次数口径/移除 cycle 标签）
+
+**开发者**: Aria
+
+### 修复
+- `leaders.vue`：`getWindLeaders(10)`→`(20)`——后端双榜（长线榜 top8 + 短线榜 top8）长线在前，limit=10 截断导致短线档只剩 2-3 个板块
+- `leaders.vue`：上榜次数按档位显示（新增 `boardCount`）——短线档显示近 20 日 `freq20`、长线档显示近 60 日 `frequency`（原先统一显示 60 日 frequency，短线次数超 30 次）
+
+### 改进
+- `leaders.vue`：删除 cycle 三态标签展示（长线风口/短线风口/长线+短线 Tag），`cycle` 字段仍用于双榜分流
+
+---
+
+## [changer] 2026-08-06 — ChatAgent 会话用量徽标 + 单轮用量进气泡 + 气泡消失修复 + HTTP 降级 token_usage + WS 端口对齐 8080
+
+**开发者**: Aria
+
+### 新增
+- 会话列表 token 用量徽标（`sessions.vue`）：本地 `sessionUsage` 优先 + 服务端 `getChatSessionUsage` 补足（未登录也显示本地用量）；`sessionUsageMerge.ts` 纯函数合并（本地优先，服务端仅补缺失会话，不数值相加避免翻倍）
+- 聊天气泡底部单轮用量文本（`index.vue`）：左侧 N tokens · 右侧深度分析按钮；移除底部 `<UsageBar />`
+- `ChatMessage` 类型扩展 `tokenUsage?`/`cards?`；`agentApi.getTokenUsageSummary()`
+
+### 修复
+- 气泡消失根因（`useChatStream.ts`）：Pinia store 实例上访问 computed 被自动解包成普通值 → 消费方单获陈旧数组快照 → v-for 永不更新；改用 `storeToRefs(chatStore)` 暴露响应式 ref
+- HTTP 降级路径 token_usage 透出（`useChatStream.ts`）：降级分支 `appendMessage` 透出 `tokenUsage: result.token_usage`（此前恒 undefined）
+- `sendMessage` 超时 15s→20s（非流式跑完整 graph ~50s 会超时无回复）
+- `deleteSession` 同步清理 `sessionUsage` 残留（防幽灵徽标）
+
+### 改进
+- `env/.env.development` + `env/.env.example`：`VITE_AGENT_WS_BASE` 端口 `8000`→`8080` 对齐 agent-py 新端口
+
+### 验证
+- vitest 19 文件 98+ 用例全绿；vue-tsc 0 错误
+- 浏览器实测气泡用量 + 会话徽标均正常显示
 
 ---
 

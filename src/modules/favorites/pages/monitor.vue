@@ -48,7 +48,7 @@
           :time="formatTime(String(alert.time))"
           :confidence="alert.confidence"
           clickable
-          @click="goTrace(alert.eventId)"
+          @click="goTrace(alert.eventId, alert.eventType)"
         />
       </view>
 
@@ -77,6 +77,7 @@ import InsightAlertCard from '@/shared/components/InsightAlertCard.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
 interface AlertItem {
   eventId: string
@@ -84,6 +85,7 @@ interface AlertItem {
   name?: string
   direction: 'up' | 'down'
   type: string
+  eventType?: string
   message: string
   time: string | number
   confidence?: 'high' | 'medium' | 'low' | 'unconfirmed'
@@ -125,9 +127,20 @@ function toAlertItem(e: WatchlistInsight): AlertItem {
     name: e.stock_name,
     direction: e.direction || 'up',
     type: e.event_type === 'limit_up_radar' ? '涨停雷达' : '异动',
+    eventType: e.event_type,
     message: attributionMessage(e),
     time: String(e.trade_date || e.created_at || ''),
     confidence: e.confidence,
+  }
+}
+
+function confidenceLabel(confidence: AlertItem['confidence']): string {
+  switch (confidence) {
+    case 'high': return '高置信'
+    case 'medium': return '中置信'
+    case 'low': return '低置信'
+    case 'unconfirmed': return '待验证'
+    default: return '归因中'
   }
 }
 
@@ -192,8 +205,9 @@ function disconnectWs() {
   wsConnected.value = false
 }
 
-function goTrace(eventId: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/insight-detail?event_id=${encodeURIComponent(eventId)}` })
+/** 洞察详情：按事件类型分流（涨停雷达 → insight-detail，价格异动 → insight-detail-move） */
+function goTrace(eventId: string, eventType?: string) {
+  navigateToInsightDetail(eventId, eventType)
 }
 
 onShow(() => {
