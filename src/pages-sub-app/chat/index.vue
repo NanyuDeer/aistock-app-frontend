@@ -54,6 +54,31 @@
                 class="bubble-html streaming-blink"
               />
 
+              <!-- 改进 20（批次 1）：引导追问按钮化——「你可以问我：…」引导句渲染为可点击快捷追问
+                   （点击即发，复用 quickAsk）；保守解析命中才渲染（正文剔除引导行），未命中回退
+                   下方既有纯文本分支（绝不渲染错按钮） -->
+              <template v-else-if="followupOf(msg)">
+                <template v-for="(sec, si) in getSections(followupBody(msg)) ?? []" :key="si">
+                  <mp-html v-if="!sec.title" :content="markdownToHtml(sec.body)" class="bubble-html" />
+                  <SectionCard v-else :variant="sec.variant" :title="sec.title" :body="sec.body" />
+                </template>
+                <mp-html
+                  v-if="!getSections(followupBody(msg))"
+                  :content="markdownToHtml(followupBody(msg))"
+                  class="bubble-html"
+                />
+                <view class="followup-questions">
+                  <view
+                    v-for="q in followupQuestions(msg)"
+                    :key="q"
+                    class="followup-question"
+                    @tap="quickAsk(q)"
+                  >
+                    <text class="followup-question-text">{{ q }}</text>
+                  </view>
+                </view>
+              </template>
+
               <!-- 改进 14：分节卡片化渲染（有分节时 SectionCard 列表，无分节时回退 mp-html） -->
               <template v-else-if="msg.content">
                 <template v-for="(sec, si) in getSections(msg.content) ?? []" :key="si">
@@ -200,6 +225,7 @@ import SectionCard from './cards/SectionCard.vue'
 import FeedbackBar from '@/shared/components/FeedbackBar.vue'
 import ConfirmSheet from '@/shared/components/ConfirmSheet.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
+import { parseFollowupQuestions, type FollowupParse } from '@/shared/utils/parseFollowupQuestions'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
@@ -536,6 +562,25 @@ function getSections(content: string): MarkdownSection[] | null {
   return parsed
 }
 
+// ── 改进 20（批次 1）：引导追问按钮化辅助函数 ──
+// 模板无法缓存单条消息的解析结果，提供三个薄函数多次调用（与 getSections 同模式）；
+// followupOf 是唯一解析入口（含角色/空内容守卫），body/questions 由其派生，保证一致性。
+
+function followupOf(msg: ChatMessage): FollowupParse | null {
+  if (msg.role !== 'assistant' || !msg.content) return null
+  return parseFollowupQuestions(msg.content)
+}
+
+/** 剔除引导行后的正文（供分节渲染）；未命中返回空串（配合 v-else-if 不会到达） */
+function followupBody(msg: ChatMessage): string {
+  return followupOf(msg)?.body ?? ''
+}
+
+/** 解析出的快捷追问条目；未命中返回空数组 */
+function followupQuestions(msg: ChatMessage): string[] {
+  return followupOf(msg)?.questions ?? []
+}
+
 /**
  * Phase 4-2 Task 3：回答气泡尾部反馈入口显隐——仅 assistant 真实回复
  * （error/cancelled/空内容无反馈价值，且与「重试」按钮互斥不重叠展示）。
@@ -673,6 +718,18 @@ onUnmounted(() => {
 :deep(.md-table) { width: 100%; border-collapse: collapse; margin: 8rpx 0; }
 :deep(.md-table th) { background: $bg-soft; font-size: 24rpx; padding: 8rpx; border: 1rpx solid $line; }
 :deep(.md-table td) { font-size: 24rpx; padding: 8rpx; border: 1rpx solid $line; }
+
+/* 改进 20：引导追问快捷按钮（点击即发，复用 quickAsk） */
+.followup-questions {
+  display: flex; flex-direction: column; gap: 12rpx;
+  margin-top: 16rpx; padding-top: 16rpx; border-top: 1rpx solid $line;
+}
+.followup-question {
+  display: inline-flex; align-items: center;
+  background: $primary-50; color: $primary;
+  border-radius: $r-md; padding: 12rpx 20rpx;
+}
+.followup-question-text { font-size: 24rpx; color: $primary; }
 
 /* 流式光标动画（mp-html 内嵌 ▊ 字符的闪烁效果） */
 :deep(.streaming-blink) {

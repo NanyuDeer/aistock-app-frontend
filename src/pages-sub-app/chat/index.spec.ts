@@ -172,3 +172,16 @@ test('改进18：示例问题覆盖六大类（大盘/个股/资金/对比/新�
   assert.match(pageSource, /宁德时代最近有什么新闻/)
   assert.match(pageSource, /市盈率是什么/)
 })
+
+// ─── 改进 20（批次 1，2026-08-13）：引导追问按钮化 ───
+
+test('改进20：引导追问按钮化（parseFollowupQuestions 接入 + 按钮点击即发）', () => {
+  assert.match(pageSource, /parseFollowupQuestions/)
+  assert.match(pageSource, /followup-questions/)
+  assert.match(pageSource, /@tap="quickAsk\(q\)"/)
+})
+
+test('改进20：解析失败回退纯文本（followupOf 返回 null 时走既有 msg.content 渲染）', () => {
+  assert.match(pageSource, /function followupOf\(msg: ChatMessage\)/)
+  assert.match(pageSource, /v-else-if="msg\.content"/)
+})
