@@ -46,8 +46,7 @@
                 },
                 "oauth" : {
                     "weixin" : {
-                        "appid" : "wx539e4bb345aff2bc",
-                        "appsecret" : "98961b8246e0c9dc18d3dfa5701966ea"
+                        "appid" : "wx539e4bb345aff2bc"
                     }
                 }
             },
@@ -102,6 +101,12 @@
         "permission" : {},
         "optimization" : {
             "subPackages" : true
+        },
+        "plugins" : {
+            "WechatSI" : {
+                "version" : "0.3.5",
+                "provider" : "wx069ba97219f66d99"
+            }
         }
     },
     "h5" : {

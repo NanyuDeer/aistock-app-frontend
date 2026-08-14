@@ -7,7 +7,7 @@
 - `pages/event-catcher.vue` - 异动捕手
 - `pages/alert-analysis.vue` - AI 异动解读
 - `pages/hot-burst.vue` - 机构调研热门股
-- `pages/leaders.vue` - 长线风口（概览入口页：泡泡图 + 板块入口卡片列表，点击板块跳转详情）
+- `pages/leaders.vue` - 长线风口（概览入口页：泡泡图 + 板块入口卡片列表，点击板块跳转详情；长线/短线两档切换，龙头股行分档展示——长线档取 `long_leader`（趋势龙头，trend_scores 评分最高）、短线档取 `leading_stock_info`（短线领涨），跨板块去重）
 - `pages/sector-detail.vue` - 板块详情子页面（板块统计、龙头股、AI 分析、主线/上游/下游个股列表）；板块详情页含近120日板块K线图（KLineChart + getBoardKline）
 - `pages/push-history.vue` - 历史推送
 

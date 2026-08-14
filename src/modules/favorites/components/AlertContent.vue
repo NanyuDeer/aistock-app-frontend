@@ -1,7 +1,7 @@
 <template>
   <view class="alert-content">
     <view class="content-wrap">
-      <!-- 异动捕手模块（新建模块：自选股异动监控） -->
+      <!-- 自选股洞察模块：预览自选股涨停雷达事件的归因结果，点击进入异动监控/洞察详情 -->
       <view class="alert-module">
         <view class="module-card">
           <view class="module-decor"></view>
@@ -10,7 +10,7 @@
               <SvgIcon name="radar-line" size="32rpx" color="#0b5fff" />
             </view>
             <view class="module-header-text">
-              <text class="module-title">异动捕手</text>
+              <text class="module-title">自选股洞察</text>
             </view>
             <text class="module-arrow">›</text>
           </view>
@@ -22,7 +22,7 @@
                 :title="item?.stock_name || '\u3000'"
                 :description="item ? `${captureDetail(item)} · ${formatTime(item.trade_date || item.created_at || '')}` : '\u3000'"
                 :clickable="!!item"
-                @click="item && goTrace(item.event_id)"
+                @click="item && goTrace(item.event_id, item.event_type)"
               >
                 <template #prefix>
                   <Tag v-if="item" :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
@@ -83,6 +83,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import { useUserStore } from '@/shared/store/modules/user'
+import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -106,14 +107,13 @@ const intelTabItems = [
   { label: '利空', value: 'negative' as const },
 ]
 
-// 异动捕手：接自选股洞察真实 API（与异动监控页 monitor.vue 同源）
+// 自选股洞察：展示自选股涨停雷达事件的归因结果（后端由 cron 周期采集 + LLM 归因）
 const captureList = ref<WatchlistInsight[]>([])
 
 async function loadCaptureList() {
   // 自选股洞察真实数据：接口失败/空数据时展示空状态（EmptyState 兜底）
   try {
-    const insights = await watchlistInsightApi.getInsights()
-    captureList.value = insights
+    captureList.value = await watchlistInsightApi.getInsights()
   } catch {
     captureList.value = []
   }
@@ -217,15 +217,14 @@ function captureTagType(direction: 'up' | 'down'): 'up' | 'down' {
   return direction
 }
 
-/** 格式化异动详情：主因归因文案（与异动监控页 monitor.vue 一致） */
+/** 格式化洞察主因：已确认展示主因 label；unconfirmed 展示待验证；其余为归因中 */
 function captureDetail(item: WatchlistInsight): string {
   if (item.attribution_status === 'unconfirmed') return '主因待验证'
-  if (item.attribution_status === 'confirmed' && item.primary_driver?.label) {
-    return `主因：${item.primary_driver.label}`
-  }
+  if (item.attribution_status === 'confirmed' && item.primary_driver?.label) return `主因：${item.primary_driver.label}`
   return '归因中'
 }
 
+/** 格式化日期为 MM-DD（trade_date 为 UTC ISO，取本地月日） */
 function formatTime(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '--'
@@ -238,14 +237,14 @@ function onIntelTabChange(val: string | number) {
   intelSubTab.value = val as 'all' | 'positive' | 'negative'
 }
 
-/** 异动捕手（新模块：自选股异动监控） */
+/** 自选股洞察（新模块：自选股异动监控） */
 function goAlertCatcher() {
   uni.navigateTo({ url: '/modules/favorites/pages/monitor' })
 }
 
-/** 异动详情：跳转到洞察详情页（与异动监控页 monitor.vue 一致） */
-function goTrace(eventId: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/insight-detail?event_id=${encodeURIComponent(eventId)}` })
+/** 洞察详情：按事件类型分流（涨停雷达 → insight-detail，价格异动 → insight-detail-move） */
+function goTrace(eventId: string, eventType?: string) {
+  navigateToInsightDetail(eventId, eventType)
 }
 
 /** 个股情报（原异动捕手/event-catcher，已改名） */

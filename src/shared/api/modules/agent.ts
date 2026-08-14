@@ -2,7 +2,6 @@
  * AI 智能体相关 API（App 专属功能）
  */
 import request from '../request'
-import { useUserStore } from '@/shared/store/modules/user'
 import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
 
 export interface ProgressStep {
@@ -82,6 +81,8 @@ export interface ChatMessage {
   cards?: ChatCard[]                 // P11: DONE 下发的结构化卡片（HTTP 降级/旧协议缺失）
   tokenUsage?: TokenUsage            // P11: DONE 下发的本轮 token 用量（会话本地累加用）
   timestamp: number
+  /** Phase 4-2 Task 3：本地赞/踩反馈（v1 纯前端本地、按 message_id 持久化，不落库；同消息可改选/取消） */
+  feedback?: 'up' | 'down'
 }
 
 /** 会话维度 token 用量聚合项（P10 线 4/线 6；对应 GET /api/chat/usage/sessions 的 data.items 结构） */
@@ -329,6 +330,26 @@ export interface AlertReportRecord {
   }
 }
 
+/** 深度分析报告 DB 记录（GET /api/agent/report/chat/:reportId 返回；不存在/非本人/过期 → null） */
+export interface ChatAnalysisReport {
+  /** API 返回的数据库主键（后端 BIGSERIAL 归一为 Number，兼容旧字符串格式） */
+  id: string | number
+  report_type: string
+  report_date: string
+  status?: string
+  data_source?: string | null
+  created_at?: string
+  content: {
+    display_report?: {
+      summary?: string
+      details?: string
+      stocks?: string[]
+      risks?: string[]
+    }
+    schema_version?: string
+  }
+}
+
 export type BriefType = 'morning' | 'evening'
 export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review'] as const
 export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
@@ -400,12 +421,10 @@ export const agentApi = {
    * App 端推荐使用 WebSocket 流式，见 useStreamingChat
    */
   sendMessage(message: string, sessionId?: string, options?: { forceDeep?: boolean }) {
-    const userId = useUserStore().userInfo?.id
+    // P0：user_id 改由服务端注入（app-api 验签 JWT 后覆写），客户端不再自报
     return request.post('/agent/chat/message', {
       message,
       session_id: sessionId,
-      // D11：HTTP 降级路径同样透传 user_id（与 WS 路径对齐）
-      ...(userId != null ? { user_id: String(userId) } : {}),
       // D4：HTTP 降级路径透传 force_deep（与 WS 路径对齐，Task 1 Python 侧支持）
       ...(options?.forceDeep ? { force_deep: true } : {})
     }, {
@@ -524,6 +543,18 @@ export const agentApi = {
   },
 
   /**
+   * 读取深度分析报告详情（B2 议题 2）：GET /api/agent/report/chat/:reportId
+   * 鉴权由 request 拦截器自动注入 Bearer token；不存在/非本人/过期 → data: null。
+   * 拦截器语义（request.ts）：{code:0, data: report} → 解包返回 report body；
+   * {code:0, data:null} → `data ?? response.data` 走右侧，返回整个信封 {code:0, data:null}。
+   * 故判断信封（对象且含 code 键）→ 空态 null；否则返回值即报告体本身。
+   */
+  async getChatAnalysisReport(reportId: string | number): Promise<ChatAnalysisReport | null> {
+    const res = await request.get<ChatAnalysisReport | { data: ChatAnalysisReport | null }>(`/agent/report/chat/${reportId}`)
+    return res && typeof res === 'object' && 'code' in res ? null : (res as ChatAnalysisReport)
+  },
+
+  /**
    * 查询指定股票的异动分析报告（缓存查询）
    * 对接 Node.js 公开路由 GET /api/agent/report/alert/:symbol/:date
    * 命中缓存时直接返回 DB 中的报告，未命中返回 null（前端再走 SSE 流式分析）
@@ -579,7 +610,9 @@ export function createWebSocket() {
  * 连接地址: {AGENT_WS_BASE_URL}/chat
  */
 export function createAgentWebSocket() {
-  const url = `${AGENT_WS_BASE_URL}/chat`
+  // P0：WS 握手鉴权（uni-app 小程序端 WS 不能自定义 header，走 query——与 createWebSocket 同模式）
+  const token = uni.getStorageSync('token')
+  const url = `${AGENT_WS_BASE_URL}/chat?token=${token || ''}`
   return uni.connectSocket({
     url,
     success: () => console.log('[AgentWS] connecting...'),

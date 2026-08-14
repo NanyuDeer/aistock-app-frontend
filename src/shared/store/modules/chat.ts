@@ -14,6 +14,14 @@ function deriveTitle(msgs: ChatMessage[]): string {
   return firstUser?.content.trim().slice(0, 20) || '新会话'
 }
 
+/** Phase 4-2 Task 3：消息赞/踩反馈记录（v1 纯前端本地、按 message_id 索引、不落库） */
+export interface ChatFeedbackRecord {
+  session_id: string
+  message_id: number
+  value: 'up' | 'down'
+  timestamp: number
+}
+
 export const useChatStore = defineStore('chat', () => {
   // P9：一次性迁移旧单会话数据（旧 CHAT_HISTORY + CHAT_SESSION_ID → messagesBySession[sessionId]）。
   // 必须在下方 ref 初始化之前执行：迁移结果写入 storage 后由 ref 初始值直接读取，保证内存态与持久态一致。
@@ -29,6 +37,10 @@ export const useChatStore = defineStore('chat', () => {
   // P9 后 createSession 生成新 session_id → 该会话天然无累计（getCurrentSessionUsage 返回 null），
   // 无需在 createSession 内显式清空；resetSessionUsage 供全局清空（本 plan 无 UI 入口）。
   const sessionUsage = ref<Record<string, TokenUsage>>(storage.get(STORAGE_KEYS.CHAT_SESSION_USAGE) || {})
+
+  // Phase 4-2 Task 3：消息赞/踩反馈记录表（key=message_id → 记录；与消息字段 feedback 同步写入，
+  // 双写保证「按 message_id 查询」与「UI 读 msg.feedback」两个消费方向都刷新可见）。
+  const feedbackRecords = ref<Record<string, ChatFeedbackRecord>>(storage.get(STORAGE_KEYS.CHAT_FEEDBACK) || {})
 
   /** 当前会话消息（对外兼容 useChatStream / modules/chat/pages/index.vue 的 messages 消费） */
   const messages = computed<ChatMessage[]>(() => messagesBySession.value[sessionId.value] || [])
@@ -128,6 +140,8 @@ export const useChatStore = defineStore('chat', () => {
    * 删除的是当前会话 → 切到列表最近（sessions[0]）或新建。
    */
   function deleteSession(id: string) {
+    // Phase 4-2 Task 3：先取该会话消息 id（用于后续反馈记录清理；delete 后 messagesBySession[id] 已不可读）
+    const deletedMsgIds = (messagesBySession.value[id] || []).map((m) => m.timestamp)
     const remaining = sessions.value.filter((s) => s.session_id !== id)
     sessions.value = remaining
     const history = { ...messagesBySession.value }
@@ -142,6 +156,14 @@ export const useChatStore = defineStore('chat', () => {
       delete usage[id]
       sessionUsage.value = usage
       storage.set(STORAGE_KEYS.CHAT_SESSION_USAGE, sessionUsage.value)
+    }
+
+    // Phase 4-2 Task 3：同步清理该会话消息的反馈记录（与 messagesBySession 同生命周期）
+    if (deletedMsgIds.length > 0) {
+      const records = { ...feedbackRecords.value }
+      for (const mid of deletedMsgIds) delete records[mid]
+      feedbackRecords.value = records
+      storage.set(STORAGE_KEYS.CHAT_FEEDBACK, records)
     }
 
     // fire-and-forget 调 server delete；Promise.resolve 兜底（单元测试 mock 可能非 Promise 返回）
@@ -212,6 +234,36 @@ export const useChatStore = defineStore('chat', () => {
         : [...sessions.value, { session_id: sid, title, last_message_at: new Date().toISOString() }]
       persistSessions()
     }
+  }
+
+  /**
+   * Phase 4-2 Task 3：设置/改选/取消消息赞/踩反馈（v1 纯前端本地，不落库）。
+   * messageId 即消息 timestamp（页面 isTypingFor 同款定位方式，ChatMessage 无独立 id 字段）。
+   * 语义：仅 assistant 消息；同一值再点 → 取消；换值 → 改选；刷新后仍保留。
+   * 双写：①消息 feedback 字段（随 messagesBySession 落盘，UI 直接读）②CHAT_FEEDBACK 记录表
+   * （key=message_id，含 session_id + 时间戳，满足「按 message_id 查询」的记录结构）。
+   */
+  function setFeedback(messageId: number, value: 'up' | 'down') {
+    const sid = sessionId.value
+    if (!sid) return
+    const arr = messagesBySession.value[sid]
+    if (!arr) return
+    const idx = arr.findIndex((m) => m.timestamp === messageId)
+    if (idx === -1 || arr[idx].role !== 'assistant') return
+    const nextValue = arr[idx].feedback === value ? undefined : value
+
+    const next = arr.map((m, i) => (i === idx ? { ...m, feedback: nextValue } : m))
+    messagesBySession.value = { ...messagesBySession.value, [sid]: next }
+    persistHistory()
+
+    const records = { ...feedbackRecords.value }
+    if (nextValue) {
+      records[messageId] = { session_id: sid, message_id: messageId, value: nextValue, timestamp: Date.now() }
+    } else {
+      delete records[messageId]
+    }
+    feedbackRecords.value = records
+    storage.set(STORAGE_KEYS.CHAT_FEEDBACK, records)
   }
 
   /** 清除当前会话（消息 + 本地/服务端列表条目）；无当前会话时清空列表 */
@@ -302,5 +354,6 @@ export const useChatStore = defineStore('chat', () => {
     syncSessionsFromServer,
     sendMessage,
     sessionUsage, accumulateSessionUsage, getCurrentSessionUsage, resetSessionUsage, // P11 T2
+    feedbackRecords, setFeedback, // Phase 4-2 Task 3：本地赞/踩反馈
   }
 })

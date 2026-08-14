@@ -30,7 +30,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 |------|------|---------|-----------------|
 | 首页 | `modules/home` | 早点听、市场概览、长线风口、异动捕手 | [home/AGENTS.md](./src/modules/home/AGENTS.md) |
 | 自选股 | `modules/favorites` | 自选股列表、特别提醒、股票详情、搜索、异动监控 | [favorites/AGENTS.md](./src/modules/favorites/AGENTS.md) |
-| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示、会话管理（P9 多会话） | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
+| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示、会话管理（P9 多会话）、深度分析报告详情页（批次 2，2026-08-13：`pages/chat-report-detail.vue`，对话内深度卡跳转查看完整报告） | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
 | 行情 | `modules/market` | 龙头股、重磅消息、板块标签、异动捕手、长线风口 | [market/AGENTS.md](./src/modules/market/AGENTS.md) |
 | 业绩分析 | `modules/analytics` | 业绩预测、业绩报告列表、财报详情 | — |
 | 用户 | `modules/user` | 个人中心、登录设置、更新日志 | [user/AGENTS.md](./src/modules/user/AGENTS.md) |
@@ -103,7 +103,7 @@ src/
 │   │   ├── useWebSocket.ts    # WebSocket hook
 │   │   ├── useTimer.ts        # 定时器 hook
 │   │   ├── usePushNotification.ts # 推送通知 hook
-│   │   ├── constants.ts       # 常量（AGENT_WS_BASE_URL fallback 本地 8000，P3-fix-2）
+│   │   ├── constants.ts       # 常量（AGENT_WS_BASE_URL 本地开发 fallback，P3-fix-2）
 │   │   ├── stock.ts           # 股票工具
 │   │   ├── tradingTime.ts     # 交易时间
 │   │   ├── datetime.ts        # 日期时间
@@ -304,7 +304,7 @@ import Card from '@/shared/components/Card.vue'
 
 | 模块文件 | 说明 | 后端路径 |
 |---------|------|---------|
-| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
+| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`；**P0 身份鉴权：`createAgentWebSocket` URL 带 `?token=`（app-api 桥接验签）、`sendMessage` 不再携带 `user_id`（服务端注入）**；**批次 2：`getChatAnalysisReport(reportId)` 深度分析报告详情查询（`/api/agent/report/chat/:reportId`，显式解包返回 `ChatAnalysisReport | null`）+ `ChatAnalysisReport` 类型（`content.display_report` 双层结构）**） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
 | `auth.ts` | 认证（登录、用户信息） | `/api/auth/wechat/*` |
 | `briefing.ts` | 早晚报结构化（BriefingItem/BriefingSummary 类型 + 降级解析适配器） | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |
@@ -320,6 +320,7 @@ import Card from '@/shared/components/Card.vue'
 - 通过 `shared/utils/useWebSocket.ts` hook 使用
 - 频道按功能拆分：quote（行情）、alert（异动）、chat（对话）
 - 连接管理和事件分发在后端 `core/ws/` 处理
+- **P0 身份鉴权（chat 频道）**：`createAgentWebSocket` 连接 `{AGENT_WS_BASE_URL}/chat`（路径不变）时带 `?token=`（`uni.getStorageSync('token')`）；app-api 桥接验签——非法/过期 token 服务端拒绝（close 4401），未登录（无 token）放行但 `user_id=None`；`user_id` 由服务端注入，客户端消息体不再携带
 
 ## 7. 共享组件速查
 
@@ -364,7 +365,9 @@ import Card from '@/shared/components/Card.vue'
 |------|------|
 | `useAuth` | 认证状态和登录/登出 |
 | `useFavorites` | 自选股增删改查 |
-| `useChatStream` | 对话流（WS 为主，HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`，P3；订阅 reasoning 聚合 `reasoningSteps` + `_testHandleWsMessage` 测试钩子，P3-fix；return `streamingReasoning` 流式实时思考链，P3-fix-2） |
+| `useChatStream` | 对话流（WS 为主，HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`，P3；订阅 reasoning 聚合 `reasoningSteps` + `_testHandleWsMessage` 测试钩子，P3-fix；return `streamingReasoning` 流式实时思考链，P3-fix-2；**P0：send 不再携带 user_id（服务端注入）；连接断开/4401 时结算挂起 send（不卡死 streaming）**；**Phase 4-2：`confirm_request` 终态处理（doneReceived 置位 + pendingConfirm ref + 结算 send promise）+ `sendConfirmResponse(request_id, choice)` 发送成功后 re-arm（doneReceived=false/streaming=true/清 progressSteps/streamingText/currentRunReasoning/currentRunEvents）**） |
+| `chatSuggestions` | 自选股联动（Phase 4-2）：`buildFavoritesQuestion`（≤5 只拼接「我的自选股里 XX、YY 怎么样」/ >5 截断提示「仅展示前 5 只」/ 空列表回退）+ `buildStockQuestion` 问 AI 跳转预填 |
+| `speechInput` | 语音容错输入侧（Phase 4-2）：`#ifdef` 平台分流（H5=Web Speech API 仅 Chrome/Edge、MP=WechatSI 插件代码就绪待真机、APP=降级提示）、判别联合 `SpeechRecognitionResult`、`isSpeechInputSupported()`、依赖注入核心供单测 |
 | `useStockCycle` | 股票周期切换 |
 | `useWebSocket` | WebSocket 连接管理 |
 | `useTimer` | 定时器管理 |

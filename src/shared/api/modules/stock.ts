@@ -295,6 +295,8 @@ export interface WindLeaderSector {
   upstream_stocks?: WindLeaderStock[]
   downstream_stocks?: WindLeaderStock[]
   leading_stock_info?: WindLeaderStock | null
+  /** 长期趋势龙头：板块成分股中 trend_scores 评分最高（长线榜展示，无命中回退 main_stocks 最高分） */
+  long_leader?: WindLeaderStock | null
   flow_data?: WindLeaderFlowData | null
 }
 
@@ -488,6 +490,11 @@ export const stockApi = {
     return request.get(`/cn/stocks/${symbol}/news`, { params })
   },
 
+  /** 获取自选股资讯（异动捕手/个股情报列表） */
+  getFavoritesNews(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
+    return request.get('/cn/favorites/news', { params }).then((res: Record<string, unknown>) => res)
+  },
+
   /** 获取趋势股评分（四维：技术面/行业赛道景气/消息面催化/基本面，含一票否决检查） */
   getTrendScore(symbol: string) {
     return request.get(`/cn/stocks/${symbol}/trend-score`).then((res: Record<string, unknown>) => normalizeTrendScore(res))
@@ -566,12 +573,12 @@ export const stockApi = {
   },
 
   /** 获取业绩预测列表 */
-  getProfitForecastList(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
+  getProfitForecastList(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; symbols?: string }) {
     return request.get('/cn/stocks/profit-forecast', { params })
   },
 
   /** 搜索业绩预测 */
-  searchProfitForecast(params?: { keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
+  searchProfitForecast(params?: { keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; symbols?: string }) {
     return request.get('/cn/stocks/profit-forecast/search', { params })
   },
 

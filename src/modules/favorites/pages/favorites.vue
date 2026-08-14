@@ -88,6 +88,8 @@
                 <text class="stock-code">{{ stock.symbol }}</text>
                 <text v-if="stock.margin" class="tag-margin">融</text>
                 <text v-if="stock.specialAlert" class="tag-alert">特别提醒</text>
+                <!-- Phase 4-2：问 AI → 跳转对话页并预填单股问句（.stop 避免触发行点击进详情） -->
+                <text class="ask-ai-btn" @tap.stop="askAi(stock)">问 AI</text>
               </view>
             </view>
             <view class="stock-right">
@@ -128,6 +130,7 @@
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
+import { buildStockQuestion } from '@/shared/utils/chatSuggestions'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
@@ -278,6 +281,13 @@ function confirmRemove(stock: StockItem) {
 
 function goDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
+}
+
+/** Phase 4-2：问 AI → 跳转对话页，q 参数预填单股问句（对话页 onLoad 自动发送/预填） */
+function askAi(stock: StockItem) {
+  uni.navigateTo({
+    url: `/pages-sub-app/chat/index?q=${encodeURIComponent(buildStockQuestion(stock.name))}`,
+  })
 }
 
 function goSearch() {
@@ -517,6 +527,15 @@ function goSearch() {
   background: rgba(244, 63, 94, 0.1);
   padding: 1rpx 6rpx;
   border-radius: 4rpx;
+}
+
+/* Phase 4-2：问 AI 入口（与 tag 同尺寸 pill，主色区分，可点按） */
+.ask-ai-btn {
+  font-size: 18rpx;
+  color: $primary;
+  background: rgba(77, 124, 254, 0.1);
+  padding: 1rpx 10rpx;
+  border-radius: 8rpx;
 }
 
 .stock-right {
