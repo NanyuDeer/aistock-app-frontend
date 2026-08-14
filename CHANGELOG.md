@@ -2,6 +2,19 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-14 — 风口龙头：统计格 3 列（去领涨股）+ 龙头股分档展示（长线=趋势龙头/短线=短线领涨）
+**开发者**: Aria
+
+### 改进
+- `src/modules/market/pages/leaders.vue`：
+  - 统计格 `:columns` 4→3（今日涨幅/均涨幅/净流入），移除"领涨股"格及对应 `:deep` 第四格样式
+  - 龙头股行新增档位标签 `.leader-mini-tag`（长线=「趋势龙头」/短线=「短线领涨」）
+  - `getTopStocks` 分档数据源：长线档优先 `long_leader` → `leading_stock_info` → `main_stocks`（评分降序去重）；短线档优先 `leading_stock_info` → `long_leader` → `main_stocks`
+- `src/modules/market/pages/sector-detail.vue`：统计格 `:columns` 4→3，移除"领涨股"格
+- `src/shared/api/modules/stock.ts`：`WindLeaderSector` 接口新增 `long_leader?: WindLeaderStock | null`
+
+---
+
 ## [changer] 2026-08-13 — 对话体验优化：回答流式显示与报告详情
 **开发者**: 37588
 

@@ -25,7 +25,7 @@
             </view>
             <Badge v-if="sector.frequency" size="sm">近120日上榜 {{ sector.frequency }} 次</Badge>
           </view>
-          <StatGrid :items="sectorStatItems" :columns="4" />
+          <StatGrid :items="sectorStatItems" :columns="3" />
         </Card>
 
         <!-- 板块K线（近120日，同花顺板块指数日线）；加载失败(数据为null)时整卡隐藏 -->
@@ -328,7 +328,6 @@ const sectorStatItems = computed<StatGridItem[]>(() => {
     { label: '今日涨幅', value: (todayChange >= 0 ? '+' : '') + formatPct(s.today_change), color: todayChange >= 0 ? 'up' : 'down' },
     { label: '均涨幅', value: (avgChange >= 0 ? '+' : '') + formatPct(s.avg_change), color: avgChange >= 0 ? 'up' : 'down' },
     { label: '净流入', value: formatNetInflow(s.net_inflow) },
-    { label: '领涨股', value: s.leading_stock || s.leading_stock_info?.name || '--' },
   ]
 })
 
