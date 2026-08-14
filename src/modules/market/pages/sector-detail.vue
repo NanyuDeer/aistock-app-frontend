@@ -420,32 +420,35 @@ const flowChartSvg = computed(() => {
   const relatedNodes = nodes.filter(n => n.type === 'related')
   const upstreamNodes = nodes.filter(n => n.type === 'upstream')
   const downstreamNodes = nodes.filter(n => n.type === 'downstream')
+  // 行业板块无 related 节点（主节点直接连上下游），以主节点为枢纽
+  const hasRelated = relatedNodes.length > 0
 
   // 布局算法（与 Web 前端 D3.js 完全一致）
   const W = 320
   const cx = W / 2
   const positions: Record<string, { x: number; y: number }> = {}
 
-  // 分组：每个 related 节点关联的 upstream/downstream
+  // 分组：每个枢纽节点（related 或主节点）关联的 upstream/downstream
   const upGroups: Record<string, any[]> = {}
   const downGroups: Record<string, any[]> = {}
-  relatedNodes.forEach(n => { upGroups[n.id] = []; downGroups[n.id] = [] })
+  const hubIds = hasRelated ? relatedNodes.map(n => n.id) : [mainNode?.id].filter(Boolean) as string[]
+  hubIds.forEach(id => { upGroups[id] = []; downGroups[id] = [] })
   links.forEach(link => {
     if (link.direction === 'upstream') {
-      const rn = relatedNodes.find(n => n.id === link.target)
+      const hub = hasRelated ? relatedNodes.find(n => n.id === link.target) : (mainNode && link.target === mainNode.id ? mainNode : null)
       const un = upstreamNodes.find(n => n.id === link.source)
-      if (rn && un && !upGroups[rn.id].includes(un)) upGroups[rn.id].push(un)
+      if (hub && un && !upGroups[hub.id].includes(un)) upGroups[hub.id].push(un)
     } else if (link.direction === 'downstream') {
-      const rn = relatedNodes.find(n => n.id === link.source)
+      const hub = hasRelated ? relatedNodes.find(n => n.id === link.source) : (mainNode && link.source === mainNode.id ? mainNode : null)
       const dn = downstreamNodes.find(n => n.id === link.target)
-      if (rn && dn && !downGroups[rn.id].includes(dn)) downGroups[rn.id].push(dn)
+      if (hub && dn && !downGroups[hub.id].includes(dn)) downGroups[hub.id].push(dn)
     }
   })
 
   const nodeGap = 22
   const groupGap = 12
-  const relatedSlots = relatedNodes.map(n =>
-    Math.max((upGroups[n.id] || []).length, (downGroups[n.id] || []).length, 1)
+  const relatedSlots = hubIds.map(id =>
+    Math.max((upGroups[id] || []).length, (downGroups[id] || []).length, 1)
   )
   const groupHeights = relatedSlots.map(s => s * nodeGap)
   const topY = 16
@@ -455,20 +458,26 @@ const flowChartSvg = computed(() => {
   }
 
   let curY = topY + nodeH / 2 + 14
-  relatedNodes.forEach((n, i) => {
+  hubIds.forEach((id, i) => {
     const slotH = groupHeights[i]
     const centerY = curY + slotH / 2
-    positions[n.id] = { x: cx, y: centerY }
-    ;(upGroups[n.id] || []).forEach((un, j) => {
+    if (!hasRelated && mainNode && id === mainNode.id) {
+      // 行业板块：主节点保持在顶部，上下游从主节点下方居中排列
+      positions[id] = { x: cx, y: topY }
+      curY = topY + nodeH + 14
+    } else {
+      positions[id] = { x: cx, y: centerY }
+    }
+    ;(upGroups[id] || []).forEach((un, j) => {
       positions[un.id] = {
         x: W * 0.20,
-        y: centerY + (j - (upGroups[n.id].length - 1) / 2) * nodeGap,
+        y: curY + (j - (upGroups[id].length - 1) / 2) * nodeGap,
       }
     })
-    ;(downGroups[n.id] || []).forEach((dn, j) => {
+    ;(downGroups[id] || []).forEach((dn, j) => {
       positions[dn.id] = {
         x: W * 0.80,
-        y: centerY + (j - (downGroups[n.id].length - 1) / 2) * nodeGap,
+        y: curY + (j - (downGroups[id].length - 1) / 2) * nodeGap,
       }
     })
     curY += slotH + groupGap
