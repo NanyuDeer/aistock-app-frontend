@@ -13,6 +13,10 @@
       <text v-for="s in symbols" :key="s" class="ds-symbol">{{ s }}</text>
     </view>
     <text v-if="createdText" class="ds-time">{{ createdText }}</text>
+    <view v-if="reportId" class="ds-detail" @tap="goDetail">
+      <text class="ds-detail-text">查看详情</text>
+      <SvgIcon name="arrow-right-s-line" size="28rpx" color="#0b5fff" />
+    </view>
   </view>
 </template>
 
@@ -37,6 +41,13 @@ const workerLabel = computed(() => {
   return w ? WORKER_LABELS[w] ?? w : ''
 })
 const symbols = computed(() => props.report.symbols ?? [])
+
+/** 改进 19：跳转报告详情入口（与展开/折叠共存，D8）。report_id 缺失（未登录/落库失败）→ 不渲染入口、不跳转（硬约束 8） */
+const reportId = computed(() => props.report.report_id ?? '')
+const goDetail = () => {
+  if (!reportId.value) return
+  uni.navigateTo({ url: '/modules/chat/pages/chat-report-detail?reportId=' + reportId.value })
+}
 const createdText = computed(() => {
   const iso = props.report.created_at
   if (!iso) return ''
@@ -102,5 +113,16 @@ const createdText = computed(() => {
   margin-top: 10rpx;
   font-size: 20rpx;
   color: #9ca3af;
+}
+.ds-detail {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4rpx;
+  margin-top: 10rpx;
+}
+.ds-detail-text {
+  font-size: 22rpx;
+  color: #0b5fff;
 }
 </style>
