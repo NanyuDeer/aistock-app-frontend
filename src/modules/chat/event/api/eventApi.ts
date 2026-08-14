@@ -21,6 +21,8 @@ export async function getEventList(params: EventListParams = {}): Promise<EventL
     params: {
       page: params.page || 1,
       pageSize: params.pageSize || 10,
+      // 方案A（2026-08-14）：事件类型由服务端筛选 + 分页；"全部"不传 eventType
+      ...(params.eventType ? { eventType: params.eventType } : {}),
     },
   })
 

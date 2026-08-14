@@ -11,7 +11,8 @@
         </Tag>
         <text class="card-time">{{ formatTime(event.publishTime) }}</text>
       </view>
-      <Rate :modelValue="event.importance" :readonly="true" type="gold" size="18rpx" :gap="2" />
+      <!-- 重要程度星级：由 chain 最大 impactStrength 映射；无有效评分时隐藏（不显示假评分） -->
+      <Rate v-if="event.importance" :modelValue="event.importance" :readonly="true" type="gold" size="18rpx" :gap="2" />
     </view>
 
     <!-- 事件标题（最多2行，点击跳转新闻） -->
