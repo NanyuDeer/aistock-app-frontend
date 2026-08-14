@@ -12,6 +12,7 @@ import type {
   MarketTraceReviewRecord,
   MarketTraceSeverity,
 } from '@/shared/api/modules/agent'
+import type { PredictionRecord } from '@/shared/api/modules/prediction'
 import { labelEvidenceList } from './evidenceLabels'
 
 export type { MarketTraceReviewRecord }
@@ -343,6 +344,7 @@ function buildRejectedReason(candidate: MarketTraceCandidateExplanation): string
 export function toMarketTracePresentation(
   record: MarketTraceReviewRecord,
   requestedDate: string,
+  predictionRecord?: PredictionRecord | null,
 ): MarketTracePresentation | null {
   if (record.status !== 'completed') return null
   if (record.content.schema_version !== '2.0') return null
@@ -464,7 +466,11 @@ export function toMarketTracePresentation(
     : null
 
   // 影响持续性预判（prediction，B2 预测能力）
-  const prediction = toPredictionPresentation(trace.prediction)
+  // G14：MarketTraceResult schema 无 prediction 字段，prediction 改从 prediction_records（predictionRecord.prediction）读取；
+  // predictionRecord 缺省（null/undefined）时预测为 null，页面预判卡片走空态占位。
+  const prediction = toPredictionPresentation(
+    predictionRecord?.prediction as unknown as MarketTracePrediction | null | undefined,
+  )
 
   return {
     reportTitle: `${tradeDate} A股收盘溯源`,

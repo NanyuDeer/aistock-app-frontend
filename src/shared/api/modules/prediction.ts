@@ -4,7 +4,7 @@
  */
 import request from '../request'
 
-export type PredictionRecordStatus = 'pending' | 'verified'
+export type PredictionRecordStatus = 'pending' | 'verified' | 'skipped'
 export type PredictionVerificationResult = 'hit' | 'miss' | 'insufficient'
 export type PredictionHorizonKey = 'short' | 'mid' | 'long'
 
@@ -53,6 +53,7 @@ export interface PredictionStats {
   total: number
   pendingCount: number
   verifiedCount: number
+  skippedCount: number
   hitRate: number | null
   verifiedHorizonCount: number
   hitCount: number
@@ -66,8 +67,13 @@ export interface PredictionListResponse {
 }
 
 export const predictionApi = {
-  /** 历史预测列表（含命中率统计）；status=all|pending|verified，默认 all */
-  list(params: { status?: 'all' | 'pending' | 'verified'; page?: number; pageSize?: number } = {}) {
+  /** 历史预测列表（含命中率统计）；status=all|pending|verified，默认 all；source_id 可定向溯源报告（如 review:2026-07-23） */
+  list(params: {
+    status?: 'all' | 'pending' | 'verified'
+    source_id?: string
+    page?: number
+    pageSize?: number
+  } = {}) {
     return request.get<PredictionListResponse>('/predictions', { params })
   },
   /** 预测详情 */

@@ -67,4 +67,24 @@ test('computeStats：命中率口径 hit/(hit+miss)，insufficient 不计', () =
   assert.equal(stats.hitRate, 0.5)
   assert.equal(stats.pendingCount, 3)
   assert.equal(stats.verifiedCount, 0)
+  assert.equal(stats.skippedCount, 0)
+})
+
+test('computeStats：skipped 记录单独计数，不计 pending/verified', () => {
+  const skipped = baseRecord({ id: 1, status: 'skipped' })
+  const pending = baseRecord({ id: 2 })
+  const verified = baseRecord({
+    id: 3,
+    verification: {
+      short: { horizon: 'short', result: 'hit', actual: '+1.2%', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' },
+      mid: { horizon: 'mid', result: 'hit', actual: '+0.8%', reason: 'x', verified_at: '2026-09-08T08:00:00.000Z' },
+      long: { horizon: 'long', result: 'hit', actual: '+2.0%', reason: 'x', verified_at: '2027-01-05T08:00:00.000Z' },
+    },
+  })
+  const stats = computeStats([skipped, pending, verified], TODAY)
+  assert.equal(stats.total, 3)
+  assert.equal(stats.skippedCount, 1)
+  assert.equal(stats.pendingCount, 1)
+  assert.equal(stats.verifiedCount, 1)
+  assert.equal(stats.hitRate, 1)
 })
