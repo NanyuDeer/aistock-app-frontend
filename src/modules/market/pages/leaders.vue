@@ -97,10 +97,11 @@
           <Badge v-if="boardCount(sector) > 0" size="sm">上榜 {{ boardCount(sector) }} 次</Badge>
         </view>
         <!-- 统计行 -->
-        <StatGrid class="leader-stat-grid" :items="sectorStatItems(sector)" :columns="4" />
-        <!-- 单只龙头股详细行情（跨板块去重） -->
+        <StatGrid class="leader-stat-grid" :items="sectorStatItems(sector)" :columns="3" />
+        <!-- 龙头股（分档：长线=趋势龙头 / 短线=短线领涨），跨板块去重 -->
         <view v-if="getSectorLeader(sector)" class="leader-mini-row" @tap.stop="goStockDetail(getSectorLeader(sector)!.code)">
           <view class="leader-mini-left">
+            <text class="leader-mini-tag">{{ activeCycle === 'long' ? '趋势龙头' : '短线领涨' }}</text>
             <text class="leader-mini-name">{{ getSectorLeader(sector)!.name }}</text>
             <text class="leader-mini-code">{{ getSectorLeader(sector)!.code }}</text>
           </view>
@@ -507,26 +508,32 @@ function sectorStatItems(sector: WindLeaderSector): StatGridItem[] {
     { label: '今日涨幅', value: (todayChange >= 0 ? '+' : '') + formatPct(sector.today_change), color: todayChange >= 0 ? 'up' : 'down' },
     { label: '均涨幅', value: (avgChange >= 0 ? '+' : '') + formatPct(sector.avg_change), color: avgChange >= 0 ? 'up' : 'down' },
     { label: '净流入', value: formatNetInflow(sector.net_inflow) },
-    { label: '领涨股', value: sector.leading_stock || sector.leading_stock_info?.name || '--' },
   ]
 }
 
-// 从板块中提取龙头股列表：优先合并 leading_stock_info 和 main_stocks，去重后按 score 降序
+// 从板块中提取龙头股候选列表：长线档优先 long_leader（趋势龙头），短线档优先 leading_stock_info（短线领涨），
+// 再补充 main_stocks（去重后按 score 降序）。消除"领涨股/龙头股"双概念歧义，统一展示一只龙头股。
 function getTopStocks(sector: WindLeaderSector): WindLeaderStock[] {
   const seen = new Set<string>()
   const stocks: WindLeaderStock[] = []
-  // 优先取 leading_stock_info
-  if (sector.leading_stock_info?.code) {
-    stocks.push(sector.leading_stock_info)
-    seen.add(sector.leading_stock_info.code)
+  const push = (s?: WindLeaderStock | null) => {
+    if (s?.code && !seen.has(s.code)) {
+      stocks.push(s)
+      seen.add(s.code)
+    }
+  }
+  // 分档首选：长线=趋势龙头(long_leader)，短线=龙头股(leading_stock_info)
+  if (activeCycle.value === 'long') {
+    push(sector.long_leader)
+    push(sector.leading_stock_info)
+  } else {
+    push(sector.leading_stock_info)
+    push(sector.long_leader)
   }
   // 补充 main_stocks（去重）
   if (sector.main_stocks) {
-    for (const s of sector.main_stocks) {
-      if (s?.code && !seen.has(s.code)) {
-        stocks.push(s)
-        seen.add(s.code)
-      }
+    for (const s of [...sector.main_stocks].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))) {
+      push(s)
     }
   }
   return stocks
@@ -732,11 +739,6 @@ onShow(() => {
   box-shadow: $shadow-sm;
 }
 
-/* 第四格是“领涨股”名称，较长时比数值字号略小以保持单行。 */
-:deep(.leader-stat-grid .as-stat-grid__item:nth-child(4) .as-stat-grid__value) {
-  font-size: 24rpx;
-}
-
 .stats-header {
   display: flex;
   justify-content: space-between;
@@ -794,6 +796,17 @@ onShow(() => {
   display: flex;
   align-items: center;
   gap: 8rpx;
+}
+
+/* 龙头股档位标签（长线=趋势龙头 / 短线=短线领涨） */
+.leader-mini-tag {
+  font-size: 18rpx;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1rpx solid rgba(37, 99, 235, 0.25);
+  border-radius: 6rpx;
+  padding: 2rpx 8rpx;
+  flex-shrink: 0;
 }
 
 .leader-mini-name {
