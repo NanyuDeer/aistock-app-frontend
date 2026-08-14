@@ -702,3 +702,142 @@ describe('useChatStream 交互式确认（改进 13，Phase 4-2）', () => {
     expect(arg.content).toBe('请提供 6 位股票代码后重试。')
   })
 })
+
+describe('useChatStream 内容流式（改进 17：content_delta/content_reset + done 前缀补尾 + stop 保留半截）', () => {
+  beforeEach(() => {
+    // 模块级状态隔离（与既有 describe 一致）：重置单例 socket / mock store / mock 调用
+    const stream = useChatStream() as any
+    stream.messages.value = []
+    stream.sessionId.value = ''
+    mockAppendMessage.mockClear()
+    mockSocketCbs.onMessageCbs.length = 0
+    mockSocketCbs.onCloseCbs.length = 0
+    mockSocketCbs.onErrorCbs.length = 0
+    mockSocketSend.mockClear()
+    mockSetSessionId.mockClear()
+    mockWsFail.fail = false
+    vi.mocked(agentApi.sendMessage).mockReset()
+    stream._testReset()
+  })
+
+  it('content_delta：增量累积进 streamingText（与 text 同构）', () => {
+    const stream = useChatStream() as any
+    stream._testHandleWsMessage({ type: 'content_delta', content: '贵州茅台' }, () => {})
+    stream._testHandleWsMessage({ type: 'content_delta', content: '是白酒龙头' }, () => {})
+    expect(stream.streamingText.value).toBe('贵州茅台是白酒龙头')
+  })
+
+  it('content_reset：整段覆盖既有累积（失败兜底显式替换）', () => {
+    const stream = useChatStream() as any
+    stream._testHandleWsMessage({ type: 'content_delta', content: '半截' }, () => {})
+    stream._testHandleWsMessage({ type: 'content_reset', content: '完整终态文本' }, () => {})
+    expect(stream.streamingText.value).toBe('完整终态文本')
+  })
+
+  it('done 前缀补尾：deltas 是字节前缀 → 只补尾部（防写完跳变）且不入 buildExecTree', () => {
+    const stream = useChatStream() as any
+    stream._testHandleWsMessage({ type: 'content_delta', content: '第一节' }, () => {})
+    stream._testHandleWsMessage({ type: 'content_delta', content: '第二节' }, () => {})
+    // DONE 全文 = 增量前缀链 + 尾节（字节全等断言：补尾结果 == DONE 全文）
+    stream._testHandleWsMessage({ type: 'done', content: '第一节第二节第三节' }, () => {})
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+    const arg = mockAppendMessage.mock.calls[0][0]
+    expect(arg.content).toBe('第一节第二节第三节')
+    // content_delta 不入 currentRunEvents（toRawWsEvent 未知类型返回 null）→ 无执行节点
+    expect(arg.execSteps).toEqual([])
+    // 既有 done 语义：流式残留清空
+    expect(stream.streamingText.value).toBe('')
+  })
+
+  it('done 前缀补尾：前缀不成立（deep/general 未走 delta 路径）→ 整体覆盖', () => {
+    const stream = useChatStream() as any
+    stream.streamingText.value = '残留半截'
+    stream._testHandleWsMessage({ type: 'done', content: '完整回答' }, () => {})
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+    const arg = mockAppendMessage.mock.calls[0][0]
+    // 必须整体覆盖，不得拼接（否则出现「残留半截完整回答」）
+    expect(arg.content).toBe('完整回答')
+    expect(arg.content).not.toContain('残留半截')
+  })
+
+  it('stop：不清空已流式半截（G8 裁决），仅清进度/思考链并结算', async () => {
+    const stream = useChatStream() as any
+    stream.send('第一条') // 触发连接（mock onOpen 同步）
+    mockSocketSend.mockClear()
+    stream.streamingText.value = '半截'
+    stream.stop()
+    expect(stream.streaming.value).toBe(false)
+    // 保留半截——由 stop_status/cancelled 分支合并「已停止生成」落消息
+    expect(stream.streamingText.value).toBe('半截')
+    const payload = JSON.parse(mockSocketSend.mock.calls[0][0].data)
+    expect(payload.type).toBe('stop')
+    expect(payload.session_id).toBeTruthy()
+  })
+
+  it('stop_status 兜底：半截 + 「已停止生成」合并落消息（pending 轮末条为 user）', () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '查一下大盘', timestamp: 1 })
+    stream.streamingText.value = '贵州茅台'
+    stream._testHandleWsMessage({ type: 'stop_status', status: 'cancelled' }, () => {})
+    expect(stream.streaming.value).toBe(false)
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+    expect(mockAppendMessage).toHaveBeenCalledWith(expect.objectContaining({ role: 'assistant', content: '贵州茅台已停止生成' }))
+  })
+
+  it('cancelled 终态：半截 + data.content 合并落消息', () => {
+    const stream = useChatStream() as any
+    stream.streamingText.value = '半截'
+    stream._testHandleWsMessage({ type: 'cancelled', content: '已停止生成' }, () => {})
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+    expect(mockAppendMessage.mock.calls[0][0].content).toBe('半截已停止生成')
+    expect(stream.streaming.value).toBe(false)
+  })
+
+  it('stop_status → 迟达 cancelled：双分支不重复 append（doneReceived 关闭本轮）', () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '查一下大盘', timestamp: 1 })
+    stream.streamingText.value = '半截'
+    stream._testHandleWsMessage({ type: 'stop_status', status: 'cancelled' }, () => {})
+    expect(mockAppendMessage).toHaveBeenCalledTimes(1)
+    expect(mockAppendMessage.mock.calls[0][0].content).toBe('半截已停止生成')
+    mockAppendMessage.mockClear()
+    // 迟到的 cancelled 终态：doneReceived 顶部早退，不得二次 append
+    stream._testHandleWsMessage({ type: 'cancelled', content: '已停止生成' }, () => {})
+    expect(mockAppendMessage).not.toHaveBeenCalled()
+  })
+
+  it('cancelled 去重（后缀判据修订）：末条已是「半截+已停止生成」时不重复 append', () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'assistant', content: '半截已停止生成', timestamp: 1 })
+    mockAppendMessage.mockClear()
+    stream._testHandleWsMessage({ type: 'cancelled', content: '已停止生成' }, () => {})
+    expect(mockAppendMessage).not.toHaveBeenCalled()
+    expect(stream.streaming.value).toBe(false)
+  })
+
+  it('未知事件：静默忽略不抛错（switch 无 default，无副作用）', () => {
+    const stream = useChatStream() as any
+    expect(() => {
+      stream._testHandleWsMessage({ type: 'unknown_event_xyz', content: 'x' }, () => {})
+    }).not.toThrow()
+    expect(stream.streamingText.value).toBe('')
+    expect(mockAppendMessage).not.toHaveBeenCalled()
+  })
+
+  it('resume 回放：content_delta 重放累积 → done 前缀补尾（回放字节前缀链）', async () => {
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'user', content: '查一下大盘', timestamp: 1 })
+    stream.send('__connect__') // 预建连接（mock onOpen 同步）
+    mockSocketSend.mockClear()
+    const p = stream.resume()
+    const sent = mockSocketSend.mock.calls[0][0]
+    expect(JSON.parse(sent.data).type).toBe('resume')
+    stream._testHandleWsMessage({ type: 'resume_status', status: 'running' }, () => {})
+    // 后端按 state.events 回放：content_delta 增量（字节前缀）+ DONE 全文
+    stream._testHandleWsMessage({ type: 'content_delta', content: '贵州茅台' }, () => {})
+    stream._testHandleWsMessage({ type: 'content_delta', content: '持续上涨' }, () => {})
+    stream._testHandleWsMessage({ type: 'done', content: '贵州茅台持续上涨，关注风险' }, () => {})
+    await p
+    expect(mockAppendMessage).toHaveBeenCalledWith(expect.objectContaining({ role: 'assistant', content: '贵州茅台持续上涨，关注风险' }))
+  })
+})

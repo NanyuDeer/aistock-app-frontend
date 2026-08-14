@@ -171,6 +171,16 @@
       }
     },
     {
+      "path": "modules/chat/pages/chat-report-detail",
+      "style": {
+        "navigationBarTitleText": "深度分析报告",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "h5": { "titleNView": false },
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
       "path": "modules/user/pages/login",
       "style": {
         "navigationBarTitleText": "登录",
