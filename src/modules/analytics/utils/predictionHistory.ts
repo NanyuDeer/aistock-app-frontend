@@ -40,6 +40,7 @@ export interface PredictionStatsView {
   total: number
   pendingCount: number
   verifiedCount: number
+  skippedCount: number
   hitRate: number | null
 }
 
@@ -47,9 +48,15 @@ export interface PredictionStatsView {
 export function computeStats(records: PredictionRecord[], today: string): PredictionStatsView {
   let pendingCount = 0
   let verifiedCount = 0
+  let skippedCount = 0
   let hitCount = 0
   let missCount = 0
   for (const record of records) {
+    // 显式跳过 skipped 记录：不计 pending/verified，单独计数（与后端 stats 语义对齐）
+    if (record.status === 'skipped') {
+      skippedCount += 1
+      continue
+    }
     if (overallStatus(record, today) === 'verified') verifiedCount += 1
     else pendingCount += 1
     for (const h of HORIZON_ORDER) {
@@ -65,6 +72,7 @@ export function computeStats(records: PredictionRecord[], today: string): Predic
     total: records.length,
     pendingCount,
     verifiedCount,
+    skippedCount,
     hitRate: comparable > 0 ? hitCount / comparable : null,
   }
 }

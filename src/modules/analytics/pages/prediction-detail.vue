@@ -10,7 +10,10 @@
       <template v-else>
         <view class="detail-head">
           <text class="detail-date">{{ record.report_date }} 溯源预测</text>
-          <view class="badge" :class="overallStatus(record, today) === 'verified' ? 'badge-done' : 'badge-ongoing'">
+          <view v-if="record.status === 'skipped'" class="badge badge-skipped">
+            <text class="badge-text">已跳过</text>
+          </view>
+          <view v-else class="badge" :class="overallStatus(record, today) === 'verified' ? 'badge-done' : 'badge-ongoing'">
             <text class="badge-text">{{ overallStatus(record, today) === 'verified' ? '已结束' : '进行中' }}</text>
           </view>
         </view>
@@ -94,4 +97,6 @@ onLoad((options) => {
 .badge-ongoing .badge-text { font-size: $font-size-xs; color: $primary; }
 .badge-done { background: $bg-soft; }
 .badge-done .badge-text { font-size: $font-size-xs; color: $text-color-tertiary; }
+.badge-skipped { background: $bg-soft; }
+.badge-skipped .badge-text { font-size: $font-size-xs; color: $text-color-tertiary; }
 </style>
