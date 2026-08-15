@@ -31,6 +31,28 @@ App 云打包真机测试发现：点击语音输入按钮弹系统提示后无�
 
 ---
 
+## [master] 2026-08-15 — 打包 App 无后端数据修复：API/WS 地址 App 端兜底线上（条件编译）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/constants.ts`：`API_BASE_URL` / `WS_BASE_URL` / `AGENT_WS_BASE_URL` 改为条件编译——App 端（APP-PLUS）env 缺失时兜底线上地址（`https://gupiao-api.yaozhineng.com`），H5/小程序保持相对路径/本地兜底；修复 HBuilderX 云打包时 env/.env.production 未注入导致 App 内请求退化相对路径 `/api`、全部接口无数据
+- `src/shared/api/request.ts`：请求 baseURL 同上加条件编译，App 端兜底线上
+- `src/shared/components/FloatingPodcast.vue` / `PodcastCard.vue`：播报音频完整 URL 拼接由 `import.meta.env.VITE_API_BASE_URL || '/api'` 改为引用 `API_BASE_URL`（App 端不再拼出相对路径导致音频无法播放）
+- `src/modules/favorites/pages/monitor.vue`：异动提醒 WebSocket 地址改用 `WS_BASE_URL`（App 端连线上而非 localhost）
+- `src/shared/api/modules/agent.ts`：异动 AI 解读 SSE URL base 改用 `API_BASE_URL`
+
+---
+
+## [master] 2026-08-14 — 风口详情页层级流向图：行业板块无 related 节点布局修复（补记 05b2b7b）
+**开发者**: changelog
+
+### 修复
+- `src/modules/market/pages/sector-detail.vue`：行业板块（881 前缀）经 `mapIndustryToChain` 取上下游，`flow_data` 无 related 节点时旧布局不分配节点位置导致流向图只剩主节点——`flowChartSvg` 对齐 Web 端 WindLeaderPanel：`hasRelated` 分流，无 related 时以主节点为枢纽（hubIds=`[mainNode.id]`），upstream/downstream 从主节点下方居中排列
+>>>>>>> origin/master
+
+---
+
 ## [changer] 2026-08-14 — 大盘溯源页预判卡片数据源切换为预判记录 + 已跳过状态展示
 
 **开发者**: changelog
