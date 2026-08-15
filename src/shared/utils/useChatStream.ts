@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AI 对话流式输出 composable — 接入 Python 后端 WebSocket
  *
  * 功能：
@@ -45,6 +45,13 @@ let currentResolve: (() => void) | null = null
 // 断连时需单独结算 streaming——否则 abortPendingSend 因 currentResolve 为 null 直接
 // return → streaming 卡 true。running 续流期置位，终态/abort/新 send 轮清位）
 let resumeInFlight = false
+// 发送后 idle 静默段超时（问题 20 R3，spec 2026-08-15）：
+// - 语义 = 静默段超时（连接保持但无任何事件），非一次性总时长；
+// - 校准期首周 30 分钟纯兜底（防自反截断校准数据）；正式值按首周真实耗时 P95 配置。
+const _STALL_TIMEOUT_MS = 1800_000
+const _STALL_CHECK_INTERVAL_MS = 10_000
+let stallTimer: ReturnType<typeof setInterval> | null = null
+let lastActivityAt = 0
 
 function connectOnce(): Promise<boolean> {
   if (sharedSocket && sharedWsConnected) return Promise.resolve(true)
@@ -134,6 +141,8 @@ export function useChatStream() {
   function handleWsMessage(data: any, onDone?: () => void) {
     // 防止 done 后继续处理事件
     if (doneReceived) return
+    // 收到任意事件刷新 idle 活动时间（终态后不再刷新：doneReceived 早退在前）
+    lastActivityAt = Date.now()
 
     // D21：收集原始事件（含前端时间戳）；done/error 由 DONE/error 分支作结束触发
     const raw = toRawWsEvent(data, Date.now())
@@ -360,8 +369,52 @@ export function useChatStream() {
     }
   }
 
+  /**
+   * idle 静默段超时兜底（问题 20 R3）：WS 发送后无任何事件超过 _STALL_TIMEOUT_MS →
+   * 落「生成超时」错误消息 + 复位流式状态 + 联动 stop + 结算 send promise（防后端 producer
+   * 卡死后 UI 永久 spinning）。无参：结算走模块级 currentResolve 单槽（与 finishRun/abortPendingSend
+   * 同一语义）；检查周期 _STALL_CHECK_INTERVAL_MS，首个严格超过阈值的 tick 才触发。
+   */
+  function startStallTimer() {
+    // 单槽：新一轮 send 先清旧定时器（防跨轮泄漏/旧定时器误触新轮 currentResolve）
+    clearStallTimer()
+    lastActivityAt = Date.now()
+    stallTimer = setInterval(() => {
+      const idleMs = Date.now() - lastActivityAt
+      if (idleMs <= _STALL_TIMEOUT_MS) return
+      // idle 超时：连接保持但后端长时间无事件 → 落错误消息 + 复位 + 联动 stop
+      clearStallTimer()
+      console.warn('[chat] stall timeout', idleMs)
+      if (!currentResolve) return
+      const r = currentResolve
+      currentResolve = null
+      doneReceived = true
+      resumeInFlight = false
+      streaming.value = false
+      progressSteps.value = []
+      streamingText.value = ''
+      currentRunReasoning.value = []
+      // 联动 stop：后端 cancel 有 finalizing/done 护栏，将成之轮不被误杀
+      if (sharedSocket && sharedWsConnected) {
+        const sid = chatStore.sessionId || `app_${Date.now()}`
+        sharedSocket.send({ data: JSON.stringify({ type: 'stop', session_id: sid }) })
+      }
+      chatStore.appendMessage({ role: 'assistant', content: '生成超时，请稍后重试', timestamp: Date.now() })
+      r()
+    }, _STALL_CHECK_INTERVAL_MS)
+  }
+
+  function clearStallTimer() {
+    if (stallTimer) {
+      clearInterval(stallTimer)
+      stallTimer = null
+    }
+  }
+
   /** 结算当前活动轮：释放单槽 currentResolve 并关闭流式状态（done/error/resume_status none 无兜底时调用） */
   function finishRun() {
+    // 终态结算：停掉 idle 超时定时器（done/error/stop_status/cancelled/confirm_request 共用）
+    clearStallTimer()
     const r = currentResolve
     currentResolve = null
     resumeInFlight = false
@@ -379,6 +432,8 @@ export function useChatStream() {
    * send 轮（currentResolve）断连维持原语义（明确报错落消息，防用户无回复）。
    */
   function abortPendingSend(reason: string) {
+    // 断连/出错：本轮不再有任何事件，idle 定时器一并清理
+    clearStallTimer()
     if (resumeInFlight) {
       resumeInFlight = false
       doneReceived = true
@@ -585,6 +640,9 @@ export function useChatStream() {
           streaming.value = false
           resolve()
         }
+        // idle 静默段超时兜底（问题 20 R3）：WS 发送后挂 idle 检查——
+        // 后端 producer 卡死无事件时，超时落错误消息 + 联动 stop 结算本轮（防 UI 永久 spinning）
+        startStallTimer()
 
         // P5-fix（问题 14）：WS 路径首轮生成 session_id 后必须写回 chatStore（此前不写回，
         // 每轮生成新 app_${Date.now()} → 后端 checkpointer 每轮新 thread → 多轮指代/纠错失效）
@@ -601,6 +659,8 @@ export function useChatStream() {
           })
         })
       })
+      // 本轮结束（done/error/超时/abort 已结算）：停掉 idle 检查
+      clearStallTimer()
     } else {
       // 降级 HTTP 非流式（带简单进度提示）
       progressSteps.value = [
@@ -652,6 +712,7 @@ export function useChatStream() {
   }
 
   function _testReset() {
+    clearStallTimer()
     sharedSocket = null
     sharedWsConnected = false
     connectPromise = null
