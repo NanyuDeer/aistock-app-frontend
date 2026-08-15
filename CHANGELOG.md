@@ -2,6 +2,25 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-15 — App 语音输入录音格式 mp3 → wav（修复真机 start 抛错「录音失败」）
+
+**开发者**: 37588
+
+### 背景
+云打包真机复测：点击麦克风显示「正在聆听」后立即弹「录音失败，请重试」——`manager.start({format:'mp3'})` 同步抛错（部分 Android ROM 缺 libmp3lame 编码器，mp3 录音不可靠）。
+
+### 修复
+- `src/shared/utils/speechInput.ts`：App 端录音 `format: 'mp3'` → `format: 'wav', sampleRate: 16000`（uni-app App 官方支持 wav 免额外插件；与后端火山 ASR format/rate 对齐）；上传 `Content-Type: audio/mpeg` → `audio/wav`；`AppRecorderManagerLike.start` 签名支持 `sampleRate`
+
+### 验证
+- `speechInput.spec.ts` 19/19（新增「wav + 16kHz 启动」断言）
+- vue-tsc 无新增错误、`uni build -p h5` 通过
+
+### 配套（后端 aistock-app-api，同 PR 窗口）
+- `VolcAsrService` `audio.format` 'mp3' → 'wav'；`/api/agent/asr` express.raw type 'audio/mpeg' → 'audio/wav'；asrController/测试同步
+
+---
+
 ## [changer] 2026-08-15 — 修复 App 真机语音输入不可用：manifest 补录音能力 + 壳层同步异常防护
 
 **开发者**: 37588

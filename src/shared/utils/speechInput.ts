@@ -184,7 +184,8 @@ export function mpRecognize(deps: MpSpeechDeps): Promise<SpeechRecognitionResult
 
 /** uni-app App 端录音管理器的最小接口（uni.getRecorderManager() 返回值形态） */
 export interface AppRecorderManagerLike {
-  start(options: { format: string }): void
+  /** format 有效值 aac/mp3/wav/PCM（App）；sampleRate 有效值 8000/16000/44100 */
+  start(options: { format: string; sampleRate?: number }): void
   stop(): void
   onStart: (() => void) | null
   onStop: ((res: { tempFilePath: string }) => void) | null
@@ -247,8 +248,10 @@ export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResu
     // App 端交互：点按开始，再点结束（stop() → onStop 结算）
     activeStop = () => manager.stop()
     try {
-      // 录音格式 mp3（iOS 不支持时降级 wav——V2 协议同样支持，免转码）
-      manager.start({ format: 'mp3' })
+      // 录音格式 wav + 16kHz 单声道（与后端火山 ASR audio.format='wav', rate=16000 一致）：
+      // - 弃用 mp3：部分 Android ROM 缺 libmp3lame 编码器，start({format:'mp3'}) 真机直接抛错（真机实测"录音失败"）
+      // - 选 wav：uni-app App 官方支持（无需额外插件），火山 V2 ASR 原生支持 format='wav'
+      manager.start({ format: 'wav', sampleRate: 16000 })
     } catch {
       activeStop = null
       setState('error')
@@ -309,7 +312,7 @@ function getAppDeps(): AppSpeechDeps | null {
           })
         }),
       uploadAudio: async (arrayBuffer) => {
-        // 二进制 body（非 multipart）：uni.request 直接发 ArrayBuffer + audio/mpeg
+        // 二进制 body（非 multipart）：uni.request 直接发 ArrayBuffer + audio/wav（与录音格式 wav 一致）
         const token = uni.getStorageSync('token') as string | undefined
         try {
           const res = await new Promise<UniNamespace.RequestSuccessCallbackResult>((resolve, reject) => {
@@ -318,7 +321,7 @@ function getAppDeps(): AppSpeechDeps | null {
               method: 'POST',
               data: arrayBuffer,
               header: {
-                'Content-Type': 'audio/mpeg',
+                'Content-Type': 'audio/wav',
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
               },
               success: resolve,
