@@ -22,6 +22,7 @@ import {
   type MpSpeechDeps,
   type MpSpeechRecognitionManagerLike,
   type AppSpeechDeps,
+  type SpeechRecognitionResult,
 } from './speechInput'
 
 /** H5 Web Speech API fake：记录 start/stop 调用，事件回调由测试手动触发 */
@@ -190,6 +191,24 @@ describe('speechInput 状态机基线', () => {
       uploadAudio: async () => ({ ok: true, text: 'x' }),
     })
     await expect(p).resolves.toEqual({ ok: false, error: '语音识别服务异常' })
+    expect(speechRecognitionState.value).toBe('error')
+  })
+
+  it('APP getRecorderManager 工厂同步抛错（壳层无防护 → 真机模块缺失时同步炸穿）：Promise 不 reject，返回错误态', async () => {
+    // G2 根因：壳层 getAppDeps/bridgeRecorder 无异常防护，uni.getRecorderManager() 抛错
+    // 或返回 null 使 bridgeRecorder 抛 TypeError 时，appRecognize 内 deps.getRecorderManager()
+    // 同步炸穿 → handleMicTap L577（try 外）isListening 卡 true。判别联合契约要求此处不 reject。
+    let pending: Promise<SpeechRecognitionResult> | undefined
+    expect(() => {
+      pending = appRecognize({
+        getRecorderManager: () => {
+          throw new TypeError("Cannot read properties of null (reading 'onStart')")
+        },
+        readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
+        uploadAudio: async () => ({ ok: true, text: 'x' }),
+      })
+    }).not.toThrow()
+    await expect(pending!).resolves.toEqual({ ok: false, error: '语音识别服务异常' })
     expect(speechRecognitionState.value).toBe('error')
   })
 })

@@ -203,7 +203,15 @@ export interface AppSpeechDeps {
 
 /** APP 单次识别（@internal 测试钩子：依赖注入；公共入口见 startSpeechRecognition） */
 export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResult> {
-  const manager = deps.getRecorderManager()
+  let manager: AppRecorderManagerLike | null
+  try {
+    // G2 防护：真机模块缺失/权限异常时 getRecorderManager 可能同步抛错或返回 null，
+    // 同步异常必须转错误态而非炸穿调用方（handleMicTap L577 同步段在 try 外）
+    manager = deps.getRecorderManager()
+  } catch {
+    setState('error')
+    return Promise.resolve({ ok: false, error: APP_UPLOAD_FAIL_HINT })
+  }
   if (!manager) {
     setState('error')
     return Promise.resolve({ ok: false, error: APP_UPLOAD_FAIL_HINT })
@@ -272,60 +280,66 @@ function bridgeRecorder(recorder: UniNamespace.RecorderManager): AppRecorderMana
 /** APP 平台壳层：真实依赖注入（uni 全局；生产路径） */
 function getAppDeps(): AppSpeechDeps | null {
   // #ifdef APP-PLUS
-  const recorder = uni.getRecorderManager()
-  const fs = uni.getFileSystemManager?.()
-  return {
-    getRecorderManager: () => bridgeRecorder(recorder),
-    readFileAsArrayBuffer: (tempFilePath) =>
-      new Promise<ArrayBuffer>((resolve, reject) => {
-        fs.readFile({
-          filePath: tempFilePath,
-          success: (res) => {
-            // data 类型为 string | ArrayBuffer：先按 string（base64）收窄，避免联合类型 instanceof 报错
-            if (typeof res.data === 'string') {
-              // base64 字符串（部分平台 readFile 无 arrayBuffer 选项时返回 base64）
-              const bin = atob(res.data)
-              const bytes = new Uint8Array(bin.length)
-              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-              resolve(bytes.buffer as ArrayBuffer)
-            } else if (res.data instanceof ArrayBuffer) {
-              resolve(res.data)
-            } else {
-              reject(new Error('读取录音文件失败'))
-            }
-          },
-          fail: reject,
-        })
-      }),
-    uploadAudio: async (arrayBuffer) => {
-      // 二进制 body（非 multipart）：uni.request 直接发 ArrayBuffer + audio/mpeg
-      const token = uni.getStorageSync('token') as string | undefined
-      try {
-        const res = await new Promise<UniNamespace.RequestSuccessCallbackResult>((resolve, reject) => {
-          uni.request({
-            url: `${API_BASE_URL}/agent/asr`,
-            method: 'POST',
-            data: arrayBuffer,
-            header: {
-              'Content-Type': 'audio/mpeg',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  try {
+    // G2 防护：真机缺 Record 模块/录音权限时 uni.getRecorderManager() 可能抛错或返回 null，
+    // 壳层必须兜底为 null（走 startAppRecognition 的错误态），不得同步炸穿 handleMicTap
+    const recorder = uni.getRecorderManager()
+    const fs = uni.getFileSystemManager?.()
+    return {
+      getRecorderManager: () => bridgeRecorder(recorder),
+      readFileAsArrayBuffer: (tempFilePath) =>
+        new Promise<ArrayBuffer>((resolve, reject) => {
+          fs.readFile({
+            filePath: tempFilePath,
+            success: (res) => {
+              // data 类型为 string | ArrayBuffer：先按 string（base64）收窄，避免联合类型 instanceof 报错
+              if (typeof res.data === 'string') {
+                // base64 字符串（部分平台 readFile 无 arrayBuffer 选项时返回 base64）
+                const bin = atob(res.data)
+                const bytes = new Uint8Array(bin.length)
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+                resolve(bytes.buffer as ArrayBuffer)
+              } else if (res.data instanceof ArrayBuffer) {
+                resolve(res.data)
+              } else {
+                reject(new Error('读取录音文件失败'))
+              }
             },
-            success: resolve,
             fail: reject,
           })
-        })
-        const body = (res.data ?? {}) as { code?: number; message?: string; text?: string }
-        if (res.statusCode === 200 && typeof body?.text === 'string') {
-          return { ok: true, text: body.text }
+        }),
+      uploadAudio: async (arrayBuffer) => {
+        // 二进制 body（非 multipart）：uni.request 直接发 ArrayBuffer + audio/mpeg
+        const token = uni.getStorageSync('token') as string | undefined
+        try {
+          const res = await new Promise<UniNamespace.RequestSuccessCallbackResult>((resolve, reject) => {
+            uni.request({
+              url: `${API_BASE_URL}/agent/asr`,
+              method: 'POST',
+              data: arrayBuffer,
+              header: {
+                'Content-Type': 'audio/mpeg',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              success: resolve,
+              fail: reject,
+            })
+          })
+          const body = (res.data ?? {}) as { code?: number; message?: string; text?: string }
+          if (res.statusCode === 200 && typeof body?.text === 'string') {
+            return { ok: true, text: body.text }
+          }
+          if (res.statusCode === 401) {
+            return { ok: false, error: '请先登录' }
+          }
+          return { ok: false, error: body?.message || APP_UPLOAD_FAIL_HINT }
+        } catch {
+          return { ok: false, error: APP_UPLOAD_FAIL_HINT }
         }
-        if (res.statusCode === 401) {
-          return { ok: false, error: '请先登录' }
-        }
-        return { ok: false, error: body?.message || APP_UPLOAD_FAIL_HINT }
-      } catch {
-        return { ok: false, error: APP_UPLOAD_FAIL_HINT }
-      }
-    },
+      },
+    }
+  } catch {
+    return null
   }
   // #endif
   return null
