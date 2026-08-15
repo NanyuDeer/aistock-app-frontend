@@ -99,7 +99,7 @@
               <view class="msg-footer">
                 <text v-if="msg.tokenUsage" class="turn-usage">{{ msg.tokenUsage.total_tokens }} tokens</text>
                 <view
-                  v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了') && !msg.content.startsWith('已停止生成')"
+                  v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了') && !msg.content.endsWith('已停止生成')"
                   class="deep-btn"
                   @tap="rerunDeep(idx)"
                 >
@@ -108,7 +108,7 @@
                 </view>
                 <!-- Phase 2 Part 2：error/cancelled 终态消息「重试」按钮（重发最近一轮 user 消息） -->
                 <view
-                  v-if="msg.role === 'assistant' && (msg.content.startsWith('抱歉，出错了') || msg.content.startsWith('已停止生成'))"
+                  v-if="msg.role === 'assistant' && (msg.content.startsWith('抱歉，出错了') || msg.content.endsWith('已停止生成'))"
                   class="retry-btn"
                   @tap="chatStream.retry()"
                 >
@@ -669,7 +669,7 @@ function followupQuestions(msg: ChatMessage): string[] {
  */
 function showFeedbackBar(msg: ChatMessage): boolean {
   if (msg.role !== 'assistant' || !msg.content) return false
-  return !msg.content.startsWith('抱歉，出错了') && !msg.content.startsWith('已停止生成')
+  return !msg.content.startsWith('抱歉，出错了') && !msg.content.endsWith('已停止生成')
 }
 
 /**

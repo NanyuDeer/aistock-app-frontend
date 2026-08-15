@@ -1,30 +1,40 @@
+<!--
+  涨停雷达洞察详情页（limit_up_radar 专用）：
+  归因结果公共区块（InsightResultBlock） + 原始来源（来源文章/关键词/发布时间）。
+  价格异动洞察见 insight-detail-move.vue（两页独立，列表按 event_type 分流）。
+-->
 <template>
-  <SubPageCard2 title="洞察详情">
-    <LoadingState v-if="loading" />
-    <EmptyState
-      v-else-if="!detail"
-      title="洞察不存在或已过期"
-      description="可能已被清理，请返回列表重试"
-    />
-    <InsightDetailLayout
-      v-else
-      :detail="detail"
-      @open-source="openSource"
-    />
-  </SubPageCard2>
+  <view class="page-insight-detail">
+    <view v-if="loading" class="state"><text>加载中</text></view>
+    <view v-else-if="!detail" class="state"><text>洞察不存在或已过期</text></view>
+    <block v-else>
+      <view class="sec-title">{{ detail.stock_name }}（{{ detail.symbol }}）· {{ fmtDate(detail.trade_date) }}</view>
+      <InsightResultBlock :insight="detail" />
+      <!-- 原始来源：仅一期事件（limit_up_radar 有来源文章）展示；价格异动事件由 insight-detail-move 的"事件原因"替代 -->
+      <block v-if="detail.source_id">
+        <view class="sec-title">原始来源</view>
+        <view class="src" @tap="openSource">{{ detail.title }}</view>
+        <view v-if="detail.keywords?.length" class="keywords">原始关键词：{{ detail.keywords.join(' / ') }}</view>
+        <view class="meta">发布时间：{{ detail.published_at }}</view>
+      </block>
+    </block>
+  </view>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
-import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import LoadingState from '@/shared/components/LoadingState.vue'
-import EmptyState from '@/shared/components/EmptyState.vue'
-import InsightDetailLayout from '@/modules/favorites/components/InsightDetailLayout.vue'
+import InsightResultBlock from '@/shared/components/InsightResultBlock.vue'
 
 const detail = ref<WatchlistInsight | null>(null)
 const loading = ref(true)
+
+/** trade_date（DATE/ISO）→ "YYYY-MM-DD" */
+function fmtDate(v?: string | Date): string {
+  if (!v) return ''
+  return String(v).slice(0, 10)
+}
 
 /** 原始来源跳转：H5 新窗口打开，非 H5 复制链接到剪贴板（与 stock-trace 证据跳转一致） */
 function openSource() {
@@ -48,7 +58,6 @@ onLoad(async (query) => {
     return
   }
   try {
-    // 自选股洞察详情：接口返回空/失败时展示空状态（EmptyState 兜底）
     detail.value = await watchlistInsightApi.getInsightDetail(eventId)
   } catch {
     detail.value = null
@@ -59,5 +68,42 @@ onLoad(async (query) => {
 </script>
 
 <style lang="scss" scoped>
-/* 组件内无自定义样式，所有视觉由 SubPageCard2 + InsightDetailLayout 提供 */
+@use '@/shared/styles/variables.scss' as *;
+
+.page-insight-detail {
+  min-height: 100%;
+  padding: $s-3;
+  background: $bg-page;
+}
+
+.state {
+  padding: $s-10;
+  text-align: center;
+  font-size: $font-size-sm;
+  color: $ink-soft;
+}
+
+.sec-title {
+  margin: $s-4 0 $s-2;
+  font-size: $font-size-base;
+  font-weight: 600;
+  color: $ink;
+}
+
+.src {
+  margin-top: $s-2;
+  padding: $s-3;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+  font-size: $font-size-sm;
+  color: $primary;
+}
+
+.keywords,
+.meta {
+  margin-top: $s-2;
+  font-size: $font-size-xs;
+  color: $ink-soft;
+}
 </style>

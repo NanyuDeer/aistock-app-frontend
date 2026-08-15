@@ -59,11 +59,10 @@ export function useEventList() {
 
       const res = await getEventList(params)
 
-      // 客户端过滤：按事件类型筛选
+      // 方案A（2026-08-14）：事件类型由服务端筛选 + 服务端分页（getEventList 透传
+      // eventType），前端不再对分页结果做 eventType 二次过滤——否则第 1 页恰好无该
+      // 类型时列表为空且 hasMore 失效（旧 bug）。
       let filtered = res.events
-      if (activeType.value !== '全部') {
-        filtered = filtered.filter(e => e.eventType === activeType.value)
-      }
 
       // 客户端过滤：仅已关注
       if (filterParams.value.followedOnly) {
@@ -82,10 +81,10 @@ export function useEventList() {
         events.value = [...events.value, ...enrichedEvents]
       }
 
-      // 更新分页信息（基于过滤后的结果估算）
+      // 更新分页信息（total/hasMore 直接采用服务端筛选后结果）
       currentPage.value = res.page
-      total.value = filtered.length
-      hasMore.value = res.hasMore && filtered.length > 0
+      total.value = res.total
+      hasMore.value = res.hasMore
     } catch (err) {
       error.value = (err as Error).message || '加载事件列表失败'
     } finally {

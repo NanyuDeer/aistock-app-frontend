@@ -9,16 +9,19 @@
  * node:test 下也能安全加载（vitest describe/it 在 node:test 运行时为空操作）。
  */
 import { describe, it, expect, beforeEach } from 'vitest'
+import assert from 'node:assert/strict'
 import {
   h5Recognize,
   mpRecognize,
   appRecognize,
   stopSpeechRecognition,
   speechRecognitionState,
+  EMPTY_TRANSCRIPT_HINT,
   type H5SpeechDeps,
   type H5SpeechRecognitionLike,
   type MpSpeechDeps,
   type MpSpeechRecognitionManagerLike,
+  type AppSpeechDeps,
 } from './speechInput'
 
 /** H5 Web Speech API fake：记录 start/stop 调用，事件回调由测试手动触发 */
@@ -180,9 +183,93 @@ describe('speechInput 状态机基线', () => {
     expect(speechRecognitionState.value).toBe('error')
   })
 
-  it('APP v1 降级：返回「当前版本暂不支持语音输入」错误态', async () => {
-    const p = appRecognize()
-    await expect(p).resolves.toEqual({ ok: false, error: '当前版本暂不支持语音输入' })
+  it('APP 录音管理器不可用：返回「语音识别服务异常」错误态', async () => {
+    const p = appRecognize({
+      getRecorderManager: () => null,
+      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
+      uploadAudio: async () => ({ ok: true, text: 'x' }),
+    })
+    await expect(p).resolves.toEqual({ ok: false, error: '语音识别服务异常' })
     expect(speechRecognitionState.value).toBe('error')
+  })
+})
+
+// ===== APP 分支（批次 3a：后端 ASR 真实链路） =====
+
+/** 可编程录音管理器 mock（uni.getRecorderManager() 返回值形态） */
+const mockRecorder: {
+  start(options: { format: string }): void
+  stop(): void
+  onStart: (() => void) | null
+  onStop: ((res: { tempFilePath: string }) => void) | null
+  onError: ((res: { errMsg?: string }) => void) | null
+  emitStart(): void
+  emitStop(tempFilePath: string): void
+  emitError(errMsg: string): void
+} = {
+  start(_options: { format: string }) {},
+  stop() {},
+  onStart: null,
+  onStop: null,
+  onError: null,
+  emitStart() { this.onStart?.() },
+  emitStop(tempFilePath: string) { this.onStop?.({ tempFilePath }) },
+  emitError(errMsg: string) { this.onError?.({ errMsg }) },
+}
+
+describe('appRecognize', () => {
+  it('录音成功 → 上传 → 回填文本', async () => {
+    const deps: AppSpeechDeps = {
+      getRecorderManager: () => mockRecorder,
+      readFileAsArrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+      uploadAudio: async () => ({ ok: true, text: '贵州茅台' }),
+    }
+    // 启动录音
+    const pending = appRecognize(deps)
+    mockRecorder.emitStart()
+    // 用户结束录音 → onStop 给临时路径
+    mockRecorder.emitStop('/tmp/rec.mp3')
+    const result = await pending
+    assert.deepEqual(result, { ok: true, text: '贵州茅台' })
+    assert.equal(speechRecognitionState.value, 'idle')
+  })
+
+  it('录音失败 → error 分支', async () => {
+    const deps: AppSpeechDeps = {
+      getRecorderManager: () => mockRecorder,
+      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
+      uploadAudio: async () => ({ ok: true, text: 'x' }),
+    }
+    const pending = appRecognize(deps)
+    mockRecorder.emitError('no permission')
+    const result = await pending
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.match(result.error, /录音失败/)
+  })
+
+  it('上传 503 → 错误信息透出', async () => {
+    const deps: AppSpeechDeps = {
+      getRecorderManager: () => mockRecorder,
+      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
+      uploadAudio: async () => ({ ok: false, error: '语音识别暂不可用' }),
+    }
+    const pending = appRecognize(deps)
+    mockRecorder.emitStart()
+    mockRecorder.emitStop('/tmp/rec.mp3')
+    const result = await pending
+    assert.deepEqual(result, { ok: false, error: '语音识别暂不可用' })
+  })
+
+  it('空文本 → 未识别到语音', async () => {
+    const deps: AppSpeechDeps = {
+      getRecorderManager: () => mockRecorder,
+      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
+      uploadAudio: async () => ({ ok: true, text: '' }),
+    }
+    const pending = appRecognize(deps)
+    mockRecorder.emitStart()
+    mockRecorder.emitStop('/tmp/rec.mp3')
+    const result = await pending
+    assert.deepEqual(result, { ok: false, error: EMPTY_TRANSCRIPT_HINT })
   })
 })

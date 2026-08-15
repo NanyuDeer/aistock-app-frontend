@@ -1,5 +1,5 @@
 <template>
-  <view v-if="hasData" class="da-card">
+  <view v-if="hasData" class="da-card" :hover-class="reportId ? 'da-card-hover' : 'none'" @tap="goDetail">
     <view class="da-header">
       <text class="da-title">{{ card.title }}</text>
       <text v-if="workerLabel" class="da-tag">{{ workerLabel }}</text>
@@ -51,6 +51,13 @@ const createdText = computed(() => {
   return d.isSame(dayjs(), 'day') ? d.format('HH:mm') : d.format('MM-DD HH:mm')
 })
 const hasData = computed(() => !!workerLabel.value || !!summary.value || symbols.value.length > 0 || tagCodes.value.length > 0 || !!createdText.value)
+
+/** 改进 19：整卡跳转报告详情。report_id 缺失（未登录/落库失败）→ 不跳转、不发请求（硬约束 8） */
+const reportId = computed(() => data.value.report_id ?? '')
+const goDetail = () => {
+  if (!reportId.value) return
+  uni.navigateTo({ url: '/modules/chat/pages/chat-report-detail?reportId=' + reportId.value })
+}
 </script>
 
 <style lang="scss" scoped>
@@ -61,6 +68,9 @@ const hasData = computed(() => !!workerLabel.value || !!summary.value || symbols
   border-radius: $r-md;
   overflow: hidden;
   box-shadow: $shadow-card;
+}
+.da-card-hover {
+  opacity: 0.85;
 }
 .da-header {
   display: flex;

@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { rpxToVw } from '@/shared/utils/rpx'
+import { rpxToPx } from '@/shared/utils/rpx'
 
 const props = withDefaults(defineProps<{
   data: number[]
@@ -48,9 +48,9 @@ const props = withDefaults(defineProps<{
   height: '80rpx'
 })
 
-/** rpx → vw 转换（H5 预览环境内联样式不识别 rpx） */
-const computedWidth = computed(() => rpxToVw(props.width))
-const computedHeight = computed(() => rpxToVw(props.height))
+/** rpx → 固定 px 转换（按项目 390px 设计基准；height 为固定设计尺寸，不随视口缩放；width '100%' 原样透传） */
+const computedWidth = computed(() => rpxToPx(props.width))
+const computedHeight = computed(() => rpxToPx(props.height))
 
 // 每个实例独立的渐变 id，避免多实例共用同一 id 导致渐变引用错乱
 const gradId = 'as-spark-' + Math.random().toString(36).slice(2, 9)

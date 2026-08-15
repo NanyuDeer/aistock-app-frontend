@@ -295,6 +295,8 @@ export interface WindLeaderSector {
   upstream_stocks?: WindLeaderStock[]
   downstream_stocks?: WindLeaderStock[]
   leading_stock_info?: WindLeaderStock | null
+  /** 长期趋势龙头：板块成分股中 trend_scores 评分最高（长线榜展示，无命中回退 main_stocks 最高分） */
+  long_leader?: WindLeaderStock | null
   flow_data?: WindLeaderFlowData | null
 }
 

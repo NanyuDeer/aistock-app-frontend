@@ -218,3 +218,53 @@ test('createAgentWebSocket URL 携带 token query（P0 WS 握手鉴权）', asyn
     await server.close()
   }
 })
+
+test('getChatAnalysisReport 解包拦截器返回体（正常态 body / 空态 null）', async () => {
+  const server = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    resolve: { alias: { '@': path.resolve(process.cwd(), 'src') } },
+    server: { middlewareMode: true },
+    appType: 'custom',
+    ssr: { noExternal: ['pinia'] },
+  })
+
+  try {
+    const piniaModule = await server.ssrLoadModule('pinia')
+    piniaModule.setActivePinia(piniaModule.createPinia())
+    const requestModule = await server.ssrLoadModule('/src/shared/api/request.ts')
+    const agentModule = await server.ssrLoadModule('/src/shared/api/modules/agent.ts')
+    const request = requestModule.default
+    const originalGet = request.get
+    const calls: string[] = []
+
+    // 正常态：拦截器对 {code:0, data: report} 已解包为 report body → 方法原样返回
+    const report = { id: 42, report_type: 'chat_analysis', report_date: '2026-08-02', content: { schema_version: '2.0' } }
+    request.get = ((url: string) => {
+      calls.push(url)
+      return Promise.resolve(report)
+    }) as typeof request.get
+    try {
+      const res = await agentModule.agentApi.getChatAnalysisReport(42)
+      assert.deepEqual(res, report)
+    } finally {
+      request.get = originalGet
+    }
+
+    // 空态：拦截器对 {code:0, data:null} 返回整个信封对象 → 方法必须判 null
+    request.get = ((url: string) => {
+      calls.push(url)
+      return Promise.resolve({ code: 0, data: null })
+    }) as typeof request.get
+    try {
+      const res = await agentModule.agentApi.getChatAnalysisReport(999)
+      assert.strictEqual(res, null)
+    } finally {
+      request.get = originalGet
+    }
+
+    assert.deepEqual(calls, ['/agent/report/chat/42', '/agent/report/chat/999'])
+  } finally {
+    await server.close()
+  }
+})

@@ -78,8 +78,8 @@ export interface EventItem {
   contentPreview?: string
   /** 事件类型 */
   eventType: EventType
-  /** 重要性评分 1-5 */
-  importance: number
+  /** 重要性评分 1-5（由 chain 最大 impactStrength 映射；无有效评分时为 undefined，前端隐藏星级） */
+  importance?: number
   /** 受影响的行业列表 */
   affectedIndustries: AffectedIndustry[]
   /** 前端展示专用：行业影响摘要（列表接口直出，旧数据缺失） */

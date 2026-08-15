@@ -21,6 +21,7 @@
  * 不含 TTS。不触碰 WS/useChatStream（Task 3/4 范围）。
  */
 import { shallowRef } from 'vue'
+import { API_BASE_URL } from './constants'
 
 export type SpeechRecognitionState = 'idle' | 'recording' | 'recognizing' | 'error'
 
@@ -34,7 +35,9 @@ export const speechRecognitionState = shallowRef<SpeechRecognitionState>('idle')
 const H5_UNSUPPORTED_HINT = '语音输入仅支持 Chrome 浏览器'
 const MP_UNAVAILABLE_HINT = '语音输入暂不可用'
 const APP_UNSUPPORTED_HINT = '当前版本暂不支持语音输入'
-const EMPTY_TRANSCRIPT_HINT = '未识别到语音'
+export const EMPTY_TRANSCRIPT_HINT = '未识别到语音'
+const APP_RECORD_FAIL_HINT = '录音失败，请重试'
+const APP_UPLOAD_FAIL_HINT = '语音识别服务异常'
 
 /** 进行中的识别会话的停止回调（stopSpeechRecognition 触发；onend/onerror/onStop 后清空） */
 let activeStop: (() => void) | null = null
@@ -177,12 +180,155 @@ export function mpRecognize(deps: MpSpeechDeps): Promise<SpeechRecognitionResult
   })
 }
 
-// ===== APP-PLUS：v1 降级（无内置 ASR） =====
+// ===== APP-PLUS：后端 ASR 真实链路（批次 3a） =====
 
-/** APP v1 降级（@internal 测试钩子；公共入口见 startSpeechRecognition） */
-export function appRecognize(): Promise<SpeechRecognitionResult> {
-  setState('error')
-  return Promise.resolve({ ok: false, error: APP_UNSUPPORTED_HINT })
+/** uni-app App 端录音管理器的最小接口（uni.getRecorderManager() 返回值形态） */
+export interface AppRecorderManagerLike {
+  start(options: { format: string }): void
+  stop(): void
+  onStart: (() => void) | null
+  onStop: ((res: { tempFilePath: string }) => void) | null
+  onError: ((res: { errMsg?: string }) => void) | null
+}
+
+/** APP 识别依赖（依赖注入，供单测替换平台全局；生产由 appRecognize 壳层注入） */
+export interface AppSpeechDeps {
+  /** 录音管理器工厂（不可用时返回 null） */
+  getRecorderManager(): AppRecorderManagerLike | null
+  /** 读取录音临时文件为 ArrayBuffer */
+  readFileAsArrayBuffer(tempFilePath: string): Promise<ArrayBuffer>
+  /** 上传音频到 app-api（JWT 携带于内部），返回判别联合 */
+  uploadAudio(arrayBuffer: ArrayBuffer): Promise<SpeechRecognitionResult>
+}
+
+/** APP 单次识别（@internal 测试钩子：依赖注入；公共入口见 startSpeechRecognition） */
+export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResult> {
+  const manager = deps.getRecorderManager()
+  if (!manager) {
+    setState('error')
+    return Promise.resolve({ ok: false, error: APP_UPLOAD_FAIL_HINT })
+  }
+  setState('recording')
+  return new Promise((resolve) => {
+    manager.onStart = () => {
+      // 录音中（UI 镜像由页面 isListening 控制；此处仅维护模块状态）
+    }
+    manager.onStop = async (res) => {
+      activeStop = null
+      setState('recognizing')
+      try {
+        const arrayBuffer = await deps.readFileAsArrayBuffer(res.tempFilePath)
+        const result = await deps.uploadAudio(arrayBuffer)
+        if (result.ok && !result.text.trim()) {
+          setState('error')
+          resolve({ ok: false, error: EMPTY_TRANSCRIPT_HINT })
+          return
+        }
+        setState(result.ok ? 'idle' : 'error')
+        resolve(result)
+      } catch {
+        setState('error')
+        resolve({ ok: false, error: APP_RECORD_FAIL_HINT })
+      }
+    }
+    manager.onError = (res) => {
+      activeStop = null
+      setState('error')
+      resolve({ ok: false, error: res?.errMsg ? `录音失败（${res.errMsg}）` : APP_RECORD_FAIL_HINT })
+    }
+    // App 端交互：点按开始，再点结束（stop() → onStop 结算）
+    activeStop = () => manager.stop()
+    try {
+      // 录音格式 mp3（iOS 不支持时降级 wav——V2 协议同样支持，免转码）
+      manager.start({ format: 'mp3' })
+    } catch {
+      activeStop = null
+      setState('error')
+      resolve({ ok: false, error: APP_RECORD_FAIL_HINT })
+    }
+  })
+}
+
+/** 桥接 uni RecorderManager 方法式回调（onStop(cb)）→ 属性式契约（AppRecorderManagerLike） */
+function bridgeRecorder(recorder: UniNamespace.RecorderManager): AppRecorderManagerLike {
+  let onStart: (() => void) | null = null
+  let onStop: ((res: { tempFilePath: string }) => void) | null = null
+  let onError: ((res: { errMsg?: string }) => void) | null = null
+  recorder.onStart(() => onStart?.())
+  recorder.onStop((res) => onStop?.(res as { tempFilePath: string }))
+  recorder.onError((res) => onError?.(res as { errMsg?: string }))
+  return {
+    start: (options) => recorder.start(options),
+    stop: () => recorder.stop(),
+    get onStart() { return onStart },
+    set onStart(fn) { onStart = fn },
+    get onStop() { return onStop },
+    set onStop(fn) { onStop = fn },
+    get onError() { return onError },
+    set onError(fn) { onError = fn },
+  }
+}
+
+/** APP 平台壳层：真实依赖注入（uni 全局；生产路径） */
+function getAppDeps(): AppSpeechDeps | null {
+  // #ifdef APP-PLUS
+  const recorder = uni.getRecorderManager()
+  const fs = uni.getFileSystemManager?.()
+  return {
+    getRecorderManager: () => bridgeRecorder(recorder),
+    readFileAsArrayBuffer: (tempFilePath) =>
+      new Promise<ArrayBuffer>((resolve, reject) => {
+        fs.readFile({
+          filePath: tempFilePath,
+          success: (res) => {
+            // data 类型为 string | ArrayBuffer：先按 string（base64）收窄，避免联合类型 instanceof 报错
+            if (typeof res.data === 'string') {
+              // base64 字符串（部分平台 readFile 无 arrayBuffer 选项时返回 base64）
+              const bin = atob(res.data)
+              const bytes = new Uint8Array(bin.length)
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+              resolve(bytes.buffer as ArrayBuffer)
+            } else if (res.data instanceof ArrayBuffer) {
+              resolve(res.data)
+            } else {
+              reject(new Error('读取录音文件失败'))
+            }
+          },
+          fail: reject,
+        })
+      }),
+    uploadAudio: async (arrayBuffer) => {
+      // 二进制 body（非 multipart）：uni.request 直接发 ArrayBuffer + audio/mpeg
+      const token = uni.getStorageSync('token') as string | undefined
+      try {
+        const res = await new Promise<UniNamespace.RequestSuccessCallbackResult>((resolve, reject) => {
+          uni.request({
+            url: `${API_BASE_URL}/agent/asr`,
+            method: 'POST',
+            data: arrayBuffer,
+            header: {
+              'Content-Type': 'audio/mpeg',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            success: resolve,
+            fail: reject,
+          })
+        })
+        const body = (res.data ?? {}) as { code?: number; message?: string; text?: string }
+        if (res.statusCode === 200 && typeof body?.text === 'string') {
+          return { ok: true, text: body.text }
+        }
+        if (res.statusCode === 401) {
+          return { ok: false, error: '请先登录' }
+        }
+        return { ok: false, error: body?.message || APP_UPLOAD_FAIL_HINT }
+      } catch {
+        return { ok: false, error: APP_UPLOAD_FAIL_HINT }
+      }
+    },
+  }
+  // #endif
+  return null
 }
 
 // ===== 平台壳层（uni 条件编译分发） =====
@@ -196,7 +342,7 @@ export function isSpeechInputSupported(): boolean {
   return getMpManager() !== null
   // #endif
   // #ifdef APP-PLUS
-  return false
+  return true
   // #endif
   return false
 }
@@ -210,9 +356,20 @@ export function startSpeechRecognition(): Promise<SpeechRecognitionResult> {
   return mpRecognize({ getRecognitionManager: getMpManager })
   // #endif
   // #ifdef APP-PLUS
-  return appRecognize()
+  return startAppRecognition(getAppDeps())
   // #endif
   return Promise.resolve({ ok: false, error: APP_UNSUPPORTED_HINT })
+}
+
+/**
+ * APP 分支入口（独立函数保证收窄发生在可达代码内——#ifdef 平台 return 使
+ * startSpeechRecognition 内 APP-PLUS 分支在 vue-tsc 视角不可达，CFG 不做收窄）
+ */
+function startAppRecognition(deps: AppSpeechDeps | null): Promise<SpeechRecognitionResult> {
+  if (!deps) {
+    return Promise.resolve({ ok: false, error: APP_UPLOAD_FAIL_HINT })
+  }
+  return appRecognize(deps)
 }
 
 /** 结束当前识别（H5 提前结束取结果 / 小程序 stop() 结算；无进行中会话为 no-op） */
