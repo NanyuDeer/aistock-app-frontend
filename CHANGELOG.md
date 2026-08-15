@@ -2,6 +2,35 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-15 — 修复 App 真机语音输入不可用：manifest 补录音能力 + 壳层同步异常防护
+
+**开发者**: 37588
+
+### 背景
+App 云打包真机测试发现：点击语音输入按钮弹系统提示后无法录音回填。正反辩论定位为两条链路叠加：
+1. `manifest.json` 未配置录音能力（`modules` 缺 Record、Android permissions 缺 `RECORD_AUDIO`、iOS 缺 `NSMicrophoneUsageDescription`）→ 云打包 APK 运行时录音模块缺失弹原生提示；
+2. 代码级缺陷：`handleMicTap` 在 try 外同步调用 `startSpeechRecognition()`，壳层 `getAppDeps`/`bridgeRecorder` 无异常防护 → 录音管理器抛错时按钮卡死无提示。
+
+### 修复
+- `src/manifest.json`：
+  - `app-plus.modules` 新增 `"Record"`（录音模块，云打包必需）
+  - Android `permissions` 新增 `android.permission.RECORD_AUDIO`
+  - iOS `distribute.ios.privacyDescription` 新增 `NSMicrophoneUsageDescription`（"用于语音输入"，防 iOS 无描述直接崩溃）
+- `src/shared/utils/speechInput.ts`：
+  - `appRecognize` 对 `deps.getRecorderManager()` 增加 try/catch 防护（同步异常转错误态，Promise 永不 reject，不炸穿调用方）
+  - `getAppDeps` 壳层整体 try/catch（`uni.getRecorderManager()` 异常时返回 null 走错误降级）
+
+### 验证
+- `speechInput.spec.ts` 18/18 通过（新增 1 个 G2 防护测试：getRecorderManager 同步抛错 → 错误态，不 reject）
+- 全量 vitest 与 vue-tsc 无新增失败（insight-detail/TraceabilityPage 8 个失败为既有基线，stash 验证）
+- `uni build -p h5` 构建通过
+
+### 待办（组长）
+- 重新云打包 APK（含 Record 模块 + RECORD_AUDIO）
+- 后端配置 `VOLC_ASR_APPID/TOKEN/CLUSTER` 火山凭证（否则录音后上传 503）
+
+---
+
 ## [changer] 2026-08-14 — 大盘溯源页预判卡片数据源切换为预判记录 + 已跳过状态展示
 
 **开发者**: changelog
