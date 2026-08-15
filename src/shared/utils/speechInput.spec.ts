@@ -217,7 +217,7 @@ describe('speechInput 状态机基线', () => {
 
 /** 可编程录音管理器 mock（uni.getRecorderManager() 返回值形态） */
 const mockRecorder: {
-  start(options: { format: string }): void
+  start(options: { format: string; sampleRate?: number }): void
   stop(): void
   onStart: (() => void) | null
   onStop: ((res: { tempFilePath: string }) => void) | null
@@ -226,7 +226,7 @@ const mockRecorder: {
   emitStop(tempFilePath: string): void
   emitError(errMsg: string): void
 } = {
-  start(_options: { format: string }) {},
+  start(_options: { format: string; sampleRate?: number }) {},
   stop() {},
   onStart: null,
   onStop: null,
@@ -247,10 +247,27 @@ describe('appRecognize', () => {
     const pending = appRecognize(deps)
     mockRecorder.emitStart()
     // 用户结束录音 → onStop 给临时路径
-    mockRecorder.emitStop('/tmp/rec.mp3')
+    mockRecorder.emitStop('/tmp/rec.wav')
     const result = await pending
     assert.deepEqual(result, { ok: true, text: '贵州茅台' })
     assert.equal(speechRecognitionState.value, 'idle')
+  })
+
+  it('录音以 wav + 16kHz 启动（与后端火山 ASR format/rate 一致，防 mp3 真机编码器缺失）', () => {
+    let startOptions: { format: string; sampleRate?: number } | null = null
+    const recorder = {
+      start(options: { format: string; sampleRate?: number }) { startOptions = options },
+      stop() {},
+      onStart: null as (() => void) | null,
+      onStop: null as ((res: { tempFilePath: string }) => void) | null,
+      onError: null as ((res: { errMsg?: string }) => void) | null,
+    }
+    appRecognize({
+      getRecorderManager: () => recorder,
+      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
+      uploadAudio: async () => ({ ok: true, text: 'x' }),
+    })
+    assert.deepEqual(startOptions, { format: 'wav', sampleRate: 16000 })
   })
 
   it('录音失败 → error 分支', async () => {
@@ -274,7 +291,7 @@ describe('appRecognize', () => {
     }
     const pending = appRecognize(deps)
     mockRecorder.emitStart()
-    mockRecorder.emitStop('/tmp/rec.mp3')
+    mockRecorder.emitStop('/tmp/rec.wav')
     const result = await pending
     assert.deepEqual(result, { ok: false, error: '语音识别暂不可用' })
   })
@@ -287,7 +304,7 @@ describe('appRecognize', () => {
     }
     const pending = appRecognize(deps)
     mockRecorder.emitStart()
-    mockRecorder.emitStop('/tmp/rec.mp3')
+    mockRecorder.emitStop('/tmp/rec.wav')
     const result = await pending
     assert.deepEqual(result, { ok: false, error: EMPTY_TRANSCRIPT_HINT })
   })
