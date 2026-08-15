@@ -2,7 +2,7 @@
  * AI 智能体相关 API（App 专属功能）
  */
 import request from '../request'
-import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
+import { API_BASE_URL, WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
 
 export interface ProgressStep {
   label: string
@@ -570,7 +570,7 @@ export const agentApi = {
 
   /** 异动提醒 AI 解读 SSE 流 URL（不走 request 拦截器，直接拼接） */
   getAlertBriefingUrl(symbol: string, cycle: string = '') {
-    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    const base = API_BASE_URL
     let url = `${base}/agent/briefing/alert?symbol=${encodeURIComponent(symbol)}`
     if (cycle) url += `&cycle=${encodeURIComponent(cycle)}`
     return url

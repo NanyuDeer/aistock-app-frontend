@@ -4,7 +4,17 @@
  */
 import Request from 'luch-request'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+// API 基础地址：H5/小程序走同源或 dev server 代理，用相对路径 /api；
+// App 端请求不走 dev server proxy，必须使用完整 URL——env 缺失时兜底线上地址，
+// 避免打包 App 时误用相对路径导致全部接口请求失败（表现为"打包 App 无后端数据"）
+const BASE_URL = (() => {
+  // #ifdef APP-PLUS
+  return import.meta.env.VITE_API_BASE_URL || 'https://gupiao-api.yaozhineng.com/api'
+  // #endif
+  // #ifndef APP-PLUS
+  return import.meta.env.VITE_API_BASE_URL || '/api'
+  // #endif
+})()
 
 const http = new Request({
   baseURL: BASE_URL,

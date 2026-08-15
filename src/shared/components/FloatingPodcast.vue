@@ -78,6 +78,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, getCurrentInstance, onMounted, onUnmounted } from 'vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
+import { API_BASE_URL } from '@/shared/utils/constants'
 import { isH5 } from '@/shared/utils/platform'
 import SvgIcon from './SvgIcon.vue'
 import { Button, LoadingState, AudioPlayer } from './index'
@@ -176,7 +177,7 @@ let movedDistance = 0
 /** 拼接完整音频 URL（后端返回 /api/agent/audio/xxx.mp3 相对路径） */
 const fullAudioUrl = computed(() => {
   if (!store.audioUrl) return ''
-  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  const base = API_BASE_URL
   const path = store.audioUrl.replace(/^\/api/, '')
   return `${base}${path}`
 })
