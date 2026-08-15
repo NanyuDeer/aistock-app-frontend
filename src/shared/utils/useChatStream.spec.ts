@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { reactive, ref } from 'vue'
-import { useChatStream } from './useChatStream'
+import { useChatStream, _STALL_TIMEOUT_MS, _STALL_CHECK_INTERVAL_MS } from './useChatStream'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { ChatMessage, ReasoningStep } from '@/shared/api/modules/agent'
 
@@ -864,11 +864,18 @@ describe('useChatStream stall timeout（问题 20 R3：WS 发送后 idle 静默�
     useChatStream()._testReset()
   })
 
+  // 设计 spec §5.2：校准期常量断言（P95 校准意识点）——idle 阈值 30min 纯兜底（首周），
+  // 检查间隔 10s。测试只允许引用导出的常量，禁止复制字面量，保证校准期改值时本块测试同步失效。
+  it('校准期常量：_STALL_TIMEOUT_MS === 30min、_STALL_CHECK_INTERVAL_MS === 10s（spec §5.2）', () => {
+    expect(_STALL_TIMEOUT_MS).toBe(1800000)
+    expect(_STALL_CHECK_INTERVAL_MS).toBe(10000)
+  })
+
   it('WS 发送后无任何事件超过 idle 阈值 → 落「生成超时」+ 复位 streaming + 发 stop', async () => {
     const stream = useChatStream() as any
     const p = stream.send('今日大盘') // mock onOpen 同步连接 → WS 分支
-    // 推进：30min 校准阈值 + 10s 检查间隔 + 余量
-    vi.advanceTimersByTime(1800_000 + 10_000 + 1000)
+    // 推进：30min 校准阈值 + 10s 检查间隔 + 余量（单一事实来源：引用导出的常量）
+    vi.advanceTimersByTime(_STALL_TIMEOUT_MS + _STALL_CHECK_INTERVAL_MS + 1000)
     await p
 
     expect(stream.streaming.value).toBe(false)
@@ -903,7 +910,7 @@ describe('useChatStream stall timeout（问题 20 R3：WS 发送后 idle 静默�
     await p
     expect(stream.streaming.value).toBe(false)
     // 推进超过阈值：done 已结束本轮，不得再落超时消息
-    vi.advanceTimersByTime(1800_000 + 10_000 + 1000)
+    vi.advanceTimersByTime(_STALL_TIMEOUT_MS + _STALL_CHECK_INTERVAL_MS + 1000)
     expect(mockAppendMessage.mock.calls.some((c: any[]) => c[0].content.includes('生成超时'))).toBe(false)
   })
 })

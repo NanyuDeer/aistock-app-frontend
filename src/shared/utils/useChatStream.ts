@@ -48,8 +48,8 @@ let resumeInFlight = false
 // 发送后 idle 静默段超时（问题 20 R3，spec 2026-08-15）：
 // - 语义 = 静默段超时（连接保持但无任何事件），非一次性总时长；
 // - 校准期首周 30 分钟纯兜底（防自反截断校准数据）；正式值按首周真实耗时 P95 配置。
-const _STALL_TIMEOUT_MS = 1800_000
-const _STALL_CHECK_INTERVAL_MS = 10_000
+export const _STALL_TIMEOUT_MS = 1800_000
+export const _STALL_CHECK_INTERVAL_MS = 10_000
 let stallTimer: ReturnType<typeof setInterval> | null = null
 let lastActivityAt = 0
 
