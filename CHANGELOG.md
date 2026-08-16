@@ -2,6 +2,22 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-16 — 对话卡死恢复止血（问题 20 R3）：WS 发送 idle 超时兜底
+
+**开发者**: 37588
+
+### 修复
+- `src/shared/utils/useChatStream.ts`：WS 发送后 idle 静默段超时兜底——`_STALL_TIMEOUT_MS=1800_000`（30min 校准期，正式值按首周 P95）+ `_STALL_CHECK_INTERVAL_MS=10_000` 间隔检查 `lastActivityAt`；超时落 assistant「生成超时，请稍后重试」+ 复位 streaming + 发 `{type:"stop"}` 联动后端 finalizing 护栏（不误杀将成之轮）+ 结算 send promise；`finishRun`/`abortPendingSend`/`_testReset` 清理定时器
+- `src/shared/utils/useChatStream.spec.ts`：新增 stall 超时 describe 4 用例（超阈值落超时消息/事件刷新不误触发/done 清理定时器/校准期常量断言 1800000）
+
+### 验证
+- spec 46/46 + 全量 vitest 无新增失败（8 既有=基线）+ vue-tsc 改动文件 0 错误
+
+### 配套（后端 agent-py，同批）
+- ws.py RuntimeError 捕获 + ChatTaskManager finalizing 护栏/660s 兜底（见 agent-py changelog）
+
+---
+
 ## [changer] 2026-08-15 — App 语音输入录音格式 mp3 → wav（修复真机 start 抛错「录音失败」）
 
 **开发者**: 37588
