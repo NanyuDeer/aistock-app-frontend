@@ -1,6 +1,6 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { reactive, ref } from 'vue'
-import { useChatStream } from './useChatStream'
+import { useChatStream, _STALL_TIMEOUT_MS, _STALL_CHECK_INTERVAL_MS } from './useChatStream'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { ChatMessage, ReasoningStep } from '@/shared/api/modules/agent'
 
@@ -839,5 +839,78 @@ describe('useChatStream 内容流式（改进 17：content_delta/content_reset +
     stream._testHandleWsMessage({ type: 'done', content: '贵州茅台持续上涨，关注风险' }, () => {})
     await p
     expect(mockAppendMessage).toHaveBeenCalledWith(expect.objectContaining({ role: 'assistant', content: '贵州茅台持续上涨，关注风险' }))
+  })
+})
+
+describe('useChatStream stall timeout（问题 20 R3：WS 发送后 idle 静默段超时兜底）', () => {
+  beforeEach(() => {
+    const stream = useChatStream() as any
+    stream.messages.value = []
+    stream.sessionId.value = ''
+    mockAppendMessage.mockClear()
+    mockSocketSend.mockClear()
+    stream._testReset()
+    // 假时钟必须先于预建连接：预建轮（__connect__）产生的 setTimeout/interval 也是假定时器，不留真定时器泄漏
+    vi.useFakeTimers()
+    // 预建连接（mock onOpen 同步）：vitest runner 在 beforeEach 返回值处 await → 微任务放行，
+    // __connect__ 的 WS 分支已执行（sharedWsConnected=true）→ 测试体内 stream.send() 同步直达
+    // WS 分支，startStallTimer 的 interval 在 advanceTimersByTime 之前已挂上（与既有 describe
+    // 预建连接模式一致；假时钟下不可用 vi.waitFor，改用推进假时钟）
+    stream.send('__connect__')
+    mockSocketSend.mockClear()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    useChatStream()._testReset()
+  })
+
+  // 设计 spec §5.2：校准期常量断言（P95 校准意识点）——idle 阈值 30min 纯兜底（首周），
+  // 检查间隔 10s。测试只允许引用导出的常量，禁止复制字面量，保证校准期改值时本块测试同步失效。
+  it('校准期常量：_STALL_TIMEOUT_MS === 30min、_STALL_CHECK_INTERVAL_MS === 10s（spec §5.2）', () => {
+    expect(_STALL_TIMEOUT_MS).toBe(1800000)
+    expect(_STALL_CHECK_INTERVAL_MS).toBe(10000)
+  })
+
+  it('WS 发送后无任何事件超过 idle 阈值 → 落「生成超时」+ 复位 streaming + 发 stop', async () => {
+    const stream = useChatStream() as any
+    const p = stream.send('今日大盘') // mock onOpen 同步连接 → WS 分支
+    // 推进：30min 校准阈值 + 10s 检查间隔 + 余量（单一事实来源：引用导出的常量）
+    vi.advanceTimersByTime(_STALL_TIMEOUT_MS + _STALL_CHECK_INTERVAL_MS + 1000)
+    await p
+
+    expect(stream.streaming.value).toBe(false)
+    const msgs = stream.messages.value
+    const last = msgs[msgs.length - 1]
+    expect(last.role).toBe('assistant')
+    expect(last.content).toContain('生成超时')
+    // 联动 stop 控制消息已发
+    const sent = mockSocketSend.mock.calls.map((c: any[]) => JSON.parse(c[0].data))
+    expect(sent.some((m: any) => m.type === 'stop')).toBe(true)
+  })
+
+  it('收到事件刷新 lastActivityAt，未达阈值不误触发', async () => {
+    const stream = useChatStream() as any
+    const p = stream.send('今日大盘')
+    // 推进不足阈值，期间注入 intermediate 事件刷新活动时间
+    vi.advanceTimersByTime(60_000)
+    stream._testHandleWsMessage({ type: 'intermediate', label: '正在理解你的问题' }, () => {})
+    vi.advanceTimersByTime(60_000)
+    expect(stream.streaming.value).toBe(true) // 未超时，仍流式
+    // 不落超时消息
+    expect(mockAppendMessage.mock.calls.some((c: any[]) => c[0].content.includes('生成超时'))).toBe(false)
+    // 清理：推 done 结束本轮，避免悬挂定时器
+    stream._testHandleWsMessage({ type: 'done', content: '回答' }, () => {})
+    await p
+  })
+
+  it('done 后清理定时器（推进不再有副作用）', async () => {
+    const stream = useChatStream() as any
+    const p = stream.send('今日大盘')
+    stream._testHandleWsMessage({ type: 'done', content: '回答' }, () => {})
+    await p
+    expect(stream.streaming.value).toBe(false)
+    // 推进超过阈值：done 已结束本轮，不得再落超时消息
+    vi.advanceTimersByTime(_STALL_TIMEOUT_MS + _STALL_CHECK_INTERVAL_MS + 1000)
+    expect(mockAppendMessage.mock.calls.some((c: any[]) => c[0].content.includes('生成超时'))).toBe(false)
   })
 })
