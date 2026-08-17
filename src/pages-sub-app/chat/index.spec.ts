@@ -188,10 +188,48 @@ test('改进20：解析失败回退纯文本（followupOf 返回 null 时走既�
 
 // ─── 改进 16（批次 1，2026-08-13）：对话滚动交互（豆包式） ───
 
-test('改进16：scroll-view 上滑检测接入（@scroll + isNearBottom 距底判定）', () => {
+test('改进16：scroll-view 上滑检测接入（@scroll + measureProximity 三态判定）', () => {
   assert.match(pageSource, /@scroll="onScroll"/)
-  assert.match(pageSource, /isNearBottom/)
+  assert.match(pageSource, /measureProximity/)
   assert.match(pageSource, /followPaused/)
+})
+
+test('5B：resetFollow 纯复位（无滚底/无定时器——硬约束 #3）', () => {
+  assert.match(pageSource, /function resetFollow\(\)/)
+  // 函数体内不得出现滚底或定时器（纯复位：仅 followPaused=false + lastFollowSig=''）
+  assert.doesNotMatch(pageSource, /function resetFollow\(\)[\s\S]{0,200}scrollToBottom/)
+  assert.doesNotMatch(pageSource, /function resetFollow\(\)[\s\S]{0,200}followTimer/)
+})
+
+test('5B：useChatStream 接线 onBeforeStream → resetFollow', () => {
+  assert.match(pageSource, /useChatStream\(\{ onBeforeStream: \(\) => resetFollow\(\) \}\)/)
+})
+
+test('5B：四处显式滚底已删除，watch(isStreaming) v=true 唯一收口（spy===1）', () => {
+  // handleSend / quickAsk / rerunDeep 函数体内不再有显式 scrollToBottom()
+  assert.doesNotMatch(pageSource, /function handleSend\(\)[\s\S]{0,300}scrollToBottom\(\)/)
+  assert.doesNotMatch(pageSource, /function quickAsk\([\s\S]{0,300}scrollToBottom\(\)/)
+  assert.doesNotMatch(pageSource, /function rerunDeep\([\s\S]{0,300}scrollToBottom\(\)/)
+  // onLoad nextTick 回调（send(q) 路径）不再有显式滚底——由 watch(isStreaming) v=true 收口
+  assert.doesNotMatch(pageSource, /void chatStream\.send\(q\)[\s\S]{0,120}scrollToBottom\(\)/)
+  // watch(isStreaming) v=true 分支 = 唯一滚底+定时器收口点
+  assert.match(pageSource, /watch\(isStreaming[\s\S]{0,600}scrollToBottom\(\)[\s\S]{0,120}followTimer = setInterval/)
+})
+
+test('5B：watch(pendingConfirm) v=true 复位跟随 + 滚底（confirm_request=第 4 个新交互入口）', () => {
+  assert.match(pageSource, /watch\(pendingConfirm[\s\S]{0,600}resetFollow\(\)[\s\S]{0,80}scrollToBottom\(\)/)
+})
+
+test('5B：onScroll 三态接入（restoreInProgress 守卫 + 位置/高度缓存 + measureProximity）', () => {
+  assert.match(pageSource, /restoreInProgress\.value\) return/)
+  assert.match(pageSource, /let currentScrollTop = 0/)
+  assert.match(pageSource, /let currentScrollHeight = 0/)
+  assert.match(pageSource, /currentScrollTop = scrollTop/)
+  assert.match(pageSource, /if \(scrollHeight > 0\) currentScrollHeight = scrollHeight/)
+  assert.match(pageSource, /const proximity = measureProximity\(scrollTop, scrollHeight, viewport\)/)
+  // 三态：near 恢复 / far 暂停 / unknown 保持（scrollHeight<=0 不谎称贴底）
+  assert.match(pageSource, /proximity === 'near'/)
+  assert.match(pageSource, /proximity === 'far'/)
 })
 
 test('改进16：「回到最新」悬浮按钮（上滑暂停后显示，点击回底 + 恢复跟随）', () => {

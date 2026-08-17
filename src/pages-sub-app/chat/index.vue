@@ -221,7 +221,7 @@ import { ref, nextTick, watch, computed, onUnmounted } from 'vue'
 import { onLoad, onShow, onReady } from '@dcloudio/uni-app'
 import { useChatStream, type ConfirmOption } from '@/shared/utils/useChatStream'
 import { markdownToHtml } from '@/shared/utils/markdown'
-import { isNearBottom } from '@/shared/utils/scrollFollow'
+import { measureProximity } from '@/shared/utils/scrollFollow'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
@@ -245,7 +245,7 @@ import {
   stopSpeechRecognition,
 } from '@/shared/utils/speechInput'
 
-const chatStream = useChatStream()
+const chatStream = useChatStream({ onBeforeStream: () => resetFollow() })
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const favoritesStore = useFavoritesStore()
@@ -263,7 +263,6 @@ onLoad((options: Record<string, string> | undefined) => {
     } else {
       inputText.value = q
     }
-    scrollToBottom()
   })
 })
 
@@ -350,6 +349,9 @@ watch(pendingConfirm, (v) => {
     confirmVisible.value = true
     confirmWaiting.value = false
     startConfirmTimer()
+    // 5B（2026-08-17）：confirm_request 到达 = 第 4 个"新交互"入口——复位跟随
+    // 并滚底展示确认框（防阶段 2 fresh run 回答在视口外生长）。
+    resetFollow()
     scrollToBottom()
   } else {
     clearConfirmTimer()
@@ -425,11 +427,28 @@ let followTimer: ReturnType<typeof setInterval> | null = null
 // 150ms 定时器已停、打字机滚动被 scrollToBottomIfFollowing 守卫（内容仍生长、位置不动）；
 // 「回到最新」按钮点击后恢复跟随。
 const followPaused = ref(false)
+// 5B（2026-08-17 design-debate 定案）：resetFollow 纯复位——仅清暂停态与增量
+// 去重签名，不滚底、不启定时器。所有新发送路径均经 streaming.value=true
+// （useChatStream _stream / sendConfirmResponse），watch(isStreaming, v=true)
+// 是唯一滚底+定时器收口点（硬约束 #3）；此处再滚即双发，spy===1 断言失败。
+function resetFollow() {
+  followPaused.value = false
+  lastFollowSig = ''
+}
 // scroll-view 视口高度（onReady 测量；测量失败/测试环境用默认值兜底，判定仍可用）
 const viewportH = ref(0)
 const DEFAULT_VIEWPORT_PX = 600
 
+// 5B/G6（2026-08-17）：onScroll 最近一次测量的滚动位置/内容高度缓存——
+// G6 恢复原位的数据源（原 scrollTop ref 被 onScroll 局部 const 遮蔽，从不更新）。
+let currentScrollTop = 0
+let currentScrollHeight = 0
+// G6（2026-08-17 分歧 #5 收敛）：恢复执行窗口标志——期间忽略 onScroll，
+// 防小程序端 scroll-top 赋值触发 @scroll → resumeFollow 回跳闪烁。
+const restoreInProgress = ref(false)
+
 function onScroll(e: unknown) {
+  if (restoreInProgress.value) return
   const detail = ((e as { detail?: unknown } | null)?.detail ?? {}) as {
     scrollTop?: unknown
     scrollHeight?: unknown
@@ -437,9 +456,13 @@ function onScroll(e: unknown) {
   const scrollTop = Number(detail.scrollTop) || 0
   const scrollHeight = Number(detail.scrollHeight) || 0
   const viewport = viewportH.value || DEFAULT_VIEWPORT_PX
-  if (isNearBottom(scrollTop, scrollHeight, viewport)) {
+  currentScrollTop = scrollTop
+  if (scrollHeight > 0) currentScrollHeight = scrollHeight
+  // 5B：三态判定——near 恢复跟随；far 暂停跟随；unknown（测失败）保持当前状态不变
+  const proximity = measureProximity(scrollTop, scrollHeight, viewport)
+  if (proximity === 'near') {
     if (followPaused.value) resumeFollow()
-  } else if (!followPaused.value) {
+  } else if (proximity === 'far' && !followPaused.value) {
     pauseFollow()
   }
 }
@@ -535,8 +558,9 @@ watch(isStreaming, (v) => {
     hadStreamText = false
     stopTypewriter()
     typingMsgKey.value = null
-    // 改进 16：上滑暂停跟随后新一轮不强制钉底（等待「回到最新」按钮恢复）；
-    // 恢复跟随态时立即滚底并重启 150ms 定时器
+    // 5B（2026-08-17 定案）：任何发送/点选确认交互已在发送路径前置 resetFollow
+    // （followPaused=false），此处守卫保留作双保险——仅当暂停态由 onScroll 上滑
+    // 触发且尚未发新消息时（如 G6 恢复原位后的暂停跟随态）才生效，不钉底。
     if (followPaused.value) return
     scrollToBottom()
     if (followTimer) clearInterval(followTimer)
@@ -558,7 +582,6 @@ function handleSend() {
   inputText.value = ''
   upsertSessionMeta(content)
   chatStream.send(content)
-  scrollToBottom()
 }
 
 /**
@@ -606,7 +629,6 @@ function quickAsk(text: string) {
   if (isStreaming.value) return
   upsertSessionMeta(text)
   chatStream.send(text)
-  scrollToBottom()
 }
 
 /**
@@ -683,7 +705,6 @@ function rerunDeep(idx: number) {
     const prev = displayMessages.value[i]
     if (prev && prev.role === 'user') {
       chatStream.send(prev.content, { forceDeep: true })
-      scrollToBottom()
       return
     }
   }
