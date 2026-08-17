@@ -66,11 +66,11 @@ const pageKey = 'main-tabs'
 // 关键：uni-app onShow/onHide 是页面实例级钩子，子组件注册的永不触发，
 // 必须用 Vue onActivated/onDeactivated（KeepAlive 缓存树内子组件可触发）维护。
 const podcastStore = usePodcastStore()
-onShow(() => podcastStore.setActivePage(pageKey))
-onHide(() => podcastStore.clearActivePage(pageKey))
-onActivated(() => podcastStore.setActivePage(pageKey))
-onDeactivated(() => podcastStore.clearActivePage(pageKey))
-onMounted(() => podcastStore.setActivePage(pageKey))
+onShow(() => { podcastStore.setActivePage(pageKey) })
+onHide(() => { podcastStore.clearActivePage(pageKey) })
+onActivated(() => { podcastStore.setActivePage(pageKey) })
+onDeactivated(() => { podcastStore.clearActivePage(pageKey) })
+onMounted(() => { podcastStore.setActivePage(pageKey) })
 
 const tabTitles: Record<string, string> = {
   morning: '早点听',

@@ -19,6 +19,29 @@
 
 ---
 
+## [master] 2026-08-17 — 非交易日过滤 + 悬浮播报全局持续播放
+
+**开发者**: Aria
+
+### 新增（非交易日过滤）
+- `src/shared/api/modules/agent.ts`：新增交易日历 API `getPreviousTradingDay` / `getNextTradingDay` / `getRecentTradingDays`
+- `pages-sub-app/briefing/index.vue`、`pages-sub-app/briefing-detail/index.vue`、`modules/chat/pages/agent-report.vue`：`changeDate` 改为按交易日历跳档（跳过周末/法定节假日），接口异常回退自然日加减；早报列表页手动切换同时清除"回退最近可用报告"提示态
+- `modules/home/components/MorningContent.vue`：市场洞见日期由"今天 + 前 2 自然日"改为最近 3 个交易日
+
+### 改进（悬浮播报全局持续播放 + 贴右缘出屏修复）
+- 新增 `src/shared/utils/floatingEngine.ts`（模块级全局音频引擎单例：同 src 复用不重播、切页仅解绑事件不销毁、关停真正停机）+ `floatingEngine.spec.ts`
+- `src/shared/components/AudioPlayer.vue`：新增 `persist` 模式；`src/shared/components/FloatingPodcast.vue`：贴右缘出屏修复（App/小程序渲染基准改用 `uni.upx2px(750)`）并承载持久化播放；`src/shared/store/modules/podcast.ts` 在 resetPlayer/startPlayback/open/close 调用 `destroyPersistent`
+- `MainTabs.vue` / `SubPageCard.vue` / `SubPageCard2.vue`：维护 activePage、移除 FP-DEBUG 探针；`vitest.config.ts` 纳入 floatingEngine.spec 与 switch 自定义元素
+
+### 同批随带
+- 其余遗留改动（favorites 自选/异动、chat 卡片与对话、AlertContent、leaders/sector-detail、Modal/PodcastCard、request/briefing/stock api 与 constants、vite.config、manifest.json、AGENTS.md）随本 commit 一并提交
+
+### 验证
+- 非交易日过滤与悬浮播报相关改动：vue-tsc 无新增错误（event-chain/index.vue 既有 placeholder 报错与本批无关）
+- 测试：floatingEngine.spec 4 项 + podcast.spec 13 项 + FloatingPodcast.spec 通过
+
+---
+
 ## [changer] 2026-08-17 — App 语音输入录音格式 wav → amr（Android 真机「录音失败」根因修复）
 
 **开发者**: 37588

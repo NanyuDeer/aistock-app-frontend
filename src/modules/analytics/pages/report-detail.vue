@@ -1,5 +1,5 @@
 <template>
-  <!-- 页面光晕覆盖层：标签+分数双红→红光，双绿→绿光，其余→蓝光；从四周向中间渐淡，压在模块卡片上 -->
+  <!-- 页面底色层：标签+分数双红→浅红底，双绿→浅绿底，其余→浅蓝底 -->
   <view class="glow-overlay" :class="glowClass" />
   <SubPageCard title="财报详情">
     <!-- 加载状态 -->
@@ -289,7 +289,35 @@ function addToFavorites() {
 }
 
 function exportReport() {
-  uni.showToast({ title: '摘要已复制', icon: 'none' })
+  // 组装摘要文本
+  const s = stock.value
+  const lines: string[] = [`${s.name}（${s.code}）${s.period}`]
+  if (s.tag) lines.push(`评级：${s.tag}`)
+  if (s.industry) lines.push(`行业：${s.industry}`)
+
+  const latest = allPeriods.value[0]
+  if (latest) {
+    const fmt = (v: number | null, suffix = '') => (v == null ? '--' : `${v.toFixed(2)}${suffix}`)
+    lines.push(
+      `营收：${fmt(latest.revenue, '亿')}（同比 ${fmt(latest.revenueYoy, '%')}）`,
+      `归母净利：${fmt(latest.netProfit, '亿')}（同比 ${fmt(latest.netProfitYoy, '%')}）`,
+      `净利率：${fmt(latest.netMargin, '%')} | ROE：${fmt(latest.roe, '%')}`,
+    )
+  }
+
+  const ai = aiScoreData.value
+  if (ai?.dataStatus === 'complete' && ai.score != null) {
+    lines.push(`四维评分：${ai.score}分（${ai.rating || ''}）`)
+    if (ai.conclusion) lines.push(`洞见：${ai.conclusion}`)
+    if (ai.advice) lines.push(`建议：${ai.advice}`)
+  }
+
+  const summary = lines.join('\n')
+  uni.setClipboardData({
+    data: summary,
+    success: () => uni.showToast({ title: '摘要已复制', icon: 'none' }),
+    fail: () => uni.showToast({ title: '复制失败，请重试', icon: 'none' }),
+  })
 }
 
 // ===== 从 API 获取分析数据 =====
@@ -376,8 +404,8 @@ onLoad((opts?: Record<string, string>) => {
 </script>
 
 <style lang="scss" scoped>
-/* ===== 页面光晕覆盖层：标签+分数双红→红光，双绿→绿光，其余→蓝光 =====
-   固定全屏、不拦截点击，光从四周向中间逐渐变淡，可压在模块卡片上 */
+/* ===== 页面底色层：标签+分数双红→浅红底，双绿→浅绿底，其余→浅蓝底 =====
+   作为全屏底层背景（z-index 0），SubPageCard 背景透明，白色卡片浮于浅色底之上 */
 .glow-overlay {
   position: fixed;
   top: 0;
@@ -385,19 +413,24 @@ onLoad((opts?: Record<string, string>) => {
   right: 0;
   bottom: 0;
   pointer-events: none;
-  z-index: 999;
+  z-index: 0;
 }
 
 .glow-red {
-  background: radial-gradient(ellipse at center, rgba(229, 77, 94, 0) 45%, rgba(229, 77, 94, 0.16) 100%);
+  background: #fdeef0;
 }
 
 .glow-blue {
-  background: radial-gradient(ellipse at center, rgba(11, 95, 255, 0) 45%, rgba(11, 95, 255, 0.16) 100%);
+  background: #edf3ff;
 }
 
 .glow-green {
-  background: radial-gradient(ellipse at center, rgba(24, 160, 88, 0) 45%, rgba(24, 160, 88, 0.16) 100%);
+  background: #edf9f1;
+}
+
+/* 子页面容器背景透明，露出页面浅色底色 */
+:deep(.as-sub1) {
+  background: transparent;
 }
 
 /* ===== 加载/错误状态 ===== */

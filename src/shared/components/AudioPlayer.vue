@@ -47,6 +47,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, getCurrentInstance } from 'vue'
+import {
+  attachPersistent,
+  detachPersistent,
+  type PersistentEngine,
+  type FloatingEvents,
+} from '@/shared/utils/floatingEngine'
 
 /**
  * AudioPlayer 通用音频播放器
@@ -125,9 +131,13 @@ const props = withDefaults(defineProps<{
   autoplay?: boolean
   /** 自动播放时的起始进度（秒），配合 autoplay 实现退出页面后续播 */
   initialTime?: number
+  /** 持久化播放（悬浮播报专用）：把引擎提升为全局单例，页面实例卸载时仅"脱离"不销毁，
+   *  切页后复用时直接续播，避免重新缓冲/重播造成的卡顿。false（默认）时引擎随组件销毁。 */
+  persist?: boolean
 }>(), {
   autoplay: false,
   initialTime: 0,
+  persist: false,
 })
 
 const emit = defineEmits<{
@@ -273,6 +283,55 @@ function setupEngine(src: string): AudioEngine | null {
   return engine
 }
 
+/* ===== persist（全局持续播放）支持 ===== */
+/** 由全局引擎 native 事件驱动 AudioPlayer 的响应式状态与语义事件 */
+function makeFloatingEvents(): FloatingEvents {
+  return {
+    onTimeUpdate: (t, d) => {
+      currentTime.value = t
+      if (d) duration.value = d
+      emit('timeupdate', t)
+    },
+    onPlay: () => { playing.value = true; emit('play') },
+    onPause: () => { playing.value = false; emit('pause') },
+    onEnded: () => { playing.value = false; emit('ended') },
+  }
+}
+
+/** 把全局引擎适配为 AudioEngine 接口（不提供真实 destroy，持久引擎由 detach/destroyPersistent 管理） */
+function adaptPersistent(e: PersistentEngine): AudioEngine {
+  return {
+    play: () => e.play(),
+    pause: () => e.pause(),
+    seek: (t: number) => e.seek(t),
+    setSrc: () => { /* 持久引擎换源走 attachPersistent，不在组件内换 */ },
+    destroy: () => { /* 不应 destroy：脱离交给 detachPersistent，停机交给 destroyPersistent */ },
+  }
+}
+
+/** 复用已持续播放的引擎时，把引擎实时状态同步到本地响应式变量（currentTime/duration/playing） */
+function syncFromEngine(e: PersistentEngine) {
+  currentTime.value = e.currentTime
+  if (e.duration) duration.value = e.duration
+  playing.value = e.isPlaying
+}
+
+/** 载入音频：persist 模式附着全局引擎；否则走引擎私有生命周期 */
+function loadFor(src: string) {
+  if (!props.persist) {
+    setupEngine(src)
+    return
+  }
+  if (!src) {
+    engine = null
+    return
+  }
+  const r = attachPersistent(src, makeFloatingEvents())
+  engine = adaptPersistent(r.engine)
+  // 复用续播：引擎仍在播放且已缓冲，无需重建；同步一次状态即可
+  if (r.reused) syncFromEngine(r.engine)
+}
+
 function togglePlay() {
   if (!engine) {
     if (props.src) {
@@ -361,7 +420,7 @@ watch(() => props.src, (src) => {
   currentTime.value = 0
   duration.value = 0
   playing.value = false
-  setupEngine(src)
+  loadFor(src)
   if (src && props.autoplay) {
     nextTick(() => playFromInitial())
   }
@@ -369,7 +428,7 @@ watch(() => props.src, (src) => {
 
 onMounted(() => {
   if (props.src) {
-    setupEngine(props.src)
+    loadFor(props.src)
     if (props.autoplay) {
       nextTick(() => playFromInitial())
     }
@@ -386,7 +445,12 @@ function playFromInitial() {
 onUnmounted(() => {
   // 先上报播放状态（引擎销毁后 currentTime 归零/事件失效），再销毁引擎
   emit('unmount', { playing: playing.value, currentTime: currentTime.value })
-  engine?.destroy()
+  if (props.persist) {
+    // 持久播放：仅"脱离"事件订阅，引擎保持播放（切页后新实例复用续播）
+    detachPersistent()
+  } else {
+    engine?.destroy()
+  }
   engine = null
 })
 

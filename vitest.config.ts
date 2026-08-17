@@ -10,7 +10,7 @@ export default defineConfig({
         // Treat them as custom elements in tests rather than unknown components.
         compilerOptions: {
           isCustomElement: (tag: string) =>
-            ['view', 'text', 'image', 'scroll-view', 'swiper', 'swiper-item', 'icon'].includes(tag),
+            ['view', 'text', 'image', 'scroll-view', 'swiper', 'swiper-item', 'icon', 'switch', 'Switch'].includes(tag),
         },
       },
     }),
@@ -58,6 +58,7 @@ export default defineConfig({
       'src/pages-sub-app/chat/cards/SectionCard.spec.ts',
       'src/shared/components/InsightAlertCard.spec.ts',
       'src/shared/components/FloatingPodcast.spec.ts',
+      'src/shared/utils/floatingEngine.spec.ts',
       'src/modules/favorites/components/InsightDetailLayout.spec.ts',
       'src/modules/favorites/pages/monitor.spec.ts',
       'src/modules/favorites/pages/insight-detail.spec.ts',
