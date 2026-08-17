@@ -8,6 +8,7 @@ import { defineStore } from 'pinia'
 import { ref, nextTick } from 'vue'
 import { agentApi } from '@/shared/api/modules/agent'
 import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
+import { destroyPersistent } from '@/shared/utils/floatingEngine'
 
 type PodcastStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -188,6 +189,8 @@ export const usePodcastStore = defineStore('podcast', () => {
 
   /** 复位悬浮窗播放器（用于外部音频抢占时让 AudioPlayer 卸载/停止） */
   function resetPlayer() {
+    // 外部音频抢占：必须彻底停掉全局持续引擎，否则悬浮播报在后台继续响导致叠音
+    destroyPersistent()
     status.value = 'idle'
     audioUrl.value = ''
     errorMsg.value = ''
@@ -200,7 +203,9 @@ export const usePodcastStore = defineStore('podcast', () => {
   /** 加载并播放一个会话（直接替换当前播放器内容）；默认收起为悬浮球，不展开播放条 */
   function startPlayback(session: PlaySession) {
     stopExternal()
-    // 新会话开始：清掉未消费的跨页续播点（防止旧音频续播残留）
+    // 新会话开始：清掉旧的全局引擎（旧播报彻底停机，避免与新会话叠音/续播残留）
+    destroyPersistent()
+    // 清掉未消费的跨页续播点（防止旧音频续播残留）
     resumePending.value = false
     playbackTime.value = 0
     text.value = ''
@@ -301,6 +306,7 @@ export const usePodcastStore = defineStore('podcast', () => {
     }
     // 互斥模式：新播报请求即停止外部音频，避免生成期间叠音
     stopExternal()
+    destroyPersistent()
     text.value = nextText
     cacheKey.value = nextKey
     title.value = nextTitle || 'AI 播报'
@@ -378,6 +384,8 @@ export const usePodcastStore = defineStore('podcast', () => {
 
   /** 关闭并清除状态 */
   function close() {
+    // 彻底停掉全局持续引擎（即使无挂载播放器，也能停止后台持续播放的音频）
+    destroyPersistent()
     playerControls.value?.pause()
     resumePending.value = false
     playbackTime.value = 0
