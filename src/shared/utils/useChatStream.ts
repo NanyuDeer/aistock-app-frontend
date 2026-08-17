@@ -11,7 +11,7 @@
  */
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep, type ReasoningStep, type TokenUsage, type ChatCard } from '@/shared/api/modules/agent'
+import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep, type ReasoningStep, type TokenUsage, type ChatCard, type DeepReportRef } from '@/shared/api/modules/agent'
 import { buildExecTree, toRawWsEvent, type RawWsEvent } from './buildExecTree'
 import { useChatStore } from '@/shared/store/modules/chat'
 
@@ -674,6 +674,9 @@ export function useChatStream() {
         chatStore.appendMessage({
           role: 'assistant',
           content: result.content || result.message || '',
+          // 5A（2026-08-17）：HTTP 降级路径透出 lastDeepReport/cards（非流式接口已补返回；缺失 undefined 兼容）
+          lastDeepReport: (result.last_deep_report as DeepReportRef | undefined) ?? undefined,
+          cards: (result.cards as ChatCard[] | undefined) ?? undefined,
           // P10 线 2 缺口修复：HTTP 降级路径同样透出 token_usage（非流式接口已补返回；缺失 undefined 兼容）
           tokenUsage: (result.token_usage as TokenUsage | undefined) ?? undefined,
           progressSteps: savedSteps,
