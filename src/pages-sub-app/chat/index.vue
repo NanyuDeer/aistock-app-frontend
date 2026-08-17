@@ -221,7 +221,7 @@ import { ref, nextTick, watch, computed, onUnmounted } from 'vue'
 import { onLoad, onShow, onReady } from '@dcloudio/uni-app'
 import { useChatStream, type ConfirmOption } from '@/shared/utils/useChatStream'
 import { markdownToHtml } from '@/shared/utils/markdown'
-import { measureProximity } from '@/shared/utils/scrollFollow'
+import { measureProximity, clampScrollTop } from '@/shared/utils/scrollFollow'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
@@ -252,6 +252,8 @@ const favoritesStore = useFavoritesStore()
 
 // P9：无当前会话时自动新建（保证 messagesBySession 有当前会话载体；切换会话返回本页不重复触发，onLoad 仅一次）
 onLoad((options: Record<string, string> | undefined) => {
+  // G6（2026-08-17）：详情类跳转出口经全局事件通知本页记录阅读位置
+  uni.$on('chat:leave-context', leaveChatContext)
   if (!chatStore.sessionId) chatStore.createSession()
   const q = options?.q
   if (!q) return
@@ -393,11 +395,69 @@ const scrollTop = ref(0)
 const speechSupported = isSpeechInputSupported()
 const isListening = ref(false)
 
+// ===== G6 跳转-返回恢复阅读位置（2026-08-17 分歧 #5 收敛：仅 D 出口接线） =====
+// 语义：详情类跳转（改进 23 个股详情）返回时恢复跳转前滚动位置；
+// 会话列表入口与 onHide（前后台）不置位——「会话列表返回=贴底」先例不破；
+// B/C（改进 19 报告详情）不接线，维持既有贴底行为（批次 2 已上线功能不改）。
+const savedScrollTop = ref(0)
+// G6：是否需在下次 onShow 恢复阅读位置（仅 D 出口置位）
+const pendingRestore = ref(false)
+let savedMessageCount = 0
+
+/** 详情跳转前记录阅读位置（由 uni.$emit('chat:leave-context') 触发，navigateTo success 回调发射） */
+function leaveChatContext() {
+  savedScrollTop.value = currentScrollTop
+  savedMessageCount = displayMessages.value.length
+  pendingRestore.value = true
+}
+
+/** 两段式恢复：先 nextTick 设值，50ms 幂等第二次（抗 mp-html 异步渲染）；
+ * 期间 restoreInProgress=true 抑制 onScroll（防小程序端编程式滚动触发 @scroll 回跳）；
+ * 完成后进入暂停跟随态（followPaused=true）——L167「回到最新」按钮兜底，
+ * 用户滚动至近底部时 onScroll isNearBottom 自动恢复跟随。 */
+function restorePosition(target: number) {
+  restoreInProgress.value = true
+  const apply = () => {
+    scrollTop.value = clampScrollTop(
+      target,
+      currentScrollHeight,
+      viewportH.value || DEFAULT_VIEWPORT_PX,
+    )
+  }
+  nextTick(apply)
+  setTimeout(() => {
+    nextTick(() => {
+      apply()
+      restoreInProgress.value = false
+      followPaused.value = true
+    })
+  }, 50)
+}
+
 // 每次进入页面（含从会话列表返回、切会话）默认停留在对话最下方
 onShow(() => {
-  // 改进 16：进入页面默认贴底跟随（重置上滑暂停态，防旧会话残留暂停状态）
-  followPaused.value = false
-  scrollToBottom()
+  // G6（2026-08-17 分歧 #5 收敛）：详情类跳转返回 → 无新推进时恢复阅读位置；
+  // 否则维持既有"回场景=贴底"语义（会话列表返回/首次进入/前后台切换）。
+  if (pendingRestore.value) {
+    pendingRestore.value = false
+    const hasNewProgress =
+      isStreaming.value ||
+      chatStream.hasPendingRun() ||
+      displayMessages.value.length !== savedMessageCount
+    if (hasNewProgress) {
+      // 对话已推进 → 放弃恢复走贴底（新消息优先，硬约束 #6）
+      followPaused.value = false
+      scrollToBottom()
+    } else {
+      restorePosition(savedScrollTop.value)
+      // 恢复分支不执行下方 resume 续跑（已判定无 pending run）
+      return
+    }
+  } else {
+    // 改进 16：进入页面默认贴底跟随（重置上滑暂停态，防旧会话残留暂停状态）
+    followPaused.value = false
+    scrollToBottom()
+  }
   // 问题 15：回页时若存在未完成轮（最后一条是 user）且连接已断开 → 自动 resume 续跑
   if (chatStream.hasPendingRun() && !chatStream.isConnected()) {
     void chatStream.resume()
@@ -711,6 +771,7 @@ function rerunDeep(idx: number) {
 }
 
 onUnmounted(() => {
+  uni.$off('chat:leave-context', leaveChatContext)
   if (followTimer) {
     clearInterval(followTimer)
     followTimer = null

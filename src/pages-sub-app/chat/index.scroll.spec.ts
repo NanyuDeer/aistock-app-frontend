@@ -155,8 +155,21 @@ vi.mock('./cards/SectionCard.vue', () => ({
   default: { name: 'SectionCard', props: ['variant', 'title', 'body'], template: '<view class="section-card-stub" />' },
 }))
 
-// uni 全局（mount 时组件 body 不触碰 uni；goSessions/onReady/handleMicTap 非本测试路径，仍补齐避免缺漏）
+// uni 全局事件系统（G6 需要 $on/$off/$emit 支撑 chat:leave-context 事件）
+const uniEventHandlers = vi.hoisted(() => ({} as Record<string, Array<(...args: any[]) => void>>))
 vi.stubGlobal('uni', {
+  $on: (event: string, handler: (...args: any[]) => void) => {
+    if (!uniEventHandlers[event]) uniEventHandlers[event] = []
+    uniEventHandlers[event].push(handler)
+  },
+  $off: (event: string, handler: (...args: any[]) => void) => {
+    if (!uniEventHandlers[event]) return
+    uniEventHandlers[event] = uniEventHandlers[event].filter(h => h !== handler)
+  },
+  $emit: (event: string, ...args: any[]) => {
+    if (!uniEventHandlers[event]) return
+    uniEventHandlers[event].forEach(h => h(...args))
+  },
   navigateTo: vi.fn(),
   createSelectorQuery: vi.fn(() => ({
     select: vi.fn(() => ({ boundingClientRect: vi.fn(() => ({ exec: vi.fn() })) })),
@@ -184,6 +197,8 @@ describe('index.vue 滚动改造（5B）运行时行为', () => {
     lifecycleMocks.onLoad.mockReset()
     lifecycleMocks.onShow.mockReset()
     lifecycleMocks.onReady.mockReset()
+    // 清空 uni 事件表（防跨用例串扰：G6 事件注册跨 mount 残留）
+    Object.keys(uniEventHandlers).forEach(k => delete uniEventHandlers[k])
   })
 
   afterEach(() => {
@@ -244,6 +259,82 @@ describe('index.vue 滚动改造（5B）运行时行为', () => {
     // near（scrollTop=1500 → remaining=-100 <= 80）→ 恢复跟随 → 按钮消失
     await scrollView.trigger('scroll', { detail: { scrollTop: 1500, scrollHeight: 2000 } })
     expect(wrapper.find('.back-to-latest').exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  // ── G6（2026-08-17 分歧 #5 收敛）：跳转-返回恢复阅读位置（仅 D 出口接线）──
+  // 触发机制：@dcloudio/uni-app mock 只捕获生命周期回调不自动执行 → 手动调用捕获的
+  // onLoad/onShow 回调；onLoad 内的 uni.$on('chat:leave-context') 注册事件 → 用
+  // globalThis.uni.$emit('chat:leave-context') 触发 leaveChatContext（真实事件链路）。
+
+  it('G6 用例A：详情跳转返回且无新推进 → 恢复原位并保持暂停跟随态', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    const scrollView = wrapper.find('scroll-view')
+    expect(scrollView.exists()).toBe(true)
+
+    // 1) 手动执行 onLoad → uni.$on('chat:leave-context', leaveChatContext) 注册事件
+    const onLoadCb = lifecycleMocks.onLoad.mock.calls[0][0] as () => void
+    onLoadCb()
+
+    // 2) 模拟用户滚动到中部 → onScroll 写入 currentScrollTop/currentScrollHeight 缓存
+    //    （proximity='far' → 同时进入暂停跟随态，后续断言 followPaused=true 不依赖此步）
+    await scrollView.trigger('scroll', { detail: { scrollTop: 500, scrollHeight: 2000 } })
+
+    // 3) 触发详情跳转出口（uni.$emit('chat:leave-context')，Task 7 navigateTo success 回调发射）
+    ;(globalThis as any).uni.$emit('chat:leave-context')
+
+    // 4) 返回页面 → onShow 恢复分支（无新推进：isStreaming=false / hasPendingRun=false / 消息数不变）
+    const onShowCb = lifecycleMocks.onShow.mock.calls[0][0] as () => void
+    onShowCb()
+
+    // 两段式恢复：nextTick 先设值 → 50ms 后幂等第二次（抗 mp-html 异步渲染）
+    await flushPromises()
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 60))
+    await flushPromises()
+    await nextTick()
+
+    // 断言：scroll-top 恢复为 clamp(500, 2000, 600)=500（非 99999/99998 贴底值）
+    expect(scrollView.attributes('scroll-top')).toBe('500')
+    // 恢复后保持暂停跟随态（followPaused=true）→ 「回到最新」按钮可见
+    expect(wrapper.find('.back-to-latest').exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('G6 用例B：返回时有新推进（消息数变化）→ 放弃恢复走贴底（pendingRestore 被消费）', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    const scrollView = wrapper.find('scroll-view')
+
+    // 1) 手动执行 onLoad → 注册 chat:leave-context 事件
+    const onLoadCb = lifecycleMocks.onLoad.mock.calls[0][0] as () => void
+    onLoadCb()
+
+    // 2) 触发详情跳转出口 → leaveChatContext 快照 savedMessageCount=0 + pendingRestore=true
+    ;(globalThis as any).uni.$emit('chat:leave-context')
+
+    // 3) 返回前对话已有新推进：displayMessages 长度 0 → 1
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'assistant', content: '新回复', timestamp: Date.now() })
+
+    // 4) 返回页面 → onShow：hasNewProgress=true（消息数变化）→ 放弃恢复走贴底
+    const onShowCb = lifecycleMocks.onShow.mock.calls[0][0] as () => void
+    onShowCb()
+    await flushPromises()
+    await nextTick()
+
+    // 断言：scroll-top 被设为贴底值（99999/99998，而非恢复目标 0）
+    expect(['99999', '99998']).toContain(scrollView.attributes('scroll-top'))
+    // followPaused=false → 「回到最新」按钮不可见
+    expect(wrapper.find('.back-to-latest').exists()).toBe(false)
+    // pendingRestore 已消费：再次 onShow 走非恢复分支（贴底，不恢复旧位置、不报错）
+    onShowCb()
+    await flushPromises()
+    await nextTick()
+    expect(['99999', '99998']).toContain(scrollView.attributes('scroll-top'))
 
     wrapper.unmount()
   })

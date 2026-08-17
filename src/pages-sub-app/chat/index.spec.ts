@@ -243,3 +243,52 @@ test('改进16：暂停跟随期间不钉底（定时器/打字机滚动均走 s
   assert.match(pageSource, /if \(followPaused\.value\) return/)
   assert.match(pageSource, /followPaused\.value = false/)
 })
+
+// ─── G6（2026-08-17 分歧 #5 收敛）：跳转-返回恢复阅读位置（仅 D 出口接线） ───
+
+test('G6：leaveChatContext 记录阅读位置（savedScrollTop/savedMessageCount/pendingRestore）', () => {
+  assert.match(pageSource, /function leaveChatContext\(\)/)
+  assert.match(pageSource, /savedScrollTop\.value = currentScrollTop/)
+  assert.match(pageSource, /savedMessageCount = displayMessages\.value\.length/)
+  assert.match(pageSource, /pendingRestore\.value = true/)
+})
+
+test('G6：restorePosition 两段式恢复（restoreInProgress + 50ms 幂等第二次 + followPaused=true）', () => {
+  assert.match(pageSource, /function restorePosition\(target: number\)/)
+  // 恢复窗口开启：restoreInProgress=true 抑制 onScroll（防编程式滚动回跳）
+  assert.match(pageSource, /restoreInProgress\.value = true/)
+  // 两段式：nextTick 先设值；50ms 后 nextTick 内幂等第二次
+  assert.match(pageSource, /nextTick\(apply\)/)
+  assert.match(pageSource, /setTimeout\(\(\) => \{\s*nextTick\(\(\) => \{\s*apply\(\)/)
+  // 完成：关恢复窗口 + 进入暂停跟随态（L167「回到最新」按钮兜底）
+  assert.match(pageSource, /restoreInProgress\.value = false/)
+  assert.match(pageSource, /followPaused\.value = true/)
+  // 恢复目标经 clampScrollTop 钳制（不超过可滚最大值）
+  assert.match(pageSource, /clampScrollTop\(\s*target,\s*currentScrollHeight,\s*viewportH\.value \|\| DEFAULT_VIEWPORT_PX,\s*\)/)
+})
+
+test('G6：onLoad 注册 / onUnmount 注销 chat:leave-context 事件（成对）', () => {
+  assert.match(pageSource, /uni\.\$on\('chat:leave-context', leaveChatContext\)/)
+  assert.match(pageSource, /uni\.\$off\('chat:leave-context', leaveChatContext\)/)
+})
+
+test('G6：onShow 恢复分支（pendingRestore 消费 + hasNewProgress 放弃条件 + restorePosition + return 跳过 resume）', () => {
+  assert.match(pageSource, /if \(pendingRestore\.value\)/)
+  assert.match(pageSource, /pendingRestore\.value = false/)
+  // 放弃条件三连：streaming || hasPendingRun || 消息数变化（硬约束 #6）
+  assert.match(pageSource, /isStreaming\.value \|\|/)
+  assert.match(pageSource, /chatStream\.hasPendingRun\(\)/)
+  assert.match(pageSource, /displayMessages\.value\.length !== savedMessageCount/)
+  // 无新推进 → 恢复原位
+  assert.match(pageSource, /restorePosition\(savedScrollTop\.value\)/)
+  // 恢复分支 return，不执行下方 resume 续跑
+  assert.match(pageSource, /restorePosition\(savedScrollTop\.value\)[\s\S]{0,200}return/)
+})
+
+test('G6：clampScrollTop import 已接入（scrollFollow 双导出）', () => {
+  assert.match(pageSource, /import \{ measureProximity, clampScrollTop \} from '@\/shared\/utils\/scrollFollow'/)
+})
+
+test('G6：goSessions 不置位 pendingRestore（仅 D 出口接线，会话列表返回仍贴底）', () => {
+  assert.doesNotMatch(pageSource, /goSessions[\s\S]{0,150}pendingRestore/)
+})
