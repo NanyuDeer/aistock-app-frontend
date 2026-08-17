@@ -253,7 +253,7 @@ describe('appRecognize', () => {
     assert.equal(speechRecognitionState.value, 'idle')
   })
 
-  it('录音以 wav + 16kHz 启动（与后端火山 ASR format/rate 一致，防 mp3 真机编码器缺失）', () => {
+  it('录音以 amr + 8kHz 启动（与后端火山 ASR format/rate 对齐；AMR-NB 窄带固定 8K 采样）', () => {
     let startOptions: { format: string; sampleRate?: number } | null = null
     const recorder = {
       start(options: { format: string; sampleRate?: number }) { startOptions = options },
@@ -267,7 +267,7 @@ describe('appRecognize', () => {
       readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
       uploadAudio: async () => ({ ok: true, text: 'x' }),
     })
-    assert.deepEqual(startOptions, { format: 'wav', sampleRate: 16000 })
+    assert.deepEqual(startOptions, { format: 'amr', sampleRate: 8000 })
   })
 
   it('录音失败 → error 分支', async () => {
