@@ -23,6 +23,23 @@ App 真机语音输入反复「录音失败，请重试」。systematic-debuggin
 
 ---
 
+## [master] 2026-08-17 — 风口龙头 leaders 页：短线榜改为"上榜次数-热度"排序 + 净流入 0 显示为 --
+
+**开发者**: Aria
+
+### 修复
+- `src/modules/market/pages/leaders.vue`：
+  - 短线风口榜排序由「短线持续天数 short_term_days → freq20」改为**上榜次数（近10日 freq20）→ 热度（short_heat）降序**（长线榜保持 long_term_days → frequency 不变），与后端 `applyDualRankings` 短线口径统一；修复短线档原按 AI 天数排序与"上榜次数-热度"预期不符的问题
+  - `formatNetInflow`：净流入为 0 时显示 `--`（与 Web 前端一致，moneyflow 缺失时后端回填 0，避免显示误导性的"0万"）
+
+### 验证
+- vue-tsc 零新增错误（event-chain 8 个既有错误与本次无关）；用线上数据模拟新排序，顺序符合上榜次数→热度降序
+
+### 配套（后端 app-api，同批）
+- `applyDualRankings` 短线榜排序对齐 + `getLatestDailyMap` 最近交易日窗口 3→10 天（修复周一凌晨 moneyflow 取空导致净流入全 0，见 app-api changelog）
+
+---
+
 ## [changer] 2026-08-16 — 对话卡死恢复止血（问题 20 R3）：WS 发送 idle 超时兜底
 
 **开发者**: 37588
@@ -105,7 +122,6 @@ App 云打包真机测试发现：点击语音输入按钮弹系统提示后无�
 
 ### 修复
 - `src/modules/market/pages/sector-detail.vue`：行业板块（881 前缀）经 `mapIndustryToChain` 取上下游，`flow_data` 无 related 节点时旧布局不分配节点位置导致流向图只剩主节点——`flowChartSvg` 对齐 Web 端 WindLeaderPanel：`hasRelated` 分流，无 related 时以主节点为枢纽（hubIds=`[mainNode.id]`），upstream/downstream 从主节点下方居中排列
->>>>>>> origin/master
 
 ---
 

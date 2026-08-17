@@ -1,8 +1,10 @@
 <template>
   <!-- 播报悬浮窗：初始位于屏幕纵向 1/3 处右侧贴边；悬浮球可拖动，松手自动吸附左右边缘 -->
-  <!-- 仅"当前前台页面"的实例渲染（页面根容器 onShow/onHide 维护 store.activePage）：
-       uni-h5 页面被 KeepAlive 缓存不卸载，多实例并存时必须避免双播放/渲染到隐藏页 -->
-  <view v-if="store.visible && store.activePage === pageKey" class="fp-wrap" :style="wrapStyle">
+  <!-- 仅"当前前台页面"的实例渲染：
+       H5：store.activePage 由页面容器 onActivated/onDeactivated 维护（KeepAlive 缓存树内子组件可触发）；
+       App/小程序：子组件 onShow/onHide 不触发（页面级钩子），改由页面栈判断（visible 期间轮询），
+       避免返回页/旧页多实例并存导致双播放或悬浮球渲染在隐藏页。 -->
+  <view v-if="store.visible && renderAllowed" class="fp-wrap" :style="wrapStyle">
     <!-- 展开（ready）：播放条；收起时仅视觉隐藏（组件保持挂载，音频持续播放） -->
     <AudioPlayer
       v-if="store.status === 'ready' && store.audioUrl"
@@ -86,11 +88,77 @@ import { Button, LoadingState, AudioPlayer } from './index'
 const store = usePodcastStore()
 
 /** 所属页面标识（由页面根容器 SubPageCard/SubPageCard2/MainTabs 传入）：
- *  仅当 store.activePage === pageKey（本页面处于前台）时渲染，避免多实例双播放 */
+ *  H5 端与 store.activePage 比对判定本页是否前台（KeepAlive 多实例去重） */
 const props = withDefaults(defineProps<{ pageKey?: string }>(), { pageKey: '' })
 
 /** 本组件实例唯一标识：用于播放器控制句柄的归属校验（防止失活实例误清新实例注册） */
 const myId = String(getCurrentInstance()?.uid ?? '')
+
+// ===== 渲染权（当前前台页面唯一渲染） =====
+// H5：依赖 store.activePage（页面容器 onActivated/onDeactivated 维护，即时准确）。
+// App/小程序：子组件 onShow/onHide 不触发，改用"本实例所在页面是否为页面栈顶"判断；
+//   页面切换无组件级事件，在 store.visible 期间以 300ms 轮询 getCurrentPages() 同步。
+const isH5Platform = isH5
+const isCurrentTop = ref(true)
+
+/** 向上查找所在页面实例的路由：页面实例带 $page（含 route），子组件兜底向上遍历 parent */
+function findPageRoute(): string | null {
+  let inst: { proxy: unknown; parent: unknown } | null = getCurrentInstance() as {
+    proxy: unknown
+    parent: unknown
+  } | null
+  while (inst) {
+    const p = inst.proxy as { $page?: { route?: string }; route?: string } | null
+    const r = p?.$page?.route ?? p?.route
+    if (r) return r
+    inst = inst.parent as { proxy: unknown; parent: unknown } | null
+  }
+  return null
+}
+
+function syncPageTop() {
+  try {
+    const pages = getCurrentPages()
+    if (!pages.length) {
+      isCurrentTop.value = true
+      return
+    }
+    const top = pages[pages.length - 1] as { route?: string } | undefined
+    const selfRoute = findPageRoute()
+    // 拿不到自身页面路由时放行（单实例兜底），能拿到则必须与栈顶一致才渲染
+    isCurrentTop.value = !selfRoute || !top?.route || selfRoute === top.route
+  } catch {
+    isCurrentTop.value = true
+  }
+}
+
+let pagePollTimer: ReturnType<typeof setInterval> | null = null
+function startPagePoll() {
+  stopPagePoll()
+  syncPageTop()
+  pagePollTimer = setInterval(syncPageTop, 300)
+}
+function stopPagePoll() {
+  if (pagePollTimer) {
+    clearInterval(pagePollTimer)
+    pagePollTimer = null
+  }
+}
+
+/** 渲染条件：visible 且本实例所在页面为当前前台页面。
+ * H5：activePage 由容器 onActivated/onDeactivated 即时维护（KeepAlive），精确匹配；
+ * App/小程序：子组件 onShow/onHide 不触发，用页面栈判断（visible 期间轮询）。 */
+const renderAllowed = computed(() =>
+  isH5Platform ? store.activePage === props.pageKey : isCurrentTop.value,
+)
+
+// App/小程序：visible 期间轮询页面栈，跟踪前台页面变化（navigateTo/back）
+watch(() => store.visible, (v) => {
+  if (!isH5Platform) {
+    if (v) startPagePoll()
+    else stopPagePoll()
+  }
+})
 
 /** AudioPlayer 实例引用：挂载后注册控制句柄到 store，供页面播放按钮暂停/继续 */
 const playerRef = ref<InstanceType<typeof AudioPlayer> | null>(null)
@@ -117,6 +185,23 @@ watch(playerRef, () => {
     store.unregisterPlayer(myId)
   }
 }, { flush: 'post' })
+
+/**
+ * 续播竞态兜底：页面切换时序可能为「新页播放器先挂载、旧页后卸载上报续播点」，
+ * 此时 watch(playerRef) 挂载时 resumePending 尚为 false，不会消费；后续旧页卸载写入
+ * resumePending=true 后，本 watch 负责消费续播（仅当前渲染实例有 playerRef 时生效，
+ * 多实例并存时只有前台实例渲染 AudioPlayer，天然单点消费）。
+ */
+watch(() => store.resumePending, () => {
+  if (!store.resumePending) return
+  const ctrl = playerRef.value
+  if (ctrl) {
+    const t = store.playbackTime
+    store.consumeResume()
+    if (t > 0) ctrl.seekTo(t)
+    nextTick(() => ctrl.play())
+  }
+})
 
 /** AudioPlayer 卸载（页面切换/换源）前上报播放状态：记录跨页续播点（携带本实例 id 防误续播） */
 function onPlayerUnmount(state: { playing: boolean; currentTime: number }) {
@@ -308,6 +393,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   store.unregisterPlayer(myId)
+  stopPagePoll()
   if (typeof window !== 'undefined') {
     window.removeEventListener('mousemove', onMouseMove)
     window.removeEventListener('mouseup', onMouseUp)

@@ -171,6 +171,10 @@ function createH5Engine(src: string): AudioEngine {
   audio.src = src
   audio.preload = 'metadata'
 
+  // 音频未就绪（readyState<1）时 seek 无效：暂存目标进度，loadedmetadata 后可跳转时补应用
+  // （跨页续播场景：新实例挂载后可能立即 seek 到续播点，此时音频可能尚未加载）
+  let pendingSeek: number | null = null
+
   audio.addEventListener('timeupdate', () => {
     currentTime.value = audio.currentTime
     if (audio.duration && !Number.isNaN(audio.duration)) duration.value = audio.duration
@@ -178,6 +182,10 @@ function createH5Engine(src: string): AudioEngine {
   })
   audio.addEventListener('loadedmetadata', () => {
     if (audio.duration && !Number.isNaN(audio.duration)) duration.value = audio.duration
+    if (pendingSeek != null) {
+      try { audio.currentTime = pendingSeek } catch { /* 忽略 seek 异常 */ }
+      pendingSeek = null
+    }
   })
   audio.addEventListener('durationchange', () => {
     if (audio.duration && !Number.isNaN(audio.duration)) duration.value = audio.duration
@@ -199,7 +207,10 @@ function createH5Engine(src: string): AudioEngine {
     play: () => { void audio.play().catch(() => { /* 自动播放被拦截，忽略 */ }) },
     pause: () => audio.pause(),
     seek: (t: number) => {
-      try { audio.currentTime = t } catch { /* 无 src 时设置可能失败，忽略 */ }
+      try {
+        if (audio.readyState >= 1) audio.currentTime = t
+        else pendingSeek = t
+      } catch { /* 无 src 时设置可能失败，忽略 */ }
       currentTime.value = t
     },
     setSrc: (s: string) => { audio.src = s; audio.load() },
@@ -211,6 +222,9 @@ function createUniEngine(src: string): AudioEngine {
   const ctx = uniApi!.createInnerAudioContext()
   ctx.src = src
 
+  // App/小程序：InnerAudioContext 在 canplay 前 seek 可能无效，暂存进度、canplay 后补应用
+  let pendingSeek: number | null = null
+
   ctx.onTimeUpdate(() => {
     currentTime.value = ctx.currentTime
     if (ctx.duration) duration.value = ctx.duration
@@ -218,6 +232,10 @@ function createUniEngine(src: string): AudioEngine {
   })
   ctx.onCanplay(() => {
     if (ctx.duration) duration.value = ctx.duration
+    if (pendingSeek != null) {
+      try { ctx.seek(pendingSeek) } catch { /* 忽略 seek 异常 */ }
+      pendingSeek = null
+    }
   })
   ctx.onPlay(() => { playing.value = true; emit('play') })
   ctx.onPause(() => { playing.value = false; emit('pause') })
@@ -227,7 +245,10 @@ function createUniEngine(src: string): AudioEngine {
   return {
     play: () => ctx.play(),
     pause: () => ctx.pause(),
-    seek: (t: number) => { ctx.seek(t); currentTime.value = t },
+    seek: (t: number) => {
+      try { ctx.seek(t) } catch { /* 忽略 seek 异常 */ }
+      currentTime.value = t
+    },
     setSrc: (s: string) => { ctx.src = s },
     // 卸载/换源时先 stop 再 destroy：保证音频立即停止（全局互斥抢占时，
     // FloatingPodcast 通过清空 src 卸载本组件，必须停掉正在播放的音频）
