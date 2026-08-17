@@ -686,6 +686,13 @@ export const stockApi = {
   getAiScore(params: { symbol: string }) {
     return request.get('/cn/stocks/performance-reports/ai-analysis', { params })
   },
+
+  /** 获取业绩排行榜（多因子评分排序） */
+  getPerformanceRanking(params?: {
+    reportPeriod?: string; sortBy?: string; sortOrder?: 'asc' | 'desc'; reportType?: string; page?: number; pageSize?: number
+  }) {
+    return request.get('/cn/stocks/performance-reports/ranking', { params })
+  },
 }
 
 function normalizeForecast(res: Record<string, unknown> | null): ForecastData | null {

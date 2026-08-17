@@ -35,31 +35,29 @@
         <!-- 筛选 + 排序 单行 -->
         <view class="filter-sort-bar">
           <view class="left-section">
-            <!-- 报告类型筛选 -->
-            <picker
-              mode="selector"
-              :range="reportTypeLabels"
-              :value="reportTypeIndex"
-              @change="onReportTypeChange"
-            >
-              <view class="type-filter-picker">
-                <text class="type-filter-text">{{ currentReportTypeLabel }}</text>
-                <SvgIcon name="arrow-down-s" size="20rpx" color="#4b5a7a" />
-              </view>
-            </picker>
+            <!-- 报告类型筛选：正式报告 / 快报 点击切换 -->
+            <view class="report-type-group">
+              <text
+                :class="['report-type-btn', reportType === 'formal' ? 'active' : '']"
+                @tap="setReportType('formal')"
+              >正式报告</text>
+              <text
+                :class="['report-type-btn', reportType === 'express' ? 'active' : '']"
+                @tap="setReportType('express')"
+              >快报</text>
+            </view>
 
-            <!-- 排序下拉 -->
-            <picker
-              mode="selector"
-              :range="sortLabels"
-              :value="sortIndex"
-              @change="onSortChange"
-            >
-              <view class="sort-picker">
-                <text class="sort-picker-text">{{ currentSortLabel }}</text>
-                <SvgIcon name="arrow-down-s" size="20rpx" color="#4b5a7a" />
-              </view>
-            </picker>
+            <!-- 排序模式切换：四维评分 / 业绩 -->
+            <view class="sort-mode-group">
+              <text
+                :class="['sort-mode-btn', sortMode === 'score' ? 'active' : '']"
+                @tap="setSortMode('score')"
+              >四维评分</text>
+              <text
+                :class="['sort-mode-btn', sortMode === 'performance' ? 'active' : '']"
+                @tap="setSortMode('performance')"
+              >业绩</text>
+            </view>
           </view>
 
           <!-- 升降序按钮 -->
@@ -102,14 +100,14 @@
           class="report-card"
           @tap="goStockDetail(item)"
         >
-          <!-- 顶部：股票名称 + 代码｜报告期｜评分｜标签 -->
+          <!-- 顶部：股票名称 + 代码｜报告期｜评分 -->
           <view class="report-top">
             <view class="report-top-left">
               <text class="stock-name">{{ item.name }}</text>
               <text class="stock-code">{{ item.code }}</text>
             </view>
             <view class="report-period">{{ item.period }}</view>
-            <text :class="['report-tag', tagClass(item.tag)]">{{ item.tag }}</text>
+            <text v-if="displayScore(item) != null" :class="['report-score', scoreClass(displayScore(item)!)]">{{ displayScore(item) }}分</text>
           </view>
           <!-- 底部：核心财务 + 更新时间 -->
           <view class="report-bottom">
@@ -119,7 +117,7 @@
                 <text class="data-value">{{ item.revenue }} 亿元</text>
               </view>
               <view class="data-right">
-                <text :class="['data-yoy', yoyClass(item.revenueYoy)]">同比 {{ formatYoy(item.revenueYoy) }}</text>
+                <text v-if="item.revenueYoy != null" class="data-yoy-label">同比 </text><text :class="['data-yoy', yoyClass(item.revenueYoy)]">{{ formatYoy(item.revenueYoy) }}</text>
               </view>
             </view>
             <view v-if="item.isFormal" class="report-data-row">
@@ -128,12 +126,11 @@
                 <text class="data-value">{{ item.netProfit }} 亿元</text>
               </view>
               <view class="data-right">
-                <text :class="['data-yoy', yoyClass(item.profitYoy)]">同比 {{ formatYoy(item.profitYoy) }}</text>
+                <text v-if="item.profitYoy != null" class="data-yoy-label">同比 </text><text :class="['data-yoy', yoyClass(item.profitYoy)]">{{ formatYoy(item.profitYoy) }}</text>
               </view>
             </view>
             <view class="report-time-row">
               <text class="update-time">更新时间：{{ item.updateTime }}</text>
-              <text v-if="item.aiScore != null" :class="['report-score', scoreClass(item.aiScore)]">{{ item.aiScore }}分</text>
             </view>
           </view>
         </view>
@@ -160,6 +157,7 @@ interface ReportItem {
   period: string
   tag: string
   aiScore: number | null
+  perfScore: number | null   // 业绩评分（多因子）
   isFormal: boolean
   revenue: string
   revenueYoy: number | null
@@ -172,19 +170,6 @@ interface ReportItem {
   goodTags: string[]
   riskTags: string[]
 }
-
-type SortField = 'revenue' | 'revenueYoy' | 'netProfit' | 'profitYoy' | 'updateTime' | 'aiScore'
-
-const SORT_KEYS: SortField[] = ['aiScore', 'netProfit', 'profitYoy', 'revenue', 'revenueYoy', 'updateTime']
-const SORT_LABELS: Record<SortField, string> = {
-  aiScore: '四维评分',
-  netProfit: '净利规模',
-  profitYoy: '净利增速',
-  revenue: '营收规模',
-  revenueYoy: '营收增速',
-  updateTime: '更新时间',
-}
-const sortLabels = ['四维评分', '净利规模', '净利增速', '营收规模', '营收增速', '更新时间']
 
 const STORAGE_KEY = 'report_filter_sort'
 
@@ -202,13 +187,10 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 // 报告类型筛选（formal=正式报告 / express=快报）
 const reportType = ref<'formal' | 'express'>('formal')
-const reportTypeLabels = ['正式报告', '快报']
-const reportTypeIndex = computed(() => (reportType.value === 'formal' ? 0 : 1))
-const currentReportTypeLabel = computed(() => reportTypeLabels[reportTypeIndex.value])
 
-// 排序
-const sortFieldIndex = ref(0)        // 当前排序维度在 SORT_KEYS 中的索引
-const sortAsc = ref(false)           // true=升序, false=降序
+// 排序模式（score=四维评分 / performance=业绩，业绩排序逻辑暂留空）
+const sortMode = ref<'score' | 'performance'>('performance')
+const sortAsc = ref(false)           // true=升序, false=降序（仅四维评分模式生效）
 
 // ===== 持久化 =====
 function loadPersistedState() {
@@ -216,8 +198,7 @@ function loadPersistedState() {
     const saved = uni.getStorageSync(STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      const idx = SORT_KEYS.indexOf(parsed.sortField)
-      if (idx >= 0) sortFieldIndex.value = idx
+      if (parsed.sortMode === 'score' || parsed.sortMode === 'performance') sortMode.value = parsed.sortMode
       if (typeof parsed.sortAsc === 'boolean') sortAsc.value = parsed.sortAsc
       if (parsed.reportType === 'formal' || parsed.reportType === 'express') reportType.value = parsed.reportType
     }
@@ -227,7 +208,7 @@ function loadPersistedState() {
 function savePersistedState() {
   try {
     uni.setStorageSync(STORAGE_KEY, JSON.stringify({
-      sortField: SORT_KEYS[sortFieldIndex.value],
+      sortMode: sortMode.value,
       sortAsc: sortAsc.value,
       reportType: reportType.value,
     }))
@@ -235,63 +216,25 @@ function savePersistedState() {
 }
 
 // ===== 计算属性 =====
-const currentSortField = computed(() => SORT_KEYS[sortFieldIndex.value])
-const currentSortLabel = computed(() => SORT_LABELS[currentSortField.value])
-const sortIndex = computed(() => sortFieldIndex.value)
-
 const hasMore = computed(() => {
   const shown = filteredList.value.length
   return shown > 0 && shown < total.value
 })
 
-// 排序映射：前端 SortField → 后端 sortBy 参数
-function sortFieldToApi(field: SortField): string {
-  const map: Record<SortField, string> = {
-    aiScore: 'ai_score',
-    revenue: 'total_revenue',
-    revenueYoy: 'total_revenue',
-    netProfit: 'n_income_attr_p',
-    profitYoy: 'n_income_attr_p',
-    updateTime: 'ann_date',
-  }
-  return map[field] || 'ann_date'
+// 排序模式 → 后端 sortBy / sortOrder 参数（仅四维评分模式使用）
+function sortParams(): { sortBy: string; sortOrder: string } {
+  // 四维评分模式：按 AI 评分排序（升降序按钮生效）
+  return { sortBy: 'ai_score', sortOrder: sortAsc.value ? 'asc' : 'desc' }
 }
 
-// 筛选 + 排序联动逻辑：先筛选 → 后排序
+// 前端排序：按当前模式的评分（AI 评分 / 业绩评分）升降序排序
 const filteredList = computed(() => {
-  let items = [...rawList.value]
-
-  // 排序
-  const field = currentSortField.value
   const asc = sortAsc.value
-  items.sort((a, b) => {
-    let valA = 0
-    let valB = 0
-
-    if (field === 'revenue') {
-      valA = parseFloat(a.revenue) || 0
-      valB = parseFloat(b.revenue) || 0
-    } else if (field === 'revenueYoy') {
-      valA = a.revenueYoy ?? 0
-      valB = b.revenueYoy ?? 0
-    } else if (field === 'netProfit') {
-      valA = parseFloat(a.netProfit) || 0
-      valB = parseFloat(b.netProfit) || 0
-    } else if (field === 'profitYoy') {
-      valA = a.profitYoy ?? 0
-      valB = b.profitYoy ?? 0
-    } else if (field === 'updateTime') {
-      valA = new Date(a.updateTime).getTime()
-      valB = new Date(b.updateTime).getTime()
-    } else if (field === 'aiScore') {
-      valA = a.aiScore ?? -1
-      valB = b.aiScore ?? -1
-    }
-
+  return [...rawList.value].sort((a, b) => {
+    const valA = sortMode.value === 'score' ? (a.aiScore ?? -1) : (a.perfScore ?? -1)
+    const valB = sortMode.value === 'score' ? (b.aiScore ?? -1) : (b.perfScore ?? -1)
     return asc ? valA - valB : valB - valA
   })
-
-  return items
 })
 
 // 空数据提示
@@ -314,15 +257,35 @@ async function fetchData(append = false) {
   }
 
   try {
+    const kw = keyword.value.trim()
+
+    if (sortMode.value === 'performance') {
+      // 业绩模式：调用排行榜接口（多因子评分排序）
+      const rankParams: any = { sortBy: 'score', sortOrder: sortAsc.value ? 'asc' : 'desc', reportType: reportType.value, page: page.value, pageSize }
+      if (kw) rankParams.keyword = kw
+      const res: any = await stockApi.getPerformanceRanking(rankParams)
+
+      if (!res) throw new Error('API 返回为空')
+      const rankingList: any[] = res['排行榜'] || []
+      total.value = res['总数量'] || 0
+      const mapped = rankingList.map(item => mapRankingItem(item))
+      if (append) {
+        rawList.value = [...rawList.value, ...mapped]
+      } else {
+        rawList.value = mapped
+      }
+      if (mapped.length && page.value * pageSize < total.value) page.value++
+      return
+    }
+
     const params: any = {
       page: page.value,
       pageSize,
-      sortBy: sortFieldToApi(currentSortField.value),
-      sortOrder: sortAsc.value ? 'asc' : 'desc',
+      sortBy: sortParams().sortBy,
+      sortOrder: sortParams().sortOrder,
       reportType: reportType.value,
     }
 
-    const kw = keyword.value.trim()
     const res: any = kw
       ? await stockApi.searchPerformanceReport({ ...params, keyword: kw })
       : await stockApi.getPerformanceReportList(params)
@@ -442,6 +405,7 @@ function mapApiItem(item: any): ReportItem {
     period,
     tag: aiTag || rating || (reportType === '快报/预告' ? '预告' : ''),
     aiScore: aiScore != null ? Number(aiScore) : null,
+    perfScore: null,
     isFormal: reportType === '正式报告',
     revenue: toYi(rawRevenue),
     revenueYoy,
@@ -453,6 +417,59 @@ function mapApiItem(item: any): ReportItem {
     updateTime: formatDate(annDate),
     goodTags: desc.good,
     riskTags: desc.risk,
+  }
+}
+
+/** 将排行榜 API 返回项映射为前端 ReportItem（业绩模式） */
+function mapRankingItem(item: any): ReportItem {
+  const code = item.symbol || ''
+  const name = item.stockName || ''
+  const annDate = item.ann_date || ''
+  const endDate = item.end_date || ''
+  const aiTag = item.ai_tag || ''
+
+  // 格式化日期: YYYYMMDD → YYYY-MM-DD
+  const formatDate = (d: string) => {
+    if (!d || d.length < 8) return d
+    return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
+  }
+
+  // 报告期显示
+  let period = endDate
+  if (period && period.length === 8) {
+    const y = period.slice(0, 4)
+    const m = period.slice(4, 6)
+    if (m === '03') period = `${y}一季报`
+    else if (m === '06') period = `${y}半年报`
+    else if (m === '09') period = `${y}三季报`
+    else if (m === '12') period = `${y}年报`
+  }
+  if (item.reportType === 'express') period += '（快报）'
+
+  // 金额（后端已转亿元）
+  const toYi = (val: number | null) => {
+    if (val == null) return ''
+    return val.toFixed(2)
+  }
+
+  return {
+    code,
+    name,
+    period,
+    tag: aiTag || (item.reportType === 'express' ? '预告' : ''),
+    aiScore: null,
+    perfScore: item.score != null ? Number(item.score) : null,
+    isFormal: item.reportType === 'formal',
+    revenue: toYi(item.revenue ?? null),
+    revenueYoy: item.revenueYoY != null ? Number(item.revenueYoY) : null,
+    netProfit: toYi(item.netProfit ?? null),
+    profitYoy: item.netProfitYoY != null ? Number(item.netProfitYoY) : null,
+    industry: '',
+    grossMargin: '',
+    cashFlow: '',
+    updateTime: formatDate(annDate),
+    goodTags: [],
+    riskTags: [],
   }
 }
 
@@ -482,27 +499,19 @@ function retry() {
 }
 
 // ===== 报告类型筛选 =====
-function onReportTypeChange(e: any) {
-  const idx = e.detail.value
-  const type = idx === 0 ? 'formal' : 'express'
+function setReportType(type: 'formal' | 'express') {
   if (reportType.value === type) return
   reportType.value = type
   savePersistedState()
   fetchData(false)
 }
 
-// ===== 排序 =====
-function onSortChange(e: any) {
-  const idx = e.detail.value
-  if (idx !== sortFieldIndex.value) {
-    sortFieldIndex.value = idx
-    sortAsc.value = false  // 切换维度时默认降序
-  } else {
-    // 点击同一项切换升降序
-    sortAsc.value = !sortAsc.value
-  }
+// ===== 排序模式切换 =====
+function setSortMode(mode: 'score' | 'performance') {
+  if (sortMode.value === mode) return
+  sortMode.value = mode
   savePersistedState()
-  fetchData(false) // 排序变更后重新请求
+  fetchData(false)
 }
 
 function setOrder(asc: boolean) {
@@ -518,12 +527,9 @@ function switchTo(tab: string) {
 }
 
 // ===== 通用 =====
-/** 标签等级颜色：红=高增/扭盈（最好），蓝=向好/修复/承压/走弱（中间），绿=疲弱/转亏（最差） */
-function tagClass(tag: string): string {
-  if (['高增', '扭盈'].includes(tag)) return 'tag-red'
-  if (['疲弱', '转亏'].includes(tag)) return 'tag-green'
-  if (['向好', '修复', '承压', '走弱'].includes(tag)) return 'tag-blue'
-  return 'tag-neutral' // 预告、评级等非等级标签
+/** 卡片右上角展示的分数：四维评分模式显示 AI 评分，业绩模式显示业绩评分 */
+function displayScore(item: ReportItem): number | null {
+  return sortMode.value === 'score' ? item.aiScore : item.perfScore
 }
 
 function scoreClass(score: number): string {
@@ -533,12 +539,13 @@ function scoreClass(score: number): string {
 }
 
 function yoyClass(val: number | null): string {
-  if (val == null || val === 0) return ''
+  if (val == null) return 'none'
+  if (val === 0) return ''
   return val > 0 ? 'up' : 'down'
 }
 
 function formatYoy(val: number | null): string {
-  if (val == null) return '--'
+  if (val == null) return '暂无数据'
   const prefix = val > 0 ? '+' : ''
   return `${prefix}${val.toFixed(2)}%`
 }
@@ -632,20 +639,30 @@ fetchData(false)
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
-.type-filter-picker {
+.report-type-group {
   display: flex;
-  align-items: center;
-  gap: 4rpx;
-  padding: 6rpx 12rpx;
-  border-radius: 8rpx;
-  background: #f0f2f5;
+  gap: 0;
   flex-shrink: 0;
+  border-radius: 10rpx;
+  overflow: hidden;
+  border: 1rpx solid #e0e3e8;
 }
 
-.type-filter-text {
-  font-size: 24rpx;
-  color: $primary;
+.report-type-btn {
+  font-size: 22rpx;
+  color: $ink-soft;
+  padding: 8rpx 16rpx;
+  background: #f9fafb;
   font-weight: 500;
+
+  &.active {
+    color: #fff;
+    background: $primary;
+  }
+
+  &:first-child {
+    border-right: 1rpx solid #e0e3e8;
+  }
 }
 
 .left-section {
@@ -655,19 +672,30 @@ fetchData(false)
   flex-shrink: 0;
 }
 
-.sort-picker {
+.sort-mode-group {
   display: flex;
-  align-items: center;
-  gap: 4rpx;
-  padding: 6rpx 12rpx;
-  border-radius: 8rpx;
-  background: #f0f2f5;
+  gap: 0;
+  flex-shrink: 0;
+  border-radius: 10rpx;
+  overflow: hidden;
+  border: 1rpx solid #e0e3e8;
 }
 
-.sort-picker-text {
-  font-size: 24rpx;
-  color: $primary;
+.sort-mode-btn {
+  font-size: 22rpx;
+  color: $ink-soft;
+  padding: 8rpx 16rpx;
+  background: #f9fafb;
   font-weight: 500;
+
+  &.active {
+    color: #fff;
+    background: $primary;
+  }
+
+  &:first-child {
+    border-right: 1rpx solid #e0e3e8;
+  }
 }
 
 .sort-order {
@@ -784,40 +812,12 @@ fetchData(false)
   flex-shrink: 0;
 }
 
-.report-tag {
+.report-score {
   font-size: 22rpx;
   font-weight: 600;
   padding: 4rpx 16rpx;
   border-radius: 8rpx;
   margin-left: auto;
-  flex-shrink: 0;
-
-  &.tag-red {
-    color: $up;
-    background: $up-soft;
-  }
-
-  &.tag-blue {
-    color: $primary;
-    background: $primary-50;
-  }
-
-  &.tag-green {
-    color: $down;
-    background: $down-soft;
-  }
-
-  &.tag-neutral {
-    color: $ink-soft;
-    background: $bg-soft;
-  }
-}
-
-.report-score {
-  font-size: 20rpx;
-  font-weight: 600;
-  padding: 4rpx 12rpx;
-  border-radius: 8rpx;
   flex-shrink: 0;
 
   &.score-high {
@@ -921,11 +921,18 @@ fetchData(false)
   min-width: 100rpx;
 }
 
+.data-yoy-label {
+  font-size: 20rpx;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
 .data-yoy {
   font-size: 20rpx;
   font-weight: 500;
   &.up { color: #f43f5e; }
   &.down { color: #22c55e; }
+  &.none { color: #9ca3af; }
 }
 
 /* 底部：辅助信息 */
