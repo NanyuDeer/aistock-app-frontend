@@ -115,9 +115,9 @@ defineProps<Props>()
 .opp-list { display: flex; flex-direction: column; gap: 6rpx; }
 .opp-item { font-size: 22rpx; color: var(--ev-text-tertiary); line-height: 1.5; }
 
-/* 风险 */
+/* 风险提示：谨慎/利空语义 → A股绿（--ev-positive 变量存 $down 绿） */
 .risk-section { border-bottom: none; }
-.risk-title { color: var(--ev-negative); }
+.risk-title { color: var(--ev-positive); }
 .risk-list { display: flex; flex-direction: column; gap: 6rpx; }
-.risk-item { font-size: 22rpx; color: var(--ev-negative); line-height: 1.5; }
+.risk-item { font-size: 22rpx; color: var(--ev-positive); line-height: 1.5; }
 </style>

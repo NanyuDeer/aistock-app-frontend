@@ -4,7 +4,7 @@
       <view class="as-kline-meta">
         <text :class="['as-kline-price', lastPoint.change >= 0 ? 'up' : 'down']">{{ formatPrice(lastPoint.close) }}</text>
         <text :class="['as-kline-change', lastPoint.change >= 0 ? 'up' : 'down']">
-          {{ formatSigned(lastPoint.change) }} {{ formatSigned(lastPoint.changePercent) }}%
+          {{ formatSigned(lastPoint.change) }} ({{ formatSigned(lastPoint.changePercent) }}%)
         </text>
       </view>
       <view class="as-kline-periods">
@@ -30,7 +30,7 @@
       v-else
       :id="chartId"
       class="kline-host"
-      style="height: 300px; min-height: 300px;"
+      style="height: 328px; min-height: 328px;"
       :chart-payload="chartPayload"
       :change:chart-payload="chartView.updateChart"
     />
@@ -75,6 +75,28 @@
       </view>
     </view>
     <!-- #endif -->
+
+    <!-- #ifdef H5 || APP-PLUS -->
+    <view :id="`${chartId}_ma_panel`" class="kline-hover-ma" style="display: none;">
+      <view class="kline-hover-ma-head">
+        <text :id="`${chartId}_ma_date`" class="kline-hover-ma-date"></text>
+        <text :id="`${chartId}_ma_close`" class="kline-hover-ma-close"></text>
+      </view>
+      <view class="kline-hover-ma-line">
+        <text class="kline-hover-ma-title">MA(5,10,20)</text>
+        <text :id="`${chartId}_ma5`" class="kline-hover-ma-value ma5"></text>
+        <text :id="`${chartId}_ma10`" class="kline-hover-ma-value ma10"></text>
+        <text :id="`${chartId}_ma20`" class="kline-hover-ma-value ma20"></text>
+      </view>
+      <view class="kline-hover-ma-line">
+        <text class="kline-hover-ma-title">VOL(5,10,20)</text>
+        <text :id="`${chartId}_vol`" class="kline-hover-ma-value volume"></text>
+        <text :id="`${chartId}_vol5`" class="kline-hover-ma-value ma5"></text>
+        <text :id="`${chartId}_vol10`" class="kline-hover-ma-value ma10"></text>
+        <text :id="`${chartId}_vol20`" class="kline-hover-ma-value ma20"></text>
+      </view>
+    </view>
+    <!-- #endif -->
   </view>
 </template>
 
@@ -89,6 +111,8 @@ interface KLineItem {
   high: number
   low: number
   volume?: number
+  change?: number
+  changePercent?: number
 }
 
 interface NormalizedKLineItem extends KLineItem {
@@ -133,7 +157,6 @@ const normalizedItems = computed<NormalizedKLineItem[]>(() => {
     const high = Number(item.high) || Math.max(open, close)
     const low = Number(item.low) || Math.min(open, close)
     if (!Number.isFinite(timestamp) || !open || !close || !high || !low) return
-    const prev = rows.get(timestamp - 1)?.close || open
     rows.set(timestamp, {
       date: item.date,
       timestamp,
@@ -142,12 +165,23 @@ const normalizedItems = computed<NormalizedKLineItem[]>(() => {
       high: Math.max(high, open, close),
       low: Math.min(low, open, close),
       volume: Number(item.volume) || 0,
-      change: close - open,
-      changePercent: open ? ((close - open) / open) * 100 : 0,
+      change: toFiniteNumber(item.change) ?? Number.NaN,
+      changePercent: toFiniteNumber(item.changePercent) ?? Number.NaN,
     })
-    void prev
   })
-  return [...rows.values()].sort((left, right) => left.timestamp - right.timestamp)
+  return [...rows.values()]
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .map((item, index, items) => {
+      const prevClose = items[index - 1]?.close || item.open
+      const fallbackChange = item.close - prevClose
+      return {
+        ...item,
+        change: Number.isFinite(item.change) ? item.change : fallbackChange,
+        changePercent: Number.isFinite(item.changePercent)
+          ? item.changePercent
+          : prevClose ? (fallbackChange / prevClose) * 100 : 0,
+      }
+    })
 })
 
 const lastPoint = computed(() => {
@@ -257,6 +291,11 @@ function formatDate(value: string): string {
   return text.length >= 8 ? `${text.slice(4, 6)}-${text.slice(6, 8)}` : value
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function formatPrice(value: number): string {
   if (!Number.isFinite(value)) return '--'
   return value.toFixed(2).replace(/\.00$/, '')
@@ -318,6 +357,7 @@ export default {
       resizeTimer: null,
       maReady: false,
       volReady: false,
+      crosshairHandler: null,
     }
   },
   beforeDestroy() {
@@ -342,7 +382,7 @@ export default {
             position: 'left',
             inside: true,
             scrollZoomEnabled: false,
-            gap: { top: 0.12, bottom: 0.1 },
+            gap: { top: 0.24, bottom: 0.1 },
           },
         },
         styles: {
@@ -382,14 +422,29 @@ export default {
             tooltip: {
               showRule: 'follow_cross',
               showType: 'rect',
+              offsetTop: 4,
+              offsetLeft: 6,
+              offsetRight: 6,
+              offsetBottom: 6,
               title: { show: true, color: COLORS.text, size: 10 },
-              legend: { color: COLORS.axis, size: 10 },
+              legend: {
+                color: COLORS.axis,
+                size: 10,
+                marginTop: 2,
+                marginBottom: 2,
+                marginLeft: 0,
+                marginRight: 0,
+              },
               rect: {
-                position: 'pointer',
+                position: 'fixed',
                 color: 'rgba(255, 255, 255, 0.96)',
                 borderColor: COLORS.grid,
                 borderSize: 1,
                 borderRadius: 4,
+                offsetLeft: 8,
+                offsetRight: 8,
+                offsetTop: 8,
+                offsetBottom: 8,
                 paddingLeft: 8,
                 paddingRight: 8,
                 paddingTop: 6,
@@ -415,9 +470,20 @@ export default {
               { color: COLORS.ma20, size: 1, style: 'solid' },
             ],
             tooltip: {
-              showRule: 'follow_cross',
+              showRule: 'none',
               showType: 'standard',
+              offsetTop: 8,
+              offsetLeft: 4,
+              offsetRight: 4,
               text: { size: 10, color: COLORS.axis },
+              legend: {
+                size: 10,
+                color: COLORS.axis,
+                marginTop: 0,
+                marginBottom: 4,
+                marginLeft: 0,
+                marginRight: 10,
+              },
             },
           },
           xAxis: {
@@ -457,6 +523,11 @@ export default {
       this.chart.setDataLoader({
         getBars: ({ callback }) => callback(this.chartData, false),
       })
+      this.crosshairHandler = data => this.updateHoverMa(data)
+      this.chart.subscribeAction('onCrosshairChange', this.crosshairHandler)
+      this.host.addEventListener('mouseleave', this.hideHoverMa)
+      this.host.addEventListener('touchend', this.hideHoverMa)
+      this.host.addEventListener('touchcancel', this.hideHoverMa)
       if (typeof ResizeObserver !== 'undefined') {
         this.resizeObserver = new ResizeObserver(() => this.scheduleResize())
         this.resizeObserver.observe(this.host)
@@ -467,13 +538,103 @@ export default {
       if (!payload || !Array.isArray(payload.data)) return
       const chart = this.ensureChart(payload.id)
       if (!chart) return
-      this.chartData = payload.data
+      this.chartData = this.withMovingAverages(payload.data)
       chart.setSymbol({ ticker: payload.title || 'K线图', pricePrecision: 2, volumePrecision: 0 })
       chart.setPeriod({ type: payload.period || 'day', span: 1 })
       chart.resetData()
       this.ensureIndicators(chart)
       this.payloadKey = payload.key
+      this.hideHoverMa()
       this.$nextTick(() => this.fitLatestBars(payload.visibleCount || 58))
+    },
+    withMovingAverages(data) {
+      return data.map((item, index, rows) => ({
+        ...item,
+        ma5: this.calcAverage(rows, index, 5, 'close'),
+        ma10: this.calcAverage(rows, index, 10, 'close'),
+        ma20: this.calcAverage(rows, index, 20, 'close'),
+        volMa5: this.calcAverage(rows, index, 5, 'volume'),
+        volMa10: this.calcAverage(rows, index, 10, 'volume'),
+        volMa20: this.calcAverage(rows, index, 20, 'volume'),
+      }))
+    },
+    calcAverage(rows, index, count, key) {
+      if (index < count - 1) return null
+      const slice = rows.slice(index - count + 1, index + 1)
+      const total = slice.reduce((sum, item) => sum + (Number(item[key]) || 0), 0)
+      return total / count
+    },
+    updateHoverMa(data) {
+      if (!data || typeof data.x !== 'number' || !this.chartData.length) {
+        this.hideHoverMa()
+        return
+      }
+      let index = Number.isFinite(data.dataIndex) ? Math.round(data.dataIndex) : -1
+      if (index < 0 && this.chart && typeof this.chart.convertFromPixel === 'function') {
+        try {
+          const converted = this.chart.convertFromPixel([{ x: data.x, y: data.y || 0 }], { paneId: data.paneId || 'candle_pane' })
+          const point = Array.isArray(converted) ? converted[0] : converted
+          if (Number.isFinite(point?.dataIndex)) index = Math.round(point.dataIndex)
+        } catch (err) {
+          index = -1
+        }
+      }
+      const item = this.chartData[index]
+      if (!item) {
+        this.hideHoverMa()
+        return
+      }
+      const ids = this.getHoverMaEls()
+      if (!ids.panel || !ids.date || !ids.close) return
+      ids.date.textContent = this.formatDate(item.timestamp)
+      ids.close.textContent = `Close ${this.formatPrice(item.close)}`
+      ids.ma5.textContent = `MA5: ${this.formatPrice(item.ma5)}`
+      ids.ma10.textContent = `MA10: ${this.formatPrice(item.ma10)}`
+      ids.ma20.textContent = `MA20: ${this.formatPrice(item.ma20)}`
+      ids.vol.textContent = `VOLUME: ${this.formatVolume(item.volume)}`
+      ids.vol5.textContent = `MA5: ${this.formatVolume(item.volMa5)}`
+      ids.vol10.textContent = `MA10: ${this.formatVolume(item.volMa10)}`
+      ids.vol20.textContent = `MA20: ${this.formatVolume(item.volMa20)}`
+      ids.panel.style.display = 'block'
+    },
+    hideHoverMa() {
+      const panel = this.host ? document.getElementById(`${this.host.id}_ma_panel`) : null
+      if (panel) panel.style.display = 'none'
+    },
+    getHoverMaEls() {
+      const prefix = this.host?.id || ''
+      return {
+        panel: document.getElementById(`${prefix}_ma_panel`),
+        date: document.getElementById(`${prefix}_ma_date`),
+        close: document.getElementById(`${prefix}_ma_close`),
+        ma5: document.getElementById(`${prefix}_ma5`),
+        ma10: document.getElementById(`${prefix}_ma10`),
+        ma20: document.getElementById(`${prefix}_ma20`),
+        vol: document.getElementById(`${prefix}_vol`),
+        vol5: document.getElementById(`${prefix}_vol5`),
+        vol10: document.getElementById(`${prefix}_vol10`),
+        vol20: document.getElementById(`${prefix}_vol20`),
+      }
+    },
+    formatDate(timestamp) {
+      const date = new Date(Number(timestamp))
+      if (!Number.isFinite(date.getTime())) return '--'
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    },
+    formatPrice(value) {
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed.toFixed(2) : 'n/a'
+    },
+    formatVolume(value) {
+      const parsed = Number(value)
+      if (!Number.isFinite(parsed)) return 'n/a'
+      if (Math.abs(parsed) >= 100000000) return `${(parsed / 100000000).toFixed(3)}B`
+      if (Math.abs(parsed) >= 1000000) return `${(parsed / 1000000).toFixed(3)}M`
+      if (Math.abs(parsed) >= 1000) return `${(parsed / 1000).toFixed(3)}K`
+      return parsed.toFixed(0)
     },
     ensureIndicators(chart) {
       if (!this.maReady) {
@@ -529,9 +690,18 @@ export default {
       if (this.resizeTimer) clearTimeout(this.resizeTimer)
       this.resizeObserver?.disconnect()
       this.resizeObserver = null
+      if (this.chart && this.crosshairHandler) {
+        this.chart.unsubscribeAction('onCrosshairChange', this.crosshairHandler)
+      }
+      if (this.host) {
+        this.host.removeEventListener('mouseleave', this.hideHoverMa)
+        this.host.removeEventListener('touchend', this.hideHoverMa)
+        this.host.removeEventListener('touchcancel', this.hideHoverMa)
+      }
       if (this.chart) dispose(this.chart)
       this.chart = null
       this.host = null
+      this.crosshairHandler = null
       this.maReady = false
       this.volReady = false
     },
@@ -603,10 +773,68 @@ export default {
 .kline-host {
   display: block;
   width: 100%;
-  height: 300px;
-  min-height: 300px;
+  height: 328px;
+  min-height: 328px;
   overflow: hidden;
   touch-action: pan-y;
+}
+
+.kline-hover-ma {
+  margin-top: 10rpx;
+  padding: 10rpx 12rpx;
+  border-radius: 8rpx;
+  background: #f8fafc;
+  border: 1rpx solid #eef2f7;
+  box-sizing: border-box;
+}
+
+.kline-hover-ma-head,
+.kline-hover-ma-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.kline-hover-ma-head {
+  margin-bottom: 6rpx;
+}
+
+.kline-hover-ma-date {
+  font-size: 21rpx;
+  line-height: 1.2;
+  color: #334155;
+  font-weight: 700;
+}
+
+.kline-hover-ma-close,
+.kline-hover-ma-title,
+.kline-hover-ma-value {
+  font-size: 21rpx;
+  line-height: 1.25;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.kline-hover-ma-close,
+.kline-hover-ma-title {
+  color: #64748b;
+}
+
+.kline-hover-ma-value.ma5 {
+  color: #f59e0b;
+}
+
+.kline-hover-ma-value.ma10 {
+  color: #2563eb;
+}
+
+.kline-hover-ma-value.ma20 {
+  color: #8b5cf6;
+}
+
+.kline-hover-ma-value.volume {
+  color: #22c55e;
 }
 
 .kline-fallback {

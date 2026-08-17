@@ -43,5 +43,18 @@ export const STORAGE_KEYS = {
   FAVORITES: 'favorites',
   APP_CONFIG: 'app_config',
   CHAT_HISTORY: 'chat_history',
-  THEME: 'theme'
+  // P5-fix（问题 14）：对话 session_id 持久化（刷新后多轮上下文不丢）
+  CHAT_SESSION_ID: 'chat_session_id',
+  // P9 会话管理：会话元数据列表镜像 + 按会话分桶的消息
+  CHAT_SESSIONS: 'chat_sessions',
+  CHAT_HISTORY_BY_SESSION: 'chat_history_by_session',
+  // P11 T2：会话维度 token 本地累加（key=session_id → TokenUsage）
+  CHAT_SESSION_USAGE: 'chat_session_usage',
+  // Phase 4-2 Task 3：消息赞/踩反馈记录（key=message_id → ChatFeedbackRecord，v1 纯前端本地不落库）
+  CHAT_FEEDBACK: 'chat_feedback',
+  // 改进 18（批次 1）：新会话空态引导关闭标记（true=用户点「不再显示」，持久化；全局生效）
+  CHAT_EMPTY_GUIDE_CLOSED: 'chat_empty_guide_closed',
+  THEME: 'theme',
+  // 播报连续播放开关（持久化；true=连续排队，false/缺省=互斥）
+  PODCAST_CONTINUOUS: 'podcast_continuous'
 } as const

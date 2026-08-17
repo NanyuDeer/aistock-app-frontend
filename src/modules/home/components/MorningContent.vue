@@ -50,7 +50,7 @@
       <view class="feature-grid">
         <Card class="feature-card" clickable @click="goSectors">
           <view class="feature-header">
-            <text class="feature-title">长线风口</text>
+            <text class="feature-title">风口龙头</text>
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">排行前三板块</text>
@@ -83,7 +83,7 @@
 
         <Card class="feature-card" clickable @click="goTraceability">
           <view class="feature-header">
-            <text class="feature-title">大盘溯源</text>
+            <text class="feature-title">市场洞见</text>
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">市场异动溯源分析</text>
@@ -280,13 +280,20 @@ const aiReports = ref<LeaderStockPreview[]>([])
 const traceReports = ref<LeaderStockPreview[]>([])
 
 /**
- * 大盘溯源卡片：查询最近 3 个自然日的复盘报告状态。
+ * 大盘溯源卡片：查询最近 3 个交易日的复盘报告状态。
  * 标签统一用日期（MM-DD），和事件传导卡片一致。
  * 名称：当日已生成 → 现象快照摘要；待更新 → 规则提示文字。
  */
 async function loadTraceReports() {
   const today = shanghaiDateString()
-  const dates = [today, addCalendarDays(today, -1), addCalendarDays(today, -2)]
+  // 用最近 3 个交易日作为日期标签，避免展示周末/法定节假日；接口异常时退回自然日
+  let dates: string[]
+  try {
+    dates = await agentApi.getRecentTradingDays(today, 3)
+  } catch (err) {
+    console.error('获取最近交易日失败，退回自然日:', err)
+    dates = [today, addCalendarDays(today, -1), addCalendarDays(today, -2)]
+  }
   const results = await Promise.allSettled(
     dates.map(d => agentApi.getMarketTraceReview(d))
   )

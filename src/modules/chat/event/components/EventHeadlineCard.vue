@@ -63,10 +63,17 @@
           </svg>
         </view>
 
-        <Badge v-for="(industry, index) in displayIndustries" :key="index" type="info" size="sm">
-          {{ industry }}
-        </Badge>
-        <Badge v-if="remainingCount > 0" type="info" size="sm">+{{ remainingCount }}</Badge>
+        <view
+          v-for="(industry, index) in displayIndustries"
+          :key="index"
+          class="industry-item"
+          :class="'industry--' + (industry.sentiment || 'neutral')"
+        >
+          <text v-if="industry.sentiment === 'bullish'" class="industry-arrow">↑</text>
+          <text v-else-if="industry.sentiment === 'bearish'" class="industry-arrow">↓</text>
+          <text class="industry-name">{{ industry.name }}</text>
+        </view>
+        <view v-if="remainingCount > 0" class="industry-item industry--neutral">+{{ remainingCount }}</view>
       </view>
     </view>
   </Card>
@@ -83,6 +90,7 @@
  * 渐变/光斑为焦点卡刻意设计，通过覆盖 Card 默认样式保留。
  */
 import { computed } from 'vue'
+import type { AffectedIndustry } from '../types'
 import Card from '@/shared/components/Card.vue'
 import Tag from '@/shared/components/Tag.vue'
 import Badge from '@/shared/components/Badge.vue'
@@ -95,8 +103,8 @@ interface Props {
   title: string
   /** 重要性：重大/重要 */
   importance?: 'major' | 'normal'
-  /** 影响行业（最多展示3个，超过显示 +N） */
-  industries?: string[]
+  /** 影响行业（最多展示5个，一行压缩展示，含涨跌方向） */
+  industries?: AffectedIndustry[]
   /** 事件ID（用于跳转） */
   eventId?: string
 }
@@ -134,7 +142,7 @@ const directionText = computed(() => {
   return '综合'
 })
 
-// 展示的行业（最多3个）
+// 展示的行业（最多3个，超过显示 +N；正常字号自然排列，不压缩）
 const displayIndustries = computed(() => {
   return props.industries.slice(0, 3)
 })
@@ -191,15 +199,15 @@ const remainingCount = computed(() => {
   box-shadow: 0 12rpx 40rpx rgba(124, 58, 237, 0.18);
 }
 
-/* 内层容器：保留原焦点卡的紧凑布局 */
+/* 内层容器：标题区域更突出；左右 padding 恢复适中，行业区自然高度 */
 .card-inner {
   position: relative;
-  padding: 12rpx;
+  padding: 8rpx 12rpx;
   display: flex;
   flex-direction: column;
   gap: 4rpx;
   min-height: 140rpx;
-  max-height: 160rpx;
+  /* 移除 max-height 固定值：行业标签换行时需自适应高度，避免截断 */
 }
 
 /* ========== AI装饰光斑 ========== */
@@ -247,28 +255,66 @@ const remainingCount = computed(() => {
   font-weight: 700;
 }
 
-/* ========== 事件标题 ========== */
+/* ========== 事件标题（最多两行，超出省略号；不再单行截断） ========== */
 .event-title {
   font-size: 24rpx;
   font-weight: 600;
   color: $ink;
   line-height: 1.3;
-  white-space: nowrap;
+  /* 最多两行，超出省略（uni-app H5 用 -webkit-box 多行截断） */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-all;
   position: relative;
   z-index: 1;
 }
 
-/* ========== 影响行业 ========== */
+/* ========== 影响行业（最多3个 + N；辅助信息：小标签、弱化视觉，标题优先） ========== */
 .industries-container {
   display: flex;
   align-items: center;
   gap: 6rpx;
+  row-gap: 4rpx; /* 换行后的行间距 */
+  flex-wrap: wrap; /* 行业标签允许换行，避免长行业名挤压/溢出卡片右缘 */
   flex-shrink: 0;
-  flex-wrap: nowrap;
   position: relative;
   z-index: 1;
+}
+
+/* 行业标签：小字号辅助展示，不抢占标题空间 */
+.industry-item {
+  display: inline-flex;
+  align-items: center;
+  font-size: 20rpx;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 2rpx 8rpx;
+  border-radius: $r-xs;
+  white-space: nowrap;
+}
+
+.industry-arrow {
+  font-size: 16rpx;
+  margin-right: 2rpx;
+}
+
+/* 上涨（红 ↑） / 下跌（绿 ↓） / 中性（含 +N） */
+.industry--bullish {
+  background: rgba($up, 0.12);
+  color: $up;
+}
+
+.industry--bearish {
+  background: rgba($down, 0.12);
+  color: $down;
+}
+
+.industry--neutral {
+  background: $bg-deep;
+  color: $ink-mute;
 }
 
 /* ========== 股票趋势图标 ========== */

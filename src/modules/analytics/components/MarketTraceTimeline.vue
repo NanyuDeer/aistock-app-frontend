@@ -22,7 +22,7 @@
         <text class="banner-text">{{ primaryCause.conclusion }}</text>
       </view>
 
-      <view class="timeline-steps" :class="`is-${layout}`">
+      <view class="timeline-steps is-vertical">
         <view v-if="primaryCause.trigger" class="step-item">
           <view class="step-rail">
             <view class="step-dot" />
@@ -56,7 +56,7 @@
 
       <view v-if="primaryCause.supportingEvidence.length" class="evidence-block">
         <text class="evidence-label">参考来源：</text>
-        <text class="evidence-text">{{ primaryCause.supportingEvidence.join('、') }}</text>
+        <text class="evidence-text">{{ labelEvidenceList(primaryCause.supportingEvidence).join('、') }}</text>
       </view>
     </Card>
   </view>
@@ -66,11 +66,11 @@
 import { computed } from 'vue'
 import Card from '@/shared/components/Card.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import { labelEvidenceList } from '@/modules/analytics/utils/evidenceLabels'
 import type { MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 
 const props = defineProps<{
   presentation: MarketTracePresentation
-  layout: 'vertical' | 'horizontal'
 }>()
 
 const primaryCause = computed(() => props.presentation.primaryCause)
@@ -115,33 +115,22 @@ const titleText = computed(() => {
   color: #ffffff; line-height: 1.5;
 }
 
-/* 时间线步骤 */
-.timeline-steps { display: flex; }
-.timeline-steps.is-vertical { flex-direction: column; gap: $spacing-sm; }
-.timeline-steps.is-horizontal { flex-direction: row; gap: $spacing-xs; align-items: stretch; }
+/* 时间线步骤（固定垂直布局，触发→传导→结果逐行展示） */
+.timeline-steps { display: flex; flex-direction: column; gap: $spacing-sm; }
 
-.step-item { position: relative; display: flex; flex: 1; }
-.timeline-steps.is-vertical .step-item { padding-left: 40rpx; }
-.timeline-steps.is-horizontal .step-item { flex-direction: column; padding-top: 40rpx; }
+.step-item { position: relative; display: flex; flex: 1; padding-left: 40rpx; }
 
-.step-rail { position: absolute; }
-.timeline-steps.is-vertical .step-rail { left: 0; top: 0; width: 32rpx; height: 100%; }
-.timeline-steps.is-horizontal .step-rail { left: 0; top: 0; width: 100%; height: 32rpx; }
+.step-rail { position: absolute; left: 0; top: 0; width: 32rpx; height: 100%; }
 
 .step-dot {
   width: 20rpx; height: 20rpx; border-radius: $r-full;
   background: $primary; box-shadow: 0 0 0 6rpx rgba(11, 95, 255, 0.15);
-  position: absolute;
+  position: absolute; top: 8rpx; left: 50%; transform: translateX(-50%);
 }
-.timeline-steps.is-vertical .step-dot { top: 8rpx; left: 50%; transform: translateX(-50%); }
-.timeline-steps.is-horizontal .step-dot { top: 6rpx; left: 0; }
 
-.step-line { background: $line-soft; position: absolute; }
-.timeline-steps.is-vertical .step-line { top: 28rpx; bottom: -1 * ($spacing-sm + 8rpx); left: 50%; transform: translateX(-50%); width: 2rpx; }
-.timeline-steps.is-horizontal .step-line { top: 16rpx; left: 20rpx; right: 0; height: 2rpx; }
+.step-line { background: $line-soft; position: absolute; top: 28rpx; bottom: -1 * ($spacing-sm + 8rpx); left: 50%; transform: translateX(-50%); width: 2rpx; }
 
 .step-body { flex: 1; }
-.timeline-steps.is-horizontal .step-body { padding-top: 8rpx; }
 .step-label { display: block; font-size: 22rpx; color: $primary; font-weight: 600; margin-bottom: 4rpx; }
 .step-text { display: block; font-size: 24rpx; color: $text-color; line-height: 1.5; }
 

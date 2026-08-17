@@ -84,7 +84,7 @@ src/
 |------|------|---------|
 | 首页 | modules/home | 早点听、市场概览、长线风口、异动捕手 |
 | 自选股 | modules/favorites | 自选股列表、特别提醒、股票详情 |
-| AI 对话 | modules/chat | 聊天页、Skill 按钮、流式对话 |
+| AI 对话 | modules/chat | 聊天页、Skill 按钮、流式对话、会话管理（多会话列表/新建/切换/删除） |
 | 行情 | modules/market | 龙头股、重磅消息、板块标签 |
 | 业绩分析 | modules/analytics | 业绩预测、业绩报告列表、财报详情、大盘溯源报告 |
 | 用户 | modules/user | 个人中心、登录设置 |

@@ -18,7 +18,8 @@
         "modules" : {
             "Push" : {},
             "Barcode" : {},
-            "OAuth" : {}
+            "OAuth" : {},
+            "Record" : {}
         },
         "distribute" : {
             "android" : {
@@ -32,11 +33,15 @@
                     "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>",
                     "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>",
                     "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
-                    "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>"
+                    "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>",
+                    "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>"
                 ]
             },
             "ios" : {
-                "dSYMs" : false
+                "dSYMs" : false,
+                "privacyDescription" : {
+                    "NSMicrophoneUsageDescription" : "用于语音输入"
+                }
             },
             "sdkConfigs" : {
                 "push" : {
@@ -46,8 +51,7 @@
                 },
                 "oauth" : {
                     "weixin" : {
-                        "appid" : "wx539e4bb345aff2bc",
-                        "appsecret" : "98961b8246e0c9dc18d3dfa5701966ea"
+                        "appid" : "wx539e4bb345aff2bc"
                     }
                 }
             },
@@ -102,10 +106,16 @@
         "permission" : {},
         "optimization" : {
             "subPackages" : true
+        },
+        "plugins" : {
+            "WechatSI" : {
+                "version" : "0.3.5",
+                "provider" : "wx069ba97219f66d99"
+            }
         }
     },
     "h5" : {
-        "title" : "AI Stock",
+        "title" : "洞见",
         "router" : {
             "mode" : "history",
             "base" : "/"
