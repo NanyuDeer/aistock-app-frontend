@@ -2,6 +2,27 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-17 — App 语音输入录音格式 wav → amr（Android 真机「录音失败」根因修复）
+
+**开发者**: 37588
+
+### 背景
+App 真机语音输入反复「录音失败，请重试」。systematic-debugging 定位：该文案只来自设备侧 `readFile` 失败（`uploadAudio` 内部吃掉异常，不产生此文案）；「录完才报错」排除 `start()` 抛错与 `onError`。根因：uni-app App 端底层是 HTML5+ `plus.audio.getRecorder`，**Android 不真正支持 `wav` 录音**，传 wav 生成「假 .wav 实为 amr」的无效文件 → `fs.readFile(tempFilePath)` 失败。（前次 mp3→wav 修复仅过 H5 build、未真机验证 Android，方向自身错了。）
+
+### 修复
+- `src/shared/utils/speechInput.ts`：`appRecognize` 启动录音 `{ format: 'wav', sampleRate: 16000 }` → `{ format: 'amr', sampleRate: 8000 }`（AMR-NB 窄带固定 8k，Android/iOS HTML5+ 原生支持）；`uploadAudio` `Content-Type: audio/wav` → `audio/amr`；同步注释与 `AppRecorderManagerLike` 格式说明
+
+### 验证
+- `speechInput.spec.ts` 定向 19/19 通过（RED→GREEN：断言 `{format:'amr',sampleRate:8000}`），全量 vitest 相关无新增失败；vue-tsc 改动文件 0 错误（`event-chain/index.vue` 为既存无关类型错误）
+
+### 配套（后端 app-api，同批）
+- `VolcAsrService` 音频协议 `format:'wav',rate:16000` → `'amr',rate:8000`；`index.ts`/`asrController` `express.raw` 消费 `audio/amr`（见 app-api changelog）
+
+### 待真机验证
+- 重新打包 App，Android 真机语音输入应成功回填文本；后端 `/agent/asr` 收到 amr 请求并识别
+
+---
+
 ## [master] 2026-08-17 — 风口龙头 leaders 页：短线榜改为"上榜次数-热度"排序 + 净流入 0 显示为 --
 
 **开发者**: Aria
@@ -101,7 +122,6 @@ App 云打包真机测试发现：点击语音输入按钮弹系统提示后无�
 
 ### 修复
 - `src/modules/market/pages/sector-detail.vue`：行业板块（881 前缀）经 `mapIndustryToChain` 取上下游，`flow_data` 无 related 节点时旧布局不分配节点位置导致流向图只剩主节点——`flowChartSvg` 对齐 Web 端 WindLeaderPanel：`hasRelated` 分流，无 related 时以主节点为枢纽（hubIds=`[mainNode.id]`），upstream/downstream 从主节点下方居中排列
->>>>>>> origin/master
 
 ---
 
