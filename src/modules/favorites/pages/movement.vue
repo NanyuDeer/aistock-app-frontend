@@ -49,8 +49,16 @@ const layerText = (l?: string): string =>
 const statusText = (s: StockTraceEvent['analysis_status']): string =>
   ({ pending: '待归因', processing: '归因中', completed: '已归因', unavailable: '暂不可用' }[s] ?? s)
 
-const fmtTime = (t: string): string =>
-  t?.slice(5, 16).replace('T', ' ') ?? ''
+const fmtTime = (t: string): string => {
+  if (!t) return '--'
+  const date = new Date(t)
+  if (Number.isNaN(date.getTime())) return '--'
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${month}-${day} ${hours}:${minutes}`
+}
 
 const goDetail = (id: string) => {
   uni.navigateTo({ url: `/modules/favorites/pages/movement-detail?event_id=${encodeURIComponent(id)}` })
