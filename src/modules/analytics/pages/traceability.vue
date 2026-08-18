@@ -64,8 +64,10 @@ import { onShow } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { LoadingState, EmptyState, Button, Card } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
+import type { MarketTraceReviewRecord } from '@/shared/api/modules/agent'
 import { predictionApi } from '@/shared/api/modules/prediction'
 import { shanghaiDateString, shanghaiDateTimeParts } from '@/shared/utils/tradingTime'
+import { traceDateCandidates } from '@/shared/utils/traceDate'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import { toMarketTracePresentation, type MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 import MarketTraceHeader from '@/modules/analytics/components/MarketTraceHeader.vue'
@@ -82,6 +84,13 @@ const presentation = ref<MarketTracePresentation | null>(null)
 const reportAvailability = ref<'pending' | 'failed' | null>(null)
 const showMarkdown = ref(false)
 
+/** 当前实际展示报告的日期（回退后为上一交易日；用于预判占位文案的"今日"判断） */
+const displayedDate = ref('')
+/** 预测接口独立失败标记（report 成功但 prediction 拉取失败时置 true） */
+const predictErr = ref(false)
+/** 最近一次 completed 的 Report 原文，供预测重试时重组 presentation */
+const fetchedReport = ref<MarketTraceReviewRecord | null>(null)
+
 const markdownHtml = computed(() => {
   return presentation.value ? markdownToHtml(presentation.value.markdownDetails) : ''
 })
@@ -91,36 +100,52 @@ async function fetchData() {
   error.value = false
   presentation.value = null
   reportAvailability.value = null
-  const requestedDate = shanghaiDateString()
+  predictErr.value = false
 
-  try {
-    // 并行拉取：复盘报告 + 对应 prediction_records（大盘溯源预判随报告一天一换，source_id=review:<date>）
-    // 预测接口失败时降级为 null（predictionRecord=null → 预判卡片走既有空态占位），不拖垮复盘报告主内容
+  const today = shanghaiDateString()
+
+  for (const date of traceDateCandidates(today, 3)) {
     const [record, predResp] = await Promise.all([
-      agentApi.getMarketTraceReview(requestedDate),
-      predictionApi.list({ source_id: `review:${requestedDate}` }).catch(() => null),
+      agentApi.getMarketTraceReview(date),
+      predictionApi
+        .list({ source_id: `review:${date}` })
+        .then((r) => ({ ok: true as const, r }))
+        .catch(() => ({ ok: false as const, r: null })),
     ])
-    if (record && record.status !== 'completed') {
-      reportAvailability.value = record.status === 'queued' || record.status === 'processing'
-        ? 'pending'
-        : 'failed'
+
+    // 找到已完成报告：采用该日期，并落 prediction（失败则 predictErr，占位给重试）
+    if (record && record.status === 'completed') {
+      const model = toMarketTracePresentation(record, date, predResp.ok ? (predResp.r?.items?.[0] ?? null) : null)
+      if (model) {
+        fetchedReport.value = record
+        displayedDate.value = date
+        predictErr.value = !predResp.ok
+        presentation.value = model
+        loading.value = false
+        return
+      }
+      // schema/字段不完整：走整页 error
+      error.value = true
+      loading.value = false
       return
     }
-    const predictionRecord = predResp?.items?.[0] ?? null
-    presentation.value = record ? toMarketTracePresentation(record, requestedDate, predictionRecord) : null
-    if (record && !presentation.value) {
-      throw new Error('复盘报告字段不完整')
+    // 记录是否处于"生成中"（queued/processing）——仅当全候选都非 completed 时用
+    if (record && (record.status === 'queued' || record.status === 'processing')) {
+      reportAvailability.value = 'pending'
     }
-  } catch (err: unknown) {
-    console.error('Failed to fetch market trace review:', err)
-    error.value = true
-  } finally {
-    loading.value = false
+    // 其余（null / failed / pending）：继续向前回退到更早日期
   }
+
+  // 没有任何 completed 报告：pending（存在生成中）/ failed
+  if (!reportAvailability.value) reportAvailability.value = 'failed'
+  loading.value = false
 }
 
-/** 预判卡片空态占位文案（按上海时间感知）：20:30 前生成中，之后仍无记录则提示暂无 */
+/** 预判卡片空态占位文案：失败态 / 回退日期 / 当日分时感知 */
 const predictionPlaceholderText = computed(() => {
+  if (predictErr.value) return '预判加载失败'
+  // 回退到历史日期：无“生成中”概念，只表示该日无预判
+  if (displayedDate.value !== shanghaiDateString()) return '该日暂无预判数据'
   const { hour, minute } = shanghaiDateTimeParts()
   return hour * 60 + minute >= 20 * 60 + 30
     ? '今日暂无预判数据'
