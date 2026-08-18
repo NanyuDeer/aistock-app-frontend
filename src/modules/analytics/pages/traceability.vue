@@ -41,6 +41,7 @@
         <!-- 空态占位：prediction 为 null（prediction_records 暂无记录）时不影响其他报告内容 -->
         <view v-if="presentation.prediction === null" class="prediction-placeholder">
           <text class="prediction-placeholder-text">{{ predictionPlaceholderText }}</text>
+          <text v-if="predictErr" class="prediction-retry" @tap="retryPrediction">点击重试</text>
         </view>
 
         <!-- 折叠兜底：完整 markdown -->
@@ -60,7 +61,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { LoadingState, EmptyState, Button, Card } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
@@ -171,9 +172,51 @@ function goPredictionHistory() {
   uni.navigateTo({ url: '/modules/analytics/pages/prediction-history' })
 }
 
+/** 跨 20:30 / 15:30 切日自动刷新定时器句柄 */
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+
+function startRefreshTimer() {
+  stopRefreshTimer()
+  // 60s 轮询：捕捉 15:30 当日报告完成、20:30 预判落库的自动切换
+  refreshTimer = setInterval(() => { void fetchData() }, 60_000)
+}
+
+function stopRefreshTimer() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+}
+
+async function retryPrediction() {
+  const report = fetchedReport.value
+  const date = displayedDate.value
+  if (!report || !date || predictErr.value === false) return
+  predictErr.value = false
+  const predResp = await predictionApi
+    .list({ source_id: `review:${date}` })
+    .then((r) => ({ ok: true as const, r }))
+    .catch(() => ({ ok: false as const, r: null }))
+  if (!predResp.ok) {
+    predictErr.value = true
+    uni.showToast({ title: '预判加载失败，请重试', icon: 'none' })
+    return
+  }
+  const model = toMarketTracePresentation(report, date, predResp.r?.items?.[0] ?? null)
+  if (model) {
+    presentation.value = model
+  } else {
+    // 拉到了但未命中 completed/预判为 null → 展示占位（无失败）即可
+    presentation.value = toMarketTracePresentation(report, date, null)
+  }
+}
+
 onShow(() => {
   void fetchData()
+  startRefreshTimer()
 })
+onHide(stopRefreshTimer)
+onUnload(stopRefreshTimer)
 </script>
 
 <style lang="scss" scoped>
@@ -225,6 +268,14 @@ onShow(() => {
 .prediction-placeholder-text {
   font-size: $font-size-base;
   color: $text-color-secondary;
+}
+
+.prediction-retry {
+  display: inline-block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: $primary;
+  text-decoration: underline;
 }
 .report-html { display: block; color: $text-color; font-size: 24rpx; line-height: 1.7; }
 .report-html :deep(.md-h2) { margin: 12rpx 0; color: $text-color-title; font-size: 28rpx; font-weight: 600; }
