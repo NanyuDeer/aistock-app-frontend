@@ -83,7 +83,10 @@ const request = {
     return http.put(url, data, { header: config.headers }) as unknown as Promise<T>
   },
   delete<T = any>(url: string, config: { params?: any; data?: any; headers?: any } = {}): Promise<T> {
-    return http.delete(url, { params: config.params, data: config.data, header: config.headers }) as unknown as Promise<T>
+    // luch-request 的 delete(url, data, options) 是"三参数"签名：请求体(data)在第二参数，
+    // 而非 axios 风格 delete(url, {data})。若把 {data} 塞进第二参数，整个 config 会被当成请求体，
+    // 后端读到 body.symbols 为空 → 自选删除等 DELETE 请求失败。因此 data 单独放第二参数。
+    return http.delete(url, config.data, { params: config.params, header: config.headers }) as unknown as Promise<T>
   }
 }
 

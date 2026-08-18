@@ -201,14 +201,24 @@
           />
         </view>
 
-        <!-- 中：text 模式 = 文本输入框 -->
-        <input
-          v-if="inputMode === 'text'"
-          v-model="inputText"
-          placeholder="输入消息..."
-          class="input"
-          @confirm="handleSend"
-        />
+        <!-- 中：text 模式 = 文本输入框（mic 图标内嵌输入框右侧，点击录音） -->
+        <view v-if="inputMode === 'text'" class="input-wrap">
+          <input
+            v-model="inputText"
+            placeholder="输入消息..."
+            class="input"
+            @confirm="handleSend"
+          />
+          <!-- 内嵌右侧麦克风：常态灰色与 GlobalChatBar 输入框内图标一致；录音激活时蓝色圆底白图标 -->
+          <view
+            v-if="speechSupported"
+            class="input-mic-btn"
+            :class="{ active: isListening }"
+            @tap.stop="handleMicTap"
+          >
+            <SvgIcon name="mic-line" size="36rpx" :color="isListening ? '#ffffff' : '#9ca3af'" />
+          </view>
+        </view>
 
         <!-- 中：voice 模式 = 按住说话 -->
         <view
@@ -220,11 +230,6 @@
           @touchcancel="onHoldEnd"
         >
           <text class="hold-talk-text">{{ holding ? '松开结束' : '按住 说话' }}</text>
-        </view>
-
-        <!-- 右：保留原"点击切换"麦克风（语音受支持才显示） -->
-        <view v-if="speechSupported" class="mic-btn" :class="{ active: isListening }" @tap="handleMicTap">
-          <SvgIcon name="mic-line" size="40rpx" :color="isListening ? '#ffffff' : '#0b5fff'" />
         </view>
 
         <!-- 发送 / 停止（保留原逻辑） -->
@@ -1010,7 +1015,15 @@ onUnmounted(() => {
 .skill-btn-text { font-size: 24rpx; color: $primary; }
 
 .input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
-.input { flex: 1; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
+.input-wrap { position: relative; flex: 1; min-width: 0; }
+.input { width: 100%; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
+/* mic 图标内嵌输入框右侧：absolute 定位，input 需预留右侧空间避免文字被图标遮挡 */
+.input-mic-btn {
+  position: absolute; right: 10rpx; top: 50%; transform: translateY(-50%);
+  width: 52rpx; height: 52rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.input-mic-btn.active { background: $primary; }
 
 /* Phase 4-2 Task 2（Task 4 扩展）：左侧模式切换（键盘 / 按住说话），与 mic-btn 同规格 */
 .mode-btn {
@@ -1028,14 +1041,6 @@ onUnmounted(() => {
   &.holding { background: $primary-50; color: $primary; border-color: $primary; }
 }
 .hold-talk-text { font-size: 28rpx; }
-
-/* Phase 4-2 Task 2：语音输入麦克风按钮（与输入框等高；active=聆听中，品牌色高亮） */
-.mic-btn {
-  display: flex; align-items: center; justify-content: center;
-  width: 72rpx; min-height: 72rpx; border-radius: 12rpx;
-  background: $bg-soft; flex-shrink: 0;
-}
-.mic-btn.active { background: $primary; }
 
 .send-btn { background: $primary; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
 
