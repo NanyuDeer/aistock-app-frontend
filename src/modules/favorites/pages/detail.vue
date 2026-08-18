@@ -157,18 +157,18 @@
                 <text v-if="aiAnalysis.analysisDate" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
               </view>
               <view v-if="logicTags.length" class="ai-section">
-                <text class="ai-section-title">核心逻辑</text>
+                <text class="ai-section-title">研判依据</text>
                 <view class="research-tags">
                   <view
                     v-for="(tag, i) in logicTags"
                     :key="'lg'+i"
-                    :class="['research-tag', 'is-logic', { 'is-expanded': expandedTag === 'logic' && expandedTagIdx === i }]"
-                    @tap="toggleTagExpand('logic', i)"
+                    :class="['research-tag', 'is-basis', { 'is-expanded': expandedTag === 'shortLogic' && expandedTagIdx === i }]"
+                    @tap="toggleTagExpand('shortLogic', i)"
                   >
                     <text class="research-tag-text">{{ tag.tag }}</text>
                   </view>
                 </view>
-                <view v-if="expandedTag === 'logic'" class="tag-detail">
+                <view v-if="expandedTag === 'shortLogic'" class="tag-detail basis">
                   <text class="tag-detail-text">{{ logicTags[expandedTagIdx]?.full }}</text>
                 </view>
               </view>
@@ -178,13 +178,13 @@
                   <view
                     v-for="(tag, i) in riskTags"
                     :key="'rk'+i"
-                    :class="['research-tag', 'is-risk', { 'is-expanded': expandedTag === 'risk' && expandedTagIdx === i }]"
-                    @tap="toggleTagExpand('risk', i)"
+                    :class="['research-tag', 'is-risk', { 'is-expanded': expandedTag === 'shortRisk' && expandedTagIdx === i }]"
+                    @tap="toggleTagExpand('shortRisk', i)"
                   >
                     <text class="research-tag-text">{{ tag.tag }}</text>
                   </view>
                 </view>
-                <view v-if="expandedTag === 'risk'" class="tag-detail risk">
+                <view v-if="expandedTag === 'shortRisk'" class="tag-detail risk">
                   <text class="tag-detail-text">{{ riskTags[expandedTagIdx]?.full }}</text>
                 </view>
               </view>
@@ -922,6 +922,7 @@ const klinePeriod = ref<KLinePeriod>('daily')
 const klineLoading = ref(false)
 const trendScoreData = ref<any>(null)
 const trendLoading = ref(false)
+const industryHealthData = ref<any>(null)
 // 历史 AI 评价
 const historyVisible = ref(false)
 const historyLoading = ref(false)
@@ -953,6 +954,7 @@ function selectActiveView(key: ViewKey) {
 const symbolRef = computed(() => symbol.value)
 const quoteRef = computed(() => ({ name: quote.value?.name, industry: stockInfo.value?.industry || quote.value?.industry }))
 const trendScoreDataRef = computed(() => trendScoreData.value)
+const industryHealthDataRef = computed(() => industryHealthData.value)
 const stockAiContextRef = computed(() => ({
   quote: quote.value,
   stockInfo: stockInfo.value,
@@ -965,7 +967,7 @@ const {
   midMockData,
   longMockData,
   trendModel,
-} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef)
+} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef, industryHealthDataRef)
 
 const visibleNewsList = computed(() => newsExpanded.value ? newsList.value : newsList.value.slice(0, 3))
 const hasAiInfoCardData = computed(() => Boolean(
@@ -1861,6 +1863,7 @@ async function loadData() {
     loadAiAnalysis()
     loadForecast(false)
     loadTrendScore()
+    loadIndustryHealth()
   } catch (err) {
     console.error('[StockDetail] load error:', err)
   } finally {
@@ -1884,6 +1887,17 @@ async function loadTrendScore() {
     }
   } finally {
     trendLoading.value = false
+  }
+}
+
+async function loadIndustryHealth() {
+  const industry = stockInfo.value?.industry
+  if (!industry) return
+  try {
+    const res = await stockApi.getIndustryHealth(industry)
+    industryHealthData.value = res
+  } catch {
+    industryHealthData.value = null
   }
 }
 
