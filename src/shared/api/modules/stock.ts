@@ -83,6 +83,21 @@ export interface TrendScoreData {
   rawData: unknown
 }
 
+// ---- 行业景气指数接口类型 ----
+export interface IndustryHealthData {
+  industry: string
+  tsCode: string
+  resolvedName: string
+  updatedAt: string
+  score: number
+  level: 'high' | 'medium' | 'low'
+  months: string[]
+  values: number[]
+  trend: 'up' | 'down' | 'flat'
+  details: { label: string; desc: string }[]
+  memberCount: number | null
+}
+
 // ---- 业绩预测接口类型 ----
 export interface ForecastPrediction {
   year: string
@@ -498,6 +513,11 @@ export const stockApi = {
   /** 获取趋势股评分（四维：技术面/行业赛道景气/消息面催化/基本面，含一票否决检查） */
   getTrendScore(symbol: string) {
     return request.get(`/cn/stocks/${symbol}/trend-score`).then((res: Record<string, unknown>) => normalizeTrendScore(res))
+  },
+
+  /** 获取行业景气指数（基于板块成分股近7个月涨跌幅） */
+  getIndustryHealth(industryName: string) {
+    return request.get<IndustryHealthData>(`/cn/industry/${encodeURIComponent(industryName)}/health`)
   },
 
   /** 获取板块龙头（指定板块 code） */

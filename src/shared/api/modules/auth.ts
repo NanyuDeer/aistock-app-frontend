@@ -41,7 +41,7 @@ export interface UserSettings {
 }
 
 export const authApi = {
-  /** 微信登录（App 端 uni.login → code → 后端换取 token） */
+  /** 微信登录（App 端 uni.login / H5 网页授权 OAuth 拿到的 code → 后端换取 token） */
   wxLogin(code: string) {
     return request.post('/auth/wx-login', { code })
   },
@@ -59,6 +59,19 @@ export const authApi = {
   /** 轮询扫码登录状态 */
   checkScanLoginStatus(state: string) {
     return request.get<ScanStatusResult>('/auth/wechat/login/scan/poll', { params: { state } })
+  },
+
+  /** 「分享到微信再授权」：H5 微信授权成功后把 token 按 state 回传后端 */
+  storeOauthResult(state: string, token: string, openid: string) {
+    return request.post<{ ok: boolean }>('/auth/oauth/store', { state, token, openid })
+  },
+
+  /** 「分享到微信再授权」：App 轮询当前 state 的登录结果，confirmed 时返回 token */
+  getOauthResult(state: string) {
+    return request.get<{ status: 'pending' | 'confirmed' | 'expired'; token?: string; openid?: string }>(
+      '/auth/oauth/result',
+      { params: { state } }
+    )
   },
 
   /** 退出登录 */
