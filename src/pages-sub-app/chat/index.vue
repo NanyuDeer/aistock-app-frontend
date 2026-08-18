@@ -192,12 +192,42 @@
 
       <!-- 输入框 -->
       <view class="input-bar">
-        <input v-model="inputText" placeholder="输入消息..." class="input" @confirm="handleSend" />
-        <!-- Phase 4-2 Task 2：语音输入（仅支持平台显示；tap 切换：点击开始聆听，再点结束） -->
+        <!-- 左：模式切换（键盘 / 按住说话）—— 仅语音受支持时显示 -->
+        <view v-if="speechSupported" class="mode-btn" @tap="toggleInputMode">
+          <SvgIcon
+            :name="inputMode === 'voice' ? 'keyboard-line' : 'mic-line'"
+            size="36rpx"
+            color="#0b5fff"
+          />
+        </view>
+
+        <!-- 中：text 模式 = 文本输入框 -->
+        <input
+          v-if="inputMode === 'text'"
+          v-model="inputText"
+          placeholder="输入消息..."
+          class="input"
+          @confirm="handleSend"
+        />
+
+        <!-- 中：voice 模式 = 按住说话 -->
+        <view
+          v-else
+          class="hold-talk"
+          :class="{ holding }"
+          @touchstart="onHoldStart"
+          @touchend="onHoldEnd"
+          @touchcancel="onHoldEnd"
+        >
+          <text class="hold-talk-text">{{ holding ? '松开结束' : '按住 说话' }}</text>
+        </view>
+
+        <!-- 右：保留原"点击切换"麦克风（语音受支持才显示） -->
         <view v-if="speechSupported" class="mic-btn" :class="{ active: isListening }" @tap="handleMicTap">
           <SvgIcon name="mic-line" size="40rpx" :color="isListening ? '#ffffff' : '#0b5fff'" />
         </view>
-        <!-- Phase 2 Part 2：生成中「发送」替换为「停止」（与 isStreaming 联动） -->
+
+        <!-- 发送 / 停止（保留原逻辑） -->
         <button v-if="isStreaming" @tap="chatStream.stop()" class="stop-btn">停止</button>
         <button v-else @tap="handleSend" :disabled="isStreaming" class="send-btn">发送</button>
       </view>
@@ -244,6 +274,7 @@ import {
   startSpeechRecognition,
   stopSpeechRecognition,
 } from '@/shared/utils/speechInput'
+import type { SpeechRecognitionResult } from '@/shared/utils/speechInput'
 
 const chatStream = useChatStream({ onBeforeStream: () => resetFollow() })
 const chatStore = useChatStore()
@@ -389,6 +420,12 @@ function handleConfirmClose() {
 }
 
 const inputText = ref('')
+/** 输入模式：text=键盘输入 / voice=按住说话（微信式） */
+const inputMode = ref<'text' | 'voice'>('text')
+/** 是否正在按住说话录制中 */
+const holding = ref(false)
+/** 进行中的按住说话识别 Promise（touchend 结算） */
+let pendingHoldRecognition: Promise<SpeechRecognitionResult> | null = null
 const scrollTop = ref(0)
 
 // Phase 4-2 Task 2：语音输入（平台支持才显示麦克风按钮；isListening 为 UI 镜像，模块状态见 speechInput）
@@ -685,6 +722,41 @@ function showListeningToast() {
   uni.showToast({ title: '正在聆听…，再次点击结束', icon: 'none', duration: 10000 })
 }
 
+/**
+ * Phase 4-2 Task 2（Task 4 扩展）：模式切换（键盘 ⇄ 按住说话，微信式）。
+ * 语音不受支持时不显示切换钮（模板 v-if="speechSupported"），此处再兜底。
+ */
+function toggleInputMode() {
+  if (!speechSupported) return
+  inputMode.value = inputMode.value === 'text' ? 'voice' : 'text'
+}
+
+/** 按住说话：touchstart → 开始录制（同步手势内启动识别），touchend/touchcancel → 停止并回填 */
+async function onHoldStart() {
+  if (holding.value || isStreaming.value) return
+  holding.value = true
+  // 复用既有 isListening 作为 UI 高亮（右 mic 按钮与 hold-talk 同源）
+  isListening.value = true
+  // startSpeechRecognition 需在同步手势内调用；返回 Promise 供 touchend 结算
+  pendingHoldRecognition = startSpeechRecognition()
+}
+
+async function onHoldEnd() {
+  if (!holding.value) return
+  holding.value = false
+  isListening.value = false
+  stopSpeechRecognition() // 提前结束并结算（小程序 stop 触发 onStop；H5 提前收结果）
+  const pending = pendingHoldRecognition
+  pendingHoldRecognition = null
+  if (!pending) return
+  const result = await pending
+  if (result.ok) {
+    inputText.value = result.text
+  } else {
+    uni.showToast({ title: result.error, icon: 'none' })
+  }
+}
+
 function quickAsk(text: string) {
   if (isStreaming.value) return
   upsertSessionMeta(text)
@@ -939,6 +1011,23 @@ onUnmounted(() => {
 
 .input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
 .input { flex: 1; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
+
+/* Phase 4-2 Task 2（Task 4 扩展）：左侧模式切换（键盘 / 按住说话），与 mic-btn 同规格 */
+.mode-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 72rpx; min-height: 72rpx; border-radius: 12rpx;
+  background: $bg-soft; flex-shrink: 0;
+}
+
+/* 按住说话按钮（微信式；touchstart/touchend 驱动，holding 高亮） */
+.hold-talk {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  min-height: 72rpx; border-radius: 12rpx;
+  background: $bg-soft; color: $ink-soft;
+  border: 2rpx solid $line;
+  &.holding { background: $primary-50; color: $primary; border-color: $primary; }
+}
+.hold-talk-text { font-size: 28rpx; }
 
 /* Phase 4-2 Task 2：语音输入麦克风按钮（与输入框等高；active=聆听中，品牌色高亮） */
 .mic-btn {
