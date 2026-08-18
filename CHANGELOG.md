@@ -2,6 +2,23 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [junliang] 2026-08-15 — 自选股价格异动归因：movement 列表页/详情页与首页卡片
+
+**开发者**: Aria
+
+### 新增
+- `src/modules/favorites/pages/movement-list.vue`：自选股尾盘价格异动列表页（展示五层归因候选列表，含股票/涨跌/归因摘要/置信度）
+- `src/modules/favorites/pages/movement-detail.vue`：异动详情页（五层候选详情 tab，含 evidence 证据包展示）
+- `src/modules/home/components/MovementCard.vue`：首页"异动捕手"卡片（Top5 异动事件入口，点击跳转 movement 列表页）
+
+### 改进
+- `src/shared/utils/insightNavigation.ts`：insightNavigation 分流逻辑——价格异动类型从 insight-detail 改为 movement-detail 跳转，涨停雷达保持 insight 路径
+
+### 验证
+- vitest 相关用例通过；vue-tsc 0 错误；build:h5 成功
+
+---
+
 ## [changer] 2026-08-13 — 对话体验优化：空态引导 / 快捷追问 / 滚动交互
 **开发者**: 37588
 
