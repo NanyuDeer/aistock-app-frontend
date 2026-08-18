@@ -53,7 +53,7 @@ export interface StockTraceArtifact {
 
 export interface TraceEvidence {
   source_id: string
-  kind: 'trigger_fact' | 'quote_fact' | 'sector_fact' | 'market_fact' | 'announcement' | 'news'
+  kind: 'trigger_fact' | 'quote_fact' | 'sector_fact' | 'market_fact' | 'announcement' | 'news' | 'capital_fact' | 'technical_fact'
   provider: string
   source_level: 'A' | 'B' | 'C' | 'D'
   title: string

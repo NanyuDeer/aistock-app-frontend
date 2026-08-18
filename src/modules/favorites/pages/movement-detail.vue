@@ -104,6 +104,15 @@
           </view>
         </view>
       </template>
+
+      <!-- 归因完成但结果不可用 -->
+      <view
+        v-else-if="analysis?.processing_status === 'completed' && !artifact"
+        class="section status-unavailable"
+      >
+        <text class="status-icon">--</text>
+        <text class="status-text">归因已完成，但结果暂不可用</text>
+      </view>
     </block>
   </view>
 </template>
@@ -166,6 +175,8 @@ const kindText = (k?: string): string =>
     market_fact: '市场事实',
     announcement: '公告',
     news: '新闻',
+    capital_fact: '资金事实',
+    technical_fact: '技术事实',
   }[k ?? ''] ?? k ?? '')
 
 const fmtTime = (t: string): string => {
