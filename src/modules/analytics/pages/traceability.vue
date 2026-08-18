@@ -104,41 +104,48 @@ async function fetchData() {
 
   const today = shanghaiDateString()
 
-  for (const date of traceDateCandidates(today, 3)) {
-    const [record, predResp] = await Promise.all([
-      agentApi.getMarketTraceReview(date),
-      predictionApi
-        .list({ source_id: `review:${date}` })
-        .then((r) => ({ ok: true as const, r }))
-        .catch(() => ({ ok: false as const, r: null })),
-    ])
+  try {
+    for (const date of traceDateCandidates(today, 3)) {
+      const [record, predResp] = await Promise.all([
+        agentApi.getMarketTraceReview(date),
+        predictionApi
+          .list({ source_id: `review:${date}` })
+          .then((r) => ({ ok: true as const, r }))
+          .catch(() => ({ ok: false as const, r: null })),
+      ])
 
-    // 找到已完成报告：采用该日期，并落 prediction（失败则 predictErr，占位给重试）
-    if (record && record.status === 'completed') {
-      const model = toMarketTracePresentation(record, date, predResp.ok ? (predResp.r?.items?.[0] ?? null) : null)
-      if (model) {
-        fetchedReport.value = record
-        displayedDate.value = date
-        predictErr.value = !predResp.ok
-        presentation.value = model
-        loading.value = false
+      // 找到已完成报告：采用该日期，并落 prediction（失败则 predictErr，占位给重试）
+      if (record && record.status === 'completed') {
+        const model = toMarketTracePresentation(record, date, predResp.ok ? (predResp.r?.items?.[0] ?? null) : null)
+        if (model) {
+          fetchedReport.value = record
+          displayedDate.value = date
+          predictErr.value = !predResp.ok
+          // 清除此前候选日残留的 'pending'，确保已采用的历史报告正常展示
+          reportAvailability.value = null
+          presentation.value = model
+          return
+        }
+        // schema/字段不完整：走整页 error
+        error.value = true
         return
       }
-      // schema/字段不完整：走整页 error
-      error.value = true
-      loading.value = false
-      return
+      // 记录是否处于"生成中"（queued/processing）——仅当全候选都非 completed 时用
+      if (record && (record.status === 'queued' || record.status === 'processing')) {
+        reportAvailability.value = 'pending'
+      }
+      // 其余（null / failed / pending）：继续向前回退到更早日期
     }
-    // 记录是否处于"生成中"（queued/processing）——仅当全候选都非 completed 时用
-    if (record && (record.status === 'queued' || record.status === 'processing')) {
-      reportAvailability.value = 'pending'
-    }
-    // 其余（null / failed / pending）：继续向前回退到更早日期
-  }
 
-  // 没有任何 completed 报告：pending（存在生成中）/ failed
-  if (!reportAvailability.value) reportAvailability.value = 'failed'
-  loading.value = false
+    // 没有任何 completed 报告：pending（存在生成中）/ failed
+    if (!reportAvailability.value) reportAvailability.value = 'failed'
+  } catch (err: unknown) {
+    // getMarketTraceReview 抛错（网络/401/服务器）：报告拉取失败非"日期不存在"，停止回退并走整页 error
+    console.error('Failed to fetch market trace review:', err)
+    error.value = true
+  } finally {
+    loading.value = false
+  }
 }
 
 /** 预判卡片空态占位文案：失败态 / 回退日期 / 当日分时感知 */
