@@ -235,9 +235,13 @@ export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResu
         }
         setState(result.ok ? 'idle' : 'error')
         resolve(result)
-      } catch {
+      } catch (err) {
         setState('error')
-        resolve({ ok: false, error: APP_RECORD_FAIL_HINT })
+        const reason = err instanceof Error ? err.message : (err ? String(err) : '')
+        // 诊断（2026-08-18）：readFile/上传异常统一透出（uploadAudio 已自身捕获不 reject，
+        // 故此 catch 实际是 readFile 读临时文件失败；wav 时代即「假 .wav】readFile 失败根因，amr 后仍需排查）
+        console.error('[asr] App 录音文件读取失败:', err)
+        resolve({ ok: false, error: reason ? `读取录音文件失败：${reason}` : APP_RECORD_FAIL_HINT })
       }
     }
     manager.onError = (res) => {
@@ -254,10 +258,13 @@ export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResu
       //   生成「假 .wav 实为 amr」的无效文件，onStop 后 readFile 读临时文件失败 → "录音失败，请重试"（真机复现根因）
       // - 选 amr：Android/iOS HTML5+ 原生支持（AMR-NB 窄带固定 8k），无需额外编码器，火山 V2 ASR 原生支持 format='amr'
       manager.start({ format: 'amr', sampleRate: 8000 })
-    } catch {
+    } catch (err) {
       activeStop = null
       setState('error')
-      resolve({ ok: false, error: APP_RECORD_FAIL_HINT })
+      const reason = err instanceof Error ? err.message : (err ? String(err) : '')
+      // 诊断（2026-08-18）：真机「录音失败」跨设备复现，透出真实原因以区分 start 失败 vs readFile 失败
+      console.error('[asr] App 录音启动失败:', err)
+      resolve({ ok: false, error: reason ? `录音启动失败：${reason}` : APP_RECORD_FAIL_HINT })
     }
   })
 }

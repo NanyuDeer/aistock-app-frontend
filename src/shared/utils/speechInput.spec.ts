@@ -308,4 +308,42 @@ describe('appRecognize', () => {
     const result = await pending
     assert.deepEqual(result, { ok: false, error: EMPTY_TRANSCRIPT_HINT })
   })
+
+  it('start 同步抛错（amr 不支持/引擎异常）→ 透出具体错误信息（诊断）', async () => {
+    // 根因排查（2026-08-18）：真机「录音失败，请重试」跨设备复现，但代码把 start 的
+    // 真实异常吞成固定文案。此用例要求把具体错误透出到 error，供真机区分 (a) start vs (c) readFile。
+    const recorder = {
+      start(_options: { format: string; sampleRate?: number }) {
+        throw new Error('amr encoder not supported')
+      },
+      stop() {},
+      onStart: null as (() => void) | null,
+      onStop: null as ((res: { tempFilePath: string }) => void) | null,
+      onError: null as ((res: { errMsg?: string }) => void) | null,
+    }
+    const pending = appRecognize({
+      getRecorderManager: () => recorder,
+      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
+      uploadAudio: async () => ({ ok: true, text: 'x' }),
+    })
+    expect(speechRecognitionState.value).toBe('error')
+    const result = await pending
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.match(result.error, /amr encoder not supported/)
+  })
+
+  it('readFile 失败（录音临时文件不可读）→ 透出具体错误信息（诊断）', async () => {
+    const pending = appRecognize({
+      getRecorderManager: () => mockRecorder,
+      readFileAsArrayBuffer: async () => {
+        throw new Error('ENOENT: no such file')
+      },
+      uploadAudio: async () => ({ ok: true, text: 'x' }),
+    })
+    mockRecorder.emitStart()
+    mockRecorder.emitStop('/tmp/rec.amr')
+    const result = await pending
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.match(result.error, /ENOENT|读取录音/)
+  })
 })
