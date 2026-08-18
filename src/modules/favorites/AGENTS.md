@@ -9,6 +9,8 @@
 - `pages/detail.vue` - 个股详情页
 - `pages/search.vue` - 股票搜索
 - `pages/monitor.vue` - 异动监控
+- `pages/movement.vue` - 异动捕手（自选股尾盘价格异动归因列表）
+- `pages/movement-detail.vue` - 异动详情（未实现，仅注册路由）
 
 ## 组件
 - `components/StockCard.vue` - 股票卡片

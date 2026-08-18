@@ -21,7 +21,7 @@ export interface StockTraceEvent {
 }
 
 export interface MovementCandidate {
-  layer: 'company' | 'sector' | 'market'
+  layer: 'company' | 'sector' | 'market' | 'capital' | 'technical'
   status: 'supported' | 'weak' | 'rejected' | 'insufficient'
   verdict: string
   supportingEvidenceIds: string[]

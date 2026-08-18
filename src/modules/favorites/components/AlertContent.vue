@@ -34,6 +34,39 @@
         </view>
       </view>
 
+      <!-- 异动捕手模块：自选股尾盘价格异动归因结果，点击进入 movement 列表页 -->
+      <view class="alert-module">
+        <view class="module-card">
+          <view class="module-decor module-decor--movement"></view>
+          <view class="module-header" @tap="goMovement">
+            <view class="module-icon">
+              <SvgIcon name="flashlight-line" size="32rpx" color="#8b5cf6" />
+            </view>
+            <view class="module-header-text">
+              <text class="module-title">异动捕手</text>
+            </view>
+            <text class="module-arrow">›</text>
+          </view>
+          <view class="movement-list">
+            <template v-if="movementItems.length">
+              <ListCell
+                v-for="(item, idx) in movementRows"
+                :key="idx"
+                :title="item?.stock_name || '\u3000'"
+                :description="item ? `${movementDetail(item)} · ${fmtMovementTime(item.triggered_at)}` : '\u3000'"
+                :clickable="!!item"
+                @click="item && goMovementDetail(item.event_id)"
+              >
+                <template #prefix>
+                  <Tag v-if="item" :type="item.direction === 'up' ? 'up' : 'down'" size="sm">{{ item.direction === 'up' ? '涨' : '跌' }}</Tag>
+                </template>
+              </ListCell>
+            </template>
+            <EmptyState v-if="!movementItems.length" title="暂无异动数据" />
+          </view>
+        </view>
+      </view>
+
       <!-- 个股情报模块（原StockMonitor，原异动捕手改名） -->
       <view class="alert-module">
         <view class="module-card">
@@ -82,6 +115,7 @@ import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
+import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { useUserStore } from '@/shared/store/modules/user'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
@@ -106,6 +140,49 @@ const intelTabItems = [
   { label: '利好', value: 'positive' as const },
   { label: '利空', value: 'negative' as const },
 ]
+
+// 异动捕手：展示自选股尾盘价格异动归因结果（前 3 条）
+const movementItems = ref<StockTraceEvent[]>([])
+
+async function loadMovementList() {
+  try {
+    const page = await stockTraceApi.list(3)
+    movementItems.value = page.items
+  } catch {
+    movementItems.value = []
+  }
+}
+
+const MOVEMENT_ROW_COUNT = 3
+const movementRows = computed<Array<StockTraceEvent | null>>(() => {
+  const rows: Array<StockTraceEvent | null> = movementItems.value.slice(0, MOVEMENT_ROW_COUNT)
+  while (rows.length < MOVEMENT_ROW_COUNT) rows.push(null)
+  return rows
+})
+
+function movementDetail(item: StockTraceEvent): string {
+  if (item.movement_view?.primaryCandidate?.verdict) {
+    return `主因：${item.movement_view.primaryCandidate.verdict}`
+  }
+  if (item.analysis_status === 'completed') return '归因完成'
+  if (item.analysis_status === 'processing') return '归因中'
+  return '待归因'
+}
+
+function fmtMovementTime(t: string): string {
+  if (!t) return '--'
+  const date = new Date(t)
+  if (Number.isNaN(date.getTime())) return '--'
+  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function goMovement() {
+  uni.navigateTo({ url: '/modules/favorites/pages/movement' })
+}
+
+function goMovementDetail(eventId: string) {
+  uni.navigateTo({ url: `/modules/favorites/pages/movement-detail?event_id=${encodeURIComponent(eventId)}` })
+}
 
 // 自选股洞察：展示自选股涨停雷达事件的归因结果（后端由 cron 周期采集 + LLM 归因）
 const captureList = ref<WatchlistInsight[]>([])
@@ -267,6 +344,7 @@ defineExpose({
 onMounted(() => {
   void loadCaptureList()
   void loadIntelList()
+  void loadMovementList()
 })
 
 // 登录/登出后，个股情报数据源会在全市场与自选股之间切换，需重新加载
@@ -322,6 +400,10 @@ watch(
   background: linear-gradient(90deg, $warning, $warning-light);
 }
 
+.module-decor--movement {
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+}
+
 /* 头部：标题/描述 + 箭头 */
 .module-header {
   display: flex;
@@ -360,7 +442,8 @@ watch(
 
 /* ===== 异动捕手 / 个股情报 列表区域（ListCell，样式一致） ===== */
 .capture-list,
-.intel-list {
+.intel-list,
+.movement-list {
   background: $bg-card;
   border-radius: $r-sm;
   padding: 0;
@@ -369,14 +452,16 @@ watch(
 
 /* 覆写 ListCell 内边距和字体：使列表更紧凑（行距比默认 $s-4 更紧凑，两列表保持一致） */
 .capture-list :deep(.as-list-cell),
-.intel-list :deep(.as-list-cell) {
+.intel-list :deep(.as-list-cell),
+.movement-list :deep(.as-list-cell) {
   padding: $s-2 $s-2;
   /* 空行占位（\u3000）与真实行等高，保证两个模块纵向长度一致 */
   min-height: 104rpx;
 }
 
 .capture-list :deep(.as-list-cell__title),
-.intel-list :deep(.as-list-cell__title) {
+.intel-list :deep(.as-list-cell__title),
+.movement-list :deep(.as-list-cell__title) {
   font-size: $font-size-sm;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -384,7 +469,8 @@ watch(
 }
 
 .capture-list :deep(.as-list-cell__desc),
-.intel-list :deep(.as-list-cell__desc) {
+.intel-list :deep(.as-list-cell__desc),
+.movement-list :deep(.as-list-cell__desc) {
   font-size: $font-size-xs;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -392,12 +478,14 @@ watch(
 }
 
 .capture-list :deep(.as-list-cell__prefix),
-.intel-list :deep(.as-list-cell__prefix) {
+.intel-list :deep(.as-list-cell__prefix),
+.movement-list :deep(.as-list-cell__prefix) {
   margin-right: $s-2;
 }
 
 .capture-list :deep(.as-list-cell__right),
-.intel-list :deep(.as-list-cell__right) {
+.intel-list :deep(.as-list-cell__right),
+.movement-list :deep(.as-list-cell__right) {
   margin-left: $s-2;
 }
 

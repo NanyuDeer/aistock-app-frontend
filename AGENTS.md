@@ -313,6 +313,7 @@ import Card from '@/shared/components/Card.vue'
 | `prediction.ts` | 历史预测跟踪（B2.1：列表+统计/详情） | `/api/predictions`、`/api/predictions/:id` |
 | `push.ts` | 推送 | `/api/push/*` |
 | `stock.ts` | 股票行情 | `/api/cn/stock-quote/*` |
+| `stockTrace.ts` | 自选股尾盘价格异动归因（stocktrace 完整链路） | `/api/cn/favorites/movements*` |
 | `valuation.ts` | 估值分析 | `/api/valuation/*` |
 
 ### 6.3 WebSocket

@@ -70,6 +70,19 @@
       }
     },
     {
+      "path": "modules/favorites/pages/movement",
+      "style": {
+        "navigationBarTitleText": "异动捕手",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "modules/favorites/pages/movement-detail",
+      "style": {
+        "navigationBarTitleText": "异动详情"
+      }
+    },
+    {
       "path": "modules/favorites/pages/favorites",
       "style": {
         "navigationBarTitleText": "自选",
