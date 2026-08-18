@@ -2,6 +2,22 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-18 — App 端应用内版本更新（全量 APK）
+**开发者**: Aria
+
+### 新增
+- `src/shared/utils/constants.ts`：新增 `DOWNLOAD_BASE_URL`（默认 `https://gupiao.yaozhineng.com/download`，可用 `VITE_DOWNLOAD_BASE_URL` 覆盖）——Web 端 public/download/ 托管的静态资源地址，非 API 域
+- `src/shared/api/modules/appUpdate.ts`：`fetchLatestVersion()` 拉取 version.json（静默降级返回 null）、`resolveDownloadUrl()` 拼接 APK 下载地址
+- `src/shared/utils/useAppUpdate.ts`：`checkAppUpdate({ manual })` 版本检查——非 Android App 环境返回 not_supported；启动自动检查 24h 节流（storage key `app_update_last_check`）；有新版本弹窗 → `uni.downloadFile` 下载 → `plus.runtime.install` 安装；本机 versionCode 经 `plus.android` 原生 PackageManager 读取
+- `src/App.vue`：APP-PLUS 端启动后 3s 静默执行 `checkAppUpdate()`（自动更新检查）
+- `src/modules/user/pages/profile.vue`：菜单新增「版本更新」项 → `checkAppUpdate({ manual: true })` 手动检查（latest/not_supported/error 分别 toast）
+
+### 发布新版本流程
+- 打包新版 APK → 上传至 Web 端 `public/download/` + 递增 version.json 的 versionCode/versionName → 部署 Web；用户在应用内启动/手动检查即可收到更新提示
+
+### 验证
+- `npx vue-tsc --noEmit` 通过（残留 event-chain/index.vue 报错为改动前已存在，与本改动无关）
+
 ## [master] 2026-08-17 — 非交易日过滤 + 悬浮播报全局持续播放
 
 **开发者**: Aria

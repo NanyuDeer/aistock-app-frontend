@@ -43,6 +43,11 @@ export const PLATFORM = {
   MP_WEIXIN: 'mp-weixin'
 } as const
 
+// App 安装包下载资源地址（Web 前端 public/download/ 托管的静态文件，非 API 域）
+// 仅 Android App 端应用内更新使用；env 缺失时兜底线上 Web 地址
+export const DOWNLOAD_BASE_URL =
+  (import.meta.env.VITE_DOWNLOAD_BASE_URL as string) || 'https://gupiao.yaozhineng.com/download'
+
 // 股票市场标识
 export const MARKET = {
   SH: 'sh',
