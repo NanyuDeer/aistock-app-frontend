@@ -11,7 +11,7 @@
  */
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep, type ReasoningStep, type TokenUsage, type ChatCard } from '@/shared/api/modules/agent'
+import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep, type ReasoningStep, type TokenUsage, type ChatCard, type DeepReportRef } from '@/shared/api/modules/agent'
 import { buildExecTree, toRawWsEvent, type RawWsEvent } from './buildExecTree'
 import { useChatStore } from '@/shared/store/modules/chat'
 
@@ -117,7 +117,10 @@ function connectOnce(): Promise<boolean> {
   return connectPromise
 }
 
-export function useChatStream() {
+export function useChatStream(options?: { onBeforeStream?: () => void }) {
+  // 5B（2026-08-17）：提前解引用外层 onBeforeStream，避免 _stream 内层同名参数
+  // （`_stream(content, options?: { forceDeep?: boolean })`）遮蔽外层 useChatStream 的 options
+  const onBeforeStream = options?.onBeforeStream
   const chatStore = useChatStore()
   // 修复气泡消失根因：Pinia store 实例上访问 computed 会被自动解包成普通值，
   // 若 index.vue 用 `const displayMessages = chatStream.messages` 捕获则得到陈旧数组快照，
@@ -529,6 +532,10 @@ export function useChatStream() {
     if (!sharedSocket || !sharedWsConnected) return false
     const sid = chatStore.sessionId || `app_${Date.now()}`
     if (!chatStore.sessionId) chatStore.setSessionId(sid)
+    // 5B（2026-08-17）：confirm 点选语义 = 用户主动发起新一轮（后端 fresh run）；
+    // 仅"点选"（choice!=='none'）触发复位——abandonConfirm 的 choice='none'
+    // 不触发（放弃语义，保持暂停态）。
+    if (choice !== 'none') onBeforeStream?.()
     sharedSocket.send({
       data: JSON.stringify({ type: 'confirm_response', request_id: requestId, choice, session_id: sid })
     })
@@ -615,6 +622,10 @@ export function useChatStream() {
   }
 
   async function _stream(content: string, options?: { forceDeep?: boolean }) {
+    // 5B（2026-08-17）：新发送轮前置复位跟随（纯复位，不滚底/不启定时器——
+    // 滚动由 watch(isStreaming) v=true 唯一收口，防同 tick 双发）。
+    // 覆盖 send/quickAsk/rerunDeep/retry/resume-none 兜底重发全部发送路径。
+    onBeforeStream?.()
     streaming.value = true
     progressSteps.value = []
     streamingText.value = ''
@@ -674,6 +685,9 @@ export function useChatStream() {
         chatStore.appendMessage({
           role: 'assistant',
           content: result.content || result.message || '',
+          // 5A（2026-08-17）：HTTP 降级路径透出 lastDeepReport/cards（非流式接口已补返回；缺失 undefined 兼容）
+          lastDeepReport: (result.last_deep_report as DeepReportRef | undefined) ?? undefined,
+          cards: (result.cards as ChatCard[] | undefined) ?? undefined,
           // P10 线 2 缺口修复：HTTP 降级路径同样透出 token_usage（非流式接口已补返回；缺失 undefined 兼容）
           tokenUsage: (result.token_usage as TokenUsage | undefined) ?? undefined,
           progressSteps: savedSteps,

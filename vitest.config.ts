@@ -35,6 +35,7 @@ export default defineConfig({
     include: [
       'tests/**/*.test.ts',
       'src/shared/utils/useChatStream.spec.ts',
+      'src/shared/utils/useChatStream.http.spec.ts',
       'src/shared/utils/chatSuggestions.spec.ts',
       'src/shared/utils/parseMarkdownSections.spec.ts',
       'src/shared/utils/parseFollowupQuestions.spec.ts',
@@ -63,6 +64,7 @@ export default defineConfig({
       'src/modules/favorites/pages/insight-detail.spec.ts',
       'src/modules/favorites/components/AlertContent.spec.ts',
       'src/shared/components/ConfirmSheet.spec.ts',
+      'src/pages-sub-app/chat/index.scroll.spec.ts',
       'src/modules/chat/pages/chat-report-detail.spec.ts',
     ],
   },
