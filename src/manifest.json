@@ -19,7 +19,8 @@
             "Push" : {},
             "Barcode" : {},
             "OAuth" : {},
-            "Record" : {}
+            "Record" : {},
+            "FileSystem" : {}
         },
         "distribute" : {
             "android" : {
