@@ -59,7 +59,8 @@
 ### 修复
 - App 端语音输入（右侧点击麦克风 / 按住说话）真机「录音失败，请重试」跨设备复现：`start()` 同步抛错 与 录音临时文件 `readFile` 失败 两处此前把真实异常吞成固定文案，无法定位根因
 - 现于两处失败分支透出真实原因（`录音启动失败：<err>` / `读取录音文件失败：<err>`）+ `console.error('[asr] …')`
-- 真机确根因：readFile 抛 `ReferenceError: nativeFileManager is not defined` —— 系 `uni.getFileSystemManager().readFile` 的 uni App 引擎框架缺陷（补 `manifest.json` FatFileSystem 模块已验证无效）。**改用 HTML5+ 原生 `plus.io` 读取**（`resolveLocalFileSystemURL` + `entry.file` + `FileReader.readAsArrayBuffer`），绕开 nativeFileManager，上传 raw/amr 链路与后端不变
+- 真机确根因一：readFile 抛 `ReferenceError: nativeFileManager is not defined` —— 系 `uni.getFileSystemManager().readFile` 的 uni App 引擎框架缺陷（补 `manifest.json` 的 `FileSystem` 模块已验证无效），改用 HTML5+ `plus.io` 读取
+- 真机确根因二：`plus.io` 读取首版误用标准 Web `FileReader.readAsArrayBuffer` → 报 `FileReader is not defined`（App 端无标准 FileReader）→ 改 `plus.io.FileReader.readAsDataURL`（返回 base64 DataURL）剥前缀，抽 `dataUrlToArrayBuffer` 纯函数（有单测）
 - 排查经验沉淀：`docs/2026-08-18-app-voice-asr-troubleshooting.md`（4 轮失败链 + 硬约束）
 
 ### 验证
