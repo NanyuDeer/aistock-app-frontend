@@ -105,3 +105,94 @@ test('详情透传 source_name 与 event_type', () => {
   assert.equal(detail.event.eventType, '监管变化')
   assert.equal(detail.event.sourceName, '财联社')
 })
+
+// ── 重要程度星级：由 chain_summary 最大 impactStrength 映射（0~1 → 1~5 星） ──
+
+test('重要程度星级：按 chain 最大 impactStrength 映射 1~5 星', () => {
+  const cases: Array<[number, number]> = [
+    [0.1, 1], [0.3, 2], [0.5, 3], [0.7, 4], [0.9, 5],
+  ]
+  for (const [strength, stars] of cases) {
+    const result = adaptEventList({
+      events: [{
+        eventId: `s${strength}`, title: '标题', source: '', publishTime: '', summary: '', conclusion: '',
+        chain_summary: [{ industry: 'A', direction: 'bullish', impactStrength: strength }],
+      }],
+      total: 1, page: 1, pageSize: 10, hasMore: false,
+    })
+    assert.equal(result.events[0].importance, stars, `impactStrength=${strength} 应为 ${stars} 星`)
+  }
+})
+
+test('重要程度星级：取最大 impactStrength（非首条）', () => {
+  const result = adaptEventList({
+    events: [{
+      eventId: 'max', title: '标题', source: '', publishTime: '', summary: '', conclusion: '',
+      chain_summary: [
+        { industry: 'A', direction: 'bullish', impactStrength: 0.3 },
+        { industry: 'B', direction: 'bearish', impactStrength: 0.9 },
+      ],
+    }],
+    total: 1, page: 1, pageSize: 10, hasMore: false,
+  })
+  assert.equal(result.events[0].importance, 5)
+})
+
+test('重要程度星级：无 chain_summary → undefined（前端隐藏，不显示假评分）', () => {
+  const result = adaptEventList({
+    events: [{ eventId: 'nochain', title: '标题', source: '', publishTime: '', summary: '', conclusion: '' }],
+    total: 1, page: 1, pageSize: 10, hasMore: false,
+  })
+  assert.equal(result.events[0].importance, undefined)
+})
+
+test('重要程度星级：非法 impactStrength（0/负数/字符串/NaN）→ undefined', () => {
+  const bad = (impactStrength: unknown) => adaptEventList({
+    events: [{
+      eventId: 'bad', title: '标题', source: '', publishTime: '', summary: '', conclusion: '',
+      chain_summary: [{ industry: 'A', direction: 'bullish', impactStrength: impactStrength as number }],
+    }],
+    total: 1, page: 1, pageSize: 10, hasMore: false,
+  })
+  for (const v of [0, -0.5, '0.9' as unknown as number, Number.NaN]) {
+    assert.equal(bad(v).events[0].importance, undefined, `impactStrength=${String(v)} 应无评分`)
+  }
+})
+
+test('详情重要程度：优先 chain_summary，回退 event_transmission.chain，均无 → undefined', () => {
+  const transmissionChain = [{
+    industry: 'X', relation: '核心', level: 1,
+    direction: 'bullish' as const, impactStrength: 0.4, reason: '',
+  }]
+
+  // 1) chain_summary 优先
+  const withSummary = adaptEventDetail({
+    id: 1, report_type: 'event_conduction', report_date: '2026-07-17', user_id: '',
+    chain_summary: [{ industry: 'A', direction: 'bullish', impactStrength: 0.8 }],
+    content: {
+      eventId: 'd1', title: '标题', source: '', publishTime: '', event: '',
+      analysis_reports: { event_transmission: { eventId: 'd1', mechanism: '', variables: [], coreIndustry: { name: 'X', impact: '', reason: '' }, chain: transmissionChain } },
+    },
+    data_source: '', status: 'completed', generation_time_ms: 0, model_version: '', created_at: '',
+  })
+  assert.equal(withSummary.event.importance, 4)
+
+  // 2) 无 chain_summary → 回退 chain
+  const fromChain = adaptEventDetail({
+    id: 2, report_type: 'event_conduction', report_date: '2026-07-17', user_id: '',
+    content: {
+      eventId: 'd2', title: '标题', source: '', publishTime: '', event: '',
+      analysis_reports: { event_transmission: { eventId: 'd2', mechanism: '', variables: [], coreIndustry: { name: 'X', impact: '', reason: '' }, chain: [{ ...transmissionChain[0], impactStrength: 0.9 }] } },
+    },
+    data_source: '', status: 'completed', generation_time_ms: 0, model_version: '', created_at: '',
+  })
+  assert.equal(fromChain.event.importance, 5)
+
+  // 3) 均无 → undefined
+  const none = adaptEventDetail({
+    id: 3, report_type: 'event_conduction', report_date: '2026-07-17', user_id: '',
+    content: { eventId: 'd3', title: '标题', source: '', publishTime: '', event: '', analysis_reports: {} },
+    data_source: '', status: 'completed', generation_time_ms: 0, model_version: '', created_at: '',
+  })
+  assert.equal(none.event.importance, undefined)
+})

@@ -866,9 +866,16 @@ function backToOverview() {
   }
 }
 
-/** 切换日期（前一天/后一天），重新加载当前模式的报告 */
-function changeDate(delta: number) {
-  date.value = addCalendarDays(date.value, delta)
+/** 前一天/后一天：按交易日历跳档，自动跳过非交易日；接口异常时退回自然日加减 */
+async function changeDate(delta: number) {
+  try {
+    date.value = delta > 0
+      ? await agentApi.getNextTradingDay(date.value)
+      : await agentApi.getPreviousTradingDay(date.value)
+  } catch (err) {
+    console.error('切换交易日失败，退回自然日加减:', err)
+    date.value = addCalendarDays(date.value, delta)
+  }
   report.value = null
   agentBriefs.value = []
   if (selectedIntent.value) {

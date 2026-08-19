@@ -40,15 +40,32 @@
     <!-- 全局AI对话栏（可通过 noChatBar 隐藏） -->
     <GlobalChatBar v-if="!noChatBar" :active-panel="activePanel" />
 
-    <!-- 播报悬浮窗（报告页调用 podcastStore.open 后显示） -->
-    <FloatingPodcast />
+    <!-- 播报悬浮窗（报告页调用 podcastStore.open 后显示；仅本页面前台时渲染） -->
+    <FloatingPodcast :page-key="pageKey" />
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated } from 'vue'
+import { onShow, onHide } from '@dcloudio/uni-app'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import FloatingPodcast from '@/shared/components/FloatingPodcast.vue'
+import { usePodcastStore } from '@/shared/store/modules/podcast'
+
+/** 模块级自增：每个容器实例唯一页面标识（FloatingPodcast 据此判定本页是否前台） */
+let subPageSeq = 0
+const pageKey = `sub2-${++subPageSeq}`
+
+// 页面可见性 → store.activePage：uni-h5 页面被 KeepAlive 缓存不卸载，
+// 悬浮球渲染权必须跟随前台页面（否则渲染在隐藏页面/多实例双播放）。
+// 关键：uni-app onShow/onHide 是页面实例级钩子，子组件注册的永不触发，
+// 必须用 Vue onActivated/onDeactivated（KeepAlive 缓存树内子组件可触发）维护。
+const podcastStore = usePodcastStore()
+onShow(() => { podcastStore.setActivePage(pageKey) })
+onHide(() => { podcastStore.clearActivePage(pageKey) })
+onActivated(() => { podcastStore.setActivePage(pageKey) })
+onDeactivated(() => { podcastStore.clearActivePage(pageKey) })
+onMounted(() => { podcastStore.setActivePage(pageKey) })
 
 const props = withDefaults(defineProps<{
   /** 主标题 */

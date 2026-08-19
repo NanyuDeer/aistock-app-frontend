@@ -111,6 +111,7 @@ import Segmented from '@/shared/components/Segmented.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
 import { EVENT_TYPES } from '@/modules/chat/event/constants'
+import { openExternalUrl } from '@/shared/utils/openExternalUrl'
 
 // ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
 const tabItems = [{ label: '全部', value: '全部' }, ...EVENT_TYPES.map(v => ({ label: v, value: v }))]
@@ -174,15 +175,10 @@ onMounted(() => {
 
 // ========== 事件处理 ==========
 
-/** 重大事件卡片点击 - 跳转到新闻详情页（事件原文） */
+/** 重大事件卡片点击 - 进入事件详情（与列表页一致；不跳原文，不改动 EventHeadlineCard 行为） */
 function handleHeadlineClick(eventId: string) {
-  // 从真实事件列表中查找对应的 newsId
-  const event = events.value.find((e) => e.eventId === eventId)
-  const newsId = event?.newsId || ''
-
-  // 跳转到新闻详情页（事件原文）
   uni.navigateTo({
-    url: `/modules/news/pages/detail?id=${newsId}&eventId=${eventId}`
+    url: `/modules/chat/pages/event/detail?id=${eventId}`
   })
 }
 
@@ -198,12 +194,12 @@ function goToDetail(event: EventItem) {
   })
 }
 
-/** 跳转新闻原文 */
+/** 点击事件标题 → 打开原文；无合法原文 URL 时降级进入事件详情 */
 function goToNews(event: EventItem) {
-  const newsId = event.newsId
-  if (newsId) {
-    uni.navigateTo({ url: `/modules/news/pages/detail?id=${newsId}&eventId=${event.eventId}` })
-  }
+  // 原文 URL 来自后端透传的 content.source（event.sourceInfo.url），
+  // 不再依赖 event.newsId（该字段从未被赋值，getNewsArticle 亦未实现）。
+  if (openExternalUrl(event.sourceInfo?.url)) return
+  goToDetail(event)
 }
 
 /** 关注/取消关注 */

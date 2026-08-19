@@ -8,9 +8,11 @@ import type {
   MarketTraceCandidateExplanation,
   MarketTraceConfidence,
   MarketTracePhenomenonKind,
+  MarketTracePrediction,
   MarketTraceReviewRecord,
   MarketTraceSeverity,
 } from '@/shared/api/modules/agent'
+import type { PredictionRecord } from '@/shared/api/modules/prediction'
 import { labelEvidenceList } from './evidenceLabels'
 
 export type { MarketTraceReviewRecord }
@@ -134,6 +136,36 @@ export interface PredictionValidationPresentation {
   overallNote: string
 }
 
+export interface PredictionHorizonPresentation {
+  horizon: 'short' | 'mid' | 'long'
+  remainingEstimate: string
+  phase: 'building' | 'peaking' | 'decaying' | 'returning'
+  direction: 'bullish' | 'bearish' | 'neutral'
+  target: string
+  metricProjection: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export interface PredictionRiskPresentation {
+  factor: string
+  invalidation: string
+}
+
+export interface PredictionStepPresentation {
+  label: string
+  text: string
+}
+
+export interface PredictionPresentation {
+  status: 'confirmed' | 'hypothesis' | 'insufficient'
+  horizons: PredictionHorizonPresentation[]
+  /** 结构化演化步骤（后端 B2 输出）；旧记录为空数组，组件回退 narrative 拆分 */
+  evolutionSteps: PredictionStepPresentation[]
+  evolutionNarrative: string
+  risks: PredictionRiskPresentation[]
+  attributionSummary: string | null
+}
+
 export interface MarketTracePresentation {
   reportTitle: string
   reportDate: string
@@ -170,6 +202,8 @@ export interface MarketTracePresentation {
   }
 
   predictionValidation: PredictionValidationPresentation | null
+
+  prediction: PredictionPresentation | null
 
   markdownDetails: string
 }
@@ -218,6 +252,53 @@ function findNodeByStage(chain: MarketTraceCausalChain | null | undefined, stage
   return chain.nodes.find(n => n.stage === stage) ?? null
 }
 
+const HORIZON_KEYS: ReadonlySet<string> = new Set(['short', 'mid', 'long'])
+const PHASE_KEYS: ReadonlySet<string> = new Set(['building', 'peaking', 'decaying', 'returning'])
+const DIRECTION_KEYS: ReadonlySet<string> = new Set(['bullish', 'bearish', 'neutral'])
+const CONFIDENCE_KEYS: ReadonlySet<string> = new Set(['high', 'medium', 'low'])
+const PREDICTION_STATUS_KEYS: ReadonlySet<string> = new Set(['confirmed', 'hypothesis', 'insufficient'])
+
+export function toPredictionPresentation(raw: MarketTracePrediction | null | undefined): PredictionPresentation | null {
+  if (!raw || typeof raw !== 'object' || !PREDICTION_STATUS_KEYS.has(raw.prediction_status)) return null
+  const horizons = Array.isArray(raw.horizons)
+    ? raw.horizons
+        .filter(h => Boolean(h)
+          && typeof h === 'object'
+          && HORIZON_KEYS.has(h.horizon)
+          && PHASE_KEYS.has(h.phase)
+          && DIRECTION_KEYS.has(h.direction)
+          && CONFIDENCE_KEYS.has(h.confidence))
+        .map(h => ({
+          horizon: h.horizon,
+          remainingEstimate: asString(h.remaining_estimate),
+          phase: h.phase,
+          direction: h.direction,
+          target: asString(h.target),
+          metricProjection: asString(h.metric_projection),
+          confidence: h.confidence,
+        }))
+    : []
+  if (horizons.length === 0) return null
+  const risks = Array.isArray(raw.risks)
+    ? raw.risks
+        .filter(r => Boolean(r) && typeof r === 'object' && typeof r.factor === 'string' && typeof r.invalidation === 'string')
+        .map(r => ({ factor: asString(r.factor), invalidation: asString(r.invalidation) }))
+    : []
+  const evolutionSteps = Array.isArray(raw.evolution_steps)
+    ? raw.evolution_steps
+        .filter(s => Boolean(s) && typeof s === 'object' && typeof s.label === 'string' && typeof s.text === 'string')
+        .map(s => ({ label: asString(s.label), text: asString(s.text) }))
+    : []
+  return {
+    status: raw.prediction_status,
+    horizons,
+    evolutionSteps,
+    evolutionNarrative: asString(raw.evolution_narrative),
+    risks,
+    attributionSummary: raw.attribution_summary ? asString(raw.attribution_summary) : null,
+  }
+}
+
 function sectorItemsFromUnknown(value: unknown): MarketTraceSectorItemView[] {
   if (!Array.isArray(value)) return []
   return value.slice(0, 5).map((item) => {
@@ -263,6 +344,7 @@ function buildRejectedReason(candidate: MarketTraceCandidateExplanation): string
 export function toMarketTracePresentation(
   record: MarketTraceReviewRecord,
   requestedDate: string,
+  predictionRecord?: PredictionRecord | null,
 ): MarketTracePresentation | null {
   if (record.status !== 'completed') return null
   if (record.content.schema_version !== '2.0') return null
@@ -383,6 +465,13 @@ export function toMarketTracePresentation(
       }
     : null
 
+  // 影响持续性预判（prediction，B2 预测能力）
+  // G14：MarketTraceResult schema 无 prediction 字段，prediction 改从 prediction_records（predictionRecord.prediction）读取；
+  // predictionRecord 缺省（null/undefined）时预测为 null，页面预判卡片走空态占位。
+  const prediction = toPredictionPresentation(
+    predictionRecord?.prediction as unknown as MarketTracePrediction | null | undefined,
+  )
+
   return {
     reportTitle: `${tradeDate} A股收盘溯源`,
     reportDate: tradeDate,
@@ -404,6 +493,7 @@ export function toMarketTracePresentation(
       topLosers: phenomenon.topLosers,
     },
     predictionValidation,
+    prediction,
     markdownDetails: details,
   }
 }

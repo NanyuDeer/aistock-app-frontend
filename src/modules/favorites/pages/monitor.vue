@@ -48,7 +48,7 @@
           :time="formatTime(String(alert.time))"
           :confidence="alert.confidence"
           clickable
-          @click="goTrace(alert.eventId)"
+          @click="goTrace(alert.eventId, alert.eventType)"
         />
       </view>
 
@@ -76,8 +76,9 @@ import { formatTime } from '@/shared/utils/datetime'
 import InsightAlertCard from '@/shared/components/InsightAlertCard.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
-import { isInsightsMockForced, buildMockInsights } from '@/modules/favorites/mock-insights'
+import { WS_BASE_URL } from '@/shared/utils/constants'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
 interface AlertItem {
   eventId: string
@@ -85,6 +86,7 @@ interface AlertItem {
   name?: string
   direction: 'up' | 'down'
   type: string
+  eventType?: string
   message: string
   time: string | number
   confidence?: 'high' | 'medium' | 'low' | 'unconfirmed'
@@ -126,20 +128,25 @@ function toAlertItem(e: WatchlistInsight): AlertItem {
     name: e.stock_name,
     direction: e.direction || 'up',
     type: e.event_type === 'limit_up_radar' ? '涨停雷达' : '异动',
+    eventType: e.event_type,
     message: attributionMessage(e),
     time: String(e.trade_date || e.created_at || ''),
     confidence: e.confidence,
   }
 }
 
+function confidenceLabel(confidence: AlertItem['confidence']): string {
+  switch (confidence) {
+    case 'high': return '高置信'
+    case 'medium': return '中置信'
+    case 'low': return '低置信'
+    case 'unconfirmed': return '待验证'
+    default: return '归因中'
+  }
+}
+
 async function fetchAlerts() {
   loading.value = true
-  // 演示阶段：异动监控暂时显示自选股 mock（isInsightsMockForced 关闭后走真实 API）
-  if (isInsightsMockForced()) {
-    alerts.value = buildMockInsights(favoritesStore.stocks).map(toAlertItem)
-    loading.value = false
-    return
-  }
   try {
     // 自选股洞察数据源：展示自选股涨停雷达事件的 LLM/规则归因结果
     const list = await watchlistInsightApi.getInsights()
@@ -168,7 +175,7 @@ function subscribeAlerts() {
   if (!subscribedSymbols.value.length) return
   try {
     const token = uni.getStorageSync('token')
-    const wsBase = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:3000/ws'
+    const wsBase = WS_BASE_URL
     wsTask = uni.connectSocket({
       url: `${wsBase}?token=${token}`,
       success: () => console.log('[Monitor WS] connecting...')
@@ -199,8 +206,9 @@ function disconnectWs() {
   wsConnected.value = false
 }
 
-function goTrace(eventId: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/insight-detail?event_id=${encodeURIComponent(eventId)}` })
+/** 洞察详情：按事件类型分流（涨停雷达 → insight-detail，价格异动 → insight-detail-move） */
+function goTrace(eventId: string, eventType?: string) {
+  navigateToInsightDetail(eventId, eventType)
 }
 
 onShow(() => {

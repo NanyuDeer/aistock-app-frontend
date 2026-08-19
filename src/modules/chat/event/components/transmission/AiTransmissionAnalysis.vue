@@ -62,6 +62,8 @@
           </view>
         </view>
       </view>
+      <!-- 情况3：chain 为空时展示降级文案（不暴露系统内部异常） -->
+      <view v-else class="chain-empty">暂无明确行业影响</view>
     </view>
     <!-- 步骤4: 产业链关系图谱 -->
     <view class="inner-step">
@@ -192,6 +194,13 @@ function chainProgressStatus(direction: TransmissionChainNode['direction']): 'pr
 
 /* ===== 步骤3: 传导链 ===== */
 .chain-view { display: flex; flex-direction: column; }
+
+/* 情况3：chain 为空降级文案 */
+.chain-empty {
+  font-size: 22rpx;
+  color: var(--ev-text-muted);
+  padding: 12rpx 0;
+}
 
 .chain-node { display: flex; gap: 12rpx; }
 

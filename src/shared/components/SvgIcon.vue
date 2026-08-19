@@ -46,8 +46,9 @@ const wrapStyle = computed(() => ({
 } as Record<string, string>))
 
 // H5：用 mask + background-color
+// 用 BASE_URL 拼接绝对路径：H5 config 设了 router base '/h5/'，硬编码 '/static' 会 404 导致图标不可见
 const h5Style = computed(() => {
-  const url = `/static/assets/icons/${props.name}.svg`
+  const url = `${import.meta.env.BASE_URL}static/assets/icons/${props.name}.svg`
   return {
     width: props.size,
     height: props.size,

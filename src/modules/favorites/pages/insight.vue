@@ -11,9 +11,22 @@
         v-for="item in insights"
         :key="item.event_id"
         class="card"
-        @tap="goDetail(item.event_id)"
+        @tap="goDetail(item.event_id, item.event_type)"
       >
         <view class="card-title">{{ item.stock_name }}（{{ item.symbol }}）</view>
+        <view class="card-move">
+          <!-- 涨停雷达：恒为涨停方向，红字标签 + 涨停幅度 10.00%；价格异动：按方向区分红/绿标签 + 百分比 -->
+          <template v-if="item.event_type === 'limit_up_radar'">
+            <text class="tag tag-up">涨停异动</text>
+            <text class="up">10.00%</text>
+          </template>
+          <template v-else>
+            <text :class="['tag', item.direction === 'up' ? 'tag-up' : 'tag-down']">{{ item.direction === 'up' ? '上涨异动' : '下跌异动' }}</text>
+            <text v-if="item.move_bps !== undefined" :class="item.move_bps >= 0 ? 'up' : 'down'">
+              {{ (item.move_bps / 100).toFixed(2) }}%
+            </text>
+          </template>
+        </view>
         <view class="card-sub">
           <text class="meta-date">{{ item.trade_date }}</text>
           <text class="tag" :class="{ 'tag--unconfirmed': item.attribution_status === 'unconfirmed' }">
@@ -34,6 +47,7 @@ import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import EmptyState from '@/shared/components/EmptyState.vue'
+import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
 const insights = ref<WatchlistInsight[]>([])
 const loading = ref(false)
@@ -42,8 +56,9 @@ function confidenceText(c: string): string {
   return { high: '高置信', medium: '中置信', low: '低置信' }[c as 'high' | 'medium' | 'low'] || c
 }
 
-function goDetail(eventId: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/insight-detail?event_id=${encodeURIComponent(eventId)}` })
+/** 按事件类型分流：涨停雷达 → insight-detail，价格异动 → insight-detail-move */
+function goDetail(eventId: string, eventType?: string) {
+  navigateToInsightDetail(eventId, eventType)
 }
 
 onShow(async () => {
@@ -95,6 +110,34 @@ onShow(async () => {
   font-size: $font-size-base;
   font-weight: 600;
   color: $ink;
+}
+
+.card-move {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+}
+
+.tag.tag-up {
+  color: $up;
+  background: $up-bg;
+}
+
+.tag.tag-down {
+  color: $down;
+  background: $down-bg;
+}
+
+.up {
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: $up;
+}
+
+.down {
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: $down;
 }
 
 .card-sub {

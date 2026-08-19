@@ -10,16 +10,8 @@ vi.mock('@/shared/api/modules/insight', () => ({
   watchlistInsightApi: insightApiMock,
 }))
 
-// mock 演示开关（默认关闭，测试走真实 API 路径；mock 开关用例单独开启）
-const mockInsightsModule = vi.hoisted(() => ({
-  isInsightsMockForced: vi.fn(() => false),
-  buildMockInsights: vi.fn(),
-}))
-vi.mock('@/modules/favorites/mock-insights', () => mockInsightsModule)
-
 const stockApiMock = vi.hoisted(() => ({
   getTrendEvents: vi.fn(),
-  getFavoritesNews: vi.fn(),
 }))
 vi.mock('@/shared/api/modules/stock', () => ({ stockApi: stockApiMock }))
 
@@ -45,6 +37,11 @@ vi.mock('@/shared/components/SvgIcon.vue', () => ({
   default: { name: 'SvgIcon', props: ['name', 'size', 'color'], template: '<view class="svg-stub" />' },
 }))
 
+// Tag 桩（ListCell prefix 内使用，避免依赖真实组件样式）
+vi.mock('@/shared/components/Tag.vue', () => ({
+  default: { name: 'Tag', props: ['type', 'size'], template: '<view class="tag-stub" />' },
+}))
+
 // uni 全局
 vi.stubGlobal('uni', {
   navigateTo: vi.fn(),
@@ -57,28 +54,30 @@ describe('AlertContent.vue 首页特别提醒', () => {
     setActivePinia(createPinia())
     insightApiMock.getInsights.mockReset()
     stockApiMock.getTrendEvents.mockReset()
-    stockApiMock.getFavoritesNews.mockReset()
-    mockInsightsModule.isInsightsMockForced.mockReset()
-    mockInsightsModule.isInsightsMockForced.mockReturnValue(false)
-    mockInsightsModule.buildMockInsights.mockReset()
     vi.mocked(uni.navigateTo).mockClear()
     // 个股情报 API 默认返回空（本测试只关注异动捕手模块）
     stockApiMock.getTrendEvents.mockResolvedValue({ events: [] })
   })
 
-  it('接口成功 → 异动捕手模块渲染 ListCell 列表（固定 4 行，含占位）', async () => {
+  it('接口成功 → 异动捕手模块渲染 ListCell 列表', async () => {
     insightApiMock.getInsights.mockResolvedValue(testInsights)
     const wrapper = mount(AlertContent)
     await flushPromises()
     const cells = wrapper.findAllComponents({ name: 'ListCell' })
     // captureRows 固定 pad 到 CAPTURE_ROW_COUNT=4 行：2 条真实 + 2 条占位
     expect(cells.length).toBe(4)
-    // 首行标题为股票名，描述为主因归因文案
+    // 标题 = 股票名，描述 = 归因文案 · 日期（日期与描述同一行）
     expect(cells[0].props('title')).toBe('贵州茅台')
-    expect(cells[0].props('description')).toBe('主因：白酒板块')
+    expect(cells[0].props('description')).toBe('主因：白酒板块 · 08-07')
+    expect(cells[1].props('title')).toBe('平安银行')
+    expect(cells[1].props('description')).toBe('主因待验证 · 08-07')
+    // 涨跌 Tag：涨→up(红)，跌→down(绿)
+    const tags = wrapper.findAllComponents({ name: 'Tag' })
+    expect(tags[0].props('type')).toBe('up')
+    expect(tags[1].props('type')).toBe('down')
   })
 
-  it('接口失败 → 展示空状态（不渲染列表）', async () => {
+  it('接口失败 → 展示空状态（不渲染列表行）', async () => {
     insightApiMock.getInsights.mockRejectedValue(new Error('network'))
     const wrapper = mount(AlertContent)
     await flushPromises()
@@ -86,35 +85,23 @@ describe('AlertContent.vue 首页特别提醒', () => {
     expect(cells.length).toBe(0)
   })
 
-  it('点击 ListCell → navigateTo 跳转 insight-detail', async () => {
+  it('点击列表行 → navigateTo 跳转 insight-detail', async () => {
     insightApiMock.getInsights.mockResolvedValue(testInsights)
     const wrapper = mount(AlertContent)
     await flushPromises()
     const firstCell = wrapper.findAllComponents({ name: 'ListCell' })[0]
-    await firstCell.vm.$emit('click', new Event('click'))
+    await firstCell.trigger('click')
     expect(uni.navigateTo).toHaveBeenCalledWith({
       url: '/modules/favorites/pages/insight-detail?event_id=c1',
     })
   })
 
-  it('数据不足 4 行 → 用占位行填充（保持卡片高度稳定）', async () => {
+  it('数据不足 4 行 → 用占位行填充（保持列表高度稳定）', async () => {
     insightApiMock.getInsights.mockResolvedValue([testInsights[0]])
     const wrapper = mount(AlertContent)
     await flushPromises()
     const cells = wrapper.findAllComponents({ name: 'ListCell' })
-    // 固定 4 行，不足补占位（占位行 title 为空字符串显示为全角空格）
+    // 固定 4 行，不足补占位（占位行 title 为全角空格 \u3000）
     expect(cells.length).toBe(4)
-  })
-
-  it('演示开关开启 → 渲染 buildMockInsights 返回的自选股 mock（不请求真实 API）', async () => {
-    mockInsightsModule.isInsightsMockForced.mockReturnValue(true)
-    mockInsightsModule.buildMockInsights.mockReturnValue(testInsights)
-    const wrapper = mount(AlertContent)
-    await flushPromises()
-    const cells = wrapper.findAllComponents({ name: 'ListCell' })
-    // mock 数据 2 条 + 占位 2 行，共 4 行
-    expect(cells.length).toBe(4)
-    expect(cells[0].props('title')).toBe('贵州茅台')
-    expect(insightApiMock.getInsights).not.toHaveBeenCalled()
   })
 })

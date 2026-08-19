@@ -47,6 +47,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, getCurrentInstance } from 'vue'
+import {
+  attachPersistent,
+  detachPersistent,
+  type PersistentEngine,
+  type FloatingEvents,
+} from '@/shared/utils/floatingEngine'
 
 /**
  * AudioPlayer 通用音频播放器
@@ -70,6 +76,7 @@ interface InnerAudioContextLike {
   duration: number
   play(): void
   pause(): void
+  stop(): void
   seek(time: number): void
   destroy(): void
   onTimeUpdate(cb: () => void): void
@@ -124,9 +131,13 @@ const props = withDefaults(defineProps<{
   autoplay?: boolean
   /** 自动播放时的起始进度（秒），配合 autoplay 实现退出页面后续播 */
   initialTime?: number
+  /** 持久化播放（悬浮播报专用）：把引擎提升为全局单例，页面实例卸载时仅"脱离"不销毁，
+   *  切页后复用时直接续播，避免重新缓冲/重播造成的卡顿。false（默认）时引擎随组件销毁。 */
+  persist?: boolean
 }>(), {
   autoplay: false,
   initialTime: 0,
+  persist: false,
 })
 
 const emit = defineEmits<{
@@ -138,6 +149,8 @@ const emit = defineEmits<{
   ended: []
   /** 播放进度更新 */
   timeupdate: [currentTime: number]
+  /** 组件卸载（引擎销毁前）：上报播放状态，供悬浮窗记录跨页续播点 */
+  unmount: [{ playing: boolean; currentTime: number }]
 }>()
 
 const playing = ref(false)
@@ -168,6 +181,10 @@ function createH5Engine(src: string): AudioEngine {
   audio.src = src
   audio.preload = 'metadata'
 
+  // 音频未就绪（readyState<1）时 seek 无效：暂存目标进度，loadedmetadata 后可跳转时补应用
+  // （跨页续播场景：新实例挂载后可能立即 seek 到续播点，此时音频可能尚未加载）
+  let pendingSeek: number | null = null
+
   audio.addEventListener('timeupdate', () => {
     currentTime.value = audio.currentTime
     if (audio.duration && !Number.isNaN(audio.duration)) duration.value = audio.duration
@@ -175,6 +192,10 @@ function createH5Engine(src: string): AudioEngine {
   })
   audio.addEventListener('loadedmetadata', () => {
     if (audio.duration && !Number.isNaN(audio.duration)) duration.value = audio.duration
+    if (pendingSeek != null) {
+      try { audio.currentTime = pendingSeek } catch { /* 忽略 seek 异常 */ }
+      pendingSeek = null
+    }
   })
   audio.addEventListener('durationchange', () => {
     if (audio.duration && !Number.isNaN(audio.duration)) duration.value = audio.duration
@@ -196,7 +217,10 @@ function createH5Engine(src: string): AudioEngine {
     play: () => { void audio.play().catch(() => { /* 自动播放被拦截，忽略 */ }) },
     pause: () => audio.pause(),
     seek: (t: number) => {
-      try { audio.currentTime = t } catch { /* 无 src 时设置可能失败，忽略 */ }
+      try {
+        if (audio.readyState >= 1) audio.currentTime = t
+        else pendingSeek = t
+      } catch { /* 无 src 时设置可能失败，忽略 */ }
       currentTime.value = t
     },
     setSrc: (s: string) => { audio.src = s; audio.load() },
@@ -208,6 +232,9 @@ function createUniEngine(src: string): AudioEngine {
   const ctx = uniApi!.createInnerAudioContext()
   ctx.src = src
 
+  // App/小程序：InnerAudioContext 在 canplay 前 seek 可能无效，暂存进度、canplay 后补应用
+  let pendingSeek: number | null = null
+
   ctx.onTimeUpdate(() => {
     currentTime.value = ctx.currentTime
     if (ctx.duration) duration.value = ctx.duration
@@ -215,6 +242,10 @@ function createUniEngine(src: string): AudioEngine {
   })
   ctx.onCanplay(() => {
     if (ctx.duration) duration.value = ctx.duration
+    if (pendingSeek != null) {
+      try { ctx.seek(pendingSeek) } catch { /* 忽略 seek 异常 */ }
+      pendingSeek = null
+    }
   })
   ctx.onPlay(() => { playing.value = true; emit('play') })
   ctx.onPause(() => { playing.value = false; emit('pause') })
@@ -224,9 +255,14 @@ function createUniEngine(src: string): AudioEngine {
   return {
     play: () => ctx.play(),
     pause: () => ctx.pause(),
-    seek: (t: number) => { ctx.seek(t); currentTime.value = t },
+    seek: (t: number) => {
+      try { ctx.seek(t) } catch { /* 忽略 seek 异常 */ }
+      currentTime.value = t
+    },
     setSrc: (s: string) => { ctx.src = s },
-    destroy: () => ctx.destroy()
+    // 卸载/换源时先 stop 再 destroy：保证音频立即停止（全局互斥抢占时，
+    // FloatingPodcast 通过清空 src 卸载本组件，必须停掉正在播放的音频）
+    destroy: () => { ctx.stop(); ctx.destroy() }
   }
 }
 
@@ -245,6 +281,55 @@ function setupEngine(src: string): AudioEngine | null {
   if (!src) return null
   engine = createEngine(src)
   return engine
+}
+
+/* ===== persist（全局持续播放）支持 ===== */
+/** 由全局引擎 native 事件驱动 AudioPlayer 的响应式状态与语义事件 */
+function makeFloatingEvents(): FloatingEvents {
+  return {
+    onTimeUpdate: (t, d) => {
+      currentTime.value = t
+      if (d) duration.value = d
+      emit('timeupdate', t)
+    },
+    onPlay: () => { playing.value = true; emit('play') },
+    onPause: () => { playing.value = false; emit('pause') },
+    onEnded: () => { playing.value = false; emit('ended') },
+  }
+}
+
+/** 把全局引擎适配为 AudioEngine 接口（不提供真实 destroy，持久引擎由 detach/destroyPersistent 管理） */
+function adaptPersistent(e: PersistentEngine): AudioEngine {
+  return {
+    play: () => e.play(),
+    pause: () => e.pause(),
+    seek: (t: number) => e.seek(t),
+    setSrc: () => { /* 持久引擎换源走 attachPersistent，不在组件内换 */ },
+    destroy: () => { /* 不应 destroy：脱离交给 detachPersistent，停机交给 destroyPersistent */ },
+  }
+}
+
+/** 复用已持续播放的引擎时，把引擎实时状态同步到本地响应式变量（currentTime/duration/playing） */
+function syncFromEngine(e: PersistentEngine) {
+  currentTime.value = e.currentTime
+  if (e.duration) duration.value = e.duration
+  playing.value = e.isPlaying
+}
+
+/** 载入音频：persist 模式附着全局引擎；否则走引擎私有生命周期 */
+function loadFor(src: string) {
+  if (!props.persist) {
+    setupEngine(src)
+    return
+  }
+  if (!src) {
+    engine = null
+    return
+  }
+  const r = attachPersistent(src, makeFloatingEvents())
+  engine = adaptPersistent(r.engine)
+  // 复用续播：引擎仍在播放且已缓冲，无需重建；同步一次状态即可
+  if (r.reused) syncFromEngine(r.engine)
 }
 
 function togglePlay() {
@@ -335,7 +420,7 @@ watch(() => props.src, (src) => {
   currentTime.value = 0
   duration.value = 0
   playing.value = false
-  setupEngine(src)
+  loadFor(src)
   if (src && props.autoplay) {
     nextTick(() => playFromInitial())
   }
@@ -343,7 +428,7 @@ watch(() => props.src, (src) => {
 
 onMounted(() => {
   if (props.src) {
-    setupEngine(props.src)
+    loadFor(props.src)
     if (props.autoplay) {
       nextTick(() => playFromInitial())
     }
@@ -358,8 +443,24 @@ function playFromInitial() {
 }
 
 onUnmounted(() => {
-  engine?.destroy()
+  // 先上报播放状态（引擎销毁后 currentTime 归零/事件失效），再销毁引擎
+  emit('unmount', { playing: playing.value, currentTime: currentTime.value })
+  if (props.persist) {
+    // 持久播放：仅"脱离"事件订阅，引擎保持播放（切页后新实例复用续播）
+    detachPersistent()
+  } else {
+    engine?.destroy()
+  }
   engine = null
+})
+
+/** 暴露控制方法：FloatingPodcast 注册到 podcast store，供页面播放按钮暂停/继续 */
+defineExpose({
+  pause: () => engine?.pause(),
+  play: () => engine?.play(),
+  togglePlay,
+  /** 跳转到指定进度（秒） */
+  seekTo: (t: number) => engine?.seek(t),
 })
 </script>
 

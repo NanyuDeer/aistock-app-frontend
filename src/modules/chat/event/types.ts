@@ -27,6 +27,18 @@ export type EventCategory = 'driving' | 'hot'
 
 // ==================== 事件列表 ====================
 
+/** 前端展示专用：行业影响摘要（后端 chain_summary 生成，impactStrength 降序 Top5） */
+export interface ChainSummary {
+  /** 行业名称 */
+  industry: string
+  /** 影响方向 */
+  direction: string
+  /** 影响强度 0-1 */
+  impactStrength: number
+  /** AI 推理原因（可选） */
+  reason?: string
+}
+
 /** 受影响的行业（列表页与详情页通用） */
 export interface AffectedIndustry {
   /** 行业名称 */
@@ -66,10 +78,12 @@ export interface EventItem {
   contentPreview?: string
   /** 事件类型 */
   eventType: EventType
-  /** 重要性评分 1-5 */
-  importance: number
+  /** 重要性评分 1-5（由 chain 最大 impactStrength 映射；无有效评分时为 undefined，前端隐藏星级） */
+  importance?: number
   /** 受影响的行业列表 */
   affectedIndustries: AffectedIndustry[]
+  /** 前端展示专用：行业影响摘要（列表接口直出，旧数据缺失） */
+  chain_summary?: ChainSummary[]
   /** AI 摘要（≤40字） */
   aiSummary: string
   /** 是否已关注 */
@@ -132,6 +146,8 @@ export interface EventGraph {
   nodes: GraphNode[]
   /** 连线列表 */
   connections: GraphConnection[]
+  /** 图谱状态：empty=chain 为空（前端展示降级，不渲染空白图） */
+  status?: 'empty'
 }
 
 // ==================== AI 影响传导分析 ====================

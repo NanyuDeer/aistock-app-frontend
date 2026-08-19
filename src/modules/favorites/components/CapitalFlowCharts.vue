@@ -1,11 +1,39 @@
 <template>
   <view class="capital-flow-charts">
-    <view class="flow-overview">
-      <text class="flow-overview-note">{{ summaryNote }}</text>
+    <!-- AI 四字标签 -->
+    <view class="cf-tag-row">
+      <text v-if="tag" :class="['cf-tag', tagClass || 'is-neutral']">{{ tag }}</text>
     </view>
 
-    <!-- 资金拆解：横向条形（每项独立轨道，中心线在50%） -->
-    <view v-if="orders.length" class="flow-panel">
+    <!-- 时间尺度分段 tab（选中整段高亮） -->
+    <view class="cf-segmented">
+      <view
+        v-for="chip in windowChips"
+        :key="chip.days"
+        :class="['cf-segment', { active: chip.days === selectedDays }]"
+        @tap="selectDays(chip.days)"
+      >
+        <text class="cf-segment-label">{{ chip.label }}</text>
+        <text :class="['cf-segment-value', chip.isPositive ? 'is-up' : 'is-down']">{{ chip.text }}</text>
+      </view>
+    </view>
+
+    <!-- 主力净流入（当前尺度） -->
+    <view class="cf-hero-card">
+      <view class="cf-hero-left">
+        <text class="cf-hero-label">主力净流入</text>
+        <text :class="['cf-hero-value', (selected?.mainInflow ?? 0) >= 0 ? 'is-up' : 'is-down']">
+          {{ formatFlowValue(selected?.mainInflow) }}
+        </text>
+      </view>
+      <view class="cf-hero-right">
+        <text class="cf-hero-scale">{{ selectedScaleLabel }}</text>
+        <text class="cf-hero-sub">{{ heroSub }}</text>
+      </view>
+    </view>
+
+    <!-- 资金拆解（当前尺度） -->
+    <view v-if="selectedOrders.length" class="flow-panel">
       <view class="panel-head">
         <text class="panel-title">资金拆解</text>
         <text class="panel-unit">亿元</text>
@@ -28,110 +56,82 @@
       </view>
     </view>
 
-    <!-- 10日资金节奏：垂直柱形 + 数值网格（方案 C，柱子样式对齐资金拆解） -->
-    <view v-if="trendModel.points.length" class="flow-panel">
-      <view class="panel-head">
-        <view class="panel-title-wrap">
-          <text class="panel-title">10日资金节奏</text>
-          <text v-if="trendBadge" class="panel-badge">{{ trendBadge }}</text>
-        </view>
-        <text class="panel-unit">亿元</text>
-      </view>
-      <view class="line-chart">
-        <view class="line-axis-col">
-          <text v-for="tick in trendModel.ticks" :key="`axis-${tick.label}`" class="line-axis-text">{{ tick.label }}</text>
-        </view>
-        <svg class="line-svg" :viewBox="`0 0 ${trendModel.plotRight} 200`" preserveAspectRatio="none">
-          <!-- 网格虚线 -->
-          <g v-for="tick in trendModel.ticks" :key="`tick-${tick.label}`">
-            <line
-              :x1="trendModel.plotLeft"
-              :y1="tick.y"
-              :x2="trendModel.plotRight"
-              :y2="tick.y"
-              :style="{ stroke: 'var(--cf-grid-line)' }"
-              stroke-width="1"
-              stroke-dasharray="4 6"
-            />
-          </g>
-          <!-- 零线（实线） -->
-          <line
-            :x1="trendModel.plotLeft"
-            :y1="trendModel.zeroY"
-            :x2="trendModel.plotRight"
-            :y2="trendModel.zeroY"
-            :style="{ stroke: 'var(--cf-zero-line)' }"
-            stroke-width="1.2"
-          />
-          <!-- 柱子：圆角纯色，红正绿负（对齐资金拆解样式） -->
-          <rect
-            v-for="point in trendModel.points"
-            :key="`bar-${point.key}`"
-            :x="point.barX"
-            :y="point.barY"
-            :width="trendModel.barWidth"
-            :height="point.barH"
-            :rx="3"
-            :style="{ fill: point.raw >= 0 ? 'var(--cf-bar-up)' : 'var(--cf-bar-down)' }"
-          />
-          <!-- 最新柱深色边框高亮 -->
-          <rect
-            v-if="latestPoint"
-            :x="latestPoint.barX"
-            :y="latestPoint.barY"
-            :width="trendModel.barWidth"
-            :height="latestPoint.barH"
-            :rx="3"
-            :style="{ stroke: 'var(--cf-latest-border)', fill: 'none' }"
-            stroke-width="1.5"
-          />
-        </svg>
-      </view>
-      <view class="line-value-grid">
-        <view
-          v-for="point in trendModel.points"
-          :key="`detail-${point.key}`"
-          :class="['line-value-item', { 'is-latest': point.isLatest }]"
-        >
-          <text class="line-value-date">{{ point.date }}</text>
-          <text :class="['line-value-number', point.raw >= 0 ? 'is-up' : 'is-down']">{{ point.text }}</text>
-        </view>
-      </view>
+    <!-- 资金流向洞见：一句话 -->
+    <view v-if="aiSummary" class="cf-ai-summary">
+      <text class="cf-ai-summary-label">洞见</text>
+      <text class="cf-ai-summary-text">{{ aiSummary }}</text>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { compactNumber } from '@/shared/utils/format'
+import { computed, ref, watch } from 'vue'
 
 interface FlowOrder {
   label: string
   value: number
 }
 
-const props = defineProps<{
-  mainInflow?: number
-  ratio?: string | number
-  fiveDay?: number
-  streak?: string
-  narrative?: string
-  risk?: string
-  orders?: FlowOrder[]
-  trend?: number[]
-  trendDates?: string[]
-  trendBadge?: string
-}>()
+interface CapitalFlowWindow {
+  days: number
+  mainInflow: number
+  retailInflow: number
+  ratio: number
+  orders: FlowOrder[]
+}
 
-const summaryNote = computed(() => props.narrative || props.trendBadge || '先看总量，再看结构和节奏')
-const orders = computed(() => (props.orders || []).filter(item => item.label && item.value !== null && item.value !== undefined))
-const trend = computed(() => props.trend || [])
-const trendDates = computed(() => props.trendDates?.length ? props.trendDates : trend.value.map((_, idx) => `${idx + 1}`))
+const props = withDefaults(defineProps<{
+  windows?: CapitalFlowWindow[]
+  streak?: string
+  tag?: string
+  tagClass?: string
+  summary?: string
+  narrative?: string
+}>(), {
+  windows: () => [],
+})
+
+const selectedDays = ref<number>(1)
+
+watch(() => props.windows, (windows) => {
+  if (!windows.some(w => w.days === selectedDays.value)) {
+    selectedDays.value = windows[0]?.days ?? 1
+  }
+}, { immediate: true })
+
+const selected = computed(() => (
+  props.windows.find(w => w.days === selectedDays.value) || props.windows[0] || null
+))
+
+const windowChips = computed(() => props.windows.map(w => ({
+  days: w.days,
+  label: w.days === 1 ? '今日' : `${w.days}日`,
+  text: formatFlowValue(w.mainInflow),
+  isPositive: w.mainInflow >= 0,
+})))
+
+const selectedScaleLabel = computed(() => {
+  const days = selected.value?.days
+  if (!days) return ''
+  return days === 1 ? '今日' : `${days}日累计`
+})
+
+const heroSub = computed(() => {
+  const w = selected.value
+  const streakText = props.streak ? `${props.streak} · ` : ''
+  if (!w) return streakText ? streakText.slice(0, -3) : ''
+  if (w.days === 1) return `${streakText}占比 ${w.ratio}%`
+  return `${streakText}日均 ${formatFlowValue(w.mainInflow / w.days)}`
+})
+
+const selectedOrders = computed(() => (
+  (selected.value?.orders || []).filter(o => o.label && o.value !== null && o.value !== undefined)
+))
 
 const breakdownRows = computed(() => {
-  const values = orders.value.map(item => Number(item.value) || 0)
+  const values = selectedOrders.value.map(item => Number(item.value) || 0)
   const maxAbs = Math.max(0.01, ...values.map(value => Math.abs(value)))
-  return orders.value.map((item, idx) => {
+  return selectedOrders.value.map((item, idx) => {
     const value = Number(item.value) || 0
     return {
       key: `${item.label}-${idx}-${value}`,
@@ -143,67 +143,46 @@ const breakdownRows = computed(() => {
   })
 })
 
-const trendModel = computed(() => {
-  const values = trend.value.map(value => Number(value) || 0)
-  const left = 8
-  const right = 352
-  const top = 20
-  const bottom = 172
-  const barWidth = 24
-  if (!values.length) {
-    return { points: [], ticks: [], zeroY: 106, plotLeft: left, plotRight: right, top, bottom, barWidth }
-  }
-
-  const max = Math.max(0, ...values)
-  const min = Math.min(0, ...values)
-  const pad = Math.max(0.3, (max - min) * 0.16)
-  const domainMax = max + pad
-  const domainMin = min - pad
-  const range = Math.max(1, domainMax - domainMin)
-  const yFor = (value: number) => top + ((domainMax - value) / range) * (bottom - top)
-  const zeroY = yFor(0)
-  const slot = values.length <= 1 ? right - left : (right - left) / values.length
-
-  const points = values.map((value, idx) => {
-    const centerX = left + slot * idx + slot / 2
-    const barX = centerX - barWidth / 2
-    const y = yFor(value)
-    const barY = value >= 0 ? y : zeroY
-    const barH = Math.max(1, Math.abs(y - zeroY))
-    return {
-      key: `${idx}-${value}`,
-      centerX,
-      barX,
-      barY,
-      barH,
-      raw: value,
-      isLatest: idx === values.length - 1,
-      text: formatSigned(value),
-      date: formatDateLabel(trendDates.value[idx] || `${idx + 1}`),
-    }
-  })
-
-  const ticks = [domainMax, 0, domainMin].map(value => ({ label: compactNumber(value), y: yFor(value) }))
-  return { points, ticks, zeroY, plotLeft: left, plotRight: right, top, bottom, barWidth }
+const aiSummary = computed(() => {
+  const text = String(props.summary || '').trim()
+  return text || buildFallbackSummary() || String(props.narrative || '').trim()
 })
 
-const latestPoint = computed(() => {
-  const points = trendModel.value.points
-  return points.length ? points[points.length - 1] : null
-})
+/** AI 缺失时的规则兜底：一句话覆盖今日 + 5/10/20 日 */
+function buildFallbackSummary(): string {
+  const byDays = (days: number) => props.windows.find(x => x.days === days)?.mainInflow
+  const w1 = byDays(1)
+  const w5 = byDays(5)
+  const w10 = byDays(10)
+  const w20 = byDays(20)
+  if (w1 === undefined || w5 === undefined || w10 === undefined || w20 === undefined) return ''
+  if (w1 > 0 && w5 > 0 && w10 > 0 && w20 > 0) return `今日主力净流入${formatAbsYi(w1)}，5/10/20日累计均净流入，资金节奏偏强，关注流入能否延续。`
+  if (w1 < 0 && w5 < 0 && w10 < 0 && w20 < 0) return `今日主力净流出${formatAbsYi(w1)}，5/10/20日累计均净流出，资金节奏偏弱，等待流出收敛信号。`
+  if (w1 > 0 && w5 <= 0) return `今日主力净流入${formatAbsYi(w1)}，但5/10/20日累计仍净流出，资金处于回流初期，持续性待确认。`
+  if (w1 < 0 && w5 >= 0) return `今日主力净流出${formatAbsYi(w1)}，但5/10/20日累计仍净流入，短线资金松动，需防节奏转弱。`
+  if (w5 > 0 && w10 <= 0) return `近5日净流入但10/20日累计仍净流出，中期资金格局尚未扭转。`
+  if (w5 < 0 && w10 >= 0) return `近5日净流出但10/20日累计仍净流入，短期回撤未改中期流入。`
+  return '今日与5/10/20日资金方向不一，节奏处于切换期。'
+}
+
+function selectDays(days: number) {
+  selectedDays.value = days
+}
+
+function formatFlowValue(value: number | undefined | null): string {
+  if (value === undefined || value === null || !Number.isFinite(value)) return '--'
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${value.toFixed(2)}亿`
+}
+
+function formatAbsYi(value: number): string {
+  return `${Math.abs(value).toFixed(2)}亿`
+}
 
 function formatSigned(value: number): string {
   const sign = value > 0 ? '+' : ''
-  return `${sign}${compactNumber(value)}`
+  return `${sign}${value.toFixed(2)}`
 }
-
-function formatDateLabel(value: string): string {
-  const text = String(value || '')
-  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(5, 10)
-  if (/^\d{8}$/.test(text)) return `${text.slice(4, 6)}/${text.slice(6, 8)}`
-  return text.slice(0, 5)
-}
-
 </script>
 
 <style lang="scss" scoped>
@@ -211,29 +190,156 @@ function formatDateLabel(value: string): string {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
-  /* SVG 柱形图颜色令牌：桥接 SCSS 变量到 SVG 内联样式 */
-  --cf-bar-up: #{$up};
-  --cf-bar-down: #{$down};
-  --cf-grid-line: #{$line-soft};
-  --cf-zero-line: #{$ink-mute};
-  --cf-latest-border: #{$ink};
 }
 
-/* 面板：白底 + 细边框 + 圆角，对齐 section-card 令牌 */
-.flow-overview,
-.flow-panel {
-  padding: 18rpx;
+/* ===== 顶部：AI 标签 + 时间尺度分段 tab ===== */
+.cf-tag-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.cf-tag {
+  flex-shrink: 0;
+  padding: 6rpx 14rpx;
+  border-radius: $r-xs;
+  background: $primary-50;
+  color: $primary;
+  font-size: $font-size-xs;
+  line-height: 1.4;
+  font-weight: 800;
+
+  &.is-bull {
+    color: $up;
+    background: $up-soft;
+  }
+
+  &.is-bear {
+    color: $down;
+    background: $down-soft;
+  }
+}
+
+.cf-segmented {
+  display: flex;
+  gap: 4rpx;
+  padding: 6rpx;
+  border-radius: 18rpx;
+  background: $bg-deep;
+}
+
+.cf-segment {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  padding: 14rpx 4rpx;
+  border-radius: 14rpx;
+
+  &.active {
+    background: $bg-card;
+    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+  }
+}
+
+.cf-segment-label {
+  font-size: 22rpx;
+  line-height: 1.3;
+  font-weight: 700;
+  color: $ink-soft;
+}
+
+.cf-segment.active .cf-segment-label {
+  color: $primary;
+  font-weight: 800;
+}
+
+.cf-segment-value {
+  font-size: 24rpx;
+  line-height: 1.3;
+  font-weight: 800;
+
+  &.is-up {
+    color: $up;
+  }
+
+  &.is-down {
+    color: $down;
+  }
+}
+
+/* ===== 主力净流入 ===== */
+.cf-hero-card {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 20rpx 22rpx;
   border-radius: $r-md;
   background: $bg-card;
   border: 2rpx solid $line;
 }
 
-.flow-overview-note {
+.cf-hero-label {
   display: block;
-  font-size: $font-size-sm;
-  line-height: 1.55;
-  color: $ink-soft;
-  word-break: break-word;
+  font-size: $font-size-xs;
+  line-height: 1.4;
+  font-weight: 600;
+  color: $ink-mute;
+}
+
+.cf-hero-value {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 44rpx;
+  line-height: 1.15;
+  font-weight: 800;
+
+  &.is-up {
+    color: $up;
+  }
+
+  &.is-down {
+    color: $down;
+  }
+}
+
+.cf-hero-right {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.cf-hero-scale {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  background: $primary-50;
+  color: $primary;
+  font-size: 20rpx;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+.cf-hero-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  line-height: 1.4;
+  font-weight: 600;
+  color: $ink-mute;
+}
+
+/* ===== 面板 ===== */
+.flow-panel {
+  padding: 18rpx;
+  border-radius: $r-md;
+  background: $bg-card;
+  border: 2rpx solid $line;
 }
 
 .panel-head {
@@ -242,10 +348,6 @@ function formatDateLabel(value: string): string {
   justify-content: space-between;
   gap: 16rpx;
   margin-bottom: 14rpx;
-}
-
-.panel-title-wrap {
-  min-width: 0;
 }
 
 .panel-title {
@@ -263,18 +365,7 @@ function formatDateLabel(value: string): string {
   color: $ink-mute;
 }
 
-.panel-badge {
-  display: inline-flex;
-  margin-top: 8rpx;
-  padding: 6rpx 12rpx;
-  border-radius: $r-xs;
-  background: $warning-soft;
-  color: $warning;
-  font-size: $font-size-xs;
-  line-height: 1.3;
-}
-
-/* ===== 横向条形（资金拆解） ===== */
+/* ===== 资金拆解横向条形 ===== */
 .hbar-list {
   display: flex;
   flex-direction: column;
@@ -345,83 +436,33 @@ function formatDateLabel(value: string): string {
   }
 }
 
-/* ===== 垂直柱形图（10日资金节奏，方案 C） ===== */
-.line-chart {
-  display: grid;
-  grid-template-columns: 36px 1fr;
-  column-gap: 4rpx;
-  width: 100%;
-  height: 200px;
-  overflow: visible;
-  padding-top: 4rpx;
-  box-sizing: border-box;
-}
-
-.line-axis-col {
-  height: 172px;
-  padding-top: 18px;
-  padding-bottom: 28px;
+/* ===== 资金流向洞见 ===== */
+.cf-ai-summary {
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-end;
-  box-sizing: border-box;
+  align-items: flex-start;
+  gap: 12rpx;
+  padding: 16rpx 18rpx;
+  border-radius: $r-md;
+  background: $bg-soft;
 }
 
-.line-axis-text {
-  font-size: $font-size-xs;
-  line-height: 1;
-  color: $ink-mute;
-}
-
-.line-svg {
-  display: block;
-  width: 100%;
-  height: 200px;
-  overflow: visible;
-}
-
-.line-value-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8rpx 10rpx;
-  padding: 8rpx 2rpx 4rpx;
-}
-
-.line-value-item {
-  min-width: 0;
-  padding: 6rpx 4rpx;
+.cf-ai-summary-label {
+  flex-shrink: 0;
+  padding: 4rpx 12rpx;
   border-radius: $r-xs;
-  background: $white;
-  text-align: center;
-  border: 2rpx solid transparent;
-  box-sizing: border-box;
-
-  &.is-latest {
-    border-color: $ink;
-  }
-}
-
-.line-value-date {
-  display: block;
+  background: $primary-50;
+  color: $primary;
   font-size: 20rpx;
-  line-height: 1.2;
-  color: $ink-mute;
+  line-height: 1.4;
+  font-weight: 800;
 }
 
-.line-value-number {
-  display: block;
-  margin-top: 4rpx;
+.cf-ai-summary-text {
+  min-width: 0;
   font-size: $font-size-xs;
-  line-height: 1.2;
-  font-weight: 700;
-
-  &.is-up {
-    color: $up;
-  }
-
-  &.is-down {
-    color: $down;
-  }
+  line-height: 1.55;
+  font-weight: 600;
+  color: $ink-soft;
+  word-break: break-word;
 }
 </style>

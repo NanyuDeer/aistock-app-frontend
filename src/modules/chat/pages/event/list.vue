@@ -104,6 +104,7 @@ import Segmented from '@/shared/components/Segmented.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
 import { EVENT_TYPES } from '@/modules/chat/event/constants'
+import { openExternalUrl } from '@/shared/utils/openExternalUrl'
 
 // ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
 const tabItems = [{ label: '全部', value: '全部' }, ...EVENT_TYPES.map(v => ({ label: v, value: v }))]
@@ -120,7 +121,7 @@ const headlineCount = computed(() => (positiveEvent.value ? 1 : 0) + (negativeEv
 
 /**
  * 加载重大事件：调用 getFocusEvents() 获取 rank=1（当前焦点）和 rank=2（持续影响）的事件
- * 数据流：getEventList → 筛选 globalImportanceRank → 获取详情 → 转换为 FocusEventViewModel
+ * 数据流（第三阶段）：getEventList（直出 chain_summary）→ adapter 生成 affectedIndustries → getFocusEvents 直接消费，不再请求详情
  */
 async function loadFocusEvents() {
   try {
@@ -174,12 +175,12 @@ function goToDetail(event: EventItem) {
   })
 }
 
-/** 跳转新闻原文 */
+/** 点击事件标题 → 打开原文；无合法原文 URL 时降级进入事件详情 */
 function goToNews(event: EventItem) {
-  const newsId = event.newsId
-  if (newsId) {
-    uni.navigateTo({ url: `/modules/news/pages/detail?id=${newsId}&eventId=${event.eventId}` })
-  }
+  // 原文 URL 来自后端透传的 content.source（event.sourceInfo.url），
+  // 不再依赖 event.newsId（该字段从未被赋值，getNewsArticle 亦未实现）。
+  if (openExternalUrl(event.sourceInfo?.url)) return
+  goToDetail(event)
 }
 
 /** 关注/取消关注 */
