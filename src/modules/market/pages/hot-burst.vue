@@ -118,23 +118,23 @@ function readHomeCache(): HotBurstSignal[] | null {
   return cached.outbreaks
 }
 
-function sortByDetectedAt(items: HotBurstSignal[]): HotBurstSignal[] {
+// 按行情涨跌幅降序
+function sortByChangePct(items: HotBurstSignal[]): HotBurstSignal[] {
   return [...items].sort((a, b) => {
-    const aTime = a.detectedAt ? Date.parse(a.detectedAt) : 0
-    const bTime = b.detectedAt ? Date.parse(b.detectedAt) : 0
-    return bTime - aTime
+    const aPct = a.changePct ?? Number.NEGATIVE_INFINITY
+    const bPct = b.changePct ?? Number.NEGATIVE_INFINITY
+    return bPct - aPct
   })
 }
 
 async function loadData() {
   const cached = readHomeCache()
   if (cached) {
-    signals.value = sortByDetectedAt(cached)
+    signals.value = sortByChangePct(cached)
     return
   }
   try {
-    // 只按检测时间排序，不按共振等级排序，保证用户优先看到最新抓取结果。
-    signals.value = sortByDetectedAt(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 2 }))
+    signals.value = sortByChangePct(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 2 }))
   } catch {
     signals.value = []
   }
