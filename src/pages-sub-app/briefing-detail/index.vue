@@ -127,8 +127,16 @@ async function loadBroadcast() {
   }
 }
 
-function changeDate(delta: number) {
-  currentDate.value = addCalendarDays(currentDate.value, delta)
+/** 前一天/后一天：按交易日历跳档，自动跳过非交易日；接口异常时退回自然日加减 */
+async function changeDate(delta: number) {
+  try {
+    currentDate.value = delta > 0
+      ? await agentApi.getNextTradingDay(currentDate.value)
+      : await agentApi.getPreviousTradingDay(currentDate.value)
+  } catch (err) {
+    console.error('切换交易日失败，退回自然日加减:', err)
+    currentDate.value = addCalendarDays(currentDate.value, delta)
+  }
   loadBroadcast()
 }
 

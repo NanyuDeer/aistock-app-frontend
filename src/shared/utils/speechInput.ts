@@ -29,6 +29,37 @@ export type SpeechRecognitionResult =
   | { ok: true; text: string }
   | { ok: false; error: string }
 
+/** HTML5+ `plus.io` 最小接口（App 端读录音临时文件用）——绕开 `uni.getFileSystemManager().readFile`
+ * 的 `nativeFileManager` 引擎缺陷 + 标准 `FileReader` 在 App 端不存在的问题
+ * （见 docs/2026-08-18-app-voice-asr-troubleshooting.md）。
+ * 仅声明用到的 resolveLocalFileSystemURL → entry.file → plus.io.FileReader.readAsDataURL。 */
+interface PlusIoFileReaderLike {
+  onload: (() => void) | null
+  onerror: ((event: unknown) => void) | null
+  readonly result?: unknown
+  readAsDataURL(file: Blob): void
+}
+interface PlusIoLike {
+  FileReader?: new () => PlusIoFileReaderLike
+  resolveLocalFileSystemURL(
+    url: string,
+    success: (entry: { file(success: (file: Blob) => void, fail?: (error: unknown) => void): void }) => void,
+    fail: (error: unknown) => void,
+  ): void
+}
+
+/** 将 DataURL（`data:...;base64,<data>`）解码为 ArrayBuffer。
+ * App 端 `plus.io.FileReader` 只支持 readAsDataURL（返回 base64），不支持 readAsArrayBuffer，
+ * 故剥前缀后用 atob 转二进制；纯函数供单测。 */
+export function dataUrlToArrayBuffer(dataUrl: string): ArrayBuffer {
+  const idx = dataUrl.indexOf(',')
+  if (idx < 0) throw new Error('非法 DataURL')
+  const bin = atob(dataUrl.slice(idx + 1))
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes.buffer as ArrayBuffer
+}
+
 /** 模块级识别状态（核心函数驱动；页面可读作录制/识别中指示） */
 export const speechRecognitionState = shallowRef<SpeechRecognitionState>('idle')
 
@@ -184,7 +215,8 @@ export function mpRecognize(deps: MpSpeechDeps): Promise<SpeechRecognitionResult
 
 /** uni-app App 端录音管理器的最小接口（uni.getRecorderManager() 返回值形态） */
 export interface AppRecorderManagerLike {
-  start(options: { format: string }): void
+  /** format 有效值 aac/mp3/wav/PCM/amr（App）；sampleRate 有效值 8000/16000/44100（amr 用 8000，AMR-NB 窄带） */
+  start(options: { format: string; sampleRate?: number }): void
   stop(): void
   onStart: (() => void) | null
   onStop: ((res: { tempFilePath: string }) => void) | null
@@ -203,7 +235,15 @@ export interface AppSpeechDeps {
 
 /** APP 单次识别（@internal 测试钩子：依赖注入；公共入口见 startSpeechRecognition） */
 export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResult> {
-  const manager = deps.getRecorderManager()
+  let manager: AppRecorderManagerLike | null
+  try {
+    // G2 防护：真机模块缺失/权限异常时 getRecorderManager 可能同步抛错或返回 null，
+    // 同步异常必须转错误态而非炸穿调用方（handleMicTap L577 同步段在 try 外）
+    manager = deps.getRecorderManager()
+  } catch {
+    setState('error')
+    return Promise.resolve({ ok: false, error: APP_UPLOAD_FAIL_HINT })
+  }
   if (!manager) {
     setState('error')
     return Promise.resolve({ ok: false, error: APP_UPLOAD_FAIL_HINT })
@@ -226,9 +266,13 @@ export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResu
         }
         setState(result.ok ? 'idle' : 'error')
         resolve(result)
-      } catch {
+      } catch (err) {
         setState('error')
-        resolve({ ok: false, error: APP_RECORD_FAIL_HINT })
+        const reason = err instanceof Error ? err.message : (err ? String(err) : '')
+        // 诊断（2026-08-18）：readFile/上传异常统一透出（uploadAudio 已自身捕获不 reject，
+        // 故此 catch 实际是 readFile 读临时文件失败；wav 时代即「假 .wav】readFile 失败根因，amr 后仍需排查）
+        console.error('[asr] App 录音文件读取失败:', err)
+        resolve({ ok: false, error: reason ? `读取录音文件失败：${reason}` : APP_RECORD_FAIL_HINT })
       }
     }
     manager.onError = (res) => {
@@ -239,12 +283,19 @@ export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResu
     // App 端交互：点按开始，再点结束（stop() → onStop 结算）
     activeStop = () => manager.stop()
     try {
-      // 录音格式 mp3（iOS 不支持时降级 wav——V2 协议同样支持，免转码）
-      manager.start({ format: 'mp3' })
-    } catch {
+      // 录音格式 amr + 8kHz（与后端火山 ASR audio.format='amr', rate=8000 一致）：
+      // - 弃用 mp3：部分 Android ROM 缺 libmp3lame 编码器，start({format:'mp3'}) 真机直接抛错（真机实测"录音失败"）
+      // - 弃用 wav：uni-app App 端底层是 HTML5+ plus.audio.getRecorder，Android 不真正支持 wav，
+      //   生成「假 .wav 实为 amr」的无效文件，onStop 后 readFile 读临时文件失败 → "录音失败，请重试"（真机复现根因）
+      // - 选 amr：Android/iOS HTML5+ 原生支持（AMR-NB 窄带固定 8k），无需额外编码器，火山 V2 ASR 原生支持 format='amr'
+      manager.start({ format: 'amr', sampleRate: 8000 })
+    } catch (err) {
       activeStop = null
       setState('error')
-      resolve({ ok: false, error: APP_RECORD_FAIL_HINT })
+      const reason = err instanceof Error ? err.message : (err ? String(err) : '')
+      // 诊断（2026-08-18）：真机「录音失败」跨设备复现，透出真实原因以区分 start 失败 vs readFile 失败
+      console.error('[asr] App 录音启动失败:', err)
+      resolve({ ok: false, error: reason ? `录音启动失败：${reason}` : APP_RECORD_FAIL_HINT })
     }
   })
 }
@@ -272,60 +323,87 @@ function bridgeRecorder(recorder: UniNamespace.RecorderManager): AppRecorderMana
 /** APP 平台壳层：真实依赖注入（uni 全局；生产路径） */
 function getAppDeps(): AppSpeechDeps | null {
   // #ifdef APP-PLUS
-  const recorder = uni.getRecorderManager()
-  const fs = uni.getFileSystemManager?.()
-  return {
-    getRecorderManager: () => bridgeRecorder(recorder),
-    readFileAsArrayBuffer: (tempFilePath) =>
-      new Promise<ArrayBuffer>((resolve, reject) => {
-        fs.readFile({
-          filePath: tempFilePath,
-          success: (res) => {
-            // data 类型为 string | ArrayBuffer：先按 string（base64）收窄，避免联合类型 instanceof 报错
-            if (typeof res.data === 'string') {
-              // base64 字符串（部分平台 readFile 无 arrayBuffer 选项时返回 base64）
-              const bin = atob(res.data)
-              const bytes = new Uint8Array(bin.length)
-              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-              resolve(bytes.buffer as ArrayBuffer)
-            } else if (res.data instanceof ArrayBuffer) {
-              resolve(res.data)
-            } else {
-              reject(new Error('读取录音文件失败'))
-            }
-          },
-          fail: reject,
-        })
-      }),
-    uploadAudio: async (arrayBuffer) => {
-      // 二进制 body（非 multipart）：uni.request 直接发 ArrayBuffer + audio/mpeg
-      const token = uni.getStorageSync('token') as string | undefined
-      try {
-        const res = await new Promise<UniNamespace.RequestSuccessCallbackResult>((resolve, reject) => {
-          uni.request({
-            url: `${API_BASE_URL}/agent/asr`,
-            method: 'POST',
-            data: arrayBuffer,
-            header: {
-              'Content-Type': 'audio/mpeg',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            success: resolve,
-            fail: reject,
+  try {
+    // G2 防护：真机缺 Record 模块/录音权限时 uni.getRecorderManager() 可能抛错或返回 null，
+    // 壳层必须兜底为 null（走 startAppRecognition 的错误态），不得同步炸穿 handleMicTap
+    const recorder = uni.getRecorderManager()
+    return {
+      getRecorderManager: () => bridgeRecorder(recorder),
+      readFileAsArrayBuffer: (tempFilePath) =>
+        new Promise<ArrayBuffer>((resolve, reject) => {
+          // App 端读录音临时文件：必须用 HTML5+ `plus.io` 原生读取——
+          // ① `uni.getFileSystemManager().readFile` 触发 `nativeFileManager` 引擎缺陷（已证伪补模块无效）；
+          // ② App 端无标准 Web `FileReader`（真机报 `FileReader is not defined`）。
+          // 故用 `plus.io.FileReader.readAsDataURL`（唯一支持，返回 base64 DataURL）→ 剥前缀 → ArrayBuffer。
+          // 见 docs/2026-08-18-app-voice-asr-troubleshooting.md
+          const io = (plus as unknown as { io?: PlusIoLike }).io
+          if (!io) {
+            reject(new Error('读取录音文件失败（plus.io 不可用）'))
+            return
+          }
+          const FileReaderCtor = io.FileReader
+          if (!FileReaderCtor) {
+            reject(new Error('读取录音文件失败（plus.io.FileReader 不可用）'))
+            return
+          }
+          io.resolveLocalFileSystemURL(
+            tempFilePath,
+            (entry) =>
+              entry.file(
+                (file) => {
+                  const reader = new FileReaderCtor()
+                  reader.onerror = (event) => reject(event instanceof Error ? event : new Error('读取录音文件失败'))
+                  reader.onload = () => {
+                    try {
+                      const raw = typeof reader.result === 'string' ? reader.result : ''
+                      if (!raw) {
+                        reject(new Error('读取录音文件失败（结果为空）'))
+                        return
+                      }
+                      resolve(dataUrlToArrayBuffer(raw))
+                    } catch (err) {
+                      reject(err instanceof Error ? err : new Error('读取录音文件失败'))
+                    }
+                  }
+                  reader.readAsDataURL(file)
+                },
+                (err) => reject(err),
+              ),
+            (err) => reject(err),
+          )
+        }),
+      uploadAudio: async (arrayBuffer) => {
+        // 二进制 body（非 multipart）：uni.request 直接发 ArrayBuffer + audio/amr（与录音格式 amr 一致）
+        const token = uni.getStorageSync('token') as string | undefined
+        try {
+          const res = await new Promise<UniNamespace.RequestSuccessCallbackResult>((resolve, reject) => {
+            uni.request({
+              url: `${API_BASE_URL}/agent/asr`,
+              method: 'POST',
+              data: arrayBuffer,
+              header: {
+                'Content-Type': 'audio/amr',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              success: resolve,
+              fail: reject,
+            })
           })
-        })
-        const body = (res.data ?? {}) as { code?: number; message?: string; text?: string }
-        if (res.statusCode === 200 && typeof body?.text === 'string') {
-          return { ok: true, text: body.text }
+          const body = (res.data ?? {}) as { code?: number; message?: string; text?: string }
+          if (res.statusCode === 200 && typeof body?.text === 'string') {
+            return { ok: true, text: body.text }
+          }
+          if (res.statusCode === 401) {
+            return { ok: false, error: '请先登录' }
+          }
+          return { ok: false, error: body?.message || APP_UPLOAD_FAIL_HINT }
+        } catch {
+          return { ok: false, error: APP_UPLOAD_FAIL_HINT }
         }
-        if (res.statusCode === 401) {
-          return { ok: false, error: '请先登录' }
-        }
-        return { ok: false, error: body?.message || APP_UPLOAD_FAIL_HINT }
-      } catch {
-        return { ok: false, error: APP_UPLOAD_FAIL_HINT }
-      }
-    },
+      },
+    }
+  } catch {
+    return null
   }
   // #endif
   return null

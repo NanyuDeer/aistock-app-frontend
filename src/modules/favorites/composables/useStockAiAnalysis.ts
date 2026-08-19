@@ -1,5 +1,5 @@
 import { computed, type Ref } from 'vue'
-import type { TrendScoreData } from '@/shared/api/modules/stock'
+import type { TrendScoreData, IndustryHealthData } from '@/shared/api/modules/stock'
 
 interface CuratedProfile {
   code: string
@@ -179,39 +179,6 @@ function getIndustryHealthClass(score: number): string {
   return 'is-cold'
 }
 
-const industryHealthPresets: Record<string, { values: number[]; details: { icon: string; title: string; desc: string }[] }> = {
-  '光通讯': { values: [70, 76, 74, 82, 87, 91, 93], details: [{ icon: '政', title: '相关政策', desc: '14项' }, { icon: '告', title: '重大公告', desc: '11条' }, { icon: '排', title: '行业股票排行', desc: '查看' }] },
-  '半导体': { values: [56, 61, 65, 71, 78, 83, 86], details: [{ icon: '政', title: '相关政策', desc: '16项' }, { icon: '告', title: '重大公告', desc: '9条' }, { icon: '排', title: '行业股票排行', desc: '查看' }] },
-  'AI应用': { values: [62, 69, 68, 76, 83, 88, 90], details: [{ icon: '政', title: '相关政策', desc: '12项' }, { icon: '告', title: '重大公告', desc: '8条' }, { icon: '排', title: '行业股票排行', desc: '查看' }] },
-  '商业航天': { values: [48, 55, 60, 66, 72, 79, 83], details: [{ icon: '政', title: '相关政策', desc: '15项' }, { icon: '告', title: '重大公告', desc: '7条' }, { icon: '排', title: '行业股票排行', desc: '查看' }] },
-  '机器人': { values: [52, 59, 64, 72, 80, 85, 88], details: [{ icon: '政', title: '相关政策', desc: '13项' }, { icon: '告', title: '重大公告', desc: '10条' }, { icon: '排', title: '行业股票排行', desc: '查看' }] },
-  '锂电储能': { values: [45, 49, 52, 58, 64, 69, 72], details: [{ icon: '政', title: '相关政策', desc: '9项' }, { icon: '告', title: '重大公告', desc: '5条' }, { icon: '排', title: '行业股票排行', desc: '查看' }] },
-  '算电协同': { values: [50, 57, 63, 70, 77, 82, 85], details: [{ icon: '政', title: '相关政策', desc: '11项' }, { icon: '告', title: '重大公告', desc: '6条' }, { icon: '排', title: '行业股票排行', desc: '查看' }] },
-  '新型储能': { values: [40, 46, 52, 59, 67, 72, 76], details: [{ icon: '政', title: '相关政策', desc: '10项' }, { icon: '告', title: '重大公告', desc: '6条' }, { icon: '排', title: '行业股票排行', desc: '查看' }] }
-}
-
-function getIndustryHealthPreset(industryName: string): { values: number[]; details: { icon: string; title: string; desc: string }[] } {
-  const rawName = String(industryName || '').trim()
-  const matchedKey = Object.keys(industryHealthPresets).find(key => rawName === key || rawName.includes(key) || key.includes(rawName))
-  if (matchedKey) return industryHealthPresets[matchedKey]
-
-  const monthsCount = 7
-  const seed = rawName.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
-  const base = 48 + (seed % 18)
-  const values = Array.from({ length: monthsCount }, (_, index) => {
-    const wave = ((seed + index * 5) % 7) - 3
-    return Math.max(38, Math.min(82, Math.round(base + index * 3.2 + wave)))
-  })
-  return {
-    values,
-    details: [
-      { icon: '政', title: '相关政策', desc: `${Math.max(4, Math.round(values[values.length - 1] / 10))}项` },
-      { icon: '告', title: '重大公告', desc: `${Math.max(2, Math.round(values[values.length - 1] / 14))}条` },
-      { icon: '排', title: '行业股票排行', desc: '查看' }
-    ]
-  }
-}
-
 function toFiniteNumber(value: any): number | null {
   if (value === null || value === undefined || value === '') return null
   if (typeof value === 'number') return Number.isFinite(value) ? value : null
@@ -285,43 +252,70 @@ function findTrendDimension(trendApiData: TrendScoreData | null, matcher: (name:
   return dimensions.find((dim: any) => matcher(String(dim.name || dim.label || ''))) || null
 }
 
-function buildIndustryHealthFromTrend(trendApiData: TrendScoreData | null, context: StockAiAnalysisContext, fallbackTheme: string) {
+function buildIndustryHealthFromTrend(trendApiData: TrendScoreData | null, context: StockAiAnalysisContext, fallbackTheme: string, industryHealthData?: IndustryHealthData | null) {
   const trackDim = findTrendDimension(trendApiData, name => name.includes('行业') || name.includes('赛道'))
-  if (!trackDim) return null
-  const score = Number(trackDim.score) || 0
-  const detail = trackDim.detail || {}
-  const indicators = Array.isArray(trackDim.indicators) ? trackDim.indicators : []
-  const sectorName = detail.sectorName || context.stockInfo?.industry || fallbackTheme
-  const policyItems = Array.isArray(detail.policyItems) ? detail.policyItems : []
-  const detailItems = [
-    ...policyItems.slice(0, 2).map((item: any) => ({
-      icon: '政',
-      title: String(item.name || '政策趋势'),
-      desc: String(item.desc || item.value || '真实趋势数据')
-    })),
-    ...indicators.slice(0, Math.max(0, 3 - policyItems.length)).map((item: any) => ({
-      icon: '因',
-      title: String(item.name || item.label || '评分因子'),
-      desc: String(item.value || item.score || '--')
-    }))
-  ].slice(0, 3)
-  const trend = [{ month: '当前', value: Math.max(0, Math.min(100, score)) }]
-  return {
-    score,
-    levelClass: getIndustryHealthClass(score),
-    tags: [
-      { text: String(sectorName || fallbackTheme), type: 'success' },
-      { text: '趋势评分真实数据', type: 'success' }
-    ],
-    trend,
-    values: trend.map(item => item.value),
-    details: detailItems.length ? detailItems : [
-      { icon: '因', title: '行业赛道评分', desc: `${score}分` },
-      { icon: '源', title: '数据来源', desc: 'trend-score' },
-      { icon: '排', title: '行业股票排行', desc: '查看' }
-    ],
-    isReal: true,
+  if (trackDim) {
+    const score = Number(trackDim.score) || 0
+    const detail = trackDim.detail || {}
+    const indicators = Array.isArray(trackDim.indicators) ? trackDim.indicators : []
+    const sectorName = detail.sectorName || context.stockInfo?.industry || fallbackTheme
+    const policyItems = Array.isArray(detail.policyItems) ? detail.policyItems : []
+    const detailItems = [
+      ...policyItems.slice(0, 2).map((item: any) => ({
+        icon: '政',
+        title: String(item.name || '政策趋势'),
+        desc: String(item.desc || item.value || '真实趋势数据')
+      })),
+      ...indicators.slice(0, Math.max(0, 3 - policyItems.length)).map((item: any) => ({
+        icon: '因',
+        title: String(item.name || item.label || '评分因子'),
+        desc: String(item.value || item.score || '--')
+      }))
+    ].slice(0, 3)
+    const trend = [{ month: '当前', value: Math.max(0, Math.min(100, score)) }]
+    return {
+      score,
+      levelClass: getIndustryHealthClass(score),
+      tags: [
+        { text: String(sectorName || fallbackTheme), type: 'success' },
+        { text: '趋势评分真实数据', type: 'success' }
+      ],
+      trend,
+      values: trend.map(item => item.value),
+      details: detailItems.length ? detailItems : [
+        { icon: '因', title: '行业赛道评分', desc: `${score}分` },
+        { icon: '源', title: '数据来源', desc: 'trend-score' },
+        { icon: '排', title: '行业股票排行', desc: '查看' }
+      ],
+      isReal: true,
+    }
   }
+  
+  // 趋势 API 无行业维度时，尝试用行业景气 API 兜底
+  if (industryHealthData) {
+    const score = industryHealthData.score || 0
+    const trend = industryHealthData.months?.length
+      ? industryHealthData.months.map((m: string, i: number) => ({ month: m, value: industryHealthData.values?.[i] || 0 }))
+      : [{ month: '当前', value: score }]
+    return {
+      score,
+      levelClass: getIndustryHealthClass(score),
+      tags: [
+        { text: String(industryHealthData.resolvedName || industryHealthData.industry || fallbackTheme), type: 'success' },
+        { text: '行业景气真实数据', type: 'success' }
+      ],
+      trend,
+      values: trend.map((item: any) => item.value),
+      details: (industryHealthData.details || []).map((d: any) => ({
+        icon: '因',
+        title: String(d.label || ''),
+        desc: String(d.desc || '')
+      })),
+      isReal: true,
+    }
+  }
+  
+  return null
 }
 
 function buildRealAnnualData(context: StockAiAnalysisContext, score: number) {
@@ -354,6 +348,18 @@ function buildMoatsFromTrend(trendApiData: TrendScoreData | null, profile: Parti
   return []
 }
 
+function cleanExplanation(text: string): string {
+  return text
+    .replace(/\[`([^`]*)`\]\([^)]+\)/g, '$1')   // [`text`](url) → text
+    .replace(/\[([^\]]*)\]\([^)]+\)/g, '$1')      // [text](url) → text
+    .replace(/`{1,3}([^`]*)`{1,3}/g, '$1')        // `text` 或 ```text``` → text
+    .replace(/\*\*([^*]*)\*\*/g, '$1')             // **text** → text
+    .replace(/\*([^*]*)\*/g, '$1')                 // *text* → text
+    .replace(/^#+\s*/gm, '')                        // 去掉行首 ### 
+    .replace(/\s+/g, ' ')                           // 多余空白合并
+    .trim()
+}
+
 export function extractTagFromText(text: string): TagItem {
   if (!text) return { tag: '', full: '' }
   const full = String(text).trim()
@@ -361,11 +367,11 @@ export function extractTagFromText(text: string): TagItem {
   if (tagMatch) {
     let tag = tagMatch[1].trim()
     if (tag.length > 30) tag = tag.substring(0, 30) + '…'
-    return { tag, full: tagMatch[2].trim() || full }
+    return { tag, full: cleanExplanation(tagMatch[2].trim()) || full }
   }
   const firstClause = full.split(/[，。；！？\n]/)[0]?.trim() || full
   const tag = firstClause.length > 30 ? firstClause.substring(0, 30) + '…' : firstClause
-  return { tag, full }
+  return { tag, full: cleanExplanation(full) }
 }
 
 export function extractTagsFromText(text: string): TagItem[] {
@@ -397,15 +403,13 @@ export function useStockAiAnalysis(
   symbolRef: Ref<string>,
   quoteRef: Ref<{ name?: string; industry?: string } | null>,
   trendScoreDataRef?: Ref<TrendScoreData | null>,
-  contextRef?: Ref<StockAiAnalysisContext | null>
+  contextRef?: Ref<StockAiAnalysisContext | null>,
+  industryHealthRef?: Ref<IndustryHealthData | null>
 ) {
   const curatedProfile = computed(() => getCuratedStockProfile(symbolRef.value))
   const profileScore = computed(() => Number(curatedProfile.value?.aiScore || 0))
   const profileTheme = computed(() => curatedProfile.value?.theme || quoteRef.value?.industry || '成长赛道')
   const profileName = computed(() => curatedProfile.value?.name || quoteRef.value?.name || '该股')
-  const expectedMultipleText = computed(() => '')
-  const expectedMultipleNumber = computed(() => 0)
-
   // 趋势股评分后端数据（四维：技术面/行业赛道景气/消息面催化/基本面）
   const trendApiData = computed(() => trendScoreDataRef?.value || null)
   const trendVetoed = computed(() => Boolean(trendApiData.value?.vetoed))
@@ -413,11 +417,18 @@ export function useStockAiAnalysis(
   const realTrendScore = computed(() => (trendApiData.value && !trendVetoed.value) ? Number(trendApiData.value.score) || 0 : 0)
   const realTrendLabel = computed(() => (trendApiData.value && !trendVetoed.value) ? String(trendApiData.value.label || '') : '')
   const realTrendMultiple = computed(() => (trendApiData.value && !trendVetoed.value) ? String(trendApiData.value.expectedMultiple || '') : '')
+  const expectedMultipleText = computed(() => trendApiData.value?.expectedMultiple || '')
+  const expectedMultipleNumber = computed(() => {
+    const text = expectedMultipleText.value
+    if (!text) return 0
+    const match = String(text).match(/([\d.]+)\s*倍/)
+    return match ? Number(match[1]) : 0
+  })
   const realDataContext = computed<StockAiAnalysisContext>(() => contextRef?.value || {})
   const realFinancialData = computed(() => buildRealFinancialData(realDataContext.value))
 
   const midMockData = computed(() => {
-    const realIndustryHealth = buildIndustryHealthFromTrend(trendApiData.value, realDataContext.value, profileTheme.value)
+    const realIndustryHealth = buildIndustryHealthFromTrend(trendApiData.value, realDataContext.value, profileTheme.value, industryHealthRef?.value)
     return {
       finance: realFinancialData.value.rows,
       industryHealth: realIndustryHealth
@@ -426,8 +437,18 @@ export function useStockAiAnalysis(
 
   const midAiAnalysis = computed<AiAnalysisView>(() => {
     const profile: Partial<CuratedProfile> = curatedProfile.value || {}
-    const focus = profile.midTermFocus || ['趋势结构保持健康', '行业景气度仍在修复', '业绩拐点需要继续验证']
-    const risks = profile.risks || ['业绩兑现节奏低于预期', '板块交易拥挤导致波动加大']
+    const dimensions = trendApiData.value && !trendVetoed.value ? (trendApiData.value.dimensions || []) : []
+    const sortedDims = [...dimensions].sort((a, b) => (b.score || 0) - (a.score || 0))
+    const focus = profile.midTermFocus?.length
+      ? profile.midTermFocus
+      : sortedDims.length
+        ? sortedDims.slice(0, 3).map(d => String(d.name || '趋势维度'))
+        : ['趋势跟踪', '业绩验证', '资金承接']
+    const risks = profile.risks?.length
+      ? profile.risks
+      : sortedDims.length
+        ? sortedDims.slice(-2).reverse().map(d => String(d.name || '风险维度'))
+        : ['趋势破位风险', '板块轮动风险']
     const score = profileScore.value
     const realScore = realTrendScore.value || score
     const conclusion = realScore >= 80 ? '持有可顺势跟踪' : realScore >= 65 ? '关注等回踩确认' : '持有者稳健观察'
@@ -517,8 +538,18 @@ export function useStockAiAnalysis(
 
   const longAiAnalysis = computed<AiAnalysisView>(() => {
     const profile: Partial<CuratedProfile> = curatedProfile.value || {}
-    const focus = profile.longTermFocus || ['产业空间', '核心壁垒', '成长弹性']
-    const risks = profile.risks || ['产业兑现节奏低于预期']
+    const dimensions = trendApiData.value && !trendVetoed.value ? (trendApiData.value.dimensions || []) : []
+    const sortedDims = [...dimensions].sort((a, b) => (b.score || 0) - (a.score || 0))
+    const focus = profile.longTermFocus?.length
+      ? profile.longTermFocus
+      : sortedDims.length
+        ? sortedDims.slice(0, 3).map(d => String(d.name || '趋势维度'))
+        : ['产业空间', '核心壁垒', '成长弹性']
+    const risks = profile.risks?.length
+      ? profile.risks
+      : sortedDims.length
+        ? sortedDims.slice(-2).reverse().map(d => String(d.name || '风险维度'))
+        : ['产业兑现节奏低于预期']
     const multiple = expectedMultipleText.value
     const multipleNumber = expectedMultipleNumber.value
     const conclusion = multiple === '10倍'

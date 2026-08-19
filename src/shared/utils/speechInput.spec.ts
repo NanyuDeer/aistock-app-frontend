@@ -16,12 +16,14 @@ import {
   appRecognize,
   stopSpeechRecognition,
   speechRecognitionState,
+  dataUrlToArrayBuffer,
   EMPTY_TRANSCRIPT_HINT,
   type H5SpeechDeps,
   type H5SpeechRecognitionLike,
   type MpSpeechDeps,
   type MpSpeechRecognitionManagerLike,
   type AppSpeechDeps,
+  type SpeechRecognitionResult,
 } from './speechInput'
 
 /** H5 Web Speech API fake：记录 start/stop 调用，事件回调由测试手动触发 */
@@ -192,13 +194,31 @@ describe('speechInput 状态机基线', () => {
     await expect(p).resolves.toEqual({ ok: false, error: '语音识别服务异常' })
     expect(speechRecognitionState.value).toBe('error')
   })
+
+  it('APP getRecorderManager 工厂同步抛错（壳层无防护 → 真机模块缺失时同步炸穿）：Promise 不 reject，返回错误态', async () => {
+    // G2 根因：壳层 getAppDeps/bridgeRecorder 无异常防护，uni.getRecorderManager() 抛错
+    // 或返回 null 使 bridgeRecorder 抛 TypeError 时，appRecognize 内 deps.getRecorderManager()
+    // 同步炸穿 → handleMicTap L577（try 外）isListening 卡 true。判别联合契约要求此处不 reject。
+    let pending: Promise<SpeechRecognitionResult> | undefined
+    expect(() => {
+      pending = appRecognize({
+        getRecorderManager: () => {
+          throw new TypeError("Cannot read properties of null (reading 'onStart')")
+        },
+        readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
+        uploadAudio: async () => ({ ok: true, text: 'x' }),
+      })
+    }).not.toThrow()
+    await expect(pending!).resolves.toEqual({ ok: false, error: '语音识别服务异常' })
+    expect(speechRecognitionState.value).toBe('error')
+  })
 })
 
 // ===== APP 分支（批次 3a：后端 ASR 真实链路） =====
 
 /** 可编程录音管理器 mock（uni.getRecorderManager() 返回值形态） */
 const mockRecorder: {
-  start(options: { format: string }): void
+  start(options: { format: string; sampleRate?: number }): void
   stop(): void
   onStart: (() => void) | null
   onStop: ((res: { tempFilePath: string }) => void) | null
@@ -207,7 +227,7 @@ const mockRecorder: {
   emitStop(tempFilePath: string): void
   emitError(errMsg: string): void
 } = {
-  start(_options: { format: string }) {},
+  start(_options: { format: string; sampleRate?: number }) {},
   stop() {},
   onStart: null,
   onStop: null,
@@ -228,10 +248,27 @@ describe('appRecognize', () => {
     const pending = appRecognize(deps)
     mockRecorder.emitStart()
     // 用户结束录音 → onStop 给临时路径
-    mockRecorder.emitStop('/tmp/rec.mp3')
+    mockRecorder.emitStop('/tmp/rec.wav')
     const result = await pending
     assert.deepEqual(result, { ok: true, text: '贵州茅台' })
     assert.equal(speechRecognitionState.value, 'idle')
+  })
+
+  it('录音以 amr + 8kHz 启动（与后端火山 ASR format/rate 对齐；AMR-NB 窄带固定 8K 采样）', () => {
+    let startOptions: { format: string; sampleRate?: number } | null = null
+    const recorder = {
+      start(options: { format: string; sampleRate?: number }) { startOptions = options },
+      stop() {},
+      onStart: null as (() => void) | null,
+      onStop: null as ((res: { tempFilePath: string }) => void) | null,
+      onError: null as ((res: { errMsg?: string }) => void) | null,
+    }
+    appRecognize({
+      getRecorderManager: () => recorder,
+      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
+      uploadAudio: async () => ({ ok: true, text: 'x' }),
+    })
+    assert.deepEqual(startOptions, { format: 'amr', sampleRate: 8000 })
   })
 
   it('录音失败 → error 分支', async () => {
@@ -255,7 +292,7 @@ describe('appRecognize', () => {
     }
     const pending = appRecognize(deps)
     mockRecorder.emitStart()
-    mockRecorder.emitStop('/tmp/rec.mp3')
+    mockRecorder.emitStop('/tmp/rec.wav')
     const result = await pending
     assert.deepEqual(result, { ok: false, error: '语音识别暂不可用' })
   })
@@ -268,8 +305,67 @@ describe('appRecognize', () => {
     }
     const pending = appRecognize(deps)
     mockRecorder.emitStart()
-    mockRecorder.emitStop('/tmp/rec.mp3')
+    mockRecorder.emitStop('/tmp/rec.wav')
     const result = await pending
     assert.deepEqual(result, { ok: false, error: EMPTY_TRANSCRIPT_HINT })
+  })
+
+  it('start 同步抛错（amr 不支持/引擎异常）→ 透出具体错误信息（诊断）', async () => {
+    // 根因排查（2026-08-18）：真机「录音失败，请重试」跨设备复现，但代码把 start 的
+    // 真实异常吞成固定文案。此用例要求把具体错误透出到 error，供真机区分 (a) start vs (c) readFile。
+    const recorder = {
+      start(_options: { format: string; sampleRate?: number }) {
+        throw new Error('amr encoder not supported')
+      },
+      stop() {},
+      onStart: null as (() => void) | null,
+      onStop: null as ((res: { tempFilePath: string }) => void) | null,
+      onError: null as ((res: { errMsg?: string }) => void) | null,
+    }
+    const pending = appRecognize({
+      getRecorderManager: () => recorder,
+      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
+      uploadAudio: async () => ({ ok: true, text: 'x' }),
+    })
+    expect(speechRecognitionState.value).toBe('error')
+    const result = await pending
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.match(result.error, /amr encoder not supported/)
+  })
+
+  it('readFile 失败（录音临时文件不可读）→ 透出具体错误信息（诊断）', async () => {
+    const pending = appRecognize({
+      getRecorderManager: () => mockRecorder,
+      readFileAsArrayBuffer: async () => {
+        throw new Error('ENOENT: no such file')
+      },
+      uploadAudio: async () => ({ ok: true, text: 'x' }),
+    })
+    mockRecorder.emitStart()
+    mockRecorder.emitStop('/tmp/rec.amr')
+    const result = await pending
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.match(result.error, /ENOENT|读取录音/)
+  })
+})
+
+// ===== dataUrlToArrayBuffer（App 端 plus.io.FileReader.readAsDataURL → ArrayBuffer 关键转换） =====
+
+describe('dataUrlToArrayBuffer', () => {
+  it('标准 DataURL：剥前缀还原原始字节', () => {
+    // 'amr\x00\x01ABC' 的 base64
+    const bytes = new Uint8Array([0x61, 0x6d, 0x72, 0x00, 0x01, 0x41, 0x42, 0x43])
+    const b64 = btoa(String.fromCharCode(...bytes))
+    const ab = dataUrlToArrayBuffer(`data:audio/amr;base64,${b64}`)
+    assert.deepEqual(Array.from(new Uint8Array(ab)), Array.from(bytes))
+  })
+
+  it('非法 DataURL（无逗号前缀）→ 抛错', () => {
+    assert.throws(() => dataUrlToArrayBuffer('not-a-dataurl'), /非法 DataURL/)
+  })
+
+  it('空数据 → 返回空 ArrayBuffer', () => {
+    const ab = dataUrlToArrayBuffer('data:audio/amr;base64,')
+    assert.equal(ab.byteLength, 0)
   })
 })

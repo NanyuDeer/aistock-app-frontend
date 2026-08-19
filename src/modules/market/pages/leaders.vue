@@ -46,20 +46,24 @@
           <text class="bubble-hint">泡泡越大持续越久，颜色越深确定性越高</text>
         </view>
         <view class="bubble-wrap" :style="{ height: bubbleHeight + 'px' }">
-          <view
-            v-for="(b, idx) in bubbleLayout"
-            :key="idx"
-            class="bubble-item"
-            :style="bubbleItemStyle(b)"
-            @tap="selectBubble(b)"
-          >
-            <text class="bubble-name" :style="{ fontSize: b.fontSize + 'px' }">{{ b.name }}</text>
-            <text
-              class="bubble-change"
-              :style="{ fontSize: (b.fontSize - 3) + 'px' }"
+          <!-- bubble-layer 尺寸 = 泡泡群包围盒（自适应），由 bubble-wrap flex 居中：
+               不依赖容器宽度测量，任何设备/缩放下泡泡群水平垂直居中 -->
+          <view v-if="bubbleLayout.items.length" class="bubble-layer" :style="bubbleLayerStyle">
+            <view
+              v-for="(b, idx) in bubbleLayout.items"
+              :key="idx"
+              class="bubble-item"
+              :style="bubbleItemStyle(b)"
+              @tap="selectBubble(b)"
             >
-              {{ b.days }}天
-            </text>
+              <text class="bubble-name" :style="{ fontSize: b.fontSize + 'px' }">{{ b.name }}</text>
+              <text
+                class="bubble-change"
+                :style="{ fontSize: (b.fontSize - 3) + 'px' }"
+              >
+                {{ b.days }}天
+              </text>
+            </view>
           </view>
         </view>
       </view>
@@ -101,7 +105,6 @@
         <!-- 龙头股（分档：长线=趋势龙头 / 短线=短线领涨），跨板块去重 -->
         <view v-if="getSectorLeader(sector)" class="leader-mini-row" @tap.stop="goStockDetail(getSectorLeader(sector)!.code)">
           <view class="leader-mini-left">
-            <text class="leader-mini-tag">{{ activeCycle === 'long' ? '趋势龙头' : '短线领涨' }}</text>
             <text class="leader-mini-name">{{ getSectorLeader(sector)!.name }}</text>
             <text class="leader-mini-code">{{ getSectorLeader(sector)!.code }}</text>
           </view>
@@ -177,22 +180,24 @@ const CYCLE_OPTIONS = [
 
 const activeCycle = ref<'long' | 'short'>('long')
 
-/** 当前档位展示的板块：长线按 long_term_days 降序、短线按 short_term_days 降序 top8。
+/** 当前档位展示的板块：短线榜按上榜次数（近10日 freq20）→ 热度（short_heat）降序、长线榜按 long_term_days 降序，各取 top8。
  * 先过滤掉该档位天数为 0 的板块（另一链被裁剪或长短线均不成立的板块），
- * 再取天数最高的 8 个——宁少勿滥，避免短线档塞满 0 天补位板块。
- * 同影响天数时按上榜次数降序（短线 freq20 / 长线 frequency），
- * 与后端 applyDualRankings 口径一致，不依赖后端返回顺序。 */
+ * 宁少勿滥，避免短线档塞满 0 天补位板块。
+ * 短线排序与后端 applyDualRankings 口径一致（上榜次数-热度），不依赖后端返回顺序。 */
 const displaySectors = computed(() =>
   [...sectors.value]
     .filter(s => getSectorDays(s, activeCycle.value) > 0)
     .sort((a, b) => {
-      const daysDiff = getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value)
+      if (activeCycle.value === 'short') {
+        // 短线榜：上榜次数（近10日 freq20）降序，相同按短线热度（short_heat）降序
+        const freqDiff = Number(b.freq20 ?? 0) - Number(a.freq20 ?? 0)
+        if (freqDiff !== 0) return freqDiff
+        return getSectorStrength(b, 'short') - getSectorStrength(a, 'short')
+      }
+      // 长线榜：长线影响天数降序，同天数按近120日上榜次数 frequency 降序
+      const daysDiff = getSectorDays(b, 'long') - getSectorDays(a, 'long')
       if (daysDiff !== 0) return daysDiff
-      // 同影响天数：短线按近10日上榜次数 freq20、长线按近120日上榜次数 frequency 降序
-      const freqDiff = activeCycle.value === 'short'
-        ? Number(b.freq20 ?? 0) - Number(a.freq20 ?? 0)
-        : Number(b.frequency ?? 0) - Number(a.frequency ?? 0)
-      return freqDiff
+      return Number(b.frequency ?? 0) - Number(a.frequency ?? 0)
     })
     .slice(0, 8)
 )
@@ -272,11 +277,13 @@ const bubbleData = computed<Bubble[]>(() => {
 })
 
 // force simulation：碰撞检测 + 居中 + 自适应缩放（确定性布局，同数据同结果）
-// 核心改进：迭代后增加"质心居中"步骤，确保泡泡群整体居中于画布
-const bubbleLayout = computed<BubbleLayout[]>(() => {
+// 最终输出为"泡泡群包围盒 layer"（layerW/layerH）+ 泡泡相对 layer 左上角的坐标；
+// .bubble-wrap 用 flex 把 layer 居中 → 泡泡群在任何设备/缩放下都水平垂直居中，
+// 不再依赖容器宽度测量（containerWidth 仅用于碰撞模拟，不影响最终居中）。
+const bubbleLayout = computed<{ layerW: number; layerH: number; items: BubbleLayout[] }>(() => {
   const items = bubbleData.value
-  if (!items.length) return []
-  const W = containerWidth.value // 动态容器宽度，匹配实际画布大小
+  if (!items.length) return { layerW: 0, layerH: 0, items: [] }
+  const W = containerWidth.value // 估算容器宽度（仅碰撞/边界模拟用）
   const H = bubbleHeight
   const cx = W / 2
   const cy = H / 2
@@ -352,39 +359,52 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
     }
   }
 
-  // 最终包围盒居中 + 自适应缩放（单次计算，确定性结果）
-  // 1. 计算所有泡泡的包围盒
-  // 2. 计算缩放比例使包围盒恰好放入画布（含 padding）
-  // 3. 以包围盒中心为原点缩放位置和半径，再平移到画布中心
-  if (nodes.length > 0) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-    for (const n of nodes) {
-      minX = Math.min(minX, n.x - n.radius)
-      maxX = Math.max(maxX, n.x + n.radius)
-      minY = Math.min(minY, n.y - n.radius)
-      maxY = Math.max(maxY, n.y + n.radius)
-    }
-    const bboxCx = (minX + maxX) / 2
-    const bboxCy = (minY + maxY) / 2
-    const bboxW = maxX - minX
-    const bboxH = maxY - minY
-
-    // 计算缩放比例：画布留 8px padding，取宽高方向较小值，不超过 1（不放大）
-    const padding = 8
-    const scaleX = bboxW > 0 ? (W - padding * 2) / bboxW : 1
-    const scaleY = bboxH > 0 ? (H - padding * 2) / bboxH : 1
-    const fitScale = Math.min(1, scaleX, scaleY)
-
-    // 以包围盒中心为原点缩放，然后平移到画布中心
-    for (const n of nodes) {
-      n.radius *= fitScale
-      n.x = cx + (n.x - bboxCx) * fitScale
-      n.y = cy + (n.y - bboxCy) * fitScale
-    }
+  // 包围盒自适应缩放：以包围盒中心为原点等比缩放，使泡泡群放入画布（含 padding）
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const n of nodes) {
+    minX = Math.min(minX, n.x - n.radius)
+    maxX = Math.max(maxX, n.x + n.radius)
+    minY = Math.min(minY, n.y - n.radius)
+    maxY = Math.max(maxY, n.y + n.radius)
+  }
+  const bboxCx = (minX + maxX) / 2
+  const bboxCy = (minY + maxY) / 2
+  const bboxW = maxX - minX
+  const bboxH = maxY - minY
+  const padding = 8
+  const scaleX = bboxW > 0 ? (W - padding * 2) / bboxW : 1
+  const scaleY = bboxH > 0 ? (H - padding * 2) / bboxH : 1
+  const fitScale = Math.min(1, scaleX, scaleY)
+  for (const n of nodes) {
+    n.radius *= fitScale
+    n.x = cx + (n.x - bboxCx) * fitScale
+    n.y = cy + (n.y - bboxCy) * fitScale
   }
 
-  return nodes.map(n => ({ ...n, x: n.x, y: n.y }))
+  // 缩放后的最终包围盒（layer 内容尺寸），泡泡坐标转换为相对 layer 左上角偏移
+  let minX2 = Infinity, maxX2 = -Infinity, minY2 = Infinity, maxY2 = -Infinity
+  for (const n of nodes) {
+    minX2 = Math.min(minX2, n.x - n.radius)
+    maxX2 = Math.max(maxX2, n.x + n.radius)
+    minY2 = Math.min(minY2, n.y - n.radius)
+    maxY2 = Math.max(maxY2, n.y + n.radius)
+  }
+  const layerW = Math.max(0, Math.ceil(maxX2 - minX2 + padding * 2))
+  const layerH = Math.max(0, Math.ceil(maxY2 - minY2 + padding * 2))
+  const offsetX = minX2 - padding
+  const offsetY = minY2 - padding
+  return {
+    layerW,
+    layerH,
+    items: nodes.map(n => ({ ...n, x: n.x - offsetX, y: n.y - offsetY })),
+  }
 })
+
+/** bubble-layer 尺寸：泡泡群包围盒 + padding（由 bubble-wrap flex 居中） */
+const bubbleLayerStyle = computed(() => ({
+  width: bubbleLayout.value.layerW + 'px',
+  height: bubbleLayout.value.layerH + 'px',
+}))
 
 // 颜色：长线蓝系（置信度）/ 短线橙红系（热度），深浅由 calcBubbleColor 按强度色阶插值
 function bubbleItemStyle(b: BubbleLayout) {
@@ -422,6 +442,8 @@ async function loadData() {
     updateTime.value = typeof data?.update_time === 'string' ? data.update_time : ''
     errorMessage.value = ''
     loadFavorites()
+    // 龙头股行情补全（非阻塞）：long_leader（趋势龙头，来自 trend_scores）可能缺 price/change_pct
+    void enrichLeaderQuotes()
   } catch {
     sectors.value = []
     updateTime.value = ''
@@ -468,7 +490,8 @@ function formatPct(val?: number | null): string {
 }
 
 function formatNetInflow(val?: number | null): string {
-  if (val === undefined || val === null) return '--'
+  // 与 Web 前端口径一致：0 视为无数据（moneyflow 缺失时后端回填 0），避免显示误导性的"0万"
+  if (val === undefined || val === null || val === 0) return '--'
   if (Math.abs(val) >= 10000) return (val / 10000).toFixed(2) + '亿'
   return Math.round(val) + '万'
 }
@@ -562,6 +585,42 @@ function getSectorLeader(sector: WindLeaderSector): WindLeaderStock | null {
   return sectorLeaderMap.value[sector.name] || null
 }
 
+/**
+ * 龙头股行情补全：long_leader（趋势龙头，来自 trend_scores）等候选股可能缺 price/change_pct，
+ * 批量拉取实时行情回填缺失字段，保证龙头行价格/涨跌幅展示完整。
+ */
+async function enrichLeaderQuotes() {
+  const codes: string[] = []
+  const seen = new Set<string>()
+  for (const s of sectors.value) {
+    for (const c of getTopStocks(s)) {
+      if (c?.code && !seen.has(c.code) && (c.price == null || c.change_pct == null)) {
+        seen.add(c.code)
+        codes.push(c.code)
+      }
+    }
+  }
+  if (!codes.length) return
+  try {
+    const quotes = await stockApi.getCoreQuotes(codes)
+    const qMap = new Map(quotes.map(q => [q.symbol, q]))
+    for (const s of sectors.value) {
+      const patch = (c?: WindLeaderStock | null) => {
+        if (!c?.code) return
+        const q = qMap.get(c.code)
+        if (!q) return
+        if (c.price == null) c.price = q.price
+        if (c.change_pct == null) c.change_pct = q.changePercent
+      }
+      patch(s.long_leader)
+      patch(s.leading_stock_info)
+      if (s.main_stocks) s.main_stocks.forEach(patch)
+    }
+  } catch {
+    // 行情补全失败不影响主流程展示
+  }
+}
+
 function getAnalysisRows(a: WindLeaderAiAnalysis | string | null | undefined): Array<{ label: string; value: string; risk?: boolean }> {
   if (!a) return []
   const obj: WindLeaderAiAnalysis = typeof a === 'string' ? { persistence_reason: a } : a
@@ -653,6 +712,15 @@ onShow(() => {
 .bubble-wrap {
   position: relative;
   width: 100%;
+  /* 泡泡群（bubble-layer）由 flex 居中：不依赖容器宽度测量，任意设备/缩放下水平垂直居中 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 泡泡群包围盒（尺寸=泡泡包围盒+padding，由脚本计算）；泡泡绝对定位相对本层 */
+.bubble-layer {
+  position: relative;
 }
 
 .bubble-item {
@@ -796,17 +864,6 @@ onShow(() => {
   display: flex;
   align-items: center;
   gap: 8rpx;
-}
-
-/* 龙头股档位标签（长线=趋势龙头 / 短线=短线领涨） */
-.leader-mini-tag {
-  font-size: 18rpx;
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.08);
-  border: 1rpx solid rgba(37, 99, 235, 0.25);
-  border-radius: 6rpx;
-  padding: 2rpx 8rpx;
-  flex-shrink: 0;
 }
 
 .leader-mini-name {

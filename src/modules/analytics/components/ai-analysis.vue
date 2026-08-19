@@ -49,7 +49,7 @@
           </view>
         </view>
         <view class="score-right">
-          <text class="conclusion-main">{{ data.conclusion }}</text>
+          <text class="conclusion-main">洞见：{{ data.conclusion }}</text>
           <text class="conclusion-sub">{{ data.conclusionSub }}</text>
         </view>
       </view>
@@ -111,9 +111,9 @@
         </view>
       </view>
 
-      <!-- 建议条 -->
+      <!-- 洞见条 -->
       <view class="advice-bar" v-if="data.advice">
-        <SvgIcon name="lightbulb-line" size="28rpx" :color="warningColor" class="advice-icon" />
+        <text class="advice-title">洞见：</text>
         <text class="advice-text">{{ data.advice }}</text>
       </view>
     </template>
@@ -418,6 +418,14 @@ function formatMetricKey(key: string): string {
     font-size: 14px;
     flex-shrink: 0;
     line-height: 1.7;
+  }
+
+  .advice-title {
+    font-size: 12px;
+    color: $warning;
+    line-height: 1.7;
+    font-weight: 600;
+    flex-shrink: 0;
   }
 
   .advice-text {

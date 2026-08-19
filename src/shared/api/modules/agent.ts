@@ -2,7 +2,7 @@
  * AI 智能体相关 API（App 专属功能）
  */
 import request from '../request'
-import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
+import { API_BASE_URL, WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
 
 export interface ProgressStep {
   label: string
@@ -568,9 +568,27 @@ export const agentApi = {
     return request.get<MarketTraceReviewRecord | null>(`/agent/report/review/${date}`)
   },
 
+  /**
+   * 交易日历：严格早于 date 的前一个交易日（YYYY-MM-DD）。
+   * 前端"前一天/后一天"跳档时跳过周末/法定节假日。
+   */
+  getPreviousTradingDay(date: string) {
+    return request.get<string>('/agent/trading-calendar/previous', { params: { date } })
+  },
+
+  /** 交易日历：严格晚于 date 的下一个交易日（YYYY-MM-DD）。 */
+  getNextTradingDay(date: string) {
+    return request.get<string>('/agent/trading-calendar/next', { params: { date } })
+  },
+
+  /** 交易日历：截至 date 最近 count 个交易日（YYYY-MM-DD 数组，含当天若当天为交易日）。 */
+  getRecentTradingDays(date: string, count = 3) {
+    return request.get<string[]>('/agent/trading-calendar/recent', { params: { date, count } })
+  },
+
   /** 异动提醒 AI 解读 SSE 流 URL（不走 request 拦截器，直接拼接） */
   getAlertBriefingUrl(symbol: string, cycle: string = '') {
-    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    const base = API_BASE_URL
     let url = `${base}/agent/briefing/alert?symbol=${encodeURIComponent(symbol)}`
     if (cycle) url += `&cycle=${encodeURIComponent(cycle)}`
     return url

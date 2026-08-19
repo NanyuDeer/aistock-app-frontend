@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AI 对话流式输出 composable — 接入 Python 后端 WebSocket
  *
  * 功能：
@@ -11,7 +11,7 @@
  */
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep, type ReasoningStep, type TokenUsage, type ChatCard } from '@/shared/api/modules/agent'
+import { createAgentWebSocket, agentApi, type ChatMessage, type ProgressStep, type ReasoningStep, type TokenUsage, type ChatCard, type DeepReportRef } from '@/shared/api/modules/agent'
 import { buildExecTree, toRawWsEvent, type RawWsEvent } from './buildExecTree'
 import { useChatStore } from '@/shared/store/modules/chat'
 
@@ -45,6 +45,13 @@ let currentResolve: (() => void) | null = null
 // 断连时需单独结算 streaming——否则 abortPendingSend 因 currentResolve 为 null 直接
 // return → streaming 卡 true。running 续流期置位，终态/abort/新 send 轮清位）
 let resumeInFlight = false
+// 发送后 idle 静默段超时（问题 20 R3，spec 2026-08-15）：
+// - 语义 = 静默段超时（连接保持但无任何事件），非一次性总时长；
+// - 校准期首周 30 分钟纯兜底（防自反截断校准数据）；正式值按首周真实耗时 P95 配置。
+export const _STALL_TIMEOUT_MS = 1800_000
+export const _STALL_CHECK_INTERVAL_MS = 10_000
+let stallTimer: ReturnType<typeof setInterval> | null = null
+let lastActivityAt = 0
 
 function connectOnce(): Promise<boolean> {
   if (sharedSocket && sharedWsConnected) return Promise.resolve(true)
@@ -110,7 +117,10 @@ function connectOnce(): Promise<boolean> {
   return connectPromise
 }
 
-export function useChatStream() {
+export function useChatStream(options?: { onBeforeStream?: () => void }) {
+  // 5B（2026-08-17）：提前解引用外层 onBeforeStream，避免 _stream 内层同名参数
+  // （`_stream(content, options?: { forceDeep?: boolean })`）遮蔽外层 useChatStream 的 options
+  const onBeforeStream = options?.onBeforeStream
   const chatStore = useChatStore()
   // 修复气泡消失根因：Pinia store 实例上访问 computed 会被自动解包成普通值，
   // 若 index.vue 用 `const displayMessages = chatStream.messages` 捕获则得到陈旧数组快照，
@@ -134,6 +144,8 @@ export function useChatStream() {
   function handleWsMessage(data: any, onDone?: () => void) {
     // 防止 done 后继续处理事件
     if (doneReceived) return
+    // 收到任意事件刷新 idle 活动时间（终态后不再刷新：doneReceived 早退在前）
+    lastActivityAt = Date.now()
 
     // D21：收集原始事件（含前端时间戳）；done/error 由 DONE/error 分支作结束触发
     const raw = toRawWsEvent(data, Date.now())
@@ -360,8 +372,52 @@ export function useChatStream() {
     }
   }
 
+  /**
+   * idle 静默段超时兜底（问题 20 R3）：WS 发送后无任何事件超过 _STALL_TIMEOUT_MS →
+   * 落「生成超时」错误消息 + 复位流式状态 + 联动 stop + 结算 send promise（防后端 producer
+   * 卡死后 UI 永久 spinning）。无参：结算走模块级 currentResolve 单槽（与 finishRun/abortPendingSend
+   * 同一语义）；检查周期 _STALL_CHECK_INTERVAL_MS，首个严格超过阈值的 tick 才触发。
+   */
+  function startStallTimer() {
+    // 单槽：新一轮 send 先清旧定时器（防跨轮泄漏/旧定时器误触新轮 currentResolve）
+    clearStallTimer()
+    lastActivityAt = Date.now()
+    stallTimer = setInterval(() => {
+      const idleMs = Date.now() - lastActivityAt
+      if (idleMs <= _STALL_TIMEOUT_MS) return
+      // idle 超时：连接保持但后端长时间无事件 → 落错误消息 + 复位 + 联动 stop
+      clearStallTimer()
+      console.warn('[chat] stall timeout', idleMs)
+      if (!currentResolve) return
+      const r = currentResolve
+      currentResolve = null
+      doneReceived = true
+      resumeInFlight = false
+      streaming.value = false
+      progressSteps.value = []
+      streamingText.value = ''
+      currentRunReasoning.value = []
+      // 联动 stop：后端 cancel 有 finalizing/done 护栏，将成之轮不被误杀
+      if (sharedSocket && sharedWsConnected) {
+        const sid = chatStore.sessionId || `app_${Date.now()}`
+        sharedSocket.send({ data: JSON.stringify({ type: 'stop', session_id: sid }) })
+      }
+      chatStore.appendMessage({ role: 'assistant', content: '生成超时，请稍后重试', timestamp: Date.now() })
+      r()
+    }, _STALL_CHECK_INTERVAL_MS)
+  }
+
+  function clearStallTimer() {
+    if (stallTimer) {
+      clearInterval(stallTimer)
+      stallTimer = null
+    }
+  }
+
   /** 结算当前活动轮：释放单槽 currentResolve 并关闭流式状态（done/error/resume_status none 无兜底时调用） */
   function finishRun() {
+    // 终态结算：停掉 idle 超时定时器（done/error/stop_status/cancelled/confirm_request 共用）
+    clearStallTimer()
     const r = currentResolve
     currentResolve = null
     resumeInFlight = false
@@ -379,6 +435,8 @@ export function useChatStream() {
    * send 轮（currentResolve）断连维持原语义（明确报错落消息，防用户无回复）。
    */
   function abortPendingSend(reason: string) {
+    // 断连/出错：本轮不再有任何事件，idle 定时器一并清理
+    clearStallTimer()
     if (resumeInFlight) {
       resumeInFlight = false
       doneReceived = true
@@ -474,6 +532,10 @@ export function useChatStream() {
     if (!sharedSocket || !sharedWsConnected) return false
     const sid = chatStore.sessionId || `app_${Date.now()}`
     if (!chatStore.sessionId) chatStore.setSessionId(sid)
+    // 5B（2026-08-17）：confirm 点选语义 = 用户主动发起新一轮（后端 fresh run）；
+    // 仅"点选"（choice!=='none'）触发复位——abandonConfirm 的 choice='none'
+    // 不触发（放弃语义，保持暂停态）。
+    if (choice !== 'none') onBeforeStream?.()
     sharedSocket.send({
       data: JSON.stringify({ type: 'confirm_response', request_id: requestId, choice, session_id: sid })
     })
@@ -560,6 +622,10 @@ export function useChatStream() {
   }
 
   async function _stream(content: string, options?: { forceDeep?: boolean }) {
+    // 5B（2026-08-17）：新发送轮前置复位跟随（纯复位，不滚底/不启定时器——
+    // 滚动由 watch(isStreaming) v=true 唯一收口，防同 tick 双发）。
+    // 覆盖 send/quickAsk/rerunDeep/retry/resume-none 兜底重发全部发送路径。
+    onBeforeStream?.()
     streaming.value = true
     progressSteps.value = []
     streamingText.value = ''
@@ -585,6 +651,9 @@ export function useChatStream() {
           streaming.value = false
           resolve()
         }
+        // idle 静默段超时兜底（问题 20 R3）：WS 发送后挂 idle 检查——
+        // 后端 producer 卡死无事件时，超时落错误消息 + 联动 stop 结算本轮（防 UI 永久 spinning）
+        startStallTimer()
 
         // P5-fix（问题 14）：WS 路径首轮生成 session_id 后必须写回 chatStore（此前不写回，
         // 每轮生成新 app_${Date.now()} → 后端 checkpointer 每轮新 thread → 多轮指代/纠错失效）
@@ -601,6 +670,8 @@ export function useChatStream() {
           })
         })
       })
+      // 本轮结束（done/error/超时/abort 已结算）：停掉 idle 检查
+      clearStallTimer()
     } else {
       // 降级 HTTP 非流式（带简单进度提示）
       progressSteps.value = [
@@ -614,6 +685,9 @@ export function useChatStream() {
         chatStore.appendMessage({
           role: 'assistant',
           content: result.content || result.message || '',
+          // 5A（2026-08-17）：HTTP 降级路径透出 lastDeepReport/cards（非流式接口已补返回；缺失 undefined 兼容）
+          lastDeepReport: (result.last_deep_report as DeepReportRef | undefined) ?? undefined,
+          cards: (result.cards as ChatCard[] | undefined) ?? undefined,
           // P10 线 2 缺口修复：HTTP 降级路径同样透出 token_usage（非流式接口已补返回；缺失 undefined 兼容）
           tokenUsage: (result.token_usage as TokenUsage | undefined) ?? undefined,
           progressSteps: savedSteps,
@@ -652,6 +726,7 @@ export function useChatStream() {
   }
 
   function _testReset() {
+    clearStallTimer()
     sharedSocket = null
     sharedWsConnected = false
     connectPromise = null
