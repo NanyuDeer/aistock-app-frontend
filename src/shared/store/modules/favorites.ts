@@ -190,6 +190,45 @@ export const useFavoritesStore = defineStore('favorites', () => {
     }
   }
 
+  /** 批量删除自选（编辑态勾选后一次性提交，减少请求数） */
+  async function removeMany(symbols: string[]) {
+    const userStore = useUserStore()
+    if (!userStore.isLoggedIn()) {
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      return false
+    }
+    if (!symbols.length) return false
+    try {
+      const data = await stockApi.removeFavorites(symbols)
+      replaceWithServerStocks(data)
+      void refreshQuotes()
+      return true
+    } catch (error: unknown) {
+      if (getErrorStatus(error) === 401) userStore.clearSession()
+      uni.showToast({ title: '删除自选失败，请重试', icon: 'none' })
+      return false
+    }
+  }
+
+  /** 保存自选股排序（symbols 顺序即最终展示顺序，编辑态点"完成"时统一提交） */
+  async function saveOrder(symbols: string[]) {
+    const userStore = useUserStore()
+    if (!userStore.isLoggedIn()) {
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      return false
+    }
+    try {
+      const data = await stockApi.saveFavoritesOrder(symbols)
+      replaceWithServerStocks(data)
+      void refreshQuotes()
+      return true
+    } catch (error: unknown) {
+      if (getErrorStatus(error) === 401) userStore.clearSession()
+      uni.showToast({ title: '保存排序失败，请重试', icon: 'none' })
+      return false
+    }
+  }
+
   /** 批量添加自选（OCR 识图勾选后一次性提交，减少请求数） */
   async function addMany(items: Array<{ symbol: string; name: string }>) {
     const userStore = useUserStore()
@@ -237,6 +276,8 @@ export const useFavoritesStore = defineStore('favorites', () => {
     add,
     addMany,
     remove,
+    removeMany,
+    saveOrder,
     isFavorite,
     isPending,
   }

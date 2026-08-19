@@ -2,6 +2,41 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-19 — 自选股编辑态 + 多股同列 + 语音输入/图标修复
+
+**开发者**: Aria
+
+### 新增
+- 自选股编辑态（`src/modules/favorites/pages/favorites.vue`）：
+  - 点击表头编辑图标进入编辑态，右上角"完成"退出；编辑态隐藏统计栏与行情列，行展示勾选框 + 名称代码 + 右侧拖拽手柄。
+  - 批量删除：勾选多只（支持全选）后点底部"删除(n)"，`removeMany` 一次提交，删除后同步编辑列表。
+  - 拖拽排序：右侧手柄触摸相邻交换实现排序，点"完成"时若顺序变化则 `saveOrder` 统一保存到后端。
+  - 左滑删除仅普通态生效（编辑态手势被勾选/拖拽接管）。
+- 多股同列（新增 `src/modules/favorites/pages/favorites-grid.vue`）：自选页表头网格图标进入，2 列宫格卡片，
+  每格显示 名称+代码 / 最新价 / 涨跌幅 / 涨跌额 + 迷你 K 线图（含成交量）；顶部切换 分时/五日/日K/周K/月K，
+  切换后全部卡片同步刷新；点击卡片跳个股详情；行情复用 favoritesStore，K 线按周期全部加载 + 前端 Map 缓存。
+- 迷你 K 线组件（新增 `src/modules/favorites/components/MiniKLine.vue`）：纯 SVG 跨端，分时/五日折线图，
+  日/周/月蜡烛图 + 成交量，涨跌色与自选页一致（涨红跌绿）。
+- `src/shared/store/modules/favorites.ts`：新增 `removeMany`（批量删除）、`saveOrder`（保存排序）。
+- `src/shared/api/modules/stock.ts`：
+  - 新增 `saveFavoritesOrder`，调 `PUT /users/me/favorites/order`。
+  - `getKLine` 扩展支持 `minute`/`five` 周期（klt=1），自动带 `startDate`（分时近 3 自然日、五日近 9 自然日）
+    限定分钟数据范围，避免拉全量历史分钟数据导致超时。
+- `src/pages.json`：注册 `modules/favorites/pages/favorites-grid` 路由。
+- `src/modules/favorites/AGENTS.md`：补充编辑态、多股同列、MiniKLine 组件及周期加载说明。
+
+### 改进
+- `src/pages-sub-app/chat/index.vue`：麦克风图标由输入框外部内嵌到输入框右侧（绝对定位），常态灰色、录音激活蓝色圆底白图标。
+
+### 修复
+- `src/shared/components/SvgIcon.vue`：H5 下图标路径改用 `import.meta.env.BASE_URL` 拼接，解决 base `/h5/` 下硬编码 `/static` 导致 404、图标不显示。
+- `src/shared/api/request.ts`：`delete` 方法修正为 luch-request 三参数签名（请求体放第二参数），解决 DELETE 请求体解析为空导致自选移除失败。
+- `MiniKLine.vue` 样式 `stroke: $AVG` 修正为字面量 `#2563eb`（`$AVG` 非 SCSS 变量，原写法触发 sass 编译错误导致页面点击报错）。
+
+### 验证
+- `vue-tsc --noEmit`：新文件零错误（仅剩 event-chain 既有错误，与本次改动无关）；H5 页面模块编译通过。
+
+---
 ## [changer] 2026-08-18 — 修复 App 语音输入「录音失败」根因（诊断透出 + plus.io 读取）
 
 **开发者**: 37588

@@ -368,6 +368,16 @@ export interface OcrImageInput {
   mime: string
 }
 
+/** 返回 N 个自然日前的 YYYYMMDD（分钟级 K 线限定拉取范围用，避免 Tushare 全量历史分钟数据） */
+function daysAgoYYYYMMDD(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}${m}${day}`
+}
+
 /** OCR 识别结果中的单只股票（后端已用 stocks 表归一化代码/名称） */
 export interface OcrStockItem {
   '股票简称': string
@@ -458,17 +468,28 @@ export const stockApi = {
     })
   },
 
-  /** 获取 K 线数据 */
-  getKLine(symbol: string, params?: { period?: 'daily' | 'weekly' | 'monthly' | string; count?: number }) {
+  /** 获取 K 线数据（minute/five 为分钟级 klt=1，多股同列宫格用；日/周/月为蜡烛线） */
+  getKLine(symbol: string, params?: { period?: 'minute' | 'five' | 'daily' | 'weekly' | 'monthly' | string; count?: number }) {
+    const p = params?.period || 'daily'
     const kltMap: Record<string, number> = {
+      minute: 1,
+      five: 1,
       daily: 101,
       weekly: 102,
       monthly: 103,
       yearly: 103,
     }
-    const klt = kltMap[params?.period || 'daily'] || 101
+    const klt = kltMap[p] || 101
+    // 分钟级数据（klt=1）必须限定 startDate：服务端无 startDate 时 Tushare 会拉全历史分钟数据（上万条）导致超时。
+    // 分时取近 3 个自然日（覆盖周末/节假日，MiniKLine 只取最近交易日序列），五日取近 9 个自然日（约 5 个交易日）。
+    let startDate: string | undefined
+    if (p === 'minute') startDate = daysAgoYYYYMMDD(3)
+    else if (p === 'five') startDate = daysAgoYYYYMMDD(9)
+    const defaultCount = p === 'minute' ? 300 : p === 'five' ? 1500 : 120
+    const qParams: Record<string, unknown> = { symbol, klt, fqt: 1, limit: params?.count || defaultCount }
+    if (startDate) qParams.startDate = startDate
     return request.get<Record<string, unknown>>('/cn/stock/quotes/kline', {
-      params: { symbol, klt, fqt: 1, limit: params?.count || 120 }
+      params: qParams
     }).then((res: Record<string, unknown>) => {
       const data = (res.data as Record<string, unknown>) || res
       const payload = (data.data as Record<string, unknown>) || data
@@ -590,6 +611,11 @@ export const stockApi = {
   /** 删除自选股 */
   removeFavorites(symbols: string[]) {
     return request.delete<UserFavoritesPayload>('/users/me/favorites', { data: { symbols } }).then(normalizeFavorites)
+  },
+
+  /** 保存自选股排序（symbols 顺序即最终展示顺序，编辑态点"完成"时调用） */
+  saveFavoritesOrder(symbols: string[]) {
+    return request.put<UserFavoritesPayload>('/users/me/favorites/order', { symbols }).then(normalizeFavorites)
   },
 
   /** 获取业绩预测列表 */
