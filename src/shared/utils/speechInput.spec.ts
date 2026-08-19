@@ -188,8 +188,7 @@ describe('speechInput 状态机基线', () => {
   it('APP 录音管理器不可用：返回「语音识别服务异常」错误态', async () => {
     const p = appRecognize({
       getRecorderManager: () => null,
-      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
-      uploadAudio: async () => ({ ok: true, text: 'x' }),
+      uploadAudioFile: async () => ({ ok: true, text: 'x' }),
     })
     await expect(p).resolves.toEqual({ ok: false, error: '语音识别服务异常' })
     expect(speechRecognitionState.value).toBe('error')
@@ -205,8 +204,7 @@ describe('speechInput 状态机基线', () => {
         getRecorderManager: () => {
           throw new TypeError("Cannot read properties of null (reading 'onStart')")
         },
-        readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
-        uploadAudio: async () => ({ ok: true, text: 'x' }),
+        uploadAudioFile: async () => ({ ok: true, text: 'x' }),
       })
     }).not.toThrow()
     await expect(pending!).resolves.toEqual({ ok: false, error: '语音识别服务异常' })
@@ -241,14 +239,13 @@ describe('appRecognize', () => {
   it('录音成功 → 上传 → 回填文本', async () => {
     const deps: AppSpeechDeps = {
       getRecorderManager: () => mockRecorder,
-      readFileAsArrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
-      uploadAudio: async () => ({ ok: true, text: '贵州茅台' }),
+      uploadAudioFile: async () => ({ ok: true, text: '贵州茅台' }),
     }
     // 启动录音
     const pending = appRecognize(deps)
     mockRecorder.emitStart()
     // 用户结束录音 → onStop 给临时路径
-    mockRecorder.emitStop('/tmp/rec.wav')
+    mockRecorder.emitStop('/tmp/rec.amr')
     const result = await pending
     assert.deepEqual(result, { ok: true, text: '贵州茅台' })
     assert.equal(speechRecognitionState.value, 'idle')
@@ -265,8 +262,7 @@ describe('appRecognize', () => {
     }
     appRecognize({
       getRecorderManager: () => recorder,
-      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
-      uploadAudio: async () => ({ ok: true, text: 'x' }),
+      uploadAudioFile: async () => ({ ok: true, text: 'x' }),
     })
     assert.deepEqual(startOptions, { format: 'amr', sampleRate: 8000 })
   })
@@ -274,8 +270,7 @@ describe('appRecognize', () => {
   it('录音失败 → error 分支', async () => {
     const deps: AppSpeechDeps = {
       getRecorderManager: () => mockRecorder,
-      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
-      uploadAudio: async () => ({ ok: true, text: 'x' }),
+      uploadAudioFile: async () => ({ ok: true, text: 'x' }),
     }
     const pending = appRecognize(deps)
     mockRecorder.emitError('no permission')
@@ -287,8 +282,7 @@ describe('appRecognize', () => {
   it('上传 503 → 错误信息透出', async () => {
     const deps: AppSpeechDeps = {
       getRecorderManager: () => mockRecorder,
-      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
-      uploadAudio: async () => ({ ok: false, error: '语音识别暂不可用' }),
+      uploadAudioFile: async () => ({ ok: false, error: '语音识别暂不可用' }),
     }
     const pending = appRecognize(deps)
     mockRecorder.emitStart()
@@ -300,8 +294,7 @@ describe('appRecognize', () => {
   it('空文本 → 未识别到语音', async () => {
     const deps: AppSpeechDeps = {
       getRecorderManager: () => mockRecorder,
-      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
-      uploadAudio: async () => ({ ok: true, text: '' }),
+      uploadAudioFile: async () => ({ ok: true, text: '' }),
     }
     const pending = appRecognize(deps)
     mockRecorder.emitStart()
@@ -324,8 +317,7 @@ describe('appRecognize', () => {
     }
     const pending = appRecognize({
       getRecorderManager: () => recorder,
-      readFileAsArrayBuffer: async () => new Uint8Array([1]).buffer,
-      uploadAudio: async () => ({ ok: true, text: 'x' }),
+      uploadAudioFile: async () => ({ ok: true, text: 'x' }),
     })
     expect(speechRecognitionState.value).toBe('error')
     const result = await pending
@@ -333,19 +325,18 @@ describe('appRecognize', () => {
     if (!result.ok) assert.match(result.error, /amr encoder not supported/)
   })
 
-  it('readFile 失败（录音临时文件不可读）→ 透出具体错误信息（诊断）', async () => {
+  it('上传阶段异常（uploadAudioFile reject，兜底 catch）→ 透出具体错误信息（诊断）', async () => {
     const pending = appRecognize({
       getRecorderManager: () => mockRecorder,
-      readFileAsArrayBuffer: async () => {
+      uploadAudioFile: async () => {
         throw new Error('ENOENT: no such file')
       },
-      uploadAudio: async () => ({ ok: true, text: 'x' }),
     })
     mockRecorder.emitStart()
     mockRecorder.emitStop('/tmp/rec.amr')
     const result = await pending
     assert.equal(result.ok, false)
-    if (!result.ok) assert.match(result.error, /ENOENT|读取录音/)
+    if (!result.ok) assert.match(result.error, /ENOENT|录音上传/)
   })
 })
 
