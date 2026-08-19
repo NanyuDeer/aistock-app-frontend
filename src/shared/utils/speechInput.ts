@@ -336,7 +336,22 @@ function getAppDeps(): AppSpeechDeps | null {
           // ② App 端无标准 Web `FileReader`（真机报 `FileReader is not defined`）。
           // 故用 `plus.io.FileReader.readAsDataURL`（唯一支持，返回 base64 DataURL）→ 剥前缀 → ArrayBuffer。
           // 见 docs/2026-08-18-app-voice-asr-troubleshooting.md
-          const io = (plus as unknown as { io?: PlusIoLike }).io
+          //
+          // 诊断（2026-08-19）：真机在「录音结束」页面报 `WebSocket is not defined`。原因很可能是
+          // `new plus.io.FileReader()` / `readAsDataURL()` 这类**同步调用**跑在 plus 回调内，不在 Promise
+          // 自动捕获范围，真机内核在此处裸读缺失的 `WebSocket` 全局 → ReferenceError 未捕获直抛页面。
+          // 故每个子步骤单独 try/catch + 阶段前缀透出，定位具体炸点；亦防同步错误逃逸到页面。
+          const wrap = (stage: string) => (err: unknown) => {
+            const msg = err instanceof Error ? err.message : err ? String(err) : '未知错误'
+            reject(new Error(`读取录音文件失败（${stage}）：${msg}`))
+          }
+          let io: PlusIoLike | undefined
+          try {
+            io = (plus as unknown as { io?: PlusIoLike }).io
+          } catch (err) {
+            wrap('定位 plus.io')(err)
+            return
+          }
           if (!io) {
             reject(new Error('读取录音文件失败（plus.io 不可用）'))
             return
@@ -346,31 +361,50 @@ function getAppDeps(): AppSpeechDeps | null {
             reject(new Error('读取录音文件失败（plus.io.FileReader 不可用）'))
             return
           }
-          io.resolveLocalFileSystemURL(
-            tempFilePath,
-            (entry) =>
-              entry.file(
-                (file) => {
-                  const reader = new FileReaderCtor()
-                  reader.onerror = (event) => reject(event instanceof Error ? event : new Error('读取录音文件失败'))
-                  reader.onload = () => {
-                    try {
-                      const raw = typeof reader.result === 'string' ? reader.result : ''
-                      if (!raw) {
-                        reject(new Error('读取录音文件失败（结果为空）'))
+          try {
+            io.resolveLocalFileSystemURL(
+              tempFilePath,
+              (entry) => {
+                try {
+                  entry.file(
+                    (file) => {
+                      let reader: PlusIoFileReaderLike
+                      try {
+                        reader = new FileReaderCtor()
+                      } catch (err) {
+                        wrap('新建 FileReader')(err)
                         return
                       }
-                      resolve(dataUrlToArrayBuffer(raw))
-                    } catch (err) {
-                      reject(err instanceof Error ? err : new Error('读取录音文件失败'))
-                    }
-                  }
-                  reader.readAsDataURL(file)
-                },
-                (err) => reject(err),
-              ),
-            (err) => reject(err),
-          )
+                      reader.onerror = wrap('FileReader.onerror')
+                      reader.onload = () => {
+                        try {
+                          const raw = typeof reader.result === 'string' ? reader.result : ''
+                          if (!raw) {
+                            reject(new Error('读取录音文件失败（FileReader 结果为空）'))
+                            return
+                          }
+                          resolve(dataUrlToArrayBuffer(raw))
+                        } catch (err) {
+                          wrap('base64 转 ArrayBuffer')(err)
+                        }
+                      }
+                      try {
+                        reader.readAsDataURL(file)
+                      } catch (err) {
+                        wrap('readAsDataURL')(err)
+                      }
+                    },
+                    wrap('entry.file'),
+                  )
+                } catch (err) {
+                  wrap('解析文件入口')(err)
+                }
+              },
+              wrap('resolveLocalFileSystemURL'),
+            )
+          } catch (err) {
+            wrap('resolveLocalFileSystemURL 同步')(err)
+          }
         }),
       uploadAudio: async (arrayBuffer) => {
         // 二进制 body（非 multipart）：uni.request 直接发 ArrayBuffer + audio/amr（与录音格式 amr 一致）

@@ -2,6 +2,19 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-19 — App 语音 readFile 真机 `WebSocket is not defined`：plus.io 读取子步骤全量 try/catch + 阶段透出
+
+**开发者**: 37588
+
+### 修复
+- `src/shared/utils/speechInput.ts`：App-PLUS 的 `readFileAsArrayBuffer` 把 `plus.io` 读取每个子步骤（`新建 FileReader` / `readAsDataURL` / `base64 转 ArrayBuffer` / `resolveLocalFileSystemURL` / `entry.file` 等）独立 try/catch + 阶段前缀透出。`new plus.io.FileReader()`/`readAsDataURL()` 属同步调用、原本跑在 plus 回调、不在 Promise 自动捕获范围，真机内核在此裸读缺失的 `WebSocket` 全局时 ReferenceError 会直抛页面；现改为受控 reject（toast 显示「读取录音文件失败（<阶段>）：<原因>」），既不崩页面又精确定位炸点。
+- **硬约束不变**：App 读文件仍只用 `plus.io.FileReader.readAsDataURL`（未用标准 FileReader / getFileSystemManager）。
+
+### 文档
+- `docs/2026-08-18-app-voice-asr-troubleshooting.md`：新增第 6 轮排查记录——真机在「录音结束」页面报 `WebSocket is not defined`，判定为 plus 回调内未捕获的同步 ReferenceError，已分阶段透出、待真机复验后靶向修复。
+
+---
+
 ## [master] 2026-08-19 — 自选股编辑态 + 多股同列 + 语音输入/图标修复
 
 **开发者**: Aria

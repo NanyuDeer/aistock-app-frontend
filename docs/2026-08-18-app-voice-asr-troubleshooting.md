@@ -17,6 +17,7 @@ App 云打包真机（权限已允许、换机复现）：「按住说话」与�
 | 3 | 换录音格式（历史已试 mp3→wav→amr 三轮） | ❌ 与根因无关 | 录音格式轮换是「症状级猜测」，不解决 readFile |
 | 4 | 用 H5 验证（用户建议"若 H5 能用真机大概率也能用"） | ⚠️ Chrome 报 `network`，Edge 可识别 | **H5 走 Web Speech API，与 App 的 `plus 录音 + readFile + 后端火山 ASR` 是两条完全独立的链路**；H5 正常不代表 App 正常 |
 | 5 | 改用 `plus.io` 读取，但用了标准 Web `FileReader.readAsArrayBuffer` | ❌ 真机报 `FileReader is not defined` | **App 端无标准 Web `FileReader`**；HTML5+ `plus.io.FileReader` 仅支持 `readAsDataURL`/`readAsText`（不支持 readAsArrayBuffer），须 `readAsDataURL` + 剥 base64 前缀转 ArrayBuffer（抽为 `dataUrlToArrayBuffer` 纯函数，有单测） |
+| 6 | 换用 `plus.io.FileReader.readAsDataURL` 后，真机在**录音结束**页面报 `WebSocket is not defined` | ⚠️ 待定位具体子步骤 | 当前代码单测 24/24 通过 + src/编译产物均无全局 `WebSocket`，故报错应来自 HBuilderX plus 回调内**未捕获的同步 ReferenceError**（`new FileReaderCtor()`/`readAsDataURL()` 跑在 plus 回调、不在 Promise 自动捕获范围）→ 已把 plus.io 全子步骤 try/catch + 阶段前缀透出，待真机复验报出的具体阶段（`新建 FileReader` / `readAsDataURL` …） |
 
 ## 关键结论与硬约束
 1. **App 端不要用 `uni.getFileSystemManager().readFile` 读录音临时文件**——会触发框架缺陷 `nativeFileManager is not defined`。改用 HTML5+ 原生 `plus.io`（`resolveLocalFileSystemURL` + `entry.file` + `plus.io.FileReader.readAsDataURL`）读取。**注意：App 端没有标准 Web `FileReader`**，且 `plus.io.FileReader` 不支持 `readAsArrayBuffer`，必须用 `readAsDataURL`（返回 base64 DataURL）剥前缀转 ArrayBuffer。
@@ -26,7 +27,8 @@ App 云打包真机（权限已允许、换机复现）：「按住说话」与�
 
 ## 当前对策（进行中）
 - `readFileAsArrayBuffer` 在 App-PLUS 注入 `plus.io` 读取实现，上传链路（`uni.request` raw/amr）不变、后端不改。
-- 改造后仍需**重新云打包真机验证**一次；若仍有新报错，凭透出信息再迭代。
+- 最新（2026-08-19）已把 plus.io 读取全子步骤 try/catch + 阶段前缀透出（`新建 FileReader` / `readAsDataURL` / `base64 转 ArrayBuffer` / `resolveLocalFileSystemURL` / `entry.file` 等），防同步 ReferenceError（如 `WebSocket is not defined`）逃逸到页面，并定位具体炸点。
+- **下一步**：重新云打包真机验证，把报出的「读取录音文件失败（<阶段>）：<原因>」阶段名回传，据此精准修复。
 
 ## 排查口径（防重蹈）
 - 先拿真实错误 → 再下结论；禁止在未透出错误时猜方案。
