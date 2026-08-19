@@ -252,7 +252,7 @@ describe('appRecognize', () => {
     assert.equal(speechRecognitionState.value, 'idle')
   })
 
-  it('录音以 pcm + 16kHz 启动（与后端火山 V3 ASR format/rate 对齐；V3 不支持 amr、rate 必须 16000）', () => {
+  it('录音以 amr + 8kHz 启动（HTML5+ 原生；后端转码 PCM 16k 送火山 V3）', () => {
     let startOptions: { format: string; sampleRate?: number } | null = null
     const recorder = {
       start(options: { format: string; sampleRate?: number }) { startOptions = options },
@@ -265,7 +265,7 @@ describe('appRecognize', () => {
       getRecorderManager: () => recorder,
       uploadAudioFile: async () => ({ ok: true, text: 'x' }),
     })
-    assert.deepEqual(startOptions, { format: 'pcm', sampleRate: 16000 })
+    assert.deepEqual(startOptions, { format: 'amr', sampleRate: 8000 })
   })
 
   it('录音失败 → error 分支', async () => {

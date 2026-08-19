@@ -284,13 +284,14 @@ export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResu
     // App 端交互：点按开始，再点结束（stop() → onStop 结算）
     activeStop = () => manager.stop()
     try {
-      // 录音格式 pcm + 16kHz（与后端火山 V3「豆包流式语音识别大模型」对齐）：
-      // - 2026-08-19 V3 升级：V3 只支持 pcm/wav/ogg/mp3，不支持 amr；rate 必须 16000，
-      //   否则报错。App 端 uni RecorderManager 的 format 'pcm' 即裸 PCM（HTML5+ plus.audio 原生支持）。
+      // 录音格式 amr + 8kHz（HTML5+ 原生格式；后端 asrController 用 ffmpeg 转 PCM 16k 送火山 V3）：
+      // - 2026-08-19 两次踩坑：format:'pcm' 在 Android 产出「假 pcm 实为 AMR-WB」（线上魔数取证
+      //   #!AMR-WB），V3 按 pcm 解析为空 →「未识别到语音」；改回 amr 后由后端转码，两端原生支持
       // - 弃用 mp3：部分 Android ROM 缺 libmp3lame 编码器，start({format:'mp3'}) 真机直接抛错（真机实测"录音失败"）
       // - 弃用 wav：uni-app App 端底层是 HTML5+ plus.audio.getRecorder，Android 不真正支持 wav，
-      //   生成「假 .wav 实为 amr」的无效文件，onStop 后 readFile 读临时文件失败 → "录音失败，请重试"（真机复现根因）
-      manager.start({ format: 'pcm', sampleRate: 16000 })
+      //   生成「假 .wav 实为 amr」的无效文件（同 pcm 的坑）
+      // - 选 amr：Android/iOS HTML5+ 原生支持（AMR-NB 窄带固定 8k），无需额外编码器
+      manager.start({ format: 'amr', sampleRate: 8000 })
     } catch (err) {
       activeStop = null
       setState('error')
