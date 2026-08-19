@@ -37,18 +37,19 @@
 - `vue-tsc --noEmit`：新文件零错误（仅剩 event-chain 既有错误，与本次改动无关）；H5 页面模块编译通过。
 
 ---
-## [changer] 2026-08-18 — 修复 App 语音输入「录音失败」根因诊断透出
+## [changer] 2026-08-18 — 修复 App 语音输入「录音失败」根因（诊断透出 + plus.io 读取）
 
 **开发者**: 37588
 
 ### 修复
 - App 端语音输入（右侧点击麦克风 / 按住说话）真机「录音失败，请重试」跨设备复现：`start()` 同步抛错 与 录音临时文件 `readFile` 失败 两处此前把真实异常吞成固定文案，无法定位根因
-- 现于两处失败分支透出真实原因（`录音启动失败：<err>` / `读取录音文件失败：<err>`）+ `console.error('[asr] …')`，用于真机区分「amr start 抛错」vs「readFile 失败」
-- 真机复现确根因：readFile 抛 `ReferenceError: nativeFileManager is not defined` → `manifest.json` `app-plus.modules` 缺 `FileSystem` 模块（App 端 `uni.getFileSystemManager()` 依赖该声明初始化原生桥接）；已补 `FileSystem` 模块
+- 现于两处失败分支透出真实原因（`录音启动失败：<err>` / `读取录音文件失败：<err>`）+ `console.error('[asr] …')`
+- 真机确根因：readFile 抛 `ReferenceError: nativeFileManager is not defined` —— 系 `uni.getFileSystemManager().readFile` 的 uni App 引擎框架缺陷（补 `manifest.json` FatFileSystem 模块已验证无效）。**改用 HTML5+ 原生 `plus.io` 读取**（`resolveLocalFileSystemURL` + `entry.file` + `FileReader.readAsArrayBuffer`），绕开 nativeFileManager，上传 raw/amr 链路与后端不变
+- 排查经验沉淀：`docs/2026-08-18-app-voice-asr-troubleshooting.md`（4 轮失败链 + 硬约束）
 
 ### 验证
-- 新增 2 个诊断单测（start 抛错 / readFile 失败错误透出），speechInput.spec.ts 21/21 通过
-- 最终修复需重新云打包真机验证 App 端 `readFile` 不再报 `nativeFileManager`
+- speechInput.spec.ts 21/21 通过；vue-tsc 无新增错误（剩余 event-chain 为既有基线）
+- 需重新云打包真机验证 App 端 readFile 不再报 nativeFileManager
 
 ---
 ## [changer] 2026-08-17 — 对话体验批次 5：深度分析降级渲染 + 滚动交互优化 + 股票卡片优化

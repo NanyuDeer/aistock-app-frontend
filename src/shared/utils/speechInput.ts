@@ -29,6 +29,17 @@ export type SpeechRecognitionResult =
   | { ok: true; text: string }
   | { ok: false; error: string }
 
+/** HTML5+ `plus.io` 最小接口（App 端读录音临时文件用）——绕开 `uni.getFileSystemManager().readFile`
+ * 的 `nativeFileManager` 框架缺陷（见 docs/2026-08-18-app-voice-asr-troubleshooting.md）。
+ * 仅声明用到的 resolveLocalFileSystemURL → entry.file，避免强依赖全局类型。 */
+interface PlusIoLike {
+  resolveLocalFileSystemURL(
+    url: string,
+    success: (entry: { file(success: (file: Blob) => void, fail?: (error: unknown) => void): void }) => void,
+    fail: (error: unknown) => void,
+  ): void
+}
+
 /** 模块级识别状态（核心函数驱动；页面可读作录制/识别中指示） */
 export const speechRecognitionState = shallowRef<SpeechRecognitionState>('idle')
 
@@ -296,29 +307,30 @@ function getAppDeps(): AppSpeechDeps | null {
     // G2 防护：真机缺 Record 模块/录音权限时 uni.getRecorderManager() 可能抛错或返回 null，
     // 壳层必须兜底为 null（走 startAppRecognition 的错误态），不得同步炸穿 handleMicTap
     const recorder = uni.getRecorderManager()
-    const fs = uni.getFileSystemManager?.()
     return {
       getRecorderManager: () => bridgeRecorder(recorder),
       readFileAsArrayBuffer: (tempFilePath) =>
         new Promise<ArrayBuffer>((resolve, reject) => {
-          fs.readFile({
-            filePath: tempFilePath,
-            success: (res) => {
-              // data 类型为 string | ArrayBuffer：先按 string（base64）收窄，避免联合类型 instanceof 报错
-              if (typeof res.data === 'string') {
-                // base64 字符串（部分平台 readFile 无 arrayBuffer 选项时返回 base64）
-                const bin = atob(res.data)
-                const bytes = new Uint8Array(bin.length)
-                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-                resolve(bytes.buffer as ArrayBuffer)
-              } else if (res.data instanceof ArrayBuffer) {
-                resolve(res.data)
-              } else {
-                reject(new Error('读取录音文件失败'))
-              }
-            },
-            fail: reject,
-          })
+          // App 端读录音临时文件：用 HTML5+ 原生 plus.io 读取（绕开
+          // uni.getFileSystemManager().readFile 的 nativeFileManager 框架缺陷——
+          // 补 manifest FileSystem 模块也无效；详见 docs/2026-08-18-app-voice-asr-troubleshooting.md）
+          const reader = new FileReader()
+          reader.onload = () => {
+            const data = reader.result
+            if (data instanceof ArrayBuffer) resolve(data)
+            else reject(new Error('读取录音文件失败（结果非二进制）'))
+          }
+          reader.onerror = () => reject(reader.error ?? new Error('读取录音文件失败'))
+          const io = (plus as unknown as { io?: PlusIoLike }).io
+          if (!io) {
+            reject(new Error('读取录音文件失败（plus.io 不可用）'))
+            return
+          }
+          io.resolveLocalFileSystemURL(
+            tempFilePath,
+            (entry) => entry.file((file) => reader.readAsArrayBuffer(file), (err) => reject(err)),
+            (err) => reject(err),
+          )
         }),
       uploadAudio: async (arrayBuffer) => {
         // 二进制 body（非 multipart）：uni.request 直接发 ArrayBuffer + audio/amr（与录音格式 amr 一致）
