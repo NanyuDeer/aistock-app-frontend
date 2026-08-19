@@ -224,15 +224,14 @@ async function loadHotBurstPreview() {
       cachedAt: Date.now(),
       outbreaks,
     })
-    hotBurstPreview.value = [...outbreaks].sort((a, b) => {
-      const aTime = a.detectedAt ? Date.parse(a.detectedAt) : 0
-      const bTime = b.detectedAt ? Date.parse(b.detectedAt) : 0
-      return bTime - aTime
-    }).slice(0, 3).map((item) => ({
-      symbol: item.symbol,
-      name: item.stockName || item.symbol,
-      level: levelLabel(item.resonanceLevel),
-    }))
+    // 按行情涨跌幅降序
+    hotBurstPreview.value = [...outbreaks]
+      .sort((a, b) => (b.changePct ?? Number.NEGATIVE_INFINITY) - (a.changePct ?? Number.NEGATIVE_INFINITY))
+      .slice(0, 3).map((item) => ({
+        symbol: item.symbol,
+        name: item.stockName || item.symbol,
+        level: levelLabel(item.resonanceLevel),
+      }))
   } catch {
     hotBurstPreview.value = []
     hotBurstError.value = '热门股数据加载失败'

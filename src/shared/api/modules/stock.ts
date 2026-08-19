@@ -293,7 +293,8 @@ export interface WindLeaderSector {
   freq_delta?: number
   avg_change?: number
   today_change?: number
-  net_inflow?: number
+  /** 板块当日成交额（元，同花顺 bk_ 实时；原 net_inflow 净流入已下线） */
+  amount?: number
   driver_type?: string
   ma60_status?: string
   vol_trend?: string

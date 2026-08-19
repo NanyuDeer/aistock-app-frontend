@@ -7,7 +7,7 @@
     <view v-if="!points.length" class="chart-empty">
       <EmptyState text="暂无K线数据" />
     </view>
-    <!-- #ifdef H5 || APP-PLUS -->
+    <!-- #ifdef H5 -->
     <!-- @vue-ignore renderjs module is injected by the uni-app compiler. -->
     <view
       v-else
@@ -17,7 +17,8 @@
       :change:chart-payload="chartView.updateChart"
     />
     <!-- #endif -->
-    <!-- #ifdef MP-WEIXIN -->
+    <!-- #ifdef APP-PLUS || MP-WEIXIN -->
+    <!-- App 真机 + 小程序统一走 uCharts canvas 分支：renderjs + klinecharts 在 App 真机 WebView 不渲染 -->
     <canvas
       v-else
       :id="chartId"
@@ -35,7 +36,7 @@
 // @ts-nocheck -- vue-tsc does not model uni-app's isolated renderjs module.
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { EmptyState } from '@/shared/components'
-// #ifdef MP-WEIXIN
+// #ifdef APP-PLUS || MP-WEIXIN
 import uCharts from '@qiun/ucharts'
 // #endif
 import type { TrendKLineData } from '@/shared/api/modules/trend-score'
@@ -100,7 +101,7 @@ const chartPayload = computed(() => ({
   data: points.value,
 }))
 
-// #ifdef MP-WEIXIN
+// #ifdef APP-PLUS || MP-WEIXIN
 const componentInstance = getCurrentInstance()
 let mpChart: InstanceType<typeof uCharts> | null = null
 let mpRenderTimer: ReturnType<typeof setTimeout> | null = null
@@ -197,7 +198,7 @@ void onBeforeUnmount
 void watch
 </script>
 
-<!-- KLineChart must run in the view layer on App WebView and H5. -->
+<!-- KLineChart renderjs 分支仅在 H5 端启用（App 真机已切换为 uCharts canvas）。 -->
 <script module="chartView" lang="renderjs">
 // @ts-nocheck -- renderjs is compiled as an isolated view-layer module by uni-app.
 import { dispose, init, registerLocale } from 'klinecharts'
