@@ -16,6 +16,7 @@ import {
   appRecognize,
   stopSpeechRecognition,
   speechRecognitionState,
+  dataUrlToArrayBuffer,
   EMPTY_TRANSCRIPT_HINT,
   type H5SpeechDeps,
   type H5SpeechRecognitionLike,
@@ -345,5 +346,26 @@ describe('appRecognize', () => {
     const result = await pending
     assert.equal(result.ok, false)
     if (!result.ok) assert.match(result.error, /ENOENT|读取录音/)
+  })
+})
+
+// ===== dataUrlToArrayBuffer（App 端 plus.io.FileReader.readAsDataURL → ArrayBuffer 关键转换） =====
+
+describe('dataUrlToArrayBuffer', () => {
+  it('标准 DataURL：剥前缀还原原始字节', () => {
+    // 'amr\x00\x01ABC' 的 base64
+    const bytes = new Uint8Array([0x61, 0x6d, 0x72, 0x00, 0x01, 0x41, 0x42, 0x43])
+    const b64 = btoa(String.fromCharCode(...bytes))
+    const ab = dataUrlToArrayBuffer(`data:audio/amr;base64,${b64}`)
+    assert.deepEqual(Array.from(new Uint8Array(ab)), Array.from(bytes))
+  })
+
+  it('非法 DataURL（无逗号前缀）→ 抛错', () => {
+    assert.throws(() => dataUrlToArrayBuffer('not-a-dataurl'), /非法 DataURL/)
+  })
+
+  it('空数据 → 返回空 ArrayBuffer', () => {
+    const ab = dataUrlToArrayBuffer('data:audio/amr;base64,')
+    assert.equal(ab.byteLength, 0)
   })
 })

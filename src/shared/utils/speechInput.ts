@@ -30,14 +30,34 @@ export type SpeechRecognitionResult =
   | { ok: false; error: string }
 
 /** HTML5+ `plus.io` 最小接口（App 端读录音临时文件用）——绕开 `uni.getFileSystemManager().readFile`
- * 的 `nativeFileManager` 框架缺陷（见 docs/2026-08-18-app-voice-asr-troubleshooting.md）。
- * 仅声明用到的 resolveLocalFileSystemURL → entry.file，避免强依赖全局类型。 */
+ * 的 `nativeFileManager` 引擎缺陷 + 标准 `FileReader` 在 App 端不存在的问题
+ * （见 docs/2026-08-18-app-voice-asr-troubleshooting.md）。
+ * 仅声明用到的 resolveLocalFileSystemURL → entry.file → plus.io.FileReader.readAsDataURL。 */
+interface PlusIoFileReaderLike {
+  onload: (() => void) | null
+  onerror: ((event: unknown) => void) | null
+  readonly result?: unknown
+  readAsDataURL(file: Blob): void
+}
 interface PlusIoLike {
+  FileReader?: new () => PlusIoFileReaderLike
   resolveLocalFileSystemURL(
     url: string,
     success: (entry: { file(success: (file: Blob) => void, fail?: (error: unknown) => void): void }) => void,
     fail: (error: unknown) => void,
   ): void
+}
+
+/** 将 DataURL（`data:...;base64,<data>`）解码为 ArrayBuffer。
+ * App 端 `plus.io.FileReader` 只支持 readAsDataURL（返回 base64），不支持 readAsArrayBuffer，
+ * 故剥前缀后用 atob 转二进制；纯函数供单测。 */
+export function dataUrlToArrayBuffer(dataUrl: string): ArrayBuffer {
+  const idx = dataUrl.indexOf(',')
+  if (idx < 0) throw new Error('非法 DataURL')
+  const bin = atob(dataUrl.slice(idx + 1))
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes.buffer as ArrayBuffer
 }
 
 /** 模块级识别状态（核心函数驱动；页面可读作录制/识别中指示） */
@@ -311,24 +331,44 @@ function getAppDeps(): AppSpeechDeps | null {
       getRecorderManager: () => bridgeRecorder(recorder),
       readFileAsArrayBuffer: (tempFilePath) =>
         new Promise<ArrayBuffer>((resolve, reject) => {
-          // App 端读录音临时文件：用 HTML5+ 原生 plus.io 读取（绕开
-          // uni.getFileSystemManager().readFile 的 nativeFileManager 框架缺陷——
-          // 补 manifest FileSystem 模块也无效；详见 docs/2026-08-18-app-voice-asr-troubleshooting.md）
-          const reader = new FileReader()
-          reader.onload = () => {
-            const data = reader.result
-            if (data instanceof ArrayBuffer) resolve(data)
-            else reject(new Error('读取录音文件失败（结果非二进制）'))
-          }
-          reader.onerror = () => reject(reader.error ?? new Error('读取录音文件失败'))
+          // App 端读录音临时文件：必须用 HTML5+ `plus.io` 原生读取——
+          // ① `uni.getFileSystemManager().readFile` 触发 `nativeFileManager` 引擎缺陷（已证伪补模块无效）；
+          // ② App 端无标准 Web `FileReader`（真机报 `FileReader is not defined`）。
+          // 故用 `plus.io.FileReader.readAsDataURL`（唯一支持，返回 base64 DataURL）→ 剥前缀 → ArrayBuffer。
+          // 见 docs/2026-08-18-app-voice-asr-troubleshooting.md
           const io = (plus as unknown as { io?: PlusIoLike }).io
           if (!io) {
             reject(new Error('读取录音文件失败（plus.io 不可用）'))
             return
           }
+          const FileReaderCtor = io.FileReader
+          if (!FileReaderCtor) {
+            reject(new Error('读取录音文件失败（plus.io.FileReader 不可用）'))
+            return
+          }
           io.resolveLocalFileSystemURL(
             tempFilePath,
-            (entry) => entry.file((file) => reader.readAsArrayBuffer(file), (err) => reject(err)),
+            (entry) =>
+              entry.file(
+                (file) => {
+                  const reader = new FileReaderCtor()
+                  reader.onerror = (event) => reject(event instanceof Error ? event : new Error('读取录音文件失败'))
+                  reader.onload = () => {
+                    try {
+                      const raw = typeof reader.result === 'string' ? reader.result : ''
+                      if (!raw) {
+                        reject(new Error('读取录音文件失败（结果为空）'))
+                        return
+                      }
+                      resolve(dataUrlToArrayBuffer(raw))
+                    } catch (err) {
+                      reject(err instanceof Error ? err : new Error('读取录音文件失败'))
+                    }
+                  }
+                  reader.readAsDataURL(file)
+                },
+                (err) => reject(err),
+              ),
             (err) => reject(err),
           )
         }),
