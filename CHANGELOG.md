@@ -37,6 +37,21 @@
 - `vue-tsc --noEmit`：新文件零错误（仅剩 event-chain 既有错误，与本次改动无关）；H5 页面模块编译通过。
 
 ---
+
+## [feat/fear-greed-node] 2026-08-18 — 恐贪指数模块接入 Node 后端 + 情绪温度页/首页悬浮温度计
+
+**开发者**: 林晓研
+
+### 新增
+- `src/modules/fear-greed/pages/index.vue`：情绪温度主面板（当前情绪 + 垂直圆柱温度计 + 投资建议 + AI 情绪洞见，沸点/冰点分档）
+- `src/modules/fear-greed/AGENTS.md`：模块文档
+- `src/shared/components/FearGreedIndex.vue`：首页悬浮温度计（沸点/冰点分档，onMounted 拉真实 API）
+- `src/shared/api/modules/fear-greed.ts`：恐贪指数 API 封装（dashboard/history/refresh）
+
+### 改进
+- `vite.config.ts`：`/api/fear-greed` 代理 target 由 Python 8001 改为 Node app-api（apiTarget 3000），2026-08-15 起恐贪服务随 app-api 提供服务
+
+---
 ## [changer] 2026-08-18 — 修复 App 语音输入「录音失败」根因（诊断透出 + plus.io 读取）
 
 **开发者**: 37588
