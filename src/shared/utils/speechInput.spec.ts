@@ -17,6 +17,7 @@ import {
   stopSpeechRecognition,
   speechRecognitionState,
   dataUrlToArrayBuffer,
+  parseAsrUploadResult,
   EMPTY_TRANSCRIPT_HINT,
   type H5SpeechDeps,
   type H5SpeechRecognitionLike,
@@ -337,6 +338,33 @@ describe('appRecognize', () => {
     const result = await pending
     assert.equal(result.ok, false)
     if (!result.ok) assert.match(result.error, /ENOENT|录音上传/)
+  })
+})
+
+// ===== parseAsrUploadResult（uni.uploadFile 的 ASR 响应解析） =====
+
+describe('parseAsrUploadResult', () => {
+  it('对象响应 200 + text → ok', () => {
+    expect(parseAsrUploadResult({ code: 200, message: 'success', text: '贵州茅台' }, 200)).toEqual({ ok: true, text: '贵州茅台' })
+  })
+
+  it('字符串 JSON 响应 502（App 真机 res.data 为字符串）+ message → 透出真实错误', () => {
+    // 2026-08-19 真机根因：App 端 uni.uploadFile success 的 res.data 是字符串而非对象，
+    // 直接当对象读 body?.message 得到 undefined → 吞成笼统文案「语音识别服务异常」。
+    // 本用例要求 JSON.parse 后透出后端真实 message（如"语音识别超时，请重试"）。
+    expect(parseAsrUploadResult('{"code":502,"message":"语音识别超时，请重试"}', 502)).toEqual({ ok: false, error: '语音识别超时，请重试' })
+  })
+
+  it('字符串 JSON 401 → 请先登录', () => {
+    expect(parseAsrUploadResult('{"code":401,"message":"未登录"}', 401)).toEqual({ ok: false, error: '请先登录' })
+  })
+
+  it('非法 JSON 字符串 → 语音识别服务异常', () => {
+    expect(parseAsrUploadResult('not-json', 200)).toEqual({ ok: false, error: '语音识别服务异常' })
+  })
+
+  it('空数据 → 语音识别服务异常', () => {
+    expect(parseAsrUploadResult(null, 200)).toEqual({ ok: false, error: '语音识别服务异常' })
   })
 })
 

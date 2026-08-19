@@ -50,6 +50,28 @@ export const EMPTY_TRANSCRIPT_HINT = '未识别到语音'
 const APP_RECORD_FAIL_HINT = '录音失败，请重试'
 const APP_UPLOAD_FAIL_HINT = '语音识别服务异常'
 
+/**
+ * 解析 uni.uploadFile 的 ASR 响应（App 真机 success 的 res.data 是字符串而非对象，
+ * 直接当对象读 body?.message 会得到 undefined → 吞成笼统文案）。
+ * 统一 JSON.parse 兜底后透出后端真实 message（错误透出硬约束）。
+ * 纯函数导出供单测；uploadAudioFile 的 success 回调消费。
+ */
+export function parseAsrUploadResult(data: unknown, statusCode: number): SpeechRecognitionResult {
+  let body: { code?: number; message?: string; text?: string } | null = null
+  if (typeof data === 'string') {
+    try {
+      body = JSON.parse(data) as { code?: number; message?: string; text?: string }
+    } catch {
+      body = null
+    }
+  } else if (data && typeof data === 'object') {
+    body = data as { code?: number; message?: string; text?: string }
+  }
+  if (statusCode === 200 && typeof body?.text === 'string') return { ok: true, text: body.text }
+  if (statusCode === 401) return { ok: false, error: '请先登录' }
+  return { ok: false, error: body?.message || APP_UPLOAD_FAIL_HINT }
+}
+
 /** 进行中的识别会话的停止回调（stopSpeechRecognition 触发；onend/onerror/onStop 后清空） */
 let activeStop: (() => void) | null = null
 
@@ -321,20 +343,9 @@ function getAppDeps(): AppSpeechDeps | null {
             name: 'file',
             header: token ? { Authorization: `Bearer ${token}` } : {},
             success: (res) => {
-              try {
-                const body = (res.data ?? {}) as { code?: number; message?: string; text?: string }
-                if (res.statusCode === 200 && typeof body?.text === 'string') {
-                  resolve({ ok: true, text: body.text })
-                  return
-                }
-                if (res.statusCode === 401) {
-                  resolve({ ok: false, error: '请先登录' })
-                  return
-                }
-                resolve({ ok: false, error: body?.message || APP_UPLOAD_FAIL_HINT })
-              } catch {
-                resolve({ ok: false, error: APP_UPLOAD_FAIL_HINT })
-              }
+              // 2026-08-19：res.data 在 App 端是字符串（需 JSON.parse 兜底），
+              // parseAsrUploadResult 负责透出后端真实 message，禁止吞成笼统文案。
+              resolve(parseAsrUploadResult(res.data, res.statusCode))
             },
             fail: () => resolve({ ok: false, error: APP_UPLOAD_FAIL_HINT }),
           })
