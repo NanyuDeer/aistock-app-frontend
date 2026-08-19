@@ -252,7 +252,7 @@ describe('appRecognize', () => {
     assert.equal(speechRecognitionState.value, 'idle')
   })
 
-  it('录音以 amr + 8kHz 启动（与后端火山 ASR format/rate 对齐；AMR-NB 窄带固定 8K 采样）', () => {
+  it('录音以 pcm + 16kHz 启动（与后端火山 V3 ASR format/rate 对齐；V3 不支持 amr、rate 必须 16000）', () => {
     let startOptions: { format: string; sampleRate?: number } | null = null
     const recorder = {
       start(options: { format: string; sampleRate?: number }) { startOptions = options },
@@ -265,7 +265,7 @@ describe('appRecognize', () => {
       getRecorderManager: () => recorder,
       uploadAudioFile: async () => ({ ok: true, text: 'x' }),
     })
-    assert.deepEqual(startOptions, { format: 'amr', sampleRate: 8000 })
+    assert.deepEqual(startOptions, { format: 'pcm', sampleRate: 16000 })
   })
 
   it('录音失败 → error 分支', async () => {
@@ -304,12 +304,12 @@ describe('appRecognize', () => {
     assert.deepEqual(result, { ok: false, error: EMPTY_TRANSCRIPT_HINT })
   })
 
-  it('start 同步抛错（amr 不支持/引擎异常）→ 透出具体错误信息（诊断）', async () => {
+  it('start 同步抛错（编码器/引擎异常）→ 透出具体错误信息（诊断）', async () => {
     // 根因排查（2026-08-18）：真机「录音失败，请重试」跨设备复现，但代码把 start 的
     // 真实异常吞成固定文案。此用例要求把具体错误透出到 error，供真机区分 (a) start vs (c) readFile。
     const recorder = {
       start(_options: { format: string; sampleRate?: number }) {
-        throw new Error('amr encoder not supported')
+        throw new Error('pcm encoder not supported')
       },
       stop() {},
       onStart: null as (() => void) | null,
@@ -323,7 +323,7 @@ describe('appRecognize', () => {
     expect(speechRecognitionState.value).toBe('error')
     const result = await pending
     assert.equal(result.ok, false)
-    if (!result.ok) assert.match(result.error, /amr encoder not supported/)
+    if (!result.ok) assert.match(result.error, /pcm encoder not supported/)
   })
 
   it('上传阶段异常（uploadAudioFile reject，兜底 catch）→ 透出具体错误信息（诊断）', async () => {

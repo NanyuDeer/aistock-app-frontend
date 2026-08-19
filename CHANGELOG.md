@@ -2,6 +2,16 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-19 — App 录音格式升级 PCM 16kHz（配合后端火山 V3 豆包流式 ASR）
+
+**开发者**: Aria
+
+### 变更
+- `src/shared/utils/speechInput.ts`：App 录音 `manager.start({ format: 'amr', sampleRate: 8000 })` → `{ format: 'pcm', sampleRate: 16000 }`。后端 ASR 升级 V3「豆包流式语音识别大模型」（见 aistock-app-api）：V3 仅支持 pcm/wav/ogg/mp3（不支持 amr）、rate 必须 16000。
+- `src/shared/utils/speechInput.spec.ts`：「录音以 amr + 8kHz 启动」用例同步改为 pcm + 16kHz；「start 同步抛错」用例错误文案 amr → pcm。29/29 通过。
+
+---
+
 ## [master] 2026-08-19 — 修复 App 语音「语音识别服务异常」误报（res.data 未 parse 吞真实错误）
 
 **开发者**: Aria
