@@ -10,7 +10,7 @@
             v-if="headlinePositive"
             type="positive"
             :title="headlinePositive.title"
-            :importance="headlinePositive.importance >= 4 ? 'major' : 'normal'"
+            :importance="(headlinePositive.importance ?? 0) >= 4 ? 'major' : 'normal'"
             :industries="headlinePositive.affectedIndustries"
             :event-id="headlinePositive.eventId"
             @click="handleHeadlineClick"
@@ -19,7 +19,7 @@
             v-if="headlineNegative"
             type="negative"
             :title="headlineNegative.title"
-            :importance="headlineNegative.importance >= 4 ? 'major' : 'normal'"
+            :importance="(headlineNegative.importance ?? 0) >= 4 ? 'major' : 'normal'"
             :industries="headlineNegative.affectedIndustries"
             :event-id="headlineNegative.eventId"
             @click="handleHeadlineClick"
@@ -149,16 +149,16 @@ function eventDirection(event: EventItem): 'positive' | 'negative' | null {
 const headlinePositive = computed<EventItem | null>(() => {
   return (
     events.value
-      .filter((e) => e.importance >= 4 && eventDirection(e) === 'positive')
-      .sort((a, b) => b.importance - a.importance)[0] ?? null
+      .filter((e) => (e.importance ?? 0) >= 4 && eventDirection(e) === 'positive')
+      .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0))[0] ?? null
   )
 })
 
 const headlineNegative = computed<EventItem | null>(() => {
   return (
     events.value
-      .filter((e) => e.importance >= 4 && eventDirection(e) === 'negative')
-      .sort((a, b) => b.importance - a.importance)[0] ?? null
+      .filter((e) => (e.importance ?? 0) >= 4 && eventDirection(e) === 'negative')
+      .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0))[0] ?? null
   )
 })
 
