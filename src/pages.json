@@ -242,6 +242,16 @@
       }
     },
     {
+      "path": "modules/fear-greed/pages/index",
+      "style": {
+        "navigationBarTitleText": "恐贪指数",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false,
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
+      }
+    },
+    {
       "path": "modules/analytics/pages/trend-score-report",
       "style": {
         "navigationBarTitleText": "趋势股评分分析",
