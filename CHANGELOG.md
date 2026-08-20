@@ -17,6 +17,88 @@
 
 ---
 
+## [junliang] 2026-08-20 — 价格异动详情迁移 insight-detail-move + 相对昨收涨跌幅展示
+
+**开发者**: Aria
+
+### 重构
+- `src/modules/favorites/pages/insight-detail-move.vue`：重写为 stocktrace 五层归因详情页（company/sector/market/capital/technical 候选 + 证据包 + 置信度），替代原 movement-detail 页；`movement-detail.vue` / `movement.vue` 删除
+- `src/shared/utils/insightNavigation.ts`：价格异动/stocktrace mv 事件导航从 movement-detail 切到 insight-detail-move；涨停雷达保持 insight-detail
+- `src/pages.json`：删除 movement/movement-detail 路由；insight / insight-detail / insight-detail-move 页改为 custom 导航样式 + disableScroll
+
+### 改进
+- `src/modules/favorites/components/AlertContent.vue`：异动卡片适配（方向/相对昨收涨跌幅/归因短语展示）
+- `src/modules/favorites/pages/insight.vue` / `insight-detail.vue` / `monitor.vue`：归因状态与 primary_cause 展示适配
+- `src/shared/api/modules/insight.ts`：`WatchlistInsight` 新增 `change_pct`（相对昨收涨跌幅，主判定口径）
+- `src/shared/api/modules/stockTrace.ts`：`StockTraceEvent` 新增 `primary_cause`（归因短语，LLM 生成）
+
+### 测试
+- `insight-detail.spec.ts` / `monitor.spec.ts` / `AlertContent.spec.ts`：适配新增字段与详情页逻辑
+
+### 文档
+- `AGENTS.md` / `src/modules/favorites/AGENTS.md` / `src/modules/home/AGENTS.md`：详情页路由与归因展示更新
+
+### 验证
+- vitest 相关用例通过；vue-tsc 0 错误
+
+---
+
+## [junliang] 2026-08-15 — 自选股价格异动归因：movement 列表页/详情页与首页卡片
+
+**开发者**: Aria
+
+### 新增
+- `src/modules/favorites/pages/movement-list.vue`：自选股尾盘价格异动列表页（展示五层归因候选列表，含股票/涨跌/归因摘要/置信度）
+- `src/modules/favorites/pages/movement-detail.vue`：异动详情页（五层候选详情 tab，含 evidence 证据包展示）
+- `src/modules/home/components/MovementCard.vue`：首页"异动捕手"卡片（Top5 异动事件入口，点击跳转 movement 列表页）
+
+### 改进
+- `src/shared/utils/insightNavigation.ts`：insightNavigation 分流逻辑——价格异动类型从 insight-detail 改为 movement-detail 跳转，涨停雷达保持 insight 路径
+
+### 验证
+- vitest 相关用例通过；vue-tsc 0 错误；build:h5 成功
+
+---
+
+## [master] 2026-08-19 — App 录音改回 amr+8k（HTML5+ 原生；后端转码 PCM 16k 送火山 V3）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/speechInput.ts`：`manager.start({ format: 'pcm', sampleRate: 16000 })` → `{ format: 'amr', sampleRate: 8000 }`。线上魔数取证 `format:'pcm'` 在 HTML5+ Android 产出「假 .pcm 实为 AMR-WB」（Android 录音只原生支持 amr/aac/3gp），V3 只支持 pcm/opus/mp3 识别为空 →「未识别到语音」；改回两端原生支持的 amr，由后端 asrController 用 ffmpeg-static 转码后识别（见 aistock-app-api）。
+- `src/shared/utils/speechInput.spec.ts`：录音格式断言 pcm+16000 → amr+8000。29/29 通过。
+
+---
+
+## [master] 2026-08-19 — App 录音格式升级 PCM 16kHz（配合后端火山 V3 豆包流式 ASR）
+
+**开发者**: Aria
+
+### 变更
+- `src/shared/utils/speechInput.ts`：App 录音 `manager.start({ format: 'amr', sampleRate: 8000 })` → `{ format: 'pcm', sampleRate: 16000 }`。后端 ASR 升级 V3「豆包流式语音识别大模型」（见 aistock-app-api）：V3 仅支持 pcm/wav/ogg/mp3（不支持 amr）、rate 必须 16000。
+- `src/shared/utils/speechInput.spec.ts`：「录音以 amr + 8kHz 启动」用例同步改为 pcm + 16kHz；「start 同步抛错」用例错误文案 amr → pcm。29/29 通过。
+
+---
+
+## [master] 2026-08-19 — 修复 App 语音「语音识别服务异常」误报（res.data 未 parse 吞真实错误）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/speechInput.ts`：新增导出纯函数 `parseAsrUploadResult(data, statusCode)`——App 真机 `uni.uploadFile` success 的 `res.data` 是字符串，此前直接当对象读 `body?.message` 得到 undefined → 吞成「语音识别服务异常」笼统文案；统一 JSON.parse 兜底后透出后端真实 message。`uploadAudioFile` success 回调改走该函数。
+
+---
+
+## [master] 2026-08-19 — App 语音 ASR 直传文件路径（uni.uploadFile 根治真机 WebSocket is not defined）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/speechInput.ts`：App 分支 `readFileAsArrayBuffer`（plus.io.FileReader 全链路）+ `uploadAudio` 替换为 `uploadAudioFile(tempFilePath)`（`uni.uploadFile` 直传路径，底层 plus.uploader 原生上传，绕开 readFile 引擎缺陷）。
+- 契约变更：`AppSpeechDeps` 由 `readFileAsArrayBuffer + uploadAudio` 改为 `uploadAudioFile(tempFilePath)`；配套后端 `/api/agent/asr` 改 multer multipart（见 aistock-app-api）。
+
+---
+
 ## [changer] 2026-08-19 — App 语音 readFile 真机 `WebSocket is not defined`：plus.io 读取子步骤全量 try/catch + 阶段透出
 
 **开发者**: 37588

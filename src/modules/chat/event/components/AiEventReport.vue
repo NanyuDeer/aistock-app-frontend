@@ -10,12 +10,12 @@
           <text
             v-if="detail.event.sourceInfo?.url"
             class="meta-link"
-            @tap="openSourceUrl(detail.event.sourceInfo!.url!)"
+            @tap="openArticle"
           >{{ detail.event.sourceInfo.name }}</text>
           <text v-else-if="detail.event.source" class="meta-text">{{ detail.event.source }}</text>
           <text v-else class="meta-unverified">暂不可验证</text>
           <text class="meta-dot">·</text>
-          <text class="meta-time">{{ detail.event.publishTime }}</text>
+          <text class="meta-time">{{ formatDateTime(detail.event.publishTime) }}</text>
           <template v-if="detail.event.eventType">
             <text class="meta-dot">·</text>
             <text class="meta-type">{{ detail.event.eventType }}</text>
@@ -85,6 +85,7 @@
 import { onMounted, watch, nextTick, computed } from 'vue'
 import type { EventDetailResponse, HistoryEvent } from '../types'
 import { useAiReasoning } from '../composables/useAiReasoning'
+import { formatDateTime } from '@/shared/utils/datetime'
 import { EmptyState } from '@/shared/components'
 import AiAnalysisSection from './AiAnalysisSection.vue'
 import AiEventUnderstanding from './AiEventUnderstanding.vue'
@@ -135,18 +136,12 @@ onMounted(() => {
   startAnalysis()
 })
 
-/** 打开来源 URL（H5 新窗口，App 用系统浏览器） */
-function openSourceUrl(url: string): void {
-  // #ifdef H5
-  window.open(url, '_blank')
-  // #endif
-  // #ifndef H5
-  // 非 H5 平台复制 URL 到剪贴板并提示
-  uni.setClipboardData({
-    data: url,
-    success: () => uni.showToast({ title: '来源链接已复制', icon: 'none' }),
+/** 打开来源 → 进入 APP 原文详情页（统一走 event-article，不依赖 WebView/剪贴板） */
+function openArticle(): void {
+  if (!props.detail?.event?.eventId) return
+  uni.navigateTo({
+    url: `/pages-sub-app/event-article/index?eventId=${props.detail.event.eventId}`,
   })
-  // #endif
 }
 
 /** Step 1: AI投资机会 */

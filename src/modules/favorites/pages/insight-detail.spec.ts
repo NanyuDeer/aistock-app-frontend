@@ -17,17 +17,13 @@ const testDetail = {
   primary_driver: { label: '白酒板块', category: 'industry_theme', confidence: 'high' },
   secondary_drivers: [{ label: '直销占比', category: 'company_event', confidence: 'medium' }],
   display_report: { summary: '摘要', details: '详情内容' },
+  source_id: 's1',
   title: '原始来源标题',
   keywords: ['白酒', '批价'],
   published_at: '2026-08-07 10:30',
   source_url: 'https://example.com/001',
   created_at: '2026-08-07T10:45:00+08:00',
 }
-
-// SvgIcon 桩
-vi.mock('@/shared/components/SvgIcon.vue', () => ({
-  default: { name: 'SvgIcon', props: ['name', 'size', 'color'], template: '<view class="svg-stub" />' },
-}))
 
 // SubPageCard2 桩（避免渲染 GlobalChatBar/FloatingPodcast 副作用）
 vi.mock('@/shared/components/SubPageCard2.vue', () => ({
@@ -38,22 +34,12 @@ vi.mock('@/shared/components/SubPageCard2.vue', () => ({
   },
 }))
 
-// InsightDetailLayout 桩（避免渲染真实组件，专注验证页面层逻辑）
-vi.mock('@/modules/favorites/components/InsightDetailLayout.vue', () => ({
+// InsightResultBlock 桩（避免渲染真实组件，专注验证页面层逻辑）
+vi.mock('@/shared/components/InsightResultBlock.vue', () => ({
   default: {
-    name: 'InsightDetailLayout',
-    props: ['detail'],
-    emits: ['open-source'],
-    template: '<view class="insight-detail-layout-stub" :data-event-id="detail.event_id" />',
-  },
-}))
-
-// EmptyState 桩
-vi.mock('@/shared/components/EmptyState.vue', () => ({
-  default: {
-    name: 'EmptyState',
-    props: ['title', 'description'],
-    template: '<view class="empty-state-stub" />',
+    name: 'InsightResultBlock',
+    props: ['insight'],
+    template: '<view class="irb-stub" />',
   },
 }))
 
@@ -81,45 +67,45 @@ describe('insight-detail.vue 洞察详情页', () => {
     vi.mocked(uni.setClipboardData).mockClear()
   })
 
-  it('加载中 → 渲染 LoadingState', () => {
+  it('加载中 → 渲染加载状态', () => {
     insightApiMock.getInsightDetail.mockReturnValue(new Promise(() => {})) // 永不 resolve
     const wrapper = mount(insightDetail)
-    expect(wrapper.findComponent({ name: 'LoadingState' }).exists()).toBe(true)
+    expect(wrapper.find('.state').exists()).toBe(true)
+    expect(wrapper.find('.state').text()).toContain('加载中')
   })
 
-  it('接口成功 → 渲染 InsightDetailLayout', async () => {
+  it('接口成功 → 渲染 InsightResultBlock', async () => {
     insightApiMock.getInsightDetail.mockResolvedValue(testDetail)
     const wrapper = mount(insightDetail)
     await flushPromises()
-    const layout = wrapper.findComponent({ name: 'InsightDetailLayout' })
-    expect(layout.exists()).toBe(true)
-    expect(layout.props('detail').event_id).toBe('d1')
+    const block = wrapper.findComponent({ name: 'InsightResultBlock' })
+    expect(block.exists()).toBe(true)
+    expect(block.props('insight').event_id).toBe('d1')
   })
 
-  it('接口返回空 → 展示 EmptyState 空状态', async () => {
+  it('接口返回空 → 展示空状态', async () => {
     insightApiMock.getInsightDetail.mockResolvedValue(null)
     const wrapper = mount(insightDetail)
     await flushPromises()
-    expect(wrapper.findComponent({ name: 'InsightDetailLayout' }).exists()).toBe(false)
-    expect(wrapper.findComponent({ name: 'EmptyState' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'InsightResultBlock' }).exists()).toBe(false)
+    expect(wrapper.find('.state').exists()).toBe(true)
   })
 
-  it('接口失败 → 展示 EmptyState 空状态', async () => {
+  it('接口失败 → 展示空状态', async () => {
     insightApiMock.getInsightDetail.mockRejectedValue(new Error('network'))
     const wrapper = mount(insightDetail)
     await flushPromises()
-    expect(wrapper.findComponent({ name: 'InsightDetailLayout' }).exists()).toBe(false)
-    expect(wrapper.findComponent({ name: 'EmptyState' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'InsightResultBlock' }).exists()).toBe(false)
+    expect(wrapper.find('.state').exists()).toBe(true)
   })
 
-  it('InsightDetailLayout 触发 open-source → 调用 openSource（H5 window.open）', async () => {
+  it('点击原始来源 → 调用 openSource（H5 window.open）', async () => {
     // H5 平台 openSource 走 window.open
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
     insightApiMock.getInsightDetail.mockResolvedValue(testDetail)
     const wrapper = mount(insightDetail)
     await flushPromises()
-    const layout = wrapper.findComponent({ name: 'InsightDetailLayout' })
-    layout.vm.$emit('open-source')
+    await wrapper.find('.src').trigger('tap')
     await flushPromises()
     expect(openSpy).toHaveBeenCalledWith('https://example.com/001', '_blank', 'noopener')
     openSpy.mockRestore()

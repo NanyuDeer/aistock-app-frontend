@@ -293,6 +293,22 @@ export interface NewsArticle {
   relatedEventId: string
 }
 
+// ==================== 原文详情 ====================
+
+/** 事件原文详情（后端 /api/agent/event/:eventId/article） */
+export interface EventArticle {
+  /** 原文标题 */
+  title: string
+  /** 来源名称 */
+  source: string
+  /** 发布时间 */
+  publishTime: string
+  /** 正文内容（财联社详情页抓取，由后端做字符截断） */
+  content: string
+  /** 原始来源链接 */
+  sourceUrl: string
+}
+
 // ==================== Agent 未来输出结构（预留） ====================
 
 /** AI分析步骤（Agent流式输出格式） */

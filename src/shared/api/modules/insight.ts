@@ -31,6 +31,8 @@ export interface WatchlistInsight {
   event_type: 'limit_up_radar' | 'midday_price_move' | 'close_price_move'
   direction: 'up' | 'down'
   move_bps?: number
+  /** 相对昨收涨跌幅（百分比，主判定口径） */
+  change_pct?: number
   open_price?: number
   latest_price?: number
   price_source?: 'realtime_snapshot' | 'kline_backfill'

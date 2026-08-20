@@ -191,7 +191,7 @@ const lastPoint = computed(() => {
 
 const chartPayload = computed(() => ({
   id: chartId,
-  key: `${currentPeriod.value}_${normalizedItems.value.length}_${normalizedItems.value.at(-1)?.timestamp || 0}`,
+  key: `${currentPeriod.value}_${normalizedItems.value.length}_${normalizedItems.value[normalizedItems.value.length - 1]?.timestamp || 0}`,
   title: props.title || 'K线图',
   period: currentPeriod.value === 'yearly' ? 'month' : currentPeriod.value === 'weekly' ? 'week' : 'day',
   visibleCount: visibleCount.value,
