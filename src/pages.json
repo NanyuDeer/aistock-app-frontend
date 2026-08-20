@@ -54,32 +54,28 @@
     {
       "path": "modules/favorites/pages/insight",
       "style": {
-        "navigationBarTitleText": "自选股洞察"
+        "navigationBarTitleText": "自选股洞察",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/favorites/pages/insight-detail",
       "style": {
-        "navigationBarTitleText": "洞察详情"
+        "navigationBarTitleText": "洞察详情",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/favorites/pages/insight-detail-move",
       "style": {
-        "navigationBarTitleText": "洞察详情"
-      }
-    },
-    {
-      "path": "modules/favorites/pages/movement",
-      "style": {
-        "navigationBarTitleText": "异动捕手",
-        "enablePullDownRefresh": true
-      }
-    },
-    {
-      "path": "modules/favorites/pages/movement-detail",
-      "style": {
-        "navigationBarTitleText": "异动详情"
+        "navigationBarTitleText": "洞察详情",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {

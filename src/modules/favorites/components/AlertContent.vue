@@ -20,7 +20,7 @@
                 v-for="(item, idx) in captureRows"
                 :key="idx"
                 :title="item?.stock_name || '\u3000'"
-                :description="item ? `${captureDetail(item)} · ${formatTime(item.trade_date || item.created_at || '')}` : '\u3000'"
+                :description="item ? `${item.detailText} · ${item.dateText}` : '\u3000'"
                 :clickable="!!item"
                 @click="item && goTrace(item.event_id, item.event_type)"
               >
@@ -30,39 +30,6 @@
               </ListCell>
             </template>
             <EmptyState v-if="!captureList.length" title="暂无异动数据" />
-          </view>
-        </view>
-      </view>
-
-      <!-- 异动捕手模块：自选股尾盘价格异动归因结果，点击进入 movement 列表页 -->
-      <view class="alert-module">
-        <view class="module-card">
-          <view class="module-decor module-decor--movement"></view>
-          <view class="module-header" @tap="goMovement">
-            <view class="module-icon">
-              <SvgIcon name="flashlight-line" size="32rpx" color="#8b5cf6" />
-            </view>
-            <view class="module-header-text">
-              <text class="module-title">异动捕手</text>
-            </view>
-            <text class="module-arrow">›</text>
-          </view>
-          <view class="movement-list">
-            <template v-if="movementItems.length">
-              <ListCell
-                v-for="(item, idx) in movementRows"
-                :key="idx"
-                :title="item?.stock_name || '\u3000'"
-                :description="item ? `${movementDetail(item)} · ${fmtMovementTime(item.triggered_at)}` : '\u3000'"
-                :clickable="!!item"
-                @click="item && goMovementDetail(item.event_id)"
-              >
-                <template #prefix>
-                  <Tag v-if="item" :type="item.direction === 'up' ? 'up' : 'down'" size="sm">{{ item.direction === 'up' ? '涨' : '跌' }}</Tag>
-                </template>
-              </ListCell>
-            </template>
-            <EmptyState v-if="!movementItems.length" title="暂无异动数据" />
           </view>
         </view>
       </view>
@@ -141,56 +108,75 @@ const intelTabItems = [
   { label: '利空', value: 'negative' as const },
 ]
 
-// 异动捕手：展示自选股尾盘价格异动归因结果（前 3 条）
-const movementItems = ref<StockTraceEvent[]>([])
-
-async function loadMovementList() {
-  try {
-    const page = await stockTraceApi.list(3)
-    movementItems.value = page.items
-  } catch {
-    movementItems.value = []
-  }
+// 自选股洞察：统一展示模型（涨停雷达 insight + 价格异动 stocktrace 融合）
+interface CaptureItem {
+  event_id: string
+  event_type: 'limit_up_radar' | 'price'
+  stock_name: string
+  direction: 'up' | 'down'
+  /** 描述文案：主因：xxx / 主因待验证 / 归因中 / 待归因 */
+  detailText: string
+  /** MM-DD 日期 */
+  dateText: string
+  /** 事件时间戳（融合列表按此倒序排列） */
+  sortTime: number
 }
 
-const MOVEMENT_ROW_COUNT = 3
-const movementRows = computed<Array<StockTraceEvent | null>>(() => {
-  const rows: Array<StockTraceEvent | null> = movementItems.value.slice(0, MOVEMENT_ROW_COUNT)
-  while (rows.length < MOVEMENT_ROW_COUNT) rows.push(null)
-  return rows
-})
+const captureList = ref<CaptureItem[]>([])
 
-function movementDetail(item: StockTraceEvent): string {
-  if (item.movement_view?.primaryCandidate?.verdict) {
-    return `主因：${item.movement_view.primaryCandidate.verdict}`
-  }
-  if (item.analysis_status === 'completed') return '归因完成'
-  if (item.analysis_status === 'processing') return '归因中'
-  return '待归因'
-}
-
-function fmtMovementTime(t: string): string {
+/** 格式化时间为 MM-DD（本地时区） */
+function fmtDateMMDD(t?: string): string {
   if (!t) return '--'
   const date = new Date(t)
   if (Number.isNaN(date.getTime())) return '--'
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-function goMovement() {
-  uni.navigateTo({ url: '/modules/favorites/pages/movement' })
+/** 涨停雷达（insight 链路）→ 统一模型 */
+function fromInsight(w: WatchlistInsight): CaptureItem {
+  let detailText = '归因中'
+  if (w.attribution_status === 'unconfirmed') detailText = '主因待验证'
+  else if (w.attribution_status === 'confirmed' && w.primary_driver?.label) detailText = `主因：${w.primary_driver.label}`
+  const date = w.trade_date || w.created_at
+  return {
+    event_id: w.event_id,
+    event_type: 'limit_up_radar',
+    stock_name: w.stock_name,
+    direction: w.direction,
+    detailText,
+    dateText: fmtDateMMDD(date),
+    sortTime: date ? new Date(date).getTime() : 0,
+  }
 }
 
-function goMovementDetail(eventId: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/movement-detail?event_id=${encodeURIComponent(eventId)}` })
+/** 价格异动（stocktrace 链路）→ 统一模型 */
+function fromMovement(m: StockTraceEvent): CaptureItem {
+  let detailText = '待归因'
+  if (m.primary_cause) detailText = `主因：${m.primary_cause}`
+  else if (m.movement_view?.primaryCandidate?.verdict) detailText = `主因：${m.movement_view.primaryCandidate.verdict}`
+  else if (m.analysis_status === 'completed') detailText = '归因完成'
+  else if (m.analysis_status === 'processing') detailText = '归因中'
+  return {
+    event_id: m.event_id,
+    event_type: 'price',
+    stock_name: m.stock_name,
+    direction: m.direction,
+    detailText,
+    dateText: fmtDateMMDD(m.triggered_at),
+    sortTime: m.triggered_at ? new Date(m.triggered_at).getTime() : 0,
+  }
 }
-
-// 自选股洞察：展示自选股涨停雷达事件的归因结果（后端由 cron 周期采集 + LLM 归因）
-const captureList = ref<WatchlistInsight[]>([])
 
 async function loadCaptureList() {
-  // 自选股洞察真实数据：接口失败/空数据时展示空状态（EmptyState 兜底）
+  // 并行拉取涨停雷达（insights）与价格异动（movements），单个失败不影响另一个
   try {
-    captureList.value = await watchlistInsightApi.getInsights()
+    const [insights, page] = await Promise.all([
+      watchlistInsightApi.getInsights().catch(() => [] as WatchlistInsight[]),
+      stockTraceApi.list(3).catch(() => ({ items: [] as StockTraceEvent[] })),
+    ])
+    // 融合后按事件时间倒序：最新异动（含今日价格异动）优先展示
+    captureList.value = [...insights.map(fromInsight), ...page.items.map(fromMovement)]
+      .sort((a, b) => b.sortTime - a.sortTime)
   } catch {
     captureList.value = []
   }
@@ -268,8 +254,8 @@ const intelRows = computed<Array<IntelItem | null>>(() => {
  * 卡片纵向长度不随数据量变化（避免只有 1 条资讯时卡片变矮）
  */
 const CAPTURE_ROW_COUNT = 4
-const captureRows = computed<Array<WatchlistInsight | null>>(() => {
-  const rows: Array<WatchlistInsight | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
+const captureRows = computed<Array<CaptureItem | null>>(() => {
+  const rows: Array<CaptureItem | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
   while (rows.length < CAPTURE_ROW_COUNT) rows.push(null)
   return rows
 })
@@ -292,21 +278,6 @@ function badgeLabel(direction: 'up' | 'down'): string {
 /** 异动方向 → Tag type：涨→up(红)，跌→down(绿) */
 function captureTagType(direction: 'up' | 'down'): 'up' | 'down' {
   return direction
-}
-
-/** 格式化洞察主因：已确认展示主因 label；unconfirmed 展示待验证；其余为归因中 */
-function captureDetail(item: WatchlistInsight): string {
-  if (item.attribution_status === 'unconfirmed') return '主因待验证'
-  if (item.attribution_status === 'confirmed' && item.primary_driver?.label) return `主因：${item.primary_driver.label}`
-  return '归因中'
-}
-
-/** 格式化日期为 MM-DD（trade_date 为 UTC ISO，取本地月日） */
-function formatTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '--'
-  // trade_date 为日期，展示 MM-DD
-  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 /** Segmented 的 change 回调（emit string|number），收敛回窄联合类型 */
@@ -344,7 +315,6 @@ defineExpose({
 onMounted(() => {
   void loadCaptureList()
   void loadIntelList()
-  void loadMovementList()
 })
 
 // 登录/登出后，个股情报数据源会在全市场与自选股之间切换，需重新加载
@@ -400,10 +370,6 @@ watch(
   background: linear-gradient(90deg, $warning, $warning-light);
 }
 
-.module-decor--movement {
-  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
-}
-
 /* 头部：标题/描述 + 箭头 */
 .module-header {
   display: flex;
@@ -440,10 +406,9 @@ watch(
   flex-shrink: 0;
 }
 
-/* ===== 异动捕手 / 个股情报 列表区域（ListCell，样式一致） ===== */
+/* ===== 自选股洞察 / 个股情报 列表区域（ListCell，样式一致） ===== */
 .capture-list,
-.intel-list,
-.movement-list {
+.intel-list {
   background: $bg-card;
   border-radius: $r-sm;
   padding: 0;
@@ -452,16 +417,14 @@ watch(
 
 /* 覆写 ListCell 内边距和字体：使列表更紧凑（行距比默认 $s-4 更紧凑，两列表保持一致） */
 .capture-list :deep(.as-list-cell),
-.intel-list :deep(.as-list-cell),
-.movement-list :deep(.as-list-cell) {
+.intel-list :deep(.as-list-cell) {
   padding: $s-2 $s-2;
   /* 空行占位（\u3000）与真实行等高，保证两个模块纵向长度一致 */
   min-height: 104rpx;
 }
 
 .capture-list :deep(.as-list-cell__title),
-.intel-list :deep(.as-list-cell__title),
-.movement-list :deep(.as-list-cell__title) {
+.intel-list :deep(.as-list-cell__title) {
   font-size: $font-size-sm;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -469,8 +432,7 @@ watch(
 }
 
 .capture-list :deep(.as-list-cell__desc),
-.intel-list :deep(.as-list-cell__desc),
-.movement-list :deep(.as-list-cell__desc) {
+.intel-list :deep(.as-list-cell__desc) {
   font-size: $font-size-xs;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -478,14 +440,12 @@ watch(
 }
 
 .capture-list :deep(.as-list-cell__prefix),
-.intel-list :deep(.as-list-cell__prefix),
-.movement-list :deep(.as-list-cell__prefix) {
+.intel-list :deep(.as-list-cell__prefix) {
   margin-right: $s-2;
 }
 
 .capture-list :deep(.as-list-cell__right),
-.intel-list :deep(.as-list-cell__right),
-.movement-list :deep(.as-list-cell__right) {
+.intel-list :deep(.as-list-cell__right) {
   margin-left: $s-2;
 }
 

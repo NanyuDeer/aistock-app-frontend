@@ -15,6 +15,8 @@ export interface StockTraceEvent {
   severity: 'medium' | 'high' | 'critical'
   rule_version: string
   analysis_status: 'pending' | 'processing' | 'completed' | 'unavailable'
+  /** 简短主因短语（LLM 生成），列表/卡片展示用；无归因结果为 null */
+  primary_cause?: string | null
   read_at?: string | null
   movement_view?: MovementViewV2 | null
   unavailable?: TraceUnavailableView

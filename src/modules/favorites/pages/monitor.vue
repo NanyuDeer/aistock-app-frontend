@@ -76,6 +76,7 @@ import { formatTime } from '@/shared/utils/datetime'
 import InsightAlertCard from '@/shared/components/InsightAlertCard.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
+import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
@@ -134,6 +135,26 @@ function toAlertItem(e: WatchlistInsight): AlertItem {
   }
 }
 
+/** 价格异动（stocktrace 链路）→ 异动提醒卡片 */
+function movementToAlertItem(m: StockTraceEvent): AlertItem {
+  let message = '待归因'
+  if (m.primary_cause) message = `主因：${m.primary_cause}`
+  else if (m.movement_view?.primaryCandidate?.verdict) message = `主因：${m.movement_view.primaryCandidate.verdict}`
+  else if (m.analysis_status === 'completed') message = '归因完成'
+  else if (m.analysis_status === 'processing') message = '归因中'
+  return {
+    eventId: m.event_id,
+    symbol: m.symbol,
+    name: m.stock_name,
+    direction: m.direction,
+    type: m.direction === 'up' ? '上涨异动' : '下跌异动',
+    eventType: 'price',
+    message,
+    time: String(m.triggered_at || ''),
+    confidence: undefined,
+  }
+}
+
 function confidenceLabel(confidence: AlertItem['confidence']): string {
   switch (confidence) {
     case 'high': return '高置信'
@@ -147,9 +168,14 @@ function confidenceLabel(confidence: AlertItem['confidence']): string {
 async function fetchAlerts() {
   loading.value = true
   try {
-    // 自选股洞察数据源：展示自选股涨停雷达事件的 LLM/规则归因结果
-    const list = await watchlistInsightApi.getInsights()
-    alerts.value = list.map(toAlertItem)
+    // 并行拉取涨停雷达（insights）与价格异动（movements），单个失败不影响另一个
+    const [list, page] = await Promise.all([
+      watchlistInsightApi.getInsights().catch(() => [] as WatchlistInsight[]),
+      stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] })),
+    ])
+    // 融合后按事件时间倒序：最新异动（含今日价格异动）优先展示
+    alerts.value = [...list.map(toAlertItem), ...page.items.map(movementToAlertItem)]
+      .sort((a, b) => (new Date(b.time).getTime() || 0) - (new Date(a.time).getTime() || 0))
   } catch {
     // API 失败时展示空状态
     alerts.value = []
