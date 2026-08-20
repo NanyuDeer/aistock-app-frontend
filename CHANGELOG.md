@@ -2,6 +2,21 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-20 — 批次4：消息长按操作菜单（复制/删除/重发）+ 引导追问胶囊升级
+
+**开发者**: 37588
+
+### 新增
+- `src/pages-sub-app/chat/index.vue`：消息项接入 `@longpress` 长按，弹出 ActionSheet 操作菜单（复制 / 重发 / 删除，删除为危险项）；复制走 `uni.setClipboardData`，重发回填输入框（可编辑后走正常 send，规避加性历史截断），删除走 `chatStore.removeMessage`；流式生成中禁用长按。
+- `src/shared/store/modules/chat.ts`：新增 `removeMessage(messageId)` 本地隐藏删除——从 `messagesBySession` 移除该条并持久化；assistant 消息反算扣减 `sessionUsage`（钳到 0）、清理对应 `feedbackRecords`；删除首条 user 消息时用剩余消息重算会话标题并同步 sessions。后端 LangGraph 加性历史不可单条删，服务端线程保持不变。
+- 引导追问按钮升级为浅色胶囊（`border-radius: 999rpx` + `:active` 反馈），对齐豆包。
+
+### 测试
+- `tests/chatRemoveMessage.test.ts`（新增）：覆盖 user/assistant 消息删除、tokenUsage 反算扣减、标题重算、反馈记录清理、无副作用用例。
+- `src/pages-sub-app/chat/index.spec.ts`：补充批次4长按/复制/重发/删除/胶囊按钮接线断言。
+
+---
+
 ## [changer] 2026-08-19 — App 语音 readFile 真机 `WebSocket is not defined`：plus.io 读取子步骤全量 try/catch + 阶段透出
 
 **开发者**: 37588
