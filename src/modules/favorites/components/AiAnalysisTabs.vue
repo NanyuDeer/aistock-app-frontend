@@ -13,11 +13,11 @@
       </view>
     </view>
 
-    <!-- 短线：AI 资讯分析 -->
+    <!-- 短线：AI 资讯洞见 -->
     <view v-show="activeView === 'short'" class="view-content">
       <view class="ai-analysis-card">
         <view class="card-header">
-          <text class="card-title">AI 资讯分析</text>
+          <text class="card-title">AI 资讯洞见</text>
           <view v-if="!aiLoading" class="ai-refresh-btn" @tap="$emit('refresh')">
             <text class="refresh-icon">↻</text>
           </view>
@@ -65,17 +65,17 @@
             </view>
           </template>
           <view v-else class="ai-empty">
-            <text class="ai-empty-text">暂无 AI 资讯分析</text>
+            <text class="ai-empty-text">暂无 AI 资讯洞见</text>
           </view>
         </view>
       </view>
     </view>
 
-    <!-- 中线 AI 研判 -->
+    <!-- 中线 AI 洞见 -->
     <view v-show="activeView === 'mid'" class="view-content">
       <view class="ai-analysis-card">
         <view class="card-header">
-          <text class="card-title">中线AI研判</text>
+          <text class="card-title">中线AI洞见</text>
         </view>
         <view class="card-body">
           <view class="ai-conclusion">
@@ -136,11 +136,11 @@
       </view>
     </view>
 
-    <!-- 长线 AI 研判 -->
+    <!-- 长线 AI 洞见 -->
     <view v-show="activeView === 'long'" class="view-content">
       <view class="ai-analysis-card">
         <view class="card-header">
-          <text class="card-title">长线AI研判</text>
+          <text class="card-title">长线AI洞见</text>
         </view>
         <view class="card-body">
           <view class="ai-conclusion">

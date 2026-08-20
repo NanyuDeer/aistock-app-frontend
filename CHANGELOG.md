@@ -2,6 +2,143 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-19 — App 录音改回 amr+8k（HTML5+ 原生；后端转码 PCM 16k 送火山 V3）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/speechInput.ts`：`manager.start({ format: 'pcm', sampleRate: 16000 })` → `{ format: 'amr', sampleRate: 8000 }`。线上魔数取证 `format:'pcm'` 在 HTML5+ Android 产出「假 .pcm 实为 AMR-WB」（Android 录音只原生支持 amr/aac/3gp），V3 只支持 pcm/opus/mp3 识别为空 →「未识别到语音」；改回两端原生支持的 amr，由后端 asrController 用 ffmpeg-static 转码后识别（见 aistock-app-api）。
+- `src/shared/utils/speechInput.spec.ts`：录音格式断言 pcm+16000 → amr+8000。29/29 通过。
+
+---
+
+## [master] 2026-08-19 — App 录音格式升级 PCM 16kHz（配合后端火山 V3 豆包流式 ASR）
+
+**开发者**: Aria
+
+### 变更
+- `src/shared/utils/speechInput.ts`：App 录音 `manager.start({ format: 'amr', sampleRate: 8000 })` → `{ format: 'pcm', sampleRate: 16000 }`。后端 ASR 升级 V3「豆包流式语音识别大模型」（见 aistock-app-api）：V3 仅支持 pcm/wav/ogg/mp3（不支持 amr）、rate 必须 16000。
+- `src/shared/utils/speechInput.spec.ts`：「录音以 amr + 8kHz 启动」用例同步改为 pcm + 16kHz；「start 同步抛错」用例错误文案 amr → pcm。29/29 通过。
+
+---
+
+## [master] 2026-08-19 — 修复 App 语音「语音识别服务异常」误报（res.data 未 parse 吞真实错误）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/speechInput.ts`：新增导出纯函数 `parseAsrUploadResult(data, statusCode)`——App 真机 `uni.uploadFile` success 的 `res.data` 是字符串，此前直接当对象读 `body?.message` 得到 undefined → 吞成「语音识别服务异常」笼统文案；统一 JSON.parse 兜底后透出后端真实 message。`uploadAudioFile` success 回调改走该函数。
+
+---
+
+## [master] 2026-08-19 — App 语音 ASR 直传文件路径（uni.uploadFile 根治真机 WebSocket is not defined）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/speechInput.ts`：App 分支 `readFileAsArrayBuffer`（plus.io.FileReader 全链路）+ `uploadAudio` 替换为 `uploadAudioFile(tempFilePath)`（`uni.uploadFile` 直传路径，底层 plus.uploader 原生上传，绕开 readFile 引擎缺陷）。
+- 契约变更：`AppSpeechDeps` 由 `readFileAsArrayBuffer + uploadAudio` 改为 `uploadAudioFile(tempFilePath)`；配套后端 `/api/agent/asr` 改 multer multipart（见 aistock-app-api）。
+
+---
+
+## [changer] 2026-08-19 — App 语音 readFile 真机 `WebSocket is not defined`：plus.io 读取子步骤全量 try/catch + 阶段透出
+
+**开发者**: 37588
+
+### 修复
+- `src/shared/utils/speechInput.ts`：App-PLUS 的 `readFileAsArrayBuffer` 把 `plus.io` 读取每个子步骤（`新建 FileReader` / `readAsDataURL` / `base64 转 ArrayBuffer` / `resolveLocalFileSystemURL` / `entry.file` 等）独立 try/catch + 阶段前缀透出。`new plus.io.FileReader()`/`readAsDataURL()` 属同步调用、原本跑在 plus 回调、不在 Promise 自动捕获范围，真机内核在此裸读缺失的 `WebSocket` 全局时 ReferenceError 会直抛页面；现改为受控 reject（toast 显示「读取录音文件失败（<阶段>）：<原因>」），既不崩页面又精确定位炸点。
+- **硬约束不变**：App 读文件仍只用 `plus.io.FileReader.readAsDataURL`（未用标准 FileReader / getFileSystemManager）。
+
+### 文档
+- `docs/2026-08-18-app-voice-asr-troubleshooting.md`：新增第 6 轮排查记录——真机在「录音结束」页面报 `WebSocket is not defined`，判定为 plus 回调内未捕获的同步 ReferenceError，已分阶段透出、待真机复验后靶向修复。
+
+---
+
+## [master] 2026-08-19 — App 真机 KLineChart 改用 uCharts canvas（renderjs 真机不渲染）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/components/KLineChart.vue`：K 线渲染分支从「H5 || APP-PLUS → renderjs+klinecharts」改为「H5 → renderjs、APP-PLUS || MP-WEIXIN → uCharts canvas」；修复 App 真机（APP-PLUS）WebView 中 renderjs+klinecharts 不渲染导致 K 线空白；H5 保留 klinecharts 交互。
+
+---
+
+## [master] 2026-08-19 — 风口龙头板块「净流入」展示位改为「成交额」（同花顺实时，元）
+
+**开发者**: Aria
+
+### 改进
+- `src/shared/api/modules/stock.ts`：`WindLeaderSector` 类型 `net_inflow` → `amount`（板块当日成交额·元）。
+- `src/modules/market/pages/leaders.vue`、`src/modules/market/pages/sector-detail.vue`：统计格「净流入/formatNetInflow」→「成交额/formatAmount」（元→亿/万）。
+
+---
+
+## [master] 2026-08-19 — 自选股编辑态 + 多股同列 + 语音输入/图标修复
+
+**开发者**: Aria
+
+### 新增
+- 自选股编辑态（`src/modules/favorites/pages/favorites.vue`）：
+  - 点击表头编辑图标进入编辑态，右上角"完成"退出；编辑态隐藏统计栏与行情列，行展示勾选框 + 名称代码 + 右侧拖拽手柄。
+  - 批量删除：勾选多只（支持全选）后点底部"删除(n)"，`removeMany` 一次提交，删除后同步编辑列表。
+  - 拖拽排序：右侧手柄触摸相邻交换实现排序，点"完成"时若顺序变化则 `saveOrder` 统一保存到后端。
+  - 左滑删除仅普通态生效（编辑态手势被勾选/拖拽接管）。
+- 多股同列（新增 `src/modules/favorites/pages/favorites-grid.vue`）：自选页表头网格图标进入，2 列宫格卡片，
+  每格显示 名称+代码 / 最新价 / 涨跌幅 / 涨跌额 + 迷你 K 线图（含成交量）；顶部切换 分时/五日/日K/周K/月K，
+  切换后全部卡片同步刷新；点击卡片跳个股详情；行情复用 favoritesStore，K 线按周期全部加载 + 前端 Map 缓存。
+- 迷你 K 线组件（新增 `src/modules/favorites/components/MiniKLine.vue`）：纯 SVG 跨端，分时/五日折线图，
+  日/周/月蜡烛图 + 成交量，涨跌色与自选页一致（涨红跌绿）。
+- `src/shared/store/modules/favorites.ts`：新增 `removeMany`（批量删除）、`saveOrder`（保存排序）。
+- `src/shared/api/modules/stock.ts`：
+  - 新增 `saveFavoritesOrder`，调 `PUT /users/me/favorites/order`。
+  - `getKLine` 扩展支持 `minute`/`five` 周期（klt=1），自动带 `startDate`（分时近 3 自然日、五日近 9 自然日）
+    限定分钟数据范围，避免拉全量历史分钟数据导致超时。
+- `src/pages.json`：注册 `modules/favorites/pages/favorites-grid` 路由。
+- `src/modules/favorites/AGENTS.md`：补充编辑态、多股同列、MiniKLine 组件及周期加载说明。
+
+### 改进
+- `src/pages-sub-app/chat/index.vue`：麦克风图标由输入框外部内嵌到输入框右侧（绝对定位），常态灰色、录音激活蓝色圆底白图标。
+
+### 修复
+- `src/shared/components/SvgIcon.vue`：H5 下图标路径改用 `import.meta.env.BASE_URL` 拼接，解决 base `/h5/` 下硬编码 `/static` 导致 404、图标不显示。
+- `src/shared/api/request.ts`：`delete` 方法修正为 luch-request 三参数签名（请求体放第二参数），解决 DELETE 请求体解析为空导致自选移除失败。
+- `MiniKLine.vue` 样式 `stroke: $AVG` 修正为字面量 `#2563eb`（`$AVG` 非 SCSS 变量，原写法触发 sass 编译错误导致页面点击报错）。
+
+### 验证
+- `vue-tsc --noEmit`：新文件零错误（仅剩 event-chain 既有错误，与本次改动无关）；H5 页面模块编译通过。
+
+---
+
+## [feat/fear-greed-node] 2026-08-18 — 恐贪指数模块接入 Node 后端 + 情绪温度页/首页悬浮温度计
+
+**开发者**: 林晓研
+
+### 新增
+- `src/modules/fear-greed/pages/index.vue`：情绪温度主面板（当前情绪 + 垂直圆柱温度计 + 投资建议 + AI 情绪洞见，沸点/冰点分档）
+- `src/modules/fear-greed/AGENTS.md`：模块文档
+- `src/shared/components/FearGreedIndex.vue`：首页悬浮温度计（沸点/冰点分档，onMounted 拉真实 API）
+- `src/shared/api/modules/fear-greed.ts`：恐贪指数 API 封装（dashboard/history/refresh）
+
+### 改进
+- `vite.config.ts`：`/api/fear-greed` 代理 target 由 Python 8001 改为 Node app-api（apiTarget 3000），2026-08-15 起恐贪服务随 app-api 提供服务
+
+---
+## [changer] 2026-08-18 — 修复 App 语音输入「录音失败」根因（诊断透出 + plus.io 读取）
+
+**开发者**: 37588
+
+### 修复
+- App 端语音输入（右侧点击麦克风 / 按住说话）真机「录音失败，请重试」跨设备复现：`start()` 同步抛错 与 录音临时文件 `readFile` 失败 两处此前把真实异常吞成固定文案，无法定位根因
+- 现于两处失败分支透出真实原因（`录音启动失败：<err>` / `读取录音文件失败：<err>`）+ `console.error('[asr] …')`
+- 真机确根因一：readFile 抛 `ReferenceError: nativeFileManager is not defined` —— 系 `uni.getFileSystemManager().readFile` 的 uni App 引擎框架缺陷（补 `manifest.json` 的 `FileSystem` 模块已验证无效），改用 HTML5+ `plus.io` 读取
+- 真机确根因二：`plus.io` 读取首版误用标准 Web `FileReader.readAsArrayBuffer` → 报 `FileReader is not defined`（App 端无标准 FileReader）→ 改 `plus.io.FileReader.readAsDataURL`（返回 base64 DataURL）剥前缀，抽 `dataUrlToArrayBuffer` 纯函数（有单测）
+- 排查经验沉淀：`docs/2026-08-18-app-voice-asr-troubleshooting.md`（4 轮失败链 + 硬约束）
+
+### 验证
+- speechInput.spec.ts 21/21 通过；vue-tsc 无新增错误（剩余 event-chain 为既有基线）
+- 需重新云打包真机验证 App 端 readFile 不再报 nativeFileManager
+
+---
 ## [changer] 2026-08-17 — 对话体验批次 5：深度分析降级渲染 + 滚动交互优化 + 股票卡片优化
 
 **开发者**: 37588

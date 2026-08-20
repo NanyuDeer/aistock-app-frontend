@@ -19,7 +19,8 @@
             "Push" : {},
             "Barcode" : {},
             "OAuth" : {},
-            "Record" : {}
+            "Record" : {},
+            "FileSystem" : {}
         },
         "distribute" : {
             "android" : {
@@ -118,7 +119,7 @@
         "title" : "洞见",
         "router" : {
             "mode" : "history",
-            "base" : "/"
+            "base" : "/h5/"
         },
         "devServer" : {
             "port" : 5173,

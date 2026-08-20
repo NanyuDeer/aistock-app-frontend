@@ -80,6 +80,15 @@
       }
     },
     {
+      "path": "modules/favorites/pages/favorites-grid",
+      "style": {
+        "navigationBarTitleText": "多股同列",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
       "path": "modules/favorites/pages/index",
       "style": {
         "navigationBarTitleText": "特别提醒",
