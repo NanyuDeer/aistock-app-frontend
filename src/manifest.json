@@ -18,7 +18,9 @@
         "modules" : {
             "Push" : {},
             "Barcode" : {},
-            "OAuth" : {}
+            "OAuth" : {},
+            "Record" : {},
+            "FileSystem" : {}
         },
         "distribute" : {
             "android" : {
@@ -32,11 +34,15 @@
                     "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>",
                     "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>",
                     "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
-                    "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>"
+                    "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>",
+                    "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>"
                 ]
             },
             "ios" : {
-                "dSYMs" : false
+                "dSYMs" : false,
+                "privacyDescription" : {
+                    "NSMicrophoneUsageDescription" : "用于语音输入"
+                }
             },
             "sdkConfigs" : {
                 "push" : {
@@ -113,7 +119,7 @@
         "title" : "洞见",
         "router" : {
             "mode" : "history",
-            "base" : "/"
+            "base" : "/h5/"
         },
         "devServer" : {
             "port" : 5173,

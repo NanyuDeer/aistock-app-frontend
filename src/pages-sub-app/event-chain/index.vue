@@ -10,7 +10,7 @@
             v-if="headlinePositive"
             type="positive"
             :title="headlinePositive.title"
-            :importance="headlinePositive.importance >= 4 ? 'major' : 'normal'"
+            :importance="(headlinePositive.importance ?? 0) >= 4 ? 'major' : 'normal'"
             :industries="headlinePositive.affectedIndustries"
             :event-id="headlinePositive.eventId"
             @click="handleHeadlineClick"
@@ -19,7 +19,7 @@
             v-if="headlineNegative"
             type="negative"
             :title="headlineNegative.title"
-            :importance="headlineNegative.importance >= 4 ? 'major' : 'normal'"
+            :importance="(headlineNegative.importance ?? 0) >= 4 ? 'major' : 'normal'"
             :industries="headlineNegative.affectedIndustries"
             :event-id="headlineNegative.eventId"
             @click="handleHeadlineClick"
@@ -149,16 +149,16 @@ function eventDirection(event: EventItem): 'positive' | 'negative' | null {
 const headlinePositive = computed<EventItem | null>(() => {
   return (
     events.value
-      .filter((e) => e.importance >= 4 && eventDirection(e) === 'positive')
-      .sort((a, b) => b.importance - a.importance)[0] ?? null
+      .filter((e) => (e.importance ?? 0) >= 4 && eventDirection(e) === 'positive')
+      .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0))[0] ?? null
   )
 })
 
 const headlineNegative = computed<EventItem | null>(() => {
   return (
     events.value
-      .filter((e) => e.importance >= 4 && eventDirection(e) === 'negative')
-      .sort((a, b) => b.importance - a.importance)[0] ?? null
+      .filter((e) => (e.importance ?? 0) >= 4 && eventDirection(e) === 'negative')
+      .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0))[0] ?? null
   )
 })
 
@@ -174,15 +174,10 @@ onMounted(() => {
 
 // ========== 事件处理 ==========
 
-/** 重大事件卡片点击 - 跳转到新闻详情页（事件原文） */
+/** 重大事件卡片点击 → 进入 APP 原文详情页（与列表标题跳转一致，不依赖 WebView） */
 function handleHeadlineClick(eventId: string) {
-  // 从真实事件列表中查找对应的 newsId
-  const event = events.value.find((e) => e.eventId === eventId)
-  const newsId = event?.newsId || ''
-
-  // 跳转到新闻详情页（事件原文）
   uni.navigateTo({
-    url: `/modules/news/pages/detail?id=${newsId}&eventId=${eventId}`
+    url: `/pages-sub-app/event-article/index?eventId=${eventId}`
   })
 }
 
@@ -198,12 +193,11 @@ function goToDetail(event: EventItem) {
   })
 }
 
-/** 跳转新闻原文 */
+/** 点击事件标题 → 进入 APP 原文详情页（不跳外部网页，不依赖 WebView） */
 function goToNews(event: EventItem) {
-  const newsId = event.newsId
-  if (newsId) {
-    uni.navigateTo({ url: `/modules/news/pages/detail?id=${newsId}&eventId=${event.eventId}` })
-  }
+  uni.navigateTo({
+    url: `/pages-sub-app/event-article/index?eventId=${event.eventId}`,
+  })
 }
 
 /** 关注/取消关注 */
@@ -249,9 +243,14 @@ async function handleFollow(event: EventItem) {
 
 .headline-cards {
   display: flex;
-  flex-direction: row;
-  gap: 8rpx;
-  align-items: stretch;
+  flex-direction: column; /* 最大利好 / 最大利空 纵向排列 */
+  min-width: 0;
+  /* 卡片间距用 margin 实现（见下方），不依赖 flex gap（部分旧 Android WebView 不渲染 gap） */
+}
+
+/* 双卡纵向排列：第二张卡片起顶部留 8rpx 间距 */
+.headline-cards :deep(.headline-card + .headline-card) {
+  margin-top: 8rpx;
 }
 
 /* 单个重大事件：单卡占满内容宽度（EventHeadlineCard 根节点 flex:1 自动填充） */

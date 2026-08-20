@@ -25,7 +25,7 @@
             </view>
             <Badge v-if="sector.frequency" size="sm">近120日上榜 {{ sector.frequency }} 次</Badge>
           </view>
-          <StatGrid :items="sectorStatItems" :columns="4" />
+          <StatGrid :items="sectorStatItems" :columns="3" />
         </Card>
 
         <!-- 板块K线（近120日，同花顺板块指数日线）；加载失败(数据为null)时整卡隐藏 -->
@@ -56,10 +56,16 @@
           <!-- 层级流向图 SVG -->
           <view v-if="flowChartData" class="flow-chart-box">
             <text class="flow-chart-title">层级流向图</text>
-            <!-- #ifdef H5 -->
-            <view v-html="flowChartSvg" class="flow-chart-svg"></view>
+            <!-- #ifdef H5 || APP-PLUS -->
+            <!-- H5 + App 统一走 renderjs 视图层 DOM 注入 SVG（v-html 在 App webview 不渲染切线注入的 svg） -->
+            <view
+              :id="flowHostId"
+              class="flow-chart-svg"
+              :data="flowChartSvgModel"
+              :change:data="flowView.render"
+            />
             <!-- #endif -->
-            <!-- #ifndef H5 -->
+            <!-- #ifndef H5 || APP-PLUS -->
             <view class="flow-chart-fallback">
               <text class="flow-chart-fallback-text">{{ flowChartTextSummary }}</text>
             </view>
@@ -254,6 +260,7 @@
 </template>
 
 <script setup lang="ts">
+// @ts-nocheck -- uni-app renderjs module (flowView) 在正常 vue-tsc 上下文之外编译；首行声明以抑制整 SFC 交叉诊断。
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
@@ -284,11 +291,13 @@ function formatPct(value: unknown): string {
   return num.toFixed(2) + '%'
 }
 
-function formatNetInflow(value: unknown): string {
+function formatAmount(value: unknown): string {
+  // 成交额（元，同花顺实时；原净流入 net_inflow 已下线）
   const num = toFiniteNumber(value)
   if (num === null) return '--'
-  if (Math.abs(num) >= 10000) return (num / 10000).toFixed(2) + '亿'
-  return Math.round(num) + '万'
+  if (Math.abs(num) >= 1e8) return (num / 1e8).toFixed(2) + '亿'
+  if (Math.abs(num) >= 10000) return (num / 10000).toFixed(0) + '万'
+  return Math.round(num) + '元'
 }
 
 // 改动1: 持续性标签提取到统计卡片头部（只显示"短期"/"中期"/"长期"）
@@ -327,8 +336,7 @@ const sectorStatItems = computed<StatGridItem[]>(() => {
   return [
     { label: '今日涨幅', value: (todayChange >= 0 ? '+' : '') + formatPct(s.today_change), color: todayChange >= 0 ? 'up' : 'down' },
     { label: '均涨幅', value: (avgChange >= 0 ? '+' : '') + formatPct(s.avg_change), color: avgChange >= 0 ? 'up' : 'down' },
-    { label: '净流入', value: formatNetInflow(s.net_inflow) },
-    { label: '领涨股', value: s.leading_stock || s.leading_stock_info?.name || '--' },
+    { label: '成交额', value: formatAmount(s.amount) },
   ]
 })
 
@@ -420,32 +428,35 @@ const flowChartSvg = computed(() => {
   const relatedNodes = nodes.filter(n => n.type === 'related')
   const upstreamNodes = nodes.filter(n => n.type === 'upstream')
   const downstreamNodes = nodes.filter(n => n.type === 'downstream')
+  // 行业板块无 related 节点（主节点直接连上下游），以主节点为枢纽
+  const hasRelated = relatedNodes.length > 0
 
   // 布局算法（与 Web 前端 D3.js 完全一致）
   const W = 320
   const cx = W / 2
   const positions: Record<string, { x: number; y: number }> = {}
 
-  // 分组：每个 related 节点关联的 upstream/downstream
+  // 分组：每个枢纽节点（related 或主节点）关联的 upstream/downstream
   const upGroups: Record<string, any[]> = {}
   const downGroups: Record<string, any[]> = {}
-  relatedNodes.forEach(n => { upGroups[n.id] = []; downGroups[n.id] = [] })
+  const hubIds = hasRelated ? relatedNodes.map(n => n.id) : [mainNode?.id].filter(Boolean) as string[]
+  hubIds.forEach(id => { upGroups[id] = []; downGroups[id] = [] })
   links.forEach(link => {
     if (link.direction === 'upstream') {
-      const rn = relatedNodes.find(n => n.id === link.target)
+      const hub = hasRelated ? relatedNodes.find(n => n.id === link.target) : (mainNode && link.target === mainNode.id ? mainNode : null)
       const un = upstreamNodes.find(n => n.id === link.source)
-      if (rn && un && !upGroups[rn.id].includes(un)) upGroups[rn.id].push(un)
+      if (hub && un && !upGroups[hub.id].includes(un)) upGroups[hub.id].push(un)
     } else if (link.direction === 'downstream') {
-      const rn = relatedNodes.find(n => n.id === link.source)
+      const hub = hasRelated ? relatedNodes.find(n => n.id === link.source) : (mainNode && link.source === mainNode.id ? mainNode : null)
       const dn = downstreamNodes.find(n => n.id === link.target)
-      if (rn && dn && !downGroups[rn.id].includes(dn)) downGroups[rn.id].push(dn)
+      if (hub && dn && !downGroups[hub.id].includes(dn)) downGroups[hub.id].push(dn)
     }
   })
 
   const nodeGap = 22
   const groupGap = 12
-  const relatedSlots = relatedNodes.map(n =>
-    Math.max((upGroups[n.id] || []).length, (downGroups[n.id] || []).length, 1)
+  const relatedSlots = hubIds.map(id =>
+    Math.max((upGroups[id] || []).length, (downGroups[id] || []).length, 1)
   )
   const groupHeights = relatedSlots.map(s => s * nodeGap)
   const topY = 16
@@ -455,20 +466,26 @@ const flowChartSvg = computed(() => {
   }
 
   let curY = topY + nodeH / 2 + 14
-  relatedNodes.forEach((n, i) => {
+  hubIds.forEach((id, i) => {
     const slotH = groupHeights[i]
     const centerY = curY + slotH / 2
-    positions[n.id] = { x: cx, y: centerY }
-    ;(upGroups[n.id] || []).forEach((un, j) => {
+    if (!hasRelated && mainNode && id === mainNode.id) {
+      // 行业板块：主节点保持在顶部，上下游从主节点下方居中排列
+      positions[id] = { x: cx, y: topY }
+      curY = topY + nodeH + 14
+    } else {
+      positions[id] = { x: cx, y: centerY }
+    }
+    ;(upGroups[id] || []).forEach((un, j) => {
       positions[un.id] = {
         x: W * 0.20,
-        y: centerY + (j - (upGroups[n.id].length - 1) / 2) * nodeGap,
+        y: curY + (j - (upGroups[id].length - 1) / 2) * nodeGap,
       }
     })
-    ;(downGroups[n.id] || []).forEach((dn, j) => {
+    ;(downGroups[id] || []).forEach((dn, j) => {
       positions[dn.id] = {
         x: W * 0.80,
-        y: centerY + (j - (downGroups[n.id].length - 1) / 2) * nodeGap,
+        y: curY + (j - (downGroups[id].length - 1) / 2) * nodeGap,
       }
     })
     curY += slotH + groupGap
@@ -567,6 +584,13 @@ function goStockDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
 }
 
+// ===== renderjs 视图层 DOM 注入：解决 v-html 在 App webview 不渲染 SVG =====
+const flowHostId = `flow_chart_${Date.now()}_${Math.floor(Math.random() * 10000)}`
+const flowChartSvgModel = computed(() => ({
+  hostId: flowHostId,
+  html: flowChartSvg.value,
+}))
+
 // ===== 理由详情弹窗：理由列单行截断，点击查看完整信息（名称/行业/价格/理由） =====
 const modalVisible = ref(false)
 const modalStock = ref<WindLeaderStock | null>(null)
@@ -616,6 +640,26 @@ onLoad((options) => {
   sectorName.value = decodeURIComponent(name)
   loadData()
 })
+</script>
+
+<!-- renderjs 分支：H5 + App 均注入真实 SVG DOM（v-html 在 App webview 不渲染切线注入的 svg）。
+     经 wrap 容器解析再取出 svg，规避 iOS WebKit 对 innerHTML 注入 SVG 命名空间不生效的已知坑。 -->
+<script module="flowView" lang="renderjs">
+// @ts-nocheck -- renderjs 由 uni-app 编译器作为独立的视图层模块编译。
+export default {
+  methods: {
+    render(model) {
+      if (!model || !model.hostId) return
+      const host = document.getElementById(model.hostId)
+      if (!host || !model.html) return
+      host.innerHTML = ''
+      const wrap = document.createElement('div')
+      wrap.innerHTML = model.html
+      const svg = wrap.querySelector('svg')
+      if (svg) host.appendChild(svg)
+    },
+  },
+}
 </script>
 
 <style lang="scss" scoped>

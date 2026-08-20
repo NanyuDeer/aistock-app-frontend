@@ -56,9 +56,9 @@
       </view>
     </view>
 
-    <!-- AI 研判：一句话 -->
+    <!-- 资金流向洞见：一句话 -->
     <view v-if="aiSummary" class="cf-ai-summary">
-      <text class="cf-ai-summary-label">AI 研判</text>
+      <text class="cf-ai-summary-label">洞见</text>
       <text class="cf-ai-summary-text">{{ aiSummary }}</text>
     </view>
   </view>
@@ -436,7 +436,7 @@ function formatSigned(value: number): string {
   }
 }
 
-/* ===== AI 研判 ===== */
+/* ===== 资金流向洞见 ===== */
 .cf-ai-summary {
   display: flex;
   align-items: flex-start;

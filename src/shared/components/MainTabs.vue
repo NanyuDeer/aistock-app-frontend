@@ -41,6 +41,9 @@
 
     <!-- 播报悬浮窗（首页晨报等调用 podcastStore.open 后显示；仅首页前台时渲染） -->
     <FloatingPodcast :page-key="pageKey" />
+
+    <!-- 市场恐贪指数悬浮温度计：常驻首页，可拖拽+磁吸，点击跳转恐贪指数页 -->
+    <FearGreedIndex />
   </view>
 </template>
 
@@ -50,6 +53,7 @@ import { onShow, onHide } from '@dcloudio/uni-app'
 import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import FloatingPodcast from '@/shared/components/FloatingPodcast.vue'
+import FearGreedIndex from '@/shared/components/FearGreedIndex.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import NotificationDropdown from '@/shared/components/NotificationDropdown.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
@@ -66,11 +70,11 @@ const pageKey = 'main-tabs'
 // 关键：uni-app onShow/onHide 是页面实例级钩子，子组件注册的永不触发，
 // 必须用 Vue onActivated/onDeactivated（KeepAlive 缓存树内子组件可触发）维护。
 const podcastStore = usePodcastStore()
-onShow(() => podcastStore.setActivePage(pageKey))
-onHide(() => podcastStore.clearActivePage(pageKey))
-onActivated(() => podcastStore.setActivePage(pageKey))
-onDeactivated(() => podcastStore.clearActivePage(pageKey))
-onMounted(() => podcastStore.setActivePage(pageKey))
+onShow(() => { podcastStore.setActivePage(pageKey) })
+onHide(() => { podcastStore.clearActivePage(pageKey) })
+onActivated(() => { podcastStore.setActivePage(pageKey) })
+onDeactivated(() => { podcastStore.clearActivePage(pageKey) })
+onMounted(() => { podcastStore.setActivePage(pageKey) })
 
 const tabTitles: Record<string, string> = {
   morning: '早点听',

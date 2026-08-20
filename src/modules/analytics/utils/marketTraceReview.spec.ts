@@ -2,8 +2,30 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { toMarketTracePresentation } from './marketTraceReview'
 import type { MarketTraceReviewRecord } from '@/shared/api/modules/agent'
+import type { PredictionRecord } from '@/shared/api/modules/prediction'
 import record0723 from './__fixtures__/market-trace-2026-07-23.json' with { type: 'json' }
 import record0731 from './__fixtures__/market-trace-2026-07-31.json' with { type: 'json' }
+
+/** 构造 prediction_records 返回的 PredictionRecord（prediction 字段与 MarketTracePrediction 结构兼容） */
+function makePredictionRecord(overrides: Partial<PredictionRecord['prediction']> = {}): PredictionRecord {
+  return {
+    id: 1,
+    source_type: 'market_trace',
+    source_id: 'review:2026-07-23',
+    report_date: '2026-07-23',
+    schema_version: '1.0',
+    status: 'pending',
+    created_at: '2026-07-23T12:00:00.000Z',
+    prediction: {
+      schema_version: '1.0',
+      prediction_status: 'confirmed',
+      attribution_summary: null,
+      ...overrides,
+    },
+    due_dates: {},
+    verification: {},
+  }
+}
 
 test('7-23 成功态：提取完整结构化 ViewModel', () => {
   const presentation = toMarketTracePresentation(
@@ -202,10 +224,8 @@ test('7-23 alternatives counterEvidence 输出中文关键词', () => {
   assert.deepEqual(alt.counterEvidence, ['MAIN_FORCE_ALL'])
 })
 
-test('prediction 提取：有预测时生成 PredictionPresentation', () => {
-  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
-  record.content.market_trace!.trace!.prediction = {
-    schema_version: '1.0',
+test('prediction 提取：传 predictionRecord 时生成 PredictionPresentation', () => {
+  const predictionRecord = makePredictionRecord({
     prediction_status: 'confirmed',
     horizons: [
       { horizon: 'short', remaining_estimate: '1-3 日', phase: 'decaying', direction: 'bearish', target: '上证指数', metric_projection: '短期弱震荡', confidence: 'high' },
@@ -215,8 +235,12 @@ test('prediction 提取：有预测时生成 PredictionPresentation', () => {
     risks: [{ factor: '政策对冲', invalidation: '超预期政策落地则失效' }],
     evidence_ids: ['SEARCH_007'],
     attribution_summary: '利空影响短线衰减、中线延续',
-  }
-  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  })
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+    predictionRecord,
+  )
   assert.ok(presentation, 'presentation 不应为 null')
   assert.ok(presentation!.prediction, 'prediction 不应为 null')
   assert.equal(presentation!.prediction!.status, 'confirmed')
@@ -234,9 +258,7 @@ test('prediction 提取：有预测时生成 PredictionPresentation', () => {
 })
 
 test('prediction 提取：evolution_steps 结构化输出时映射为 evolutionSteps', () => {
-  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
-  record.content.market_trace!.trace!.prediction = {
-    schema_version: '1.0',
+  const predictionRecord = makePredictionRecord({
     prediction_status: 'confirmed',
     horizons: [
       { horizon: 'short', remaining_estimate: '1-3 日', phase: 'decaying', direction: 'bearish', target: '上证指数', metric_projection: '短期弱震荡', confidence: 'high' },
@@ -248,8 +270,12 @@ test('prediction 提取：evolution_steps 结构化输出时映射为 evolutionS
     ],
     risks: [],
     evidence_ids: ['SEARCH_007'],
-  }
-  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  })
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+    predictionRecord,
+  )
   assert.ok(presentation, 'presentation 不应为 null')
   assert.ok(presentation!.prediction, 'prediction 不应为 null')
   assert.equal(presentation!.prediction!.evolutionSteps.length, 2)
@@ -261,9 +287,7 @@ test('prediction 提取：evolution_steps 结构化输出时映射为 evolutionS
 })
 
 test('prediction 提取：旧记录无 evolution_steps 时 evolutionSteps 为空数组', () => {
-  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
-  record.content.market_trace!.trace!.prediction = {
-    schema_version: '1.0',
+  const predictionRecord = makePredictionRecord({
     prediction_status: 'confirmed',
     horizons: [
       { horizon: 'short', remaining_estimate: '1-3 日', phase: 'decaying', direction: 'bearish', target: '上证指数', metric_projection: '短期弱震荡', confidence: 'high' },
@@ -271,30 +295,51 @@ test('prediction 提取：旧记录无 evolution_steps 时 evolutionSteps 为空
     evolution_narrative: '短线已兑现大半，中线延续，长线回归',
     risks: [],
     evidence_ids: ['SEARCH_007'],
-  }
-  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  })
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+    predictionRecord,
+  )
   assert.ok(presentation, 'presentation 不应为 null')
   assert.deepEqual(presentation!.prediction!.evolutionSteps, [])
   assert.equal(presentation!.prediction!.evolutionNarrative, '短线已兑现大半，中线延续，长线回归')
 })
 
-test('prediction 提取：无预测字段时为 null（兼容旧报告）', () => {
-  // record0731 fixture 不含 prediction 字段
+test('prediction 提取：不再读 trace.prediction，仅读 predictionRecord', () => {
+  // 即使 trace 内注入 prediction，也必须被忽略（G14：MarketTraceResult schema 无 prediction 字段）
+  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
+  record.content.market_trace!.trace!.prediction = {
+    prediction_status: 'confirmed',
+    horizons: [
+      { horizon: 'short', remaining_estimate: '1-3 日', phase: 'decaying', direction: 'bearish', target: '上证指数', metric_projection: '短期弱震荡', confidence: 'high' },
+    ],
+  }
+  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.equal(presentation!.prediction, null)
+})
+
+test('prediction 提取：传 null predictionRecord 时 prediction 为 null', () => {
   const presentation = toMarketTracePresentation(
-    record0731 as unknown as MarketTraceReviewRecord,
-    '2026-07-31',
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+    null,
   )
   assert.ok(presentation, 'presentation 不应为 null')
   assert.equal(presentation!.prediction, null)
 })
 
-test('prediction 提取：非法 shape（horizons 为空）时为 null', () => {
-  const record = JSON.parse(JSON.stringify(record0723)) as unknown as MarketTraceReviewRecord
-  record.content.market_trace!.trace!.prediction = {
+test('prediction 提取：predictionRecord.prediction 非法 shape（horizons 为空）时为 null', () => {
+  const predictionRecord = makePredictionRecord({
     prediction_status: 'confirmed',
     horizons: [],
-  }
-  const presentation = toMarketTracePresentation(record, '2026-07-23')
+  })
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+    predictionRecord,
+  )
   assert.ok(presentation, 'presentation 不应为 null')
   assert.equal(presentation!.prediction, null)
 })

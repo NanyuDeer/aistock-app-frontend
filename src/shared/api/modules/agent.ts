@@ -2,7 +2,7 @@
  * AI 智能体相关 API（App 专属功能）
  */
 import request from '../request'
-import { WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
+import { API_BASE_URL, WS_BASE_URL, AGENT_WS_BASE_URL } from '@/shared/utils/constants'
 
 export interface ProgressStep {
   label: string
@@ -330,6 +330,26 @@ export interface AlertReportRecord {
   }
 }
 
+/** 深度分析报告 DB 记录（GET /api/agent/report/chat/:reportId 返回；不存在/非本人/过期 → null） */
+export interface ChatAnalysisReport {
+  /** API 返回的数据库主键（后端 BIGSERIAL 归一为 Number，兼容旧字符串格式） */
+  id: string | number
+  report_type: string
+  report_date: string
+  status?: string
+  data_source?: string | null
+  created_at?: string
+  content: {
+    display_report?: {
+      summary?: string
+      details?: string
+      stocks?: string[]
+      risks?: string[]
+    }
+    schema_version?: string
+  }
+}
+
 export type BriefType = 'morning' | 'evening'
 export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review'] as const
 export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
@@ -523,6 +543,18 @@ export const agentApi = {
   },
 
   /**
+   * 读取深度分析报告详情（B2 议题 2）：GET /api/agent/report/chat/:reportId
+   * 鉴权由 request 拦截器自动注入 Bearer token；不存在/非本人/过期 → data: null。
+   * 拦截器语义（request.ts）：{code:0, data: report} → 解包返回 report body；
+   * {code:0, data:null} → `data ?? response.data` 走右侧，返回整个信封 {code:0, data:null}。
+   * 故判断信封（对象且含 code 键）→ 空态 null；否则返回值即报告体本身。
+   */
+  async getChatAnalysisReport(reportId: string | number): Promise<ChatAnalysisReport | null> {
+    const res = await request.get<ChatAnalysisReport | { data: ChatAnalysisReport | null }>(`/agent/report/chat/${reportId}`)
+    return res && typeof res === 'object' && 'code' in res ? null : (res as ChatAnalysisReport)
+  },
+
+  /**
    * 查询指定股票的异动分析报告（缓存查询）
    * 对接 Node.js 公开路由 GET /api/agent/report/alert/:symbol/:date
    * 命中缓存时直接返回 DB 中的报告，未命中返回 null（前端再走 SSE 流式分析）
@@ -536,9 +568,27 @@ export const agentApi = {
     return request.get<MarketTraceReviewRecord | null>(`/agent/report/review/${date}`)
   },
 
+  /**
+   * 交易日历：严格早于 date 的前一个交易日（YYYY-MM-DD）。
+   * 前端"前一天/后一天"跳档时跳过周末/法定节假日。
+   */
+  getPreviousTradingDay(date: string) {
+    return request.get<string>('/agent/trading-calendar/previous', { params: { date } })
+  },
+
+  /** 交易日历：严格晚于 date 的下一个交易日（YYYY-MM-DD）。 */
+  getNextTradingDay(date: string) {
+    return request.get<string>('/agent/trading-calendar/next', { params: { date } })
+  },
+
+  /** 交易日历：截至 date 最近 count 个交易日（YYYY-MM-DD 数组，含当天若当天为交易日）。 */
+  getRecentTradingDays(date: string, count = 3) {
+    return request.get<string[]>('/agent/trading-calendar/recent', { params: { date, count } })
+  },
+
   /** 异动提醒 AI 解读 SSE 流 URL（不走 request 拦截器，直接拼接） */
   getAlertBriefingUrl(symbol: string, cycle: string = '') {
-    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    const base = API_BASE_URL
     let url = `${base}/agent/briefing/alert?symbol=${encodeURIComponent(symbol)}`
     if (cycle) url += `&cycle=${encodeURIComponent(cycle)}`
     return url

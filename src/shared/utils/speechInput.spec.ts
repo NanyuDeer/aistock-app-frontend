@@ -9,16 +9,22 @@
  * node:test 下也能安全加载（vitest describe/it 在 node:test 运行时为空操作）。
  */
 import { describe, it, expect, beforeEach } from 'vitest'
+import assert from 'node:assert/strict'
 import {
   h5Recognize,
   mpRecognize,
   appRecognize,
   stopSpeechRecognition,
   speechRecognitionState,
+  dataUrlToArrayBuffer,
+  parseAsrUploadResult,
+  EMPTY_TRANSCRIPT_HINT,
   type H5SpeechDeps,
   type H5SpeechRecognitionLike,
   type MpSpeechDeps,
   type MpSpeechRecognitionManagerLike,
+  type AppSpeechDeps,
+  type SpeechRecognitionResult,
 } from './speechInput'
 
 /** H5 Web Speech API fake：记录 start/stop 调用，事件回调由测试手动触发 */
@@ -180,9 +186,205 @@ describe('speechInput 状态机基线', () => {
     expect(speechRecognitionState.value).toBe('error')
   })
 
-  it('APP v1 降级：返回「当前版本暂不支持语音输入」错误态', async () => {
-    const p = appRecognize()
-    await expect(p).resolves.toEqual({ ok: false, error: '当前版本暂不支持语音输入' })
+  it('APP 录音管理器不可用：返回「语音识别服务异常」错误态', async () => {
+    const p = appRecognize({
+      getRecorderManager: () => null,
+      uploadAudioFile: async () => ({ ok: true, text: 'x' }),
+    })
+    await expect(p).resolves.toEqual({ ok: false, error: '语音识别服务异常' })
     expect(speechRecognitionState.value).toBe('error')
+  })
+
+  it('APP getRecorderManager 工厂同步抛错（壳层无防护 → 真机模块缺失时同步炸穿）：Promise 不 reject，返回错误态', async () => {
+    // G2 根因：壳层 getAppDeps/bridgeRecorder 无异常防护，uni.getRecorderManager() 抛错
+    // 或返回 null 使 bridgeRecorder 抛 TypeError 时，appRecognize 内 deps.getRecorderManager()
+    // 同步炸穿 → handleMicTap L577（try 外）isListening 卡 true。判别联合契约要求此处不 reject。
+    let pending: Promise<SpeechRecognitionResult> | undefined
+    expect(() => {
+      pending = appRecognize({
+        getRecorderManager: () => {
+          throw new TypeError("Cannot read properties of null (reading 'onStart')")
+        },
+        uploadAudioFile: async () => ({ ok: true, text: 'x' }),
+      })
+    }).not.toThrow()
+    await expect(pending!).resolves.toEqual({ ok: false, error: '语音识别服务异常' })
+    expect(speechRecognitionState.value).toBe('error')
+  })
+})
+
+// ===== APP 分支（批次 3a：后端 ASR 真实链路） =====
+
+/** 可编程录音管理器 mock（uni.getRecorderManager() 返回值形态） */
+const mockRecorder: {
+  start(options: { format: string; sampleRate?: number }): void
+  stop(): void
+  onStart: (() => void) | null
+  onStop: ((res: { tempFilePath: string }) => void) | null
+  onError: ((res: { errMsg?: string }) => void) | null
+  emitStart(): void
+  emitStop(tempFilePath: string): void
+  emitError(errMsg: string): void
+} = {
+  start(_options: { format: string; sampleRate?: number }) {},
+  stop() {},
+  onStart: null,
+  onStop: null,
+  onError: null,
+  emitStart() { this.onStart?.() },
+  emitStop(tempFilePath: string) { this.onStop?.({ tempFilePath }) },
+  emitError(errMsg: string) { this.onError?.({ errMsg }) },
+}
+
+describe('appRecognize', () => {
+  it('录音成功 → 上传 → 回填文本', async () => {
+    const deps: AppSpeechDeps = {
+      getRecorderManager: () => mockRecorder,
+      uploadAudioFile: async () => ({ ok: true, text: '贵州茅台' }),
+    }
+    // 启动录音
+    const pending = appRecognize(deps)
+    mockRecorder.emitStart()
+    // 用户结束录音 → onStop 给临时路径
+    mockRecorder.emitStop('/tmp/rec.amr')
+    const result = await pending
+    assert.deepEqual(result, { ok: true, text: '贵州茅台' })
+    assert.equal(speechRecognitionState.value, 'idle')
+  })
+
+  it('录音以 amr + 8kHz 启动（HTML5+ 原生；后端转码 PCM 16k 送火山 V3）', () => {
+    let startOptions: { format: string; sampleRate?: number } | null = null
+    const recorder = {
+      start(options: { format: string; sampleRate?: number }) { startOptions = options },
+      stop() {},
+      onStart: null as (() => void) | null,
+      onStop: null as ((res: { tempFilePath: string }) => void) | null,
+      onError: null as ((res: { errMsg?: string }) => void) | null,
+    }
+    appRecognize({
+      getRecorderManager: () => recorder,
+      uploadAudioFile: async () => ({ ok: true, text: 'x' }),
+    })
+    assert.deepEqual(startOptions, { format: 'amr', sampleRate: 8000 })
+  })
+
+  it('录音失败 → error 分支', async () => {
+    const deps: AppSpeechDeps = {
+      getRecorderManager: () => mockRecorder,
+      uploadAudioFile: async () => ({ ok: true, text: 'x' }),
+    }
+    const pending = appRecognize(deps)
+    mockRecorder.emitError('no permission')
+    const result = await pending
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.match(result.error, /录音失败/)
+  })
+
+  it('上传 503 → 错误信息透出', async () => {
+    const deps: AppSpeechDeps = {
+      getRecorderManager: () => mockRecorder,
+      uploadAudioFile: async () => ({ ok: false, error: '语音识别暂不可用' }),
+    }
+    const pending = appRecognize(deps)
+    mockRecorder.emitStart()
+    mockRecorder.emitStop('/tmp/rec.wav')
+    const result = await pending
+    assert.deepEqual(result, { ok: false, error: '语音识别暂不可用' })
+  })
+
+  it('空文本 → 未识别到语音', async () => {
+    const deps: AppSpeechDeps = {
+      getRecorderManager: () => mockRecorder,
+      uploadAudioFile: async () => ({ ok: true, text: '' }),
+    }
+    const pending = appRecognize(deps)
+    mockRecorder.emitStart()
+    mockRecorder.emitStop('/tmp/rec.wav')
+    const result = await pending
+    assert.deepEqual(result, { ok: false, error: EMPTY_TRANSCRIPT_HINT })
+  })
+
+  it('start 同步抛错（编码器/引擎异常）→ 透出具体错误信息（诊断）', async () => {
+    // 根因排查（2026-08-18）：真机「录音失败，请重试」跨设备复现，但代码把 start 的
+    // 真实异常吞成固定文案。此用例要求把具体错误透出到 error，供真机区分 (a) start vs (c) readFile。
+    const recorder = {
+      start(_options: { format: string; sampleRate?: number }) {
+        throw new Error('pcm encoder not supported')
+      },
+      stop() {},
+      onStart: null as (() => void) | null,
+      onStop: null as ((res: { tempFilePath: string }) => void) | null,
+      onError: null as ((res: { errMsg?: string }) => void) | null,
+    }
+    const pending = appRecognize({
+      getRecorderManager: () => recorder,
+      uploadAudioFile: async () => ({ ok: true, text: 'x' }),
+    })
+    expect(speechRecognitionState.value).toBe('error')
+    const result = await pending
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.match(result.error, /pcm encoder not supported/)
+  })
+
+  it('上传阶段异常（uploadAudioFile reject，兜底 catch）→ 透出具体错误信息（诊断）', async () => {
+    const pending = appRecognize({
+      getRecorderManager: () => mockRecorder,
+      uploadAudioFile: async () => {
+        throw new Error('ENOENT: no such file')
+      },
+    })
+    mockRecorder.emitStart()
+    mockRecorder.emitStop('/tmp/rec.amr')
+    const result = await pending
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.match(result.error, /ENOENT|录音上传/)
+  })
+})
+
+// ===== parseAsrUploadResult（uni.uploadFile 的 ASR 响应解析） =====
+
+describe('parseAsrUploadResult', () => {
+  it('对象响应 200 + text → ok', () => {
+    expect(parseAsrUploadResult({ code: 200, message: 'success', text: '贵州茅台' }, 200)).toEqual({ ok: true, text: '贵州茅台' })
+  })
+
+  it('字符串 JSON 响应 502（App 真机 res.data 为字符串）+ message → 透出真实错误', () => {
+    // 2026-08-19 真机根因：App 端 uni.uploadFile success 的 res.data 是字符串而非对象，
+    // 直接当对象读 body?.message 得到 undefined → 吞成笼统文案「语音识别服务异常」。
+    // 本用例要求 JSON.parse 后透出后端真实 message（如"语音识别超时，请重试"）。
+    expect(parseAsrUploadResult('{"code":502,"message":"语音识别超时，请重试"}', 502)).toEqual({ ok: false, error: '语音识别超时，请重试' })
+  })
+
+  it('字符串 JSON 401 → 请先登录', () => {
+    expect(parseAsrUploadResult('{"code":401,"message":"未登录"}', 401)).toEqual({ ok: false, error: '请先登录' })
+  })
+
+  it('非法 JSON 字符串 → 语音识别服务异常', () => {
+    expect(parseAsrUploadResult('not-json', 200)).toEqual({ ok: false, error: '语音识别服务异常' })
+  })
+
+  it('空数据 → 语音识别服务异常', () => {
+    expect(parseAsrUploadResult(null, 200)).toEqual({ ok: false, error: '语音识别服务异常' })
+  })
+})
+
+// ===== dataUrlToArrayBuffer（App 端 plus.io.FileReader.readAsDataURL → ArrayBuffer 关键转换） =====
+
+describe('dataUrlToArrayBuffer', () => {
+  it('标准 DataURL：剥前缀还原原始字节', () => {
+    // 'amr\x00\x01ABC' 的 base64
+    const bytes = new Uint8Array([0x61, 0x6d, 0x72, 0x00, 0x01, 0x41, 0x42, 0x43])
+    const b64 = btoa(String.fromCharCode(...bytes))
+    const ab = dataUrlToArrayBuffer(`data:audio/amr;base64,${b64}`)
+    assert.deepEqual(Array.from(new Uint8Array(ab)), Array.from(bytes))
+  })
+
+  it('非法 DataURL（无逗号前缀）→ 抛错', () => {
+    assert.throws(() => dataUrlToArrayBuffer('not-a-dataurl'), /非法 DataURL/)
+  })
+
+  it('空数据 → 返回空 ArrayBuffer', () => {
+    const ab = dataUrlToArrayBuffer('data:audio/amr;base64,')
+    assert.equal(ab.byteLength, 0)
   })
 })

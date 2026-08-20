@@ -32,6 +32,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { agentApi } from '@/shared/api/modules/agent'
+import { API_BASE_URL } from '@/shared/utils/constants'
 import SvgIcon from './SvgIcon.vue'
 import { Card, Button, LoadingState, AudioPlayer } from './index'
 
@@ -64,7 +65,7 @@ const previewText = computed(() => {
 /** 完整音频 URL（后端返回的是 /api/agent/audio/xxx.mp3 相对路径） */
 const fullAudioUrl = computed(() => {
   if (!audioUrl.value) return ''
-  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  const base = API_BASE_URL
   // audioUrl 形如 /api/agent/audio/xxx.mp3，需去掉前缀 /api 后拼接 base
   const path = audioUrl.value.replace(/^\/api/, '')
   return `${base}${path}`

@@ -82,7 +82,7 @@
         </view>
       </view>
 
-      <view v-if="isFavorite && latestMajorEvent" class="major-event-alert">
+      <view v-if="isFavorite" class="major-event-alert">
         <view class="major-event-head">
           <text class="decision-kicker">最新重大异动</text>
           <text v-if="latestMajorEvent" :class="['major-impact', majorEventImpactClass]">
@@ -99,9 +99,6 @@
         </template>
         <template v-else>
           <text class="major-event-title">暂无数据</text>
-          <view class="major-event-meta">
-            <text>暂无真实异动来源</text>
-          </view>
         </template>
       </view>
 
@@ -109,13 +106,16 @@
       <view v-if="isFavorite && displayedStockEvents.length" class="section-card">
         <text class="section-title">个股异动</text>
         <view class="event-list">
-          <view v-for="(evt, idx) in displayedStockEvents" :key="idx" class="event-item">
+          <view v-for="(evt, idx) in displayedStockEventsVisible" :key="idx" class="event-item">
             <view class="event-dot" :class="evt.change_type || evt.cycle || 'default'"></view>
             <view class="event-content">
               <text class="event-title">{{ evt.title || evt.change_type_name || evt.summary || '异动' }}</text>
               <text v-if="evt.event_time || evt.event_time_display" class="event-time">{{ evt.event_time_display || formatEventTime(evt.event_time) }}</text>
             </view>
           </view>
+        </view>
+        <view v-if="hasMoreEvents" class="event-toggle" @tap="eventListExpanded = !eventListExpanded">
+          <text class="event-toggle-text">{{ eventListExpanded ? '收起' : '展开查看全部' }}</text>
         </view>
       </view>
 
@@ -134,10 +134,10 @@
 
       <!-- 4. 短线视图 -->
       <view v-show="activeView === 'short'" class="view-content">
-        <!-- AI 资讯分析 -->
+        <!-- AI 资讯洞见 -->
         <view v-if="hasAiInfoCardData" class="ai-analysis-card">
           <view class="card-header">
-            <text class="card-title">AI 资讯分析</text>
+            <text class="card-title">AI 资讯洞见</text>
             <view class="card-header-actions">
               <view class="ai-history-btn" @tap="openHistoryDialog">
                 <text class="history-icon">历史</text>
@@ -157,18 +157,18 @@
                 <text v-if="aiAnalysis.analysisDate" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
               </view>
               <view v-if="logicTags.length" class="ai-section">
-                <text class="ai-section-title">核心逻辑</text>
+                <text class="ai-section-title">研判依据</text>
                 <view class="research-tags">
                   <view
                     v-for="(tag, i) in logicTags"
                     :key="'lg'+i"
-                    :class="['research-tag', 'is-logic', { 'is-expanded': expandedTag === 'logic' && expandedTagIdx === i }]"
-                    @tap="toggleTagExpand('logic', i)"
+                    :class="['research-tag', 'is-basis', { 'is-expanded': expandedTag === 'shortLogic' && expandedTagIdx === i }]"
+                    @tap="toggleTagExpand('shortLogic', i)"
                   >
                     <text class="research-tag-text">{{ tag.tag }}</text>
                   </view>
                 </view>
-                <view v-if="expandedTag === 'logic'" class="tag-detail">
+                <view v-if="expandedTag === 'shortLogic'" class="tag-detail basis">
                   <text class="tag-detail-text">{{ logicTags[expandedTagIdx]?.full }}</text>
                 </view>
               </view>
@@ -178,13 +178,13 @@
                   <view
                     v-for="(tag, i) in riskTags"
                     :key="'rk'+i"
-                    :class="['research-tag', 'is-risk', { 'is-expanded': expandedTag === 'risk' && expandedTagIdx === i }]"
-                    @tap="toggleTagExpand('risk', i)"
+                    :class="['research-tag', 'is-risk', { 'is-expanded': expandedTag === 'shortRisk' && expandedTagIdx === i }]"
+                    @tap="toggleTagExpand('shortRisk', i)"
                   >
                     <text class="research-tag-text">{{ tag.tag }}</text>
                   </view>
                 </view>
-                <view v-if="expandedTag === 'risk'" class="tag-detail risk">
+                <view v-if="expandedTag === 'shortRisk'" class="tag-detail risk">
                   <text class="tag-detail-text">{{ riskTags[expandedTagIdx]?.full }}</text>
                 </view>
               </view>
@@ -363,10 +363,10 @@
 
       <!-- 5. 中线视图 -->
       <view v-show="activeView === 'mid'" class="view-content">
-        <!-- 中线 AI 研判 -->
+        <!-- 中线 AI 洞见 -->
         <view class="ai-analysis-card">
           <view class="card-header">
-            <text class="card-title">中线AI研判</text>
+            <text class="card-title">中线AI洞见</text>
           </view>
           <view class="card-body">
             <view class="ai-conclusion">
@@ -588,10 +588,10 @@
 
       <!-- 6. 长线视图 -->
       <view v-show="activeView === 'long'" class="view-content">
-        <!-- 长线 AI 研判 -->
+        <!-- 长线 AI 洞见 -->
         <view class="ai-analysis-card">
           <view class="card-header">
-            <text class="card-title">长线AI研判</text>
+            <text class="card-title">长线AI洞见</text>
           </view>
           <view class="card-body">
             <view class="ai-conclusion">
@@ -922,6 +922,7 @@ const klinePeriod = ref<KLinePeriod>('daily')
 const klineLoading = ref(false)
 const trendScoreData = ref<any>(null)
 const trendLoading = ref(false)
+const industryHealthData = ref<any>(null)
 // 历史 AI 评价
 const historyVisible = ref(false)
 const historyLoading = ref(false)
@@ -949,10 +950,11 @@ function selectActiveView(key: ViewKey) {
   activeView.value = key
 }
 
-// AI 研判 composable（接入真实 trend-score 数据）
+// AI 洞见 composable（接入真实 trend-score 数据）
 const symbolRef = computed(() => symbol.value)
 const quoteRef = computed(() => ({ name: quote.value?.name, industry: stockInfo.value?.industry || quote.value?.industry }))
 const trendScoreDataRef = computed(() => trendScoreData.value)
+const industryHealthDataRef = computed(() => industryHealthData.value)
 const stockAiContextRef = computed(() => ({
   quote: quote.value,
   stockInfo: stockInfo.value,
@@ -965,7 +967,7 @@ const {
   midMockData,
   longMockData,
   trendModel,
-} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef)
+} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef, industryHealthDataRef)
 
 const visibleNewsList = computed(() => newsExpanded.value ? newsList.value : newsList.value.slice(0, 3))
 const hasAiInfoCardData = computed(() => Boolean(
@@ -1255,6 +1257,14 @@ const displayedStockEvents = computed(() => {
   const latestKey = getEventIdentity(latestMajorEvent.value)
   return stockEvents.value.filter((event, index) => index !== 0 && getEventIdentity(event) !== latestKey)
 })
+// 个股异动列表展开/收起：默认仅展示前 3 条
+const EVENT_PREVIEW_COUNT = 3
+const eventListExpanded = ref(false)
+const displayedStockEventsVisible = computed(() => {
+  const all = displayedStockEvents.value
+  return eventListExpanded.value ? all : all.slice(0, EVENT_PREVIEW_COUNT)
+})
+const hasMoreEvents = computed(() => displayedStockEvents.value.length > EVENT_PREVIEW_COUNT)
 const majorEventImpactClass = computed(() => {
   const impact = getEventImpact(latestMajorEvent.value)
   if (impact.includes('利好')) return 'is-positive'
@@ -1318,7 +1328,7 @@ const legacyOverallDecision = computed(() => {
     ? ((majorImpact.includes('利好') && getEventDecisionPoint(latestMajorEvent.value, '机会'))
       || (isBullishFlow && getFlowOpportunityPoint(capital))
       || logicTags.value[0]?.tag
-      || (conclusion ? `短线资讯分析：${conclusion}` : '')
+      || (conclusion ? `短线资讯洞见：${conclusion}` : '')
       || trendModel.value?.description)
     : ''
   const riskSource = (isBearishEvent && getEventDecisionPoint(latestMajorEvent.value, '风险'))
@@ -1853,6 +1863,7 @@ async function loadData() {
     loadAiAnalysis()
     loadForecast(false)
     loadTrendScore()
+    loadIndustryHealth()
   } catch (err) {
     console.error('[StockDetail] load error:', err)
   } finally {
@@ -1876,6 +1887,17 @@ async function loadTrendScore() {
     }
   } finally {
     trendLoading.value = false
+  }
+}
+
+async function loadIndustryHealth() {
+  const industry = stockInfo.value?.industry
+  if (!industry) return
+  try {
+    const res = await stockApi.getIndustryHealth(industry)
+    industryHealthData.value = res
+  } catch {
+    industryHealthData.value = null
   }
 }
 
@@ -2132,7 +2154,7 @@ function openNews(news: any) {
     window.open(url, '_blank')
     // #endif
     // #ifndef H5
-    uni.navigateTo({ url: `/modules/chat/pages/webview?url=${encodeURIComponent(url)}` })
+    uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
     // #endif
   } else {
     uni.showToast({ title: '暂无详情', icon: 'none' })
@@ -2731,7 +2753,7 @@ function goChat() {
   margin-bottom: 16rpx;
 }
 
-/* AI 研判卡片 */
+/* AI 洞见卡片 */
 .ai-analysis-card {
   background: $bg-card;
   border: 2rpx solid $line;
@@ -3044,6 +3066,19 @@ function goChat() {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
+}
+
+.event-toggle {
+  margin-top: 20rpx;
+  padding: 16rpx 0;
+  text-align: center;
+  border-top: 2rpx solid $line;
+}
+
+.event-toggle-text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: $primary;
 }
 
 .event-item {

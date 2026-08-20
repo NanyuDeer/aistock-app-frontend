@@ -23,6 +23,10 @@
             <text class="stat-label">已结束</text>
           </view>
           <view class="stat-item">
+            <text class="stat-value">{{ stats.skippedCount }}</text>
+            <text class="stat-label">已跳过</text>
+          </view>
+          <view class="stat-item">
             <text class="stat-value">{{ hitRateText }}</text>
             <text class="stat-label">档位命中率</text>
           </view>
@@ -49,15 +53,19 @@
               <text class="card-date">{{ record.report_date }} 溯源预测</text>
               <view class="head-right">
                 <text class="card-status">{{ predictionStatusLabel(record) }}</text>
-                <view class="badge" :class="isVerified(record) ? 'badge-done' : 'badge-ongoing'">
+                <view v-if="record.status === 'skipped'" class="badge badge-skipped">
+                  <text class="badge-text">已跳过</text>
+                </view>
+                <view v-else class="badge" :class="isVerified(record) ? 'badge-done' : 'badge-ongoing'">
                   <text class="badge-text">{{ isVerified(record) ? '已结束' : '进行中' }}</text>
                 </view>
               </view>
             </view>
-            <view v-if="record.prediction.attribution_summary" class="card-summary">
+            <view v-if="record.status !== 'skipped' && record.prediction?.attribution_summary" class="card-summary">
               <text class="summary-text">{{ record.prediction.attribution_summary }}</text>
             </view>
-            <view class="card-horizons">
+            <!-- skipped 记录不渲染 horizon 结果（prediction 可能只有 skip_reason） -->
+            <view v-if="record.status !== 'skipped'" class="card-horizons">
               <template v-for="h in HORIZON_ORDER" :key="h">
                 <view v-if="record.due_dates[h]" class="horizon-row">
                   <text class="horizon-name">{{ HORIZON_LABELS[h] }}</text>
@@ -102,7 +110,7 @@ type FilterValue = (typeof FILTER_TABS)[number]['value']
 const loading = ref(false)
 const error = ref(false)
 const list = ref<PredictionRecord[]>([])
-const stats = ref<PredictionStatsView>({ total: 0, pendingCount: 0, verifiedCount: 0, hitRate: null })
+const stats = ref<PredictionStatsView>({ total: 0, pendingCount: 0, verifiedCount: 0, skippedCount: 0, hitRate: null })
 const activeFilter = ref<FilterValue>('all')
 const today = shanghaiDateString()
 
@@ -117,7 +125,8 @@ function isVerified(record: PredictionRecord): boolean {
 
 function predictionStatusLabel(record: PredictionRecord): string {
   const map: Record<string, string> = { confirmed: '已确认', hypothesis: '假设推演', insufficient: '证据不足' }
-  return map[record.prediction.prediction_status] || record.prediction.prediction_status
+  // skipped 记录 prediction 可能只有 skip_reason（无 prediction_status），防御访问
+  return map[record.prediction?.prediction_status || ''] || record.prediction?.prediction_status || '已跳过'
 }
 
 async function loadData() {
@@ -280,6 +289,8 @@ onShow(() => {
 .badge-ongoing .badge-text { font-size: $font-size-xs; color: $primary; }
 .badge-done { background: $bg-soft; }
 .badge-done .badge-text { font-size: $font-size-xs; color: $text-color-tertiary; }
+.badge-skipped { background: $bg-soft; }
+.badge-skipped .badge-text { font-size: $font-size-xs; color: $text-color-tertiary; }
 
 .card-summary {
   margin-bottom: $spacing-sm;

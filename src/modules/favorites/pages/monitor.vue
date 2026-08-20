@@ -77,6 +77,7 @@ import InsightAlertCard from '@/shared/components/InsightAlertCard.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
+import { WS_BASE_URL } from '@/shared/utils/constants'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
@@ -200,7 +201,7 @@ function subscribeAlerts() {
   if (!subscribedSymbols.value.length) return
   try {
     const token = uni.getStorageSync('token')
-    const wsBase = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:3000/ws'
+    const wsBase = WS_BASE_URL
     wsTask = uni.connectSocket({
       url: `${wsBase}?token=${token}`,
       success: () => console.log('[Monitor WS] connecting...')

@@ -78,8 +78,8 @@ export interface EventItem {
   contentPreview?: string
   /** 事件类型 */
   eventType: EventType
-  /** 重要性评分 1-5 */
-  importance: number
+  /** 重要性评分 1-5（由 chain 最大 impactStrength 映射；无有效评分时为 undefined，前端隐藏星级） */
+  importance?: number
   /** 受影响的行业列表 */
   affectedIndustries: AffectedIndustry[]
   /** 前端展示专用：行业影响摘要（列表接口直出，旧数据缺失） */
@@ -291,6 +291,22 @@ export interface NewsArticle {
   content: string
   /** 关联事件ID */
   relatedEventId: string
+}
+
+// ==================== 原文详情 ====================
+
+/** 事件原文详情（后端 /api/agent/event/:eventId/article） */
+export interface EventArticle {
+  /** 原文标题 */
+  title: string
+  /** 来源名称 */
+  source: string
+  /** 发布时间 */
+  publishTime: string
+  /** 正文内容（财联社详情页抓取，由后端做字符截断） */
+  content: string
+  /** 原始来源链接 */
+  sourceUrl: string
 }
 
 // ==================== Agent 未来输出结构（预留） ====================

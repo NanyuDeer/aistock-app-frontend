@@ -38,6 +38,11 @@
         <MarketTraceRejected :presentation="presentation" />
         <MarketTracePendingRisks :presentation="presentation" />
         <MarketTracePrediction :prediction="presentation.prediction" />
+        <!-- 空态占位：prediction 为 null（prediction_records 暂无记录）时不影响其他报告内容 -->
+        <view v-if="presentation.prediction === null" class="prediction-placeholder">
+          <text class="prediction-placeholder-text">{{ predictionPlaceholderText }}</text>
+          <text v-if="predictErr" class="prediction-retry" @tap="retryPrediction">点击重试</text>
+        </view>
 
         <!-- 折叠兜底：完整 markdown -->
         <view class="markdown-section">
@@ -56,11 +61,14 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { LoadingState, EmptyState, Button, Card } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
-import { shanghaiDateString } from '@/shared/utils/tradingTime'
+import type { MarketTraceReviewRecord } from '@/shared/api/modules/agent'
+import { predictionApi } from '@/shared/api/modules/prediction'
+import { shanghaiDateString, shanghaiDateTimeParts } from '@/shared/utils/tradingTime'
+import { traceDateCandidates } from '@/shared/utils/traceDate'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import { toMarketTracePresentation, type MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 import MarketTraceHeader from '@/modules/analytics/components/MarketTraceHeader.vue'
@@ -77,6 +85,13 @@ const presentation = ref<MarketTracePresentation | null>(null)
 const reportAvailability = ref<'pending' | 'failed' | null>(null)
 const showMarkdown = ref(false)
 
+/** 当前实际展示报告的日期（回退后为上一交易日；用于预判占位文案的"今日"判断） */
+const displayedDate = ref('')
+/** 预测接口独立失败标记（report 成功但 prediction 拉取失败时置 true） */
+const predictErr = ref(false)
+/** 最近一次 completed 的 Report 原文，供预测重试时重组 presentation */
+const fetchedReport = ref<MarketTraceReviewRecord | null>(null)
+
 const markdownHtml = computed(() => {
   return presentation.value ? markdownToHtml(presentation.value.markdownDetails) : ''
 })
@@ -86,27 +101,64 @@ async function fetchData() {
   error.value = false
   presentation.value = null
   reportAvailability.value = null
-  const requestedDate = shanghaiDateString()
+  predictErr.value = false
+
+  const today = shanghaiDateString()
 
   try {
-    const record = await agentApi.getMarketTraceReview(requestedDate)
-    if (record && record.status !== 'completed') {
-      reportAvailability.value = record.status === 'queued' || record.status === 'processing'
-        ? 'pending'
-        : 'failed'
-      return
+    for (const date of traceDateCandidates(today, 3)) {
+      const [record, predResp] = await Promise.all([
+        agentApi.getMarketTraceReview(date),
+        predictionApi
+          .list({ source_id: `review:${date}` })
+          .then((r) => ({ ok: true as const, r }))
+          .catch(() => ({ ok: false as const, r: null })),
+      ])
+
+      // 找到已完成报告：采用该日期，并落 prediction（失败则 predictErr，占位给重试）
+      if (record && record.status === 'completed') {
+        const model = toMarketTracePresentation(record, date, predResp.ok ? (predResp.r?.items?.[0] ?? null) : null)
+        if (model) {
+          fetchedReport.value = record
+          displayedDate.value = date
+          predictErr.value = !predResp.ok
+          // 清除此前候选日残留的 'pending'，确保已采用的历史报告正常展示
+          reportAvailability.value = null
+          presentation.value = model
+          return
+        }
+        // schema/字段不完整：走整页 error
+        error.value = true
+        return
+      }
+      // 记录是否处于"生成中"（queued/processing）——仅当全候选都非 completed 时用
+      if (record && (record.status === 'queued' || record.status === 'processing')) {
+        reportAvailability.value = 'pending'
+      }
+      // 其余（null / failed / pending）：继续向前回退到更早日期
     }
-    presentation.value = record ? toMarketTracePresentation(record, requestedDate) : null
-    if (record && !presentation.value) {
-      throw new Error('复盘报告字段不完整')
-    }
+
+    // 没有任何 completed 报告：pending（存在生成中）/ failed
+    if (!reportAvailability.value) reportAvailability.value = 'failed'
   } catch (err: unknown) {
+    // getMarketTraceReview 抛错（网络/401/服务器）：报告拉取失败非"日期不存在"，停止回退并走整页 error
     console.error('Failed to fetch market trace review:', err)
     error.value = true
   } finally {
     loading.value = false
   }
 }
+
+/** 预判卡片空态占位文案：失败态 / 回退日期 / 当日分时感知 */
+const predictionPlaceholderText = computed(() => {
+  if (predictErr.value) return '预判加载失败'
+  // 回退到历史日期：无“生成中”概念，只表示该日无预判
+  if (displayedDate.value !== shanghaiDateString()) return '该日暂无预判数据'
+  const { hour, minute } = shanghaiDateTimeParts()
+  return hour * 60 + minute >= 20 * 60 + 30
+    ? '今日暂无预判数据'
+    : '预判生成中（今日 20:30 后可见）'
+})
 
 function retry() {
   void fetchData()
@@ -120,9 +172,51 @@ function goPredictionHistory() {
   uni.navigateTo({ url: '/modules/analytics/pages/prediction-history' })
 }
 
+/** 跨 20:30 / 15:30 切日自动刷新定时器句柄 */
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+
+function startRefreshTimer() {
+  stopRefreshTimer()
+  // 60s 轮询：捕捉 15:30 当日报告完成、20:30 预判落库的自动切换
+  refreshTimer = setInterval(() => { void fetchData() }, 60_000)
+}
+
+function stopRefreshTimer() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+}
+
+async function retryPrediction() {
+  const report = fetchedReport.value
+  const date = displayedDate.value
+  if (!report || !date || predictErr.value === false) return
+  predictErr.value = false
+  const predResp = await predictionApi
+    .list({ source_id: `review:${date}` })
+    .then((r) => ({ ok: true as const, r }))
+    .catch(() => ({ ok: false as const, r: null }))
+  if (!predResp.ok) {
+    predictErr.value = true
+    uni.showToast({ title: '预判加载失败，请重试', icon: 'none' })
+    return
+  }
+  const model = toMarketTracePresentation(report, date, predResp.r?.items?.[0] ?? null)
+  if (model) {
+    presentation.value = model
+  } else {
+    // 拉到了但未命中 completed/预判为 null → 展示占位（无失败）即可
+    presentation.value = toMarketTracePresentation(report, date, null)
+  }
+}
+
 onShow(() => {
   void fetchData()
+  startRefreshTimer()
 })
+onHide(stopRefreshTimer)
+onUnload(stopRefreshTimer)
 </script>
 
 <style lang="scss" scoped>
@@ -161,6 +255,27 @@ onShow(() => {
 .markdown-card {
   margin-top: $spacing-sm; padding: $spacing-base;
   background: $bg-card; border-radius: $r-md; box-shadow: $shadow-card;
+}
+
+.prediction-placeholder {
+  margin: 0 $spacing-base $spacing-sm;
+  padding: $spacing-base;
+  background: $bg-card;
+  border-radius: $r-md;
+  box-shadow: $shadow-card;
+}
+
+.prediction-placeholder-text {
+  font-size: $font-size-base;
+  color: $text-color-secondary;
+}
+
+.prediction-retry {
+  display: inline-block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: $primary;
+  text-decoration: underline;
 }
 .report-html { display: block; color: $text-color; font-size: 24rpx; line-height: 1.7; }
 .report-html :deep(.md-h2) { margin: 12rpx 0; color: $text-color-title; font-size: 28rpx; font-weight: 600; }

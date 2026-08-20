@@ -221,6 +221,31 @@ function normalizeEventType(raw: string | undefined): EventType {
 }
 
 /**
+ * 从 impactStrength 列表计算事件重要程度星级（1~5）。
+ *
+ * 规则：取最大 impactStrength（0~1）映射为 5 星制——round(max × 5)，clamp 到 1~5。
+ * 依据：后端 Global Importance 预筛 candidate_importance_score 同样取 max(impact_strength)
+ *       衡量事件重要性（aistock-agent-py global_importance_evaluation.py）。
+ * 无有效强度（空 / 非正数 / 非数值）→ undefined：前端隐藏星级，不显示假评分。
+ */
+function computeImportanceFromStrengths(strengths: Array<number | undefined>): number | undefined {
+  const valid = strengths.filter((n): n is number =>
+    typeof n === 'number' && Number.isFinite(n) && n > 0
+  )
+  if (valid.length === 0) return undefined
+  const max = Math.max(...valid)
+  return Math.min(5, Math.max(1, Math.round(max * 5)))
+}
+
+/** 从 chain_summary（列表/详情接口直出字段）计算事件重要程度星级。 */
+function computeImportance(
+  summary?: Array<{ industry: string; direction: string; impactStrength: number; reason?: string }>,
+): number | undefined {
+  if (!Array.isArray(summary) || summary.length === 0) return undefined
+  return computeImportanceFromStrengths(summary.map((s) => s?.impactStrength))
+}
+
+/**
  * 单个事件适配
  * 将后端事件字段转换为前端 EventItem
  *
@@ -247,7 +272,8 @@ function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventI
 
     // 事件类型：真实值（白名单校验），缺失/非法回退默认
     eventType: normalizeEventType(backendEvent.event_type),
-    importance: 3,          // 降级默认值，无法真实反映事件重要性
+    // 重要程度星级：由 chain_summary 最大 impactStrength 映射（0~1 → 1~5 星）；无 chain 时 undefined → 前端隐藏
+    importance: computeImportance(backendEvent.chain_summary),
     // 第三阶段：优先消费后端直出的 chain_summary（旧数据缺失时回退 []）
     affectedIndustries: extractAffectedIndustriesFromSummary(backendEvent.chain_summary),
     chain_summary: backendEvent.chain_summary,
@@ -300,7 +326,9 @@ export function adaptEventDetail(backend: BackendEventDetailData): EventDetailRe
 
       // 事件类型：真实值（白名单校验），缺失/非法回退默认
       eventType: normalizeEventType(content.event_type),
-      importance: 3,          // 降级默认值，无法真实反映事件重要性
+      // 重要程度星级：优先 chain_summary，旧数据回退 event_transmission.chain 计算；均无 → undefined 隐藏
+      importance: computeImportance(chainSummary)
+        ?? computeImportanceFromStrengths((analysis.event_transmission?.chain ?? []).map((n) => n.impactStrength)),
       affectedIndustries,
       aiSummary: analysis.event_understanding?.summary || '',
       isFollowed: false,      // 功能暂不实现

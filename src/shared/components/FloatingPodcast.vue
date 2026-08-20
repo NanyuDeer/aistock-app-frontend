@@ -1,8 +1,9 @@
 <template>
   <!-- 播报悬浮窗：初始位于屏幕纵向 1/3 处右侧贴边；悬浮球可拖动，松手自动吸附左右边缘 -->
-  <!-- 仅"当前前台页面"的实例渲染（页面根容器 onShow/onHide 维护 store.activePage）：
-       uni-h5 页面被 KeepAlive 缓存不卸载，多实例并存时必须避免双播放/渲染到隐藏页 -->
-  <view v-if="store.visible && store.activePage === pageKey" class="fp-wrap" :style="wrapStyle">
+  <!-- 仅"当前前台页面"的实例渲染：store.activePage === pageKey（由页面根容器 MainTabs/
+       SubPageCard/SubPageCard2 在 onShow/onActivated/onMounted 维护），避免返回页/旧页
+       多实例并存导致双播放或悬浮球渲染在隐藏页。 -->
+  <view v-if="store.visible && renderAllowed" class="fp-wrap" :style="wrapStyle">
     <!-- 展开（ready）：播放条；收起时仅视觉隐藏（组件保持挂载，音频持续播放） -->
     <AudioPlayer
       v-if="store.status === 'ready' && store.audioUrl"
@@ -11,6 +12,7 @@
       :title="store.title"
       :autoplay="store.autoplay"
       :initial-time="store.startTime"
+      :persist="true"
       :class="['fp-player', { 'fp-player--hidden': !store.expanded }]"
       @play="onPlayerPlay"
       @pause="onPlayerPause"
@@ -78,6 +80,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, getCurrentInstance, onMounted, onUnmounted } from 'vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
+import { API_BASE_URL } from '@/shared/utils/constants'
 import { isH5 } from '@/shared/utils/platform'
 import SvgIcon from './SvgIcon.vue'
 import { Button, LoadingState, AudioPlayer } from './index'
@@ -85,11 +88,20 @@ import { Button, LoadingState, AudioPlayer } from './index'
 const store = usePodcastStore()
 
 /** 所属页面标识（由页面根容器 SubPageCard/SubPageCard2/MainTabs 传入）：
- *  仅当 store.activePage === pageKey（本页面处于前台）时渲染，避免多实例双播放 */
+ *  H5 端与 store.activePage 比对判定本页是否前台（KeepAlive 多实例去重） */
 const props = withDefaults(defineProps<{ pageKey?: string }>(), { pageKey: '' })
 
 /** 本组件实例唯一标识：用于播放器控制句柄的归属校验（防止失活实例误清新实例注册） */
 const myId = String(getCurrentInstance()?.uid ?? '')
+
+// ===== 渲染权（当前前台页面唯一渲染） =====
+// 全端统一：仅当 store.activePage === pageKey（本实例所在页面处于前台）时渲染，避免多实例双播放。
+// store.activePage 由页面根容器 MainTabs/SubPageCard/SubPageCard2 在
+// onShow/onActivated/onMounted（前台）与 onHide/onDeactivated（离场）时维护。
+// 注：曾为 App/小程序单独采用"页面栈轮询 getCurrentPages() 比对路由"（提交 1f2e2f3），
+// 但 App 端页面路由不暴露在 Vue 实例链上（findPageRoute 取不到自身路由），导致悬浮球
+// 在 App 端不渲染；已回退统一走 store.activePage，与 H5 行为一致且可靠。
+const renderAllowed = computed(() => store.activePage === props.pageKey)
 
 /** AudioPlayer 实例引用：挂载后注册控制句柄到 store，供页面播放按钮暂停/继续 */
 const playerRef = ref<InstanceType<typeof AudioPlayer> | null>(null)
@@ -116,6 +128,23 @@ watch(playerRef, () => {
     store.unregisterPlayer(myId)
   }
 }, { flush: 'post' })
+
+/**
+ * 续播竞态兜底：页面切换时序可能为「新页播放器先挂载、旧页后卸载上报续播点」，
+ * 此时 watch(playerRef) 挂载时 resumePending 尚为 false，不会消费；后续旧页卸载写入
+ * resumePending=true 后，本 watch 负责消费续播（仅当前渲染实例有 playerRef 时生效，
+ * 多实例并存时只有前台实例渲染 AudioPlayer，天然单点消费）。
+ */
+watch(() => store.resumePending, () => {
+  if (!store.resumePending) return
+  const ctrl = playerRef.value
+  if (ctrl) {
+    const t = store.playbackTime
+    store.consumeResume()
+    if (t > 0) ctrl.seekTo(t)
+    nextTick(() => ctrl.play())
+  }
+})
 
 /** AudioPlayer 卸载（页面切换/换源）前上报播放状态：记录跨页续播点（携带本实例 id 防误续播） */
 function onPlayerUnmount(state: { playing: boolean; currentTime: number }) {
@@ -176,7 +205,7 @@ let movedDistance = 0
 /** 拼接完整音频 URL（后端返回 /api/agent/audio/xxx.mp3 相对路径） */
 const fullAudioUrl = computed(() => {
   if (!store.audioUrl) return ''
-  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  const base = API_BASE_URL
   const path = store.audioUrl.replace(/^\/api/, '')
   return `${base}${path}`
 })
@@ -186,15 +215,40 @@ const panelLeft = computed(() =>
   posX.value >= winW.value / 2 ? winW.value - panelWidthPx.value : 0,
 )
 
-const wrapStyle = computed(() => ({
-  left: (store.expanded ? panelLeft.value : posX.value) + 'px',
-  top: Math.min(
+const wrapStyle = computed(() => {
+  // 顶部坐标：App/小程序 与 H5 一致换算（clamp 防止小屏/异常尺寸时跑到屏外）
+  const baseTop = Math.min(
     posY.value,
     store.expanded ? winH.value - 240 : winH.value - ballSizePx.value,
-  ) + 'px',
-  // 拖动时不加过渡，松手吸附时平滑滑动
-  transition: dragging.value ? 'none' : 'left 0.2s ease',
-}))
+  )
+  // #ifdef H5
+  const baseLeft = store.expanded ? panelLeft.value : posX.value
+  const transition = dragging.value ? 'none' : 'left 0.2s ease'
+  return { left: baseLeft + 'px', top: baseTop + 'px', transition }
+  // #endif
+  // #ifndef H5
+  // App/小程序：内核可能把整页 n 倍整体缩放（实测 windowWidth=360 但 CSS rpx 基准 432），
+  // 用 windowWidth 推算的 JS 尺寸与 CSS 渲染基准不一致，`left%` 推算的右缘位置会溢出
+  // （贴右缘时悬浮球部分出屏）。静止/吸附态改用以可视区边缘为基准的 right/left 定位，
+  // 保证悬浮球完全落在屏内；拖动中临时用 left% 跟随手指。
+  const topPct = (baseTop / winH.value) * 100 + '%'
+  const margin = EDGE_MARGIN_PX + 'px'
+  if (dragging.value) {
+    const baseLeft = store.expanded ? panelLeft.value : posX.value
+    return {
+      left: (baseLeft / winW.value) * 100 + '%',
+      top: topPct,
+      transition: 'none',
+    }
+  }
+  // 静止/吸附：球在右半屏 → right:4px 贴右缘；左半屏 → left:4px 贴左缘。
+  // 展开面板同理按所在半屏对齐（panelLeft 语义与 ball 相同）。
+  const dockRight = posX.value >= winW.value / 2
+  return dockRight
+    ? { right: margin, top: topPct, transition: 'left 0.2s ease, right 0.2s ease' }
+    : { left: margin, top: topPct, transition: 'left 0.2s ease, right 0.2s ease' }
+  // #endif
+})
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))
@@ -207,7 +261,9 @@ function clamp(v: number, min: number, max: number): number {
  *   rpx 按 390 基准换算（1rpx = 390/750）。拖动位移需按缩放比例换算回画布空间：
  *   屏幕位移 ÷ scale = 画布位移。用视口坐标会在大视口（>390px）时把悬浮球定位到画布外，
  *   被 #app 的 overflow:hidden 裁剪（"跑到页面外部"）。
- * - App/小程序：无缩放，fixed 相对屏幕，用系统 windowWidth/windowHeight，scale 恒 1。
+ * - App/小程序：无整体 transform 缩放，fixed 相对屏幕。但 windowWidth 与 CSS rpx 的
+ *   换算基准可能不一致（实测 App 端 CSS 按 432px 基准、windowWidth 却报 360px），
+ *   因此 rpx→px 与坐标空间必须经 uni.upx2px() 取得（见 onMounted），scale 恒 1。
  */
 function getScale(): number {
   if (!isH5 || typeof window === 'undefined') return 1
@@ -288,17 +344,25 @@ onMounted(() => {
     ballSizePx.value = Math.round(BALL_SIZE_RPX * factor)
     panelWidthPx.value = Math.round(PANEL_WIDTH_RPX * factor)
   } else {
-    // App / 小程序：以屏幕尺寸为坐标空间
+    // App / 小程序：坐标空间宽度统一取 CSS rpx 渲染基准，避免与 windowWidth 错位。
+    // App 内核可能对整页 n 倍整体缩放（实测某真机 windowWidth=360 但 CSS rpx 基准=432），
+    // 用 windowWidth 推算的 JS 尺寸与 CSS 渲染基准不一致，导致贴右缘的坐标推算溢出屏外
+    // （此前悬浮球贴右侧时有一小段落在屏幕外侧）。uni.upx2px(750) 即渲染基准宽，
+    // 使 JS 计算（拖拽 clamp、贴边阈值）与 CSS 渲染落在同一坐标系。
     try {
       const sys = uni.getSystemInfoSync()
-      winW.value = sys.windowWidth || DESIGN_WIDTH
+      const renderedW = (typeof uni.upx2px === 'function' ? uni.upx2px(750) : 0)
+        || sys.windowWidth || DESIGN_WIDTH
+      winW.value = renderedW
       winH.value = sys.windowHeight || DESIGN_HEIGHT
     } catch {
       // 保持默认画布尺寸
     }
-    const factor = winW.value / 750
-    ballSizePx.value = Math.round(BALL_SIZE_RPX * factor)
-    panelWidthPx.value = Math.round(PANEL_WIDTH_RPX * factor)
+    // 悬浮球/面板宽也用 upx2px，与 CSS 的 rpx 尺寸一致（否则拖拽 clamp 与贴边判断偏小）
+    ballSizePx.value = (typeof uni.upx2px === 'function' ? uni.upx2px(BALL_SIZE_RPX) : 0)
+      || Math.round(BALL_SIZE_RPX * winW.value / 750)
+    panelWidthPx.value = (typeof uni.upx2px === 'function' ? uni.upx2px(PANEL_WIDTH_RPX) : 0)
+      || Math.round(PANEL_WIDTH_RPX * winW.value / 750)
   }
   // 初始位置：右侧贴边、屏幕纵向 1/3 处（clamp 防止小屏/异常尺寸时跑到屏外）
   posX.value = Math.max(0, winW.value - ballSizePx.value - EDGE_MARGIN_PX)

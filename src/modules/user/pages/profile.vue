@@ -93,9 +93,19 @@
               <SvgIcon name="bar-chart-line" size="36rpx" color="#4b5a7a" />
             </template>
           </ListCell>
+          <ListCell title="版本更新" clickable showArrow :border="true" @click="checkUpdate">
+            <template #prefix>
+              <SvgIcon name="refresh-line" size="36rpx" color="#4b5a7a" />
+            </template>
+          </ListCell>
           <ListCell title="关于" clickable showArrow :border="true" @click="goAbout">
             <template #prefix>
               <SvgIcon name="information-line" size="36rpx" color="#4b5a7a" />
+            </template>
+          </ListCell>
+          <ListCell title="对话引导" description="重置后，新会话将重新显示引导" clickable showArrow :border="true" @click="resetChatGuide">
+            <template #prefix>
+              <SvgIcon name="chat-history-line" size="36rpx" color="#4b5a7a" />
             </template>
           </ListCell>
         </Card>
@@ -116,9 +126,11 @@ import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { authApi, type UserSettings } from '@/shared/api/modules/auth'
 import { deleteUserProfile } from '@/shared/api/modules/profile'
+import { checkAppUpdate } from '@/shared/utils/useAppUpdate'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { Switch, ListCell, Card, Tag, Button } from '@/shared/components'
+import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 
 const userStore = useUserStore()
 const favoritesStore = useFavoritesStore()
@@ -223,6 +235,24 @@ function goFavorites() {
 
 function goAbout() {
   uni.showToast({ title: '洞见 v2.1', icon: 'none' })
+}
+
+// 手动检查版本更新：不受 24h 节流限制；非 Android App 环境提示不支持
+async function checkUpdate() {
+  const result = await checkAppUpdate({ manual: true })
+  if (result === 'latest') {
+    uni.showToast({ title: '已是最新版本', icon: 'none' })
+  } else if (result === 'not_supported') {
+    uni.showToast({ title: '当前环境不支持应用内更新', icon: 'none' })
+  } else if (result === 'error') {
+    uni.showToast({ title: '检查更新失败，请稍后重试', icon: 'none' })
+  }
+}
+
+/** 重置对话空态引导（清除"不再显示"标记，下次新会话重新显示） */
+function resetChatGuide() {
+  storage.remove(STORAGE_KEYS.CHAT_EMPTY_GUIDE_CLOSED)
+  uni.showToast({ title: '已重置，新会话将显示引导', icon: 'none' })
 }
 
 function goStockDetail(symbol: string) {

@@ -12,7 +12,7 @@
       { 'as-btn--loading': loading, 'as-btn--block': block, 'is-disabled': disabled }
     ]"
     :disabled="disabled || loading"
-    @click="handleClick"
+    @click.stop="handleClick"
   >
     <view v-if="loading" class="as-btn__loading">
       <view class="as-btn__loading-icon"></view>

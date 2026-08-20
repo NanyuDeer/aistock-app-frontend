@@ -99,7 +99,7 @@
               <view class="msg-footer">
                 <text v-if="msg.tokenUsage" class="turn-usage">{{ msg.tokenUsage.total_tokens }} tokens</text>
                 <view
-                  v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了') && !msg.content.startsWith('已停止生成')"
+                  v-if="msg.role === 'assistant' && !msg.lastDeepReport && !msg.content.startsWith('抱歉，出错了') && !msg.content.endsWith('已停止生成')"
                   class="deep-btn"
                   @tap="rerunDeep(idx)"
                 >
@@ -108,7 +108,7 @@
                 </view>
                 <!-- Phase 2 Part 2：error/cancelled 终态消息「重试」按钮（重发最近一轮 user 消息） -->
                 <view
-                  v-if="msg.role === 'assistant' && (msg.content.startsWith('抱歉，出错了') || msg.content.startsWith('已停止生成'))"
+                  v-if="msg.role === 'assistant' && (msg.content.startsWith('抱歉，出错了') || msg.content.endsWith('已停止生成'))"
                   class="retry-btn"
                   @tap="chatStream.retry()"
                 >
@@ -192,12 +192,47 @@
 
       <!-- 输入框 -->
       <view class="input-bar">
-        <input v-model="inputText" placeholder="输入消息..." class="input" @confirm="handleSend" />
-        <!-- Phase 4-2 Task 2：语音输入（仅支持平台显示；tap 切换：点击开始聆听，再点结束） -->
-        <view v-if="speechSupported" class="mic-btn" :class="{ active: isListening }" @tap="handleMicTap">
-          <SvgIcon name="mic-line" size="40rpx" :color="isListening ? '#ffffff' : '#0b5fff'" />
+        <!-- 左：模式切换（键盘 / 按住说话）—— 仅语音受支持时显示 -->
+        <view v-if="speechSupported" class="mode-btn" @tap="toggleInputMode">
+          <SvgIcon
+            :name="inputMode === 'voice' ? 'keyboard-line' : 'mic-line'"
+            size="36rpx"
+            color="#0b5fff"
+          />
         </view>
-        <!-- Phase 2 Part 2：生成中「发送」替换为「停止」（与 isStreaming 联动） -->
+
+        <!-- 中：text 模式 = 文本输入框（mic 图标内嵌输入框右侧，点击录音） -->
+        <view v-if="inputMode === 'text'" class="input-wrap">
+          <input
+            v-model="inputText"
+            placeholder="输入消息..."
+            class="input"
+            @confirm="handleSend"
+          />
+          <!-- 内嵌右侧麦克风：常态灰色与 GlobalChatBar 输入框内图标一致；录音激活时蓝色圆底白图标 -->
+          <view
+            v-if="speechSupported"
+            class="input-mic-btn"
+            :class="{ active: isListening }"
+            @tap.stop="handleMicTap"
+          >
+            <SvgIcon name="mic-line" size="36rpx" :color="isListening ? '#ffffff' : '#9ca3af'" />
+          </view>
+        </view>
+
+        <!-- 中：voice 模式 = 按住说话 -->
+        <view
+          v-else
+          class="hold-talk"
+          :class="{ holding }"
+          @touchstart="onHoldStart"
+          @touchend="onHoldEnd"
+          @touchcancel="onHoldEnd"
+        >
+          <text class="hold-talk-text">{{ holding ? '松开结束' : '按住 说话' }}</text>
+        </view>
+
+        <!-- 发送 / 停止（保留原逻辑） -->
         <button v-if="isStreaming" @tap="chatStream.stop()" class="stop-btn">停止</button>
         <button v-else @tap="handleSend" :disabled="isStreaming" class="send-btn">发送</button>
       </view>
@@ -221,7 +256,7 @@ import { ref, nextTick, watch, computed, onUnmounted } from 'vue'
 import { onLoad, onShow, onReady } from '@dcloudio/uni-app'
 import { useChatStream, type ConfirmOption } from '@/shared/utils/useChatStream'
 import { markdownToHtml } from '@/shared/utils/markdown'
-import { isNearBottom } from '@/shared/utils/scrollFollow'
+import { measureProximity, clampScrollTop } from '@/shared/utils/scrollFollow'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
@@ -244,14 +279,17 @@ import {
   startSpeechRecognition,
   stopSpeechRecognition,
 } from '@/shared/utils/speechInput'
+import type { SpeechRecognitionResult } from '@/shared/utils/speechInput'
 
-const chatStream = useChatStream()
+const chatStream = useChatStream({ onBeforeStream: () => resetFollow() })
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const favoritesStore = useFavoritesStore()
 
 // P9：无当前会话时自动新建（保证 messagesBySession 有当前会话载体；切换会话返回本页不重复触发，onLoad 仅一次）
 onLoad((options: Record<string, string> | undefined) => {
+  // G6（2026-08-17）：详情类跳转出口经全局事件通知本页记录阅读位置
+  uni.$on('chat:leave-context', leaveChatContext)
   if (!chatStore.sessionId) chatStore.createSession()
   const q = options?.q
   if (!q) return
@@ -263,7 +301,6 @@ onLoad((options: Record<string, string> | undefined) => {
     } else {
       inputText.value = q
     }
-    scrollToBottom()
   })
 })
 
@@ -350,6 +387,9 @@ watch(pendingConfirm, (v) => {
     confirmVisible.value = true
     confirmWaiting.value = false
     startConfirmTimer()
+    // 5B（2026-08-17）：confirm_request 到达 = 第 4 个"新交互"入口——复位跟随
+    // 并滚底展示确认框（防阶段 2 fresh run 回答在视口外生长）。
+    resetFollow()
     scrollToBottom()
   } else {
     clearConfirmTimer()
@@ -385,17 +425,81 @@ function handleConfirmClose() {
 }
 
 const inputText = ref('')
+/** 输入模式：text=键盘输入 / voice=按住说话（微信式） */
+const inputMode = ref<'text' | 'voice'>('text')
+/** 是否正在按住说话录制中 */
+const holding = ref(false)
+/** 进行中的按住说话识别 Promise（touchend 结算） */
+let pendingHoldRecognition: Promise<SpeechRecognitionResult> | null = null
 const scrollTop = ref(0)
 
 // Phase 4-2 Task 2：语音输入（平台支持才显示麦克风按钮；isListening 为 UI 镜像，模块状态见 speechInput）
 const speechSupported = isSpeechInputSupported()
 const isListening = ref(false)
 
+// ===== G6 跳转-返回恢复阅读位置（2026-08-17 分歧 #5 收敛：仅 D 出口接线） =====
+// 语义：详情类跳转（改进 23 个股详情）返回时恢复跳转前滚动位置；
+// 会话列表入口与 onHide（前后台）不置位——「会话列表返回=贴底」先例不破；
+// B/C（改进 19 报告详情）不接线，维持既有贴底行为（批次 2 已上线功能不改）。
+const savedScrollTop = ref(0)
+// G6：是否需在下次 onShow 恢复阅读位置（仅 D 出口置位）
+const pendingRestore = ref(false)
+let savedMessageCount = 0
+
+/** 详情跳转前记录阅读位置（由 uni.$emit('chat:leave-context') 触发，navigateTo success 回调发射） */
+function leaveChatContext() {
+  savedScrollTop.value = currentScrollTop
+  savedMessageCount = displayMessages.value.length
+  pendingRestore.value = true
+}
+
+/** 两段式恢复：先 nextTick 设值，50ms 幂等第二次（抗 mp-html 异步渲染）；
+ * 期间 restoreInProgress=true 抑制 onScroll（防小程序端编程式滚动触发 @scroll 回跳）；
+ * 完成后进入暂停跟随态（followPaused=true）——L167「回到最新」按钮兜底，
+ * 用户滚动至近底部时 onScroll isNearBottom 自动恢复跟随。 */
+function restorePosition(target: number) {
+  restoreInProgress.value = true
+  const apply = () => {
+    scrollTop.value = clampScrollTop(
+      target,
+      currentScrollHeight,
+      viewportH.value || DEFAULT_VIEWPORT_PX,
+    )
+  }
+  nextTick(apply)
+  setTimeout(() => {
+    nextTick(() => {
+      apply()
+      restoreInProgress.value = false
+      followPaused.value = true
+    })
+  }, 50)
+}
+
 // 每次进入页面（含从会话列表返回、切会话）默认停留在对话最下方
 onShow(() => {
-  // 改进 16：进入页面默认贴底跟随（重置上滑暂停态，防旧会话残留暂停状态）
-  followPaused.value = false
-  scrollToBottom()
+  // G6（2026-08-17 分歧 #5 收敛）：详情类跳转返回 → 无新推进时恢复阅读位置；
+  // 否则维持既有"回场景=贴底"语义（会话列表返回/首次进入/前后台切换）。
+  if (pendingRestore.value) {
+    pendingRestore.value = false
+    const hasNewProgress =
+      isStreaming.value ||
+      chatStream.hasPendingRun() ||
+      displayMessages.value.length !== savedMessageCount
+    if (hasNewProgress) {
+      // 对话已推进 → 放弃恢复走贴底（新消息优先，硬约束 #6）
+      followPaused.value = false
+      scrollToBottom()
+    } else {
+      restorePosition(savedScrollTop.value)
+      // 恢复分支不执行下方 resume 续跑（已判定无 pending run）
+      return
+    }
+  } else {
+    // 改进 16：进入页面默认贴底跟随（重置上滑暂停态，防旧会话残留暂停状态）
+    followPaused.value = false
+    scrollToBottom()
+  }
   // 问题 15：回页时若存在未完成轮（最后一条是 user）且连接已断开 → 自动 resume 续跑
   if (chatStream.hasPendingRun() && !chatStream.isConnected()) {
     void chatStream.resume()
@@ -425,11 +529,28 @@ let followTimer: ReturnType<typeof setInterval> | null = null
 // 150ms 定时器已停、打字机滚动被 scrollToBottomIfFollowing 守卫（内容仍生长、位置不动）；
 // 「回到最新」按钮点击后恢复跟随。
 const followPaused = ref(false)
+// 5B（2026-08-17 design-debate 定案）：resetFollow 纯复位——仅清暂停态与增量
+// 去重签名，不滚底、不启定时器。所有新发送路径均经 streaming.value=true
+// （useChatStream _stream / sendConfirmResponse），watch(isStreaming, v=true)
+// 是唯一滚底+定时器收口点（硬约束 #3）；此处再滚即双发，spy===1 断言失败。
+function resetFollow() {
+  followPaused.value = false
+  lastFollowSig = ''
+}
 // scroll-view 视口高度（onReady 测量；测量失败/测试环境用默认值兜底，判定仍可用）
 const viewportH = ref(0)
 const DEFAULT_VIEWPORT_PX = 600
 
+// 5B/G6（2026-08-17）：onScroll 最近一次测量的滚动位置/内容高度缓存——
+// G6 恢复原位的数据源（原 scrollTop ref 被 onScroll 局部 const 遮蔽，从不更新）。
+let currentScrollTop = 0
+let currentScrollHeight = 0
+// G6（2026-08-17 分歧 #5 收敛）：恢复执行窗口标志——期间忽略 onScroll，
+// 防小程序端 scroll-top 赋值触发 @scroll → resumeFollow 回跳闪烁。
+const restoreInProgress = ref(false)
+
 function onScroll(e: unknown) {
+  if (restoreInProgress.value) return
   const detail = ((e as { detail?: unknown } | null)?.detail ?? {}) as {
     scrollTop?: unknown
     scrollHeight?: unknown
@@ -437,9 +558,13 @@ function onScroll(e: unknown) {
   const scrollTop = Number(detail.scrollTop) || 0
   const scrollHeight = Number(detail.scrollHeight) || 0
   const viewport = viewportH.value || DEFAULT_VIEWPORT_PX
-  if (isNearBottom(scrollTop, scrollHeight, viewport)) {
+  currentScrollTop = scrollTop
+  if (scrollHeight > 0) currentScrollHeight = scrollHeight
+  // 5B：三态判定——near 恢复跟随；far 暂停跟随；unknown（测失败）保持当前状态不变
+  const proximity = measureProximity(scrollTop, scrollHeight, viewport)
+  if (proximity === 'near') {
     if (followPaused.value) resumeFollow()
-  } else if (!followPaused.value) {
+  } else if (proximity === 'far' && !followPaused.value) {
     pauseFollow()
   }
 }
@@ -535,8 +660,9 @@ watch(isStreaming, (v) => {
     hadStreamText = false
     stopTypewriter()
     typingMsgKey.value = null
-    // 改进 16：上滑暂停跟随后新一轮不强制钉底（等待「回到最新」按钮恢复）；
-    // 恢复跟随态时立即滚底并重启 150ms 定时器
+    // 5B（2026-08-17 定案）：任何发送/点选确认交互已在发送路径前置 resetFollow
+    // （followPaused=false），此处守卫保留作双保险——仅当暂停态由 onScroll 上滑
+    // 触发且尚未发新消息时（如 G6 恢复原位后的暂停跟随态）才生效，不钉底。
     if (followPaused.value) return
     scrollToBottom()
     if (followTimer) clearInterval(followTimer)
@@ -558,7 +684,6 @@ function handleSend() {
   inputText.value = ''
   upsertSessionMeta(content)
   chatStream.send(content)
-  scrollToBottom()
 }
 
 /**
@@ -602,11 +727,45 @@ function showListeningToast() {
   uni.showToast({ title: '正在聆听…，再次点击结束', icon: 'none', duration: 10000 })
 }
 
+/**
+ * Phase 4-2 Task 2（Task 4 扩展）：模式切换（键盘 ⇄ 按住说话，微信式）。
+ * 语音不受支持时不显示切换钮（模板 v-if="speechSupported"），此处再兜底。
+ */
+function toggleInputMode() {
+  if (!speechSupported) return
+  inputMode.value = inputMode.value === 'text' ? 'voice' : 'text'
+}
+
+/** 按住说话：touchstart → 开始录制（同步手势内启动识别），touchend/touchcancel → 停止并回填 */
+async function onHoldStart() {
+  if (holding.value || isStreaming.value) return
+  holding.value = true
+  // 复用既有 isListening 作为 UI 高亮（右 mic 按钮与 hold-talk 同源）
+  isListening.value = true
+  // startSpeechRecognition 需在同步手势内调用；返回 Promise 供 touchend 结算
+  pendingHoldRecognition = startSpeechRecognition()
+}
+
+async function onHoldEnd() {
+  if (!holding.value) return
+  holding.value = false
+  isListening.value = false
+  stopSpeechRecognition() // 提前结束并结算（小程序 stop 触发 onStop；H5 提前收结果）
+  const pending = pendingHoldRecognition
+  pendingHoldRecognition = null
+  if (!pending) return
+  const result = await pending
+  if (result.ok) {
+    inputText.value = result.text
+  } else {
+    uni.showToast({ title: result.error, icon: 'none' })
+  }
+}
+
 function quickAsk(text: string) {
   if (isStreaming.value) return
   upsertSessionMeta(text)
   chatStream.send(text)
-  scrollToBottom()
 }
 
 /**
@@ -669,7 +828,7 @@ function followupQuestions(msg: ChatMessage): string[] {
  */
 function showFeedbackBar(msg: ChatMessage): boolean {
   if (msg.role !== 'assistant' || !msg.content) return false
-  return !msg.content.startsWith('抱歉，出错了') && !msg.content.startsWith('已停止生成')
+  return !msg.content.startsWith('抱歉，出错了') && !msg.content.endsWith('已停止生成')
 }
 
 /**
@@ -683,13 +842,13 @@ function rerunDeep(idx: number) {
     const prev = displayMessages.value[i]
     if (prev && prev.role === 'user') {
       chatStream.send(prev.content, { forceDeep: true })
-      scrollToBottom()
       return
     }
   }
 }
 
 onUnmounted(() => {
+  uni.$off('chat:leave-context', leaveChatContext)
   if (followTimer) {
     clearInterval(followTimer)
     followTimer = null
@@ -856,15 +1015,32 @@ onUnmounted(() => {
 .skill-btn-text { font-size: 24rpx; color: $primary; }
 
 .input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
-.input { flex: 1; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
+.input-wrap { position: relative; flex: 1; min-width: 0; }
+.input { width: 100%; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
+/* mic 图标内嵌输入框右侧：absolute 定位，input 需预留右侧空间避免文字被图标遮挡 */
+.input-mic-btn {
+  position: absolute; right: 10rpx; top: 50%; transform: translateY(-50%);
+  width: 52rpx; height: 52rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.input-mic-btn.active { background: $primary; }
 
-/* Phase 4-2 Task 2：语音输入麦克风按钮（与输入框等高；active=聆听中，品牌色高亮） */
-.mic-btn {
+/* Phase 4-2 Task 2（Task 4 扩展）：左侧模式切换（键盘 / 按住说话），与 mic-btn 同规格 */
+.mode-btn {
   display: flex; align-items: center; justify-content: center;
   width: 72rpx; min-height: 72rpx; border-radius: 12rpx;
   background: $bg-soft; flex-shrink: 0;
 }
-.mic-btn.active { background: $primary; }
+
+/* 按住说话按钮（微信式；touchstart/touchend 驱动，holding 高亮） */
+.hold-talk {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  min-height: 72rpx; border-radius: 12rpx;
+  background: $bg-soft; color: $ink-soft;
+  border: 2rpx solid $line;
+  &.holding { background: $primary-50; color: $primary; border-color: $primary; }
+}
+.hold-talk-text { font-size: 28rpx; }
 
 .send-btn { background: $primary; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
 

@@ -174,12 +174,11 @@ function goToDetail(event: EventItem) {
   })
 }
 
-/** 跳转新闻原文 */
+/** 点击事件标题 → 进入 APP 原文详情页（不跳外部网页，不依赖 WebView） */
 function goToNews(event: EventItem) {
-  const newsId = event.newsId
-  if (newsId) {
-    uni.navigateTo({ url: `/modules/news/pages/detail?id=${newsId}&eventId=${event.eventId}` })
-  }
+  uni.navigateTo({
+    url: `/pages-sub-app/event-article/index?eventId=${event.eventId}`,
+  })
 }
 
 /** 关注/取消关注 */
@@ -230,9 +229,14 @@ async function handleFollow(event: EventItem) {
 
 .headline-cards {
   display: flex;
-  flex-direction: row;
-  gap: 8rpx;
-  align-items: stretch;
+  flex-direction: column; /* 最大利好 / 最大利空 纵向排列 */
+  min-width: 0;
+  /* 卡片间距用 margin 实现（见下方），不依赖 flex gap（部分旧 Android WebView 不渲染 gap） */
+}
+
+/* 双卡纵向排列：第二张卡片起顶部留 8rpx 间距 */
+.headline-cards :deep(.headline-card + .headline-card) {
+  margin-top: 8rpx;
 }
 
 /* 单个重大事件：单卡占满内容宽度（EventHeadlineCard 根节点 flex:1 自动填充） */
