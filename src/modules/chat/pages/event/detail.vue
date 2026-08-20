@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 ref="subPageRef" title="AI事件分析" :subtitle="subtitle" back-url="/modules/chat/pages/event/list">
+  <SubPageCard2 ref="subPageRef" title="事件机会洞见" :subtitle="subtitle" back-url="/modules/chat/pages/event/list">
     <!-- ===== 加载状态 ===== -->
     <template v-if="loading">
       <view class="state-container">

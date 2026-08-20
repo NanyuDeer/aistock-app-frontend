@@ -300,7 +300,7 @@
     {
       "path": "modules/chat/pages/event/detail",
       "style": {
-        "navigationBarTitleText": "AI事件传导解析",
+        "navigationBarTitleText": "事件机会洞见",
         "navigationStyle": "custom",
         "disableScroll": true,
         "h5": { "titleNView": false },
@@ -312,6 +312,15 @@
     {
       "root": "pages-sub-app",
       "pages": [
+        {
+          "path": "event-article/index",
+          "style": {
+            "navigationBarTitleText": "原文详情",
+            "navigationStyle": "custom",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+          }
+        },
         {
           "path": "chat/index",
           "style": {
@@ -378,6 +387,13 @@
             "navigationBarTitleText": "交易复盘",
             "disableScroll": true,
             "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+          }
+        },
+        {
+          "path": "webview/index",
+          "style": {
+            "navigationBarTitleText": "网页",
+            "navigationStyle": "custom"
           }
         }
       ]

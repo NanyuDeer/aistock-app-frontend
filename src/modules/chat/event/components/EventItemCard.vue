@@ -9,14 +9,14 @@
         <Tag size="sm" :type="sourceTagType">
           {{ sourceLabel }}
         </Tag>
-        <text class="card-time">{{ formatTime(event.publishTime) }}</text>
+        <text class="card-time">{{ formatDateTime(event.publishTime) }}</text>
       </view>
       <!-- 重要程度星级：由 chain 最大 impactStrength 映射；无有效评分时隐藏（不显示假评分） -->
       <Rate v-if="event.importance" :modelValue="event.importance" :readonly="true" type="gold" size="18rpx" :gap="2" />
     </view>
 
     <!-- 事件标题（最多2行，点击跳转新闻） -->
-    <text class="card-title" @tap.stop="$emit('view-news', event)">{{ event.title }}</text>
+    <text class="card-title" @click.stop="$emit('view-news', event)">{{ event.title }}</text>
 
     <!-- Top5 影响行业（排序后取前5，横向滑动查看完整名称，隐藏滚动条；空数据展示降级文案） -->
     <scroll-view scroll-x :show-scrollbar="false" class="card-top5">
@@ -81,6 +81,7 @@
 import { computed } from 'vue'
 import type { EventItem } from '../types'
 import { EVENT_TYPE_COLORS } from '../constants'
+import { formatDateTime } from '@/shared/utils/datetime'
 import { Card, Button, Tag, Badge } from '@/shared/components'
 import Rate from '@/shared/components/Rate.vue'
 
@@ -127,16 +128,6 @@ const top5Industries = computed(() => {
     .sort((a, b) => b.impactLevel - a.impactLevel)
     .slice(0, 5)
 })
-
-// ========== 工具函数 ==========
-
-/** 格式化发布时间 */
-function formatTime(time: string): string {
-  if (!time) return ''
-  const d = new Date(time)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time.slice(11, 16)}`
-}
 </script>
 
 <style lang="scss" scoped>

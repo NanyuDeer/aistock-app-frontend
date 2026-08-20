@@ -2132,7 +2132,7 @@ function openNews(news: any) {
     window.open(url, '_blank')
     // #endif
     // #ifndef H5
-    uni.navigateTo({ url: `/modules/chat/pages/webview?url=${encodeURIComponent(url)}` })
+    uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
     // #endif
   } else {
     uni.showToast({ title: '暂无详情', icon: 'none' })
