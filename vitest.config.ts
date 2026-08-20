@@ -59,6 +59,7 @@ export default defineConfig({
       'src/pages-sub-app/chat/cards/SectionCard.spec.ts',
       'src/shared/components/InsightAlertCard.spec.ts',
       'src/shared/components/FloatingPodcast.spec.ts',
+      'src/shared/components/NotificationDropdown.spec.ts',
       'src/shared/utils/floatingEngine.spec.ts',
       'src/modules/favorites/components/InsightDetailLayout.spec.ts',
       'src/modules/favorites/pages/monitor.spec.ts',

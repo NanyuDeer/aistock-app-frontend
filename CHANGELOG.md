@@ -30,6 +30,25 @@
 
 ---
 
+## [master] 2026-08-19 — App 真机 KLineChart 改用 uCharts canvas（renderjs 真机不渲染）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/components/KLineChart.vue`：K 线渲染分支从「H5 || APP-PLUS → renderjs+klinecharts」改为「H5 → renderjs、APP-PLUS || MP-WEIXIN → uCharts canvas」；修复 App 真机（APP-PLUS）WebView 中 renderjs+klinecharts 不渲染导致 K 线空白；H5 保留 klinecharts 交互。
+
+---
+
+## [master] 2026-08-19 — 风口龙头板块「净流入」展示位改为「成交额」（同花顺实时，元）
+
+**开发者**: Aria
+
+### 改进
+- `src/shared/api/modules/stock.ts`：`WindLeaderSector` 类型 `net_inflow` → `amount`（板块当日成交额·元）。
+- `src/modules/market/pages/leaders.vue`、`src/modules/market/pages/sector-detail.vue`：统计格「净流入/formatNetInflow」→「成交额/formatAmount」（元→亿/万）。
+
+---
+
 ## [master] 2026-08-19 — 自选股编辑态 + 多股同列 + 语音输入/图标修复
 
 **开发者**: Aria

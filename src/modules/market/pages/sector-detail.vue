@@ -284,11 +284,13 @@ function formatPct(value: unknown): string {
   return num.toFixed(2) + '%'
 }
 
-function formatNetInflow(value: unknown): string {
+function formatAmount(value: unknown): string {
+  // 成交额（元，同花顺实时；原净流入 net_inflow 已下线）
   const num = toFiniteNumber(value)
   if (num === null) return '--'
-  if (Math.abs(num) >= 10000) return (num / 10000).toFixed(2) + '亿'
-  return Math.round(num) + '万'
+  if (Math.abs(num) >= 1e8) return (num / 1e8).toFixed(2) + '亿'
+  if (Math.abs(num) >= 10000) return (num / 10000).toFixed(0) + '万'
+  return Math.round(num) + '元'
 }
 
 // 改动1: 持续性标签提取到统计卡片头部（只显示"短期"/"中期"/"长期"）
@@ -327,7 +329,7 @@ const sectorStatItems = computed<StatGridItem[]>(() => {
   return [
     { label: '今日涨幅', value: (todayChange >= 0 ? '+' : '') + formatPct(s.today_change), color: todayChange >= 0 ? 'up' : 'down' },
     { label: '均涨幅', value: (avgChange >= 0 ? '+' : '') + formatPct(s.avg_change), color: avgChange >= 0 ? 'up' : 'down' },
-    { label: '净流入', value: formatNetInflow(s.net_inflow) },
+    { label: '成交额', value: formatAmount(s.amount) },
   ]
 })
 

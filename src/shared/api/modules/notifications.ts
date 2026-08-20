@@ -12,6 +12,7 @@ export interface UserNotification {
   targetPath: string
   payload: Record<string, unknown>
   createdAt: string
+  occurredAt?: string
   readAt: string | null
 }
 
