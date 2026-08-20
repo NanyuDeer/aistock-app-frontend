@@ -15,13 +15,15 @@ export interface StockTraceEvent {
   severity: 'medium' | 'high' | 'critical'
   rule_version: string
   analysis_status: 'pending' | 'processing' | 'completed' | 'unavailable'
+  /** 简短主因短语（LLM 生成），列表/卡片展示用；无归因结果为 null */
+  primary_cause?: string | null
   read_at?: string | null
   movement_view?: MovementViewV2 | null
   unavailable?: TraceUnavailableView
 }
 
 export interface MovementCandidate {
-  layer: 'company' | 'sector' | 'market'
+  layer: 'company' | 'sector' | 'market' | 'capital' | 'technical'
   status: 'supported' | 'weak' | 'rejected' | 'insufficient'
   verdict: string
   supportingEvidenceIds: string[]
@@ -53,7 +55,7 @@ export interface StockTraceArtifact {
 
 export interface TraceEvidence {
   source_id: string
-  kind: 'trigger_fact' | 'quote_fact' | 'sector_fact' | 'market_fact' | 'announcement' | 'news'
+  kind: 'trigger_fact' | 'quote_fact' | 'sector_fact' | 'market_fact' | 'announcement' | 'news' | 'capital_fact' | 'technical_fact'
   provider: string
   source_level: 'A' | 'B' | 'C' | 'D'
   title: string

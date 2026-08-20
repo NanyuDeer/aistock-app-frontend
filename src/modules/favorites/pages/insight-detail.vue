@@ -4,7 +4,8 @@
   价格异动洞察见 insight-detail-move.vue（两页独立，列表按 event_type 分流）。
 -->
 <template>
-  <view class="page-insight-detail">
+  <SubPageCard2 title="洞察详情">
+    <view class="page-insight-detail">
     <view v-if="loading" class="state"><text>加载中</text></view>
     <view v-else-if="!detail" class="state"><text>洞察不存在或已过期</text></view>
     <block v-else>
@@ -18,7 +19,8 @@
         <view class="meta">发布时间：{{ detail.published_at }}</view>
       </block>
     </block>
-  </view>
+    </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
@@ -26,6 +28,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import InsightResultBlock from '@/shared/components/InsightResultBlock.vue'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 
 const detail = ref<WatchlistInsight | null>(null)
 const loading = ref(true)
@@ -71,7 +74,6 @@ onLoad(async (query) => {
 @use '@/shared/styles/variables.scss' as *;
 
 .page-insight-detail {
-  min-height: 100%;
   padding: $s-3;
   background: $bg-page;
 }

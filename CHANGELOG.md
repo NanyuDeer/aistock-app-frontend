@@ -2,6 +2,49 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [junliang] 2026-08-20 — 价格异动详情迁移 insight-detail-move + 相对昨收涨跌幅展示
+
+**开发者**: Aria
+
+### 重构
+- `src/modules/favorites/pages/insight-detail-move.vue`：重写为 stocktrace 五层归因详情页（company/sector/market/capital/technical 候选 + 证据包 + 置信度），替代原 movement-detail 页；`movement-detail.vue` / `movement.vue` 删除
+- `src/shared/utils/insightNavigation.ts`：价格异动/stocktrace mv 事件导航从 movement-detail 切到 insight-detail-move；涨停雷达保持 insight-detail
+- `src/pages.json`：删除 movement/movement-detail 路由；insight / insight-detail / insight-detail-move 页改为 custom 导航样式 + disableScroll
+
+### 改进
+- `src/modules/favorites/components/AlertContent.vue`：异动卡片适配（方向/相对昨收涨跌幅/归因短语展示）
+- `src/modules/favorites/pages/insight.vue` / `insight-detail.vue` / `monitor.vue`：归因状态与 primary_cause 展示适配
+- `src/shared/api/modules/insight.ts`：`WatchlistInsight` 新增 `change_pct`（相对昨收涨跌幅，主判定口径）
+- `src/shared/api/modules/stockTrace.ts`：`StockTraceEvent` 新增 `primary_cause`（归因短语，LLM 生成）
+
+### 测试
+- `insight-detail.spec.ts` / `monitor.spec.ts` / `AlertContent.spec.ts`：适配新增字段与详情页逻辑
+
+### 文档
+- `AGENTS.md` / `src/modules/favorites/AGENTS.md` / `src/modules/home/AGENTS.md`：详情页路由与归因展示更新
+
+### 验证
+- vitest 相关用例通过；vue-tsc 0 错误
+
+---
+
+## [junliang] 2026-08-15 — 自选股价格异动归因：movement 列表页/详情页与首页卡片
+
+**开发者**: Aria
+
+### 新增
+- `src/modules/favorites/pages/movement-list.vue`：自选股尾盘价格异动列表页（展示五层归因候选列表，含股票/涨跌/归因摘要/置信度）
+- `src/modules/favorites/pages/movement-detail.vue`：异动详情页（五层候选详情 tab，含 evidence 证据包展示）
+- `src/modules/home/components/MovementCard.vue`：首页"异动捕手"卡片（Top5 异动事件入口，点击跳转 movement 列表页）
+
+### 改进
+- `src/shared/utils/insightNavigation.ts`：insightNavigation 分流逻辑——价格异动类型从 insight-detail 改为 movement-detail 跳转，涨停雷达保持 insight 路径
+
+### 验证
+- vitest 相关用例通过；vue-tsc 0 错误；build:h5 成功
+
+---
+
 ## [master] 2026-08-19 — App 录音改回 amr+8k（HTML5+ 原生；后端转码 PCM 16k 送火山 V3）
 
 **开发者**: Aria
