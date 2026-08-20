@@ -292,3 +292,30 @@ test('G6：clampScrollTop import 已接入（scrollFollow 双导出）', () => {
 test('G6：goSessions 不置位 pendingRestore（仅 D 出口接线，会话列表返回仍贴底）', () => {
   assert.doesNotMatch(pageSource, /goSessions[\s\S]{0,150}pendingRestore/)
 })
+
+// ─── 批次 4（2026）：消息长按操作 + 引导胶囊升级 ───
+
+test('批次4：消息项长按接入（message-item @longpress → 打开操作菜单）', () => {
+  assert.match(pageSource, /@longpress="openMessageActions\(msg\)"/)
+  assert.match(pageSource, /function openMessageActions\(msg: ChatMessage\)/)
+})
+
+test('批次4：长按菜单含复制/删除/重发（ActionSheet 接入 + 危险项删除）', () => {
+  assert.match(pageSource, /<ActionSheet/)
+  assert.match(pageSource, /\{ label: '复制', value: 'copy' \}/)
+  assert.match(pageSource, /\{ label: '重发', value: 'resend' \}/)
+  assert.match(pageSource, /\{ label: '删除', value: 'delete', danger: true \}/)
+})
+
+test('批次4：复制走剪贴板 / 重发回填输入框可编辑 / 删除调用 store.removeMessage', () => {
+  assert.match(pageSource, /uni\.setClipboardData\(\{ data: msg\.content \}\)/)
+  assert.match(pageSource, /inputText\.value = msg\.content/)
+  assert.match(pageSource, /function handleMessageAction\(item: \{ label: string; value: string \}\)/)
+  assert.match(pageSource, /chatStore\.removeMessage\(msg\.timestamp\)/)
+  assert.match(pageSource, /isStreaming\.value\) return \/\/ 流式中禁长按/)
+})
+
+test('批次4：引导提问升级为浅色胶囊按钮（999rpx 圆角 + active 反馈，对齐豆包）', () => {
+  assert.match(pageSource, /\.followup-question \{[\s\S]{0,160}border-radius: 999rpx/)
+  assert.match(pageSource, /\.followup-question:active \{ opacity: 0\.7; \}/)
+})
