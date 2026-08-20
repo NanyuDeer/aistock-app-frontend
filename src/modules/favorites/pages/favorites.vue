@@ -382,7 +382,17 @@ const totalChange = computed(() => {
   return list.reduce((sum, s) => sum + (s.changePercent || 0), 0)
 })
 
-onShow(() => favoritesStore.fetchFavorites({ silent: false }))
+onShow(() => {
+  // 返回自选页时若已持有当前登录态数据，不再整表重新拉取——
+  // 否则在 App.onShow 的 restoreSession 竞态/瞬间 401 把内存 token 置空时，
+  // fetchFavorites 会走进"未登录→塞演示股"分支，导致页面闪一下 5 只演示股再恢复真实自选。
+  // 已就绪时仅原地刷新行情（不复写列表），避免闪屏。
+  if (favoritesStore.hasCurrentData()) {
+    void favoritesStore.refreshQuotes()
+  } else {
+    void favoritesStore.fetchFavorites({ silent: false })
+  }
+})
 
 /* ===== 左滑删除（仅普通态生效；编辑态由勾选/拖拽接管） ===== */
 const openSwipeSymbol = ref('')

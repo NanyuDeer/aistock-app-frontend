@@ -15,7 +15,7 @@
 - `components/StockCard.vue` - 股票卡片
 - `components/StockCardList.vue` - 股票列表
 - `components/KLineChart.vue` - K 线图
-- `components/MiniKLine.vue` - 迷你 K 线（多股同列宫格用；分时/五日为折线，日/周/月为蜡烛+成交量，纯 SVG 跨端）
+- `components/MiniKLine.vue` - 迷你 K 线（多股同列宫格用；分时/五日为折线，日/周/月为蜡烛+成交量；App + H5 走 renderjs 视图层 `createElementNS` 构建真实 SVG，小程序回退到占位"--"）
 - `components/StockDetailTable.vue` - 股票详情表格
 
 ## Hooks

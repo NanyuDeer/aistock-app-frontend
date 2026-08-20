@@ -56,10 +56,16 @@
           <!-- 层级流向图 SVG -->
           <view v-if="flowChartData" class="flow-chart-box">
             <text class="flow-chart-title">层级流向图</text>
-            <!-- #ifdef H5 -->
-            <view v-html="flowChartSvg" class="flow-chart-svg"></view>
+            <!-- #ifdef H5 || APP-PLUS -->
+            <!-- H5 + App 统一走 renderjs 视图层 DOM 注入 SVG（v-html 在 App webview 不渲染切线注入的 svg） -->
+            <view
+              :id="flowHostId"
+              class="flow-chart-svg"
+              :data="flowChartSvgModel"
+              :change:data="flowView.render"
+            />
             <!-- #endif -->
-            <!-- #ifndef H5 -->
+            <!-- #ifndef H5 || APP-PLUS -->
             <view class="flow-chart-fallback">
               <text class="flow-chart-fallback-text">{{ flowChartTextSummary }}</text>
             </view>
@@ -254,6 +260,7 @@
 </template>
 
 <script setup lang="ts">
+// @ts-nocheck -- uni-app renderjs module (flowView) 在正常 vue-tsc 上下文之外编译；首行声明以抑制整 SFC 交叉诊断。
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
@@ -577,6 +584,13 @@ function goStockDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
 }
 
+// ===== renderjs 视图层 DOM 注入：解决 v-html 在 App webview 不渲染 SVG =====
+const flowHostId = `flow_chart_${Date.now()}_${Math.floor(Math.random() * 10000)}`
+const flowChartSvgModel = computed(() => ({
+  hostId: flowHostId,
+  html: flowChartSvg.value,
+}))
+
 // ===== 理由详情弹窗：理由列单行截断，点击查看完整信息（名称/行业/价格/理由） =====
 const modalVisible = ref(false)
 const modalStock = ref<WindLeaderStock | null>(null)
@@ -626,6 +640,26 @@ onLoad((options) => {
   sectorName.value = decodeURIComponent(name)
   loadData()
 })
+</script>
+
+<!-- renderjs 分支：H5 + App 均注入真实 SVG DOM（v-html 在 App webview 不渲染切线注入的 svg）。
+     经 wrap 容器解析再取出 svg，规避 iOS WebKit 对 innerHTML 注入 SVG 命名空间不生效的已知坑。 -->
+<script module="flowView" lang="renderjs">
+// @ts-nocheck -- renderjs 由 uni-app 编译器作为独立的视图层模块编译。
+export default {
+  methods: {
+    render(model) {
+      if (!model || !model.hostId) return
+      const host = document.getElementById(model.hostId)
+      if (!host || !model.html) return
+      host.innerHTML = ''
+      const wrap = document.createElement('div')
+      wrap.innerHTML = model.html
+      const svg = wrap.querySelector('svg')
+      if (svg) host.appendChild(svg)
+    },
+  },
+}
 </script>
 
 <style lang="scss" scoped>
