@@ -33,34 +33,9 @@
 
       <!-- 影响行业 -->
       <view class="industries-container">
-        <!-- 股票趋势图标（自定义迷你图表，组件库无对应组件，保留） -->
-        <view class="trend-icon" :class="`trend-icon--${type}`">
-          <!-- 上升趋势图 -->
-          <svg v-if="type === 'positive'" width="48" height="28" viewBox="0 0 48 28" fill="none">
-            <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
-            <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
-            <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M12 22L18 18L24 20L30 12L36 14L42 6" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M40 6L42 6L42 8" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <!-- 下降趋势图 -->
-          <svg v-else-if="type === 'negative'" width="48" height="28" viewBox="0 0 48 28" fill="none">
-            <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
-            <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
-            <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M12 6L18 10L24 8L30 16L36 14L42 22" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M40 22L42 22L42 20" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <!-- 综合趋势图（紫色波浪） -->
-          <svg v-else width="48" height="28" viewBox="0 0 48 28" fill="none">
-            <path d="M8 4L8 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
-            <path d="M8 24L44 24" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round"/>
-            <path d="M6 6L8 4L10 6" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M42 22L44 24L42 26" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M12 14L18 8L24 20L30 10L36 18L42 12" stroke="#7C3AED" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          </svg>
+        <!-- 股票趋势图标：统一走 SvgIcon，APP/H5 双通道（H5 mask / APP data-URI image） -->
+        <view class="trend-icon">
+          <SvgIcon :name="trendIconName" size="48rpx" :color="trendColor" />
         </view>
 
         <view
@@ -128,6 +103,19 @@ const dirIconColor = computed(() => {
 })
 const fireColor = '#a67c1f' // $gold-deep
 
+// 趋势图标：SvgIcon 资源名（网格用固定灰 #9CA3AF，折线用 currentColor 由下方色值统一替换）
+const trendIconName = computed(() => {
+  if (props.type === 'positive') return 'trend-up-line'
+  if (props.type === 'negative') return 'trend-down-line'
+  return 'trend-mixed-line'
+})
+// 折线颜色，保持与原内联 SVG 视觉一致（红升/绿降/紫综合）
+const trendColor = computed(() => {
+  if (props.type === 'positive') return '#DC2626'
+  if (props.type === 'negative') return '#059669'
+  return '#7C3AED'
+})
+
 // 点击处理
 function handleClick() {
   if (props.eventId) {
@@ -168,6 +156,7 @@ const remainingCount = computed(() => {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   flex: 1;
   width: 100%;
+  min-width: 0; /* 防止双卡横向排列时被内部内容撑破 */
 }
 
 .headline-card.as-card:active {
@@ -202,12 +191,13 @@ const remainingCount = computed(() => {
 /* 内层容器：标题区域更突出；左右 padding 恢复适中，行业区自然高度 */
 .card-inner {
   position: relative;
-  padding: 8rpx 12rpx;
+  padding: 3rpx 12rpx; /* 极致收紧上下留白，仍保留左右 12rpx 呼吸 */
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
-  min-height: 140rpx;
-  /* 移除 max-height 固定值：行业标签换行时需自适应高度，避免截断 */
+  gap: 2rpx; /* 仅保留必要区块间距，几乎贴行 */
+  min-height: 0; /* 不设下限：高度完全由内容决定，杜绝留白 */
+  min-width: 0; /* 窄卡下允许内部收缩，避免行业溢出推宽卡片 */
+  /* 不设 max-height / 固定高度：行业标签换行时自适应，避免截断 */
 }
 
 /* ========== AI装饰光斑 ========== */
@@ -260,7 +250,7 @@ const remainingCount = computed(() => {
   font-size: 24rpx;
   font-weight: 600;
   color: $ink;
-  line-height: 1.3;
+  line-height: 1.2;
   /* 最多两行，超出省略（uni-app H5 用 -webkit-box 多行截断） */
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -276,12 +266,12 @@ const remainingCount = computed(() => {
 .industries-container {
   display: flex;
   align-items: center;
-  gap: 6rpx;
-  row-gap: 4rpx; /* 换行后的行间距 */
   flex-wrap: wrap; /* 行业标签允许换行，避免长行业名挤压/溢出卡片右缘 */
   flex-shrink: 0;
+  min-width: 0; /* 窄卡下行业区可收缩，防止把卡片撑宽 */
   position: relative;
   z-index: 1;
+  /* 间距用 margin 实现（见 .industry-item），避免依赖 flex gap（部分旧 Android WebView 不渲染 gap） */
 }
 
 /* 行业标签：小字号辅助展示，不抢占标题空间 */
@@ -290,9 +280,19 @@ const remainingCount = computed(() => {
   align-items: center;
   font-size: 20rpx;
   font-weight: 500;
-  line-height: 1.4;
-  padding: 2rpx 8rpx;
+  line-height: 1.15; /* 收紧行高，减少行业标签纵向高度 */
+  padding: 1rpx 8rpx; /* 上下仅留 1rpx，几乎贴字 */
   border-radius: $r-xs;
+  white-space: nowrap;
+  margin-right: 6rpx; /* 替代 flex gap 的横向间距 */
+  margin-bottom: 2rpx; /* 换行后的最小行间距 */
+}
+
+/* 行业名称：纵向全宽后空间充足，适当放宽宽度；仍保留省略兜底，防极端长名撑破 */
+.industry-name {
+  max-width: 240rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -317,14 +317,13 @@ const remainingCount = computed(() => {
   color: $ink-mute;
 }
 
-/* ========== 股票趋势图标 ========== */
+/* ========== 股票趋势图标（SvgIcon 渲染，尺寸由 SvgIcon size 决定） ========== */
 .trend-icon {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 48rpx;
-  height: 28rpx;
-  margin-right: 4rpx;
+  margin-right: 6rpx; /* 与行业标签间距保持一致（同 .industry-item） */
   flex-shrink: 0;
 }
 </style>
