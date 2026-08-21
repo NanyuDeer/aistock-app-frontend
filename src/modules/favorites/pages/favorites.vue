@@ -208,7 +208,9 @@ interface StockItem {
 
 /* ===== 排序状态 ===== */
 type SortKey = 'price' | 'changePercent' | 'changeAmount'
-const sortKey = ref<SortKey>('price')
+// sortKey 为 null 表示"未手动排序列"，展示顺序退回用户保存的自选顺序（服务端 sort_order）。
+// 仅在用户点某一列表头时才按该列排序，避免一进入页面就按价格排序。
+const sortKey = ref<SortKey | null>(null)
 const sortDir = ref<'asc' | 'desc'>('asc')
 
 const sortColumns = [
@@ -218,6 +220,7 @@ const sortColumns = [
 ]
 
 function toggleSort(key: SortKey) {
+  // sortKey 为 null（当前按用户顺序）→ 点击某列切换为按该列排序；重复点击同列翻转方向
   if (sortKey.value === key) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   } else {
@@ -250,8 +253,11 @@ function calculateChangeAmount(price: number, changePercent: number): number {
 
 const sortedStocks = computed(() => {
   const list = [...stocks.value]
+  // sortKey 为 null（未手动排序）→ 保持用户保存的自选顺序，不按任何行情列排序
+  if (sortKey.value === null) return list
+  const key: SortKey = sortKey.value // 缓存到局部变量：TS 不把 .value 收窄带进 sort 回调
   const dir = sortDir.value === 'asc' ? 1 : -1
-  return list.sort((a, b) => (a[sortKey.value] - b[sortKey.value]) * dir)
+  return list.sort((a, b) => (a[key] - b[key]) * dir)
 })
 
 /* ===== 编辑态（点击表头编辑图标进入） ===== */
@@ -392,6 +398,10 @@ onShow(() => {
   } else {
     void favoritesStore.fetchFavorites({ silent: false })
   }
+
+  // 一进入页面即恢复为用户保存的自选顺序（不保留上次的排序列选择）
+  sortKey.value = null
+  sortDir.value = 'asc'
 })
 
 /* ===== 左滑删除（仅普通态生效；编辑态由勾选/拖拽接管） ===== */
