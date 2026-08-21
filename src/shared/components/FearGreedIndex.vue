@@ -208,8 +208,8 @@ onMounted(async () => {
     }
     bodyWidthPx.value = Math.round((BODY_WIDTH_RPX * winW.value) / 750)
   }
-  // 初始位置：右侧贴边、屏幕纵向中部
-  posX.value = winW.value - bodyWidthPx.value - EDGE_MARGIN_PX
+  // 初始位置：左侧贴边、屏幕纵向中部（避免默认悬在右侧带来的"乱飘"观感）
+  posX.value = EDGE_MARGIN_PX
   posY.value = Math.round((winH.value - 240) / 2)
 })
 
