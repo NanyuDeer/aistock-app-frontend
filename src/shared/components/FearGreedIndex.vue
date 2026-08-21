@@ -98,8 +98,11 @@ const winW = ref(DESIGN_WIDTH)
 const winH = ref(DESIGN_HEIGHT)
 const bodyWidthPx = ref(Math.round((BODY_WIDTH_RPX * DESIGN_WIDTH) / 750))
 
-const posX = ref(0)
-const posY = ref(0)
+// 初始位置直接定为「左侧贴边、屏幕纵向中部」，声明时就渲染在目标位置，
+// 避免 onMounted 之后才定位导致首帧先出现在左上角再跳变的闪烁。
+// App 端 onMounted 会用真实窗口尺寸重算；H5 端 winH 恒为 DESIGN_HEIGHT，故数值一致不变。
+const posX = ref(EDGE_MARGIN_PX)
+const posY = ref(Math.round((DESIGN_HEIGHT - 240) / 2))
 const dragging = ref(false)
 const startX = ref(0)
 const startY = ref(0)
