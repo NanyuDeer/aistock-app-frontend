@@ -68,7 +68,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { onShow, onLoad } from '@dcloudio/uni-app'
+import { onShow } from '@dcloudio/uni-app'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { useAppStore } from '@/shared/store/modules/app'
 import { getMarketStatus } from '@/shared/utils/tradingTime'
@@ -77,7 +77,6 @@ import InsightAlertCard from '@/shared/components/InsightAlertCard.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
-import { mockTraceEvents, mockInsights } from './monitor.mock'
 import { WS_BASE_URL } from '@/shared/utils/constants'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
@@ -101,8 +100,6 @@ const loading = ref(false)
 const alerts = ref<AlertItem[]>([])
 const wsConnected = ref(false)
 const detecting = ref(false)
-/** `?mock=1` 时注入 mock 事件用于 H5 预览；未开启时仅走真实 API（真实数据保留） */
-const mockEnabled = ref(false)
 let wsTask: UniApp.SocketTask | null = null
 
 const subscribedSymbols = computed(() => favoritesStore.stocks.map(s => s.symbol))
@@ -178,11 +175,7 @@ async function fetchAlerts() {
       stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] })),
     ])
     // 融合后按事件时间倒序：最新异动（含今日价格异动）优先展示
-    let items = [...list.map(toAlertItem), ...page.items.map(movementToAlertItem)]
-    // mock=1 预览：把 mock 事件并入列表顶部，真实 API 数据保留（不替换）
-    if (mockEnabled.value) {
-      items = [...mockInsights.map(toAlertItem), ...mockTraceEvents.map(movementToAlertItem), ...items]
-    }
+    const items = [...list.map(toAlertItem), ...page.items.map(movementToAlertItem)]
     alerts.value = items
       .sort((a, b) => (new Date(b.time).getTime() || 0) - (new Date(a.time).getTime() || 0))
   } catch {
@@ -248,11 +241,6 @@ function goTrace(eventId: string, eventType?: string) {
 onShow(() => {
   favoritesStore.fetchFavorites()
   fetchAlerts()
-})
-
-onLoad((options) => {
-  // H5 预览：?mock=1 注入 mock 事件（真实数据保留，仅演示 stock_trace 各状态渲染）
-  mockEnabled.value = options?.mock === '1'
 })
 
 onMounted(() => {

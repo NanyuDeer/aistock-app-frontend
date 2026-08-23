@@ -126,7 +126,6 @@ import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { watchlistInsightApi, type WatchlistInsight, type InsightEvidenceItem } from '@/shared/api/modules/insight'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import { findMockInsight } from './monitor.mock'
 
 const detail = ref<WatchlistInsight | null>(null)
 const loading = ref(true)
@@ -215,12 +214,6 @@ onLoad(async (query) => {
   let eventId = raw
   try { eventId = decodeURIComponent(raw) } catch { /* 原值非法编码时按原值使用 */ }
   if (!eventId) {
-    loading.value = false
-    return
-  }
-  // mock 事件（监捕手 ?mock=1 注入）：直接渲染本地 mock，不走真实 API
-  if (eventId.startsWith('mock-')) {
-    detail.value = findMockInsight(eventId) ?? null
     loading.value = false
     return
   }

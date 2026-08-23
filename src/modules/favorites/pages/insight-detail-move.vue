@@ -184,7 +184,6 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockTraceApi, type StockTraceEvent, type StockTraceAnalysisResponse, type TraceChain, type TraceEvidence } from '@/shared/api/modules/stockTrace'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import { findMockTrace, buildMockAnalysis } from './monitor.mock'
 
 const detail = ref<StockTraceEvent | null>(null)
 const analysis = ref<StockTraceAnalysisResponse | null>(null)
@@ -347,16 +346,6 @@ onLoad(async (query) => {
   let eventId = raw
   try { eventId = decodeURIComponent(raw) } catch { /* 原值非法编码时按原值使用 */ }
   if (!eventId) {
-    loading.value = false
-    return
-  }
-  // mock 事件（监捕手 ?mock=1 注入）：直接用 mock 事件 + 由 movement_view 合成的归因分析
-  if (eventId.startsWith('mock-')) {
-    const ev = findMockTrace(eventId)
-    if (ev) {
-      detail.value = ev
-      analysis.value = buildMockAnalysis(ev)
-    }
     loading.value = false
     return
   }
