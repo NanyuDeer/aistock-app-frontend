@@ -2,6 +2,25 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-21 — 修复温度计首帧出现在左上角后跳变到左侧中间的闪烁
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/components/FearGreedIndex.vue`：`posX/posY` 初始值由 `0,0`（左上角）改为声明时即初始化到「左侧贴边、屏幕纵向中部」（`EDGE_MARGIN_PX`、`(DESIGN_HEIGHT-240)/2`），首帧直接渲染在目标位置，消除先左上角再移动的闪烁；H5 端 winH 恒为 `DESIGN_HEIGHT` 故 onMounted 不再移动，App 端用真实窗口高度同步重算一次。
+
+---
+
+## [master] 2026-08-21 — 恐贪指数温度计默认位置改为界面左侧中间
+
+**开发者**: Aria
+
+### 改进
+- `src/shared/components/FearGreedIndex.vue`：`onMounted` 初始定位改为**左侧贴边、屏幕纵向中部**（`posX = EDGE_MARGIN_PX`），替代原右侧贴边（视觉"悬空飘动"）；保留可拖拽 + 磁吸左右边缘 + 点击跳恐贪页。
+- 恒显示默认值12、点击无页面的根因不在前端：后端 `/api/fear-greed` 路由漏挂，已由 aistock-app-api 侧修复（见该仓库 CHANGELOG）。
+
+---
+
 ## [changer] 2026-08-20 — 批次4：消息长按操作菜单（复制/删除/重发）+ 引导追问胶囊升级
 
 **开发者**: 37588
