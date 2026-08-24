@@ -438,6 +438,11 @@ import { usePodcastStore } from '@/shared/store/modules/podcast'
 import { useUserStore } from '@/shared/store/modules/user'
 import { LoadingState, EmptyState, Card, Tag, Button } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
+// PDF 导出（仅 H5/Dom 环境可用，见 handleExportPdf 中 document 守卫）。
+// 必须在模块顶部静态 import：若在函数内用动态 import()，会触发 code-splitting，
+// 与 App(app-plus) 的 iife 输出格式冲突（"iife output formats are not supported for code-splitting builds"）。
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 
 // ===== Markdown 分区解析工具（参考 hot-burst-report 模式）=====
 function escapeRegExp(value: string): string {
@@ -631,10 +636,6 @@ async function handleExportPdf() {
       uni.showToast({ title: '报告内容未就绪', icon: 'none' })
       return
     }
-    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-      import('html2canvas'),
-      import('jspdf'),
-    ])
     const canvas = await html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
     const pdf = new jsPDF('p', 'mm', 'a4')
     const pageW = pdf.internal.pageSize.getWidth()

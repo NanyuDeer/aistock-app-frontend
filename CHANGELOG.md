@@ -2,6 +2,27 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-24 — 0.1.1 发版：修复 HBuilder/App 打包失败 + 应用内更新弹窗 + 版本号升至 0.1.1
+
+**开发者**: Aria
+
+### 修复
+- HBuilder/App 打包失败（`Rollup failed to resolve import "@babel/runtime/helpers/typeof"` 与 `iife ... not supported for code-splitting`）：
+  - `src/modules/chat/pages/agent-report.vue`：PDF 导出 `html2canvas`/`jspdf` 改为文件顶部静态 import，移除函数内动态 `import()`（动态导入触发 code-splitting，与 App 的 iife 输出冲突）。
+  - `vite.config.ts`：App(app-plus) 平台将 `jspdf` alias 到自包含的 UMD 构建（`jspdf/dist/jspdf.umd.min.js`，无动态 import）；删除与 uni `manualChunks` 冲突的 `forceInlineDynamicImports` 插件。
+  - `package.json`/`pnpm-lock.yaml`：补齐 `@babel/runtime`、`fflate`、`fast-png`、`dompurify`、`canvg`、`core-js`、`stackblur-canvas`、`svg-pathdata`、`text-segmentation`、`raf`、`rgbcolor`、`iobuffer`、`pako` 到顶层依赖。
+
+### 新增
+- 应用内版本更新弹窗（更新操作入口 + 永久关闭版本标记）：
+  - `src/shared/utils/useAppUpdate.ts`：启动检查移除 24h 节流，写入全局 `updatePromptState`；新增「永久关闭」标记（`app_update_never_v{versionCode}`）与 `neverUpdateStorageKey`/`isNeverUpdate`/`downloadAndInstall`。
+  - `src/shared/components/UpdateModal.vue`：复用 `Modal`+`Button` 的更新弹窗，「立即更新」/「永久关闭」/仅叉掉下次仍提示。
+  - `src/shared/components/MainTabs.vue`、`src/modules/user/pages/profile.vue`、`src/shared/components/index.ts`：挂载 `<UpdateModal />`。
+
+### 变更
+- `src/manifest.json`：`versionName` 0.1.0→0.1.1，`versionCode` 100→101（触发存量用户自动更新）。
+
+---
+
 ## [master] 2026-08-24 — 恐贪指数悬浮温度计改为首页晨报头部入口按钮
 
 **开发者**: 林晓研
