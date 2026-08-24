@@ -43,6 +43,7 @@
           :data="klineMap.get(stock.symbol) || []"
           :period="period"
           :trend-up="(stock.changePercent ?? 0) >= 0"
+          :show-volume="true"
           height="220rpx"
         />
       </view>
