@@ -2,6 +2,20 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-24 — 自选分时图盘中实时刷新 + mini 分时视觉优化
+
+**开发者**: Aria
+
+### 新增
+- `favorites` 分时图模式盘中实时刷新：`fenshiMode` 开启且处于 A 股交易时段内，每分钟轮询拉取全部分时覆盖缓存（`refreshMinuteData`/`syncMinuteRefresh`）；定时器由 `watch(fenshiMode)`/`onShow`/`onUnmounted` 管理，非交易时段自动停止。
+
+### 改进
+- `MiniKLine` 分时折线视觉：折线/均价线/蜡烛影线加 `vector-effect=non-scaling-stroke`，消除 `preserveAspectRatio=none` 非等比拉伸导致的线宽不均；分时不画成交量时价格区扩展至画布底部，消除底部空白带；`buildScale` 支持下边界参数。
+- `favorites` 分时图尺寸：mini 高度收敛至 82rpx（与行高一致）、宽度加宽至 320rpx；新增 `showVolume`/`showAvg`/`maxLinePoints` 控制项。
+- `favorites-grid` 分时图开启成交量柱。
+
+---
+
 ## [master] 2026-08-24 — 应用内版本更新 + 报告导出 PDF + 分时图优化
 
 **开发者**: NanyuDeer

@@ -60,14 +60,32 @@ export function buildLineGroupsRaw(period: MiniPeriod, data: KLineItem[]): LineG
   }]
 }
 
+/** 取最近一个交易日的分时原始序列（含 volume，供折线+成交量对齐渲染） */
+export function buildMinuteSeries(data: KLineItem[]): KLineItem[] {
+  const groups = groupByDate(data)
+  return groups.length ? [...groups[groups.length - 1][1]] : data
+}
+
+/** 均匀降采样：把序列压到 <=maxPoints 个点并保留首尾；maxPoints<=0 或长度不足时原样返回。
+ *  用于"降低分时折线精度/毛刺"（列表页紧凑行不画全部分时点）。 */
+export function downsampleItems<T>(items: T[], maxPoints: number): T[] {
+  const n = items.length
+  if (maxPoints <= 0 || n <= maxPoints || n < 2) return items
+  const step = (n - 1) / (maxPoints - 1)
+  const out: T[] = []
+  for (let i = 0; i < maxPoints; i++) out.push(items[Math.round(i * step)])
+  return out
+}
+
 /** 折线可渲染判定：任一分组有效收盘价 >=2（分时至少 2 个分笔点才画得出折线） */
 export function isLineRenderable(period: MiniPeriod, data: KLineItem[]): boolean {
   if (!isLinePeriod(period)) return false
   return buildLineGroupsRaw(period, data).some((g) => g.values.length >= 2)
 }
 
-/** 生成价格区域 y 映射（统一按全部折线点归一化，保证五日各日同尺度可比）；<2 点返回 null */
-export function buildScale(values: number[]): PriceScale | null {
+/** 生成价格区域 y 映射（统一按全部折线点归一化，保证五日各日同尺度可比）；<2 点返回 null。
+ *  默认价格区下边界为 PRICE_BOTTOM（保留成交量带）；折线不画成交量时传 VIEW_H 消除底部空白带。 */
+export function buildScale(values: number[], bottom = PRICE_BOTTOM): PriceScale | null {
   const nums = values.filter((v) => Number.isFinite(v))
   if (nums.length < 2) return null
   let min = Math.min(...nums)
@@ -81,6 +99,6 @@ export function buildScale(values: number[]): PriceScale | null {
   max += pad
   const range = max - min || 1
   return {
-    yFor: (v: number) => PRICE_TOP + ((max - v) / range) * (PRICE_BOTTOM - PRICE_TOP),
+    yFor: (v: number) => PRICE_TOP + ((max - v) / range) * (bottom - PRICE_TOP),
   }
 }
