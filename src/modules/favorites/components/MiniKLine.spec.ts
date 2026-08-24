@@ -11,6 +11,8 @@ import {
   isLineRenderable,
   groupByDate,
   buildScale,
+  buildMinuteSeries,
+  downsampleItems,
 } from './miniKLineLogic'
 
 const mk = (date: string, close: number): KLineItem => ({
@@ -78,4 +80,30 @@ describe('MiniKLine 分时折线判定', () => {
     if (!scale) return
     expect(scale.yFor(20)).toBeLessThan(scale.yFor(10))
   })
+
+  it('buildMinuteSeries 只取最近交易日原始序列（含 volume，不过滤）', () => {
+    const series = buildMinuteSeries(twoDaySeries())
+    expect(series.length).toBeGreaterThanOrEqual(2)
+    expect(typeof series[0].volume).toBe('number')
+  })
+
+  it('downsampleItems 压到 maxPoints 并保留首尾；<=0 或长度不足原样返回', () => {
+    const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    const out = downsampleItems(arr, 4)
+    expect(out).toHaveLength(4)
+    expect(out[0]).toBe(0)
+    expect(out[out.length - 1]).toBe(9)
+    expect(downsampleItems(arr, 0)).toBe(arr)
+    expect(downsampleItems(arr, 20)).toBe(arr)
+    expect(downsampleItems([1], 10)).toEqual([1])
+  })
 })
+
+function twoDaySeries(): KLineItem[] {
+  return [
+    mk('2026-08-24 09:30', 10.2),
+    mk('2026-08-24 09:31', 10.5),
+    mk('2026-08-24 09:32', 10.4),
+    mk('2026-08-21 09:30', 9.5),
+  ]
+}

@@ -42,6 +42,9 @@
 
     <!-- 播报悬浮窗（首页晨报等调用 podcastStore.open 后显示；仅首页前台时渲染） -->
     <FloatingPodcast :page-key="pageKey" />
+
+    <!-- 应用内版本更新弹窗（首页为启动首屏，覆盖启动自动检查；仅前台页面可见） -->
+    <UpdateModal />
   </view>
 </template>
 
@@ -52,6 +55,7 @@ import AppBottomBar from '@/shared/components/AppBottomBar.vue'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import FloatingPodcast from '@/shared/components/FloatingPodcast.vue'
 import FearGreedIndex from '@/shared/components/FearGreedIndex.vue'
+import UpdateModal from '@/shared/components/UpdateModal.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import NotificationDropdown from '@/shared/components/NotificationDropdown.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
