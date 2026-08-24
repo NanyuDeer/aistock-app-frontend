@@ -8,6 +8,8 @@ export interface StockTraceEvent {
   event_type: 'price'
   direction: 'up' | 'down'
   triggered_at: string
+  /** 最近触发/窗口更新时间：事件窗口合并时每次检测都会刷新，列表按此展示"最近异动" */
+  window_end_at?: string | null
   latest_price: number
   previous_close: number
   change_pct: number
