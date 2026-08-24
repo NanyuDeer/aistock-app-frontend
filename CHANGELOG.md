@@ -2,7 +2,7 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
-## [master] 2026-08-24 — 0.1.2 发版：修复 APP 启动白屏 + 版本号升至 0.1.2
+## [master] 2026-08-24 — 0.1.1 发版：修复 APP 启动白屏 + 版本号保持 0.1.1（修复开发版 bug）
 
 **开发者**: Aria
 
@@ -17,8 +17,8 @@
   - `package.json`/`pnpm-lock.yaml`：显式新增 `performance-now ^2.1.0`（raf 的运行依赖），让 Rollup 能解析并打包。
 
 ### 变更
-- `src/manifest.json`：`versionName` 0.1.1→0.1.2，`versionCode` 101→102（触发存量用户自动更新）。
-- `public/download/version.json`（Web 端）：`versionName` 0.1.2/`versionCode` 102，`downloadUrl` 指向 `aistock-0.1.2.apk`，文案由 APP 介绍改为本次更新内容。
+- `src/manifest.json`：`versionName` 保持 0.1.1，`versionCode` 保持 101（修复开发版 bug，正式版仍为 0.1.1）。
+- `public/download/version.json`（Web 端）：`versionName` 0.1.1/`versionCode` 101，`downloadUrl` 指向 `aistock-0.1.1.apk`，文案由 APP 介绍改为本次更新内容。
 
 ---
 
