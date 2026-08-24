@@ -1,5 +1,15 @@
 # Changelog Pending
 
+## 2026-08-24 分时 mini 折线图修复 + favorites 表头"三横线"分时切换
+- 背景：favorites-grid 宫格卡片"分时"档位被反馈图形不显示；favorites 自选页表头"三横线"按钮无事件。根因排查：后端 klt=1 实测返回 482 行完整分时数据（来源腾讯财经），数据源/解析/路由均正常且已有覆盖测试 → 根因非后端空数据，落在前端渲染侧。
+- 文件：`src/modules/favorites/components/MiniKLine.vue`、新增 `src/modules/favorites/components/miniKLineLogic.ts`、新增 `src/modules/favorites/components/MiniKLine.spec.ts`、`src/modules/favorites/pages/favorites.vue`、`vitest.config.ts`
+- 改动：
+  - 抽离 MiniKLine 纯逻辑至 `miniKLineLogic.ts`（isLinePeriod/groupByDate/buildLineGroupsRaw/isLineRenderable/buildScale），组件复用；分时/五日折线可渲染判定收敛为 `isLineRenderable`（分时最近交易日 ≥2 有效收盘价）
+  - `renderable` 折线分支改用 `isLineRenderable`；分时"下方面积"基线由 `VOL_BOTTOM(96)` 修正为 `PRICE_BOTTOM(78)`，止于价格区底部（贴合同花顺分时排版）
+  - 新增 `MiniKLine.spec.ts`：7 条 vitest 用例锁定分时/五日折线判定与分组/尺度（RED→GREEN），并纳入 `vitest.config.ts` include
+  - favorites.vue 表头"三横线"（menu-line）按钮点击切换 `fenshiMode`：开启后每行 `.stock-right` 替换为 `MiniKLine` 分时折线（`:data="minuteCache.get(symbol) || []"` period=minute），图标高亮 `#0b5fff`；再次点击恢复 最新/涨幅/涨跌。分时数据 `shallowRef` Map 按 symbol 懒加载缓存（仅补缺失，切回不重拉）
+- 验证：`npx vitest run src/modules/favorites/components/MiniKLine.spec.ts` 7 passed；`npm run type-check` 通过
+
 ## 2026-08-24 应用内版本更新闭环（发布 SOP）
 - 背景：打通「新装包后用户点开即见更新提醒 → 可选下载 → 系统引导安装」闭环；补齐打包发布流程供每次发版复用
 - 文件：`src/shared/utils/useAppUpdate.ts`、`src/shared/api/modules/appUpdate.ts`、`version.json` 策略、Web `public/download/version.json`
