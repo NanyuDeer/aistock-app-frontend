@@ -14,9 +14,14 @@ const testDetail = {
   event_id: 'd1', symbol: '600519', stock_name: '贵州茅台',
   trade_date: '2026-08-07', event_type: 'limit_up_radar',
   direction: 'up', attribution_status: 'confirmed', confidence: 'high',
-  primary_driver: { label: '白酒板块', category: 'industry_theme', confidence: 'high' },
+  open_price: 1380, latest_price: 1492.35, change_pct: 10,
+  primary_driver: { label: '白酒板块', category: 'industry_theme', confidence: 'high', evidence_quote: '白酒景气度回升' },
   secondary_drivers: [{ label: '直销占比', category: 'company_event', confidence: 'medium' }],
   display_report: { summary: '摘要', details: '详情内容' },
+  evidence_package: [
+    { source_id: 'e1', source_type: 'rating', provider: '东方证券', title: '上调目标价', published_at: '2026-08-07' },
+    { source_id: 'e2', source_type: 'news', title: '板块净流入', published_at: '2026-08-07' },
+  ],
   source_id: 's1',
   title: '原始来源标题',
   keywords: ['白酒', '批价'],
@@ -31,15 +36,6 @@ vi.mock('@/shared/components/SubPageCard2.vue', () => ({
     name: 'SubPageCard2',
     props: ['title', 'subtitle'],
     template: '<view class="subpage-stub"><slot /></view>',
-  },
-}))
-
-// InsightResultBlock 桩（避免渲染真实组件，专注验证页面层逻辑）
-vi.mock('@/shared/components/InsightResultBlock.vue', () => ({
-  default: {
-    name: 'InsightResultBlock',
-    props: ['insight'],
-    template: '<view class="irb-stub" />',
   },
 }))
 
@@ -74,20 +70,23 @@ describe('insight-detail.vue 洞察详情页', () => {
     expect(wrapper.find('.state').text()).toContain('加载中')
   })
 
-  it('接口成功 → 渲染 InsightResultBlock', async () => {
+  it('接口成功 → 渲染报价头、主因判定卡、归因明细、证据时间线与来源', async () => {
     insightApiMock.getInsightDetail.mockResolvedValue(testDetail)
     const wrapper = mount(insightDetail)
     await flushPromises()
-    const block = wrapper.findComponent({ name: 'InsightResultBlock' })
-    expect(block.exists()).toBe(true)
-    expect(block.props('insight').event_id).toBe('d1')
+    expect(wrapper.find('.quote').exists()).toBe(true)
+    expect(wrapper.find('.hero-card').exists()).toBe(true)
+    expect(wrapper.find('.rows .row').exists()).toBe(true)
+    expect(wrapper.find('.timeline .tl-item').exists()).toBe(true)
+    expect(wrapper.find('.source .src').text()).toContain('原始来源标题')
+    expect(wrapper.find('.state').exists()).toBe(false)
   })
 
   it('接口返回空 → 展示空状态', async () => {
     insightApiMock.getInsightDetail.mockResolvedValue(null)
     const wrapper = mount(insightDetail)
     await flushPromises()
-    expect(wrapper.findComponent({ name: 'InsightResultBlock' }).exists()).toBe(false)
+    expect(wrapper.find('.quote').exists()).toBe(false)
     expect(wrapper.find('.state').exists()).toBe(true)
   })
 
@@ -95,7 +94,7 @@ describe('insight-detail.vue 洞察详情页', () => {
     insightApiMock.getInsightDetail.mockRejectedValue(new Error('network'))
     const wrapper = mount(insightDetail)
     await flushPromises()
-    expect(wrapper.findComponent({ name: 'InsightResultBlock' }).exists()).toBe(false)
+    expect(wrapper.find('.quote').exists()).toBe(false)
     expect(wrapper.find('.state').exists()).toBe(true)
   })
 

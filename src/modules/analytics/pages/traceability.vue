@@ -3,6 +3,9 @@
     <SubPageCard title="市场洞见">
       <template #header-right>
         <view class="header-right-actions">
+          <view v-if="displayedDate" class="date-label">
+            <text class="date-label-text">{{ displayedDate }}</text>
+          </view>
           <view class="history-btn" @tap="goPredictionHistory">
             <text class="history-btn-text">预测验证</text>
           </view>
@@ -55,6 +58,20 @@
           </view>
         </view>
       </view>
+
+      <!-- 日期切换（放在 footer 插槽，固定在底部不依赖 scroll-view 滚动） -->
+      <template #footer>
+        <view class="date-nav">
+          <view class="date-btn" @click="changeDate(-1)">
+            <SvgIcon name="arrow-left-line" size="32rpx" color="#0b5fff" />
+            <text class="date-btn-text">前一天</text>
+          </view>
+          <view class="date-btn" @click="changeDate(1)">
+            <text class="date-btn-text">后一天</text>
+            <SvgIcon name="arrow-right-line" size="32rpx" color="#0b5fff" />
+          </view>
+        </view>
+      </template>
     </SubPageCard>
   </view>
 </template>
@@ -67,8 +84,9 @@ import { LoadingState, EmptyState, Button, Card } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { MarketTraceReviewRecord } from '@/shared/api/modules/agent'
 import { predictionApi } from '@/shared/api/modules/prediction'
-import { shanghaiDateString, shanghaiDateTimeParts } from '@/shared/utils/tradingTime'
+import { shanghaiDateString, shanghaiDateTimeParts, addCalendarDays } from '@/shared/utils/tradingTime'
 import { traceDateCandidates } from '@/shared/utils/traceDate'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import { toMarketTracePresentation, type MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 import MarketTraceHeader from '@/modules/analytics/components/MarketTraceHeader.vue'
@@ -96,31 +114,35 @@ const markdownHtml = computed(() => {
   return presentation.value ? markdownToHtml(presentation.value.markdownDetails) : ''
 })
 
-async function fetchData() {
+/** 当前导航到的目标交易日（切日基准；默认今天） */
+const date = ref(shanghaiDateString())
+
+async function fetchData(strictTarget?: string) {
   loading.value = true
   error.value = false
   presentation.value = null
   reportAvailability.value = null
   predictErr.value = false
 
-  const today = shanghaiDateString()
-
   try {
-    for (const date of traceDateCandidates(today, 3)) {
+    // strictTarget 提供时严格只看该日（切日不回退）；否则从 date 起向前回退找最近 completed（进入页面/轮询默认体验）
+    const candidates = strictTarget ? [strictTarget] : traceDateCandidates(date.value, 3)
+
+    for (const cdate of candidates) {
       const [record, predResp] = await Promise.all([
-        agentApi.getMarketTraceReview(date),
+        agentApi.getMarketTraceReview(cdate),
         predictionApi
-          .list({ source_id: `review:${date}` })
+          .list({ source_id: `review:${cdate}` })
           .then((r) => ({ ok: true as const, r }))
           .catch(() => ({ ok: false as const, r: null })),
       ])
 
       // 找到已完成报告：采用该日期，并落 prediction（失败则 predictErr，占位给重试）
       if (record && record.status === 'completed') {
-        const model = toMarketTracePresentation(record, date, predResp.ok ? (predResp.r?.items?.[0] ?? null) : null)
+        const model = toMarketTracePresentation(record, cdate, predResp.ok ? (predResp.r?.items?.[0] ?? null) : null)
         if (model) {
           fetchedReport.value = record
-          displayedDate.value = date
+          displayedDate.value = cdate
           predictErr.value = !predResp.ok
           // 清除此前候选日残留的 'pending'，确保已采用的历史报告正常展示
           reportAvailability.value = null
@@ -135,6 +157,11 @@ async function fetchData() {
       if (record && (record.status === 'queued' || record.status === 'processing')) {
         reportAvailability.value = 'pending'
       }
+      // 严格目标模式：该日无 completed 即结束，不回退到更早日期
+      if (strictTarget) {
+        if (!reportAvailability.value) reportAvailability.value = 'failed'
+        return
+      }
       // 其余（null / failed / pending）：继续向前回退到更早日期
     }
 
@@ -147,6 +174,21 @@ async function fetchData() {
   } finally {
     loading.value = false
   }
+}
+
+/** 前一天/后一天：按交易日历跳档，自动跳过非交易日；接口异常时退回自然日加减 */
+async function changeDate(delta: number) {
+  let target: string
+  try {
+    target = delta > 0
+      ? await agentApi.getNextTradingDay(date.value)
+      : await agentApi.getPreviousTradingDay(date.value)
+  } catch (err) {
+    console.error('切换交易日失败，退回自然日加减:', err)
+    target = addCalendarDays(date.value, delta)
+  }
+  date.value = target
+  await fetchData(target)
 }
 
 /** 预判卡片空态占位文案：失败态 / 回退日期 / 当日分时感知 */
@@ -240,6 +282,43 @@ onUnload(stopRefreshTimer)
 
 .history-btn-text {
   font-size: $font-size-sm;
+  color: $primary;
+  font-weight: 500;
+}
+
+.date-label {
+  padding: 8rpx 16rpx;
+  background: $bg-soft;
+  border-radius: $r-xs;
+}
+
+.date-label-text {
+  font-size: $font-size-sm;
+  color: $text-color-secondary;
+  font-weight: 500;
+}
+
+/* 底部日期切换（对齐 agent-report.vue 的 date-nav） */
+.date-nav {
+  display: flex;
+  justify-content: space-between;
+  padding: 16rpx 32rpx;
+  background: $bg-page;
+  border-top: 2rpx solid $line-soft;
+}
+
+.date-btn {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 14rpx 22rpx;
+  background: #ffffff;
+  border-radius: 999rpx;
+  box-shadow: 0 2rpx 8rpx rgba(11, 95, 255, 0.08);
+}
+
+.date-btn-text {
+  font-size: 26rpx;
   color: $primary;
   font-weight: 500;
 }

@@ -42,7 +42,10 @@
             <view class="tool-icon-btn" @tap="enterEdit">
               <SvgIcon name="edit-line" size="28rpx" color="#9ca3af" />
             </view>
-            <SvgIcon name="menu-line" size="28rpx" color="#9ca3af" />
+            <!-- 三横线按钮：点击切换"分时图"模式（开启后每行右侧替换为 mini 分时折线，再次点击恢复价格文本） -->
+            <view class="tool-icon-btn" @tap="toggleFenshiMode">
+              <SvgIcon name="menu-line" size="28rpx" :color="fenshiMode ? '#0b5fff' : '#9ca3af'" />
+            </view>
             <view class="tool-icon-btn" @tap="goGrid">
               <SvgIcon name="grid-line" size="28rpx" color="#9ca3af" />
             </view>
@@ -133,7 +136,19 @@
                   <text class="ask-ai-btn" @tap.stop="askAi(stock)">问 AI</text>
                 </view>
               </view>
-              <view class="stock-right">
+              <!-- 普通态：fenshiMode 开启 → 该行右侧显示 mini 分时折线；否则原 最新/涨幅/涨跌 -->
+              <template v-if="fenshiMode">
+                <view class="stock-right">
+                  <MiniKLine
+                    :data="minuteCache.get(stock.symbol) || []"
+                    period="minute"
+                    :trend-up="(stock.changePercent ?? 0) >= 0"
+                    height="120rpx"
+                    class="stock-mini-minute"
+                  />
+                </view>
+              </template>
+              <view v-else class="stock-right">
                 <text class="stock-price">{{ stock.price ? stock.price.toFixed(2) : '--' }}</text>
                 <text :class="['stock-change', stock.changePercent >= 0 ? 'up' : 'down']">
                   {{ stock.changePercent >= 0 ? '+' : '' }}{{ stock.changePercent.toFixed(2) }}%
@@ -187,13 +202,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { buildStockQuestion } from '@/shared/utils/chatSuggestions'
+import { stockApi, type KLineItem } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
+import MiniKLine from '@/modules/favorites/components/MiniKLine.vue'
 
 /* ===== 类型定义 ===== */
 interface StockItem {
@@ -208,7 +225,9 @@ interface StockItem {
 
 /* ===== 排序状态 ===== */
 type SortKey = 'price' | 'changePercent' | 'changeAmount'
-const sortKey = ref<SortKey>('price')
+// sortKey 为 null 表示"未手动排序列"，展示顺序退回用户保存的自选顺序（服务端 sort_order）。
+// 仅在用户点某一列表头时才按该列排序，避免一进入页面就按价格排序。
+const sortKey = ref<SortKey | null>(null)
 const sortDir = ref<'asc' | 'desc'>('asc')
 
 const sortColumns = [
@@ -218,6 +237,7 @@ const sortColumns = [
 ]
 
 function toggleSort(key: SortKey) {
+  // sortKey 为 null（当前按用户顺序）→ 点击某列切换为按该列排序；重复点击同列翻转方向
   if (sortKey.value === key) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   } else {
@@ -228,6 +248,38 @@ function toggleSort(key: SortKey) {
 
 /* ===== 数据 ===== */
 const favoritesStore = useFavoritesStore()
+
+/* ===== 分时图模式（表头"三横线"按钮）：开启后每行价格区替换为 mini 分时折线，再点恢复价格文本 ===== */
+const fenshiMode = ref(false)
+/** 分时数据缓存（首次开启后懒加载，按 symbol：key 已有缓存则切回不再请求，去重逻辑见 ensureMinuteData） */
+const minuteCache = shallowRef(new Map<string, KLineItem[]>())
+
+function toggleFenshiMode() {
+  fenshiMode.value = !fenshiMode.value
+  // 开启时按需补齐当前自选的全部分时数据（仅缓存缺失的 symbol）
+  if (fenshiMode.value) void ensureMinuteData()
+}
+
+/** 按需拉取全部自选股分时数据并缓存；自选列表增删后下次开启会补齐缺失 symbol */
+async function ensureMinuteData() {
+  const list = stocks.value
+  if (!list.length) return
+  const toFetch = list.filter((s) => !minuteCache.value.has(s.symbol))
+  if (!toFetch.length) return
+  try {
+    const results = await Promise.allSettled(
+      toFetch.map((s) => stockApi.getKLine(s.symbol, { period: 'minute', count: 300 })),
+    )
+    const next = new Map(minuteCache.value)
+    results.forEach((r, i) => {
+      const symbol = toFetch[i].symbol
+      next.set(symbol, r.status === 'fulfilled' && Array.isArray(r.value) ? r.value : [])
+    })
+    minuteCache.value = next
+  } catch {
+    // 个别股票获取失败不影响整体；已成功项也保留在缓存中
+  }
+}
 
 const stocks = computed<StockItem[]>(() => {
   const list = favoritesStore.stocks
@@ -250,8 +302,11 @@ function calculateChangeAmount(price: number, changePercent: number): number {
 
 const sortedStocks = computed(() => {
   const list = [...stocks.value]
+  // sortKey 为 null（未手动排序）→ 保持用户保存的自选顺序，不按任何行情列排序
+  if (sortKey.value === null) return list
+  const key: SortKey = sortKey.value // 缓存到局部变量：TS 不把 .value 收窄带进 sort 回调
   const dir = sortDir.value === 'asc' ? 1 : -1
-  return list.sort((a, b) => (a[sortKey.value] - b[sortKey.value]) * dir)
+  return list.sort((a, b) => (a[key] - b[key]) * dir)
 })
 
 /* ===== 编辑态（点击表头编辑图标进入） ===== */
@@ -392,6 +447,10 @@ onShow(() => {
   } else {
     void favoritesStore.fetchFavorites({ silent: false })
   }
+
+  // 一进入页面即恢复为用户保存的自选顺序（不保留上次的排序列选择）
+  sortKey.value = null
+  sortDir.value = 'asc'
 })
 
 /* ===== 左滑删除（仅普通态生效；编辑态由勾选/拖拽接管） ===== */
@@ -774,6 +833,13 @@ function goSearch() {
   background: rgba(77, 124, 254, 0.1);
   padding: 1rpx 10rpx;
   border-radius: 8rpx;
+}
+
+/* 分时图模式：行右侧 mini 分时折线宽度固定，避免挤压名称区 */
+.stock-mini-minute {
+  width: 240rpx;
+  height: 120rpx;
+  flex-shrink: 0;
 }
 
 .stock-right {

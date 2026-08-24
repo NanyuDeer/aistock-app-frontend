@@ -130,6 +130,20 @@
 - `src/modules/fear-greed/pages/index.vue`：图表下方新增均线数值区——5日/20日/60日均线当前值，颜色随热度区间变化
 - `src/modules/fear-greed/pages/index.vue`：AI 情绪洞见卡片新增「冰点反弹统计」——从历史数据计算冰点出现次数、次日反弹概率、平均反弹幅度，配套数据驱动洞见文字（≥70% 高概率 / ≥50% 中等 / <50% 趋势性下跌三档解读）
 
+## [master] 2026-08-24 — 应用内版本更新 + 报告导出 PDF + 分时图优化
+
+**开发者**: NanyuDeer
+
+### 新增
+- 报告导出：`agent-report` 详情页"概览"按钮替换为"导出 PDF"（`isVip` 会员解锁，非会员 toast 提示）；`jspdf` + `html2canvas` 生成多页 A4 PDF，修复多页分片截断并优化单次编码性能；`UserInfo`/store 接入 `isVip`。
+- 分时图：`favorites` 表头"三横线"按钮开启每行 mini 分时图（懒加载缓存、涨红跌绿、图标高亮）；`MiniKLine` 分时折线修复（面积基线修正 + 纯逻辑抽离 `miniKLineLogic.ts` + TDD 7 用例）。
+
+### 改进
+- 应用内版本更新：更新弹窗展示版本号+文件大小、安装失败引导开启"安装未知应用"、`plus.runtime.install` 失败兜底 `openFile`；记录发布 SOP。
+
+### 文档
+- 修正分时 mini 图修复范围表述，标注需真机实证。
+
 ---
 
 ## [master] 2026-08-21 — 修复温度计首帧出现在左上角后跳变到左侧中间的闪烁

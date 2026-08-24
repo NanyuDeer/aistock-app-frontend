@@ -25,7 +25,20 @@
 // @ts-nocheck -- uni-app renderjs module (miniView) 在正常 vue-tsc 上下文之外编译；首行声明以抑制整 SFC 交叉诊断。
 import { computed } from 'vue'
 import type { KLineItem } from '@/shared/api/modules/stock'
+import {
+  VIEW_W,
+  PRICE_BOTTOM,
+  VOL_TOP,
+  VOL_BOTTOM,
+  isLinePeriod,
+  buildLineGroupsRaw,
+  isLineRenderable,
+  buildScale,
+} from './miniKLineLogic'
 
+// 供页面以 `MiniKLine, { type MiniPeriod }` 跨文件 type 导入
+// （script setup 中 `export type {} from ...` 重导不会被 vue-tsc 识别为 SFC 模块导出，故在此直接声明；
+//   与 miniKLineLogic.ts 的 MiniPeriod 为同一字面量联合，结构兼容）。
 export type MiniPeriod = 'minute' | 'five' | 'daily' | 'weekly' | 'monthly'
 
 const props = withDefaults(defineProps<{
@@ -44,71 +57,19 @@ const props = withDefaults(defineProps<{
 const UP = '#f43f5e'
 const DOWN = '#22c55e'
 const AVG = '#2563eb'
-const VIEW_W = 200
-const VIEW_H = 100
-const PRICE_TOP = 6
-const PRICE_BOTTOM = 78
-const VOL_TOP = 86
-const VOL_BOTTOM = 96
 
 /** renderjs 视图层 host 元素 id（模块经 uni-app 编译器映射到真实 DOM） */
 const hostId = `mini_kline_${Date.now()}_${Math.floor(Math.random() * 10000)}`
 
-const isLine = computed(() => props.period === 'minute' || props.period === 'five')
+const isLine = computed(() => isLinePeriod(props.period))
 const isCandle = computed(() => !isLine.value)
 
 /* ===== 折线数据（分时/五日） ===== */
-interface LineGroup { label: string; values: number[] }
-
-/** 按日期（YYYYMMDD）分组，供五日按日叠加与分时取最近交易日 */
-function groupByDate(items: KLineItem[]) {
-  const map = new Map<string, KLineItem[]>()
-  items.forEach((item) => {
-    const d = String(item.date || '').replace(/\D/g, '').slice(0, 8)
-    if (!d) return
-    const list = map.get(d) || []
-    list.push(item)
-    map.set(d, list)
-  })
-  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-}
-
-const lineGroupsRaw = computed<LineGroup[]>(() => {
-  if (!isLine.value) return []
-  if (props.period === 'five') {
-    return groupByDate(props.data).slice(-5).map(([label, list]) => ({
-      label,
-      values: list.map((i) => Number(i.close) || 0).filter((v) => v > 0),
-    }))
-  }
-  // 分时：取最近一个交易日的分钟序列
-  const groups = groupByDate(props.data)
-  const source = groups.length ? groups[groups.length - 1][1] : props.data
-  return [{
-    label: groups.length ? groups[groups.length - 1][0] : '',
-    values: source.map((i) => Number(i.close) || 0).filter((v) => v > 0),
-  }]
-})
+const lineGroupsRaw = computed<{ label: string; values: number[] }[]>(() =>
+  buildLineGroupsRaw(props.period, props.data),
+)
 
 /** 生成价格区域 y 映射（统一按全部折线点归一化，保证五日各日同尺度可比） */
-function buildScale(values: number[]) {
-  const nums = values.filter((v) => Number.isFinite(v))
-  if (nums.length < 2) return null
-  let min = Math.min(...nums)
-  let max = Math.max(...nums)
-  if (min === max) {
-    min -= 0.5
-    max += 0.5
-  }
-  const pad = (max - min) * 0.12
-  min -= pad
-  max += pad
-  const range = max - min || 1
-  return {
-    yFor: (v: number) => PRICE_TOP + ((max - v) / range) * (PRICE_BOTTOM - PRICE_TOP),
-  }
-}
-
 const lineScale = computed(() => buildScale(lineGroupsRaw.value.flatMap((g) => g.values)))
 
 const lineGroups = computed(() => {
@@ -139,7 +100,7 @@ const areaPoints = computed(() => {
   const pts = g.values
     .map((v, i) => `${((i / (n - 1)) * VIEW_W).toFixed(2)},${scale.yFor(v).toFixed(2)}`)
     .join(' ')
-  return `${pts} ${VIEW_W},${VOL_BOTTOM} 0,${VOL_BOTTOM}`
+  return `${pts} ${VIEW_W},${PRICE_BOTTOM} 0,${PRICE_BOTTOM}`
 })
 
 /** 分时：均价线（收盘运行均值，蓝色区分） */
@@ -217,7 +178,7 @@ const lineColor = computed(() => (trendUp.value ? UP : DOWN))
 
 const renderable = computed(() => {
   if (isCandle.value) return candles.value.length > 0
-  return lineGroupsRaw.value.some((g) => g.values.length >= 2)
+  return isLineRenderable(props.period, props.data)
 })
 
 /**
