@@ -15,9 +15,10 @@
 
     <!-- 白色圆角卡片 -->
     <view class="as-main-tabs__card" :style="{ marginBottom: dynamicMarginBottom }">
-      <!-- 卡片标题（随Tab切换） -->
+      <!-- 卡片标题（随Tab切换） + 恐贪指数按钮 -->
       <view class="as-main-tabs__header">
         <text class="as-main-tabs__title">{{ tabTitles[activeTab] }}</text>
+        <FearGreedIndex v-if="activeTab === 'morning'" />
       </view>
 
       <!-- 可滚动内容区域 -->
@@ -41,9 +42,6 @@
 
     <!-- 播报悬浮窗（首页晨报等调用 podcastStore.open 后显示；仅首页前台时渲染） -->
     <FloatingPodcast :page-key="pageKey" />
-
-    <!-- 市场恐贪指数悬浮温度计：常驻首页，可拖拽+磁吸，点击跳转恐贪指数页 -->
-    <FearGreedIndex />
   </view>
 </template>
 
