@@ -142,7 +142,9 @@ async function changeDate(delta: number) {
 
 onLoad((options) => {
   const opts = options as Record<string, string> || {}
-  briefType.value = normalizeBriefingType(opts.type)
+  // 详情页仅支持晨报/晚报双人播报；midday 无独立广播详情，回落晨报
+  const normalized = normalizeBriefingType(opts.type)
+  briefType.value = normalized === 'midday' ? 'morning' : normalized
   currentDate.value = opts.date || shanghaiDateString()
   loadBroadcast()
 })
