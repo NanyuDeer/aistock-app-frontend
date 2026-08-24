@@ -9,8 +9,8 @@
 - 会员门禁逻辑保持不变：非会员 toast 拦截、会员解锁导出
 - 验证：`npm run type-check` 通过
 
-## 2026-08-24 分时 mini 折线图修复 + favorites 表头"三横线"分时切换
-- 背景：favorites-grid 宫格卡片"分时"档位被反馈图形不显示；favorites 自选页表头"三横线"按钮无事件。根因排查：后端 klt=1 实测返回 482 行完整分时数据（来源腾讯财经），数据源/解析/路由均正常且已有覆盖测试 → 根因非后端空数据，落在前端渲染侧。
+## 2026-08-24 分时 mini 折线图逻辑整理（面积基线 + 纯逻辑抽离 + TDD） + favorites 表头"三横线"分时切换
+- 背景：①favorites 自选页表头"三横线"按钮无事件 → 本批次新增行内 `fenshiMode` 分时折线（真实新功能，已可用）；②favorites-grid 宫格卡片"分时"档位被反馈图形不显示，初始排查后端 klt=1 实测返回 482 行完整分时数据（来源腾讯财经），数据源/解析/路由均正常 → 判定落在前端。但本批次对 MiniKLine 的改动经代码审查复核确认：`renderable` 折线判据前后（`lineGroupsRaw.some(...>=2)` vs `isLineRenderable(...)`）**语义完全等价**，面积基线 `VOL_BOTTOM→PRICE_BOTTOM` 为纯视觉修正，二者均不构成对宫格"分时不显示"的**确认性根因修复**；renderjs `:change:data` 触发链在 favorites-grid 的 daily/minute/five 切换路径上引用传递与首次挂载均核验自洽且与其他周期一致。**宫格分时显示问题保留为待真机实证**（优先核查 renderjs `:change:data` 在宿主元素 v-if 重建/引用变更场景下的实际触发时效），不擅自宣称已修复。
 - 文件：`src/modules/favorites/components/MiniKLine.vue`、新增 `src/modules/favorites/components/miniKLineLogic.ts`、新增 `src/modules/favorites/components/MiniKLine.spec.ts`、`src/modules/favorites/pages/favorites.vue`、`vitest.config.ts`
 - 改动：
   - 抽离 MiniKLine 纯逻辑至 `miniKLineLogic.ts`（isLinePeriod/groupByDate/buildLineGroupsRaw/isLineRenderable/buildScale），组件复用；分时/五日折线可渲染判定收敛为 `isLineRenderable`（分时最近交易日 ≥2 有效收盘价）
