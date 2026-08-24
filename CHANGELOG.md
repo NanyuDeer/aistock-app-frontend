@@ -2,6 +2,26 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-24 — 0.1.2 发版：修复 APP 启动白屏 + 版本号升至 0.1.2
+
+**开发者**: Aria
+
+### 修复
+- App 启动白屏（部分老旧 Android WebView 缺少 `TextEncoder`，PDF 导出链 fast-png 在模块顶层 `new TextEncoder()` 抛 ReferenceError）：
+  - `vite.config.ts`：新增 `prependGlobalPolyfill` 插件，在发行打包时把 TextEncoder/TextDecoder polyfill 字面前插到 bundle 开头，先于 fast-png 执行。
+  - `src/shared/utils/global-polyfills.ts`（新增）：TextEncoder/TextDecoder 兜底实现，作为 `main.ts` 首条 import，保障 dev（HBuilder 运行）场景按 import 顺序先定义。
+  - `src/main.ts`：首行导入 `global-polyfills`。
+- 循环依赖导致的分块执行顺序损坏：
+  - `src/shared/components/KLineChart.vue`：`EmptyState` 从 barrel `index.ts` 改为直接导入 `./EmptyState.vue`，切断 `KLineChart → index.ts → KLineChart` 回环。
+- App 端 `performance-now` 被当外部依赖导致 `require$$0$1 is not defined`：
+  - `package.json`/`pnpm-lock.yaml`：显式新增 `performance-now ^2.1.0`（raf 的运行依赖），让 Rollup 能解析并打包。
+
+### 变更
+- `src/manifest.json`：`versionName` 0.1.1→0.1.2，`versionCode` 101→102（触发存量用户自动更新）。
+- `public/download/version.json`（Web 端）：`versionName` 0.1.2/`versionCode` 102，`downloadUrl` 指向 `aistock-0.1.2.apk`，文案由 APP 介绍改为本次更新内容。
+
+---
+
 ## [master] 2026-08-24 — 0.1.1 发版：修复 HBuilder/App 打包失败 + 应用内更新弹窗 + 版本号升至 0.1.1
 
 **开发者**: Aria
