@@ -1,5 +1,14 @@
 # Changelog Pending
 
+## 2026-08-24 D-3 报告导出功能（is_vip 门禁 + PDF 导出按钮 + 会员解锁）
+- 文件：`src/modules/chat/pages/agent-report.vue`
+- 改动：
+  - 详情页右上角「概览」按钮替换为「导出 PDF」按钮（is_detail 详情模式显示），点击走 `handleExportPdf`：非会员（`userInfo?.isVip` 假）toast「开通会员后可导出 PDF」；会员经 html2canvas 抓取 `.report-body` 生成多页 A4 PDF 并下载
+  - 多页分片采用经典逐页整幅偏移算法（`heightLeft`/`position` 每页递减 `pageH`），修复旧算法（初始偏移 `-(pageH - imgH % pageH)`）导致长报告底部内容丢失、部分行重复的问题；整幅图 `toDataURL('image/jpeg', 0.95)` 只编码一次供各分页复用，避免每页重复编码的性能开销
+  - 外层容纳按钮的 `v-if` 由 `canBackToOverview || podcastBriefForFloating` 改为 `isDetail || podcastBriefForFloating`，避免深层链接无 `podcast_brief` 详情时会员看不到导出按钮（播报按钮保留自身条件）；`document` 访问加 `typeof document === 'undefined'` 前置容错
+- 会员门禁逻辑保持不变：非会员 toast 拦截、会员解锁导出
+- 验证：`npm run type-check` 通过
+
 ## 2026-08-24 分时 mini 折线图修复 + favorites 表头"三横线"分时切换
 - 背景：favorites-grid 宫格卡片"分时"档位被反馈图形不显示；favorites 自选页表头"三横线"按钮无事件。根因排查：后端 klt=1 实测返回 482 行完整分时数据（来源腾讯财经），数据源/解析/路由均正常且已有覆盖测试 → 根因非后端空数据，落在前端渲染侧。
 - 文件：`src/modules/favorites/components/MiniKLine.vue`、新增 `src/modules/favorites/components/miniKLineLogic.ts`、新增 `src/modules/favorites/components/MiniKLine.spec.ts`、`src/modules/favorites/pages/favorites.vue`、`vitest.config.ts`

@@ -1,7 +1,7 @@
 <template>
   <SubPageCard2 :title="pageTitle" :subtitle="pageSubtitle">
-    <!-- 右上角：播报按钮（有播报稿时）+ 概览按钮（从概览进入详情时） -->
-    <template v-if="canBackToOverview || podcastBriefForFloating" #header-right>
+    <!-- 右上角：详情模式下显示导出按钮（播报按钮保留自身条件），避免深层链接无 podcast_brief 时导出按钮被隐藏 -->
+    <template v-if="isDetail || podcastBriefForFloating" #header-right>
       <view class="header-right-actions">
         <view v-if="podcastBriefForFloating" class="header-podcast-btn" @tap="openFloatingPodcast">
           <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
@@ -618,14 +618,19 @@ async function handleExportPdf() {
     uni.showToast({ title: '开通会员后可导出 PDF', icon: 'none' })
     return
   }
-  const target = document.querySelector('.report-body') as HTMLElement | null
-  if (!target) {
+  // 非 H5/无 DOM 环境不可导出（document 访问移入容错）
+  if (typeof document === 'undefined') {
     uni.showToast({ title: '报告内容未就绪', icon: 'none' })
     return
   }
   exporting.value = true
   uni.showLoading({ title: '正在生成 PDF...', mask: true })
   try {
+    const target = document.querySelector('.report-body') as HTMLElement | null
+    if (!target) {
+      uni.showToast({ title: '报告内容未就绪', icon: 'none' })
+      return
+    }
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
       import('html2canvas'),
       import('jspdf'),
@@ -636,16 +641,16 @@ async function handleExportPdf() {
     const pageH = pdf.internal.pageSize.getHeight()
     const imgW = pageW
     const imgH = (canvas.height * imgW) / canvas.width
-    let pos = 0
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, pos, imgW, imgH)
-    const remaining = imgH - pageH
-    if (remaining > 0) {
-      pos = -(pageH - (imgH % pageH))
-      while (remaining > Math.abs(pos)) {
-        pdf.addPage()
-        pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, pos, imgW, imgH)
-        pos -= pageH
-      }
+    // 整幅图只编码一次，供所有分页复用（避免每页重复 toDataURL）
+    const imgData = canvas.toDataURL('image/jpeg', 0.95)
+    pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH)
+    let heightLeft = imgH - pageH
+    let position = -pageH
+    while (heightLeft > 0) {
+      pdf.addPage()
+      pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH)
+      heightLeft -= pageH
+      position -= pageH
     }
     const fname = `报告-${effectiveIntent.value || date.value}-${date.value}.pdf`
     pdf.save(fname)
