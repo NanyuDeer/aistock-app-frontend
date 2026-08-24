@@ -11,6 +11,11 @@ vi.mock('@/shared/api/modules/insight', () => ({
   // 类型导出占位（Vue SFC 内 import type 不实际调用）
 }))
 
+const stockTraceApiMock = vi.hoisted(() => ({
+  list: vi.fn(),
+}))
+vi.mock('@/shared/api/modules/stockTrace', () => ({ stockTraceApi: stockTraceApiMock }))
+
 // mock favorites store：stocks 置空、fetchFavorites no-op，
 // 隔离 refreshQuotes / uni.showToast 等真实 store 副作用
 vi.mock('@/shared/store/modules/favorites', () => ({
@@ -42,6 +47,18 @@ const testInsights = [
     trade_date: '2026-08-07', event_type: 'limit_up_radar',
     direction: 'down', attribution_status: 'unconfirmed', confidence: 'unconfirmed',
     created_at: '2026-08-07T11:00:00+08:00',
+  },
+]
+
+// 价格异动（stocktrace 链路）测试数据
+const testMovements = [
+  {
+    event_id: 'mv:601318:2026-08-19:1:up', trigger_revision: 1, symbol: '601318', stock_name: '中国平安',
+    event_type: 'price', direction: 'up', triggered_at: '2026-08-19T07:26:22.789Z',
+    latest_price: 100, previous_close: 100, change_pct: 8.5, threshold_pct: 7,
+    severity: 'high', rule_version: 'price-v1', analysis_status: 'completed',
+    primary_cause: '大盘系统性下跌',
+    movement_view: { primaryCandidate: { layer: 'market', verdict: '大盘系统性下跌是主要背景' } },
   },
 ]
 
@@ -78,27 +95,35 @@ describe('monitor.vue 异动监控页', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     insightApiMock.getInsights.mockReset()
+    stockTraceApiMock.list.mockReset()
     vi.mocked(uni.navigateTo).mockClear()
+    // 价格异动默认返回空
+    stockTraceApiMock.list.mockResolvedValue({ items: [], nextCursor: null })
   })
 
-  it('接口成功 → 渲染 InsightAlertCard 列表', async () => {
+  it('接口成功 → 渲染涨停雷达 + 价格异动融合列表', async () => {
     insightApiMock.getInsights.mockResolvedValue(testInsights)
+    stockTraceApiMock.list.mockResolvedValue({ items: testMovements, nextCursor: null })
     const wrapper = mount(monitor)
     await flushPromises()
-    // 验证 InsightAlertCard 渲染数量
+    // 2 条涨停雷达 + 1 条价格异动
     const cards = wrapper.findAllComponents({ name: 'InsightAlertCard' })
-    expect(cards.length).toBe(2)
+    expect(cards.length).toBe(3)
+    // 时间倒序：价格异动（08-19）排最前，message 显示 LLM 主因短语
+    expect(cards[0].props('name')).toBe('中国平安')
+    expect(cards[0].props('message')).toBe('主因：大盘系统性下跌')
   })
 
   it('接口失败 → 展示空状态（不渲染卡片）', async () => {
     insightApiMock.getInsights.mockRejectedValue(new Error('network'))
+    stockTraceApiMock.list.mockRejectedValue(new Error('network'))
     const wrapper = mount(monitor)
     await flushPromises()
     const cards = wrapper.findAllComponents({ name: 'InsightAlertCard' })
     expect(cards.length).toBe(0)
   })
 
-  it('点击 InsightAlertCard → navigateTo 跳转 insight-detail', async () => {
+  it('点击涨停雷达卡片 → navigateTo 跳转 insight-detail', async () => {
     insightApiMock.getInsights.mockResolvedValue(testInsights)
     const wrapper = mount(monitor)
     await flushPromises()
@@ -106,6 +131,19 @@ describe('monitor.vue 异动监控页', () => {
     await firstCard.vm.$emit('click', new Event('click'))
     expect(uni.navigateTo).toHaveBeenCalledWith({
       url: '/modules/favorites/pages/insight-detail?event_id=m1',
+    })
+  })
+
+  it('点击价格异动卡片 → navigateTo 跳转 insight-detail-move', async () => {
+    insightApiMock.getInsights.mockResolvedValue(testInsights)
+    stockTraceApiMock.list.mockResolvedValue({ items: testMovements, nextCursor: null })
+    const wrapper = mount(monitor)
+    await flushPromises()
+    // 时间倒序：价格异动（08-19）排最前
+    const firstCard = wrapper.findAllComponents({ name: 'InsightAlertCard' })[0]
+    await firstCard.vm.$emit('click', new Event('click'))
+    expect(uni.navigateTo).toHaveBeenCalledWith({
+      url: `/modules/favorites/pages/insight-detail-move?event_id=${encodeURIComponent(testMovements[0].event_id)}`,
     })
   })
 })

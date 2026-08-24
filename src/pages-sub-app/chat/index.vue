@@ -32,7 +32,7 @@
             <text class="empty-guide-close-text">不再显示</text>
           </view>
         </view>
-        <view v-for="(msg, idx) in displayMessages" :key="idx" class="message-item" :class="msg.role">
+        <view v-for="(msg, idx) in displayMessages" :key="idx" class="message-item" :class="msg.role" @longpress="openMessageActions(msg)">
           <!-- 用户消息 -->
           <text v-if="msg.role === 'user'" class="msg-content user">{{ msg.content }}</text>
 
@@ -248,6 +248,14 @@
       @select="handleConfirmSelect"
       @close="handleConfirmClose"
     />
+
+    <!-- 批次 4：消息长按操作菜单（复制/删除/重发到输入框；全体消息可用） -->
+    <ActionSheet
+      :visible="messageSheetVisible"
+      :items="messageSheetItems"
+      @select="handleMessageAction"
+      @update:visible="(v: boolean) => (messageSheetVisible = v)"
+    />
   </SubPageCard2>
 </template>
 
@@ -266,6 +274,7 @@ import CardRenderer from './cards/CardRenderer.vue'
 import SectionCard from './cards/SectionCard.vue'
 import FeedbackBar from '@/shared/components/FeedbackBar.vue'
 import ConfirmSheet from '@/shared/components/ConfirmSheet.vue'
+import ActionSheet from '@/shared/components/ActionSheet.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
 import { parseFollowupQuestions, type FollowupParse } from '@/shared/utils/parseFollowupQuestions'
 import { useChatStore } from '@/shared/store/modules/chat'
@@ -686,6 +695,47 @@ function handleSend() {
   chatStream.send(content)
 }
 
+// ── 批次 4（消息长按操作：复制/删除/重发到输入框；全体消息可用） ──
+const messageSheetVisible = ref(false)
+const messageSheetItems = ref<{ label: string; value: string; danger?: boolean }[]>([])
+/** 当前长按选中的消息（timestamp 定位；删除/复制/重发都基于它） */
+const messageActionTarget = ref<ChatMessage | null>(null)
+
+/** 长按消息 → 组装操作菜单并弹出。复制/删除/重发对 user 与 assistant 消息同样适用：
+ *  - 复制：剪贴板复制文本
+ *  - 重发：回填输入框（可编辑后再发，走正常 send，后端按新消息追加——规避加性历史截断问题）
+ *  - 删除：本地隐藏删除（后端 LangGraph 线程保持不变）
+ */
+function openMessageActions(msg: ChatMessage) {
+  if (isStreaming.value) return // 流式中禁长按，避免打断正在生成的回答
+  messageActionTarget.value = msg
+  messageSheetItems.value = [
+    { label: '复制', value: 'copy' },
+    { label: '重发', value: 'resend' },
+    { label: '删除', value: 'delete', danger: true },
+  ]
+  messageSheetVisible.value = true
+}
+
+function handleMessageAction(item: { label: string; value: string | number }) {
+  const msg = messageActionTarget.value
+  if (!msg) return
+  switch (item.value) {
+    case 'copy':
+      uni.setClipboardData({ data: msg.content })
+      break
+    case 'resend':
+      // 回填输入框并切到文本模式；由用户确认/编辑后点发送，上下文字段由新 send 重建
+      inputMode.value = 'text'
+      inputText.value = msg.content
+      break
+    case 'delete':
+      chatStore.removeMessage(msg.timestamp)
+      break
+  }
+  messageActionTarget.value = null
+}
+
 /**
  * Phase 4-2 Task 2：语音输入 tap 切换（点击开始聆听，再点结束）。
  * 识别文本仅回填输入框（v-model 可编辑、不自动发送），由用户点「发送」走 handleSend；
@@ -970,17 +1020,18 @@ onUnmounted(() => {
 :deep(.md-table th) { background: $bg-soft; font-size: 24rpx; padding: 8rpx; border: 1rpx solid $line; }
 :deep(.md-table td) { font-size: 24rpx; padding: 8rpx; border: 1rpx solid $line; }
 
-/* 改进 20：引导追问快捷按钮（点击即发，复用 quickAsk） */
+/* 批次 4（改进 20 升级）：引导追问胶囊按钮（点击即发，复用 quickAsk；对齐豆包浅色胶囊） */
 .followup-questions {
   display: flex; flex-direction: column; gap: 12rpx;
-  margin-top: 16rpx; padding-top: 16rpx; border-top: 1rpx solid $line;
+  margin-top: 16rpx;
 }
 .followup-question {
-  display: inline-flex; align-items: center;
+  display: inline-flex; align-items: center; align-self: flex-start; max-width: 100%;
   background: $primary-50; color: $primary;
-  border-radius: $r-md; padding: 12rpx 20rpx;
+  border-radius: 999rpx; padding: 14rpx 24rpx;
 }
-.followup-question-text { font-size: 24rpx; color: $primary; }
+.followup-question:active { opacity: 0.7; }
+.followup-question-text { font-size: 24rpx; color: $primary; line-height: 1.4; }
 
 /* 流式光标动画（mp-html 内嵌 ▊ 字符的闪烁效果） */
 :deep(.streaming-blink) {

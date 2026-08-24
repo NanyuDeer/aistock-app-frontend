@@ -266,6 +266,59 @@ export const useChatStore = defineStore('chat', () => {
     storage.set(STORAGE_KEYS.CHAT_FEEDBACK, records)
   }
 
+  /**
+   * 批次 4（消息长按）：本地隐藏删除单条消息（按 timestamp 定位）。
+   * 仅做展示层本地删除：从 messagesBySession 移除该条 + 清理关联派生状态；
+   * 后端 LangGraph 加性历史不可单条删，服务端线程保持不变（与豆包本地删除语义一致）。
+   * 清理内容：
+   * - assistant 消息的 tokenUsage → 反算扣减 sessionUsage（幽灵徽标）
+   * - 该消息的反馈记录 → feedbackRecords
+   * - 删除的是首条 user 消息（会话标题来源）→ 用剩余消息重算标题并同步 sessions
+   */
+  function removeMessage(messageId: number) {
+    const sid = sessionId.value
+    if (!sid) return
+    const arr = messagesBySession.value[sid]
+    if (!arr) return
+    const msg = arr.find((m) => m.timestamp === messageId)
+    if (!msg) return
+    const next = arr.filter((m) => m.timestamp !== messageId)
+    messagesBySession.value = { ...messagesBySession.value, [sid]: next }
+    persistHistory()
+
+    // tokenUsage 反算扣减（assistant 消息累计过才扣；数值不足时钳到 0 防负数）
+    if (msg.role === 'assistant' && msg.tokenUsage && sessionUsage.value[sid]) {
+      const cur = sessionUsage.value[sid]
+      const dec = (n?: number, d?: number) => Math.max(0, (n ?? 0) - (d ?? 0))
+      const usage: TokenUsage = {
+        prompt_tokens: dec(cur.prompt_tokens, msg.tokenUsage.prompt_tokens),
+        completion_tokens: dec(cur.completion_tokens, msg.tokenUsage.completion_tokens),
+        total_tokens: dec(cur.total_tokens, msg.tokenUsage.total_tokens),
+      }
+      sessionUsage.value = { ...sessionUsage.value, [sid]: usage }
+      storage.set(STORAGE_KEYS.CHAT_SESSION_USAGE, sessionUsage.value)
+    }
+
+    // 反馈记录清理（按 message_id 索引，与 setFeedback 双写结构对应）
+    const records = { ...feedbackRecords.value }
+    if (records[messageId]) {
+      delete records[messageId]
+      feedbackRecords.value = records
+      storage.set(STORAGE_KEYS.CHAT_FEEDBACK, records)
+    }
+
+    // 首条 user 消息被删 → 会话标题来源变化，用剩余消息重算并同步列表
+    const firstUser = next.find((m) => m.role === 'user')
+    const newTitle = firstUser?.content.trim().slice(0, 20) || '新会话'
+    const curSession = sessions.value.find((s) => s.session_id === sid)
+    if (curSession && curSession.title !== newTitle) {
+      sessions.value = sessions.value.map((s) =>
+        s.session_id === sid ? { ...s, title: newTitle } : s
+      )
+      persistSessions()
+    }
+  }
+
   /** 清除当前会话（消息 + 本地/服务端列表条目）；无当前会话时清空列表 */
   function clearHistory() {
     const cur = sessionId.value
@@ -351,6 +404,7 @@ export const useChatStore = defineStore('chat', () => {
     createSession,
     switchSession,
     deleteSession,
+    removeMessage,
     syncSessionsFromServer,
     sendMessage,
     sessionUsage, accumulateSessionUsage, getCurrentSessionUsage, resetSessionUsage, // P11 T2

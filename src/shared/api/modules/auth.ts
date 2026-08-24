@@ -15,6 +15,8 @@ export interface UserInfo {
   nickname: string
   avatar?: string
   avatar_url?: string
+  isVip?: boolean   // 2026-08-24 报告导出会员解锁
+  is_vip?: boolean // 后端 /users/me 原始 snake_case 字段，fetchUserInfo 归一化为 isVip
   createdAt?: string
   created_at?: string
 }

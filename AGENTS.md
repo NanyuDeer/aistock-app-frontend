@@ -313,6 +313,7 @@ import Card from '@/shared/components/Card.vue'
 | `prediction.ts` | 历史预测跟踪（B2.1：列表+统计/详情） | `/api/predictions`、`/api/predictions/:id` |
 | `push.ts` | 推送 | `/api/push/*` |
 | `stock.ts` | 股票行情 | `/api/cn/stock-quote/*` |
+| `stockTrace.ts` | 自选股尾盘价格异动归因（stocktrace 完整链路）；`StockTraceEvent.primary_cause`（`string \| null`）为 LLM 生成的 ≤20 字简短主因短语，列表/卡片展示"主因：xxx"用，无归因结果为 `null` | `/api/cn/favorites/movements*` |
 | `valuation.ts` | 估值分析 | `/api/valuation/*` |
 
 ### 6.3 WebSocket

@@ -54,19 +54,28 @@
     {
       "path": "modules/favorites/pages/insight",
       "style": {
-        "navigationBarTitleText": "自选股洞察"
+        "navigationBarTitleText": "自选股洞察",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/favorites/pages/insight-detail",
       "style": {
-        "navigationBarTitleText": "洞察详情"
+        "navigationBarTitleText": "洞察详情",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/favorites/pages/insight-detail-move",
       "style": {
-        "navigationBarTitleText": "洞察详情"
+        "navigationBarTitleText": "洞察详情",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
@@ -242,6 +251,16 @@
       }
     },
     {
+      "path": "modules/fear-greed/pages/index",
+      "style": {
+        "navigationBarTitleText": "恐贪指数",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false,
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
+      }
+    },
+    {
       "path": "modules/analytics/pages/trend-score-report",
       "style": {
         "navigationBarTitleText": "趋势股评分分析",
@@ -309,7 +328,7 @@
     {
       "path": "modules/chat/pages/event/detail",
       "style": {
-        "navigationBarTitleText": "AI事件传导解析",
+        "navigationBarTitleText": "事件机会洞见",
         "navigationStyle": "custom",
         "disableScroll": true,
         "h5": { "titleNView": false },
@@ -321,6 +340,15 @@
     {
       "root": "pages-sub-app",
       "pages": [
+        {
+          "path": "event-article/index",
+          "style": {
+            "navigationBarTitleText": "原文详情",
+            "navigationStyle": "custom",
+            "disableScroll": true,
+            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+          }
+        },
         {
           "path": "chat/index",
           "style": {
@@ -387,6 +415,13 @@
             "navigationBarTitleText": "交易复盘",
             "disableScroll": true,
             "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+          }
+        },
+        {
+          "path": "webview/index",
+          "style": {
+            "navigationBarTitleText": "网页",
+            "navigationStyle": "custom"
           }
         }
       ]

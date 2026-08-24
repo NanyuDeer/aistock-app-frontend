@@ -68,9 +68,13 @@ export const useUserStore = defineStore('user', () => {
 
   async function fetchUserInfo() {
     const info = await authApi.getUserInfo()
-    userInfo.value = info
-    storage.set(STORAGE_KEYS.USER_INFO, info)
-    return info
+    // is_vip 归一化为 isVip（2026-08-24 报告导出会员解锁；后端未升级缺省按非会员）
+    userInfo.value = {
+      ...info,
+      isVip: !!info.is_vip || !!info.isVip,
+    }
+    storage.set(STORAGE_KEYS.USER_INFO, userInfo.value)
+    return userInfo.value
   }
 
   async function restoreSession() {

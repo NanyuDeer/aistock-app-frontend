@@ -11,7 +11,8 @@
       </view>
 
       <!-- 主面板：只展示恐贪指数一个页面，无六指标/无折线图 -->
-      <template v-else>
+      <!-- v-else-if="dashboard" 显式收窄 dashboard 非空，满足 TS 类型检查 -->
+      <template v-else-if="dashboard">
         <!-- 当前情绪 + 更新时间 -->
         <view class="fg-hero">
           <view class="fg-hero__left">

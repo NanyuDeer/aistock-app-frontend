@@ -9,35 +9,31 @@
     </view>
     <!-- #ifdef H5 || APP-PLUS -->
     <!-- @vue-ignore renderjs module is injected by the uni-app compiler. -->
+    <!-- H5 桌面与 App 真机统一走 renderjs + klinecharts 单引擎，保证两端渲染与交互完全一致（废除 App 端手写 SVG 差异实现） -->
     <view
       v-else
       :id="chartId"
       class="kline-host"
+      style="height: 200px; min-height: 200px;"
       :chart-payload="chartPayload"
       :change:chart-payload="chartView.updateChart"
     />
     <!-- #endif -->
-    <!-- #ifdef MP-WEIXIN -->
-    <canvas
-      v-else
-      :id="chartId"
-      :canvas-id="chartId"
-      class="kline-host"
-      @touchstart="mpTouchStart"
-      @touchmove="mpTouchMove"
-      @touchend="mpTouchEnd"
-    />
+    <!-- #ifndef H5 || APP-PLUS -->
+    <!-- 小程序/其他：renderjs 不可用且用户严禁 canvas → 文本占位 -->
+    <view v-else class="kline-host">
+      <view class="kline-mp-fallback">
+        <text class="kline-mp-fallback-text">K线暂仅支持 App / H5</text>
+      </view>
+    </view>
     <!-- #endif -->
   </view>
 </template>
 
 <script setup lang="ts">
 // @ts-nocheck -- vue-tsc does not model uni-app's isolated renderjs module.
-import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed } from 'vue'
 import { EmptyState } from '@/shared/components'
-// #ifdef MP-WEIXIN
-import uCharts from '@qiun/ucharts'
-// #endif
 import type { TrendKLineData } from '@/shared/api/modules/trend-score'
 
 interface KLinePoint {
@@ -94,110 +90,15 @@ const points = computed<KLinePoint[]>(() => {
 const dateRange = computed(() => points.value.length ? `近${points.value.length}日` : '')
 const chartPayload = computed(() => ({
   id: chartId,
-  key: `${props.title}_${points.value.length}_${points.value.at(-1)?.timestamp || 0}`,
+  key: `${props.title}_${points.value.length}_${points.value[points.value.length - 1]?.timestamp || 0}`,
   title: props.title,
   visibleCount: VISIBLE_KLINE_COUNT,
   data: points.value,
 }))
-
-// #ifdef MP-WEIXIN
-const componentInstance = getCurrentInstance()
-let mpChart: InstanceType<typeof uCharts> | null = null
-let mpRenderTimer: ReturnType<typeof setTimeout> | null = null
-
-function formatDate(timestamp: number): string {
-  const date = new Date(timestamp)
-  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-function renderMpChart() {
-  void nextTick(() => {
-    const query = uni.createSelectorQuery().in(componentInstance?.proxy)
-    query.select(`#${chartId}`).boundingClientRect((rect) => {
-      const node = Array.isArray(rect) ? rect[0] : rect
-      const width = Math.max(280, Number(node?.width) || 320)
-      const height = Math.max(190, Number(node?.height) || 220)
-      const context = uni.createCanvasContext(chartId, componentInstance?.proxy)
-      mpChart = new uCharts({
-        type: 'candle',
-        context,
-        width,
-        height,
-        pixelRatio: 1,
-        categories: points.value.map((item) => formatDate(item.timestamp)),
-        series: [{ name: 'K线', data: points.value.map((item) => [item.open, item.close, item.low, item.high]) }],
-        animation: false,
-        background: '#ffffff',
-        padding: [10, 8, 24, 8],
-        enableScroll: points.value.length > VISIBLE_KLINE_COUNT,
-        legend: { show: false },
-        xAxis: {
-          disableGrid: false,
-          gridColor: '#f0f2f5',
-          itemCount: Math.min(VISIBLE_KLINE_COUNT, points.value.length),
-          scrollAlign: 'right',
-          labelCount: 4,
-          fontColor: '#9ca3af',
-          fontSize: 10,
-        },
-        yAxis: {
-          gridColor: '#f0f2f5',
-          fontColor: '#9ca3af',
-          fontSize: 10,
-          splitNumber: 4,
-          data: [{ position: 'right', tofix: 2 }],
-        },
-        extra: {
-          candle: {
-            color: {
-              upLine: '#f43f5e',
-              upFill: '#f43f5e',
-              downLine: '#22c55e',
-              downFill: '#22c55e',
-            },
-            average: {
-              show: points.value.length >= 60,
-              name: ['MA60'],
-              day: [60],
-              color: ['#0b5fff'],
-            },
-          },
-        },
-      })
-    }).exec()
-  })
-}
-
-function scheduleMpRender() {
-  if (mpRenderTimer) clearTimeout(mpRenderTimer)
-  mpRenderTimer = setTimeout(renderMpChart, 0)
-}
-
-type MpScrollStartEvent = Parameters<InstanceType<typeof uCharts>['scrollStart']>[0]
-type MpScrollEvent = Parameters<InstanceType<typeof uCharts>['scroll']>[0]
-type MpScrollEndEvent = Parameters<InstanceType<typeof uCharts>['scrollEnd']>[0]
-
-function mpTouchStart(event: MpScrollStartEvent) { mpChart?.scrollStart(event) }
-function mpTouchMove(event: MpScrollEvent) { mpChart?.scroll(event) }
-function mpTouchEnd(event: MpScrollEndEvent) { mpChart?.scrollEnd(event) }
-
-watch(points, scheduleMpRender)
-onMounted(scheduleMpRender)
-onBeforeUnmount(() => {
-  if (mpRenderTimer) clearTimeout(mpRenderTimer)
-  mpChart = null
-})
-// #endif
-
-// Keep Vue lifecycle imports available after conditional compilation.
-void getCurrentInstance
-void nextTick
-void onMounted
-void onBeforeUnmount
-void watch
 </script>
 
-<!-- KLineChart must run in the view layer on App WebView and H5. -->
+<!-- 单引擎方案：H5 与 App 缺省 drop 相同 klinecharts 配置，交叉渲染由 UniApp 编译到视图层，保证两端一致。
+     不再包含任何手写 SVG 分支（App 端取消自绘蜡烛/MA/手势，统一交给 klinecharts）。 -->
 <script module="chartView" lang="renderjs">
 // @ts-nocheck -- renderjs is compiled as an isolated view-layer module by uni-app.
 import { dispose, init, registerLocale } from 'klinecharts'
@@ -241,9 +142,6 @@ export default {
       resizeTimer: null,
     }
   },
-  mounted() {
-    // The payload callback supplies the inner host id after uni-app mounts it.
-  },
   beforeDestroy() {
     this.destroyChart()
   },
@@ -252,14 +150,16 @@ export default {
   },
   methods: {
     ensureChart(hostId) {
-      if (this.chart) return this.chart
+      if (this.chart && this.host && document.body.contains(this.host) && this.host.id === hostId) return this.chart
+      if (this.chart) this.destroyChart()
       this.host = document.getElementById(hostId)
       if (!this.host) return null
+
       this.chart = init(this.host, {
         locale: 'zh-CN',
         timezone: 'Asia/Shanghai',
         layout: {
-          barSpaceLimit: { min: 3, max: 24 },
+          barSpaceLimit: { min: 3, max: 26 },
           yAxis: {
             position: 'left',
             inside: false,
@@ -269,6 +169,7 @@ export default {
           },
         },
         styles: {
+          separator: { size: 1, color: COLORS.grid, fill: true, activeBackgroundColor: 'rgba(11, 95, 255, 0.08)' },
           grid: {
             show: true,
             horizontal: { show: true, color: COLORS.grid, size: 1, style: 'dashed', dashedValue: [2, 2] },
@@ -297,21 +198,29 @@ export default {
                 upColor: COLORS.up,
                 downColor: COLORS.down,
                 noChangeColor: COLORS.axis,
-                line: { show: true, style: 'dashed', size: 1, dashedValue: [3, 3] },
-                text: { show: true, color: '#ffffff', size: 10 },
+                line: { show: true, style: 'dashed', size: 1, dashedValue: [4, 4] },
+                text: { show: true, color: '#ffffff', size: 10, paddingLeft: 4, paddingRight: 4 },
               },
             },
             tooltip: {
               showRule: 'follow_cross',
               showType: 'rect',
+              offsetTop: 4,
+              offsetLeft: 6,
+              offsetRight: 6,
+              offsetBottom: 6,
               title: { show: true, color: COLORS.text, size: 10 },
-              legend: { color: COLORS.axis, size: 10 },
+              legend: { color: COLORS.axis, size: 10, marginTop: 2, marginBottom: 2 },
               rect: {
-                position: 'pointer',
-                color: '#ffffff',
+                position: 'fixed',
+                color: 'rgba(255, 255, 255, 0.96)',
                 borderColor: COLORS.grid,
                 borderSize: 1,
                 borderRadius: 4,
+                offsetLeft: 8,
+                offsetRight: 8,
+                offsetTop: 8,
+                offsetBottom: 8,
                 paddingLeft: 8,
                 paddingRight: 8,
                 paddingTop: 6,
@@ -320,6 +229,9 @@ export default {
             },
           },
           indicator: {
+            lines: [
+              { color: COLORS.brand, size: 1.5, style: 'solid' },
+            ],
             tooltip: { showRule: 'follow_cross', showType: 'rect' },
           },
           xAxis: {
@@ -351,6 +263,7 @@ export default {
         },
       })
       if (!this.chart) return null
+
       this.chart.setScrollEnabled(true)
       this.chart.setZoomEnabled(true)
       this.chart.setRightMinVisibleBarCount(2)
@@ -451,8 +364,8 @@ export default {
 .kline-host {
   display: block;
   width: 100%;
-  max-width: 100%;
-  height: 440rpx;
+  height: 200px;
+  min-height: 200px;
   overflow: hidden;
   box-sizing: border-box;
   touch-action: pan-y;

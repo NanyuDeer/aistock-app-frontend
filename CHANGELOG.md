@@ -2,6 +2,170 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-24 — 应用内版本更新 + 报告导出 PDF + 分时图优化
+
+**开发者**: NanyuDeer
+
+### 新增
+- 报告导出：`agent-report` 详情页"概览"按钮替换为"导出 PDF"（`isVip` 会员解锁，非会员 toast 提示）；`jspdf` + `html2canvas` 生成多页 A4 PDF，修复多页分片截断并优化单次编码性能；`UserInfo`/store 接入 `isVip`。
+- 分时图：`favorites` 表头"三横线"按钮开启每行 mini 分时图（懒加载缓存、涨红跌绿、图标高亮）；`MiniKLine` 分时折线修复（面积基线修正 + 纯逻辑抽离 `miniKLineLogic.ts` + TDD 7 用例）。
+
+### 改进
+- 应用内版本更新：更新弹窗展示版本号+文件大小、安装失败引导开启"安装未知应用"、`plus.runtime.install` 失败兜底 `openFile`；记录发布 SOP。
+
+### 文档
+- 修正分时 mini 图修复范围表述，标注需真机实证。
+
+---
+
+## [master] 2026-08-21 — 修复温度计首帧出现在左上角后跳变到左侧中间的闪烁
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/components/FearGreedIndex.vue`：`posX/posY` 初始值由 `0,0`（左上角）改为声明时即初始化到「左侧贴边、屏幕纵向中部」（`EDGE_MARGIN_PX`、`(DESIGN_HEIGHT-240)/2`），首帧直接渲染在目标位置，消除先左上角再移动的闪烁；H5 端 winH 恒为 `DESIGN_HEIGHT` 故 onMounted 不再移动，App 端用真实窗口高度同步重算一次。
+
+---
+
+## [master] 2026-08-21 — 恐贪指数温度计默认位置改为界面左侧中间
+
+**开发者**: Aria
+
+### 改进
+- `src/shared/components/FearGreedIndex.vue`：`onMounted` 初始定位改为**左侧贴边、屏幕纵向中部**（`posX = EDGE_MARGIN_PX`），替代原右侧贴边（视觉"悬空飘动"）；保留可拖拽 + 磁吸左右边缘 + 点击跳恐贪页。
+- 恒显示默认值12、点击无页面的根因不在前端：后端 `/api/fear-greed` 路由漏挂，已由 aistock-app-api 侧修复（见该仓库 CHANGELOG）。
+
+---
+
+## [changer] 2026-08-20 — 批次4：消息长按操作菜单（复制/删除/重发）+ 引导追问胶囊升级
+
+**开发者**: 37588
+
+### 新增
+- `src/pages-sub-app/chat/index.vue`：消息项接入 `@longpress` 长按，弹出 ActionSheet 操作菜单（复制 / 重发 / 删除，删除为危险项）；复制走 `uni.setClipboardData`，重发回填输入框（可编辑后走正常 send，规避加性历史截断），删除走 `chatStore.removeMessage`；流式生成中禁用长按。
+- `src/shared/store/modules/chat.ts`：新增 `removeMessage(messageId)` 本地隐藏删除——从 `messagesBySession` 移除该条并持久化；assistant 消息反算扣减 `sessionUsage`（钳到 0）、清理对应 `feedbackRecords`；删除首条 user 消息时用剩余消息重算会话标题并同步 sessions。后端 LangGraph 加性历史不可单条删，服务端线程保持不变。
+- 引导追问按钮升级为浅色胶囊（`border-radius: 999rpx` + `:active` 反馈），对齐豆包。
+
+### 测试
+- `tests/chatRemoveMessage.test.ts`（新增）：覆盖 user/assistant 消息删除、tokenUsage 反算扣减、标题重算、反馈记录清理、无副作用用例。
+- `src/pages-sub-app/chat/index.spec.ts`：补充批次4长按/复制/重发/删除/胶囊按钮接线断言。
+
+---
+
+## [junliang] 2026-08-20 — 价格异动详情迁移 insight-detail-move + 相对昨收涨跌幅展示
+
+**开发者**: Aria
+
+### 重构
+- `src/modules/favorites/pages/insight-detail-move.vue`：重写为 stocktrace 五层归因详情页（company/sector/market/capital/technical 候选 + 证据包 + 置信度），替代原 movement-detail 页；`movement-detail.vue` / `movement.vue` 删除
+- `src/shared/utils/insightNavigation.ts`：价格异动/stocktrace mv 事件导航从 movement-detail 切到 insight-detail-move；涨停雷达保持 insight-detail
+- `src/pages.json`：删除 movement/movement-detail 路由；insight / insight-detail / insight-detail-move 页改为 custom 导航样式 + disableScroll
+
+### 改进
+- `src/modules/favorites/components/AlertContent.vue`：异动卡片适配（方向/相对昨收涨跌幅/归因短语展示）
+- `src/modules/favorites/pages/insight.vue` / `insight-detail.vue` / `monitor.vue`：归因状态与 primary_cause 展示适配
+- `src/shared/api/modules/insight.ts`：`WatchlistInsight` 新增 `change_pct`（相对昨收涨跌幅，主判定口径）
+- `src/shared/api/modules/stockTrace.ts`：`StockTraceEvent` 新增 `primary_cause`（归因短语，LLM 生成）
+
+### 测试
+- `insight-detail.spec.ts` / `monitor.spec.ts` / `AlertContent.spec.ts`：适配新增字段与详情页逻辑
+
+### 文档
+- `AGENTS.md` / `src/modules/favorites/AGENTS.md` / `src/modules/home/AGENTS.md`：详情页路由与归因展示更新
+
+### 验证
+- vitest 相关用例通过；vue-tsc 0 错误
+
+---
+
+## [junliang] 2026-08-15 — 自选股价格异动归因：movement 列表页/详情页与首页卡片
+
+**开发者**: Aria
+
+### 新增
+- `src/modules/favorites/pages/movement-list.vue`：自选股尾盘价格异动列表页（展示五层归因候选列表，含股票/涨跌/归因摘要/置信度）
+- `src/modules/favorites/pages/movement-detail.vue`：异动详情页（五层候选详情 tab，含 evidence 证据包展示）
+- `src/modules/home/components/MovementCard.vue`：首页"异动捕手"卡片（Top5 异动事件入口，点击跳转 movement 列表页）
+
+### 改进
+- `src/shared/utils/insightNavigation.ts`：insightNavigation 分流逻辑——价格异动类型从 insight-detail 改为 movement-detail 跳转，涨停雷达保持 insight 路径
+
+### 验证
+- vitest 相关用例通过；vue-tsc 0 错误；build:h5 成功
+
+---
+
+## [master] 2026-08-19 — App 录音改回 amr+8k（HTML5+ 原生；后端转码 PCM 16k 送火山 V3）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/speechInput.ts`：`manager.start({ format: 'pcm', sampleRate: 16000 })` → `{ format: 'amr', sampleRate: 8000 }`。线上魔数取证 `format:'pcm'` 在 HTML5+ Android 产出「假 .pcm 实为 AMR-WB」（Android 录音只原生支持 amr/aac/3gp），V3 只支持 pcm/opus/mp3 识别为空 →「未识别到语音」；改回两端原生支持的 amr，由后端 asrController 用 ffmpeg-static 转码后识别（见 aistock-app-api）。
+- `src/shared/utils/speechInput.spec.ts`：录音格式断言 pcm+16000 → amr+8000。29/29 通过。
+
+---
+
+## [master] 2026-08-19 — App 录音格式升级 PCM 16kHz（配合后端火山 V3 豆包流式 ASR）
+
+**开发者**: Aria
+
+### 变更
+- `src/shared/utils/speechInput.ts`：App 录音 `manager.start({ format: 'amr', sampleRate: 8000 })` → `{ format: 'pcm', sampleRate: 16000 }`。后端 ASR 升级 V3「豆包流式语音识别大模型」（见 aistock-app-api）：V3 仅支持 pcm/wav/ogg/mp3（不支持 amr）、rate 必须 16000。
+- `src/shared/utils/speechInput.spec.ts`：「录音以 amr + 8kHz 启动」用例同步改为 pcm + 16kHz；「start 同步抛错」用例错误文案 amr → pcm。29/29 通过。
+
+---
+
+## [master] 2026-08-19 — 修复 App 语音「语音识别服务异常」误报（res.data 未 parse 吞真实错误）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/speechInput.ts`：新增导出纯函数 `parseAsrUploadResult(data, statusCode)`——App 真机 `uni.uploadFile` success 的 `res.data` 是字符串，此前直接当对象读 `body?.message` 得到 undefined → 吞成「语音识别服务异常」笼统文案；统一 JSON.parse 兜底后透出后端真实 message。`uploadAudioFile` success 回调改走该函数。
+
+---
+
+## [master] 2026-08-19 — App 语音 ASR 直传文件路径（uni.uploadFile 根治真机 WebSocket is not defined）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/speechInput.ts`：App 分支 `readFileAsArrayBuffer`（plus.io.FileReader 全链路）+ `uploadAudio` 替换为 `uploadAudioFile(tempFilePath)`（`uni.uploadFile` 直传路径，底层 plus.uploader 原生上传，绕开 readFile 引擎缺陷）。
+- 契约变更：`AppSpeechDeps` 由 `readFileAsArrayBuffer + uploadAudio` 改为 `uploadAudioFile(tempFilePath)`；配套后端 `/api/agent/asr` 改 multer multipart（见 aistock-app-api）。
+
+---
+
+## [changer] 2026-08-19 — App 语音 readFile 真机 `WebSocket is not defined`：plus.io 读取子步骤全量 try/catch + 阶段透出
+
+**开发者**: 37588
+
+### 修复
+- `src/shared/utils/speechInput.ts`：App-PLUS 的 `readFileAsArrayBuffer` 把 `plus.io` 读取每个子步骤（`新建 FileReader` / `readAsDataURL` / `base64 转 ArrayBuffer` / `resolveLocalFileSystemURL` / `entry.file` 等）独立 try/catch + 阶段前缀透出。`new plus.io.FileReader()`/`readAsDataURL()` 属同步调用、原本跑在 plus 回调、不在 Promise 自动捕获范围，真机内核在此裸读缺失的 `WebSocket` 全局时 ReferenceError 会直抛页面；现改为受控 reject（toast 显示「读取录音文件失败（<阶段>）：<原因>」），既不崩页面又精确定位炸点。
+- **硬约束不变**：App 读文件仍只用 `plus.io.FileReader.readAsDataURL`（未用标准 FileReader / getFileSystemManager）。
+
+### 文档
+- `docs/2026-08-18-app-voice-asr-troubleshooting.md`：新增第 6 轮排查记录——真机在「录音结束」页面报 `WebSocket is not defined`，判定为 plus 回调内未捕获的同步 ReferenceError，已分阶段透出、待真机复验后靶向修复。
+
+---
+
+## [master] 2026-08-19 — App 真机 KLineChart 改用 uCharts canvas（renderjs 真机不渲染）
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/components/KLineChart.vue`：K 线渲染分支从「H5 || APP-PLUS → renderjs+klinecharts」改为「H5 → renderjs、APP-PLUS || MP-WEIXIN → uCharts canvas」；修复 App 真机（APP-PLUS）WebView 中 renderjs+klinecharts 不渲染导致 K 线空白；H5 保留 klinecharts 交互。
+
+---
+
+## [master] 2026-08-19 — 风口龙头板块「净流入」展示位改为「成交额」（同花顺实时，元）
+
+**开发者**: Aria
+
+### 改进
+- `src/shared/api/modules/stock.ts`：`WindLeaderSector` 类型 `net_inflow` → `amount`（板块当日成交额·元）。
+- `src/modules/market/pages/leaders.vue`、`src/modules/market/pages/sector-detail.vue`：统计格「净流入/formatNetInflow」→「成交额/formatAmount」（元→亿/万）。
+
+---
+
 ## [master] 2026-08-19 — 自选股编辑态 + 多股同列 + 语音输入/图标修复
 
 **开发者**: Aria
