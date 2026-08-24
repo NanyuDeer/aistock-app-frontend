@@ -12,8 +12,19 @@ export default defineConfig(({ mode }) => {
   const agentTarget = env.VITE_PROXY_AGENT_TARGET || 'http://localhost:8080'
   const wsTarget = env.VITE_PROXY_WS_TARGET || 'ws://localhost:3000'
 
+  // App(app-plus) 目标输出格式为 iife，不支持 code-splitting。PDF 导出用的 jspdf
+  // 其 ESM 构建在内部对 html2canvas/dompurify/canvg 使用动态 import()，触发 code-splitting。
+  // 已在 agent-report.vue 将项目侧动态 import 改为静态 import，并在此把 jspdf 指向自包含的
+  // UMD 构建（无任何动态 import），从而彻底消除代码分割。H5/h5 平台仍走 ESM 保持轻量。
+  const isAppPlus = process.env.UNI_PLATFORM === 'app' || process.env.UNI_PLATFORM === 'app-plus'
+  const jspdfAlias = isAppPlus
+    ? { jspdf: 'jspdf/dist/jspdf.umd.min.js' }
+    : {}
+
   return {
-    plugins: [uni()],
+    plugins: [
+      uni(),
+    ],
     // AudioPlayer 同时被首页和懒加载的播报详情页使用。合并 CSS 可避免样式
     // 被首个分包独占，导致详情页单独打开时播放器成为无样式结构。
     build: {
@@ -24,7 +35,8 @@ export default defineConfig(({ mode }) => {
     envDir: path.resolve(__dirname, 'env'),
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, 'src')
+        '@': path.resolve(__dirname, 'src'),
+        ...jspdfAlias,
       }
     },
     css: {

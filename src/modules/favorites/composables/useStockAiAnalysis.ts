@@ -1,20 +1,6 @@
 import { computed, type Ref } from 'vue'
 import type { TrendScoreData, IndustryHealthData } from '@/shared/api/modules/stock'
 
-interface CuratedProfile {
-  code: string
-  name: string
-  theme: string
-  category?: string[]
-  aiScore: number
-  expectedMultiple: string
-  investmentLogic: string
-  shortTermFocus: string[]
-  midTermFocus: string[]
-  longTermFocus: string[]
-  risks: string[]
-}
-
 interface TagItem {
   tag: string
   full: string
@@ -34,141 +20,6 @@ interface StockAiAnalysisContext {
   stockInfo?: Record<string, any> | null
   semiAnnualReport?: Record<string, any> | null
   forecastData?: Record<string, any> | null
-}
-
-const tenbaggerProfiles: CuratedProfile[] = [
-  {
-    code: '688205',
-    name: '德科立',
-    theme: '光通讯',
-    category: ['十倍潜力股'],
-    aiScore: 94,
-    expectedMultiple: '10倍',
-    investmentLogic: '相干光模块、数通光模块和海外算力链需求同时打开空间，小市值叠加高景气赛道带来长线弹性。',
-    shortTermFocus: ['光模块板块轮动', '订单传闻催化', '科创成长风格回暖'],
-    midTermFocus: ['高速产品放量', '海外客户认证', '毛利率改善'],
-    longTermFocus: ['AI数据中心带宽升级', '相干光通信国产替代', '规模化后利润弹性'],
-    risks: ['客户认证进度不及预期', '高速光模块价格波动', '小市值流动性波动']
-  },
-  {
-    code: '688008',
-    name: '澜起科技',
-    theme: '半导体',
-    category: ['十倍潜力股'],
-    aiScore: 93,
-    expectedMultiple: '10倍',
-    investmentLogic: '内存接口芯片具备全球竞争力，AI服务器带动DDR5、MRDIMM及配套芯片升级，平台化价值有望重估。',
-    shortTermFocus: ['半导体设备材料情绪', 'AI服务器链条扩散', '科创板芯片资金回流'],
-    midTermFocus: ['DDR5渗透率', '新产品放量节奏', '客户结构优化'],
-    longTermFocus: ['服务器内存升级周期', '芯片平台化扩张', '国产高端芯片突破'],
-    risks: ['存储周期恢复慢于预期', '新品量产爬坡不确定', '海外竞争加剧']
-  },
-  {
-    code: '300058',
-    name: '蓝色光标',
-    theme: 'AI应用',
-    category: ['趋势龙头股', '十倍潜力股'],
-    aiScore: 90,
-    expectedMultiple: '10倍',
-    investmentLogic: 'AI营销从降本工具转向业务增量入口，一旦利润率随AIGC工具链提升，公司有望被按AI应用平台重新定价。',
-    shortTermFocus: ['AI应用热度', '成交额排名', '短剧与营销催化'],
-    midTermFocus: ['AI业务收入占比', '毛利率修复', '大客户预算恢复'],
-    longTermFocus: ['AIGC商业化效率', '营销自动化平台', '海外业务复用'],
-    risks: ['AI业务收入质量不稳定', '营销行业预算波动', '高换手带来剧烈回撤']
-  },
-  {
-    code: '300136',
-    name: '信维通讯',
-    theme: '商业航天',
-    category: ['十倍潜力股'],
-    aiScore: 89,
-    expectedMultiple: '10倍',
-    investmentLogic: '射频、天线和连接能力可延展到卫星通信终端，若商业航天终端放量，公司有望从消费电子估值切换到卫星通信估值。',
-    shortTermFocus: ['商业航天政策催化', '消费电子复苏', '卫星通信主题活跃'],
-    midTermFocus: ['卫星终端订单', '射频产品升级', '客户导入节奏'],
-    longTermFocus: ['低轨卫星终端普及', '高频通信材料升级', '多业务协同'],
-    risks: ['卫星终端商业化慢', '消费电子需求波动', '新业务利润贡献延后']
-  },
-  {
-    code: '002050',
-    name: '三花智控',
-    theme: '机器人',
-    category: ['十倍潜力股'],
-    aiScore: 92,
-    expectedMultiple: '10倍',
-    investmentLogic: '热管理龙头具备全球制造体系，若机器人执行器业务形成第二曲线，传统白马估值可能切换为机器人核心供应商估值。',
-    shortTermFocus: ['机器人产业链热度', '海外客户催化', '白马成长资金回流'],
-    midTermFocus: ['机器人部件定点', '汽零热管理订单', '海外产能利用率'],
-    longTermFocus: ['执行器规模化', '全球客户体系', '精密制造壁垒'],
-    risks: ['机器人业务验证周期长', '汽车需求周期波动', '白马股估值弹性受限']
-  },
-  {
-    code: '002015',
-    name: '协鑫能科',
-    theme: '算电协同',
-    category: ['十倍潜力股'],
-    aiScore: 88,
-    expectedMultiple: '10倍',
-    investmentLogic: '电力资源、储能调度和算力需求结合后，资产有机会从传统能源运营重估为算电协同基础设施。',
-    shortTermFocus: ['电力改革预期', '算力租赁主题扩散', '储能板块回暖'],
-    midTermFocus: ['绿电资源利用率', '算力项目落地', '储能调度收益'],
-    longTermFocus: ['电力资产重估', '算力能源一体化', '虚拟电厂商业模式'],
-    risks: ['算力项目推进慢', '电价机制变化', '资产负债率压力']
-  },
-  {
-    code: '300438',
-    name: '鹏辉能源',
-    theme: '新型储能',
-    category: ['十倍潜力股'],
-    aiScore: 87,
-    expectedMultiple: '10倍',
-    investmentLogic: '储能周期底部修复时，小市值电池厂商弹性更大，海外户储、工商业储能和新型储能需求可能带来利润反转。',
-    shortTermFocus: ['储能板块反弹', '电池价格企稳', '海外订单预期'],
-    midTermFocus: ['户储去库结束', '工商业储能放量', '毛利率底部修复'],
-    longTermFocus: ['新型储能渗透率', '海外渠道恢复', '电芯技术迭代'],
-    risks: ['行业价格战延续', '海外需求恢复慢', '现金流压力']
-  }
-]
-
-const curatedStockProfiles = tenbaggerProfiles.reduce<Record<string, CuratedProfile>>((profiles, profile) => {
-  const current = profiles[profile.code]
-  if (!current) {
-    profiles[profile.code] = profile
-    return profiles
-  }
-  profiles[profile.code] = {
-    ...current,
-    ...profile,
-    category: Array.from(new Set([...(current.category || []), ...(profile.category || [])]))
-  }
-  return profiles
-}, {})
-
-function getCuratedStockProfile(code: string): CuratedProfile | null {
-  if (!code) return null
-  return curatedStockProfiles[String(code)] || null
-}
-
-const fifteenthPlanThemeMap: Record<string, string> = {
-  '光通讯': '算力基础设施、数据中心网络升级和高速信息通信底座',
-  '半导体': '集成电路、高端芯片和关键产业链自主可控',
-  'AI应用': '人工智能+、数字经济和智能化应用落地',
-  '商业航天': '商业航天、卫星互联网和空天信息产业',
-  '机器人': '具身智能、智能制造和机器人产业',
-  '锂电储能': '新型能源体系、新型储能和绿色低碳转型',
-  '算电协同': '算力网络、能源数字化和算电协同基础设施',
-  '新型储能': '新型能源体系、新型储能和绿色低碳转型'
-}
-
-function getFifteenthPlanStatement(themeName: string): string {
-  const rawName = String(themeName || '').trim()
-  const matchedKey = Object.keys(fifteenthPlanThemeMap).find(
-    key => rawName === key || rawName.includes(key) || key.includes(rawName)
-  )
-  if (matchedKey) {
-    return `${matchedKey}对应${fifteenthPlanThemeMap[matchedKey]}，属于十五五期间培育新质生产力、战略性新兴产业和未来产业时容易被重点关注的方向。`
-  }
-  return `${rawName || '该方向'}与十五五期间培育新质生产力、发展战略性新兴产业的政策主线存在一定关联。`
 }
 
 function getIndustryHealthClass(score: number): string {
@@ -335,7 +186,7 @@ function buildRealAnnualData(context: StockAiAnalysisContext, score: number) {
   return []
 }
 
-function buildMoatsFromTrend(trendApiData: TrendScoreData | null, profile: Partial<CuratedProfile>, profileName: string) {
+function buildMoatsFromTrend(trendApiData: TrendScoreData | null) {
   const fundamentalDim = findTrendDimension(trendApiData, name => name.includes('基本面'))
   const subDimensions = Array.isArray(fundamentalDim?.subDimensions) ? fundamentalDim.subDimensions : []
   if (subDimensions.length) {
@@ -406,10 +257,9 @@ export function useStockAiAnalysis(
   contextRef?: Ref<StockAiAnalysisContext | null>,
   industryHealthRef?: Ref<IndustryHealthData | null>
 ) {
-  const curatedProfile = computed(() => getCuratedStockProfile(symbolRef.value))
-  const profileScore = computed(() => Number(curatedProfile.value?.aiScore || 0))
-  const profileTheme = computed(() => curatedProfile.value?.theme || quoteRef.value?.industry || '成长赛道')
-  const profileName = computed(() => curatedProfile.value?.name || quoteRef.value?.name || '该股')
+  const profileScore = computed(() => 0)
+  const profileTheme = computed(() => quoteRef.value?.industry || '成长赛道')
+  const profileName = computed(() => quoteRef.value?.name || '该股')
   // 趋势股评分后端数据（四维：技术面/行业赛道景气/消息面催化/基本面）
   const trendApiData = computed(() => trendScoreDataRef?.value || null)
   const trendVetoed = computed(() => Boolean(trendApiData.value?.vetoed))
@@ -436,19 +286,14 @@ export function useStockAiAnalysis(
   })
 
   const midAiAnalysis = computed<AiAnalysisView>(() => {
-    const profile: Partial<CuratedProfile> = curatedProfile.value || {}
     const dimensions = trendApiData.value && !trendVetoed.value ? (trendApiData.value.dimensions || []) : []
     const sortedDims = [...dimensions].sort((a, b) => (b.score || 0) - (a.score || 0))
-    const focus = profile.midTermFocus?.length
-      ? profile.midTermFocus
-      : sortedDims.length
-        ? sortedDims.slice(0, 3).map(d => String(d.name || '趋势维度'))
-        : ['趋势跟踪', '业绩验证', '资金承接']
-    const risks = profile.risks?.length
-      ? profile.risks
-      : sortedDims.length
-        ? sortedDims.slice(-2).reverse().map(d => String(d.name || '风险维度'))
-        : ['趋势破位风险', '板块轮动风险']
+    const focus = sortedDims.length
+      ? sortedDims.slice(0, 3).map(d => String(d.name || '趋势维度'))
+      : ['趋势跟踪', '业绩验证', '资金承接']
+    const risks = sortedDims.length
+      ? sortedDims.slice(-2).reverse().map(d => String(d.name || '风险维度'))
+      : ['趋势破位风险', '板块轮动风险']
     const score = profileScore.value
     const realScore = realTrendScore.value || score
     const conclusion = realScore >= 80 ? '持有可顺势跟踪' : realScore >= 65 ? '关注等回踩确认' : '持有者稳健观察'
@@ -473,7 +318,9 @@ export function useStockAiAnalysis(
         riskTips: []
       }
     }
-    const planStatement = getFifteenthPlanStatement(profileTheme.value)
+    const policyText = health.isReal && health.details?.length
+      ? `趋势评分中行业政策线索指向"${health.details.map((d: any) => d.title || d.desc).join('、')}"`
+      : `${profileTheme.value}方向与十五五培育新质生产力、战略性新兴产业的政策主线存在关联`
     const summary = hasRealFinancial || forecastSummary || health.isReal
       ? `${profileName.value}中线判断优先参考真实财报、预测和趋势评分：营收/利润验证盈利弹性，行业赛道评分验证景气延续。`
       : `${profileName.value}中线核心在于${focus.slice(0, 2).join('和')}，当前后端财报/预测数据不足，先作为观察样本处理。`
@@ -486,7 +333,7 @@ export function useStockAiAnalysis(
         { tag: '估值位置校验', full: `实时行情估值显示 PE(TTM) 为${pe?.value || '--'}、PB 为${pb?.value || '--'}，需要和利润增速、行业景气度一起看，避免只看题材热度。` },
         { tag: '赛道景气同步', full: health.isReal ? `行业景气指数为${health.score}分，标签集中在"${health.tags.map((tag: any) => tag.text).join('、')}"，来自趋势评分后端维度。` : '暂无真实行业趋势评分，本项不作为中线机会或风险依据。' },
         { tag: '预测数据验证', full: forecastSummary || `业绩预测净利润同比为${formatPercent(forecast.netProfitYoy)}，暂无更完整预测摘要时，先用预测列表和半年报数据交叉验证。` },
-        { tag: '政策方向支撑', full: `${planStatement} 这会强化中线资金对赛道景气和订单兑现的跟踪，但仍需要用财报增速与资金承接继续验证。` },
+        { tag: '政策方向支撑', full: `${policyText}，这会强化中线资金对赛道景气和订单兑现的跟踪，但仍需要用财报增速与资金承接继续验证。` },
         { tag: '跟踪条件', full: `中线关注点为"${focus.join('、')}"。当前结论由真实财报、预测、估值和趋势评分共同校验后给出：${conclusion}。` }
       ],
       advice: realScore >= 80
@@ -511,10 +358,8 @@ export function useStockAiAnalysis(
   })
 
   const longMockData = computed(() => {
-    const profile: Partial<CuratedProfile> = curatedProfile.value || {}
     const theme = profileTheme.value
-    const focus = profile.longTermFocus || ['产业空间仍在扩张', '核心壁垒需要持续验证', '估值弹性取决于盈利兑现']
-    const planStatement = getFifteenthPlanStatement(theme)
+    const focus = ['产业空间仍在扩张', '核心壁垒需要持续验证', '估值弹性取决于盈利兑现']
     const trackDim = findTrendDimension(trendApiData.value, name => name.includes('行业') || name.includes('赛道'))
     const trackDetail = trackDim?.detail || {}
     const policyItems = Array.isArray(trackDetail.policyItems) ? trackDetail.policyItems : []
@@ -531,38 +376,32 @@ export function useStockAiAnalysis(
       : []
     return {
       policies,
-      moats: buildMoatsFromTrend(trendApiData.value, profile, profileName.value),
+      moats: buildMoatsFromTrend(trendApiData.value),
       annual: buildRealAnnualData(realDataContext.value, realTrendScore.value || profileScore.value)
     }
   })
 
   const longAiAnalysis = computed<AiAnalysisView>(() => {
-    const profile: Partial<CuratedProfile> = curatedProfile.value || {}
     const dimensions = trendApiData.value && !trendVetoed.value ? (trendApiData.value.dimensions || []) : []
     const sortedDims = [...dimensions].sort((a, b) => (b.score || 0) - (a.score || 0))
-    const focus = profile.longTermFocus?.length
-      ? profile.longTermFocus
-      : sortedDims.length
-        ? sortedDims.slice(0, 3).map(d => String(d.name || '趋势维度'))
-        : ['产业空间', '核心壁垒', '成长弹性']
-    const risks = profile.risks?.length
-      ? profile.risks
-      : sortedDims.length
-        ? sortedDims.slice(-2).reverse().map(d => String(d.name || '风险维度'))
-        : ['产业兑现节奏低于预期']
-    const multiple = expectedMultipleText.value
+    const focus = sortedDims.length
+      ? sortedDims.slice(0, 3).map(d => String(d.name || '趋势维度'))
+      : ['产业空间', '核心壁垒', '成长弹性']
+    const risks = sortedDims.length
+      ? sortedDims.slice(-2).reverse().map(d => String(d.name || '风险维度'))
+      : ['产业兑现节奏低于预期']
     const multipleNumber = expectedMultipleNumber.value
-    const conclusion = multiple === '10倍'
-      ? '长线可分批跟踪'
-      : multipleNumber >= 3
-        ? '长线弹性观察'
-        : multipleNumber >= 2
-          ? '长线稳健跟踪'
-          : '长线耐心观察'
+    const conclusion = multipleNumber >= 3
+      ? '长线弹性观察'
+      : multipleNumber >= 2
+        ? '长线稳健跟踪'
+        : '长线耐心观察'
     const policies = longMockData.value.policies
     const moats = longMockData.value.moats
     const annual = longMockData.value.annual
-    const planStatement = getFifteenthPlanStatement(profileTheme.value)
+    const policyFallback = policies.length
+      ? `趋势评分后端返回${policies.length}条政策/产业趋势线索`
+      : `${profileTheme.value}方向与十五五培育新质生产力、战略性新兴产业的政策主线存在关联`
     const hasRealTrend = Boolean(trendApiData.value) && !trendVetoed.value
     const hasRealAnnual = buildRealFinancialData(realDataContext.value).rows.length > 0
     if (!hasRealTrend && !hasRealAnnual && !trendVetoed.value) {
@@ -583,24 +422,24 @@ export function useStockAiAnalysis(
       : `${profileName.value}长线核心在于${focus.slice(0, 2).join('和')}，当前真实长线数据不足，先以观察和等待验证为主。`
     return {
       conclusion,
-      badgeClass: multiple === '10倍' ? 'is-bull' : 'is-hold',
+      badgeClass: multipleNumber >= 3 ? 'is-bull' : 'is-hold',
       logic: summary,
       basis: [
-        { tag: '政策产业共振', full: `行业政策卡片中有${policies.length}条线索，核心方向是"${profileTheme.value}"；${hasRealTrend ? '优先来自趋势评分后端的行业赛道维度。' : `${planStatement} 需要后续用真实政策/产业数据继续验证。`}` },
+        { tag: '政策产业共振', full: `行业政策卡片中有${policies.length}条线索，核心方向是"${profileTheme.value}"；${hasRealTrend ? '优先来自趋势评分后端的行业赛道维度。' : `${policyFallback}，需要后续用真实政策/产业数据继续验证。`}` },
         { tag: '护城河四维支撑', full: `公司护城河卡片显示"${moats.map((item: any) => item.title).join('、')}"四个维度，${hasRealTrend ? '优先来自趋势评分基本面子维度' : '目前仍以画像和财报验证方向为主'}。` },
         { tag: '财报估值双验证', full: `年报/半年报对比中研发费用为${annual.find((item: any) => item.label === '研发费用' || item.label === '研发投入')?.value || '--'}，营收增速为${annual.find((item: any) => item.label === '营收增速')?.value || '--'}，PE(TTM) 为${annual.find((item: any) => item.label === 'PE(TTM)')?.value || '--'}。` },
         tenxBasis,
         { tag: '反向跟踪风险', full: `需要反向跟踪的风险是：${risks[0]}，如果这个风险兑现，长线判断会先从真实趋势模型、护城河和财报质量下修。` }
       ],
-      advice: multiple === '10倍'
+      advice: multipleNumber >= 3
         ? [
-          { tag: '分批跟踪高弹性', full: '已持有者可按长线高弹性样本跟踪，避免一次性重仓，适合用分批方式等待产业验证。' },
-          { tag: '等估值回落确认', full: '关注者优先等估值回落、业绩公告或订单数据确认，不把短期题材上涨直接等同于十倍股兑现。' },
+          { tag: '弹性跟踪', full: '已持有者可按长线高弹性样本跟踪，避免一次性重仓，适合用分批方式等待产业验证。' },
+          { tag: '等估值回落确认', full: '关注者优先等估值回落、业绩公告或订单数据确认，不把短期题材上涨直接等同于高倍数兑现。' },
           { tag: '产业验证是基础', full: `若${focus[0] || '产业空间'}和${focus[1] || '核心壁垒'}持续验证，趋势股模型的高分才有继续上修基础。` },
           { tag: '四维长期跟踪', full: '长期跟踪重点放在研发投入、客户突破、现金流改善和政策落地四个维度。' }
         ]
         : [
-          { tag: '趋势龙头长期观察', full: `已持有者可按趋势龙头做长期观察，核心是验证${focus[0] || '产业空间'}能否持续兑现。` },
+          { tag: '长期观察', full: `已持有者可按趋势龙头做长期观察，核心是验证${focus[0] || '产业空间'}能否持续兑现。` },
           { tag: '估值业绩匹配再介入', full: '关注者不必预设倍数空间，更适合在估值和业绩匹配时分批跟踪。' },
           { tag: '护城河改善提可信度', full: '若护城河、研发投入和资本回报率继续改善，长线空间的可信度会提高。' },
           { tag: '无验证降预期', full: '若长期逻辑没有新订单或新利润验证，应降低长线预期，把它视作稳健成长而非高弹性标的。' }
@@ -695,7 +534,6 @@ export function useStockAiAnalysis(
   }
 
   return {
-    curatedProfile,
     profileScore,
     profileTheme,
     profileName,
