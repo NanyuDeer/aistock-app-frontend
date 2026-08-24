@@ -2,6 +2,17 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [junliang] 2026-08-24 — 洞察页异动按最近触发时间排序 + 详情只展示支撑性主因
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/favorites/pages/insight.vue`：异动列表排序由首次触发时间改为最近触发时间（`window_end_at` 兜底 `triggered_at`），长窗口事件不再沉底
+- `src/modules/favorites/pages/insight-detail-move.vue`：异动详情页候选只展示支撑性主因（supported），隐藏证据不足/偏弱候选，标题改"支撑性主因"
+- `src/shared/api/modules/stockTrace.ts`：`StockTraceEvent` 新增 `window_end_at` 字段（最近触发/窗口更新时间）
+
+---
+
 ## [junliang] 2026-08-20 — 价格异动详情迁移 insight-detail-move + 相对昨收涨跌幅展示
 
 **开发者**: Aria

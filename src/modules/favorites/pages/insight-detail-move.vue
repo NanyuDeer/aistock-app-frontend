@@ -53,9 +53,9 @@
 
       <!-- ===== 归因结果（completed） ===== -->
       <template v-if="artifact && analysis?.processing_status === 'completed'">
-        <!-- 五层候选列表 -->
+        <!-- 五层候选列表（仅支撑性主因维度） -->
         <view v-if="allCandidates.length" class="section">
-          <text class="section-title">归因候选</text>
+          <text class="section-title">支撑性主因</text>
           <view
             v-for="c in allCandidates"
             :key="c.layer"
@@ -137,8 +137,8 @@ const loading = ref(true)
 const artifact = computed(() => analysis.value?.artifact)
 
 /**
- * 全部归因候选（五层）：直接取 artifactJson.candidates（含偏弱/证据不足/排除的各层判定结论）。
- * movementView.alternatives 只含 supported 候选，证据不足时为空会导致候选区信息缺失。
+ * 归因候选（仅展示支撑性维度）：按主因优先排序后，只保留 status='supported' 的候选，
+ * 证据不足（insufficient）/偏弱（weak）/排除（rejected）的维度不展示，聚焦确立的主因。
  */
 const allCandidates = computed(() => {
   const art = artifact.value
@@ -148,7 +148,9 @@ const allCandidates = computed(() => {
   const primaryCandidateId = art?.artifactJson.chains?.find((ch) => ch.chainId === primaryChainId)?.candidateId
   const primary = candidates.find((c) => c.candidateId === primaryCandidateId)
   const rest = candidates.filter((c) => c.candidateId !== primaryCandidateId)
-  return [primary, ...rest].filter((c): c is NonNullable<typeof c> => !!c)
+  return [primary, ...rest]
+    .filter((c): c is NonNullable<typeof c> => !!c)
+    .filter((c) => c.status === 'supported')
 })
 
 /** 主因链（备选链信息由归因候选全量覆盖，统一不展示） */
