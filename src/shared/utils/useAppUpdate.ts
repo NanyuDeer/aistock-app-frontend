@@ -92,9 +92,11 @@ export async function checkAppUpdate(opts: { manual?: boolean } = {}): Promise<A
 
 /** 弹出更新确认框，确认后下载并安装 */
 function showUpdateModal(info: AppVersionInfo): void {
+  const sizeTxt = info.fileSize && info.fileSize !== '待发布' ? ` · ${info.fileSize}` : ''
+  const content = `v${info.versionName}${sizeTxt}\n${info.description || '检测到新版本，请更新后体验'}`
   uni.showModal({
-    title: `发现新版本 v${info.versionName}`,
-    content: info.description || '检测到新版本，请更新后体验',
+    title: `发现新版本`,
+    content,
     confirmText: '立即更新',
     cancelText: '稍后再说',
     success: (res) => {
@@ -119,6 +121,11 @@ function downloadAndInstall(info: AppVersionInfo): void {
         return
       }
       // #ifdef APP-PLUS
+      // 兜底：当前运行时不可用 plus.runtime.install 时，降级为让系统文件管理器打开安装包
+      if (typeof plus.runtime.install !== 'function') {
+        plus.runtime.openFile(res.tempFilePath || '')
+        return
+      }
       plus.runtime.install(
         res.tempFilePath,
         { force: true },
@@ -127,10 +134,13 @@ function downloadAndInstall(info: AppVersionInfo): void {
         },
         (err: Error) => {
           uni.showModal({
-            title: '安装失败',
-            content: (err && err.message) || '安装失败，请检查是否允许安装未知来源应用',
+            title: '安装未完成',
+            content:
+              '下载已完成，安装被系统拦截。请在手机「设置 → 应用/安全 → 安装未知应用」中为当前应用开启允许安装后重试。',
+            confirmText: '知道了',
             showCancel: false
           })
+          console.warn('[appUpdate] 安装失败', (err && err.message) || err)
         }
       )
       // #endif
