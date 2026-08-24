@@ -40,7 +40,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 
 | 页面 | 文件 | 说明 |
 |------|------|------|
-| 早点听 | `briefing/index.vue` | 结构化早晚报（音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期。音频纳入全局播报互斥（podcast store acquireExternal）：播放前注册、暂停/结束/卸载注销 |
+| 早点听 | `briefing/index.vue` | 晨报/午间报/晚报三 Tab（午间报=盘中报，2026-08-24）。晨/晚报：音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页。午间报：走 `agentApi.getReport('midday', date)` 渲染 `content.display_report`（summary/details/risks，样式参考晨报头条卡片），音频读 `content.audio_path`（可选——后端有音频才渲染音频条并经 podcast store 播放，无音频只展示文字、不跳详情页仅播放）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期。音频纳入全局播报互斥（podcast store acquireExternal）：播放前注册、暂停/结束/卸载注销 |
 | 持仓管理 | `portfolio/index.vue` | 持仓分析 |
 | 事件传导链 | `event-chain/index.vue` | 事件传导链路可视化 |
 | 估值分析 | `valuation/index.vue` | 个股估值 |
@@ -304,7 +304,7 @@ import Card from '@/shared/components/Card.vue'
 
 | 模块文件 | 说明 | 后端路径 |
 |---------|------|---------|
-| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`；**P0 身份鉴权：`createAgentWebSocket` URL 带 `?token=`（app-api 桥接验签）、`sendMessage` 不再携带 `user_id`（服务端注入）**；**批次 2：`getChatAnalysisReport(reportId)` 深度分析报告详情查询（`/api/agent/report/chat/:reportId`，显式解包返回 `ChatAnalysisReport | null`）+ `ChatAnalysisReport` 类型（`content.display_report` 双层结构）**） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
+| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`；**P0 身份鉴权：`createAgentWebSocket` URL 带 `?token=`（app-api 桥接验签）、`sendMessage` 不再携带 `user_id`（服务端注入）**；**批次 2：`getChatAnalysisReport(reportId)` 深度分析报告详情查询（`/api/agent/report/chat/:reportId`，显式解包返回 `ChatAnalysisReport | null`）+ `ChatAnalysisReport` 类型（`content.display_report` 双层结构）**；**午间报（2026-08-24）：`MiddayReportRecord` 类型（`content.display_report` + `content.audio_path` 可选，方案 A）**） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
 | `auth.ts` | 认证（登录、用户信息） | `/api/auth/wechat/*` |
 | `briefing.ts` | 早晚报结构化（BriefingItem/BriefingSummary 类型 + 降级解析适配器） | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |

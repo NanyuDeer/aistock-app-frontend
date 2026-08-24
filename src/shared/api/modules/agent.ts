@@ -351,6 +351,28 @@ export interface ChatAnalysisReport {
 }
 
 export type BriefType = 'morning' | 'evening'
+
+/** 午间报报告 DB 记录（GET /api/agent/report/midday/:date 返回；方案 A 契约） */
+export interface MiddayReportRecord {
+  id?: string | number
+  report_type: string
+  report_date: string
+  status?: string
+  data_source?: string | null
+  created_at?: string
+  content: {
+    display_report?: {
+      summary?: string
+      details?: string
+      stocks?: string[]
+      risks?: string[]
+    }
+    podcast_brief?: string
+    schema_version?: string
+    /** 方案 A：音频回填到同一份 midday 报告的 content.audio_path；未生成音频时缺失/null */
+    audio_path?: string | null
+  }
+}
 export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review'] as const
 export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
 
