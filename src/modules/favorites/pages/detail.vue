@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol">
+  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol" :scroll-into-view="scrollIntoView">
     <view class="page-detail">
     <view v-if="loading" class="loading">
       <text class="loading-text">加载中...</text>
@@ -82,6 +82,7 @@
         </view>
       </view>
 
+      <view id="detail-anchor-stock-info" class="detail-anchor"></view>
       <view v-if="isFavorite" class="major-event-alert">
         <view class="major-event-head">
           <text class="decision-kicker">最新重大异动</text>
@@ -433,6 +434,7 @@
         </view>
 
         <!-- 财报分析 -->
+        <view id="detail-anchor-performance-report" class="detail-anchor"></view>
         <view v-if="hasFinanceCardData" class="section-card">
           <view class="section-header">
             <text class="section-title">财报分析</text>
@@ -493,6 +495,7 @@
         </view>
 
         <!-- 业绩预测 -->
+        <view id="detail-anchor-forecast" class="detail-anchor"></view>
         <view v-if="forecastLoading || hasForecastCardData" class="section-card">
           <view class="section-header">
             <text class="section-title">业绩预测</text>
@@ -890,7 +893,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive } from 'vue'
+import { computed, nextTick, ref, reactive } from 'vue'
 import { onLoad, onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
@@ -916,6 +919,8 @@ const stockEvents = ref<any[]>([])
 const forecastData = ref<any>(null)
 const forecastLoading = ref(false)
 const forecastDetailExpanded = ref(false)
+const detailAnchor = ref<DetailAnchor | ''>('')
+const scrollIntoView = ref('')
 const klineData = ref<any[]>([])
 type KLinePeriod = 'daily' | 'weekly' | 'monthly'
 const klinePeriod = ref<KLinePeriod>('daily')
@@ -937,6 +942,7 @@ const hasStockHeaderTags = computed(() => Boolean(
 
 // 周期切换
 type ViewKey = 'short' | 'mid' | 'long'
+type DetailAnchor = 'stock-info' | 'forecast' | 'performance-report'
 const activeView = ref<ViewKey>('short')
 const viewTabs: { key: ViewKey; label: string; desc: string }[] = [
   { key: 'short', label: '短线', desc: '日/周' },
@@ -948,6 +954,28 @@ const policyExpanded = ref(false)
 
 function selectActiveView(key: ViewKey) {
   activeView.value = key
+}
+
+function normalizeDetailAnchor(value: unknown): DetailAnchor | '' {
+  const anchor = String(value || '').trim()
+  return anchor === 'stock-info' || anchor === 'forecast' || anchor === 'performance-report'
+    ? anchor
+    : ''
+}
+
+function viewForAnchor(anchor: DetailAnchor): ViewKey {
+  return anchor === 'stock-info' ? 'short' : 'mid'
+}
+
+async function scrollToDetailAnchor() {
+  const anchor = detailAnchor.value
+  if (!anchor) return
+  activeView.value = viewForAnchor(anchor)
+  await nextTick()
+  scrollIntoView.value = ''
+  setTimeout(() => {
+    scrollIntoView.value = `detail-anchor-${anchor}`
+  }, 120)
 }
 
 // AI 洞见 composable（接入真实 trend-score 数据）
@@ -1805,6 +1833,7 @@ onUnload(() => {
 
 onLoad((options: any) => {
   symbol.value = options?.symbol || ''
+  detailAnchor.value = normalizeDetailAnchor(options?.anchor)
   if (symbol.value) {
     loadData()
   }
@@ -1868,6 +1897,7 @@ async function loadData() {
     console.error('[StockDetail] load error:', err)
   } finally {
     loading.value = false
+    void scrollToDetailAnchor()
   }
 }
 
@@ -2275,6 +2305,11 @@ function goChat() {
   width: 100%;
   max-width: 430px;
   margin: 0 auto;
+}
+
+.detail-anchor {
+  height: 1rpx;
+  overflow: hidden;
 }
 
 .loading, .empty {
