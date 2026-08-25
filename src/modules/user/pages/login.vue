@@ -19,7 +19,7 @@
     <!-- 登录方式区域（统一模板：H5 / APP-PLUS / MP-WEIXIN 共用二维码 + 错误状态） -->
     <view class="login-body">
       <!-- 初始状态：登录方式选择 -->
-      <view v-if="!qrCodeUrl && !loginLoading && !errorMsg && !showSmsForm" class="login-methods">
+      <view v-if="!qrCodeUrl && !loginLoading && !errorMsg && !showEmailForm" class="login-methods">
         <!-- #ifdef MP-WEIXIN -->
         <button @tap="handleWxLogin" class="btn-wx-login">
           <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
@@ -42,10 +42,10 @@
         </button>
         <!-- #endif -->
 
-        <!-- 手机号验证码登录入口（全平台） -->
-        <button @click="showSmsForm = true" class="btn-phone-login">
-          <SvgIcon name="smartphone-line" size="36rpx" color="#0b5fff" />
-          <text class="btn-text">手机号验证码登录</text>
+        <!-- 邮箱验证码登录入口（全平台） -->
+        <button @click="showEmailForm = true" class="btn-email-login">
+          <SvgIcon name="mail-line" size="36rpx" color="#0b5fff" />
+          <text class="btn-text">邮箱验证码登录</text>
         </button>
 
         <view class="login-tip">
@@ -56,16 +56,14 @@
         </view>
       </view>
 
-      <!-- 手机号验证码登录表单（全平台） -->
-      <view v-else-if="showSmsForm" class="sms-form">
-        <text class="form-title">手机号验证码登录</text>
+      <!-- 邮箱验证码登录表单（全平台） -->
+      <view v-else-if="showEmailForm" class="email-form">
+        <text class="form-title">邮箱验证码登录</text>
         <view class="form-row">
-          <SvgIcon name="smartphone-line" size="36rpx" color="#9ca3af" />
+          <SvgIcon name="mail-line" size="36rpx" color="#9ca3af" />
           <Input
-            v-model="phone"
-            type="number"
-            :maxlength="11"
-            placeholder="请输入手机号"
+            v-model="email"
+            placeholder="请输入邮箱"
             class="form-input"
           />
         </view>
@@ -80,17 +78,17 @@
           />
           <Button
             class="form-code-btn"
-            :disabled="countdown > 0 || !isValidPhone"
+            :disabled="countdown > 0 || !isValidEmail"
             size="sm"
-            @click="handleSendSms"
+            @click="handleSendEmail"
           >
             {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
           </Button>
         </view>
         <view class="form-submit">
-          <Button block :loading="loginLoading" @click="handleSmsLogin">登录</Button>
+          <Button block :loading="loginLoading" @click="handleEmailLogin">登录</Button>
         </view>
-        <view class="form-back" @click="showSmsForm = false">
+        <view class="form-back" @click="showEmailForm = false">
           <SvgIcon name="arrow-left-line" size="28rpx" color="#4b5a7a" />
           <text class="form-back-text">返回微信登录</text>
         </view>
@@ -159,12 +157,12 @@ const scanStatus = ref<'waiting' | 'scanned' | 'confirmed' | 'expired'>('waiting
 const loginLoading = ref(false)
 const errorMsg = ref('')
 
-// 手机号验证码登录状态
-const showSmsForm = ref(false)
-const phone = ref('')
+// 邮箱验证码登录状态
+const showEmailForm = ref(false)
+const email = ref('')
 const smsCode = ref('')
 const countdown = ref(0)
-const isValidPhone = computed(() => /^1[3-9]\d{9}$/.test(phone.value))
+const isValidEmail = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value))
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -258,15 +256,15 @@ function stopCountdown() {
   }
 }
 
-/** 发送短信验证码（60s 倒计时） */
-async function handleSendSms() {
-  if (!isValidPhone.value) {
-    uni.showToast({ title: '请输入正确的手机号', icon: 'none' })
+/** 发送邮箱验证码（60s 倒计时） */
+async function handleSendEmail() {
+  if (!isValidEmail.value) {
+    uni.showToast({ title: '请输入正确的邮箱', icon: 'none' })
     return
   }
   try {
-    await authApi.sendSmsCode(phone.value)
-    uni.showToast({ title: '验证码已发送', icon: 'none' })
+    await authApi.sendEmailCode(email.value)
+    uni.showToast({ title: '验证码已发送，请查收邮箱', icon: 'none' })
     countdown.value = 60
     stopCountdown()
     countdownTimer = setInterval(() => {
@@ -278,10 +276,10 @@ async function handleSendSms() {
   }
 }
 
-/** 手机号 + 验证码登录 */
-async function handleSmsLogin() {
-  if (!isValidPhone.value) {
-    uni.showToast({ title: '请输入正确的手机号', icon: 'none' })
+/** 邮箱 + 验证码登录 */
+async function handleEmailLogin() {
+  if (!isValidEmail.value) {
+    uni.showToast({ title: '请输入正确的邮箱', icon: 'none' })
     return
   }
   if (!smsCode.value) {
@@ -290,7 +288,7 @@ async function handleSmsLogin() {
   }
   loginLoading.value = true
   try {
-    await userStore.smsLogin(phone.value, smsCode.value)
+    await userStore.emailLogin(email.value, smsCode.value)
     loginLoading.value = false
     stopCountdown()
     uni.showToast({ title: '登录成功', icon: 'success' })
@@ -497,8 +495,8 @@ function goBack() {
   }
 }
 
-/* 手机号验证码登录入口（描边按钮） */
-.btn-phone-login {
+/* 邮箱验证码登录入口（描边按钮） */
+.btn-email-login {
   width: 100%;
   margin-top: 24rpx;
   display: flex;
@@ -518,8 +516,8 @@ function goBack() {
   }
 }
 
-/* ===== 手机号验证码登录表单 ===== */
-.sms-form {
+/* ===== 邮箱验证码登录表单 ===== */
+.email-form {
   width: 100%;
   display: flex;
   flex-direction: column;
