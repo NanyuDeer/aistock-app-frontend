@@ -32,7 +32,17 @@
             <text class="empty-guide-close-text">不再显示</text>
           </view>
         </view>
-        <view v-for="(msg, idx) in displayMessages" :key="idx" class="message-item" :class="msg.role" @longpress="openMessageActions(msg)">
+        <view
+          v-for="(msg, idx) in displayMessages"
+          :key="idx"
+          class="message-item"
+          :class="[msg.role, { selectable: msg.timestamp === selectingMsgTimestamp }]"
+          :data-ts="msg.timestamp"
+          @touchstart="onMsgTouchStart($event, msg)"
+          @touchmove="onMsgTouchMove"
+          @touchend="onMsgTouchEnd"
+          @touchcancel="onMsgTouchCancel"
+        >
           <!-- 用户消息 -->
           <text v-if="msg.role === 'user'" class="msg-content user">{{ msg.content }}</text>
 
@@ -695,6 +705,50 @@ function handleSend() {
   chatStream.send(content)
 }
 
+// ── 长按手势：手动触摸监听（350ms 按住 + 10px 位移取消，修复滑动误触） ──
+const LONG_PRESS_MS = 350
+const MOVE_CANCEL_PX = 10
+const menuPos = ref({ x: 0, y: 0 })
+/** 选中文字模式：记录正在圈选的消息 timestamp；null = 非选中态 */
+const selectingMsgTimestamp = ref<number | null>(null)
+
+let lpTimer: ReturnType<typeof setTimeout> | null = null
+let lpStartX = 0
+let lpStartY = 0
+
+function onMsgTouchStart(e: TouchEvent, msg: ChatMessage) {
+  if (isStreaming.value) return
+  const t = e.touches[0]
+  lpStartX = t.clientX
+  lpStartY = t.clientY
+  lpTimer = setTimeout(() => {
+    lpTimer = null
+    openMessageActions(msg, lpStartX, lpStartY)
+  }, LONG_PRESS_MS)
+}
+
+function onMsgTouchMove(e: TouchEvent) {
+  const t = e.touches[0]
+  const dx = Math.abs(t.clientX - lpStartX)
+  const dy = Math.abs(t.clientY - lpStartY)
+  if (dx > MOVE_CANCEL_PX || dy > MOVE_CANCEL_PX) cancelLongPress()
+}
+
+function onMsgTouchEnd() {
+  cancelLongPress()
+}
+
+function onMsgTouchCancel() {
+  cancelLongPress()
+}
+
+function cancelLongPress() {
+  if (lpTimer) {
+    clearTimeout(lpTimer)
+    lpTimer = null
+  }
+}
+
 // ── 批次 4（消息长按操作：复制/删除/重发到输入框；全体消息可用） ──
 const messageSheetVisible = ref(false)
 const messageSheetItems = ref<{ label: string; value: string; danger?: boolean }[]>([])
@@ -706,9 +760,10 @@ const messageActionTarget = ref<ChatMessage | null>(null)
  *  - 重发：回填输入框（可编辑后再发，走正常 send，后端按新消息追加——规避加性历史截断问题）
  *  - 删除：本地隐藏删除（后端 LangGraph 线程保持不变）
  */
-function openMessageActions(msg: ChatMessage) {
+function openMessageActions(msg: ChatMessage, clientX = 0, clientY = 0) {
   if (isStreaming.value) return // 流式中禁长按，避免打断正在生成的回答
   messageActionTarget.value = msg
+  menuPos.value = { x: clientX, y: clientY }
   messageSheetItems.value = [
     { label: '复制', value: 'copy' },
     { label: '重发', value: 'resend' },
