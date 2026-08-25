@@ -300,11 +300,19 @@ test('批次4：消息项长按接入（message-item @touchstart → 打开操�
   assert.match(pageSource, /function openMessageActions\(msg: ChatMessage, clientX = 0, clientY = 0\)/)
 })
 
-test('批次4：长按菜单含复制/删除/重发（MessageActionMenu 接入 + 危险项删除）', () => {
+test('批次4：长按菜单含复制/选中文字/删除/重发（MessageActionMenu 接入 + 危险项删除）', () => {
   assert.match(pageSource, /<MessageActionMenu/)
   assert.match(pageSource, /\{ label: '复制', value: 'copy' \}/)
+  assert.match(pageSource, /\{ label: '选中文字', value: 'select-text' \}/)
   assert.match(pageSource, /\{ label: '重发', value: 'resend' \}/)
   assert.match(pageSource, /\{ label: '删除', value: 'delete', danger: true \}/)
+})
+
+test('批次4：选中文字态（原生手柄圈选复制片段，仅 App）', () => {
+  assert.match(pageSource, /user-select: text/)
+  assert.match(pageSource, /copy-selection-bar/)
+  assert.match(pageSource, /function handleSelectText\(msg: ChatMessage\)/)
+  assert.match(pageSource, /case 'select-text':/)
 })
 
 test('批次4：复制走剪贴板 / 重发回填输入框可编辑 / 删除调用 store.removeMessage', () => {

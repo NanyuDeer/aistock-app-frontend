@@ -268,6 +268,11 @@
       @select="handleMessageAction"
       @close="closeMenu"
     />
+
+    <!-- 批次 4：选中文字态浮出「复制已选」栏（仅 App 原生手柄圈选后出现） -->
+    <view v-if="selectingActive" class="copy-selection-bar" @tap="copySelection">
+      <text class="copy-selection-text">复制已选</text>
+    </view>
   </SubPageCard2>
 </template>
 
@@ -572,6 +577,8 @@ const restoreInProgress = ref(false)
 
 function onScroll(e: unknown) {
   if (restoreInProgress.value) return
+  // 选中文字态下滚动列表即退出选中态，避免手柄残留
+  if (selectingMsgTimestamp.value !== null) exitSelectMode()
   const detail = ((e as { detail?: unknown } | null)?.detail ?? {}) as {
     scrollTop?: unknown
     scrollHeight?: unknown
@@ -713,6 +720,83 @@ const MOVE_CANCEL_PX = 10
 const menuPos = ref({ x: 0, y: 0 })
 /** 选中文字模式：记录正在圈选的消息 timestamp；null = 非选中态 */
 const selectingMsgTimestamp = ref<number | null>(null)
+/** 是否已圈选出非空文本（供「复制已选」按钮显隐/交互） */
+const hasSelection = ref(false)
+/** 处于选中文字态（非 null）时浮出「复制已选」栏 */
+const selectingActive = computed(() => selectingMsgTimestamp.value !== null)
+
+function handleSelectText(msg: ChatMessage) {
+  menuTarget.value = msg
+  selectingMsgTimestamp.value = msg.timestamp
+  menuVisible.value = false
+  ensureSelectionListener()
+  nextTick(() => {
+    // App webview：程序化选中该消息文本，使原生拖拽手柄出现
+    const el = document.querySelector<HTMLElement>(`[data-ts="${msg.timestamp}"]`)
+    selectMessageText(el)
+  })
+}
+
+function selectMessageText(el: HTMLElement | null) {
+  // #ifdef APP-PLUS
+  if (!el) return
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  let first: Text | null = null
+  let last: Text | null = null
+  while (walker.nextNode()) {
+    const t = walker.currentNode as Text
+    if (!t.textContent || !t.textContent.trim()) continue
+    if (!first) first = t
+    last = t
+  }
+  if (!first || !last) return
+  const range = document.createRange()
+  range.setStart(first, 0)
+  range.setEnd(last, last.textContent!.length)
+  const sel = window.getSelection()
+  sel?.removeAllRanges()
+  sel?.addRange(range)
+  // #endif
+}
+
+let selectionBound = false
+
+function ensureSelectionListener() {
+  // #ifdef APP-PLUS
+  if (selectionBound) return
+  document.addEventListener('selectionchange', onMessageSelectChange)
+  selectionBound = true
+  // #endif
+}
+
+function onMessageSelectChange() {
+  // #ifdef APP-PLUS
+  const sel = window.getSelection()
+  const text = sel?.toString() ?? ''
+  hasSelection.value = !!text.trim()
+  // #endif
+}
+
+function copySelection() {
+  const msg = menuTarget.value
+  // #ifdef APP-PLUS
+  const sel = window.getSelection()?.toString() ?? ''
+  if (sel.trim()) {
+    uni.setClipboardData({ data: sel })
+  } else if (msg?.content) {
+    uni.setClipboardData({ data: msg.content })
+  }
+  // #endif
+  exitSelectMode()
+}
+
+function exitSelectMode() {
+  selectingMsgTimestamp.value = null
+  hasSelection.value = false
+  // #ifdef APP-PLUS
+  window.getSelection()?.removeAllRanges()
+  // #endif
+}
 
 let lpTimer: ReturnType<typeof setTimeout> | null = null
 let lpStartX = 0
@@ -768,6 +852,7 @@ function openMessageActions(msg: ChatMessage, clientX = 0, clientY = 0) {
   menuPos.value = { x: clientX, y: clientY }
   menuItems.value = [
     { label: '复制', value: 'copy' },
+    { label: '选中文字', value: 'select-text' },
     { label: '重发', value: 'resend' },
     { label: '删除', value: 'delete', danger: true },
   ]
@@ -793,6 +878,10 @@ function handleMessageAction(item: MenuItem) {
     case 'delete':
       chatStore.removeMessage(msg.timestamp)
       break
+    case 'select-text':
+      // 进入选中态：自行关闭菜单，保留 menuTarget 供 copySelection 整条兜底复制
+      handleSelectText(msg)
+      return
   }
   menuTarget.value = null
   menuVisible.value = false
@@ -969,11 +1058,47 @@ onUnmounted(() => {
   clearConfirmTimer()
   // 问题 15：不再 disconnect —— socket 为模块级单例，跨页面存活，
   // 后台任务继续生成，回页经 onShow resume 补全
+  // 批次 4：退出页面移除选中文字监听（仅 App 绑定过）
+  // #ifdef APP-PLUS
+  document.removeEventListener('selectionchange', onMessageSelectChange)
+  // #endif
 })
 </script>
 
 <style lang="scss" scoped>
 @use '@/shared/styles/variables.scss' as *;
+
+/* 批次 4：选中文字态——默认禁选中，选中态恢复文本可选（原生拖拽手柄圈选，仅 App） */
+/* #ifdef APP-PLUS */
+.message-item .msg-content,
+.message-item .bubble {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.message-item.selectable .msg-content,
+.message-item.selectable .bubble {
+  user-select: text;
+  -webkit-user-select: text;
+}
+/* #endif */
+
+/* 「复制已选」浮栏：居中悬浮在列表底部上方 */
+.copy-selection-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 120rpx;
+  z-index: $z-popover;
+  padding: $s-2 $s-4;
+  background: $bg-card;
+  border-radius: $r-full;
+  box-shadow: $shadow-card;
+}
+
+.copy-selection-text {
+  font-size: $font-size-md;
+  color: $primary;
+}
 
 /* P9：会话入口按钮（导航栏右侧） */
 .sessions-entry {
