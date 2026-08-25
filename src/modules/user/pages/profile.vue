@@ -93,7 +93,7 @@
               <SvgIcon name="bar-chart-line" size="36rpx" color="#4b5a7a" />
             </template>
           </ListCell>
-          <ListCell title="账号与安全" description="绑定手机号 / 微信" clickable showArrow :border="true" @click="goAccountSecurity">
+          <ListCell title="账号与安全" description="绑定邮箱 / 微信" clickable showArrow :border="true" @click="goAccountSecurity">
             <template #prefix>
               <SvgIcon name="shield-check-line" size="36rpx" color="#4b5a7a" />
             </template>
