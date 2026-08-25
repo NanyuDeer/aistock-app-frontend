@@ -259,12 +259,14 @@
       @close="handleConfirmClose"
     />
 
-    <!-- 批次 4：消息长按操作菜单（复制/删除/重发到输入框；全体消息可用） -->
-    <ActionSheet
-      :visible="messageSheetVisible"
-      :items="messageSheetItems"
+    <!-- 批次 4：消息长按原位浮动菜单（无遮罩、无模糊、不跳页） -->
+    <MessageActionMenu
+      :visible="menuVisible"
+      :x="menuPos.x"
+      :y="menuPos.y"
+      :items="menuItems"
       @select="handleMessageAction"
-      @update:visible="(v: boolean) => (messageSheetVisible = v)"
+      @close="closeMenu"
     />
   </SubPageCard2>
 </template>
@@ -284,7 +286,7 @@ import CardRenderer from './cards/CardRenderer.vue'
 import SectionCard from './cards/SectionCard.vue'
 import FeedbackBar from '@/shared/components/FeedbackBar.vue'
 import ConfirmSheet from '@/shared/components/ConfirmSheet.vue'
-import ActionSheet from '@/shared/components/ActionSheet.vue'
+import MessageActionMenu, { type MenuItem } from './MessageActionMenu.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
 import { parseFollowupQuestions, type FollowupParse } from '@/shared/utils/parseFollowupQuestions'
 import { useChatStore } from '@/shared/store/modules/chat'
@@ -750,30 +752,34 @@ function cancelLongPress() {
 }
 
 // ── 批次 4（消息长按操作：复制/删除/重发到输入框；全体消息可用） ──
-const messageSheetVisible = ref(false)
-const messageSheetItems = ref<{ label: string; value: string; danger?: boolean }[]>([])
+const menuVisible = ref(false)
+const menuItems = ref<MenuItem[]>([])
 /** 当前长按选中的消息（timestamp 定位；删除/复制/重发都基于它） */
-const messageActionTarget = ref<ChatMessage | null>(null)
+const menuTarget = ref<ChatMessage | null>(null)
 
-/** 长按消息 → 组装操作菜单并弹出。复制/删除/重发对 user 与 assistant 消息同样适用：
+/** 长按消息 → 组装操作菜单并原位弹出。复制/删除/重发对 user 与 assistant 消息同样适用：
  *  - 复制：剪贴板复制文本
  *  - 重发：回填输入框（可编辑后再发，走正常 send，后端按新消息追加——规避加性历史截断问题）
  *  - 删除：本地隐藏删除（后端 LangGraph 线程保持不变）
  */
 function openMessageActions(msg: ChatMessage, clientX = 0, clientY = 0) {
   if (isStreaming.value) return // 流式中禁长按，避免打断正在生成的回答
-  messageActionTarget.value = msg
+  menuTarget.value = msg
   menuPos.value = { x: clientX, y: clientY }
-  messageSheetItems.value = [
+  menuItems.value = [
     { label: '复制', value: 'copy' },
     { label: '重发', value: 'resend' },
     { label: '删除', value: 'delete', danger: true },
   ]
-  messageSheetVisible.value = true
+  menuVisible.value = true
 }
 
-function handleMessageAction(item: { label: string; value: string | number }) {
-  const msg = messageActionTarget.value
+function closeMenu() {
+  menuVisible.value = false
+}
+
+function handleMessageAction(item: MenuItem) {
+  const msg = menuTarget.value
   if (!msg) return
   switch (item.value) {
     case 'copy':
@@ -788,7 +794,8 @@ function handleMessageAction(item: { label: string; value: string | number }) {
       chatStore.removeMessage(msg.timestamp)
       break
   }
-  messageActionTarget.value = null
+  menuTarget.value = null
+  menuVisible.value = false
 }
 
 /**
