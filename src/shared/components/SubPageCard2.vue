@@ -28,6 +28,7 @@
         class="as-sub2__scroll"
         :enhanced="true"
         :bounces="false"
+        :scroll-into-view="scrollIntoView"
       >
         <slot />
       </scroll-view>
@@ -80,6 +81,8 @@ const props = withDefaults(defineProps<{
   backUrl?: string
   /** 隐藏底部全局 AI 对话栏（对话页等自带输入栏时使用） */
   noChatBar?: boolean
+  /** 需要滚动到的子元素 id */
+  scrollIntoView?: string
 }>(), {
   title: '',
   subtitle: '',
@@ -87,6 +90,7 @@ const props = withDefaults(defineProps<{
   activePanel: '',
   backUrl: '/modules/home/pages/index',
   noChatBar: false,
+  scrollIntoView: '',
 })
 
 /** noChatBar 时 padding 为 0，否则使用传入的 contentPaddingBottom */

@@ -2,6 +2,28 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-25 — AI 投顾对话页长按菜单优化（滑动误触 + 原位浮动菜单 + 圈选复制）
+
+**开发者**: 37588
+
+### 改进
+- 修复消息列表滑动时仍计算长按导致误弹出菜单的问题：改为手动触摸判定（按住 350ms 触发 + 位移超过 10px 取消），滚动过程不弹出。
+- 底部 ActionSheet 替换为长按原位浮动菜单，无遮罩、无模糊、不跳页，贴视口边缘自动内收。
+
+### 新增
+- 长按菜单新增「选中文字」，点击后启用系统原生拖拽手柄圈选，浮出「复制已选」按钮，复制优先取选中片段、未圈选则整条复制；仅 App 生效。
+
+---
+
+## [changer] 2026-08-24 — 早点听新增午间报（盘中报）展示与播报
+
+**开发者**: 37588
+
+### 新增
+- 早点听由晨报/晚报两个入口扩展为晨报/午间报/晚报三个入口，新增午间报（盘中报）入口。
+- 午间报展示盘中摘要、详细解读与风险提示；当日未生成时自动回退最近可用报告并标注日期。
+- 午间报音频就绪时支持播报播放，音频未生成时仅展示文字内容。
+
 ## [junliang] 2026-08-24 — 洞察页异动按最近触发时间排序 + 详情只展示支撑性主因
 
 **开发者**: Aria
@@ -10,6 +32,24 @@
 - `src/modules/favorites/pages/insight.vue`：异动列表排序由首次触发时间改为最近触发时间（`window_end_at` 兜底 `triggered_at`），长窗口事件不再沉底
 - `src/modules/favorites/pages/insight-detail-move.vue`：异动详情页候选只展示支撑性主因（supported），隐藏证据不足/偏弱候选，标题改"支撑性主因"
 - `src/shared/api/modules/stockTrace.ts`：`StockTraceEvent` 新增 `window_end_at` 字段（最近触发/窗口更新时间）
+
+## [master] 2026-08-24 — 0.1.1 发版：修复 APP 启动白屏 + 版本号保持 0.1.1（修复开发版 bug）
+
+**开发者**: Aria
+
+### 修复
+- App 启动白屏（部分老旧 Android WebView 缺少 `TextEncoder`，PDF 导出链 fast-png 在模块顶层 `new TextEncoder()` 抛 ReferenceError）：
+  - `vite.config.ts`：新增 `prependGlobalPolyfill` 插件，在发行打包时把 TextEncoder/TextDecoder polyfill 字面前插到 bundle 开头，先于 fast-png 执行。
+  - `src/shared/utils/global-polyfills.ts`（新增）：TextEncoder/TextDecoder 兜底实现，作为 `main.ts` 首条 import，保障 dev（HBuilder 运行）场景按 import 顺序先定义。
+  - `src/main.ts`：首行导入 `global-polyfills`。
+- 循环依赖导致的分块执行顺序损坏：
+  - `src/shared/components/KLineChart.vue`：`EmptyState` 从 barrel `index.ts` 改为直接导入 `./EmptyState.vue`，切断 `KLineChart → index.ts → KLineChart` 回环。
+- App 端 `performance-now` 被当外部依赖导致 `require$$0$1 is not defined`：
+  - `package.json`/`pnpm-lock.yaml`：显式新增 `performance-now ^2.1.0`（raf 的运行依赖），让 Rollup 能解析并打包。
+
+### 变更
+- `src/manifest.json`：`versionName` 保持 0.1.1，`versionCode` 保持 101（修复开发版 bug，正式版仍为 0.1.1）。
+- `public/download/version.json`（Web 端）：`versionName` 0.1.1/`versionCode` 101，`downloadUrl` 指向 `aistock-0.1.1.apk`，文案由 APP 介绍改为本次更新内容。
 
 ---
 

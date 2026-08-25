@@ -33,7 +33,10 @@
 <script setup lang="ts">
 // @ts-nocheck -- vue-tsc does not model uni-app's isolated renderjs module.
 import { computed } from 'vue'
-import { EmptyState } from '@/shared/components'
+// 直接导入 EmptyState 源文件而非 barrel index.ts：index.ts 会 re-export KLineChart，
+// 若在此又经 barrel 导入会形成 KLineChart → index.ts → KLineChart 的循环依赖，
+// Rollup 会把二者拆到不同 chunk，破坏运行顺序导致白屏。
+import EmptyState from './EmptyState.vue'
 import type { TrendKLineData } from '@/shared/api/modules/trend-score'
 
 interface KLinePoint {

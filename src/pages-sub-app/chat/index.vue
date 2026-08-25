@@ -32,7 +32,17 @@
             <text class="empty-guide-close-text">不再显示</text>
           </view>
         </view>
-        <view v-for="(msg, idx) in displayMessages" :key="idx" class="message-item" :class="msg.role" @longpress="openMessageActions(msg)">
+        <view
+          v-for="(msg, idx) in displayMessages"
+          :key="idx"
+          class="message-item"
+          :class="[msg.role, { selectable: msg.timestamp === selectingMsgTimestamp }]"
+          :data-ts="msg.timestamp"
+          @touchstart="onMsgTouchStart($event, msg)"
+          @touchmove="onMsgTouchMove"
+          @touchend="onMsgTouchEnd"
+          @touchcancel="onMsgTouchCancel"
+        >
           <!-- 用户消息 -->
           <text v-if="msg.role === 'user'" class="msg-content user">{{ msg.content }}</text>
 
@@ -249,13 +259,20 @@
       @close="handleConfirmClose"
     />
 
-    <!-- 批次 4：消息长按操作菜单（复制/删除/重发到输入框；全体消息可用） -->
-    <ActionSheet
-      :visible="messageSheetVisible"
-      :items="messageSheetItems"
+    <!-- 批次 4：消息长按原位浮动菜单（无遮罩、无模糊、不跳页） -->
+    <MessageActionMenu
+      :visible="menuVisible"
+      :x="menuPos.x"
+      :y="menuPos.y"
+      :items="menuItems"
       @select="handleMessageAction"
-      @update:visible="(v: boolean) => (messageSheetVisible = v)"
+      @close="closeMenu"
     />
+
+    <!-- 批次 4：选中文字态浮出「复制已选」栏（仅 App 原生手柄圈选后出现） -->
+    <view v-if="selectingActive && hasSelection" class="copy-selection-bar" @tap="copySelection">
+      <text class="copy-selection-text">复制已选</text>
+    </view>
   </SubPageCard2>
 </template>
 
@@ -274,7 +291,7 @@ import CardRenderer from './cards/CardRenderer.vue'
 import SectionCard from './cards/SectionCard.vue'
 import FeedbackBar from '@/shared/components/FeedbackBar.vue'
 import ConfirmSheet from '@/shared/components/ConfirmSheet.vue'
-import ActionSheet from '@/shared/components/ActionSheet.vue'
+import MessageActionMenu, { type MenuItem } from './MessageActionMenu.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
 import { parseFollowupQuestions, type FollowupParse } from '@/shared/utils/parseFollowupQuestions'
 import { useChatStore } from '@/shared/store/modules/chat'
@@ -560,6 +577,8 @@ const restoreInProgress = ref(false)
 
 function onScroll(e: unknown) {
   if (restoreInProgress.value) return
+  // 选中文字态下滚动列表即退出选中态，避免手柄残留
+  if (selectingMsgTimestamp.value !== null) exitSelectMode()
   const detail = ((e as { detail?: unknown } | null)?.detail ?? {}) as {
     scrollTop?: unknown
     scrollHeight?: unknown
@@ -695,30 +714,162 @@ function handleSend() {
   chatStream.send(content)
 }
 
-// ── 批次 4（消息长按操作：复制/删除/重发到输入框；全体消息可用） ──
-const messageSheetVisible = ref(false)
-const messageSheetItems = ref<{ label: string; value: string; danger?: boolean }[]>([])
-/** 当前长按选中的消息（timestamp 定位；删除/复制/重发都基于它） */
-const messageActionTarget = ref<ChatMessage | null>(null)
+// ── 长按手势：手动触摸监听（350ms 按住 + 10px 位移取消，修复滑动误触） ──
+const LONG_PRESS_MS = 350
+const MOVE_CANCEL_PX = 10
+const menuPos = ref({ x: 0, y: 0 })
+/** 选中文字模式：记录正在圈选的消息 timestamp；null = 非选中态 */
+const selectingMsgTimestamp = ref<number | null>(null)
+/** 是否已圈选出非空文本（供「复制已选」按钮显隐/交互） */
+const hasSelection = ref(false)
+/** 处于选中文字态（非 null）时浮出「复制已选」栏 */
+const selectingActive = computed(() => selectingMsgTimestamp.value !== null)
 
-/** 长按消息 → 组装操作菜单并弹出。复制/删除/重发对 user 与 assistant 消息同样适用：
+function handleSelectText(msg: ChatMessage) {
+  menuTarget.value = msg
+  selectingMsgTimestamp.value = msg.timestamp
+  menuVisible.value = false
+  ensureSelectionListener()
+  nextTick(() => {
+    // App webview：程序化选中该消息文本，使原生拖拽手柄出现（仅 App 有 document；MP/H5 无需选中态）
+    // #ifdef APP-PLUS
+    const el = document.querySelector<HTMLElement>(`[data-ts="${msg.timestamp}"]`)
+    selectMessageText(el)
+    // #endif
+  })
+}
+
+function selectMessageText(el: HTMLElement | null) {
+  // #ifdef APP-PLUS
+  if (!el) return
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  let first: Text | null = null
+  let last: Text | null = null
+  while (walker.nextNode()) {
+    const t = walker.currentNode as Text
+    if (!t.textContent || !t.textContent.trim()) continue
+    if (!first) first = t
+    last = t
+  }
+  if (!first || !last) return
+  const range = document.createRange()
+  range.setStart(first, 0)
+  range.setEnd(last, last.textContent!.length)
+  const sel = window.getSelection()
+  sel?.removeAllRanges()
+  sel?.addRange(range)
+  hasSelection.value = true
+  // #endif
+}
+
+let selectionBound = false
+
+function ensureSelectionListener() {
+  // #ifdef APP-PLUS
+  if (selectionBound) return
+  document.addEventListener('selectionchange', onMessageSelectChange)
+  selectionBound = true
+  // #endif
+}
+
+function onMessageSelectChange() {
+  // #ifdef APP-PLUS
+  const sel = window.getSelection()
+  const text = sel?.toString() ?? ''
+  hasSelection.value = !!text.trim()
+  // #endif
+}
+
+function copySelection() {
+  const msg = menuTarget.value
+  // #ifdef APP-PLUS
+  const sel = window.getSelection()?.toString() ?? ''
+  if (sel.trim()) {
+    uni.setClipboardData({ data: sel })
+  } else if (msg?.content) {
+    uni.setClipboardData({ data: msg.content })
+  }
+  // #endif
+  exitSelectMode()
+}
+
+function exitSelectMode() {
+  selectingMsgTimestamp.value = null
+  hasSelection.value = false
+  // #ifdef APP-PLUS
+  window.getSelection()?.removeAllRanges()
+  // #endif
+}
+
+let lpTimer: ReturnType<typeof setTimeout> | null = null
+let lpStartX = 0
+let lpStartY = 0
+
+function onMsgTouchStart(e: TouchEvent, msg: ChatMessage) {
+  if (isStreaming.value) return
+  const t = e.touches[0]
+  lpStartX = t.clientX
+  lpStartY = t.clientY
+  lpTimer = setTimeout(() => {
+    lpTimer = null
+    openMessageActions(msg, lpStartX, lpStartY)
+  }, LONG_PRESS_MS)
+}
+
+function onMsgTouchMove(e: TouchEvent) {
+  const t = e.touches[0]
+  const dx = Math.abs(t.clientX - lpStartX)
+  const dy = Math.abs(t.clientY - lpStartY)
+  if (dx > MOVE_CANCEL_PX || dy > MOVE_CANCEL_PX) cancelLongPress()
+}
+
+function onMsgTouchEnd() {
+  cancelLongPress()
+}
+
+function onMsgTouchCancel() {
+  cancelLongPress()
+}
+
+function cancelLongPress() {
+  if (lpTimer) {
+    clearTimeout(lpTimer)
+    lpTimer = null
+  }
+}
+
+// ── 批次 4（消息长按操作：复制/删除/重发到输入框；全体消息可用） ──
+const menuVisible = ref(false)
+const menuItems = ref<MenuItem[]>([])
+/** 当前长按选中的消息（timestamp 定位；删除/复制/重发都基于它） */
+const menuTarget = ref<ChatMessage | null>(null)
+
+/** 长按消息 → 组装操作菜单并原位弹出。复制/删除/重发对 user 与 assistant 消息同样适用：
  *  - 复制：剪贴板复制文本
  *  - 重发：回填输入框（可编辑后再发，走正常 send，后端按新消息追加——规避加性历史截断问题）
  *  - 删除：本地隐藏删除（后端 LangGraph 线程保持不变）
  */
-function openMessageActions(msg: ChatMessage) {
+function openMessageActions(msg: ChatMessage, clientX = 0, clientY = 0) {
   if (isStreaming.value) return // 流式中禁长按，避免打断正在生成的回答
-  messageActionTarget.value = msg
-  messageSheetItems.value = [
+  menuTarget.value = msg
+  menuPos.value = { x: clientX, y: clientY }
+  menuItems.value = [
     { label: '复制', value: 'copy' },
+    // #ifdef APP-PLUS
+    { label: '选中文字', value: 'select-text' },
+    // #endif
     { label: '重发', value: 'resend' },
     { label: '删除', value: 'delete', danger: true },
   ]
-  messageSheetVisible.value = true
+  menuVisible.value = true
 }
 
-function handleMessageAction(item: { label: string; value: string | number }) {
-  const msg = messageActionTarget.value
+function closeMenu() {
+  menuVisible.value = false
+}
+
+function handleMessageAction(item: MenuItem) {
+  const msg = menuTarget.value
   if (!msg) return
   switch (item.value) {
     case 'copy':
@@ -732,8 +883,13 @@ function handleMessageAction(item: { label: string; value: string | number }) {
     case 'delete':
       chatStore.removeMessage(msg.timestamp)
       break
+    case 'select-text':
+      // 进入选中态：自行关闭菜单，保留 menuTarget 供 copySelection 整条兜底复制
+      handleSelectText(msg)
+      return
   }
-  messageActionTarget.value = null
+  menuTarget.value = null
+  menuVisible.value = false
 }
 
 /**
@@ -899,6 +1055,7 @@ function rerunDeep(idx: number) {
 
 onUnmounted(() => {
   uni.$off('chat:leave-context', leaveChatContext)
+  cancelLongPress()
   if (followTimer) {
     clearInterval(followTimer)
     followTimer = null
@@ -907,11 +1064,47 @@ onUnmounted(() => {
   clearConfirmTimer()
   // 问题 15：不再 disconnect —— socket 为模块级单例，跨页面存活，
   // 后台任务继续生成，回页经 onShow resume 补全
+  // 批次 4：退出页面移除选中文字监听（仅 App 绑定过）
+  // #ifdef APP-PLUS
+  document.removeEventListener('selectionchange', onMessageSelectChange)
+  // #endif
 })
 </script>
 
 <style lang="scss" scoped>
 @use '@/shared/styles/variables.scss' as *;
+
+/* 批次 4：选中文字态——默认禁选中，选中态恢复文本可选（原生拖拽手柄圈选，仅 App） */
+/* #ifdef APP-PLUS */
+.message-item .msg-content,
+.message-item .bubble {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.message-item.selectable .msg-content,
+.message-item.selectable .bubble {
+  user-select: text;
+  -webkit-user-select: text;
+}
+/* #endif */
+
+/* 「复制已选」浮栏：居中悬浮在列表底部上方 */
+.copy-selection-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 120rpx;
+  z-index: $z-popover;
+  padding: $s-2 $s-4;
+  background: $bg-card;
+  border-radius: $r-full;
+  box-shadow: $shadow-card;
+}
+
+.copy-selection-text {
+  font-size: $font-size-md;
+  color: $primary;
+}
 
 /* P9：会话入口按钮（导航栏右侧） */
 .sessions-entry {

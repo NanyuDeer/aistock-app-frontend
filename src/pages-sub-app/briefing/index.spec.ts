@@ -26,3 +26,22 @@ test('非交易日无当日报告时自动回退最近可用报告并标注日�
   assert.match(source, /当前显示最近可用报告/)
   assert.match(source, /isFallback\.value = true/)
 })
+
+test('午间报 Tab 独立分支：走 getReport(midday) + 严格解析器渲染 display_report', () => {
+  assert.match(source, /switchType\('midday'\)/)
+  assert.match(source, /agentApi\.getReport\('midday', date\)/)
+  assert.match(source, /parseMiddayReport\(/)
+  assert.match(source, /content\.display_report/)
+  assert.match(source, /午间报/)
+})
+
+test('午间报不消费广播型字段：无 broadcast_midday、音频仅经 content.audio_path', () => {
+  assert.doesNotMatch(source, /broadcast_midday/)
+  assert.doesNotMatch(source, /getBroadcast\('midday'/)
+  assert.match(source, /content\.audio_path/)
+})
+
+test('午间报无音频时隐藏音频条只展示文字（空态用 hasAnyContent 守卫）', () => {
+  assert.match(source, /hasAnyContent/)
+  assert.match(source, /empty-state/)
+})

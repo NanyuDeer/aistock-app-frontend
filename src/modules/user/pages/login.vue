@@ -35,9 +35,10 @@
         <!-- #endif -->
 
         <!-- #ifdef APP-PLUS -->
-        <button @tap="handleWxLogin" class="btn-wx-login">
+        <!-- 测试号 AppID 无法走微信原生登录(uni.login code 为空)，统一用扫码登录 -->
+        <button @tap="startScanLogin" class="btn-wx-login">
           <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
-          <text class="btn-text">微信登录</text>
+          <text class="btn-text">微信扫码登录</text>
         </button>
         <!-- #endif -->
 
