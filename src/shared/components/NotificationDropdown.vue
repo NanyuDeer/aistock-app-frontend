@@ -40,7 +40,7 @@ import LoadingState from '@/shared/components/LoadingState.vue'
 import { notificationApi, type UserNotification } from '@/shared/api/modules/notifications'
 import { useNotificationSocket } from '@/shared/utils/useNotificationSocket'
 import { useUserStore } from '@/shared/store/modules/user'
-import { formatShanghaiClock } from '@/shared/utils/datetime'
+import { formatShanghaiDateTime } from '@/shared/utils/datetime'
 
 const userStore = useUserStore()
 const open = ref(false)
@@ -54,7 +54,7 @@ const loggedIn = computed(() => userStore.isLoggedIn())
 let latestLoadRequest = 0
 let notificationRevision = 0
 
-function formatTime(value: string) { return formatShanghaiClock(value) }
+function formatTime(value: string) { return formatShanghaiDateTime(value) }
 
 function mergeItem(notification: UserNotification) {
   notificationRevision += 1
