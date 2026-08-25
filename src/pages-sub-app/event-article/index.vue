@@ -33,7 +33,10 @@
           <text class="article-time">{{ formatDateTime(article?.publishTime) }}</text>
         </view>
         <view class="article-divider" />
-        <text class="article-content" selectable>{{ article?.content }}</text>
+        <text v-if="article?.content" class="article-content" selectable>{{ article?.content }}</text>
+        <view v-else class="article-empty">
+          <text class="article-empty-text">暂无原文内容</text>
+        </view>
       </view>
     </scroll-view>
   </view>
@@ -267,5 +270,18 @@ onLoad((query) => {
   overflow-wrap: break-word;
   white-space: pre-wrap;
   max-width: 100%;
+}
+
+/* 无正文降级展示 */
+.article-empty {
+  padding: 48rpx 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.article-empty-text {
+  font-size: 28rpx;
+  color: #8a9099;
 }
 </style>
