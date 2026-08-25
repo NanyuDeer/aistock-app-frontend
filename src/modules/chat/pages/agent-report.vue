@@ -1,12 +1,18 @@
 <template>
   <SubPageCard2 :title="pageTitle" :subtitle="pageSubtitle">
-    <!-- 右上角：播报按钮（有播报稿时）+ 概览按钮（从概览进入详情时） -->
-    <template v-if="canBackToOverview || podcastBriefForFloating" #header-right>
+    <!-- 右上角：详情模式下显示导出按钮（播报按钮保留自身条件），避免深层链接无 podcast_brief 时导出按钮被隐藏 -->
+    <template v-if="isDetail || podcastBriefForFloating" #header-right>
       <view class="header-right-actions">
         <view v-if="podcastBriefForFloating" class="header-podcast-btn" @tap="openFloatingPodcast">
           <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
         </view>
-        <Button v-if="canBackToOverview" type="ghost" size="sm" @click="backToOverview">概览</Button>
+        <Button
+          v-if="isDetail"
+          type="primary"
+          size="sm"
+          :loading="exporting"
+          @click="handleExportPdf"
+        >导出 PDF</Button>
       </view>
     </template>
 
@@ -429,8 +435,14 @@ import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
+import { useUserStore } from '@/shared/store/modules/user'
 import { LoadingState, EmptyState, Card, Tag, Button } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
+// PDF 导出（仅 H5/Dom 环境可用，见 handleExportPdf 中 document 守卫）。
+// 必须在模块顶部静态 import：若在函数内用动态 import()，会触发 code-splitting，
+// 与 App(app-plus) 的 iife 输出格式冲突（"iife output formats are not supported for code-splitting builds"）。
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 
 // ===== Markdown 分区解析工具（参考 hot-burst-report 模式）=====
 function escapeRegExp(value: string): string {
@@ -593,6 +605,65 @@ const isOverview = computed(() => !selectedIntent.value && !intent.value)
 
 /** 是否可以返回概览（从概览进入详情时） */
 const canBackToOverview = computed(() => !intent.value && !!selectedIntent.value)
+
+/** 当前是否为详情模式（概览 → 显示单个报告） */
+const isDetail = computed(() => !isOverview.value)
+
+/** 用户信息 store（导出 PDF 会员门禁） */
+const userStore = useUserStore()
+
+/** 导出 PDF 进行中标记 */
+const exporting = ref(false)
+
+/** 会员导出当前报告为多页 A4 PDF；非会员提示开通 */
+async function handleExportPdf() {
+  if (exporting.value) return
+  const vip = userStore.userInfo?.isVip
+  if (!vip) {
+    uni.showToast({ title: '开通会员后可导出 PDF', icon: 'none' })
+    return
+  }
+  // 非 H5/无 DOM 环境不可导出（document 访问移入容错）
+  if (typeof document === 'undefined') {
+    uni.showToast({ title: '报告内容未就绪', icon: 'none' })
+    return
+  }
+  exporting.value = true
+  uni.showLoading({ title: '正在生成 PDF...', mask: true })
+  try {
+    const target = document.querySelector('.report-body') as HTMLElement | null
+    if (!target) {
+      uni.showToast({ title: '报告内容未就绪', icon: 'none' })
+      return
+    }
+    const canvas = await html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pageW = pdf.internal.pageSize.getWidth()
+    const pageH = pdf.internal.pageSize.getHeight()
+    const imgW = pageW
+    const imgH = (canvas.height * imgW) / canvas.width
+    // 整幅图只编码一次，供所有分页复用（避免每页重复 toDataURL）
+    const imgData = canvas.toDataURL('image/jpeg', 0.95)
+    pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH)
+    let heightLeft = imgH - pageH
+    let position = -pageH
+    while (heightLeft > 0) {
+      pdf.addPage()
+      pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH)
+      heightLeft -= pageH
+      position -= pageH
+    }
+    const fname = `报告-${effectiveIntent.value || date.value}-${date.value}.pdf`
+    pdf.save(fname)
+    uni.showToast({ title: '报告已导出', icon: 'success' })
+  } catch (e) {
+    console.error('[agent-report] 导出 PDF 失败', e)
+    uni.showToast({ title: '导出失败，请重试', icon: 'none' })
+  } finally {
+    exporting.value = false
+    uni.hideLoading()
+  }
+}
 
 /** 当前生效的 intent */
 const effectiveIntent = computed(() => selectedIntent.value || intent.value)

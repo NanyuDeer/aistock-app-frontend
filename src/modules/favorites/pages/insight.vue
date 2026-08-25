@@ -112,6 +112,9 @@ function fromMovement(m: StockTraceEvent): InsightListItem {
   else if (m.movement_view?.primaryCandidate?.verdict) statusText = `主因：${m.movement_view.primaryCandidate.verdict}`
   else if (m.analysis_status === 'completed') statusText = '归因完成'
   else if (m.analysis_status === 'processing') statusText = '归因中'
+  // 最近触发时间优先：长窗口事件（连续涨停合并）按 window_end_at 展示最新异动日期，
+  // 避免始终停留在首次触发日期（如 8/10 锚定的近岸显示 08-10 而非 08-21）
+  const recent = m.window_end_at || m.triggered_at
   return {
     event_id: m.event_id,
     event_type: 'price',
@@ -119,9 +122,9 @@ function fromMovement(m: StockTraceEvent): InsightListItem {
     symbol: m.symbol,
     direction: m.direction,
     change_pct: m.change_pct,
-    dateText: fmtDateMMDD(m.triggered_at),
+    dateText: fmtDateMMDD(recent),
     statusText,
-    sortTime: m.triggered_at ? new Date(m.triggered_at).getTime() : 0,
+    sortTime: recent ? new Date(recent).getTime() : 0,
   }
 }
 

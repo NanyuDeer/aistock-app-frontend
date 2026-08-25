@@ -175,7 +175,8 @@ async function fetchAlerts() {
       stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] })),
     ])
     // 融合后按事件时间倒序：最新异动（含今日价格异动）优先展示
-    alerts.value = [...list.map(toAlertItem), ...page.items.map(movementToAlertItem)]
+    const items = [...list.map(toAlertItem), ...page.items.map(movementToAlertItem)]
+    alerts.value = items
       .sort((a, b) => (new Date(b.time).getTime() || 0) - (new Date(a.time).getTime() || 0))
   } catch {
     // API 失败时展示空状态

@@ -2,23 +2,48 @@
  * App 版本更新检查 Hook（仅 Android App 端生效，全量 APK 更新）
  *
  * 流程：拉取 Web 端 version.json → 对比本机 versionCode →
- *      有新版则弹窗 → 确认后 uni.downloadFile 下载 → plus.runtime.install 安装
+ *      有新版则把待更新信息写入全局 updatePromptState（由 UpdateModal 渲染弹窗）→
+ *      用户「立即更新」下载安装 /「永久关闭」该版本不再提示 / 仅叉掉则下次进应用再提示。
  *
  * 使用场景：
- * - 启动自动检查：checkAppUpdate()，24h 节流，静默失败
- * - 个人中心手动检查：checkAppUpdate({ manual: true })，不受节流限制
+ * - 启动自动检查：checkAppUpdate()，静默失败；每次启动都检查（不节流），
+ *   仅「叉掉」未永久关闭的版本下次进入仍会提示
+ * - 个人中心手动检查：checkAppUpdate({ manual: true })
  */
+import { reactive } from 'vue'
 import { fetchLatestVersion, resolveDownloadUrl, type AppVersionInfo } from '@/shared/api/modules/appUpdate'
-
-/** 启动自动检查节流 key（本地时间戳，24h 内不重复弹窗） */
-export const UPDATE_LAST_CHECK_KEY = 'app_update_last_check'
-const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 
 export type AppUpdateCheckResult =
   | 'not_supported' // 非 Android App 环境（iOS / H5 / 小程序）
-  | 'latest' // 已是最新版本
+  | 'latest' // 已是最新版本（含：无新版 / 已对该版本永久关闭）
   | 'prompted' // 已弹出更新提示
   | 'error' // 版本信息获取失败
+
+/**
+ * 全局更新弹窗状态：checkAppUpdate 检测到新版本时写入，
+ * UpdateModal 组件据此渲染（挂在各宿主页面，仅前台页面可见）。
+ * info 置空表示无待更新。
+ */
+export interface UpdatePromptState {
+  visible: boolean
+  info: AppVersionInfo | null
+}
+
+/** 更新弹窗全局单例状态（跨首页/个人中心页面共享） */
+export const updatePromptState = reactive<UpdatePromptState>({
+  visible: false,
+  info: null,
+})
+
+/** 「永久关闭」标记：用户对某 versionCode 选择不再提示后写入，命中则此版本不再弹窗 */
+export function neverUpdateStorageKey(versionCode: number): string {
+  return `app_update_never_v${versionCode}`
+}
+
+/** 是否已对该版本选择「永久关闭」（不再提示） */
+export function isNeverUpdate(versionCode: number): boolean {
+  return !!uni.getStorageSync(neverUpdateStorageKey(versionCode))
+}
 
 /** 是否 Android App 环境（仅此环境支持 APK 下载安装） */
 function isAndroidApp(): boolean {
@@ -62,51 +87,37 @@ function getCurrentVersionCode(): number {
 
 /**
  * 执行一次版本检查。
- * @param opts.manual 是否手动检查；手动检查不受 24h 节流限制
+ *
+ * 行为（针对用户需求：叉掉下次仍提示，可永久关闭）：
+ * - 不再进行 24h 节流——每次进入应用都会检查，尚未「永久关闭」的新版本都会提示。
+ * - 拉到新版本 → 写入全局 updatePromptState，由 UpdateModal 渲染弹窗；
+ * - 用户「永久关闭」该版本后，isNeverUpdate 命中 → 返回 latest，不再弹窗。
  */
 export async function checkAppUpdate(opts: { manual?: boolean } = {}): Promise<AppUpdateCheckResult> {
   // 非 Android App 环境不支持 APK 更新
   if (!isAndroidApp()) return 'not_supported'
 
-  // 启动自动检查节流：24h 内不重复弹窗（手动检查跳过）
-  if (!opts.manual) {
-    const last = Number(uni.getStorageSync(UPDATE_LAST_CHECK_KEY) || 0)
-    if (last && Date.now() - last < UPDATE_CHECK_INTERVAL_MS) return 'latest'
-  }
-
   // 拉取线上版本信息（静默失败）
   const info = await fetchLatestVersion()
   if (!info) return 'error'
 
-  const current = getCurrentVersionCode()
+  // 比对版本号
   const latest = Number(info.versionCode) || 0
+  const current = getCurrentVersionCode()
   if (!latest || latest <= current) return 'latest'
 
-  // 有新版本 → 弹更新框（先记录节流时间戳，避免用户拒绝后 24h 内反复弹窗）
-  if (!opts.manual) {
-    uni.setStorageSync(UPDATE_LAST_CHECK_KEY, String(Date.now()))
-  }
-  showUpdateModal(info)
+  // 用户已对该版本选择「永久关闭」→ 直接跳过，不再提示
+  if (isNeverUpdate(latest)) return 'latest'
+
+  // 有新版 → 写入全局弹窗状态（真正弹窗由 UpdateModal 渲染）
+  updatePromptState.info = info
+  updatePromptState.visible = true
   return 'prompted'
 }
 
-/** 弹出更新确认框，确认后下载并安装 */
-function showUpdateModal(info: AppVersionInfo): void {
-  uni.showModal({
-    title: `发现新版本 v${info.versionName}`,
-    content: info.description || '检测到新版本，请更新后体验',
-    confirmText: '立即更新',
-    cancelText: '稍后再说',
-    success: (res) => {
-      if (res.confirm) {
-        downloadAndInstall(info)
-      }
-    }
-  })
-}
-
-/** 下载 APK 并调用系统安装器安装 */
-function downloadAndInstall(info: AppVersionInfo): void {
+/** 立即更新：当前待更新信息存在则开始下载安装 */
+export function downloadAndInstall(info: AppVersionInfo): void {
+  updatePromptState.visible = false
   const url = resolveDownloadUrl(info)
   uni.showLoading({ title: '正在下载更新包...', mask: true })
   uni.downloadFile({
@@ -119,6 +130,11 @@ function downloadAndInstall(info: AppVersionInfo): void {
         return
       }
       // #ifdef APP-PLUS
+      // 兜底：当前运行时不可用 plus.runtime.install 时，降级为让系统文件管理器打开安装包
+      if (typeof plus.runtime.install !== 'function') {
+        plus.runtime.openFile(res.tempFilePath || '')
+        return
+      }
       plus.runtime.install(
         res.tempFilePath,
         { force: true },
@@ -127,10 +143,13 @@ function downloadAndInstall(info: AppVersionInfo): void {
         },
         (err: Error) => {
           uni.showModal({
-            title: '安装失败',
-            content: (err && err.message) || '安装失败，请检查是否允许安装未知来源应用',
+            title: '安装未完成',
+            content:
+              '下载已完成，安装被系统拦截。请在手机「设置 → 应用/安全 → 安装未知应用」中为当前应用开启允许安装后重试。',
+            confirmText: '知道了',
             showCancel: false
           })
+          console.warn('[appUpdate] 安装失败', (err && err.message) || err)
         }
       )
       // #endif
