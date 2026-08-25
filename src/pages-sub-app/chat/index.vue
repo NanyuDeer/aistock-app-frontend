@@ -270,7 +270,7 @@
     />
 
     <!-- 批次 4：选中文字态浮出「复制已选」栏（仅 App 原生手柄圈选后出现） -->
-    <view v-if="selectingActive" class="copy-selection-bar" @tap="copySelection">
+    <view v-if="selectingActive && hasSelection" class="copy-selection-bar" @tap="copySelection">
       <text class="copy-selection-text">复制已选</text>
     </view>
   </SubPageCard2>
@@ -731,9 +731,11 @@ function handleSelectText(msg: ChatMessage) {
   menuVisible.value = false
   ensureSelectionListener()
   nextTick(() => {
-    // App webview：程序化选中该消息文本，使原生拖拽手柄出现
+    // App webview：程序化选中该消息文本，使原生拖拽手柄出现（仅 App 有 document；MP/H5 无需选中态）
+    // #ifdef APP-PLUS
     const el = document.querySelector<HTMLElement>(`[data-ts="${msg.timestamp}"]`)
     selectMessageText(el)
+    // #endif
   })
 }
 
@@ -756,6 +758,7 @@ function selectMessageText(el: HTMLElement | null) {
   const sel = window.getSelection()
   sel?.removeAllRanges()
   sel?.addRange(range)
+  hasSelection.value = true
   // #endif
 }
 
@@ -852,7 +855,9 @@ function openMessageActions(msg: ChatMessage, clientX = 0, clientY = 0) {
   menuPos.value = { x: clientX, y: clientY }
   menuItems.value = [
     { label: '复制', value: 'copy' },
+    // #ifdef APP-PLUS
     { label: '选中文字', value: 'select-text' },
+    // #endif
     { label: '重发', value: 'resend' },
     { label: '删除', value: 'delete', danger: true },
   ]
@@ -1050,6 +1055,7 @@ function rerunDeep(idx: number) {
 
 onUnmounted(() => {
   uni.$off('chat:leave-context', leaveChatContext)
+  cancelLongPress()
   if (followTimer) {
     clearInterval(followTimer)
     followTimer = null
