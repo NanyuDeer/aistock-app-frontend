@@ -295,22 +295,30 @@ test('G6：goSessions 不置位 pendingRestore（仅 D 出口接线，会话列�
 
 // ─── 批次 4（2026）：消息长按操作 + 引导胶囊升级 ───
 
-test('批次4：消息项长按接入（message-item @longpress → 打开操作菜单）', () => {
-  assert.match(pageSource, /@longpress="openMessageActions\(msg\)"/)
-  assert.match(pageSource, /function openMessageActions\(msg: ChatMessage\)/)
+test('批次4：消息项长按接入（message-item @touchstart → 打开操作菜单）', () => {
+  assert.match(pageSource, /@touchstart="onMsgTouchStart\(\$event, msg\)"/)
+  assert.match(pageSource, /function openMessageActions\(msg: ChatMessage, clientX = 0, clientY = 0\)/)
 })
 
-test('批次4：长按菜单含复制/删除/重发（ActionSheet 接入 + 危险项删除）', () => {
-  assert.match(pageSource, /<ActionSheet/)
+test('批次4：长按菜单含复制/选中文字/删除/重发（MessageActionMenu 接入 + 危险项删除）', () => {
+  assert.match(pageSource, /<MessageActionMenu/)
   assert.match(pageSource, /\{ label: '复制', value: 'copy' \}/)
+  assert.match(pageSource, /\{ label: '选中文字', value: 'select-text' \}/)
   assert.match(pageSource, /\{ label: '重发', value: 'resend' \}/)
   assert.match(pageSource, /\{ label: '删除', value: 'delete', danger: true \}/)
+})
+
+test('批次4：选中文字态（原生手柄圈选复制片段，仅 App）', () => {
+  assert.match(pageSource, /user-select: text/)
+  assert.match(pageSource, /copy-selection-bar/)
+  assert.match(pageSource, /function handleSelectText\(msg: ChatMessage\)/)
+  assert.match(pageSource, /case 'select-text':/)
 })
 
 test('批次4：复制走剪贴板 / 重发回填输入框可编辑 / 删除调用 store.removeMessage', () => {
   assert.match(pageSource, /uni\.setClipboardData\(\{ data: msg\.content \}\)/)
   assert.match(pageSource, /inputText\.value = msg\.content/)
-  assert.match(pageSource, /function handleMessageAction\(item: \{ label: string; value: string \}\)/)
+  assert.match(pageSource, /function handleMessageAction\(item: MenuItem\)/)
   assert.match(pageSource, /chatStore\.removeMessage\(msg\.timestamp\)/)
   assert.match(pageSource, /isStreaming\.value\) return \/\/ 流式中禁长按/)
 })
