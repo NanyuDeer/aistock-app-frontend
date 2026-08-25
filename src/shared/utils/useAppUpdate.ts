@@ -60,23 +60,20 @@ function isAndroidApp(): boolean {
 }
 
 /**
- * Android 原生运行时桥接（plus.android 类型定义缺失，运行时调用）
- * 仅用 getPackageManager().getPackageInfo() 读取 versionCode 作版本对比
+ * 读取本机已安装版本号（Android 原生 versionCode）。
+ * 注意：plus.android 返回的是 Java 对象句柄，读字段必须走 plus.android.invoke(obj,'get','field')，
+ * 不可直接 pkgInfo.versionCode 属性访问——否则会读不到值返回 0，
+ * 被误判为「比线上旧」而反复弹出更新（0.1.1 用户装好后仍弹更新的根因）。
  */
-interface AndroidRuntimeBridge {
-  getPackageManager(): {
-    getPackageInfo(pkg: string, flags: number): { versionCode?: number }
-  }
-  getPackageName(): string
-}
-
-/** 读取本机已安装版本号（Android 原生 versionCode） */
 function getCurrentVersionCode(): number {
   // #ifdef APP-PLUS
   try {
-    const main = plus.android.runtimeMainActivity() as unknown as AndroidRuntimeBridge
-    const pkgInfo = main.getPackageManager().getPackageInfo(main.getPackageName(), 0)
-    return Number(pkgInfo.versionCode) || 0
+    const main = plus.android.runtimeMainActivity()
+    const pkgName = plus.android.invoke(main, 'getPackageName')
+    const pm = plus.android.invoke(main, 'getPackageManager')
+    const pkgInfo = plus.android.invoke(pm, 'getPackageInfo', [pkgName, 0])
+    const versionCode = Number(plus.android.invoke(pkgInfo, 'get', 'versionCode'))
+    return Number.isFinite(versionCode) && versionCode > 0 ? versionCode : 0
   } catch (e) {
     console.warn('[useAppUpdate] 读取本机版本号失败:', e)
     return 0
@@ -104,7 +101,8 @@ export async function checkAppUpdate(opts: { manual?: boolean } = {}): Promise<A
   // 比对版本号
   const latest = Number(info.versionCode) || 0
   const current = getCurrentVersionCode()
-  if (!latest || latest <= current) return 'latest'
+  // current<=0 表示本机版本号读取失败（无法判定本机版本），保守视为已最新，避免反复误弹
+  if (!latest || current <= 0 || latest <= current) return 'latest'
 
   // 用户已对该版本选择「永久关闭」→ 直接跳过，不再提示
   if (isNeverUpdate(latest)) return 'latest'

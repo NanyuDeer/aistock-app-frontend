@@ -93,6 +93,11 @@
               <SvgIcon name="bar-chart-line" size="36rpx" color="#4b5a7a" />
             </template>
           </ListCell>
+          <ListCell title="账号与安全" description="绑定手机号 / 微信" clickable showArrow :border="true" @click="goAccountSecurity">
+            <template #prefix>
+              <SvgIcon name="shield-check-line" size="36rpx" color="#4b5a7a" />
+            </template>
+          </ListCell>
           <ListCell title="版本更新" clickable showArrow :border="true" @click="checkUpdate">
             <template #prefix>
               <SvgIcon name="refresh-line" size="36rpx" color="#4b5a7a" />
@@ -234,6 +239,10 @@ function goLogin() {
 
 function goFavorites() {
   uni.navigateTo({ url: '/modules/favorites/pages/favorites' })
+}
+
+function goAccountSecurity() {
+  uni.navigateTo({ url: '/modules/user/pages/account-security' })
 }
 
 function goAbout() {

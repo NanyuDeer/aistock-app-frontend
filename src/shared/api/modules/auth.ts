@@ -11,7 +11,10 @@ export interface LoginParams {
 
 export interface UserInfo {
   id?: number | string
-  openid: string
+  /** 微信 openid（手机号账户未绑微信时为空串） */
+  openid?: string
+  /** 已绑定手机号（未绑定时为空） */
+  phone?: string
   nickname: string
   avatar?: string
   avatar_url?: string
@@ -46,6 +49,26 @@ export const authApi = {
   /** 微信登录（App 端 uni.login → code → 后端换取 token） */
   wxLogin(code: string) {
     return request.post('/auth/wx-login', { code })
+  },
+
+  /** 发送短信验证码（限流 60s，dev 环境回显 123456） */
+  sendSmsCode(phone: string) {
+    return request.post<{ expireSeconds: number }>('/auth/sms/send', { phone })
+  },
+
+  /** 手机号 + 短信验证码登录（无账户自动创建） */
+  smsLogin(phone: string, code: string) {
+    return request.post<{ token: string; userInfo: UserInfo }>('/auth/sms/login', { phone, code })
+  },
+
+  /** 给当前登录账户绑定手机号（Bearer） */
+  bindPhone(phone: string, code: string) {
+    return request.post<{ phoneBound: boolean }>('/auth/bind/phone', { phone, code })
+  },
+
+  /** 给当前登录的手机号账户绑定微信（Bearer，手机+验证码证明归属） */
+  bindWechat(phone: string, code: string, wxCode: string) {
+    return request.post<{ wechatBound: boolean }>('/auth/bind/wechat', { phone, code, wxCode })
   },
 
   /** 账号密码登录（App/H5，保留兼容） */

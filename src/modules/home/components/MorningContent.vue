@@ -156,10 +156,37 @@ const {
   refresh: briefingRefresh,
 } = useBriefingCard()
 
+/** 大盘归因降级文案判定：后端在归因结论无归因时返回"今日证据不足，未确认主因" */
+function isDowngradedAttribution(text: string): boolean {
+  return /证据不足|未确认主因|暂无明确主因/.test(text)
+}
+
+/**
+ * 大盘（归因结论）无归因时，改取市场异象条目结论作为标签来源。
+ * 晚报 items：[归因结论 / 市场快照(板块) / 收盘复盘(现象摘要)]，
+ * 优先"收盘复盘"（现象摘要，如"今日概念板块集中异动…"）的市场异象关键词，
+ * 其次"市场快照"（板块行情），均无则回退首个非归因条目。
+ */
+function marketAnomalyText(items: readonly { title?: string; conclusion?: string }[]): string {
+  for (const title of ['收盘复盘', '市场快照']) {
+    const hit = items.find(it => it?.title === title)
+    if (hit?.conclusion) return hit.conclusion
+  }
+  const fallback = items.find(it => it?.title !== '归因结论')
+  return fallback?.conclusion ?? ''
+}
+
 /** 摘要拆分为标签：按标点切割，过滤过长片段（整句），最多3个，每个限12字 */
 const summaryTags = computed(() => {
-  const text = briefingSummary.value || ''
-  return text
+  const items = report.value?.items ?? []
+  const head = items[0]
+  const headText = head?.conclusion ?? ''
+  // 大盘无归因（头条为归因结论且降级）时，改用市场异象关键词，不展示降级文案
+  const sourceText =
+    head?.title === '归因结论' && isDowngradedAttribution(headText)
+      ? marketAnomalyText(items)
+      : briefingSummary.value
+  return sourceText
     .split(/[，,、+。！!？?]/)
     .map(s => s.trim())
     .filter(s => s.length > 0 && s.length <= 15)

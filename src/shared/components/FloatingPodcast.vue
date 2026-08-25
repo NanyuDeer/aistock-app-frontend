@@ -25,7 +25,8 @@
         </view>
         <view class="fp-switch-row">
           <text class="fp-switch-label">连续播放</text>
-          <Switch
+          <!-- uni-app 原生 switch 组件必须用小写标签，大写 <Switch> 会被当作自定义组件解析报 "Failed to resolve component" -->
+          <switch
             :checked="store.continuousPlay"
             :color="SWITCH_COLOR"
             style="transform: scale(0.7)"
@@ -170,9 +171,11 @@ function onPlayerEnded() {
   store.onAudioEnded()
 }
 
-/** 连续播放开关切换：仅当状态变化时同步 store（避免 Switch 双向回写循环） */
-function onContinuousToggle(e: { detail: { value: boolean } }) {
-  if (store.continuousPlay !== e.detail.value) {
+/** 连续播放开关切换：仅当状态变化时同步 store（避免 switch 双向回写循环）
+ *  原生 <switch> 的 change 事件为 { detail: { value } }，类型用宽松 unknown 兼容 */
+function onContinuousToggle(e: unknown) {
+  const value = (e as { detail?: { value?: boolean } } | undefined)?.detail?.value
+  if (value !== undefined && store.continuousPlay !== value) {
     store.toggleContinuous()
   }
 }
