@@ -14,12 +14,12 @@
               <Tag v-else type="gray" size="sm">未绑定</Tag>
             </template>
           </ListCell>
-          <ListCell title="手机号" :description="phoneDesc">
+          <ListCell title="邮箱" :description="emailDesc">
             <template #prefix>
-              <SvgIcon name="smartphone-line" size="36rpx" color="#0b5fff" />
+              <SvgIcon name="mail-line" size="36rpx" color="#0b5fff" />
             </template>
             <template #value>
-              <Tag v-if="hasPhone" type="up" size="sm">已绑定</Tag>
+              <Tag v-if="hasEmail" type="up" size="sm">已绑定</Tag>
               <Tag v-else type="gray" size="sm">未绑定</Tag>
             </template>
           </ListCell>
@@ -31,16 +31,16 @@
         <text class="section-title">绑定设置</text>
         <Card flush>
           <ListCell
-            v-if="!hasPhone"
-            title="绑定手机号"
-            description="绑定后可用手机号验证码登录"
+            v-if="!hasEmail"
+            title="绑定邮箱"
+            description="绑定后可用邮箱验证码登录"
             clickable
             showArrow
             :border="true"
-            @click="startBind('phone')"
+            @click="startBind('email')"
           >
             <template #prefix>
-              <SvgIcon name="phone-line" size="36rpx" color="#4b5a7a" />
+              <SvgIcon name="mail-line" size="36rpx" color="#4b5a7a" />
             </template>
           </ListCell>
           <ListCell
@@ -63,15 +63,13 @@
         <Card>
           <view class="bind-form">
             <text class="bind-form-title">
-              {{ bindMode === 'wechat' ? '绑定微信（验证归属）' : '绑定手机号' }}
+              {{ bindMode === 'wechat' ? '绑定微信（验证归属）' : '绑定邮箱' }}
             </text>
             <view class="form-row">
-              <SvgIcon name="smartphone-line" size="36rpx" color="#9ca3af" />
+              <SvgIcon name="mail-line" size="36rpx" color="#9ca3af" />
               <Input
-                v-model="bindPhone"
-                type="number"
-                :maxlength="11"
-                placeholder="请输入手机号"
+                v-model="bindEmail"
+                placeholder="请输入邮箱"
                 class="form-input"
               />
             </view>
@@ -86,9 +84,9 @@
               />
               <Button
                 class="form-code-btn"
-                :disabled="countdown > 0 || !isValidPhone"
+                :disabled="countdown > 0 || !isValidEmail"
                 size="sm"
-                @click="handleSendSms"
+                @click="handleSendEmail"
               >
                 {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
               </Button>
@@ -105,8 +103,8 @@
       <view class="section">
         <Card>
           <text class="as-desc">
-            手机号登录的账户也可以绑定微信：绑定后即可用微信登录，原有微信账号（自选股、推送设置等）信息将保留在本账户中。
-            若提示「该微信已绑定其他账户」，请先用该微信登录一次，再在「账号与安全」页绑定手机号。
+            邮箱登录的账户也可以绑定微信：绑定后即可用微信登录，原有微信账号（自选股、推送设置等）信息将保留在本账户中。
+            若提示「该微信已绑定其他账户」，请先用该微信登录一次，再在「账号与安全」页绑定邮箱。
           </text>
         </Card>
       </view>
@@ -126,41 +124,43 @@ import { ListCell, Card, Tag, Button } from '@/shared/components'
 const userStore = useUserStore()
 
 const hasWechat = computed(() => !!userStore.userInfo?.openid)
-const hasPhone = computed(() => !!userStore.userInfo?.phone)
+const hasEmail = computed(() => !!userStore.userInfo?.email)
 const wechatDesc = computed(() => {
   const nickname = userStore.userInfo?.nickname
   return hasWechat.value ? (nickname || '已绑定微信') : '未绑定'
 })
-const phoneDesc = computed(() => {
-  const phone = userStore.userInfo?.phone
-  return hasPhone.value && phone ? maskPhone(phone) : '未绑定'
+const emailDesc = computed(() => {
+  const email = userStore.userInfo?.email
+  return hasEmail.value && email ? maskEmail(email) : '未绑定'
 })
 
-/** 手机号脱敏：138****1234 */
-function maskPhone(phone: string): string {
-  if (phone.length < 7) return phone
-  return `${phone.slice(0, 3)}****${phone.slice(-4)}`
+/** 邮箱脱敏：use***@163.com */
+function maskEmail(email: string): string {
+  const [name, domain] = email.split('@')
+  if (!domain) return email
+  const head = name.slice(0, 3)
+  return `${head}***@${domain}`
 }
 
 // 绑定表单状态
-const bindMode = ref<'phone' | 'wechat' | ''>('')
-const bindPhone = ref('')
+const bindMode = ref<'email' | 'wechat' | ''>('')
+const bindEmail = ref('')
 const bindCode = ref('')
 const wxCode = ref('')
 const countdown = ref(0)
 const binding = ref(false)
-const isValidPhone = computed(() => /^1[3-9]\d{9}$/.test(bindPhone.value))
+const isValidEmail = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bindEmail.value))
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 
-function startBind(mode: 'phone' | 'wechat') {
+function startBind(mode: 'email' | 'wechat') {
   bindMode.value = mode
-  bindPhone.value = ''
+  bindEmail.value = ''
   bindCode.value = ''
   wxCode.value = ''
   // 绑定微信：先获取微信授权 code（App/小程序），H5 端扫码登录无法直接取 code，提示走微信登录
   if (mode === 'wechat') {
     // #ifdef H5
-    uni.showToast({ title: '请在微信端登录后绑定手机号', icon: 'none' })
+    uni.showToast({ title: '请在微信端登录后绑定邮箱', icon: 'none' })
     bindMode.value = ''
     return
     // #endif
@@ -180,7 +180,7 @@ function startBind(mode: 'phone' | 'wechat') {
 
 function cancelBind() {
   bindMode.value = ''
-  bindPhone.value = ''
+  bindEmail.value = ''
   bindCode.value = ''
   wxCode.value = ''
   stopCountdown()
@@ -194,14 +194,14 @@ function stopCountdown() {
 }
 
 /** 发送验证码 */
-async function handleSendSms() {
-  if (!isValidPhone.value) {
-    uni.showToast({ title: '请输入正确的手机号', icon: 'none' })
+async function handleSendEmail() {
+  if (!isValidEmail.value) {
+    uni.showToast({ title: '请输入正确的邮箱', icon: 'none' })
     return
   }
   try {
-    await authApi.sendSmsCode(bindPhone.value)
-    uni.showToast({ title: '验证码已发送', icon: 'none' })
+    await authApi.sendEmailCode(bindEmail.value)
+    uni.showToast({ title: '验证码已发送，请查收邮箱', icon: 'none' })
     countdown.value = 60
     stopCountdown()
     countdownTimer = setInterval(() => {
@@ -215,8 +215,8 @@ async function handleSendSms() {
 
 /** 确认绑定 */
 async function handleBind() {
-  if (!isValidPhone.value) {
-    uni.showToast({ title: '请输入正确的手机号', icon: 'none' })
+  if (!isValidEmail.value) {
+    uni.showToast({ title: '请输入正确的邮箱', icon: 'none' })
     return
   }
   if (!bindCode.value) {
@@ -230,9 +230,9 @@ async function handleBind() {
   binding.value = true
   try {
     if (bindMode.value === 'wechat') {
-      await authApi.bindWechat(bindPhone.value, bindCode.value, wxCode.value)
+      await authApi.bindWechat(bindEmail.value, bindCode.value, wxCode.value)
     } else {
-      await authApi.bindPhone(bindPhone.value, bindCode.value)
+      await authApi.bindEmail(bindEmail.value, bindCode.value)
     }
     binding.value = false
     stopCountdown()
