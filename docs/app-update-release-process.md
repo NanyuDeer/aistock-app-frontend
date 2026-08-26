@@ -158,6 +158,8 @@ cd /home/aistock/aistock-frontend
 git pull origin main
 
 # 3) 构建并部署到 Web 根目录
+# ⚠️ 不要用 `npm run build -- --dest /var/www/aistock`——scripts/build.js 忽略 --dest 参数，
+#    产物仍输出到 dist/，线上网页不会更新（2026-08-26 实测踩坑）。必须用 rm+cp 方案：
 npm run build && rm -rf /var/www/aistock/* && cp -r dist/* /var/www/aistock/
 
 # 4) 重要：部署完重新上传 APK（见第 4 节，否则被 rm -rf 清掉）
@@ -210,3 +212,4 @@ scp dist/release/apk/aistock-0.1.1.apk aistock@121.37.46.229:/var/www/aistock/do
 | 手机不提示下载 | Android 需允许安装未知应用（弹窗内已给引导） |
 | iOS / H5 / 小程序 | 该机制仅 Android App 端生效，其他端需另走应用商店更新 |
 | 网页 `/download` 打不开 | 服务器 Caddy 需保证 `try_files {path} /index.html`（含 `download` 目录下的 APK 静态资源） |
+| 部署后网页没更新 | 误用了 `npm run build -- --dest /var/www/aistock`——`scripts/build.js` 忽略 `--dest` 参数，产物仍留在 `dist/`。改用 `npm run build && rm -rf /var/www/aistock/* && cp -r dist/* /var/www/aistock/`，部署后重新 scp APK |
