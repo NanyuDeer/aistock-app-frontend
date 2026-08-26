@@ -400,6 +400,33 @@ describe('index.vue 追问面板（Task 8）运行时行为', () => {
     wrapper.unmount()
   })
 
+  it('立即展示路径（无打字机直接落地）× 收起 → pending 保留（footer 弱入口可恢复面板）', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    const stream = useChatStream() as any
+    stream.messages.value.push({
+      role: 'assistant', content: '回答', timestamp: Date.now(), questions: ['追问一', '追问二'],
+    })
+    await flushPromises()
+    await nextTick()
+
+    // 无打字机 + 未暂停跟随 → 立即展示面板
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+
+    // × 收起（非丢弃）：面板消失、quick-skills 回来；pending 保留 → 弱入口可见
+    await wrapper.find('.suggest-collapse').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    expect(wrapper.find('.panel-restore-btn').exists()).toBe(true)
+
+    // 弱入口恢复面板
+    await wrapper.find('.panel-restore-btn').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('无 questions 的 assistant 消息不触发面板（quick-skills 保持）', async () => {
     const wrapper = mount(ChatIndex)
     await flushPromises()

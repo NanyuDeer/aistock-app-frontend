@@ -770,7 +770,8 @@ watch(
     onAnswerSettled(last) // 统一收口：记 pending（打字机未完成 / followPaused 时等待）
     nextTick(() => {
       if (shouldShowPanel(hasQuestions, typingMsgKey.value !== null, followPaused.value)) {
-        panelState.value = { visible: true, messageId: last.timestamp, pending: false }
+        // 展示：仅置 visible，保留 onAnswerSettled 写入的 pending（× 收起后可经 footer 弱入口恢复）
+        panelState.value.visible = true
       }
     })
   }
