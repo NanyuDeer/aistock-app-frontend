@@ -231,11 +231,14 @@ const wrapStyle = computed(() => {
   // #endif
   // #ifndef H5
   // App/小程序：内核可能把整页 n 倍整体缩放（实测 windowWidth=360 但 CSS rpx 基准 432），
-  // 用 windowWidth 推算的 JS 尺寸与 CSS 渲染基准不一致，`left%` 推算的右缘位置会溢出
-  // （贴右缘时悬浮球部分出屏）。静止/吸附态改用以可视区边缘为基准的 right/left 定位，
-  // 保证悬浮球完全落在屏内；拖动中临时用 left% 跟随手指。
+  // 用 windowWidth 推算的 JS 尺寸与 CSS 渲染基准不一致。因此：
+  // - 静止/吸附/展开统一用「left px 计算」定位（不用 right）：App 内核整页缩放时
+  //   right 定位推算的右缘会溢出屏外，展开面板右缘出屏会让面板头部最右侧的
+  //   「关闭」按钮落在屏外 → 点击无效（用户反馈"× 叉不掉"）。left 计算配合 clamp
+  //   保证右缘恒为 winW - margin，面板/悬浮球完全落在屏内。
+  // - 拖动中临时用 left% 跟随手指。
   const topPct = (baseTop / winH.value) * 100 + '%'
-  const margin = EDGE_MARGIN_PX + 'px'
+  const marginPx = EDGE_MARGIN_PX
   if (dragging.value) {
     const baseLeft = store.expanded ? panelLeft.value : posX.value
     return {
@@ -244,12 +247,16 @@ const wrapStyle = computed(() => {
       transition: 'none',
     }
   }
-  // 静止/吸附：球在右半屏 → right:4px 贴右缘；左半屏 → left:4px 贴左缘。
-  // 展开面板同理按所在半屏对齐（panelLeft 语义与 ball 相同）。
+  // 静止/吸附：球在右半屏 → 右对齐（left = winW - 自身宽 - margin）；左半屏 → 贴左缘。
+  // 展开面板同理按所在半屏对齐（右对齐时 left = winW - 面板宽 - margin）。
   const dockRight = posX.value >= winW.value / 2
-  return dockRight
-    ? { right: margin, top: topPct, transition: 'left 0.2s ease, right 0.2s ease' }
-    : { left: margin, top: topPct, transition: 'left 0.2s ease, right 0.2s ease' }
+  const selfW = store.expanded ? panelWidthPx.value : ballSizePx.value
+  const leftPx = dockRight ? winW.value - selfW - marginPx : marginPx
+  return {
+    left: Math.max(0, leftPx) + 'px',
+    top: topPct,
+    transition: 'left 0.2s ease',
+  }
   // #endif
 })
 
