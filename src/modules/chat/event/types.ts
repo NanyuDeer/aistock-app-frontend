@@ -303,10 +303,12 @@ export interface EventArticle {
   source: string
   /** 发布时间 */
   publishTime: string
-  /** 正文内容（财联社详情页抓取，由后端做字符截断） */
+  /** 正文内容（优先来自 event_scrape 既有正文；为空表示暂无原文） */
   content: string
   /** 原始来源链接 */
   sourceUrl: string
+  /** 是否有正文（content 为空时 false，前端展示"暂无原文内容"；兼容旧响应可缺省） */
+  hasContent?: boolean
 }
 
 // ==================== Agent 未来输出结构（预留） ====================
