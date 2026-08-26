@@ -92,8 +92,8 @@ test('Phase 4-2 语音输入：麦克风按钮仅支持平台显示（speechInpu
 })
 
 test('Phase 4-2 语音输入：识别文本回填 inputText（可编辑），不自动发送', () => {
-  // tap 切换：isListening 时结束识别，否则开始识别并回填
-  assert.match(pageSource, /@tap="handleMicTap"/)
+  // tap 切换：isListening 时结束识别，否则开始识别并回填（.stop 阻止冒泡，避免误触输入区其他处理）
+  assert.match(pageSource, /@tap(\.stop)?="handleMicTap"/)
   assert.match(pageSource, /stopSpeechRecognition\(\)/)
   assert.match(pageSource, /inputText\.value = result\.text/)
   // 回填后必须走用户手动发送（handleSend 只被发送按钮/确认键触发），识别回调内禁止直接 chatStream.send
@@ -171,19 +171,6 @@ test('改进18：示例问题覆盖六大类（大盘/个股/资金/对比/新�
   assert.match(pageSource, /贵州茅台和五粮液哪个更好/)
   assert.match(pageSource, /宁德时代最近有什么新闻/)
   assert.match(pageSource, /市盈率是什么/)
-})
-
-// ─── 改进 20（批次 1，2026-08-13）：引导追问按钮化 ───
-
-test('改进20：引导追问按钮化（parseFollowupQuestions 接入 + 按钮点击即发）', () => {
-  assert.match(pageSource, /parseFollowupQuestions/)
-  assert.match(pageSource, /followup-questions/)
-  assert.match(pageSource, /@tap="quickAsk\(q\)"/)
-})
-
-test('改进20：解析失败回退纯文本（followupOf 返回 null 时走既有 msg.content 渲染）', () => {
-  assert.match(pageSource, /function followupOf\(msg: ChatMessage\)/)
-  assert.match(pageSource, /v-else-if="msg\.content"/)
 })
 
 // ─── 改进 16（批次 1，2026-08-13）：对话滚动交互（豆包式） ───
@@ -293,7 +280,7 @@ test('G6：goSessions 不置位 pendingRestore（仅 D 出口接线，会话列�
   assert.doesNotMatch(pageSource, /goSessions[\s\S]{0,150}pendingRestore/)
 })
 
-// ─── 批次 4（2026）：消息长按操作 + 引导胶囊升级 ───
+// ─── 批次 4（2026）：消息长按操作 ───
 
 test('批次4：消息项长按接入（message-item @touchstart → 打开操作菜单）', () => {
   assert.match(pageSource, /@touchstart="onMsgTouchStart\(\$event, msg\)"/)
@@ -321,11 +308,6 @@ test('批次4：复制走剪贴板 / 重发回填输入框可编辑 / 删除调�
   assert.match(pageSource, /function handleMessageAction\(item: MenuItem\)/)
   assert.match(pageSource, /chatStore\.removeMessage\(msg\.timestamp\)/)
   assert.match(pageSource, /isStreaming\.value\) return \/\/ 流式中禁长按/)
-})
-
-test('批次4：引导提问升级为浅色胶囊按钮（999rpx 圆角 + active 反馈，对齐豆包）', () => {
-  assert.match(pageSource, /\.followup-question \{[\s\S]{0,160}border-radius: 999rpx/)
-  assert.match(pageSource, /\.followup-question:active \{ opacity: 0\.7; \}/)
 })
 
 // ─── 追问面板（2026-08-26，Task 8）：panelState 状态机 + 替换 quick-skills + 打字机完成信号 ───
