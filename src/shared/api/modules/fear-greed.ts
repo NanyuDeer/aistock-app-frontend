@@ -25,6 +25,22 @@ export interface FearGreedHistory {
   scores: number[]
 }
 
+/** 每日 intraday 快照（盘前/正午/盘后），缺失为 null */
+export interface FearGreedSnapshot {
+  date: string
+  pre: number | null
+  noon: number | null
+  post: number | null
+}
+
+/** DB 历史快照集合：日级 composite 均值 + 每日3次快照 */
+export interface FearGreedHistorySnapshots {
+  index_key: string
+  dates: string[]              // 升序
+  composite: number[]          // 升序 - 每日均值，用于中热度线/均线
+  snapshots: FearGreedSnapshot[] // 升序 - 每日3次快照，用于短热度线
+}
+
 export interface FearGreedIndicator {
   key: string
   name: string
@@ -47,6 +63,7 @@ export interface FearGreedDashboard {
   updateProgress: { fearGreed: number; indexValue: number }
   indicators: FearGreedIndicator[]
   history: FearGreedHistory
+  historySnapshots?: FearGreedHistorySnapshots
 }
 
 export const fearGreedApi = {

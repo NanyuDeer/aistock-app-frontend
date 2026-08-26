@@ -143,7 +143,9 @@
                     :data="minuteCache.get(stock.symbol) || []"
                     period="minute"
                     :trend-up="(stock.changePercent ?? 0) >= 0"
-                    height="120rpx"
+                    :show-avg="false"
+                    :max-line-points="60"
+                    height="82rpx"
                     class="stock-mini-minute"
                   />
                 </view>
@@ -202,10 +204,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef, watch, onUnmounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { buildStockQuestion } from '@/shared/utils/chatSuggestions'
+import { isTradingTime } from '@/shared/utils/tradingTime'
 import { stockApi, type KLineItem } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
@@ -280,6 +283,44 @@ async function ensureMinuteData() {
     // 个别股票获取失败不影响整体；已成功项也保留在缓存中
   }
 }
+
+/* ===== 盘中实时刷新：fenshiMode 开启且处于交易日时段内，每分钟轮询更新全部分时缓存 ===== */
+let minuteRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+/** 强制拉取全部自选最新分时并覆盖缓存（盘中刷新用；不复用 ensureMinuteData 的去重缓存） */
+async function refreshMinuteData() {
+  const list = stocks.value
+  if (!list.length) return
+  try {
+    const results = await Promise.allSettled(
+      list.map((s) => stockApi.getKLine(s.symbol, { period: 'minute', count: 300 })),
+    )
+    const next = new Map(minuteCache.value)
+    results.forEach((r, i) => {
+      const symbol = list[i].symbol
+      if (r.status === 'fulfilled' && Array.isArray(r.value)) next.set(symbol, r.value)
+    })
+    minuteCache.value = next
+  } catch {
+    // 盘中某次刷新失败忽略，保留上一次缓存
+  }
+}
+
+/** 依据 fenshiMode + 交易时段开关轮询定时器：开启并处于盘中则立即刷新一次并每 60s 轮询，否则停止 */
+function syncMinuteRefresh() {
+  if (minuteRefreshTimer) {
+    clearInterval(minuteRefreshTimer)
+    minuteRefreshTimer = null
+  }
+  if (!fenshiMode.value || !isTradingTime()) return
+  void refreshMinuteData()
+  minuteRefreshTimer = setInterval(async () => {
+    if (isTradingTime()) await refreshMinuteData()
+  }, 60 * 1000)
+}
+
+// 开启/关闭 fenshiMode 时同步实时刷新逻辑；页面重新 onShow（返回自选页）也需恢复定时器
+watch(fenshiMode, () => syncMinuteRefresh())
 
 const stocks = computed<StockItem[]>(() => {
   const list = favoritesStore.stocks
@@ -451,6 +492,17 @@ onShow(() => {
   // 一进入页面即恢复为用户保存的自选顺序（不保留上次的排序列选择）
   sortKey.value = null
   sortDir.value = 'asc'
+
+  // 返回自选页时若处于分时模式，恢复盘中实时刷新定时器
+  syncMinuteRefresh()
+})
+
+// 组件卸载时清理盘中轮询定时器，避免内存泄漏
+onUnmounted(() => {
+  if (minuteRefreshTimer) {
+    clearInterval(minuteRefreshTimer)
+    minuteRefreshTimer = null
+  }
 })
 
 /* ===== 左滑删除（仅普通态生效；编辑态由勾选/拖拽接管） ===== */
@@ -835,10 +887,10 @@ function goSearch() {
   border-radius: 8rpx;
 }
 
-/* 分时图模式：行右侧 mini 分时折线宽度固定，避免挤压名称区 */
+/* 分时图模式：行右侧 mini 分时折线宽度固定，加宽横向空间以显示更完整的折线（高度由 inline height 控制，与 uni-view 行高一致） */
 .stock-mini-minute {
-  width: 240rpx;
-  height: 120rpx;
+  width: 320rpx;
+  height: 82rpx;
   flex-shrink: 0;
 }
 

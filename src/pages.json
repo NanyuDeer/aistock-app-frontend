@@ -225,6 +225,22 @@
       }
     },
     {
+      "path": "modules/user/pages/account-security",
+      "style": {
+        "navigationBarTitleText": "账号与安全",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
+      "path": "modules/user/pages/vip",
+      "style": {
+        "navigationBarTitleText": "会员中心",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
       "path": "modules/analytics/pages/index",
       "style": {
         "navigationBarTitleText": "洞察",

@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@babel/runtime':
+        specifier: ^7.29.7
+        version: 7.29.7
       '@dcloudio/uni-app':
         specifier: 3.0.0-4030620241128001
         version: 3.0.0-4030620241128001(@dcloudio/types@3.4.31)(postcss@8.5.16)(rollup@4.62.2)(vue@3.5.39(typescript@5.7.2))
@@ -29,12 +32,30 @@ importers:
       '@qiun/ucharts':
         specifier: 2.5.0-20230101
         version: 2.5.0-20230101
+      canvg:
+        specifier: ^3.0.11
+        version: 3.0.11
+      core-js:
+        specifier: ^3.50.0
+        version: 3.50.0
       dayjs:
         specifier: ^1.11.13
         version: 1.11.21
+      dompurify:
+        specifier: ^3.4.14
+        version: 3.4.14
+      fast-png:
+        specifier: ^6.2.0
+        version: 6.2.0
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       html2canvas:
         specifier: ^1.4.1
         version: 1.4.1
+      iobuffer:
+        specifier: ^6.0.1
+        version: 6.0.1
       jspdf:
         specifier: ^4.2.1
         version: 4.2.1
@@ -50,12 +71,33 @@ importers:
       mp-html:
         specifier: ^2.5.0
         version: 2.5.2
+      pako:
+        specifier: ^3.0.1
+        version: 3.0.1
+      performance-now:
+        specifier: ^2.1.0
+        version: 2.1.0
       pinia:
         specifier: ^2.3.1
         version: 2.3.1(typescript@5.7.2)(vue@3.5.39(typescript@5.7.2))
       pinia-plugin-unistorage:
         specifier: ^0.1.2
         version: 0.1.2
+      raf:
+        specifier: ^3.4.1
+        version: 3.4.1
+      rgbcolor:
+        specifier: ^1.0.1
+        version: 1.0.1
+      stackblur-canvas:
+        specifier: ^3.0.1
+        version: 3.0.1
+      svg-pathdata:
+        specifier: ^9.0.0
+        version: 9.0.0
+      text-segmentation:
+        specifier: ^1.0.3
+        version: 1.0.3
       vue:
         specifier: ^3.4.21
         version: 3.5.39(typescript@5.7.2)
@@ -2390,8 +2432,8 @@ packages:
   core-js-compat@3.49.0:
     resolution: {integrity: sha512-VQXt1jr9cBz03b331DFDCCP90b3fanciLkgiOoy8SBHy06gNf+vQ1A3WFLqG7I8TipYIKeYK9wxd0tUrvHcOZA==}
 
-  core-js@3.49.0:
-    resolution: {integrity: sha512-es1U2+YTtzpwkxVLwAFdSpaIMyQaq0PBgm3YD1W3Qpsn1NAmO3KSgZfu+oGSWVu6NvLHoHCV/aYcsE5wiB7ALg==}
+  core-js@3.50.0:
+    resolution: {integrity: sha512-BRWgOLKkFeCgRudR6zrs8p9XJZcE14grzKMMssoYrk6krtuEZ7MTKPIY5RzOnqsEKIR9kst7wNzphttraT+Yqw==}
 
   cross-env@7.0.3:
     resolution: {integrity: sha512-+/HKd6EgcQCJGh2PSjZuUitQBQynKor4wrFbRg4DtAgS1aWO+gU52xpH7M9ScGgXSYmAVS9bIJ8EzuaGw0oNAw==}
@@ -2894,6 +2936,9 @@ packages:
 
   iobuffer@5.4.0:
     resolution: {integrity: sha512-DRebOWuqDvxunfkNJAlc3IzWIPD5xVxwUNbHr7xKB8E6aLJxIPfNX3CoMJghcFjpv6RWQsrcJbghtEwSPoJqMA==}
+
+  iobuffer@6.0.1:
+    resolution: {integrity: sha512-SZWYkWNfjIXIBYSDpXDYIgshqtbOPsi4lviawAEceR1Kqk+sHDlcQjWrzNQsii80AyBY0q5c8HCTNjqo74ul+Q==}
 
   ipaddr.js@1.9.1:
     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
@@ -3426,6 +3471,9 @@ packages:
   pako@2.2.0:
     resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
 
+  pako@3.0.1:
+    resolution: {integrity: sha512-GupotUUI0mlhugKjUs4bjOwLt3nrehy9Ys2dxC0GtgVef5cnKggkDMmf2bq2poCCuVXopWPmqsc9VDT2iJUy+w==}
+
   parse-bmfont-ascii@1.0.6:
     resolution: {integrity: sha512-U4RrVsUFCleIOBsIGYOMKjn9PavsGOXxbvYGtMOEfnId0SVNsgehXh1DxUdVPLoxd5mvcEtvmKs2Mmf0Mpa1ZA==}
 
@@ -3846,6 +3894,10 @@ packages:
     resolution: {integrity: sha512-660gH1SpjeKyfUYnne9nuIya7CDGds6NdIrxzOToSgaSlOqbh7UYGP9VlxlQ8IX7af/nPuAHLkN03l84OesX7Q==}
     deprecated: Fixed build bug in 2.2.0 as not converting ES6 source for older browsers
 
+  stackblur-canvas@3.0.1:
+    resolution: {integrity: sha512-eJpxkL5PR39dioN3ZapIIhkjQd01wxcigCnBURzbRofZk5M+cHZUA8VwBelHLhsFW20gO9vdH6hFRIekA+jJfA==}
+    engines: {node: '>=0.1.16'}
+
   statuses@2.0.2:
     resolution: {integrity: sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==}
     engines: {node: '>= 0.8'}
@@ -3901,6 +3953,10 @@ packages:
   svg-pathdata@6.0.3:
     resolution: {integrity: sha512-qsjeeq5YjBZ5eMdFuUa4ZosMLxgr5RZ+F+Y1OrDhuOCEInRMA3x74XdBtggJcj9kOeInz0WE+LgCPDkZFlBYJw==}
     engines: {node: '>=12.0.0'}
+
+  svg-pathdata@9.0.0:
+    resolution: {integrity: sha512-h9FuqmNsgDKq2hQBqTMOWjZwqdZOnWijZmcg6FL4iSmH6VvRnobhHrBQSdOiP0W9nwgv0qiW5vQ3//Arrmp19g==}
+    engines: {node: '>=24.14.0'}
 
   svg-tags@1.0.0:
     resolution: {integrity: sha512-ovssysQTa+luh7A5Weu3Rta6FJlFBBbInjOh722LIt6klpU2/HtdUbszju/G4devcvk8PGt7FCLv5wftu3THUA==}
@@ -5989,7 +6045,7 @@ snapshots:
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
       bmp-js: 0.1.0
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/core@0.10.3':
     dependencies:
@@ -5997,7 +6053,7 @@ snapshots:
       '@jimp/utils': 0.10.3
       any-base: 1.1.0
       buffer: 5.7.1
-      core-js: 3.49.0
+      core-js: 3.50.0
       exif-parser: 0.1.12
       file-type: 9.0.0
       load-bmfont: 1.4.2
@@ -6012,7 +6068,7 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/core': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
     transitivePeerDependencies:
       - debug
 
@@ -6021,7 +6077,7 @@ snapshots:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
       omggif: 1.0.10
 
   '@jimp/jpeg@0.10.3(@jimp/custom@0.10.3)':
@@ -6029,7 +6085,7 @@ snapshots:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
       jpeg-js: 0.3.7
 
   '@jimp/plugin-blit@0.10.3(@jimp/custom@0.10.3)':
@@ -6037,28 +6093,28 @@ snapshots:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-blur@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-circle@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-color@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
       tinycolor2: 1.6.0
 
   '@jimp/plugin-contain@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-blit@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-scale@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3)))':
@@ -6069,7 +6125,7 @@ snapshots:
       '@jimp/plugin-resize': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/plugin-scale': 0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-cover@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-crop@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-scale@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3)))':
     dependencies:
@@ -6079,35 +6135,35 @@ snapshots:
       '@jimp/plugin-resize': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/plugin-scale': 0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-crop@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-displace@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-dither@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-fisheye@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-flip@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-rotate@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-blit@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-crop@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3)))':
     dependencies:
@@ -6115,35 +6171,35 @@ snapshots:
       '@jimp/custom': 0.10.3
       '@jimp/plugin-rotate': 0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-blit@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-crop@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-gaussian@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-invert@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-mask@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-normalize@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-print@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-blit@0.10.3(@jimp/custom@0.10.3))':
     dependencies:
@@ -6151,7 +6207,7 @@ snapshots:
       '@jimp/custom': 0.10.3
       '@jimp/plugin-blit': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
       load-bmfont: 1.4.2
     transitivePeerDependencies:
       - debug
@@ -6161,7 +6217,7 @@ snapshots:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-rotate@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-blit@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-crop@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))':
     dependencies:
@@ -6171,7 +6227,7 @@ snapshots:
       '@jimp/plugin-crop': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/plugin-resize': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-scale@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))':
     dependencies:
@@ -6179,7 +6235,7 @@ snapshots:
       '@jimp/custom': 0.10.3
       '@jimp/plugin-resize': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-shadow@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-blur@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))':
     dependencies:
@@ -6188,7 +6244,7 @@ snapshots:
       '@jimp/plugin-blur': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/plugin-resize': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugin-threshold@0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-color@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))':
     dependencies:
@@ -6197,7 +6253,7 @@ snapshots:
       '@jimp/plugin-color': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/plugin-resize': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
 
   '@jimp/plugins@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
@@ -6224,7 +6280,7 @@ snapshots:
       '@jimp/plugin-scale': 0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))
       '@jimp/plugin-shadow': 0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-blur@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))
       '@jimp/plugin-threshold': 0.10.3(@jimp/custom@0.10.3)(@jimp/plugin-color@0.10.3(@jimp/custom@0.10.3))(@jimp/plugin-resize@0.10.3(@jimp/custom@0.10.3))
-      core-js: 3.49.0
+      core-js: 3.50.0
       timm: 1.7.1
     transitivePeerDependencies:
       - debug
@@ -6234,14 +6290,14 @@ snapshots:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
       '@jimp/utils': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
       pngjs: 3.4.0
 
   '@jimp/tiff@0.10.3(@jimp/custom@0.10.3)':
     dependencies:
       '@babel/runtime': 7.29.7
       '@jimp/custom': 0.10.3
-      core-js: 3.49.0
+      core-js: 3.50.0
       utif: 2.0.1
 
   '@jimp/types@0.10.1(@jimp/custom@0.10.3)':
@@ -6253,13 +6309,13 @@ snapshots:
       '@jimp/jpeg': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/png': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/tiff': 0.10.3(@jimp/custom@0.10.3)
-      core-js: 3.49.0
+      core-js: 3.50.0
       timm: 1.7.1
 
   '@jimp/utils@0.10.3':
     dependencies:
       '@babel/runtime': 7.29.7
-      core-js: 3.49.0
+      core-js: 3.50.0
       regenerator-runtime: 0.13.11
 
   '@jridgewell/gen-mapping@0.3.12':
@@ -6532,8 +6588,7 @@ snapshots:
 
   '@types/prettier@2.7.3': {}
 
-  '@types/raf@3.4.3':
-    optional: true
+  '@types/raf@3.4.3': {}
 
   '@types/stack-utils@2.0.3': {}
 
@@ -6558,7 +6613,7 @@ snapshots:
       '@babel/preset-env': 7.29.7(@babel/core@7.29.7)
       browserslist: 4.28.4
       browserslist-to-esbuild: 2.1.1(browserslist@4.28.4)
-      core-js: 3.49.0
+      core-js: 3.50.0
       magic-string: 0.30.21
       regenerator-runtime: 0.14.1
       systemjs: 6.15.1
@@ -7045,13 +7100,12 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.29.7
       '@types/raf': 3.4.3
-      core-js: 3.49.0
+      core-js: 3.50.0
       raf: 3.4.1
       regenerator-runtime: 0.13.11
       rgbcolor: 1.0.1
       stackblur-canvas: 2.0.0
       svg-pathdata: 6.0.3
-    optional: true
 
   centra@2.7.0:
     dependencies:
@@ -7153,7 +7207,7 @@ snapshots:
     dependencies:
       browserslist: 4.28.4
 
-  core-js@3.49.0: {}
+  core-js@3.50.0: {}
 
   cross-env@7.0.3:
     dependencies:
@@ -7245,7 +7299,6 @@ snapshots:
   dompurify@3.4.14:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
-    optional: true
 
   dunder-proto@1.0.1:
     dependencies:
@@ -7710,6 +7763,8 @@ snapshots:
 
   iobuffer@5.4.0: {}
 
+  iobuffer@6.0.1: {}
+
   ipaddr.js@1.9.1: {}
 
   is-binary-path@2.1.0:
@@ -8145,7 +8200,7 @@ snapshots:
       '@jimp/custom': 0.10.3
       '@jimp/plugins': 0.10.3(@jimp/custom@0.10.3)
       '@jimp/types': 0.10.1(@jimp/custom@0.10.3)
-      core-js: 3.49.0
+      core-js: 3.50.0
       regenerator-runtime: 0.13.11
     transitivePeerDependencies:
       - debug
@@ -8221,7 +8276,7 @@ snapshots:
       fflate: 0.8.3
     optionalDependencies:
       canvg: 3.0.11
-      core-js: 3.49.0
+      core-js: 3.50.0
       dompurify: 3.4.14
       html2canvas: 1.4.1
 
@@ -8442,6 +8497,8 @@ snapshots:
 
   pako@2.2.0: {}
 
+  pako@3.0.1: {}
+
   parse-bmfont-ascii@1.0.6: {}
 
   parse-bmfont-binary@1.0.6: {}
@@ -8485,8 +8542,7 @@ snapshots:
 
   pathval@2.0.1: {}
 
-  performance-now@2.1.0:
-    optional: true
+  performance-now@2.1.0: {}
 
   phin@2.9.3: {}
 
@@ -8657,7 +8713,6 @@ snapshots:
   raf@3.4.1:
     dependencies:
       performance-now: 2.1.0
-    optional: true
 
   range-parser@1.2.1: {}
 
@@ -8722,8 +8777,7 @@ snapshots:
 
   reusify@1.1.0: {}
 
-  rgbcolor@1.0.1:
-    optional: true
+  rgbcolor@1.0.1: {}
 
   rimraf@3.0.0:
     dependencies:
@@ -8880,8 +8934,9 @@ snapshots:
 
   stackback@0.0.2: {}
 
-  stackblur-canvas@2.0.0:
-    optional: true
+  stackblur-canvas@2.0.0: {}
+
+  stackblur-canvas@3.0.1: {}
 
   statuses@2.0.2: {}
 
@@ -8931,8 +8986,9 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  svg-pathdata@6.0.3:
-    optional: true
+  svg-pathdata@6.0.3: {}
+
+  svg-pathdata@9.0.0: {}
 
   svg-tags@1.0.0: {}
 

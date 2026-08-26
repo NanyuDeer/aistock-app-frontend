@@ -2,6 +2,279 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-25 — App 手机号短信验证码登录 + 账号与安全绑定
+
+**开发者**: Aria
+
+### 变更
+- `src/shared/api/modules/auth.ts`：新增 `sendSmsCode` / `smsLogin` / `bindPhone` / `bindWechat` 接口
+- `src/shared/store/modules/user.ts`：新增短信登录、手机/微信绑定 actions，维护 `phoneBound` / `wechatBound` 绑定态
+- `src/modules/user/pages/login.vue`：登录页新增「手机号验证码登录」入口与表单（手机号/验证码输入、60s 倒计时、dev 固定测试码 123456），可切回微信登录
+- `src/modules/user/pages/account-security.vue`（新增）：账号与安全页——展示并绑定/解绑手机号与微信，归属冲突 409 时展示引导文案
+- `src/modules/user/pages/profile.vue`：新增「账号与安全」入口
+- `src/pages.json`：注册 `modules/user/pages/account-security` 路由
+
+### 说明
+- 微信老用户数据保留：手机号登录后可在账号与安全页绑回原微信；微信用户也可绑定手机号，两渠道数据归属同一账户
+
+---
+
+## [master] 2026-08-25 — AI 报告详情改 VIP 会员专属 + 移除导出（renderjs 导出实现一并清理）
+
+**开发者**: Aria
+
+### 背景
+- 手机端导出 PDF 体验差、renderjs 视图层生成不稳定（预生成/导出超时），且在手机上阅读/截图即可满足需求 → 移除「导出报告」，报告改为 App 内纯阅读；同时报告详情设为 VIP 会员专属，非会员进入详情前弹窗引导开通
+
+### 变更
+- `src/modules/chat/pages/agent-report.vue`：移除导出入口（右上角「导出报告」按钮）与全部导出实现（renderjs `pdfExporter` 模块、预生成缓存、`savePdfAndShare`、`onPdfBase64/onPdfError` 等）；新增 VIP 门禁 `vipModalVisible` 弹窗，概览→详情与深层链接两条路径均校验 `userInfo.isVip`，非会员回退展示概览并引导跳转 VIP 页
+- `src/modules/user/pages/vip.vue`（新增）：会员中心占位页（SubPageCard2 容器，含「开通会员」底栏与开发中提示；`isVip` 时切换为已开通态）
+- `src/pages.json`：注册 `modules/user/pages/vip` 路由
+- `src/shared/components/FloatingPodcast.vue`：连续播放开关改用 uni-app 原生 `<switch>`（消除「Failed to resolve component: Switch」构建警告）
+
+### 说明
+- VIP 判定沿用 `userInfo.isVip`（后端 `/users/me` 的 `is_vip` 归一化）；未登录按非会员处理
+
+---
+
+## [master] 2026-08-25 — 发布流程文档补全 + 修复「已装 0.1.1 仍反复弹更新」
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/useAppUpdate.ts`：本机 versionCode 读取改走 `plus.android.invoke(pkgInfo,'get','versionCode')`（不可直接 `pkgInfo.versionCode` 属性访问，否则读不到返回 0 被误判比线上旧而反复弹更新）；`current<=0`（读取失败）保守视为已最新，避免反复误弹
+
+### 文档
+- `docs/app-update-release-process.md`：补全第 0 节「前置条件与权限」（HBuilderX 开发版 / DCloud 云打包权限 / 正式签名证书 / SSH / 仓库访问）、第 2.0 节「打包前 git pull 最新主干」、第 3 节正式证书注意事项、第 5 节 `export PATH` 前置、自检清单与 10 步流程速览、FAQ 补充
+
+---
+
+## [master] 2026-08-25 — 首页简报卡片：大盘无归因时改用市场异象关键词标签
+
+**开发者**: 协作
+
+### 修复
+- `src/modules/home/components/MorningContent.vue`：`summaryTags` 当头条为「归因结论」且结论命中降级文案（`证据不足|未确认主因|暂无明确主因`）时，改从市场异象条目（收盘复盘/市场快照）取结论切标签；新增 `isDowngradedAttribution` / `marketAnomalyText` 辅助函数
+- `src/modules/home/components/MorningContent.spec.ts`：新增静态断言校验降级判定与市场异象回退逻辑
+
+---
+
+## [changer] 2026-08-25 — AI 投顾对话页长按菜单优化（滑动误触 + 原位浮动菜单 + 圈选复制）
+
+**开发者**: 37588
+
+### 改进
+- 修复消息列表滑动时仍计算长按导致误弹出菜单的问题：改为手动触摸判定（按住 350ms 触发 + 位移超过 10px 取消），滚动过程不弹出。
+- 底部 ActionSheet 替换为长按原位浮动菜单，无遮罩、无模糊、不跳页，贴视口边缘自动内收。
+
+### 新增
+- 长按菜单新增「选中文字」，点击后启用系统原生拖拽手柄圈选，浮出「复制已选」按钮，复制优先取选中片段、未圈选则整条复制；仅 App 生效。
+
+---
+
+## [changer] 2026-08-24 — 早点听新增午间报（盘中报）展示与播报
+
+**开发者**: 37588
+
+### 新增
+- 早点听由晨报/晚报两个入口扩展为晨报/午间报/晚报三个入口，新增午间报（盘中报）入口。
+- 午间报展示盘中摘要、详细解读与风险提示；当日未生成时自动回退最近可用报告并标注日期。
+- 午间报音频就绪时支持播报播放，音频未生成时仅展示文字内容。
+
+## [junliang] 2026-08-24 — 洞察页异动按最近触发时间排序 + 详情只展示支撑性主因
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/favorites/pages/insight.vue`：异动列表排序由首次触发时间改为最近触发时间（`window_end_at` 兜底 `triggered_at`），长窗口事件不再沉底
+- `src/modules/favorites/pages/insight-detail-move.vue`：异动详情页候选只展示支撑性主因（supported），隐藏证据不足/偏弱候选，标题改"支撑性主因"
+- `src/shared/api/modules/stockTrace.ts`：`StockTraceEvent` 新增 `window_end_at` 字段（最近触发/窗口更新时间）
+
+## [master] 2026-08-24 — 0.1.1 发版：修复 APP 启动白屏 + 版本号保持 0.1.1（修复开发版 bug）
+
+**开发者**: Aria
+
+### 修复
+- App 启动白屏（部分老旧 Android WebView 缺少 `TextEncoder`，PDF 导出链 fast-png 在模块顶层 `new TextEncoder()` 抛 ReferenceError）：
+  - `vite.config.ts`：新增 `prependGlobalPolyfill` 插件，在发行打包时把 TextEncoder/TextDecoder polyfill 字面前插到 bundle 开头，先于 fast-png 执行。
+  - `src/shared/utils/global-polyfills.ts`（新增）：TextEncoder/TextDecoder 兜底实现，作为 `main.ts` 首条 import，保障 dev（HBuilder 运行）场景按 import 顺序先定义。
+  - `src/main.ts`：首行导入 `global-polyfills`。
+- 循环依赖导致的分块执行顺序损坏：
+  - `src/shared/components/KLineChart.vue`：`EmptyState` 从 barrel `index.ts` 改为直接导入 `./EmptyState.vue`，切断 `KLineChart → index.ts → KLineChart` 回环。
+- App 端 `performance-now` 被当外部依赖导致 `require$$0$1 is not defined`：
+  - `package.json`/`pnpm-lock.yaml`：显式新增 `performance-now ^2.1.0`（raf 的运行依赖），让 Rollup 能解析并打包。
+
+### 变更
+- `src/manifest.json`：`versionName` 保持 0.1.1，`versionCode` 保持 101（修复开发版 bug，正式版仍为 0.1.1）。
+- `public/download/version.json`（Web 端）：`versionName` 0.1.1/`versionCode` 101，`downloadUrl` 指向 `aistock-0.1.1.apk`，文案由 APP 介绍改为本次更新内容。
+
+---
+
+## [master] 2026-08-24 — 0.1.1 发版：修复 HBuilder/App 打包失败 + 应用内更新弹窗 + 版本号升至 0.1.1
+
+**开发者**: Aria
+
+### 修复
+- HBuilder/App 打包失败（`Rollup failed to resolve import "@babel/runtime/helpers/typeof"` 与 `iife ... not supported for code-splitting`）：
+  - `src/modules/chat/pages/agent-report.vue`：PDF 导出 `html2canvas`/`jspdf` 改为文件顶部静态 import，移除函数内动态 `import()`（动态导入触发 code-splitting，与 App 的 iife 输出冲突）。
+  - `vite.config.ts`：App(app-plus) 平台将 `jspdf` alias 到自包含的 UMD 构建（`jspdf/dist/jspdf.umd.min.js`，无动态 import）；删除与 uni `manualChunks` 冲突的 `forceInlineDynamicImports` 插件。
+  - `package.json`/`pnpm-lock.yaml`：补齐 `@babel/runtime`、`fflate`、`fast-png`、`dompurify`、`canvg`、`core-js`、`stackblur-canvas`、`svg-pathdata`、`text-segmentation`、`raf`、`rgbcolor`、`iobuffer`、`pako` 到顶层依赖。
+
+### 新增
+- 应用内版本更新弹窗（更新操作入口 + 永久关闭版本标记）：
+  - `src/shared/utils/useAppUpdate.ts`：启动检查移除 24h 节流，写入全局 `updatePromptState`；新增「永久关闭」标记（`app_update_never_v{versionCode}`）与 `neverUpdateStorageKey`/`isNeverUpdate`/`downloadAndInstall`。
+  - `src/shared/components/UpdateModal.vue`：复用 `Modal`+`Button` 的更新弹窗，「立即更新」/「永久关闭」/仅叉掉下次仍提示。
+  - `src/shared/components/MainTabs.vue`、`src/modules/user/pages/profile.vue`、`src/shared/components/index.ts`：挂载 `<UpdateModal />`。
+
+### 变更
+- `src/manifest.json`：`versionName` 0.1.0→0.1.1，`versionCode` 100→101（触发存量用户自动更新）。
+
+---
+
+## [master] 2026-08-24 — 恐贪指数悬浮温度计改为首页晨报头部入口按钮
+
+**开发者**: 林晓研
+
+### 重构
+- `src/shared/components/FearGreedIndex.vue`：恐贪指数从「悬浮可拖拽温度计」重构为「头部紧凑按钮」（情绪色点 + 恐贪前缀 + 数值 + 分档标签 + 右箭头），点击跳转恐贪指数页；拉取失败保留默认值，不阻塞首页渲染
+- `src/shared/components/MainTabs.vue`：`FearGreedIndex` 从 MainTabs 底部悬浮改为嵌入晨报 Tab 头部（`activeTab === 'morning'` 时显示）
+
+---
+
+## [master] 2026-08-24 — 投资建议仓位改为数据驱动动态计算
+
+**开发者**: 林晓研
+
+### 变更
+- `src/modules/fear-greed/pages/index.vue`：新增 `positionRange` 计算属性，建议总仓位由「静态分档区间」改为**数据驱动动态仓位**：
+  - **基准曲线**：按当前恐贪指数在各温度档锚点（各档预设区间中心）间线性插值，指数越接近中性(50)仓位越高、两端防守低仓，随指数连续变化、无跳档
+  - **动态修正**：冰点区域且历史次日反弹概率 ≥70% 加 8%（超跌布局）；5日均线高于20日均线 +3、低于 -3（趋势修正）
+  - 钳制在 10%-90% 区间
+- `src/modules/fear-greed/pages/index.vue`：仓位条与文字改读 `positionRange.min/max`；`positionMin/positionMax` 保留为各档锚点数据
+
+---
+
+## [master] 2026-08-24 — 历史走势图改为每日单点折线（去掉盘中3次路径与K线影线）
+
+**开发者**: 林晓研
+
+### 变更
+- `src/modules/fear-greed/pages/index.vue`：历史走势图主线由「每日 3 次 intraday 快照（pre→noon→post）连续路径」改为**每日单点折线**——每天一个恐贪指数值（DB 快照日均值优先，回退 `history.scores` 日级序列），数据更干净、趋势更直观
+- `src/modules/fear-greed/pages/index.vue`：删除 K 线式当日区间影线（涨绿跌红）及其「日内上涨/日内下跌」图例与样式（`.fg-chart__line-wick-*`），不再展示盘中粒度
+- `src/modules/fear-greed/pages/index.vue`：tooltip 简化为「日期 + 恐贪指数」两项，去掉盘前/正午/盘后三行；`chartData` / `activeDayData` 相应移除 snapshots 依赖
+
+---
+
+## [master] 2026-08-24 — AI 洞见字体与页面正文对齐
+
+**开发者**: 林晓研
+
+### 变更
+- `src/modules/fear-greed/pages/index.vue`：AI 洞见正文字号/颜色对齐卡片正文风格（`$font-size-sm` + `$ink-soft`，与「投资建议」段落一致），避免 md+ink 过重破坏页面协调
+
+---
+
+## [master] 2026-08-24 — AI 洞见样式调整（去底色、去标签、加大加深字体）
+
+**开发者**: 林晓研
+
+### 变更
+- `src/modules/fear-greed/pages/index.vue`：AI 洞见文本去掉「为什么：」「后续预判：」字面标签，仅保留两句式结构（第一句市场情绪总结 + 第二句后续预判）
+- `src/modules/fear-greed/pages/index.vue`：删除 `fg-insight--trend` 的淡蓝底色 + 左边框样式，洞见正文不再有底色
+- `src/modules/fear-greed/pages/index.vue`：`.fg-insight` 字号由 `$font-size-sm` 提升到 `$font-size-md`，颜色由 `$ink-soft`（灰）改为 `$ink`（正文深色），提升可读性
+
+---
+
+## [master] 2026-08-24 — 恐贪指数页删除历史参照 + AI 洞见改为"为什么+后续预判"
+
+**开发者**: 林晓研
+
+### 变更
+- `src/modules/fear-greed/pages/index.vue`：AI 情绪洞见卡片删除「历史参照」（上次到达当前水平约 X 天前）提示条
+- `src/modules/fear-greed/pages/index.vue`：历史走势图例「恐贪指数(盘中3次)」简化为「恐贪指数」（不再赘述盘中3次）
+- `src/modules/fear-greed/pages/index.vue`：AI 情绪洞见逻辑重构为**「为什么 + 后续预判」一句话/两句话格式**——「为什么」由情绪档位 + 情绪总结话语 + 5/20日均线关系构成，「后续预判」基于历史走势图数据（冰点反弹概率优先，其次均线排列）；替换原静态 `zone.insight` + `trendInsight` 两段文本
+- `src/modules/fear-greed/pages/index.vue`：`ZoneDef` 的 `insight`（长段静态解读）字段改为 `summary`（精炼情绪总结话语，供 AI 洞见"为什么"部分使用）
+- 同步删除废弃的 `zoneStats` 计算属性及 `fg-ref` 样式
+
+---
+
+## [master] 2026-08-24 — 恐贪指数页删除趋势对比/关键信号/指数名展示
+
+**开发者**: 林晓研
+
+### 变更
+- `src/modules/fear-greed/pages/index.vue`：AI 情绪洞见卡片删除「趋势对比」（较昨日/较上周/近30天同区间）区块——信息与历史走势图重复，图表已能直观呈现变化
+- `src/modules/fear-greed/pages/index.vue`：AI 情绪洞见卡片删除「关键信号」（北上资金/升贴水率/避险天堂/指数波动）卡片网格，洞见区聚焦文字解读
+- `src/modules/fear-greed/pages/index.vue`：hero 区删除「韭圈儿恐贪指数」名称展示，右侧仅保留更新时间
+- 同步删除废弃的 `trend` / `keySignals` 计算属性及对应 `fg-trend` / `fg-signals` / `fg-hero__name` 样式
+
+---
+
+## [master] 2026-08-24 — 恐贪指数历史走势图新增交互 tooltip（悬停/点击查看每日数据）
+
+**开发者**: 林晓研
+
+### 新增
+- `src/modules/fear-greed/pages/index.vue`：历史走势图新增交互热区层——每日一列透明热区（对齐 SVG 点位），H5 端 `mousemove` 悬停、App/H5 `tap`/`touchstart` 点击均可选中当日；选中日显示竖向十字线 + 高亮圆点，热区列淡蓝高亮
+- `src/modules/fear-greed/pages/index.vue`：新增悬浮 tooltip——显示选中日日期、综合指数、盘前/正午/盘后三次快照值（缺失项隐藏），靠近左右边缘时自动调整对齐方向避免溢出；未选中时默认显示最新一日数据
+- 配套 `fg-chart__hotzone-container` / `fg-chart__hotzone` / `fg-chart__tooltip` 系列样式（`touch-action: none` 防止热区拦截页面滚动）
+
+### 变更
+- `src/modules/fear-greed/pages/index.vue`：历史走势卡片标题提示语更新为「近 3 个月 · 滑动查看每日」，引导用户交互
+
+---
+
+## [master] 2026-08-24 — 恐贪指数图表改为单线+K线影线 + 卡片顺序调整
+
+**开发者**: 林晓研
+
+### 变更
+- `src/modules/fear-greed/pages/index.vue`：历史走势图去掉中热度线（20日MA），改为单线展示每日 3 次 intraday 快照（pre→noon→post→次日pre 连续路径）；新增 K 线式当日区间影线（每日 min~max 垂直线，涨绿跌红），让每个点直观显示当日波动范围
+- `src/modules/fear-greed/pages/index.vue`：图例更新——移除「短热度/中热度」双线图例，新增「恐贪指数(盘中3次)」+「日内上涨/下跌」影线图例 +「冰点日」
+- `src/modules/fear-greed/pages/index.vue`：卡片顺序调整——「AI 情绪洞见」移到「投资建议」前面，让用户先看数据驱动的情绪分析再看操作建议
+
+---
+
+## [master] 2026-08-24 — 恐贪指数图表短线改为 intraday 3次/日 + AI 趋势研判
+
+**开发者**: 林晓研
+
+### 新增
+- `src/shared/api/modules/fear-greed.ts`：新增 `FearGreedSnapshot` / `FearGreedHistorySnapshots` 接口；`FearGreedDashboard` 新增可选 `historySnapshots` 字段，承载后端每日 3 次（pre/noon/post）intraday 快照
+- `src/modules/fear-greed/pages/index.vue`：AI 情绪洞见新增「趋势研判」——基于图表均线（5/20/60日）多空排列、当前值 vs 5日均线偏离、冰点反弹概率生成数据驱动洞见文字，蓝色左边框样式区分静态 insight
+
+### 变更
+- `src/modules/fear-greed/pages/index.vue`：历史走势图短热度线由「5日 MA」改为「每日 3 次 intraday 快照」（pre/noon/post 各一点，跨日不连接），更敏锐反映盘中情绪波动；中热度线保持 20日 MA（基于日级 composite 均值）
+- `src/modules/fear-greed/pages/index.vue`：`historyChartSrc` / `movingAverages` / `icePointStats` 数据源优先使用 `historySnapshots.composite`（与图表口径一致），无 DB 快照时回退到 `history.scores`
+- `src/modules/fear-greed/pages/index.vue`：图例标签更新——「短热度(5日)」→「短热度(盘中3次)」、「中热度(20日)」→「中热度(20日均线)」
+
+---
+
+## [master] 2026-08-24 — 恐贪指数页新增历史走势图 + 冰点反弹统计
+
+**开发者**: 林晓研
+
+### 新增
+- `src/modules/fear-greed/pages/index.vue`：仪表盘卡片后新增「历史走势」卡片——SVG 双线折线图（短热度5日MA蓝色 + 中热度20日MA橙色）+ 五色色带背景，取近 60 交易日数据，冰点位置标记红圆点，含双线图例
+- `src/modules/fear-greed/pages/index.vue`：图表下方新增均线数值区——5日/20日/60日均线当前值，颜色随热度区间变化
+- `src/modules/fear-greed/pages/index.vue`：AI 情绪洞见卡片新增「冰点反弹统计」——从历史数据计算冰点出现次数、次日反弹概率、平均反弹幅度，配套数据驱动洞见文字（≥70% 高概率 / ≥50% 中等 / <50% 趋势性下跌三档解读）
+
+---
+
+## [master] 2026-08-24 — 自选分时图盘中实时刷新 + mini 分时视觉优化
+
+**开发者**: Aria
+
+### 新增
+- `favorites` 分时图模式盘中实时刷新：`fenshiMode` 开启且处于 A 股交易时段内，每分钟轮询拉取全部分时覆盖缓存（`refreshMinuteData`/`syncMinuteRefresh`）；定时器由 `watch(fenshiMode)`/`onShow`/`onUnmounted` 管理，非交易时段自动停止。
+
+### 改进
+- `MiniKLine` 分时折线视觉：折线/均价线/蜡烛影线加 `vector-effect=non-scaling-stroke`，消除 `preserveAspectRatio=none` 非等比拉伸导致的线宽不均；分时不画成交量时价格区扩展至画布底部，消除底部空白带；`buildScale` 支持下边界参数。
+- `favorites` 分时图尺寸：mini 高度收敛至 82rpx（与行高一致）、宽度加宽至 320rpx；新增 `showVolume`/`showAvg`/`maxLinePoints` 控制项。
+- `favorites-grid` 分时图开启成交量柱。
+
+---
+
 ## [master] 2026-08-24 — 应用内版本更新 + 报告导出 PDF + 分时图优化
 
 **开发者**: NanyuDeer

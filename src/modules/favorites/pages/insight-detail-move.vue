@@ -112,9 +112,9 @@
           </view>
         </view>
 
-        <!-- 候选解释：卡片列表（主因外的各层候选） -->
+        <!-- 候选解释：卡片列表（仅支撑性主因，主因外的各层候选） -->
         <view v-if="candidateCards.length" class="section">
-          <text class="section-title">候选解释</text>
+          <text class="section-title">支撑性主因</text>
           <view class="cand-list">
             <view v-for="c in candidateCards" :key="c.layer" class="cand-card">
               <view class="cand-header">

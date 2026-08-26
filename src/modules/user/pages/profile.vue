@@ -93,6 +93,11 @@
               <SvgIcon name="bar-chart-line" size="36rpx" color="#4b5a7a" />
             </template>
           </ListCell>
+          <ListCell title="账号与安全" description="绑定邮箱 / 微信" clickable showArrow :border="true" @click="goAccountSecurity">
+            <template #prefix>
+              <SvgIcon name="shield-check-line" size="36rpx" color="#4b5a7a" />
+            </template>
+          </ListCell>
           <ListCell title="版本更新" clickable showArrow :border="true" @click="checkUpdate">
             <template #prefix>
               <SvgIcon name="refresh-line" size="36rpx" color="#4b5a7a" />
@@ -116,6 +121,9 @@
         <Button type="danger" block @click="handleLogout">退出登录</Button>
       </view>
     </view>
+
+    <!-- 应用内版本更新弹窗（手动「版本更新」检查后在本页展示；仅前台页面可见） -->
+    <UpdateModal />
   </SubPageCard>
 </template>
 
@@ -129,7 +137,7 @@ import { deleteUserProfile } from '@/shared/api/modules/profile'
 import { checkAppUpdate } from '@/shared/utils/useAppUpdate'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { Switch, ListCell, Card, Tag, Button } from '@/shared/components'
+import { Switch, ListCell, Card, Tag, Button, UpdateModal } from '@/shared/components'
 import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 
 const userStore = useUserStore()
@@ -231,6 +239,10 @@ function goLogin() {
 
 function goFavorites() {
   uni.navigateTo({ url: '/modules/favorites/pages/favorites' })
+}
+
+function goAccountSecurity() {
+  uni.navigateTo({ url: '/modules/user/pages/account-security' })
 }
 
 function goAbout() {
