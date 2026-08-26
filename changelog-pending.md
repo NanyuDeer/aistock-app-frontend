@@ -1,5 +1,9 @@
 ## 未提交修改
 
+> ⚠️ 下方改动已提交（fa0096f）并作为 **v0.1.2（versionCode 102）** 发布，详见各节说明。仓库无 CHANGELOG.md 文件（guard：不擅自创建），发布文案以 Web `public/download/version.json` 为准。
+
+### v0.1.2 发布内容：首页滑动与卡片点击修复（2026-08-26）
+
 ### 首页卡片整卡跳转修复（MorningContent.vue）
 - 根因：`<Card>` 的 `@tap → emit('click') → 父级 @click` 组件事件链在 H5 端无法触发跳转，而原生 `@tap`（透传到 Card 根 `<view>`）可靠可用（风口龙头/事件传导 行内 `@tap.stop` 已证明）。市场洞见/今日分析概览 仅依赖组件事件链，故整卡点击（含标题）无声响应。
 - 修复：将 MorningContent.vue 中 5 张需求"整卡跳转"的卡片（风口龙头/事件传导/市场洞见/今日分析概览/重磅事件跟踪）的 `@click="goX"` 改为原生 `@tap="goX"`（fallthrough 到 Card 根视图），保留 `clickable` 以显示 cursor:pointer 与点击缩放动画；行内 `@tap.stop` 预览跳转逻辑不变、不冲突（stop 阻止冒泡到卡片根，无重复跳转）。
