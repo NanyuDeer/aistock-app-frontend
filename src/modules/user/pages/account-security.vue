@@ -241,7 +241,8 @@ async function handleBind() {
     cancelBind()
   } catch (e: any) {
     binding.value = false
-    uni.showToast({ title: e?.data?.message || '绑定失败，请重试', icon: 'none' })
+    // e.data.message（后端业务 message）优先，e.message 兜底；取不到再显示通用文案
+    uni.showToast({ title: e?.data?.message || e?.message || '绑定失败，请重试', icon: 'none' })
   }
 }
 </script>

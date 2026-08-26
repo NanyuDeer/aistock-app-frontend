@@ -147,7 +147,8 @@ function goProfile() {
   overflow: hidden;
   background: $bg-page;
   overscroll-behavior: none;
-  touch-action: none;
+  /* 不能设置 touch-action: none——H5 端(预览 App)会禁用浏览器原生触摸滚动与点击识别，
+     导致"划很多次才动"、卡片点击无反应。滚动交给内部 scroll-view 处理。 */
 }
 
 /* 透明导航区域 */

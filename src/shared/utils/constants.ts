@@ -2,39 +2,65 @@
  * 全局常量
  */
 
-// API 基础地址：H5/小程序走同源或 dev server 代理，用相对路径 /api；
-// App 端必须使用完整 URL——env 缺失时兜底线上地址，避免打包 App 全部接口请求失败
-export const API_BASE_URL = (() => {
+/**
+ * 判断 env 提供的地址能否作为真机/打包 App 的外部请求地址：
+ * - 必须是绝对地址（http/https/ws/wss），相对路径（如 dev 注入的 /api）在 App 端无效；
+ * - 且不能是回环地址（localhost/127.x），真机调试时指向本机无法访问。
+ * 归因：`env/.env.development` 恒提供 `VITE_API_BASE_URL=/api`（truthy），
+ * 会覆盖 `|| 线上兜底`，导致 App 用 `http` 之外的 scheme 请求（request:fail
+ * Expected URL scheme 'http' or 'https'）。此判定让 App 只接受真正可用的绝对地址。
+ */
+function isExternalUrl(value: string | undefined): value is string {
+  if (!value) return false
+  if (!/^(https?|wss?):\/\//i.test(value)) return false
+  const host = value.replace(/^[a-z]+:\/\//i, '').split('/')[0]
+  return !/^(localhost|127\.)/i.test(host)
+}
+
+function completeApiBase(): string {
   // #ifdef APP-PLUS
-  return import.meta.env.VITE_API_BASE_URL || 'https://gupiao-api.yaozhineng.com/api'
+  return isExternalUrl(import.meta.env.VITE_API_BASE_URL)
+    ? (import.meta.env.VITE_API_BASE_URL as string)
+    : 'https://gupiao-api.yaozhineng.com/api'
   // #endif
   // #ifndef APP-PLUS
   return import.meta.env.VITE_API_BASE_URL || '/api'
   // #endif
-})()
+}
 
-// WebSocket 地址（Node.js 服务）
-export const WS_BASE_URL = (() => {
+function completeWsBase(): string {
   // #ifdef APP-PLUS
-  return import.meta.env.VITE_WS_BASE_URL || 'wss://gupiao-api.yaozhineng.com/ws'
+  return isExternalUrl(import.meta.env.VITE_WS_BASE_URL)
+    ? (import.meta.env.VITE_WS_BASE_URL as string)
+    : 'wss://gupiao-api.yaozhineng.com/ws'
   // #endif
   // #ifndef APP-PLUS
   return import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:3000/ws'
   // #endif
-})()
+}
+
+function completeAgentWsBase(): string {
+  // #ifdef APP-PLUS
+  return isExternalUrl(import.meta.env.VITE_AGENT_WS_BASE)
+    ? (import.meta.env.VITE_AGENT_WS_BASE as string)
+    : 'wss://gupiao-api.yaozhineng.com/api/agent/ws'
+  // #endif
+  // #ifndef APP-PLUS
+  return import.meta.env.VITE_AGENT_WS_BASE || 'ws://localhost:8080/api/agent/ws'
+  // #endif
+}
+
+// API 基础地址：H5/小程序走同源或 dev server 代理，用相对路径 /api；
+// App 端必须使用完整 URL——env 缺失或为相对/回环地址时兜底线上地址，避免全部接口请求失败
+export const API_BASE_URL = completeApiBase()
+
+// WebSocket 地址（Node.js 服务）
+export const WS_BASE_URL = completeWsBase()
 
 // Agent Python 后端 WebSocket 地址（后端路由前缀 /api/agent + /ws/chat）
 // 端口走 env 分层：本地开发默认 8000（env/.env.development 注入），
-// 生产由 env/.env.production 注入 wss://gupiao-api.yaozhineng.com/api/agent/ws；
-// 此处 fallback 仅在 env 缺失时兜底：App 端兜底线上，其余平台对齐本地开发约定
-export const AGENT_WS_BASE_URL = (() => {
-  // #ifdef APP-PLUS
-  return import.meta.env.VITE_AGENT_WS_BASE || 'wss://gupiao-api.yaozhineng.com/api/agent/ws'
-  // #endif
-  // #ifndef APP-PLUS
-  return import.meta.env.VITE_AGENT_WS_BASE || 'ws://localhost:8000/api/agent/ws'
-  // #endif
-})()
+// 生产由 env/.env.production 注入 wss://gupiao-api.yaozhineng.com/api/agent/ws
+export const AGENT_WS_BASE_URL = completeAgentWsBase()
 
 // 平台标识
 export const PLATFORM = {

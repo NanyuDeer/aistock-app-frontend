@@ -2,6 +2,28 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-26 — 午间报展示与播报 + 邮箱登录 App 联调 + 请求 scheme 修复
+
+**开发者**: Aria
+
+### 新增
+- 首页「今日专属」报卡补充午间报：`src/modules/home/components/MorningContent.vue` 按时间自动切换晨报/午间报/晚报（12:00–15:30 显示午间报，摘要+短关键词标签与晨/晚报样式统一）；`src/shared/utils/useBriefingCard.ts` 扩展支持 `midday` 类型（走 `/agent/report/midday/:date` 的 display_report 结构，晨/晚报仍走 `/agent/brief/:type/:date`）；`briefingTypeAtShanghaiTime` 时段划分：15:30+ 晚报 / 12:00–15:30 午间报 / 早间晨报
+- agent-report 概览加入「午间报」入口：`src/modules/chat/pages/agent-report.vue` 概览卡片在「收盘复盘」正上方新增午间报卡片（`OVERVIEW_ORDER` 增加 `midday`），走统一 `/agent/report/:intent/:date` 读取，点击 `selectAgent('midday')` 原地加载详情；`AGENT_META`/`titleMap` 新增 midday 配置
+- `src/shared/utils/middayReport.ts`：新增 `MiddaySection` 接口与 `normalizeSections` 归一化多分段摘要（仅保留含非空 conclusion 的项，容忍 LLM 字段缺漏/顺序变化）
+- `src/shared/utils/briefingNavigation.ts`：`buildBriefingUrl` 类型扩展支持 `midday`
+- 邮箱登录 App 前端联调打通：`Input.vue` 修复输入框高度塌缩为 0px 无法点击（`.as-input__inner` 固定 `height: 88rpx; box-sizing: border-box`）与 v-model 失效（`handleInput` 优先读 uni-app 标准 `event.detail.value`，保留 `target.value` 兜底）；邮箱登录表单验证码发送、60s 倒计时与登录落盘正常
+
+### 修复
+- App 调试请求 scheme 错误导致首页无数据：`src/shared/utils/constants.ts` 新增 `isExternalUrl()`（仅接受绝对且非回环地址），`API_BASE_URL`/`WS_BASE_URL`/`AGENT_WS_BASE_URL` 在 APP-PLUS 下仅接受外部绝对地址、否则兜底线上，不再被 dev 注入的相对 `/api` 或 `localhost` 覆盖（真机/基座调试不再报 `request:fail Expected URL scheme 'http' or 'https'`）；`src/shared/api/request.ts` baseURL 直接复用 constants 的 `API_BASE_URL`，删除重复的 `|| /api` 判定
+- 早点听午间报格式对齐晨/晚报（精简）：`src/pages-sub-app/briefing/index.vue` 午间报页由「完整长报告」改为与晨/晚报一致的精简结构——播报器 + 「盘中研判」结论卡 + 风险提示洞见卡，移除 `details` 全文渲染，新增「查看完整报告」入口 `openMiddayFullReport()` 跳转 agent-report 查看完整 Markdown
+- 邮箱绑定报错透传 + 空壳账户自动接管：`src/shared/api/request.ts` 非 2xx 错误归一化时把原始响应体挂到 `error.data`；`src/modules/user/pages/account-security.vue` `handleBind` 失败 toast 优先取 `e.data.message`，绑定被空账户占用的邮箱时自动释放旧账户并绑定成功
+- `src/shared/components/MainTabs.vue`：移除 `touch-action: none`（H5 端预览 App 会禁用浏览器原生触摸滚动与点击识别，导致「划很多次才动」、卡片点击无反应）
+
+### 验证
+- `vue-tsc --noEmit` 退出码 0；`node --import tsx --test` 相关用例全过（含午间报入口/格式新增用例）
+
+---
+
 ## [master] 2026-08-25 — App 手机号短信验证码登录 + 账号与安全绑定
 
 **开发者**: Aria

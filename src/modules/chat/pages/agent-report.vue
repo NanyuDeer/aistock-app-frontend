@@ -554,6 +554,7 @@ interface AgentMeta {
 
 const AGENT_META: Record<string, AgentMeta> = {
   morning: { title: '今日晨报', icon: 'sun-line', color: '#f0a020', bgColor: '#f0a020', desc: '每日开盘前市场概览' },
+  midday: { title: '午间报', icon: 'sun-cloudy-line', color: '#ff8f1f', bgColor: '#ff8f1f', desc: '午间市场快评与异动解读' },
   wind_leader: { title: '风口龙头', icon: 'windy-line', color: '#0b5fff', bgColor: '#0b5fff', desc: '长短线风口与龙头股追踪' },
   hot_burst: { title: '机构调研', icon: 'eye-line', color: '#00b8ff', bgColor: '#00b8ff', desc: '机构推荐热门股分析' },
   trend_score: { title: '趋势股评分', icon: 'line-chart-line', color: '#18a058', bgColor: '#18a058', desc: '趋势形态评分排名' },
@@ -562,10 +563,11 @@ const AGENT_META: Record<string, AgentMeta> = {
 }
 
 /** 概览模式下的 Agent 顺序（不含 broadcast，用户不需要在概览中看到双人播报） */
-const OVERVIEW_ORDER = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review']
+const OVERVIEW_ORDER = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'midday', 'review']
 
 const titleMap: Record<string, string> = {
   morning: '今日晨报',
+  midday: '午间报',
   wind_leader: '风口龙头分析',
   hot_burst: '机构调研分析',
   trend_score: '趋势股评分分析',
@@ -806,6 +808,8 @@ async function loadAllReports() {
   loading.value = true
   loadingText.value = '正在加载今日分析...'
 
+  // midday 与其余 Agent 一致走 /agent/report/:intent/:date（Node DB analysis_reports），
+  // 由 report_date 匹配判断"已更新/待生成"并展示摘要
   const results = await Promise.allSettled(
     OVERVIEW_ORDER.map((agentIntent) => agentApi.getReport(agentIntent, date.value))
   )

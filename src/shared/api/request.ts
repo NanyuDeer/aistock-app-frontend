@@ -3,21 +3,13 @@
  * 提供兼容 axios 的 API，方便 api/modules/*.ts 使用
  */
 import Request from 'luch-request'
+import { API_BASE_URL } from '@/shared/utils/constants'
 
-// API 基础地址：H5/小程序走同源或 dev server 代理，用相对路径 /api；
-// App 端请求不走 dev server proxy，必须使用完整 URL——env 缺失时兜底线上地址，
-// 避免打包 App 时误用相对路径导致全部接口请求失败（表现为"打包 App 无后端数据"）
-const BASE_URL = (() => {
-  // #ifdef APP-PLUS
-  return import.meta.env.VITE_API_BASE_URL || 'https://gupiao-api.yaozhineng.com/api'
-  // #endif
-  // #ifndef APP-PLUS
-  return import.meta.env.VITE_API_BASE_URL || '/api'
-  // #endif
-})()
-
+// API 基础地址统一用 constants 的 API_BASE_URL：
+// App 端已内置"仅接受绝对非回环地址，否则兜底线上"逻辑，避免 dev 注入的
+// 相对路径 /api 覆盖兜底导致 scheme 错误（request:fail Expected URL scheme 'http' or 'https'）
 const http = new Request({
-  baseURL: BASE_URL,
+  baseURL: API_BASE_URL,
   timeout: 15000,
   withCredentials: true,
   header: { 'Content-Type': 'application/json' }
@@ -60,8 +52,10 @@ http.interceptors.response.use(
       const statusCode = error.statusCode
       const responseData = error.data
       const msg = typeof responseData === 'object' ? responseData?.message : responseData
-      const normalizedError = new Error(`服务异常(${statusCode}): ${msg || '请稍后重试'}`) as Error & { statusCode?: number }
+      const normalizedError = new Error(`服务异常(${statusCode}): ${msg || '请稍后重试'}`) as Error & { statusCode?: number; data?: unknown }
       normalizedError.statusCode = statusCode
+      // 挂上原始响应体，兼容调用方按 e.data.message 读取后端真实错误信息（如"该邮箱已绑定其他账户"）
+      normalizedError.data = responseData
       return Promise.reject(normalizedError)
     }
     return Promise.reject(error)

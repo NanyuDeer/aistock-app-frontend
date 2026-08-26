@@ -1,27 +1,42 @@
 <template>
   <view class="morning-content">
     <view class="content-wrap">
-      <!-- 今日专属晨报卡片 -->
+      <!-- 今日专属播报卡片（晨报/午间报/晚报按时间自动切换） -->
       <view class="briefing-card" @tap="goBriefingDetail">
         <view class="briefing-left">
           <view class="briefing-top">
             <text class="briefing-title">今日专属 · {{ briefingTypeLabel }}</text>
             <text v-if="report?.degraded" class="briefing-degraded">证据不完整</text>
           </view>
-          <!-- 有数据时：显示线索数量和简洁摘要 -->
+          <!-- 有数据时：午间报摘要+关键词，晨/晚报线索数量和简洁摘要；关键词样式统一为短标签 -->
           <template v-if="briefingStatus === 'ready'">
-            <view v-if="briefingClueCount > 0" class="briefing-clue">
-              <text class="clue-text">{{ briefingClueCount }}条关键线索需关注</text>
-            </view>
-            <view v-if="briefingClueCount > 0" class="briefing-tags">
-              <view v-for="(tag, idx) in summaryTags" :key="idx" class="summary-tag">
-                <text class="tag-text">{{ tag }}</text>
+            <!-- 午间报：摘要一行 + 短关键词标签（与晨/晚报一致的紧凑样式） -->
+            <template v-if="briefingType === 'midday' && middayReport">
+              <view class="briefing-clue">
+                <text class="clue-text">{{ middayReport.content.display_report.summary }}</text>
               </view>
-              <text class="tags-arrow">›</text>
-            </view>
-            <view v-else class="briefing-clue">
-              <text class="clue-text">暂无关键线索</text>
-            </view>
+              <view v-if="summaryTags.length" class="briefing-tags">
+                <view v-for="(tag, idx) in summaryTags" :key="idx" class="summary-tag">
+                  <text class="tag-text">{{ tag }}</text>
+                </view>
+                <text class="tags-arrow">›</text>
+              </view>
+            </template>
+            <!-- 晨/晚报：保留原有"线索数量 + 短标签"展示 -->
+            <template v-else>
+              <view v-if="briefingClueCount > 0" class="briefing-clue">
+                <text class="clue-text">{{ briefingClueCount }}条关键线索需关注</text>
+              </view>
+              <view v-if="briefingClueCount > 0" class="briefing-tags">
+                <view v-for="(tag, idx) in summaryTags" :key="idx" class="summary-tag">
+                  <text class="tag-text">{{ tag }}</text>
+                </view>
+                <text class="tags-arrow">›</text>
+              </view>
+              <view v-else class="briefing-clue">
+                <text class="clue-text">暂无关键线索</text>
+              </view>
+            </template>
           </template>
           <!-- 空状态/错误/加载时：显示提示 -->
           <view v-else class="briefing-clue">
@@ -56,7 +71,12 @@
           <text class="feature-sub">排行前三板块</text>
           <view class="feature-list">
             <template v-if="leaderSectors.length">
-              <view v-for="(item, idx) in leaderSectors.slice(0, 3)" :key="idx" class="feature-item">
+              <view
+                v-for="(item, idx) in leaderSectors.slice(0, 3)"
+                :key="idx"
+                class="feature-item"
+                @tap.stop="goSectorDetail(item.name)"
+              >
                 <text class="item-name">No.{{ idx + 1 }} {{ item.name }}</text>
                 <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
               </view>
@@ -74,7 +94,12 @@
           </view>
           <text class="feature-sub">产业链追踪</text>
           <view class="feature-list">
-            <view v-for="(item, idx) in chainEvents.slice(0, 3)" :key="idx" class="feature-item">
+            <view
+              v-for="(item, idx) in chainEvents.slice(0, 3)"
+              :key="idx"
+              class="feature-item"
+              @tap.stop="goEventDetail(item.eventId)"
+            >
               <text class="item-name">{{ item.name }}</text>
               <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
             </view>
@@ -153,6 +178,7 @@ const {
   report,
   status: briefingStatus,
   loading: briefingLoading,
+  middayReport,
   refresh: briefingRefresh,
 } = useBriefingCard()
 
@@ -203,7 +229,8 @@ const briefingClueCount = computed(() => {
 function getBriefingDesc(): string {
   switch (briefingStatus.value) {
     case 'empty':
-      return briefingTypeLabel.value === '晨报'
+      if (briefingType.value === 'midday') return '午间报生成中，12:05后查看'
+      return briefingType.value === 'morning'
         ? '晨报生成中，9:00后查看'
         : '晚报生成中，收盘后查看'
     case 'error':
@@ -215,10 +242,9 @@ function getBriefingDesc(): string {
   }
 }
 
-// 卡片点击：进入早点听页面（音频播报 + 条目列表）
+// 卡片点击：进入早点听页面（音频播报 + 条目列表），保留当前报告类型
 function goBriefingDetail() {
-  const type = briefingTypeLabel.value === '晨报' ? 'morning' : 'review'
-  uni.navigateTo({ url: `/pages-sub-app/briefing/index?type=${type}` })
+  uni.navigateTo({ url: `/pages-sub-app/briefing/index?type=${briefingType.value}` })
 }
 
 // 长线风口：从后端 API 获取风口板块数据，提取排行前3的板块在首页预览
@@ -226,6 +252,8 @@ interface LeaderStockPreview {
   name: string
   tag: string
   tagType: 'buy' | 'sell' | 'wash' | 'up' | 'down' | 'date'
+  /** 预览行额外携带的跳转标识：事件传导行 → 事件 ID，跳转 AI 事件分析页用 */
+  eventId?: string
 }
 
 const leaderSectors = ref<LeaderStockPreview[]>([])
@@ -285,7 +313,7 @@ async function loadChainEvents() {
     chainEvents.value = events.slice(0, 3).map(e => {
       // 标签：优先用 publishTime 的日期，否则标"新"
       const tag = e.publishTime ? e.publishTime.slice(5, 10) : '新'
-      return { name: e.title, tag, tagType: 'date' as const }
+      return { name: e.title, tag, tagType: 'date' as const, eventId: e.eventId }
     })
 
     // 重磅事件跟踪：取第1条事件
@@ -414,6 +442,21 @@ function goSectors() {
 
 function goEventChain() {
   uni.navigateTo({ url: '/modules/chat/pages/event/list' })
+}
+
+/** 风口龙头卡片的预览板块行 → 板块/风口详情页（按板块名定位） */
+function goSectorDetail(name: string) {
+  if (!name) return
+  uni.navigateTo({ url: `/modules/market/pages/sector-detail?name=${encodeURIComponent(name)}` })
+}
+
+/** 事件传导卡片的预览事件行 → AI 事件分析页（按事件 ID）；无 ID 回退事件列表 */
+function goEventDetail(eventId?: string) {
+  if (!eventId) {
+    goEventChain()
+    return
+  }
+  uni.navigateTo({ url: `/modules/chat/pages/event/detail?id=${eventId}` })
 }
 
 function goTraceability() {

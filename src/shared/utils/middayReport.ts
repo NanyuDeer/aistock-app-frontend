@@ -11,8 +11,14 @@
  * 无音频时报告仍有效（前端只展示文字、隐藏音频条）。
  */
 
+export interface MiddaySection {
+  title: string
+  conclusion: string
+}
+
 export interface MiddayDisplayReport {
   summary: string
+  sections: MiddaySection[]
   details: string
   risks: string[]
 }
@@ -35,6 +41,21 @@ function isCalendarDate(value: string): boolean {
 
 function isStringList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+/** 归一化多分段摘要 sections：仅保留含非空 conclusion 的项（容忍 LLM 字段缺漏/顺序变化）。 */
+function normalizeSections(value: unknown): MiddaySection[] {
+  if (!Array.isArray(value)) return []
+  const result: MiddaySection[] = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue
+    const body = item as Record<string, unknown>
+    const conclusion = typeof body.conclusion === 'string' ? body.conclusion.trim() : ''
+    if (!conclusion) continue
+    const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim() : ''
+    result.push({ title, conclusion })
+  }
+  return result
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -70,6 +91,7 @@ export function parseMiddayReport(content: unknown, expectedDate: string): Midda
     content: {
       display_report: {
         summary,
+        sections: normalizeSections(displayBody.sections),
         details,
         risks: isStringList(displayBody.risks) ? displayBody.risks : [],
       },
