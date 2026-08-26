@@ -69,7 +69,7 @@ git log --oneline -3   # 确认已包含你要打包的那版提交
 文件：[src/manifest.json](file:///d:/aistock/aistock-app-frontend/src/manifest.json)
 
 ```jsonc
-{ 
+{
   "name": "洞见",
   "versionName": "0.1.1",   // 新版本号，展示用
   "versionCode": 101        // 必须大于已发布版本（升级的关键）

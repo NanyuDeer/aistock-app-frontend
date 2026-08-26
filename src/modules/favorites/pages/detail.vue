@@ -1,11 +1,11 @@
 <template>
-  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol" :scroll-into-view="scrollIntoView">
-    <view class="page-detail">
-    <view v-if="loading" class="loading">
+  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol" :scroll-top="detailScrollTop">
+    <view class="page-detail" :class="{ 'page-detail--anchoring': anchorNavigating }">
+    <view v-if="loading || anchorNavigating" class="loading">
       <text class="loading-text">加载中...</text>
     </view>
 
-    <template v-else-if="quote">
+    <template v-if="quote">
       <!-- 1. 股票头部 -->
       <view class="stock-header">
         <view class="stock-name-row">
@@ -82,7 +82,7 @@
         </view>
       </view>
 
-      <view id="detail-anchor-stock-info" class="detail-anchor"></view>
+      <view id="detail-anchor-stock-info">
       <view v-if="isFavorite" class="major-event-alert">
         <view class="major-event-head">
           <text class="decision-kicker">最新重大异动</text>
@@ -101,6 +101,7 @@
         <template v-else>
           <text class="major-event-title">暂无数据</text>
         </template>
+      </view>
       </view>
 
       <!-- 2. 个股异动 -->
@@ -434,8 +435,7 @@
         </view>
 
         <!-- 财报分析 -->
-        <view id="detail-anchor-performance-report" class="detail-anchor"></view>
-        <view v-if="hasFinanceCardData" class="section-card">
+        <view v-if="hasFinanceCardData" id="detail-anchor-performance-report" class="section-card">
           <view class="section-header">
             <text class="section-title">财报分析</text>
             <text v-if="semiAnnualReport?.reports?.length" class="section-sub">
@@ -495,8 +495,7 @@
         </view>
 
         <!-- 业绩预测 -->
-        <view id="detail-anchor-forecast" class="detail-anchor"></view>
-        <view v-if="forecastLoading || hasForecastCardData" class="section-card">
+        <view v-if="forecastLoading || hasForecastCardData" id="detail-anchor-forecast" class="section-card">
           <view class="section-header">
             <text class="section-title">业绩预测</text>
             <view v-if="!forecastLoading" class="ai-refresh-btn" @tap="loadForecast(true)">
@@ -885,7 +884,7 @@
       </view>
     </view>
 
-    <view v-else-if="!loading && !quote" class="empty">
+    <view v-if="!loading && !quote && !anchorNavigating" class="empty">
       <text class="empty-text">未找到股票数据</text>
     </view>
     </view>
@@ -920,7 +919,8 @@ const forecastData = ref<any>(null)
 const forecastLoading = ref(false)
 const forecastDetailExpanded = ref(false)
 const detailAnchor = ref<DetailAnchor | ''>('')
-const scrollIntoView = ref('')
+const detailScrollTop = ref(0)
+const anchorNavigating = ref(false)
 const klineData = ref<any[]>([])
 type KLinePeriod = 'daily' | 'weekly' | 'monthly'
 const klinePeriod = ref<KLinePeriod>('daily')
@@ -970,12 +970,44 @@ function viewForAnchor(anchor: DetailAnchor): ViewKey {
 async function scrollToDetailAnchor() {
   const anchor = detailAnchor.value
   if (!anchor) return
-  activeView.value = viewForAnchor(anchor)
-  await nextTick()
-  scrollIntoView.value = ''
-  setTimeout(() => {
-    scrollIntoView.value = `detail-anchor-${anchor}`
-  }, 120)
+  try {
+    await nextTick()
+    await nextTick()
+    detailScrollTop.value = 0
+    await waitForDetailLayout()
+
+    // 图表等组件在 nextTick 后仍可能完成一次异步布局，按当前位置连续校正，
+    // 保证锚点卡片最终贴齐内容区顶部。
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const offset = await getAnchorOffset(anchor)
+      if (offset === null || Math.abs(offset) < 1) break
+      detailScrollTop.value = Math.max(0, detailScrollTop.value + offset)
+      await nextTick()
+      await waitForDetailLayout()
+    }
+  } finally {
+    anchorNavigating.value = false
+  }
+}
+
+function waitForDetailLayout() {
+  return new Promise<void>(resolve => setTimeout(resolve, 50))
+}
+
+function getAnchorOffset(anchor: DetailAnchor): Promise<number | null> {
+  return new Promise(resolve => {
+    const query = uni.createSelectorQuery()
+    query.select('.as-sub2__scroll').boundingClientRect()
+    query.select(`#detail-anchor-${anchor}`).boundingClientRect()
+    query.exec((result: any[]) => {
+      const [container, target] = result || []
+      if (!container || !target) {
+        resolve(null)
+        return
+      }
+      resolve(Number(target.top || 0) - Number(container.top || 0))
+    })
+  })
 }
 
 // AI 洞见 composable（接入真实 trend-score 数据）
@@ -1834,8 +1866,14 @@ onUnload(() => {
 onLoad((options: any) => {
   symbol.value = options?.symbol || ''
   detailAnchor.value = normalizeDetailAnchor(options?.anchor)
+  if (detailAnchor.value) {
+    activeView.value = viewForAnchor(detailAnchor.value)
+    anchorNavigating.value = true
+  }
   if (symbol.value) {
     loadData()
+  } else {
+    anchorNavigating.value = false
   }
 })
 
@@ -1888,16 +1926,21 @@ async function loadData() {
       klineData.value = Array.isArray(klineRes.value) ? klineRes.value : []
     }
     applyLiveQuoteToKline()
-    // 非阻塞加载 AI 分析、业绩预测和趋势股评分
-    loadAiAnalysis()
-    loadForecast(false)
-    loadTrendScore()
-    loadIndustryHealth()
+    // 中线卡片上方的异步内容会改变锚点位置，完成后再执行锚定。
+    const aiTask = loadAiAnalysis()
+    const forecastTask = loadForecast(false)
+    const trendTask = loadTrendScore()
+    const industryTask = loadIndustryHealth()
+    if (detailAnchor.value === 'forecast') {
+      await Promise.all([aiTask, forecastTask, trendTask, industryTask])
+    } else if (detailAnchor.value === 'performance-report') {
+      await Promise.all([aiTask, trendTask, industryTask])
+    }
   } catch (err) {
     console.error('[StockDetail] load error:', err)
   } finally {
+    if (detailAnchor.value) await scrollToDetailAnchor()
     loading.value = false
-    void scrollToDetailAnchor()
   }
 }
 
@@ -2299,6 +2342,7 @@ function goChat() {
 @import '@/shared/styles/variables.scss';
 
 .page-detail {
+  position: relative;
   padding: 24rpx;
   background: $bg-soft;
   box-sizing: border-box;
@@ -2307,9 +2351,16 @@ function goChat() {
   margin: 0 auto;
 }
 
-.detail-anchor {
-  height: 1rpx;
-  overflow: hidden;
+.page-detail--anchoring > :not(.loading) {
+  visibility: hidden;
+}
+
+.page-detail--anchoring > .loading {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
 }
 
 .loading, .empty {
