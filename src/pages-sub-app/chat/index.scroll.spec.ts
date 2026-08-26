@@ -570,4 +570,44 @@ describe('index.vue 追问面板（Task 8）运行时行为', () => {
     expect(wrapper.find('.as-followup-chips').text()).toContain('历史追问')
     wrapper.unmount()
   })
+
+  it('同页实例会话切换（A→B→A）：切回后旧回答不自动弹面板，仅保留弱入口/pending', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    // 锚点 = mount 时 Date.now()；小延迟保证下方"新鲜回答"严格晚于初始锚点
+    await new Promise((r) => setTimeout(r, 20))
+    const stream = useChatStream() as any
+
+    // 会话 A：新鲜回答（timestamp ≥ 锚点）→ 面板自动展示
+    const answerTs = Date.now() - 1
+    stream.messages.value.push({ role: 'assistant', content: '回答', timestamp: answerTs, questions: ['追问一'] })
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+
+    // 切到会话 B（无新发送）→ watch(sessionId) 收起面板并重置锚点
+    stream.sessionId.value = 'session_B'
+    stream.messages.value = []
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+
+    // 切回会话 A：旧回答（answerTs 早于切换时重置的锚点）以"恢复历史"重入 displayMessages
+    stream.sessionId.value = 'session_A'
+    stream.messages.value = [{ role: 'assistant', content: '旧回答', timestamp: answerTs, questions: ['追问一'] }]
+    await flushPromises()
+    await nextTick()
+
+    // 不自动弹面板（visible 保持 false）；weak entry 保留
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    expect(wrapper.find('.panel-restore-btn').exists()).toBe(true)
+
+    // 弱入口仍可恢复（pending 未丢失）
+    await wrapper.find('.panel-restore-btn').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+    wrapper.unmount()
+  })
 })

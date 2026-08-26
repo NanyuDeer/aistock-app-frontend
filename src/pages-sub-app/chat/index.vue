@@ -718,6 +718,16 @@ const panelState = ref<{ visible: boolean; messageId: number | null; pending: bo
 // （timestamp ≥ 锚点）才满足自动展示条件。
 const roundAnchor = ref(Date.now())
 
+// FIX-3（final review）：会话切换（同页实例 A→B→A，无新发送）→ 收起面板并重置轮次锚点。
+// 锚点仅随发送前移：切走再切回时，A 的旧回答（timestamp ≥ 旧锚点）会以「恢复历史」重入
+// displayMessages 并通过锚点守卫误自动弹面板——在切换时刻清面板 + 重置锚点，恢复消息至多
+// 保留 pending（footer 弱入口），不自动弹。必须注册于 display-messages 收口 watch 之前，
+// 保证同一次 flush 中本 watch 回调先执行（锚点已重置）再轮到收口 watch 的锚点判定。
+watch(chatStream.sessionId, () => {
+  clearPanel()
+  roundAnchor.value = Date.now()
+})
+
 /** F2：面板立即展示判定（纯函数）——questions 存在 且 打字机已完成 且 未暂停跟随 */
 function shouldShowPanel(hasQuestions: boolean, typingActive: boolean, followPaused: boolean): boolean {
   return hasQuestions && !typingActive && !followPaused
