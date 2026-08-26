@@ -29,6 +29,7 @@
         :enhanced="true"
         :bounces="false"
         :scroll-into-view="scrollIntoView"
+        :scroll-top="scrollTop"
       >
         <slot />
       </scroll-view>
@@ -83,6 +84,8 @@ const props = withDefaults(defineProps<{
   noChatBar?: boolean
   /** 需要滚动到的子元素 id */
   scrollIntoView?: string
+  /** 指定内容区域的纵向滚动位置 */
+  scrollTop?: number
 }>(), {
   title: '',
   subtitle: '',
@@ -91,6 +94,7 @@ const props = withDefaults(defineProps<{
   backUrl: '/modules/home/pages/index',
   noChatBar: false,
   scrollIntoView: '',
+  scrollTop: 0,
 })
 
 /** noChatBar 时 padding 为 0，否则使用传入的 contentPaddingBottom */
