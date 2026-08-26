@@ -63,7 +63,7 @@
 
       <!-- 功能入口 2x2 网格 -->
       <view class="feature-grid">
-        <Card class="feature-card" clickable @click="goSectors">
+        <Card class="feature-card" clickable @tap="goSectors">
           <view class="feature-header">
             <text class="feature-title">风口龙头</text>
             <text class="feature-more">›</text>
@@ -87,7 +87,7 @@
           </view>
         </Card>
 
-        <Card class="feature-card" clickable @click="goEventChain">
+        <Card class="feature-card" clickable @tap="goEventChain">
           <view class="feature-header">
             <text class="feature-title">事件传导</text>
             <text class="feature-more">›</text>
@@ -106,7 +106,7 @@
           </view>
         </Card>
 
-        <Card class="feature-card" clickable @click="goTraceability">
+        <Card class="feature-card" clickable @tap="goTraceability">
           <view class="feature-header">
             <text class="feature-title">市场洞见</text>
             <text class="feature-more">›</text>
@@ -120,7 +120,7 @@
           </view>
         </Card>
 
-        <Card class="feature-card" clickable @click="goAgentReport">
+        <Card class="feature-card" clickable @tap="goAgentReport">
           <view class="feature-header">
             <text class="feature-title">今日分析概览</text>
             <text class="feature-more">›</text>
@@ -136,7 +136,7 @@
       </view>
 
       <!-- 重磅事件跟踪 -->
-      <Card class="track-card" clickable @click="goTrackDetail">
+      <Card class="track-card" clickable @tap="goTrackDetail">
         <view class="track-header">
           <text class="track-title">重磅事件跟踪</text>
           <text class="track-more">›</text>
@@ -311,8 +311,10 @@ async function loadChainEvents() {
 
     // 事件传导卡片：取最新3条事件
     chainEvents.value = events.slice(0, 3).map(e => {
-      // 标签：优先用 publishTime 的日期，否则标"新"
-      const tag = e.publishTime ? e.publishTime.slice(5, 10) : '新'
+      // 标签：优先用 publishTime 的时间(HH:MM)，无时间则回退日期，否则标"新"
+      const tag = e.publishTime
+        ? (e.publishTime.length >= 16 ? e.publishTime.slice(11, 16) : e.publishTime.slice(5, 10))
+        : '新'
       return { name: e.title, tag, tagType: 'date' as const, eventId: e.eventId }
     })
 
@@ -407,16 +409,17 @@ async function loadAiReports() {
 
 /**
  * 业务 tagType → 组件库 Tag type 映射
- * up→up(红)，down/date/sell→down(绿)，wash→warning(橙)，buy→neutral(蓝)
+ * up→up(红)，down/sell→down(绿)，date→neutral(静尘蓝)，
+ * buy/已更新→warning(暖杏橙)，wash/待更新→gray(中性灰)
  */
-function itemTagType(tagType: LeaderStockPreview['tagType']): 'up' | 'down' | 'neutral' | 'warning' {
+function itemTagType(tagType: LeaderStockPreview['tagType']): 'up' | 'down' | 'neutral' | 'warning' | 'gray' {
   switch (tagType) {
     case 'up': return 'up'
     case 'down': return 'down'
-    case 'date': return 'down'
+    case 'date': return 'neutral'
     case 'sell': return 'down'
-    case 'wash': return 'warning'
-    case 'buy': return 'neutral'
+    case 'wash': return 'gray'
+    case 'buy': return 'warning'
   }
 }
 

@@ -17,11 +17,11 @@
 
     <!-- 中间内容区域 -->
     <view class="as-sub1__body" :class="{ 'as-sub1__body--no-chat': noChatBar }">
+      <!-- 原生滚动：enhanced 在 H5 端 passive touchmove preventDefault 触发浏览器 Warning，
+           回归 scroll-y 原生滚动（与首页 MainTabs 一致） -->
       <scroll-view
         scroll-y
         class="as-sub1__scroll"
-        :enhanced="true"
-        :bounces="false"
       >
         <slot />
       </scroll-view>

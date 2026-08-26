@@ -22,14 +22,14 @@
       <view v-if="!qrCodeUrl && !loginLoading && !errorMsg && !showEmailForm" class="login-methods">
         <!-- #ifdef MP-WEIXIN -->
         <button @tap="handleWxLogin" class="btn-wx-login">
-          <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
+          <SvgIcon name="wechat" size="36rpx" color="#ffffff" />
           <text class="btn-text">微信一键登录</text>
         </button>
         <!-- #endif -->
 
         <!-- #ifdef H5 -->
         <button @click="startScanLogin" class="btn-wx-login">
-          <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
+          <SvgIcon name="wechat" size="36rpx" color="#ffffff" />
           <text class="btn-text">微信扫码登录</text>
         </button>
         <!-- #endif -->
@@ -37,7 +37,7 @@
         <!-- #ifdef APP-PLUS -->
         <!-- 测试号 AppID 无法走微信原生登录(uni.login code 为空)，统一用扫码登录 -->
         <button @tap="startScanLogin" class="btn-wx-login">
-          <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
+          <SvgIcon name="wechat" size="36rpx" color="#ffffff" />
           <text class="btn-text">微信扫码登录</text>
         </button>
         <!-- #endif -->
@@ -471,12 +471,6 @@ function goBack() {
   padding: 18rpx 0;
   border: none;
   line-height: 1.2;
-
-  .btn-wx-icon {
-    width: 36rpx;
-    height: 36rpx;
-    flex-shrink: 0;
-  }
 
   .btn-text {
     font-size: 30rpx;

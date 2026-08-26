@@ -10,7 +10,11 @@ export function usePushNotification() {
     success: (res) => {
       console.log('[Push] clientId:', res.cid)
       // 上传到后端
-      agentApi.registerPushToken(res.cid, 'unipush').catch((e) => {
+      agentApi.registerPushToken(res.cid, 'unipush').catch((e: unknown) => {
+        // 后端 push/token 接口尚未实现（见 agent.ts 的 TODO），404 属预期，
+        // 静默跳过避免调试时被"服务异常(404)"误导刷屏；仅其它异常才打印
+        const statusCode = (e as { statusCode?: number })?.statusCode
+        if (statusCode === 404) return
         console.error('[Push] register failed:', e)
       })
     },

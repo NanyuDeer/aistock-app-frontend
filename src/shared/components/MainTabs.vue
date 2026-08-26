@@ -25,8 +25,6 @@
       <scroll-view
         scroll-y
         class="as-main-tabs__body"
-        :enhanced="true"
-        :bounces="false"
       >
         <!-- Tab 内容（v-show 保持组件状态，切换不销毁） -->
         <MorningContent v-show="activeTab === 'morning'" />

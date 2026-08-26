@@ -117,7 +117,7 @@
                 class="drag-handle"
                 @tap.stop="noop"
                 @touchstart.stop="onDragStart($event, index)"
-                @touchmove.stop.prevent="onDragMove($event)"
+                @touchmove.stop="onDragMove($event)"
                 @touchend.stop="onDragEnd"
                 @touchcancel.stop="onDragEnd"
               >
@@ -970,6 +970,8 @@ function goSearch() {
   justify-content: center;
   margin-left: 16rpx;
   flex-shrink: 0;
+  /* 拖拽时由样式层禁用默认滚动，替代 @touchmove.prevent 以避免 passive 告警 */
+  touch-action: none;
 }
 
 /* 编辑态底部操作栏 */
