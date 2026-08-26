@@ -327,3 +327,57 @@ test('批次4：引导提问升级为浅色胶囊按钮（999rpx 圆角 + active
   assert.match(pageSource, /\.followup-question \{[\s\S]{0,160}border-radius: 999rpx/)
   assert.match(pageSource, /\.followup-question:active \{ opacity: 0\.7; \}/)
 })
+
+// ─── 追问面板（2026-08-26，Task 8）：panelState 状态机 + 替换 quick-skills + 打字机完成信号 ───
+
+test('Task8：追问面板状态机已接入（panelState 类型 + 状态函数 + 纯函数判定）', () => {
+  assert.match(pageSource, /const panelState = ref<\{ visible: boolean; messageId: number \| null; pending: boolean \}>\(/)
+  assert.match(pageSource, /function onAnswerSettled\(msg: ChatMessage\)/)
+  assert.match(pageSource, /function clearPanel\(\)/)
+  assert.match(pageSource, /function dismissPanel\(\)/)
+  assert.match(pageSource, /function restorePanel\(\)/)
+  assert.match(pageSource, /function shouldShowPanel\(hasQuestions: boolean, typingActive: boolean, followPaused: boolean\)/)
+})
+
+test('Task8：display-messages 收口 watch（最后一条 assistant 且 questions 非空才处理；打字机完成 + 未暂停才立即展示）', () => {
+  assert.match(pageSource, /displayMessages\.value\[displayMessages\.value\.length - 1\]\?\.timestamp/)
+  assert.match(pageSource, /if \(ts === prev\) return/)
+  assert.match(pageSource, /last\.role !== 'assistant' \|\| !hasQuestions/)
+  assert.match(pageSource, /onAnswerSettled\(last\)/)
+  assert.match(pageSource, /shouldShowPanel\(hasQuestions, typingMsgKey\.value !== null, followPaused\.value\)/)
+})
+
+test('Task8：display-messages 收口 watch 创建于 watch(isStreaming) 之后（同 flush 先启动打字机，静态 DONE 守卫成立）', () => {
+  const isStreamingIdx = pageSource.search(/watch\(isStreaming,/)
+  const displayWatchIdx = pageSource.search(/displayMessages\.value\[displayMessages\.value\.length - 1\]\?\.timestamp/)
+  assert.ok(isStreamingIdx !== -1 && displayWatchIdx !== -1)
+  assert.ok(isStreamingIdx < displayWatchIdx)
+})
+
+test('Task8：typingMsgKey→null 完成信号展示面板（pending 且未暂停跟随）', () => {
+  assert.match(pageSource, /watch\(typingMsgKey, \(k\) => \{/)
+  assert.match(pageSource, /if \(k !== null \|\| !panelState\.value\.pending\) return/)
+  assert.match(pageSource, /if \(!followPaused\.value\) panelState\.value\.visible = true/)
+})
+
+test('Task8：quick-skills 行被面板替换（v-if/v-else + FollowupSuggestChips + × 收起）', () => {
+  assert.match(pageSource, /<view v-if="!panelState\.visible" class="quick-skills">/)
+  assert.match(pageSource, /<FollowupSuggestChips :items="panelQuestions" @select="onPanelSelect" \/>/)
+  assert.match(pageSource, /@tap="dismissPanel"/)
+  assert.match(pageSource, /import FollowupSuggestChips from '@\/shared\/components\/FollowupSuggestChips\.vue'/)
+})
+
+test('Task8：footer「查看追问」弱入口（pending && !visible && 消息归属）→ restorePanel；建议点击 → clearPanel + quickAsk', () => {
+  assert.match(pageSource, /panelState\.pending && !panelState\.visible && msg\.timestamp === panelState\.messageId/)
+  assert.match(pageSource, /@tap="restorePanel"/)
+  assert.match(pageSource, /function onPanelSelect\(q: string\)/)
+  assert.match(pageSource, /clearPanel\(\)[\s\S]{0,80}quickAsk\(q\)/)
+})
+
+test('Task8：新发送轮收起面板（watch(isStreaming) v=true 先清 pending 防 typingMsgKey 复活旧建议）', () => {
+  assert.match(pageSource, /if \(v\) \{[\s\S]{0,200}clearPanel\(\)/)
+})
+
+test('Task8：quickAsk 发送入口清面板', () => {
+  assert.match(pageSource, /function quickAsk\(text: string\)[\s\S]{0,120}clearPanel\(\)/)
+})

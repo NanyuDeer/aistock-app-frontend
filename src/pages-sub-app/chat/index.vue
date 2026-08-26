@@ -125,6 +125,15 @@
                   <SvgIcon name="refresh-line" size="24rpx" color="#0b5fff" />
                   <text class="retry-btn-text">重试</text>
                 </view>
+                <!-- Task 8：追问面板弱入口（pending 且未展示时，消息尾部可恢复面板） -->
+                <view
+                  v-if="panelState.pending && !panelState.visible && msg.timestamp === panelState.messageId"
+                  class="panel-restore-btn"
+                  @tap="restorePanel"
+                >
+                  <SvgIcon name="chat-follow-up-line" size="24rpx" color="#0b5fff" />
+                  <text class="panel-restore-text">查看追问</text>
+                </view>
               </view>
 
               <!-- Phase 4-2 Task 3：回答反馈入口（赞/踩本地持久化；error/cancelled/空回复不显示；
@@ -179,8 +188,8 @@
         <text class="back-to-latest-text">回到最新</text>
       </view>
 
-      <!-- 快捷 Skills -->
-      <view class="quick-skills">
+      <!-- 快捷 Skills（追问面板可见时替换为底部建议行） -->
+      <view v-if="!panelState.visible" class="quick-skills">
         <view class="skill-btn" @tap="quickAsk('今日大盘怎么样')">
           <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
           <text class="skill-btn-text">大盘</text>
@@ -197,6 +206,15 @@
         <view class="skill-btn" @tap="quickAsk('今天的龙头股有哪些')">
           <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
           <text class="skill-btn-text">龙头</text>
+        </view>
+      </view>
+      <!-- 追问面板（2026-08-26）：回答完成后的建议追问替换快捷技能行；× 收起保留 pending（footer 弱入口可恢复） -->
+      <view v-else class="suggest-row">
+        <view class="suggest-chips-wrap">
+          <FollowupSuggestChips :items="panelQuestions" @select="onPanelSelect" />
+        </view>
+        <view class="suggest-collapse" @tap="dismissPanel">
+          <SvgIcon name="close-line" size="28rpx" color="#9aa3b2" />
         </view>
       </view>
 
@@ -290,6 +308,7 @@ import ReasoningPanel from './ReasoningPanel.vue'
 import CardRenderer from './cards/CardRenderer.vue'
 import SectionCard from './cards/SectionCard.vue'
 import FeedbackBar from '@/shared/components/FeedbackBar.vue'
+import FollowupSuggestChips from '@/shared/components/FollowupSuggestChips.vue'
 import ConfirmSheet from '@/shared/components/ConfirmSheet.vue'
 import MessageActionMenu, { type MenuItem } from './MessageActionMenu.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
@@ -682,6 +701,9 @@ function startTypewriterIfNeeded() {
 
 watch(isStreaming, (v) => {
   if (v) {
+    // Task 8：新发送轮 → 收起追问面板（先清 pending 再清 typingMsgKey，
+    // 防 watch(typingMsgKey) 以 null 信号误复活上一轮未完成建议）
+    clearPanel()
     // Phase 4-2 改进 13：confirm_response 后后端 fresh run 开始流式 → 弹框完成使命（waiting 态结束），关闭
     confirmVisible.value = false
     // 新一轮开始：重置"本轮是否出现过真流式文本"，并停掉上一条未播完的打字机
@@ -705,6 +727,84 @@ watch(isStreaming, (v) => {
     startTypewriterIfNeeded()
   }
 })
+
+// ===== 追问面板（2026-08-26，Task 8）：豆包/元宝式底部建议追问 =====
+// pending：本轮存在可展示建议但未达展示条件（打字机未完成 / followPaused）；
+// visible：面板显示；messageId：面板归属消息（最新带 questions 的 assistant 消息）。
+const panelState = ref<{ visible: boolean; messageId: number | null; pending: boolean }>({
+  visible: false, messageId: null, pending: false,
+})
+
+/** F2：面板立即展示判定（纯函数）——questions 存在 且 打字机已完成 且 未暂停跟随 */
+function shouldShowPanel(hasQuestions: boolean, typingActive: boolean, followPaused: boolean): boolean {
+  return hasQuestions && !typingActive && !followPaused
+}
+
+/** 消息终态落地统一收口：done/HTTP append 后置检查（不依赖 watch(isStreaming) 边沿） */
+function onAnswerSettled(msg: ChatMessage) {
+  if (!msg.questions || msg.questions.length === 0) return
+  panelState.value = { visible: false, messageId: msg.timestamp, pending: true }
+}
+
+/** light 分支打字机完成信号 → 展示面板（正文已完整呈现，完成信号不先于正文） */
+watch(typingMsgKey, (k) => {
+  if (k !== null || !panelState.value.pending) return
+  if (!followPaused.value) panelState.value.visible = true
+})
+
+/**
+ * 统一收口（F2）：最后一条消息落地 → 记 pending；打字机未播且未暂停跟随才立即展示。
+ * 时序修正（Vue 3.5 实测）：watch 回调按依赖变更入队顺序执行，而非创建顺序——
+ * DONE 处理内先 appendMessage 后 streaming=false，故本 watch 先于 watch(isStreaming)
+ * 入队并先执行，此时打字机尚未启动（typingMsgKey 仍为 null）。因此展示判定延后一帧
+ * （nextTick）：届时 isStreaming watch 已启动打字机（静态 light 场景）→ 等
+ * typingMsgKey→null 完成信号；D9 伪流式 light / deep 真流式 / HTTP 降级无打字机 → 展示。
+ */
+watch(
+  () => displayMessages.value[displayMessages.value.length - 1]?.timestamp,
+  (ts, prev) => {
+    if (ts === prev) return
+    const last = displayMessages.value[displayMessages.value.length - 1]
+    const hasQuestions = !!last?.questions?.length
+    if (!last || last.role !== 'assistant' || !hasQuestions) return
+    onAnswerSettled(last) // 统一收口：记 pending（打字机未完成 / followPaused 时等待）
+    nextTick(() => {
+      if (shouldShowPanel(hasQuestions, typingMsgKey.value !== null, followPaused.value)) {
+        panelState.value = { visible: true, messageId: last.timestamp, pending: false }
+      }
+    })
+  }
+)
+
+/** 发送追问 / 新消息到达 → 收起并清 pending */
+function clearPanel() {
+  panelState.value = { visible: false, messageId: null, pending: false }
+}
+
+/** × 收起（非丢弃）：清 visible 留 pending（footer 弱入口可恢复） */
+function dismissPanel() {
+  panelState.value.visible = false
+}
+
+/** footer「查看追问」弱入口恢复 */
+function restorePanel() {
+  if (panelState.value.pending && panelState.value.messageId !== null) {
+    panelState.value.visible = true
+  }
+}
+
+/** 面板建议 = panelState.messageId 对应消息的 questions（消息被删/缺失 → 空数组） */
+const panelQuestions = computed(() => {
+  const id = panelState.value.messageId
+  if (id === null) return []
+  return displayMessages.value.find((m) => m.timestamp === id)?.questions ?? []
+})
+
+/** 点击建议追问：收起面板并发送（复用 quickAsk） */
+function onPanelSelect(q: string) {
+  clearPanel()
+  quickAsk(q)
+}
 
 function handleSend() {
   const content = inputText.value.trim()
@@ -970,6 +1070,7 @@ async function onHoldEnd() {
 
 function quickAsk(text: string) {
   if (isStreaming.value) return
+  clearPanel() // Task 8：点任何快捷入口即收起追问面板
   upsertSessionMeta(text)
   chatStream.send(text)
 }
@@ -1258,6 +1359,22 @@ onUnmounted(() => {
 }
 .skill-btn-text { font-size: 24rpx; color: $primary; }
 
+/* Task 8：追问面板建议行（替换快捷技能行；× 收起右侧，非丢弃——footer 弱入口可恢复） */
+.suggest-row {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+.suggest-chips-wrap { flex: 1; min-width: 0; }
+.suggest-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 20rpx;
+  flex-shrink: 0;
+}
+
 .input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
 .input-wrap { position: relative; flex: 1; min-width: 0; }
 .input { width: 100%; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
@@ -1340,5 +1457,19 @@ onUnmounted(() => {
   margin-left: 8rpx;
   color: $primary;
   font-size: 24rpx;
+}
+
+/* Task 8：追问面板弱入口（消息尾部「查看追问」，pending 未展示时出现；浅色胶囊弱化） */
+.panel-restore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 6rpx 20rpx;
+  background: rgba(77, 124, 254, 0.08);
+  border-radius: 20rpx;
+}
+.panel-restore-text {
+  font-size: 22rpx;
+  color: #0b5fff;
 }
 </style>
