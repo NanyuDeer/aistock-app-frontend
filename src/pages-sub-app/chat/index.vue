@@ -300,7 +300,10 @@ import {
 } from '@/shared/utils/speechInput'
 import type { SpeechRecognitionResult } from '@/shared/utils/speechInput'
 
-const chatStream = useChatStream({ onBeforeStream: () => resetFollow() })
+// FIX-2（final review）：onBeforeStream = 页面"新一轮启动"钩子（覆盖 send/quickAsk/rerunDeep/
+// retry/resume-none 兜底/confirm fresh run 全部发送路径）——复位跟随 + 更新轮次锚点（本轮新鲜
+// 回答 timestamp ≥ 锚点才自动弹面板；会话切换恢复的旧消息早于锚点 → 不弹）
+const chatStream = useChatStream({ onBeforeStream: () => { resetFollow(); roundAnchor.value = Date.now() } })
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const favoritesStore = useFavoritesStore()
@@ -709,6 +712,12 @@ const panelState = ref<{ visible: boolean; messageId: number | null; pending: bo
   visible: false, messageId: null, pending: false,
 })
 
+// FIX-2（final review）：轮次锚点 = 本页实例当前轮启动时刻（useChatStream onBeforeStream 置位；
+// 页面创建时取 Date.now()）。会话切换恢复的历史消息（switchSession 重入 displayMessages 的
+// 旧消息，timestamp 早于锚点）不自动弹面板，仅记 pending（footer 弱入口）；仅当前轮新鲜回答
+// （timestamp ≥ 锚点）才满足自动展示条件。
+const roundAnchor = ref(Date.now())
+
 /** F2：面板立即展示判定（纯函数）——questions 存在 且 打字机已完成 且 未暂停跟随 */
 function shouldShowPanel(hasQuestions: boolean, typingActive: boolean, followPaused: boolean): boolean {
   return hasQuestions && !typingActive && !followPaused
@@ -742,6 +751,9 @@ watch(
     const hasQuestions = !!last?.questions?.length
     if (!last || last.role !== 'assistant' || !hasQuestions) return
     onAnswerSettled(last) // 统一收口：记 pending（打字机未完成 / followPaused 时等待）
+    // FIX-2（final review）：历史恢复（switchSession 重入的旧消息）不自动弹面板——
+    // 消息早于本轮锚点 → 仅保留 pending 弱入口，跳过展示判定；仅当前轮新鲜回答自动展示
+    if (last.timestamp < roundAnchor.value) return
     nextTick(() => {
       if (shouldShowPanel(hasQuestions, typingMsgKey.value !== null, followPaused.value)) {
         // 展示：仅置 visible，保留 onAnswerSettled 写入的 pending（× 收起后可经 footer 弱入口恢复）
@@ -957,6 +969,8 @@ function handleMessageAction(item: MenuItem) {
       break
     case 'delete':
       chatStore.removeMessage(msg.timestamp)
+      // FIX-4（final review）：删除的是追问面板归属消息 → 收起面板（防残留空面板）
+      if (panelState.value.messageId === msg.timestamp) clearPanel()
       break
     case 'select-text':
       // 进入选中态：自行关闭菜单，保留 menuTarget 供 copySelection 整条兜底复制
@@ -1413,6 +1427,6 @@ onUnmounted(() => {
 }
 .panel-restore-text {
   font-size: 22rpx;
-  color: #0b5fff;
+  color: $primary;
 }
 </style>

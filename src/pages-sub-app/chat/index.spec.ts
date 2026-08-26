@@ -188,8 +188,8 @@ test('5B：resetFollow 纯复位（无滚底/无定时器——硬约束 #3）',
   assert.doesNotMatch(pageSource, /function resetFollow\(\)[\s\S]{0,200}followTimer/)
 })
 
-test('5B：useChatStream 接线 onBeforeStream → resetFollow', () => {
-  assert.match(pageSource, /useChatStream\(\{ onBeforeStream: \(\) => resetFollow\(\) \}\)/)
+test('5B：useChatStream 接线 onBeforeStream → resetFollow + 轮次锚点更新（FIX-2 全发送路径覆盖）', () => {
+  assert.match(pageSource, /useChatStream\(\{ onBeforeStream: \(\) => \{ resetFollow\(\); roundAnchor\.value = Date\.now\(\) \} \}\)/)
 })
 
 test('5B：四处显式滚底已删除，watch(isStreaming) v=true 唯一收口（spy===1）', () => {
@@ -329,7 +329,10 @@ test('Task8：display-messages 收口 watch（最后一条 assistant 且 questio
   assert.match(pageSource, /shouldShowPanel\(hasQuestions, typingMsgKey\.value !== null, followPaused\.value\)/)
 })
 
-test('Task8：display-messages 收口 watch 创建于 watch(isStreaming) 之后（同 flush 先启动打字机，静态 DONE 守卫成立）', () => {
+test('Task8：display-messages 收口 watch 定义于 watch(isStreaming) 之后（结构性事实）', () => {
+  // final review 修正：Vue 3.5 的 watch 回调按依赖变更入队顺序执行（非创建顺序），
+  // 旧名「同 flush 先启动打字机」的机制表述已过时；真正守卫是展示判定 nextTick 延后一帧。
+  // 本测试仅保留可验证的结构性事实：display 收口 watch 在源码中定义于 watch(isStreaming) 之后。
   const isStreamingIdx = pageSource.search(/watch\(isStreaming,/)
   const displayWatchIdx = pageSource.search(/displayMessages\.value\[displayMessages\.value\.length - 1\]\?\.timestamp/)
   assert.ok(isStreamingIdx !== -1 && displayWatchIdx !== -1)

@@ -543,4 +543,31 @@ describe('index.vue 追问面板（Task 8）运行时行为', () => {
     expect(wrapper.find('.quick-skills').exists()).toBe(true)
     wrapper.unmount()
   })
+
+  it('会话切换恢复历史（旧消息重入 displayMessages）→ 不自动弹面板，仅保留弱入口/pending', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    const stream = useChatStream() as any
+    // 模拟 switchSession 恢复：displayMessages 整体替换为持久化历史（末条 assistant 含 questions，
+    // 时间戳早于页面实例轮次锚点 → 判定为历史恢复而非当前轮新鲜回答）
+    stream.messages.value = [
+      { role: 'user', content: '旧问题', timestamp: Date.now() - 61000 },
+      { role: 'assistant', content: '旧回答', timestamp: Date.now() - 60000, questions: ['历史追问'] },
+    ]
+    await flushPromises()
+    await nextTick()
+
+    // 不自动弹面板（visible 保持 false）；quick-skills 不被替换
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    // pending + 消息归属保留 → footer 弱入口可见
+    expect(wrapper.find('.panel-restore-btn').exists()).toBe(true)
+
+    // 弱入口恢复面板（pending 未丢失，历史建议仍可点）
+    await wrapper.find('.panel-restore-btn').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+    expect(wrapper.find('.as-followup-chips').text()).toContain('历史追问')
+    wrapper.unmount()
+  })
 })
