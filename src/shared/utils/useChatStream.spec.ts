@@ -247,6 +247,7 @@ describe('useChatStream reasoning event', () => {
       content: 'HTTP 回复',
       session_id: 's1',
       token_usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+      questions: ['追问A', '追问B'],
     } as any)
 
     await stream.send('你好')
@@ -257,6 +258,8 @@ describe('useChatStream reasoning event', () => {
     expect(arg.content).toBe('HTTP 回复')
     // P10 线 2 缺口修复前：降级分支不读 result.token_usage → arg.tokenUsage 为 undefined
     expect(arg.tokenUsage).toEqual({ prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 })
+    // 追问面板：HTTP 降级路径同样透出 questions（缺失 undefined 兼容）
+    expect(arg.questions).toEqual(['追问A', '追问B'])
   })
 
   it('服务端 open 后立即 close（4401）→ 本轮 send 结算不挂起（P0）', async () => {
@@ -912,5 +915,37 @@ describe('useChatStream stall timeout（问题 20 R3：WS 发送后 idle 静默�
     // 推进超过阈值：done 已结束本轮，不得再落超时消息
     vi.advanceTimersByTime(_STALL_TIMEOUT_MS + _STALL_CHECK_INTERVAL_MS + 1000)
     expect(mockAppendMessage.mock.calls.some((c: any[]) => c[0].content.includes('生成超时'))).toBe(false)
+  })
+})
+
+describe('useChatStream 追问面板（questions 缓存进消息，渲染 O(1)）', () => {
+  beforeEach(() => {
+    // 模块级状态隔离（与既有 describe 一致）：重置单例 socket / mock store / mock 调用
+    const stream = useChatStream() as any
+    stream.messages.value = []
+    stream.sessionId.value = ''
+    mockAppendMessage.mockClear()
+    mockSocketCbs.onMessageCbs.length = 0
+    mockSocketCbs.onCloseCbs.length = 0
+    mockSocketCbs.onErrorCbs.length = 0
+    mockSocketSend.mockClear()
+    mockSetSessionId.mockClear()
+    mockWsFail.fail = false
+    vi.mocked(agentApi.sendMessage).mockReset()
+    stream._testReset()
+  })
+
+  it('WS DONE 携带 questions 时缓存进消息', () => {
+    const stream = useChatStream() as any
+    stream._testHandleWsMessage({ type: 'done', content: '回答', questions: ['追问1', '追问2'] }, () => {})
+    const last = stream.messages.value[stream.messages.value.length - 1]
+    expect(last.questions).toEqual(['追问1', '追问2'])
+  })
+
+  it('WS DONE 无 questions 时消息 questions 为 undefined', () => {
+    const stream = useChatStream() as any
+    stream._testHandleWsMessage({ type: 'done', content: '回答' }, () => {})
+    const last = stream.messages.value[stream.messages.value.length - 1]
+    expect(last.questions).toBeUndefined()
   })
 })
