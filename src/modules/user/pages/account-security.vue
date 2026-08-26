@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard title="账号与安全" noChatBar>
+  <SubPageCard2 title="账号与安全" no-chat-bar>
     <view class="security-content">
       <!-- 当前绑定状态 -->
       <view class="section">
@@ -109,14 +109,14 @@
         </Card>
       </view>
     </view>
-  </SubPageCard>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useUserStore } from '@/shared/store/modules/user'
 import { authApi } from '@/shared/api/modules/auth'
-import SubPageCard from '@/shared/components/SubPageCard.vue'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import Input from '@/shared/components/Input.vue'
 import { ListCell, Card, Tag, Button } from '@/shared/components'
@@ -249,7 +249,7 @@ async function handleBind() {
 
 <style lang="scss" scoped>
 .security-content {
-  padding: 0 24rpx 48rpx;
+  padding: 32rpx 24rpx 48rpx;
 }
 
 .section {

@@ -728,6 +728,17 @@ function goLogin() {
   padding: $s-2;
 }
 
+/* 首页白色卡片：与今日专属卡片一致的按压动效（覆盖 Card 默认 scale(0.995)，加阴影变化） */
+.feature-card.as-card,
+.track-card.as-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: $shadow-sm;
+  }
+}
+
 .feature-header {
   display: flex;
   justify-content: space-between;

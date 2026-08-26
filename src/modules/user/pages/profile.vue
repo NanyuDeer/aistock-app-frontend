@@ -98,6 +98,11 @@
               <SvgIcon name="shield-check-line" size="36rpx" color="#4b5a7a" />
             </template>
           </ListCell>
+          <ListCell title="对话引导" description="重置后，新会话将重新显示引导" clickable showArrow :border="true" @click="resetChatGuide">
+            <template #prefix>
+              <SvgIcon name="chat-history-line" size="36rpx" color="#4b5a7a" />
+            </template>
+          </ListCell>
           <ListCell title="版本更新" clickable showArrow :border="true" @click="checkUpdate">
             <template #prefix>
               <SvgIcon name="refresh-line" size="36rpx" color="#4b5a7a" />
@@ -106,11 +111,6 @@
           <ListCell title="关于" clickable showArrow :border="true" @click="goAbout">
             <template #prefix>
               <SvgIcon name="information-line" size="36rpx" color="#4b5a7a" />
-            </template>
-          </ListCell>
-          <ListCell title="对话引导" description="重置后，新会话将重新显示引导" clickable showArrow :border="true" @click="resetChatGuide">
-            <template #prefix>
-              <SvgIcon name="chat-history-line" size="36rpx" color="#4b5a7a" />
             </template>
           </ListCell>
         </Card>
@@ -124,6 +124,17 @@
 
     <!-- 应用内版本更新弹窗（手动「版本更新」检查后在本页展示；仅前台页面可见） -->
     <UpdateModal />
+    <!-- 统一确认/信息弹窗（样式对齐版本更新弹窗） -->
+    <ConfirmModal
+      v-model:visible="modalVisible"
+      :title="modal?.title || ''"
+      :content="modal?.content || ''"
+      :confirm-text="modal?.confirmText"
+      :cancel-text="modal?.cancelText"
+      :show-cancel="modal?.showCancel ?? true"
+      :danger="modal?.danger ?? false"
+      @confirm="handleModalConfirm"
+    />
   </SubPageCard>
 </template>
 
@@ -137,7 +148,7 @@ import { deleteUserProfile } from '@/shared/api/modules/profile'
 import { checkAppUpdate } from '@/shared/utils/useAppUpdate'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { Switch, ListCell, Card, Tag, Button, UpdateModal } from '@/shared/components'
+import { Switch, ListCell, Card, Tag, Button, UpdateModal, ConfirmModal } from '@/shared/components'
 import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 
 const userStore = useUserStore()
@@ -153,6 +164,28 @@ const DEFAULT_SETTINGS: UserSettings = {
 }
 const settings = ref<UserSettings>({ ...DEFAULT_SETTINGS })
 const favoriteStocks = computed(() => favoritesStore.stocks)
+
+/** 统一确认/信息弹窗状态（替换原生 uni.showModal，样式对齐版本更新弹窗） */
+interface ModalOptions {
+  title: string
+  content: string
+  confirmText?: string
+  cancelText?: string
+  showCancel?: boolean
+  danger?: boolean
+  onConfirm?: () => void | Promise<void>
+}
+const modal = ref<ModalOptions | null>(null)
+const modalVisible = ref(false)
+
+function openModal(options: ModalOptions) {
+  modal.value = options
+  modalVisible.value = true
+}
+
+function handleModalConfirm() {
+  void modal.value?.onConfirm?.()
+}
 
 onShow(async () => {
   if (!isLoggedIn.value) return
@@ -199,37 +232,35 @@ async function onSettingChange(key: keyof UserSettings, enabled: boolean) {
 }
 
 function handleLogout() {
-  uni.showModal({
+  openModal({
     title: '确认退出',
     content: '退出后自选股和推送设置将不会同步',
-    success: (res) => {
-      if (res.confirm) {
-        userStore.logout()
-        settings.value = { ...DEFAULT_SETTINGS }
-        uni.showToast({ title: '已退出登录', icon: 'none' })
-        // 退出后返回首页，避免停留在 profile 页面造成"没退出"的错觉
-        setTimeout(() => {
-          uni.redirectTo({ url: '/modules/home/pages/index' })
-        }, 500)
-      }
-    }
+    onConfirm: () => {
+      userStore.logout()
+      settings.value = { ...DEFAULT_SETTINGS }
+      uni.showToast({ title: '已退出登录', icon: 'none' })
+      // 退出后返回首页，避免停留在 profile 页面造成"没退出"的错觉
+      setTimeout(() => {
+        uni.redirectTo({ url: '/modules/home/pages/index' })
+      }, 500)
+    },
   })
 }
 
 // B8：PIPL 删除权——确认后删除用户画像，删除后 AI 按通用方式回答
 function handleDeleteProfile() {
-  uni.showModal({
+  openModal({
     title: '确认删除',
     content: '删除后 AI 将按通用方式回答，且不可恢复',
-    success: async (res) => {
-      if (!res.confirm) return
+    danger: true,
+    onConfirm: async () => {
       try {
         await deleteUserProfile()
         uni.showToast({ title: '已删除', icon: 'success' })
       } catch {
         uni.showToast({ title: '删除失败，请重试', icon: 'none' })
       }
-    }
+    },
   })
 }
 
@@ -245,8 +276,14 @@ function goAccountSecurity() {
   uni.navigateTo({ url: '/modules/user/pages/account-security' })
 }
 
+/** 关于：展示应用名称、版本与版权信息（版本号需与 src/manifest.json 的 versionName 保持同步） */
 function goAbout() {
-  uni.showToast({ title: '洞见 v2.1', icon: 'none' })
+  openModal({
+    title: '关于洞见',
+    content: '洞见 v0.1.2\nAI 股票资讯智能分析助手\n仅供研究参考，不构成投资建议',
+    showCancel: false,
+    confirmText: '知道了',
+  })
 }
 
 // 手动检查版本更新：不受 24h 节流限制；非 Android App 环境提示不支持
@@ -261,10 +298,16 @@ async function checkUpdate() {
   }
 }
 
-/** 重置对话空态引导（清除"不再显示"标记，下次新会话重新显示） */
+/** 重置对话空态引导（清除"不再显示"标记，下次新会话重新显示）——先弹确认窗，避免误触即重置 */
 function resetChatGuide() {
-  storage.remove(STORAGE_KEYS.CHAT_EMPTY_GUIDE_CLOSED)
-  uni.showToast({ title: '已重置，新会话将显示引导', icon: 'none' })
+  openModal({
+    title: '确认重置',
+    content: '重置后，新会话将重新显示对话引导',
+    onConfirm: () => {
+      storage.remove(STORAGE_KEYS.CHAT_EMPTY_GUIDE_CLOSED)
+      uni.showToast({ title: '已重置，新会话将显示引导', icon: 'none' })
+    },
+  })
 }
 
 function goStockDetail(symbol: string) {

@@ -4,7 +4,11 @@
  * 保留 app 前端业务逻辑：Tab 切换 + 三内容组件 v-show + AppBottomBar + GlobalChatBar
  */
 <template>
-  <view class="as-main-tabs" :style="{ paddingTop: statusBarHeight + 'px' }">
+  <view
+    class="as-main-tabs"
+    :class="{ 'is-wide': isWide }"
+    :style="{ paddingTop: statusBarHeight + 'px' }"
+  >
     <!-- 透明导航区域（共享，不闪烁） -->
     <view class="as-main-tabs__nav">
       <NotificationDropdown />
@@ -57,6 +61,7 @@ import UpdateModal from '@/shared/components/UpdateModal.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import NotificationDropdown from '@/shared/components/NotificationDropdown.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
+import { useAdaptiveScreen } from '@/shared/utils/useAdaptiveScreen'
 import { px2rpx, getBottomFixedHeightPx } from '@/shared/utils/layout'
 import MorningContent from '@/modules/home/components/MorningContent.vue'
 import StockContent from '@/modules/home/components/StockContent.vue'
@@ -64,6 +69,9 @@ import AlertContent from '@/modules/favorites/components/AlertContent.vue'
 
 /** 首页容器唯一页面标识（FloatingPodcast 据此判定首页是否前台） */
 const pageKey = 'main-tabs'
+
+/** 多端适配：宽屏（平板/折叠屏展开/横屏）时内容限宽居中 */
+const { isWide } = useAdaptiveScreen()
 
 // 页面可见性 → store.activePage：uni-h5 页面被 KeepAlive 缓存不卸载，
 // 悬浮球渲染权必须跟随前台页面（否则渲染在隐藏页面/多实例双播放）。
@@ -182,6 +190,24 @@ function goProfile() {
   overflow: hidden;
   box-shadow: $shadow-sm;
   min-height: 0;
+}
+
+/* 多端适配：宽屏（平板/折叠屏展开/横屏）内容限宽居中，避免文字行过长、卡片太空。
+   限宽取 1200px：平板横屏（1194）与大屏（1024）内容横向铺满；平板竖屏（860）不受限、自然铺满 */
+.as-main-tabs.is-wide .as-main-tabs__card {
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* 多端适配：宽屏时顶部导航与底部 Tab 栏同样限宽，保持视觉同轴 */
+.as-main-tabs.is-wide .as-main-tabs__nav,
+.as-main-tabs.is-wide :deep(.as-tab-bar) {
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* 卡片标题（固定位置） */

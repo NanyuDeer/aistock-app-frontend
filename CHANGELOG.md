@@ -2,6 +2,38 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-26 — 我的页 UI 完善 + 统一确认弹窗 + Modal 隐形拦截修复 + 多端适配
+
+**开发者**: Aria
+
+### 新增
+- 统一确认弹窗 `src/shared/components/ConfirmModal.vue`：基于 Modal 组件（白色圆角卡片 + 标题 + 关闭叉号 + 内容区 + footer 等宽按钮），样式与版本更新弹窗（UpdateModal）一致；支持 `v-model:visible`、title/content、confirmText/cancelText、showCancel（信息弹窗）、danger（删除等危险操作红字确认）；替换原生 `uni.showModal`（H5 浏览器原生样式不统一）：
+  - `profile.vue`：确认退出、确认删除（danger）、确认重置、关于洞见（单按钮）
+  - `favorites.vue`：删除自选股（单个/批量，danger）
+- 多端适配（方案 B 中等自适应，平板/折叠屏/横屏大屏）：
+  - `src/pages.json` globalStyle 配置 rpx 收敛参数（`rpxCalcMaxDeviceWidth: 1024` 等，平板/折叠屏展开时 rpx 放大不再失控）
+  - 新增 `src/shared/utils/useAdaptiveScreen.ts`：宽屏判断（阈值 700px）+ `uni.onWindowResize` 监听窗口变化（折叠屏展开/收起、平板旋转实时响应）
+  - `src/shared/utils/h5-scale.ts` 支持画布模式切换（手机 390×693 / 平板竖屏 860×900 / 平板横屏 1194×834 / 大屏 1024×768）：切换时同步 html font-size（rpx 基准）与 #app 尺寸，仅 H5 开发环境显示右下角切换按钮（localStorage 持久化）
+  - 宽屏布局：MainTabs/SubPageCard/SubPageCard2 宽屏内容限宽 1200px 居中；首页 feature-grid 宽屏 3 列
+
+### 修复
+- Modal.vue 隐藏态隐形拦截：`.as-modal:not(.is-visible) .as-modal__dialog { pointer-events: none }`——弹窗隐藏时（opacity:0）dialog 不再占据 DOM 捕获指针事件，修复首页「机构推荐热门股」整卡点不开（CDP 实证：居中的不可见版本更新弹窗恰好盖住屏幕中央卡片）；一并解决所有使用 Modal/UpdateModal 页面屏幕中央区域被隐形拦截的同类问题
+- 账号与安全页双顶栏：`src/pages.json` 为 `account-security`/`vip` 页补 `"navigationStyle": "custom"`（此前原生导航栏与 SubPageCard2 自带白色导航栏同时渲染）
+- ListCell 可点击列表项 H5 光标：`.as-list-cell.is-clickable` 补 `cursor: pointer; user-select: none`（与 Card 组件一致）
+- 首页白色卡片与提醒模块卡片按压动效：MorningContent.vue（feature-card/track-card）与 AlertContent.vue（module-card）复用 briefing-card 点击动效（`:active { transform: scale(0.98); box-shadow: $shadow-sm }`），与「今日专属」卡片一致
+
+### 改进
+- 账号与安全页改用 SubPageCard2（v2 白色导航栏，与 vip/insight/monitor 等新子页面视觉统一）：`account-security.vue` 由 SubPageCard v1 迁移，`noChatBar` → `no-chat-bar`，内容区顶部加 32rpx 间距
+- profile.vue「对话引导」重置先弹确认窗：确认后才清除 `chat_empty_guide_closed` 标记并提示，取消无操作
+- profile.vue「关于」入口修正：由仅弹 toast（版本号过期 v2.1）改为弹关于对话框（洞见 v0.1.2 + 简介 + 免责声明），菜单项移到「版本更新」下方；最终菜单顺序：自选股 → 账号与安全 → 对话引导 → 版本更新 → 关于
+- 文档：`src/modules/user/AGENTS.md` 补充 account-security/vip 页面登记，注明 SubPageCard2 容器使用情况
+
+### 验证
+- CDP 实证：Modal 隐形拦截根因（`document.elementFromPoint` 命中 um-footer）+ 修复后真实鼠标点击卡片跳转成功；多端画布切换（尺寸/rpx 基准/缩放）、首页 is-wide 类、宽屏 3 列均正常
+- 多端适配经 5 轮验收修正收敛（平板按宽缩放/完整显示、画布模式 4 个、宽屏限宽 1200px、平板竖屏 860×900 等）
+
+---
+
 ## [master] 2026-08-26 — 午间报展示与播报 + 邮箱登录 App 联调 + 请求 scheme 修复
 
 **开发者**: Aria

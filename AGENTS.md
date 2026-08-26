@@ -278,6 +278,7 @@ import Card from '@/shared/components/Card.vue'
 | H5 完整性 | H5 用于 App 预览，必须具备完整 App 功能（无阉割） |
 | 布局 | 用 `position:fixed`，禁止 `100vh` |
 | 样式单位 | 使用 SCSS + rpx 单位 |
+| 多端适配 | 宽屏（平板/折叠屏展开/横屏，windowWidth>700px）用 `useAdaptiveScreen` 的 `isWide` 做布局切换；页面根容器（MainTabs/SubPageCard/SubPageCard2）宽屏限宽 1200px 居中；H5 开发环境右下角有画布切换按钮（手机 390×693 → 平板竖屏 860×900 → 平板横屏 1194×834 → 大屏 1024×768），调 H5 大屏布局时先切换画布 |
 | 浅色主题 | 背景 `#f5f7fb`，卡片白色 `#ffffff` |
 | Design Token | 所有颜色/字号/圆角必须用 `shared/styles/variables.scss` 中的变量，禁止硬编码（如 `#4d7cfe` 用 `$brand-color`） |
 | App 端 envDir | `vite.config.ts` 必须配置 `envDir: 'env'`，否则 App 打包时 env 文件不加载，所有 API 请求失败 |
@@ -373,6 +374,7 @@ import Card from '@/shared/components/Card.vue'
 | `useWebSocket` | WebSocket 连接管理 |
 | `useTimer` | 定时器管理 |
 | `usePushNotification` | 推送通知 |
+| `useAdaptiveScreen` | 多端适配（2026-08-26）：判断宽屏（平板/折叠屏展开/横屏，默认阈值 700px）+ `uni.onWindowResize` 监听窗口变化（折叠屏展开/收起实时响应）。H5 调试画布切换为 tablet/landscape 时返回模拟设备宽度 |
 
 ## 9. 常用命令
 
