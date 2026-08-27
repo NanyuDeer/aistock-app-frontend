@@ -109,9 +109,9 @@
             <view class="report-period">{{ item.period }}</view>
             <text v-if="displayScore(item) != null" :class="['report-score', scoreClass(displayScore(item)!)]">{{ displayScore(item) }}分</text>
           </view>
-          <!-- 底部：核心财务 + 更新时间 -->
+          <!-- 底部：核心财务 + 更新时间（正式报告与快报卡片展示相同字段） -->
           <view class="report-bottom">
-            <view v-if="item.isFormal" class="report-data-row">
+            <view class="report-data-row">
               <view class="data-left">
                 <text class="data-label">营业总收入</text>
                 <text class="data-value">{{ item.revenue }} 亿元</text>
@@ -120,7 +120,7 @@
                 <text v-if="item.revenueYoy != null" class="data-yoy-label">同比 </text><text :class="['data-yoy', yoyClass(item.revenueYoy)]">{{ formatYoy(item.revenueYoy) }}</text>
               </view>
             </view>
-            <view v-if="item.isFormal" class="report-data-row">
+            <view class="report-data-row">
               <view class="data-left">
                 <text class="data-label">归母净利润</text>
                 <text class="data-value">{{ item.netProfit }} 亿元</text>
