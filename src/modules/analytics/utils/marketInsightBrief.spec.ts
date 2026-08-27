@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { toMarketInsightBrief } from './marketInsightBrief'
+import { toMarketInsightBrief, toMarketInsightDetail } from './marketInsightBrief'
 import type { MarketTracePresentation } from './marketTraceReview'
+import { labelEvidenceList } from './evidenceLabels'
 
 function makePresentation(overrides: Partial<MarketTracePresentation> = {}): MarketTracePresentation {
   return {
@@ -68,4 +69,28 @@ test('toMarketInsightBrief: 超长文案截断', () => {
 test('toMarketInsightBrief: null 输入返回 null', () => {
   assert.equal(toMarketInsightBrief(null), null)
   assert.equal(toMarketInsightBrief(undefined), null)
+})
+
+test('toMarketInsightDetail: 三块详情字段映射', () => {
+  const detail = toMarketInsightDetail(makePresentation())
+  assert.ok(detail)
+  assert.equal(detail!.phenomenon.summary, 'A股放量普涨，沪指涨1.2%')
+  assert.equal(detail!.phenomenon.severityLabel, '高')
+  assert.equal(detail!.trace!.categoryLabel, '产业技术供应')
+  assert.equal(detail!.trace!.conclusion, '半导体国产替代提速推动板块普涨')
+  assert.equal(detail!.trace!.trigger, '触发')
+  assert.equal(detail!.trace!.transmission, '传导')
+  assert.equal(detail!.trace!.result, '结果')
+  assert.deepEqual(detail!.trace!.evidenceLabels, labelEvidenceList([]))
+  assert.equal(detail!.forecast!.attributionSummary, '短线情绪延续，中线关注政策落地')
+})
+
+test('toMarketInsightDetail: 无主因时 trace 为 null，无预判时 forecast 为 null', () => {
+  const detail = toMarketInsightDetail(makePresentation({ primaryCause: null, prediction: null }))
+  assert.equal(detail!.trace, null)
+  assert.equal(detail!.forecast, null)
+})
+
+test('toMarketInsightDetail: null 输入返回 null', () => {
+  assert.equal(toMarketInsightDetail(null), null)
 })

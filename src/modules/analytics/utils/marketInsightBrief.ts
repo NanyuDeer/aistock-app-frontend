@@ -1,4 +1,5 @@
-import type { MarketTracePresentation } from './marketTraceReview'
+import { labelEvidenceList } from './evidenceLabels'
+import type { MarketTracePresentation, PredictionPresentation } from './marketTraceReview'
 
 export interface MarketInsightBrief {
   type: 'market'
@@ -36,4 +37,51 @@ export function toMarketInsightBrief(
   const confidence = p.confidence ? (CONFIDENCE_LABELS[p.confidence] ?? '') : ''
   const time = (p.reportDate || '').slice(5).replace('-', '.') // YYYY-MM-DD → MM.DD
   return { type: 'market', time, title, trace, forecast, confidence }
+}
+
+export interface MarketInsightDetail {
+  phenomenon: {
+    summary: string
+    severityLabel: string
+    indexPerformance: Array<{ name: string; pctChange: number | null }>
+    topGainers: Array<{ name: string; pctChange: number | null }>
+    topLosers: Array<{ name: string; pctChange: number | null }>
+  }
+  trace: {
+    categoryLabel: string
+    conclusion: string
+    trigger: string
+    transmission: string
+    result: string
+    evidenceLabels: string[]
+  } | null
+  forecast: PredictionPresentation | null
+}
+
+/** 构建市场洞见展开详情（现象/溯源/预判三块，强相关对应 title/trace/forecast）。 */
+export function toMarketInsightDetail(
+  p: MarketTracePresentation | null | undefined,
+): MarketInsightDetail | null {
+  if (!p) return null
+  const pc = p.primaryCause
+  return {
+    phenomenon: {
+      summary: p.phenomenon.summary,
+      severityLabel: p.phenomenon.severityLabel,
+      indexPerformance: p.phenomenon.indexPerformance,
+      topGainers: p.phenomenon.topGainers,
+      topLosers: p.phenomenon.topLosers,
+    },
+    trace: pc
+      ? {
+          categoryLabel: pc.categoryLabel,
+          conclusion: pc.conclusion,
+          trigger: pc.trigger,
+          transmission: pc.transmission,
+          result: pc.result,
+          evidenceLabels: labelEvidenceList(pc.supportingEvidence),
+        }
+      : null,
+    forecast: p.prediction,
+  }
 }
