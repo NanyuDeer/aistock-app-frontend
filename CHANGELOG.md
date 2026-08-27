@@ -2,6 +2,23 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-27 — 午间报切换修复 + 盘中要点从 details 解析 + 卡片样式统一
+
+**开发者**: Aria
+
+### 修复
+- 晨/晚报切换后路由不更新（URL 停在进入时类型）→ `switchType` 状态切换 + H5 `history.replaceState` 同步 URL 类型参数（不重建页面）
+- 切回午间报后残留晨报 Agent 洞见 → `fetchReportFor` 午间报分支先清空 items/report/eveningViewModel，杜绝类型间数据串扰
+- 晚报切回午间报盘中要点卡片消失 → 根因：后端 `display_report` 只返回 `details`（markdown），不返回结构化 `sections` 字段，前端只消费 `sections`（恒空）→ 盘中要点从未渲染。修复：`middayReport.ts` 新增 `parseSectionsFromDetails` 从 details「## 第N部分：标题」解析分段摘要（标题去前缀、结论为要点合并），`parseMiddayReport` 在 sections 为空时兜底；结论加 `-webkit-line-clamp: 3` 截断；保留 loadSeq 竞态守卫
+
+### 改进
+- 盘中研判标题方标「盘」→ 早报同款 ★ 星标；盘中要点分段卡片改洞见卡同款布局（左侧方标 + 右侧标题/结论随 body 缩进）；风险提示标题字号/字重统一 28rpx/600（红色保留）；风险编号列表项加 20rpx 左缩进
+
+### 验证
+- `npx tsc --noEmit` 通过；`parseSectionsFromDetails` 用真实后端 details 解析出「上午盘面回顾/午后前瞻」2 个分段
+
+---
+
 ## [xusiyun] 2026-08-27 — 修复事件原文详情页顶部状态栏遮挡
 
 **开发者**: xusiyun
@@ -9,6 +26,20 @@
 ### 修复
 - `src/pages-sub-app/event-article/index.vue`：页面配置 `navigationStyle: custom` 后自绘导航栏从屏幕最顶渲染，返回按钮与「原文详情」标题被系统状态栏/摄像头/刘海遮挡。修复：页面根容器增加 `paddingTop: statusBarHeight`（`uni.getSystemInfoSync().statusBarHeight`，APP 端除以 zoom 1.2 补偿，与 SubPageCard2 同款方案），兼容 iOS 刘海 / Android 状态栏 / 普通设备 / H5（H5 statusBarHeight=0，无额外顶部空白）。
 - 验证：`npm run type-check` 通过；`npm run build:app` 构建通过且产物含修复；H5 实测 statusBarHeight=0、导航栏紧贴视口顶端、正文正常从导航栏下方开始；真机待验证。
+
+## [changer] 2026-08-26 — AI 投顾追问面板（回答后底部建议追问 + 输入框）
+
+**开发者**: 37588
+
+### 新增
+- 追问面板：回答打字机完成后底部弹出建议追问胶囊 + 输入框；点胶囊发送追问 → 面板收起、输入栏恢复；无 questions（deep 降级/闸门/澄清）不弹面板；× 收起恢复 quick-skills 行，消息 footer「查看追问」弱入口可恢复；上滑（followPaused）不自动弹、弱入口可恢复
+- ChatMessage 增加 `questions?: string[]`（WS/HTTP 容缺消费，`[]` 与 `undefined` 均视为无建议）；FollowupSuggestChips 组件自组件库复制接入；面板状态机 + 打字机完成信号触发（typingMsgKey → null 才展示，F2 守卫）
+
+### 改进
+- 新发送轮/发送追问收起面板；立即展示路径保留 pending（× 收起后 footer 弱入口可恢复）；删除气泡胶囊与 parseFollowupQuestions 解析器（单一追问面板范式）
+
+### 验证
+- vitest useChatStream 48/48 + node:test chat/index 49/49 + tsc/vue-tsc 0 错误
 
 ---
 

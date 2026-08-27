@@ -30,7 +30,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 |------|------|---------|-----------------|
 | 首页 | `modules/home` | 早点听、市场概览、长线风口、异动捕手 | [home/AGENTS.md](./src/modules/home/AGENTS.md) |
 | 自选股 | `modules/favorites` | 自选股列表、特别提醒、股票详情、搜索、异动监控 | [favorites/AGENTS.md](./src/modules/favorites/AGENTS.md) |
-| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示、会话管理（P9 多会话）、深度分析报告详情页（批次 2，2026-08-13：`pages/chat-report-detail.vue`，对话内深度卡跳转查看完整报告） | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
+| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示、会话管理（P9 多会话）、深度分析报告详情页（批次 2，2026-08-13：`pages/chat-report-detail.vue`，对话内深度卡跳转查看完整报告）、**追问面板（回答后底部建议追问 + 输入框，questions 结构化下发，2026-08-26）** | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
 | 行情 | `modules/market` | 龙头股、重磅消息、板块标签、异动捕手、长线风口 | [market/AGENTS.md](./src/modules/market/AGENTS.md) |
 | 业绩分析 | `modules/analytics` | 业绩预测、业绩报告列表、财报详情 | — |
 | 用户 | `modules/user` | 个人中心、登录设置、更新日志 | [user/AGENTS.md](./src/modules/user/AGENTS.md) |

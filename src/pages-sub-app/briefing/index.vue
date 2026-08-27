@@ -34,6 +34,7 @@
         <template v-if="broadcastType === 'midday' && middayReport">
           <view class="midday-card">
             <view class="midday-label">
+              <text class="midday-star">★</text>
               <text class="midday-label-text">盘中研判</text>
             </view>
             <text
@@ -47,10 +48,10 @@
             </view>
           </view>
 
-          <!-- 多分段摘要：与晨/晚报 Agent 洞见卡一致的多个精简要点 -->
+          <!-- 多分段摘要：与晨/晚报 Agent 洞见卡一致的多个精简要点，每张卡片标题前带圆角方标 -->
           <template v-if="middayReport.content.display_report.sections.length">
             <view class="section-label">
-              <text class="section-label-text">盘中要点</text>
+              <text class="section-label-text">Agent 洞见</text>
               <view class="section-line" />
             </view>
             <view
@@ -58,24 +59,33 @@
               :key="index"
               class="midday-section-card"
             >
-              <text v-if="sec.title" class="midday-section-title">{{ sec.title }}</text>
-              <text class="midday-section-conclusion">{{ sec.conclusion }}</text>
+              <!-- 洞见卡同款布局：左侧方标 + 右侧标题/结论（结论随 body 缩进） -->
+              <view v-if="sec.title" class="midday-section-head">
+                <view class="midday-badge" :class="sectionBadgeClass(sec.title)">{{ sectionBadgeText(sec.title) }}</view>
+                <view class="midday-section-body">
+                  <text class="midday-section-title">{{ sec.title }}</text>
+                  <text class="midday-section-conclusion">{{ sec.conclusion }}</text>
+                </view>
+              </view>
+              <text v-else class="midday-section-conclusion">{{ sec.conclusion }}</text>
             </view>
           </template>
 
-          <!-- 风险提示（精简为洞见卡片样式，仅当日存在风险时展示） -->
+          <!-- 风险提示（单卡片 + 编号列表，仅当日存在风险时展示） -->
           <template v-if="middayReport.content.display_report.risks.length">
-            <view class="section-label">
-              <text class="section-label-text">风险提示</text>
-              <view class="section-line" />
-            </view>
-            <view
-              v-for="(risk, index) in middayReport.content.display_report.risks"
-              :key="index"
-              class="midday-risk-card"
-            >
-              <text class="midday-risk-dot">•</text>
-              <text class="midday-risk">{{ risk }}</text>
+            <view class="midday-risk-card">
+              <view class="midday-label">
+                <view class="midday-badge midday-badge--risk">警</view>
+                <text class="midday-label-text midday-risk-label-text">风险提示</text>
+              </view>
+              <view
+                v-for="(risk, index) in middayReport.content.display_report.risks"
+                :key="index"
+                class="midday-risk-item"
+              >
+                <text class="midday-risk-index">{{ index + 1 }}</text>
+                <text class="midday-risk">{{ risk }}</text>
+              </view>
             </view>
           </template>
         </template>
@@ -283,6 +293,8 @@ const isFallback = ref(false)
 const requestedDate = ref('')
 /** 晚报卡片 ViewModel（仅晚报分支使用） */
 const eveningViewModel = ref<EveningCardViewModel | null>(null)
+/** 加载序号：类型/日期切换时递增，用于丢弃过期请求的迟到结果（防竞态覆盖） */
+let loadSeq = 0
 
 const subtitleText = computed(() => {
   const typeLabel = broadcastType.value === 'morning'
@@ -397,6 +409,22 @@ function sentimentClass(sentiment: Sentiment): string {
   return `sentiment-${sentiment}`
 }
 
+/** 盘中要点分段标识（圆角方标文字）：按标题关键词区分，避免清一色"点" */
+function sectionBadgeText(title: string): string {
+  if (/盘面|回顾/.test(title)) return '盘'
+  if (/前瞻|午后|展望/.test(title)) return '瞻'
+  if (/资金|情绪/.test(title)) return '金'
+  return '点'
+}
+
+/** 盘中要点分段标识配色：盘面回顾→蓝、午后前瞻→紫、资金情绪→橙 */
+function sectionBadgeClass(title: string): string {
+  if (/盘面|回顾/.test(title)) return 'midday-badge--blue'
+  if (/前瞻|午后|展望/.test(title)) return 'midday-badge--purple'
+  if (/资金|情绪/.test(title)) return 'midday-badge--orange'
+  return 'midday-badge--blue'
+}
+
 /** 将早点听摘要与事件库标题做最小匹配，命中后直达对应 AI 事件分析。 */
 function eventMatchScore(target: string, candidate: string): number {
   const normalizedTarget = target.replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '')
@@ -489,27 +517,58 @@ async function changeDate(delta: number) {
   loadReport()
 }
 
-/** 切换晨报/午间报/晚报，重新加载当日对应类型的报告 */
+/** 切换晨报/午间报/晚报：状态切换 + 重载当前类型报告。
+ *  不重建页面（uni.redirectTo 同路由重建/复用在 H5 下不确定，会导致加载竞态、内容丢失）；
+ *  类型间数据残留由 fetchReportFor 各分支清空兜底。H5 端用 replaceState 同步地址栏类型参数。 */
 function switchType(type: BriefingTabType) {
   if (broadcastType.value === type) return
   broadcastType.value = type
   loadReport()
+  // #ifdef H5
+  syncUrlType(type)
+  // #endif
 }
+
+// #ifdef H5
+/** H5 端同步 URL 类型参数：仅更新地址栏（replaceState 不触发路由导航，页面不重建） */
+function syncUrlType(type: BriefingTabType) {
+  try {
+    const url = new URL(window.location.href)
+    url.searchParams.set('type', type)
+    url.searchParams.set('date', currentDate.value)
+    history.replaceState(null, '', url.toString())
+  } catch {
+    /* 忽略：地址栏同步失败不影响功能 */
+  }
+}
+// #endif
 
 /**
  * 拉取指定日期的广播与简报并写入展示状态，返回是否找到可用内容。
  * 仅消费通过严格校验的 Broadcast v1 / Brief v1（解析器强制绑定同日同类型，
  * 不会把跨日期或旧结构数据混入）。
+ * seq 为发起时的加载序号：await 期间类型/日期可能被再次切换（loadSeq 递增），
+ * 迟到结果必须丢弃，否则旧请求会覆盖新状态（如晨报请求晚到执行
+ * middayReport=null 清空刚加载好的午间报 → 盘中要点卡片消失）。
  */
-async function fetchReportFor(date: string): Promise<boolean> {
+async function fetchReportFor(date: string, seq: number): Promise<boolean> {
+  /** 本请求是否已过期（期间发生过新的加载） */
+  const stale = () => seq !== loadSeq
   try {
-    // 午间报分支：走通用报告端点（方案 A，audio_path 回填在 content 内），不消费 broadcast/brief
+    // 午间报分支：走通用报告端点（方案 A，audio_path 回填在 content 内），不消费 broadcast/brief。
+    // 必须先清空晨/晚报的广播与洞见条目（items/report/eveningViewModel）——
+    // 否则从晨报切回午间报时，晨报的 Agent 洞见会残留并渲染在午间报下方。
     if (broadcastType.value === 'midday') {
+      items.value = []
+      report.value = null
+      eveningViewModel.value = null
       const res: unknown = await agentApi.getReport('midday', date)
+      if (stale()) return false
       middayReport.value = parseMiddayReport(res, date)
       return middayReport.value !== null
     }
     // 午间报报告不适用于晨/晚报展示，切换类型时清空
+    if (stale()) return false
     middayReport.value = null
 
     // 晚报分支：并行加载 broadcast + brief + review
@@ -523,6 +582,7 @@ async function fetchReportFor(date: string): Promise<boolean> {
     }
 
     const [broadcastRes, briefRes, reviewRes] = await Promise.allSettled(requests)
+    if (stale()) return false
 
     // 仅消费通过严格校验的 Broadcast v1，避免跨日期或旧结构数据混入。
     if (broadcastRes.status === 'fulfilled') {
@@ -561,6 +621,8 @@ async function fetchReportFor(date: string): Promise<boolean> {
 
     return report.value !== null || items.value.length > 0
   } catch {
+    // 过期请求的异常不落状态（新请求会自行初始化）
+    if (stale()) return false
     report.value = null
     items.value = []
     middayReport.value = null
@@ -571,6 +633,8 @@ async function fetchReportFor(date: string): Promise<boolean> {
 
 async function loadReport() {
   if (!currentDate.value) return
+  // 每次加载递增序号：使仍在进行中的旧请求过期，丢弃其迟到结果（防竞态覆盖）
+  const seq = ++loadSeq
   loading.value = true
   // 切换日期/类型：暂停悬浮窗播放（避免旧报告音频继续，用户可手动续播）
   podcastStore.pause()
@@ -584,7 +648,8 @@ async function loadReport() {
     let found = false
     for (let offset = 0; offset <= MAX_FALLBACK_DAYS; offset++) {
       const date = offset === 0 ? requested : addCalendarDays(requested, -offset)
-      if (await fetchReportFor(date)) {
+      if (await fetchReportFor(date, seq)) {
+        if (seq !== loadSeq) return // 已切换到新加载，丢弃本轮回退结果
         if (offset > 0) {
           currentDate.value = date
           isFallback.value = true
@@ -594,12 +659,13 @@ async function loadReport() {
         break
       }
     }
+    if (seq !== loadSeq) return
     if (!found) {
       // 回退窗口内无任何报告：保持请求日期，展示空状态。
       currentDate.value = requested
     }
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
@@ -751,7 +817,41 @@ onLoad((options) => {
 }
 
 .midday-label {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
   margin-bottom: 16rpx;
+}
+
+/* 盘中研判标题星标：与早报「今日头条」★ 一致 */
+.midday-star {
+  font-size: 24rpx;
+  color: $primary;
+}
+
+/* 卡片标题前的圆角正方形标识（中间文字），与晨/晚报洞见卡图标（64rpx 圆角方标）风格一致 */
+.midday-badge {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
+  background: $primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+/* 盘中要点分段标识配色：盘面回顾→蓝、午后前瞻→紫、资金情绪→橙 */
+.midday-badge--blue { background: $primary; }
+.midday-badge--purple { background: #7c3aed; }
+.midday-badge--orange { background: #d97706; }
+
+/* 风险提示卡片：红色方标 */
+.midday-badge--risk {
+  background: #e04545;
 }
 
 .midday-label-text {
@@ -759,6 +859,12 @@ onLoad((options) => {
   font-weight: 700;
   color: $primary;
   letter-spacing: 2rpx;
+}
+
+.midday-risk-label-text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #e04545;
 }
 
 .midday-summary {
@@ -795,46 +901,76 @@ onLoad((options) => {
   box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
 }
 
+/* 午间报分段卡片：洞见卡同款布局（左侧方标 + 右侧标题/结论，结论随 body 缩进） */
+.midday-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.midday-section-body {
+  flex: 1;
+  min-width: 0;
+}
+
 .midday-section-title {
   display: block;
   font-size: 28rpx;
   font-weight: 600;
   color: $ink;
   line-height: 1.4;
-  margin-bottom: 8rpx;
+  margin-bottom: 6rpx;
 }
 
 .midday-section-conclusion {
-  display: block;
-  font-size: 25rpx;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-size: 24rpx;
   color: #4b5563;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
-/* 午间报风险提示卡片（对齐洞见行卡片样式） */
+/* 午间报风险提示：单卡片容器（标题方标 + 编号列表） */
 .midday-risk-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 12rpx;
   background: #ffffff;
   border-radius: 20rpx;
-  padding: 22rpx 28rpx;
+  padding: 28rpx 32rpx;
   margin-bottom: 16rpx;
   border: 1rpx solid $line;
   box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
 }
 
-.midday-risk-dot {
-  font-size: 24rpx;
+.midday-risk-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  margin-top: 18rpx;
+  /* 与标题/方标区形成层级缩进 */
+  padding-left: 20rpx;
+}
+
+/* 风险编号（圆角小方块） */
+.midday-risk-index {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 10rpx;
+  background: rgba(224, 69, 69, 0.10);
   color: #e04545;
-  line-height: 1.6;
+  font-size: 22rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  margin-top: 2rpx;
 }
 
 .midday-risk {
-  font-size: 25rpx;
+  font-size: 24rpx;
   color: #4b5563;
-  line-height: 1.6;
+  line-height: 1.5;
   flex: 1;
 }
 
