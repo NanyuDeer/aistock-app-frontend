@@ -105,10 +105,10 @@ const {
   visibleSteps, isAllCompleted, currentStep, currentStepTitle,
   startAnalysis,
 } = useAiReasoning([
-  { title: 'AI投资机会' },
+  { title: '投资机会洞见' },
   { title: '投资逻辑解析' },
   { title: '事件理解' },
-  { title: 'AI影响传导推理' },
+  { title: '事件影响传导推理' },
   { title: '历史验证' },
 ])
 

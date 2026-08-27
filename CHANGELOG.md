@@ -18,6 +18,136 @@
 
 ---
 
+## [master] 2026-08-26 — 悬浮播报 App 端面板定位修复
+
+**开发者**: Aria
+
+### 修复
+- `FloatingPodcast.vue`：展开面板右缘出屏 + 面板头部最右侧「关闭」按钮落在屏外点不到（用户反馈"× 叉不掉"、"右偏移到屏幕外"）。根因：App 内核整页缩放时 `right` 定位推算右缘溢出屏外（与既有注释记载的 App rpx 基准不一致问题一致）。修复：App/小程序分支静止/吸附/展开统一改为 `left` px 计算定位并 clamp（右缘恒为 winW - margin），面板与悬浮球完全落在屏内，关闭按钮回到可点击区域。
+- 验证：`FloatingPodcast.spec.ts` 2 个用例通过；`npx tsc --noEmit` 通过。
+
+---
+
+## [master] 2026-08-26 — 文档：部署 Web 前端流程补充
+
+**开发者**: Aria
+
+### 文档
+- `docs/app-update-release-process.md`：补充「部署 Web 前端」章节警告（`npm run build -- --dest` 无效，`scripts/build.js` 忽略 `--dest`，须用 rm+cp 方案）并新增常见问题条目「部署后网页没更新」（2026-08-26，0.1.2 重发时实测踩坑）
+
+---
+
+## [master] 2026-08-26 — 我的页 UI 完善 + 统一确认弹窗 + Modal 隐形拦截修复 + 多端适配
+
+**开发者**: Aria
+
+### 新增
+- 统一确认弹窗 `src/shared/components/ConfirmModal.vue`：基于 Modal 组件（白色圆角卡片 + 标题 + 关闭叉号 + 内容区 + footer 等宽按钮），样式与版本更新弹窗（UpdateModal）一致；支持 `v-model:visible`、title/content、confirmText/cancelText、showCancel（信息弹窗）、danger（删除等危险操作红字确认）；替换原生 `uni.showModal`（H5 浏览器原生样式不统一）：
+  - `profile.vue`：确认退出、确认删除（danger）、确认重置、关于洞见（单按钮）
+  - `favorites.vue`：删除自选股（单个/批量，danger）
+- 多端适配（方案 B 中等自适应，平板/折叠屏/横屏大屏）：
+  - `src/pages.json` globalStyle 配置 rpx 收敛参数（`rpxCalcMaxDeviceWidth: 1024` 等，平板/折叠屏展开时 rpx 放大不再失控）
+  - 新增 `src/shared/utils/useAdaptiveScreen.ts`：宽屏判断（阈值 700px）+ `uni.onWindowResize` 监听窗口变化（折叠屏展开/收起、平板旋转实时响应）
+  - `src/shared/utils/h5-scale.ts` 支持画布模式切换（手机 390×693 / 平板竖屏 860×900 / 平板横屏 1194×834 / 大屏 1024×768）：切换时同步 html font-size（rpx 基准）与 #app 尺寸，仅 H5 开发环境显示右下角切换按钮（localStorage 持久化）
+  - 宽屏布局：MainTabs/SubPageCard/SubPageCard2 宽屏内容限宽 1200px 居中；首页 feature-grid 宽屏 3 列
+
+### 修复
+- Modal.vue 隐藏态隐形拦截：`.as-modal:not(.is-visible) .as-modal__dialog { pointer-events: none }`——弹窗隐藏时（opacity:0）dialog 不再占据 DOM 捕获指针事件，修复首页「机构推荐热门股」整卡点不开（CDP 实证：居中的不可见版本更新弹窗恰好盖住屏幕中央卡片）；一并解决所有使用 Modal/UpdateModal 页面屏幕中央区域被隐形拦截的同类问题
+- 账号与安全页双顶栏：`src/pages.json` 为 `account-security`/`vip` 页补 `"navigationStyle": "custom"`（此前原生导航栏与 SubPageCard2 自带白色导航栏同时渲染）
+- ListCell 可点击列表项 H5 光标：`.as-list-cell.is-clickable` 补 `cursor: pointer; user-select: none`（与 Card 组件一致）
+- 首页白色卡片与提醒模块卡片按压动效：MorningContent.vue（feature-card/track-card）与 AlertContent.vue（module-card）复用 briefing-card 点击动效（`:active { transform: scale(0.98); box-shadow: $shadow-sm }`），与「今日专属」卡片一致
+
+### 改进
+- 账号与安全页改用 SubPageCard2（v2 白色导航栏，与 vip/insight/monitor 等新子页面视觉统一）：`account-security.vue` 由 SubPageCard v1 迁移，`noChatBar` → `no-chat-bar`，内容区顶部加 32rpx 间距
+- profile.vue「对话引导」重置先弹确认窗：确认后才清除 `chat_empty_guide_closed` 标记并提示，取消无操作
+- profile.vue「关于」入口修正：由仅弹 toast（版本号过期 v2.1）改为弹关于对话框（洞见 v0.1.2 + 简介 + 免责声明），菜单项移到「版本更新」下方；最终菜单顺序：自选股 → 账号与安全 → 对话引导 → 版本更新 → 关于
+- 文档：`src/modules/user/AGENTS.md` 补充 account-security/vip 页面登记，注明 SubPageCard2 容器使用情况
+
+### 验证
+- CDP 实证：Modal 隐形拦截根因（`document.elementFromPoint` 命中 um-footer）+ 修复后真实鼠标点击卡片跳转成功；多端画布切换（尺寸/rpx 基准/缩放）、首页 is-wide 类、宽屏 3 列均正常
+- 多端适配经 5 轮验收修正收敛（平板按宽缩放/完整显示、画布模式 4 个、宽屏限宽 1200px、平板竖屏 860×900 等）
+
+---
+
+## [master] 2026-08-26 — 午间报展示与播报 + 邮箱登录 App 联调 + 请求 scheme 修复
+
+**开发者**: Aria
+
+### 新增
+- 首页「今日专属」报卡补充午间报：`src/modules/home/components/MorningContent.vue` 按时间自动切换晨报/午间报/晚报（12:00–15:30 显示午间报，摘要+短关键词标签与晨/晚报样式统一）；`src/shared/utils/useBriefingCard.ts` 扩展支持 `midday` 类型（走 `/agent/report/midday/:date` 的 display_report 结构，晨/晚报仍走 `/agent/brief/:type/:date`）；`briefingTypeAtShanghaiTime` 时段划分：15:30+ 晚报 / 12:00–15:30 午间报 / 早间晨报
+- agent-report 概览加入「午间报」入口：`src/modules/chat/pages/agent-report.vue` 概览卡片在「收盘复盘」正上方新增午间报卡片（`OVERVIEW_ORDER` 增加 `midday`），走统一 `/agent/report/:intent/:date` 读取，点击 `selectAgent('midday')` 原地加载详情；`AGENT_META`/`titleMap` 新增 midday 配置
+- `src/shared/utils/middayReport.ts`：新增 `MiddaySection` 接口与 `normalizeSections` 归一化多分段摘要（仅保留含非空 conclusion 的项，容忍 LLM 字段缺漏/顺序变化）
+- `src/shared/utils/briefingNavigation.ts`：`buildBriefingUrl` 类型扩展支持 `midday`
+- 邮箱登录 App 前端联调打通：`Input.vue` 修复输入框高度塌缩为 0px 无法点击（`.as-input__inner` 固定 `height: 88rpx; box-sizing: border-box`）与 v-model 失效（`handleInput` 优先读 uni-app 标准 `event.detail.value`，保留 `target.value` 兜底）；邮箱登录表单验证码发送、60s 倒计时与登录落盘正常
+
+### 修复
+- App 调试请求 scheme 错误导致首页无数据：`src/shared/utils/constants.ts` 新增 `isExternalUrl()`（仅接受绝对且非回环地址），`API_BASE_URL`/`WS_BASE_URL`/`AGENT_WS_BASE_URL` 在 APP-PLUS 下仅接受外部绝对地址、否则兜底线上，不再被 dev 注入的相对 `/api` 或 `localhost` 覆盖（真机/基座调试不再报 `request:fail Expected URL scheme 'http' or 'https'`）；`src/shared/api/request.ts` baseURL 直接复用 constants 的 `API_BASE_URL`，删除重复的 `|| /api` 判定
+- 早点听午间报格式对齐晨/晚报（精简）：`src/pages-sub-app/briefing/index.vue` 午间报页由「完整长报告」改为与晨/晚报一致的精简结构——播报器 + 「盘中研判」结论卡 + 风险提示洞见卡，移除 `details` 全文渲染，新增「查看完整报告」入口 `openMiddayFullReport()` 跳转 agent-report 查看完整 Markdown
+- 邮箱绑定报错透传 + 空壳账户自动接管：`src/shared/api/request.ts` 非 2xx 错误归一化时把原始响应体挂到 `error.data`；`src/modules/user/pages/account-security.vue` `handleBind` 失败 toast 优先取 `e.data.message`，绑定被空账户占用的邮箱时自动释放旧账户并绑定成功
+- `src/shared/components/MainTabs.vue`：移除 `touch-action: none`（H5 端预览 App 会禁用浏览器原生触摸滚动与点击识别，导致「划很多次才动」、卡片点击无反应）
+
+### 验证
+- `vue-tsc --noEmit` 退出码 0；`node --import tsx --test` 相关用例全过（含午间报入口/格式新增用例）
+
+---
+
+## [master] 2026-08-25 — App 手机号短信验证码登录 + 账号与安全绑定
+
+**开发者**: Aria
+
+### 变更
+- `src/shared/api/modules/auth.ts`：新增 `sendSmsCode` / `smsLogin` / `bindPhone` / `bindWechat` 接口
+- `src/shared/store/modules/user.ts`：新增短信登录、手机/微信绑定 actions，维护 `phoneBound` / `wechatBound` 绑定态
+- `src/modules/user/pages/login.vue`：登录页新增「手机号验证码登录」入口与表单（手机号/验证码输入、60s 倒计时、dev 固定测试码 123456），可切回微信登录
+- `src/modules/user/pages/account-security.vue`（新增）：账号与安全页——展示并绑定/解绑手机号与微信，归属冲突 409 时展示引导文案
+- `src/modules/user/pages/profile.vue`：新增「账号与安全」入口
+- `src/pages.json`：注册 `modules/user/pages/account-security` 路由
+
+### 说明
+- 微信老用户数据保留：手机号登录后可在账号与安全页绑回原微信；微信用户也可绑定手机号，两渠道数据归属同一账户
+
+---
+
+## [master] 2026-08-25 — AI 报告详情改 VIP 会员专属 + 移除导出（renderjs 导出实现一并清理）
+
+**开发者**: Aria
+
+### 背景
+- 手机端导出 PDF 体验差、renderjs 视图层生成不稳定（预生成/导出超时），且在手机上阅读/截图即可满足需求 → 移除「导出报告」，报告改为 App 内纯阅读；同时报告详情设为 VIP 会员专属，非会员进入详情前弹窗引导开通
+
+### 变更
+- `src/modules/chat/pages/agent-report.vue`：移除导出入口（右上角「导出报告」按钮）与全部导出实现（renderjs `pdfExporter` 模块、预生成缓存、`savePdfAndShare`、`onPdfBase64/onPdfError` 等）；新增 VIP 门禁 `vipModalVisible` 弹窗，概览→详情与深层链接两条路径均校验 `userInfo.isVip`，非会员回退展示概览并引导跳转 VIP 页
+- `src/modules/user/pages/vip.vue`（新增）：会员中心占位页（SubPageCard2 容器，含「开通会员」底栏与开发中提示；`isVip` 时切换为已开通态）
+- `src/pages.json`：注册 `modules/user/pages/vip` 路由
+- `src/shared/components/FloatingPodcast.vue`：连续播放开关改用 uni-app 原生 `<switch>`（消除「Failed to resolve component: Switch」构建警告）
+
+### 说明
+- VIP 判定沿用 `userInfo.isVip`（后端 `/users/me` 的 `is_vip` 归一化）；未登录按非会员处理
+
+---
+
+## [master] 2026-08-25 — 发布流程文档补全 + 修复「已装 0.1.1 仍反复弹更新」
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/useAppUpdate.ts`：本机 versionCode 读取改走 `plus.android.invoke(pkgInfo,'get','versionCode')`（不可直接 `pkgInfo.versionCode` 属性访问，否则读不到返回 0 被误判比线上旧而反复弹更新）；`current<=0`（读取失败）保守视为已最新，避免反复误弹
+
+### 文档
+- `docs/app-update-release-process.md`：补全第 0 节「前置条件与权限」（HBuilderX 开发版 / DCloud 云打包权限 / 正式签名证书 / SSH / 仓库访问）、第 2.0 节「打包前 git pull 最新主干」、第 3 节正式证书注意事项、第 5 节 `export PATH` 前置、自检清单与 10 步流程速览、FAQ 补充
+
+---
+
+## [master] 2026-08-25 — 首页简报卡片：大盘无归因时改用市场异象关键词标签
+
+**开发者**: 协作
+
+### 修复
+- `src/modules/home/components/MorningContent.vue`：`summaryTags` 当头条为「归因结论」且结论命中降级文案（`证据不足|未确认主因|暂无明确主因`）时，改从市场异象条目（收盘复盘/市场快照）取结论切标签；新增 `isDowngradedAttribution` / `marketAnomalyText` 辅助函数
+- `src/modules/home/components/MorningContent.spec.ts`：新增静态断言校验降级判定与市场异象回退逻辑
+
+---
+
 ## [changer] 2026-08-25 — AI 投顾对话页长按菜单优化（滑动误触 + 原位浮动菜单 + 圈选复制）
 
 **开发者**: 37588

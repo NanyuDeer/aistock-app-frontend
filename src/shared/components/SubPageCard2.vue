@@ -4,7 +4,11 @@
  * 保留 app 前端业务逻辑：GlobalChatBar + statusBarHeight + goBack(backUrl) + noChatBar
  */
 <template>
-  <view class="as-sub2" :style="{ paddingTop: statusBarHeight + 'px' }">
+  <view
+    class="as-sub2"
+    :class="{ 'is-wide': isWide }"
+    :style="{ paddingTop: statusBarHeight + 'px' }"
+  >
     <!-- 白色导航栏：返回按钮 + 标题/副标题 + 右侧按钮 -->
     <view class="as-sub2__nav" :class="{ 'as-sub2__nav--subtitle': subtitle }">
       <view class="as-sub2__nav-left">
@@ -23,12 +27,13 @@
 
     <!-- 中间内容区域 -->
     <view class="as-sub2__body" :style="bodyStyle">
+      <!-- 原生滚动：enhanced 在 H5 端 passive touchmove preventDefault 触发浏览器 Warning，
+           回归 scroll-y 原生滚动（与首页 MainTabs 一致） -->
       <scroll-view
         scroll-y
         class="as-sub2__scroll"
-        :enhanced="true"
-        :bounces="false"
         :scroll-into-view="scrollIntoView"
+        :scroll-top="scrollTop"
       >
         <slot />
       </scroll-view>
@@ -52,10 +57,14 @@ import { onShow, onHide } from '@dcloudio/uni-app'
 import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import FloatingPodcast from '@/shared/components/FloatingPodcast.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
+import { useAdaptiveScreen } from '@/shared/utils/useAdaptiveScreen'
 
 /** 模块级自增：每个容器实例唯一页面标识（FloatingPodcast 据此判定本页是否前台） */
 let subPageSeq = 0
 const pageKey = `sub2-${++subPageSeq}`
+
+/** 多端适配：宽屏（平板/折叠屏展开/横屏）时子页面限宽居中 */
+const { isWide } = useAdaptiveScreen()
 
 // 页面可见性 → store.activePage：uni-h5 页面被 KeepAlive 缓存不卸载，
 // 悬浮球渲染权必须跟随前台页面（否则渲染在隐藏页面/多实例双播放）。
@@ -83,6 +92,8 @@ const props = withDefaults(defineProps<{
   noChatBar?: boolean
   /** 需要滚动到的子元素 id */
   scrollIntoView?: string
+  /** 指定内容区域的纵向滚动位置 */
+  scrollTop?: number
 }>(), {
   title: '',
   subtitle: '',
@@ -91,6 +102,7 @@ const props = withDefaults(defineProps<{
   backUrl: '/modules/home/pages/index',
   noChatBar: false,
   scrollIntoView: '',
+  scrollTop: 0,
 })
 
 /** noChatBar 时 padding 为 0，否则使用传入的 contentPaddingBottom */
@@ -138,6 +150,14 @@ defineExpose({ goBack })
   background: $bg-card;
   overscroll-behavior: none;
   touch-action: none;
+}
+
+/* 多端适配：宽屏（平板/折叠屏展开/横屏）时子页面限宽居中，避免文字行过长 */
+.as-sub2.is-wide {
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ===== 白色导航栏 ===== */

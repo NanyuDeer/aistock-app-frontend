@@ -12,7 +12,7 @@ export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(storage.get(STORAGE_KEYS.USER_INFO))
   const settings = ref<UserSettings>({})
 
-  const isLoggedIn = () => !!token.value || !!userInfo.value?.openid
+  const isLoggedIn = () => !!token.value || !!userInfo.value?.id
 
   function clearSession() {
     token.value = ''
@@ -48,6 +48,25 @@ export const useUserStore = defineStore('user', () => {
     }
     // 再调 getUserInfo 获取完整信息（id, createdAt 等）
     await fetchUserInfo()
+  }
+
+  /** 邮箱 + 验证码登录（无账户自动创建；dev 验证码 123456） */
+  async function emailLogin(email: string, code: string) {
+    const result: any = await authApi.emailLogin(email, code)
+    token.value = result.token
+    storage.set(STORAGE_KEYS.TOKEN, result.token)
+    if (result.userInfo) {
+      userInfo.value = {
+        id: result.userInfo.id,
+        openid: result.userInfo.openid || '',
+        email: result.userInfo.email || '',
+        nickname: result.userInfo.nickname || '',
+        avatar: result.userInfo.avatar || result.userInfo.avatar_url || '',
+      }
+      storage.set(STORAGE_KEYS.USER_INFO, userInfo.value)
+    }
+    await fetchUserInfo()
+    return userInfo.value
   }
 
   /** 扫码登录成功后，存储 token 并获取用户信息 */
@@ -122,6 +141,7 @@ export const useUserStore = defineStore('user', () => {
     isLoggedIn,
     login,
     wxLogin,
+    emailLogin,
     handleScanLoginSuccess,
     fetchUserInfo,
     restoreSession,

@@ -30,31 +30,55 @@
           <text class="audio-arrow">›</text>
         </view>
 
-        <!-- 午间报专属卡片：盘中报 display_report（summary/details/risks），样式参考晨报头条卡片（仅午间报展示） -->
-        <view v-if="broadcastType === 'midday' && middayReport" class="midday-card">
-          <view class="midday-label">
-            <text class="midday-label-text">盘中报</text>
-          </view>
-          <text
-            v-if="middayReport.content.display_report.summary"
-            class="midday-summary"
-          >{{ middayReport.content.display_report.summary }}</text>
-          <text
-            v-if="middayReport.content.display_report.details"
-            class="midday-details"
-          >{{ middayReport.content.display_report.details }}</text>
-          <view
-            v-if="middayReport.content.display_report.risks.length"
-            class="midday-risks"
-          >
-            <text class="midday-risks-title">风险提示</text>
+        <!-- 午间报专属精简卡片：盘中报仅展示精简结论（summary + 风险提示），完整报告跳转 agent-report（与晨/晚报"播报器+洞见卡"的精简结构一致） -->
+        <template v-if="broadcastType === 'midday' && middayReport">
+          <view class="midday-card">
+            <view class="midday-label">
+              <text class="midday-label-text">盘中研判</text>
+            </view>
             <text
-              v-for="risk in middayReport.content.display_report.risks"
-              :key="risk"
-              class="midday-risk"
-            >{{ risk }}</text>
+              v-if="middayReport.content.display_report.summary"
+              class="midday-summary"
+            >{{ middayReport.content.display_report.summary }}</text>
+            <text v-else class="midday-summary">今日盘中报已生成</text>
+            <view class="midday-view-entry" @tap="openMiddayFullReport">
+              <text class="midday-view-entry-text">查看完整报告</text>
+              <SvgIcon name="arrow-right-s-line" size="30rpx" color="#0b5fff" />
+            </view>
           </view>
-        </view>
+
+          <!-- 多分段摘要：与晨/晚报 Agent 洞见卡一致的多个精简要点 -->
+          <template v-if="middayReport.content.display_report.sections.length">
+            <view class="section-label">
+              <text class="section-label-text">盘中要点</text>
+              <view class="section-line" />
+            </view>
+            <view
+              v-for="(sec, index) in middayReport.content.display_report.sections"
+              :key="index"
+              class="midday-section-card"
+            >
+              <text v-if="sec.title" class="midday-section-title">{{ sec.title }}</text>
+              <text class="midday-section-conclusion">{{ sec.conclusion }}</text>
+            </view>
+          </template>
+
+          <!-- 风险提示（精简为洞见卡片样式，仅当日存在风险时展示） -->
+          <template v-if="middayReport.content.display_report.risks.length">
+            <view class="section-label">
+              <text class="section-label-text">风险提示</text>
+              <view class="section-line" />
+            </view>
+            <view
+              v-for="(risk, index) in middayReport.content.display_report.risks"
+              :key="index"
+              class="midday-risk-card"
+            >
+              <text class="midday-risk-dot">•</text>
+              <text class="midday-risk">{{ risk }}</text>
+            </view>
+          </template>
+        </template>
 
         <!-- 大盘洞见卡片（原市场异象）：参考早报「今日头条」卡片设计，紧跟音频播报下方（仅晚报展示，有异象时显示） -->
         <template v-if="broadcastType === 'evening' && eveningViewModel">
@@ -245,6 +269,7 @@ const report = ref<BroadcastV1 | null>(null)
 const items = ref<BriefingItem[]>([])
 /** 午间报报告（方案 A：audio_path 回填在 content 内，可能无音频） */
 const middayReport = ref<MiddayReport | null>(null)
+
 /** 播放状态来自悬浮窗 store（FloatingPodcast AudioPlayer 事件同步），页面内按钮与悬浮球状态一致 */
 const isPlaying = computed(() => podcastStore.playing)
 /** 悬浮播报 store：音频统一由全局悬浮窗承载，跨页切换状态不丢 */
@@ -411,6 +436,13 @@ function goDetail() {
   if (broadcastType.value === 'midday') return
   uni.navigateTo({
     url: buildBriefingDetailUrl(currentDate.value, broadcastType.value),
+  })
+}
+
+/** 午间报完整报告跳转 agent-report（intent=midday）展示 details 全文；页面本身只保留精简结论。 */
+function openMiddayFullReport() {
+  uni.navigateTo({
+    url: `/modules/chat/pages/agent-report?intent=midday&date=${currentDate.value}`,
   })
 }
 
@@ -735,36 +767,75 @@ onLoad((options) => {
   color: $ink;
   line-height: 1.4;
   display: block;
-  margin-bottom: 16rpx;
-}
-
-.midday-details {
-  font-size: 26rpx;
-  color: #4b5563;
-  line-height: 1.6;
-  display: block;
   margin-bottom: 20rpx;
-  white-space: pre-wrap;
 }
 
-.midday-risks {
-  margin-top: 8rpx;
+.midday-view-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  background: rgba(11, 95, 255, 0.06);
+  border-radius: 999rpx;
+  padding: 12rpx 24rpx;
 }
 
-.midday-risks-title {
+.midday-view-entry-text {
   font-size: 24rpx;
   font-weight: 600;
-  color: #e04545;
+  color: $primary;
+}
+
+/* 午间报多分段摘要卡片（对齐洞见行卡片样式） */
+.midday-section-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 16rpx;
+  border: 1rpx solid $line;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
+}
+
+.midday-section-title {
   display: block;
-  margin-bottom: 12rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: $ink;
+  line-height: 1.4;
+  margin-bottom: 8rpx;
+}
+
+.midday-section-conclusion {
+  display: block;
+  font-size: 25rpx;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+/* 午间报风险提示卡片（对齐洞见行卡片样式） */
+.midday-risk-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 22rpx 28rpx;
+  margin-bottom: 16rpx;
+  border: 1rpx solid $line;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
+}
+
+.midday-risk-dot {
+  font-size: 24rpx;
+  color: #e04545;
+  line-height: 1.6;
+  flex-shrink: 0;
 }
 
 .midday-risk {
-  font-size: 24rpx;
-  color: #e04545;
-  line-height: 1.5;
-  display: block;
-  margin-bottom: 8rpx;
+  font-size: 25rpx;
+  color: #4b5563;
+  line-height: 1.6;
+  flex: 1;
 }
 
 /* 分区标签 */

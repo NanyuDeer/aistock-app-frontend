@@ -345,7 +345,7 @@ watch(
   }
 }
 
-/* 灰色卡片容器：参考 InsightListCard 设计 */
+/* 灰色卡片容器：参考 InsightListCard 设计；与首页今日专属卡片一致的按压动效 */
 .module-card {
   background: $bg-soft;
   border: 2rpx solid $line;
@@ -354,6 +354,12 @@ watch(
   position: relative;
   overflow: hidden;
   box-shadow: $shadow-card;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: $shadow-sm;
+  }
 }
 
 /* 顶部装饰条 */

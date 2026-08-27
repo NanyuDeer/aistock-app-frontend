@@ -117,7 +117,7 @@
                 class="drag-handle"
                 @tap.stop="noop"
                 @touchstart.stop="onDragStart($event, index)"
-                @touchmove.stop.prevent="onDragMove($event)"
+                @touchmove.stop="onDragMove($event)"
                 @touchend.stop="onDragEnd"
                 @touchcancel.stop="onDragEnd"
               >
@@ -200,6 +200,18 @@
       <!-- 底部留白，避免被 GlobalChatBar 遮挡 -->
       <view class="bottom-spacer"></view>
     </view>
+
+    <!-- 统一确认弹窗（样式对齐版本更新弹窗） -->
+    <ConfirmModal
+      v-model:visible="modalVisible"
+      :title="modal?.title || ''"
+      :content="modal?.content || ''"
+      :confirm-text="modal?.confirmText"
+      :cancel-text="modal?.cancelText"
+      :show-cancel="modal?.showCancel ?? true"
+      :danger="modal?.danger ?? false"
+      @confirm="handleModalConfirm"
+    />
   </SubPageCard>
 </template>
 
@@ -213,6 +225,7 @@ import { stockApi, type KLineItem } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
+import { ConfirmModal } from '@/shared/components'
 import MiniKLine from '@/modules/favorites/components/MiniKLine.vue'
 
 /* ===== 类型定义 ===== */
@@ -224,6 +237,28 @@ interface StockItem {
   changeAmount: number
   margin: boolean
   specialAlert: boolean
+}
+
+/* ===== 统一确认弹窗状态（替换原生 uni.showModal，样式对齐版本更新弹窗） ===== */
+interface ModalOptions {
+  title: string
+  content: string
+  confirmText?: string
+  cancelText?: string
+  showCancel?: boolean
+  danger?: boolean
+  onConfirm?: () => void | Promise<void>
+}
+const modal = ref<ModalOptions | null>(null)
+const modalVisible = ref(false)
+
+function openModal(options: ModalOptions) {
+  modal.value = options
+  modalVisible.value = true
+}
+
+function handleModalConfirm() {
+  void modal.value?.onConfirm?.()
 }
 
 /* ===== 排序状态 ===== */
@@ -412,12 +447,12 @@ function toggleSelectAll() {
 function confirmRemoveMany() {
   if (!selectedCount.value) return
   const count = selectedCount.value
-  uni.showModal({
+  openModal({
     title: '删除自选股',
     content: `确认删除选中的 ${count} 只自选股吗？`,
     confirmText: '删除',
-    success: async ({ confirm }) => {
-      if (!confirm) return
+    danger: true,
+    onConfirm: async () => {
       const removed = await favoritesStore.removeMany([...selectedSymbols.value])
       if (removed) {
         // 从编辑列表同步移除已删除项，保持展示与后端一致；排序随后在点"完成"时校验
@@ -585,12 +620,12 @@ function retrySync() {
 
 function confirmRemove(stock: StockItem) {
   if (favoritesStore.isPending(stock.symbol)) return
-  uni.showModal({
+  openModal({
     title: '删除自选股',
     content: `确认将 ${stock.name} 从自选股中删除吗？`,
     confirmText: '删除',
-    success: async ({ confirm }) => {
-      if (!confirm) return
+    danger: true,
+    onConfirm: async () => {
       const removed = await favoritesStore.remove(stock.symbol)
       if (removed) uni.showToast({ title: '已移除自选', icon: 'none' })
     },
@@ -970,6 +1005,8 @@ function goSearch() {
   justify-content: center;
   margin-left: 16rpx;
   flex-shrink: 0;
+  /* 拖拽时由样式层禁用默认滚动，替代 @touchmove.prevent 以避免 passive 告警 */
+  touch-action: none;
 }
 
 /* 编辑态底部操作栏 */
