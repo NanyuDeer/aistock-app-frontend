@@ -1,5 +1,6 @@
 <template>
-  <view class="article-page">
+  <!-- custom 导航下页面从屏幕最顶开始渲染，需为系统状态栏预留高度，避免自绘导航栏被遮挡 -->
+  <view class="article-page" :style="{ paddingTop: statusBarHeight + 'px' }">
     <!-- 自绘返回导航栏 -->
     <view class="nav-bar">
       <view class="nav-back" hover-class="nav-back--hover" @click="goBack">
@@ -68,6 +69,21 @@ const loading = ref(false)
 
 /** 错误信息（加载失败），空表示无错误 */
 const error = ref('')
+
+/** 状态栏高度（px）：与 SubPageCard2 同款方案，APP 端需除以 zoom(1.2) 补偿 */
+const statusBarHeight = ref(0)
+try {
+  const sysInfo = uni.getSystemInfoSync()
+  const raw = sysInfo.statusBarHeight || 0
+  // #ifdef APP-PLUS
+  statusBarHeight.value = raw / 1.2
+  // #endif
+  // #ifndef APP-PLUS
+  statusBarHeight.value = raw
+  // #endif
+} catch {
+  statusBarHeight.value = 0
+}
 
 function goBack() {
   const pages = getCurrentPages()

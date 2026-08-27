@@ -2,6 +2,14 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [xusiyun] 2026-08-27 — 修复事件原文详情页顶部状态栏遮挡
+
+**开发者**: xusiyun
+
+### 修复
+- `src/pages-sub-app/event-article/index.vue`：页面配置 `navigationStyle: custom` 后自绘导航栏从屏幕最顶渲染，返回按钮与「原文详情」标题被系统状态栏/摄像头/刘海遮挡。修复：页面根容器增加 `paddingTop: statusBarHeight`（`uni.getSystemInfoSync().statusBarHeight`，APP 端除以 zoom 1.2 补偿，与 SubPageCard2 同款方案），兼容 iOS 刘海 / Android 状态栏 / 普通设备 / H5（H5 statusBarHeight=0，无额外顶部空白）。
+- 验证：`npm run type-check` 通过；`npm run build:app` 构建通过且产物含修复；H5 实测 statusBarHeight=0、导航栏紧贴视口顶端、正文正常从导航栏下方开始；真机待验证。
+
 ## [changer] 2026-08-26 — AI 投顾追问面板（回答后底部建议追问 + 输入框）
 
 **开发者**: 37588
