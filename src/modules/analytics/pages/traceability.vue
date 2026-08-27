@@ -34,29 +34,7 @@
       <EmptyState v-else-if="!presentation" text="当日暂无已完成复盘报告" />
 
       <view v-else class="report-content">
-        <MarketTraceHeader :presentation="presentation" />
-        <MarketTracePhenomenon :presentation="presentation" />
-        <MarketTraceTimeline :presentation="presentation" />
-        <MarketTraceAlternatives :presentation="presentation" />
-        <MarketTraceRejected :presentation="presentation" />
-        <MarketTracePendingRisks :presentation="presentation" />
-        <MarketTracePrediction :prediction="presentation.prediction" />
-        <!-- 空态占位：prediction 为 null（prediction_records 暂无记录）时不影响其他报告内容 -->
-        <view v-if="presentation.prediction === null" class="prediction-placeholder">
-          <text class="prediction-placeholder-text">{{ predictionPlaceholderText }}</text>
-          <text v-if="predictErr" class="prediction-retry" @tap="retryPrediction">点击重试</text>
-        </view>
-
-        <!-- 折叠兜底：完整 markdown -->
-        <view class="markdown-section">
-          <view class="section-title" @tap="toggleMarkdown">
-            <text class="title-text">完整报告（原始）</text>
-            <text class="toggle-icon" :class="{ 'is-open': showMarkdown }">▾</text>
-          </view>
-          <view v-if="showMarkdown" class="markdown-card">
-            <rich-text :nodes="markdownHtml" class="report-html" />
-          </view>
-        </view>
+        <MarketInsightCard :presentation="presentation" />
       </view>
 
       <!-- 日期切换（放在 footer 插槽，固定在底部不依赖 scroll-view 滚动） -->
@@ -77,42 +55,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { LoadingState, EmptyState, Button, Card } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
-import type { MarketTraceReviewRecord } from '@/shared/api/modules/agent'
 import { predictionApi } from '@/shared/api/modules/prediction'
-import { shanghaiDateString, shanghaiDateTimeParts, addCalendarDays } from '@/shared/utils/tradingTime'
+import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import { traceDateCandidates } from '@/shared/utils/traceDate'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { markdownToHtml } from '@/shared/utils/markdown'
 import { toMarketTracePresentation, type MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
-import MarketTraceHeader from '@/modules/analytics/components/MarketTraceHeader.vue'
-import MarketTracePendingRisks from '@/modules/analytics/components/MarketTracePendingRisks.vue'
-import MarketTracePhenomenon from '@/modules/analytics/components/MarketTracePhenomenon.vue'
-import MarketTraceTimeline from '@/modules/analytics/components/MarketTraceTimeline.vue'
-import MarketTraceAlternatives from '@/modules/analytics/components/MarketTraceAlternatives.vue'
-import MarketTraceRejected from '@/modules/analytics/components/MarketTraceRejected.vue'
-import MarketTracePrediction from '@/modules/analytics/components/MarketTracePrediction.vue'
+import MarketInsightCard from '@/modules/analytics/components/MarketInsightCard.vue'
 
 const loading = ref(false)
 const error = ref(false)
 const presentation = ref<MarketTracePresentation | null>(null)
 const reportAvailability = ref<'pending' | 'failed' | null>(null)
-const showMarkdown = ref(false)
 
-/** 当前实际展示报告的日期（回退后为上一交易日；用于预判占位文案的"今日"判断） */
+/** 当前实际展示报告的日期（回退后为上一交易日） */
 const displayedDate = ref('')
-/** 预测接口独立失败标记（report 成功但 prediction 拉取失败时置 true） */
-const predictErr = ref(false)
-/** 最近一次 completed 的 Report 原文，供预测重试时重组 presentation */
-const fetchedReport = ref<MarketTraceReviewRecord | null>(null)
-
-const markdownHtml = computed(() => {
-  return presentation.value ? markdownToHtml(presentation.value.markdownDetails) : ''
-})
 
 /** 当前导航到的目标交易日（切日基准；默认今天） */
 const date = ref(shanghaiDateString())
@@ -122,7 +83,6 @@ async function fetchData(strictTarget?: string) {
   error.value = false
   presentation.value = null
   reportAvailability.value = null
-  predictErr.value = false
 
   try {
     // strictTarget 提供时严格只看该日（切日不回退）；否则从 date 起向前回退找最近 completed（进入页面/轮询默认体验）
@@ -137,13 +97,11 @@ async function fetchData(strictTarget?: string) {
           .catch(() => ({ ok: false as const, r: null })),
       ])
 
-      // 找到已完成报告：采用该日期，并落 prediction（失败则 predictErr，占位给重试）
+      // 找到已完成报告：采用该日期，并透传 prediction 供预判块展示
       if (record && record.status === 'completed') {
         const model = toMarketTracePresentation(record, cdate, predResp.ok ? (predResp.r?.items?.[0] ?? null) : null)
         if (model) {
-          fetchedReport.value = record
           displayedDate.value = cdate
-          predictErr.value = !predResp.ok
           // 清除此前候选日残留的 'pending'，确保已采用的历史报告正常展示
           reportAvailability.value = null
           presentation.value = model
@@ -191,23 +149,8 @@ async function changeDate(delta: number) {
   await fetchData(target)
 }
 
-/** 预判卡片空态占位文案：失败态 / 回退日期 / 当日分时感知 */
-const predictionPlaceholderText = computed(() => {
-  if (predictErr.value) return '预判加载失败'
-  // 回退到历史日期：无“生成中”概念，只表示该日无预判
-  if (displayedDate.value !== shanghaiDateString()) return '该日暂无预判数据'
-  const { hour, minute } = shanghaiDateTimeParts()
-  return hour * 60 + minute >= 20 * 60 + 30
-    ? '今日暂无预判数据'
-    : '预判生成中（今日 20:30 后可见）'
-})
-
 function retry() {
   void fetchData()
-}
-
-function toggleMarkdown() {
-  showMarkdown.value = !showMarkdown.value
 }
 
 function goPredictionHistory() {
@@ -227,29 +170,6 @@ function stopRefreshTimer() {
   if (refreshTimer) {
     clearInterval(refreshTimer)
     refreshTimer = null
-  }
-}
-
-async function retryPrediction() {
-  const report = fetchedReport.value
-  const date = displayedDate.value
-  if (!report || !date || predictErr.value === false) return
-  predictErr.value = false
-  const predResp = await predictionApi
-    .list({ source_id: `review:${date}` })
-    .then((r) => ({ ok: true as const, r }))
-    .catch(() => ({ ok: false as const, r: null }))
-  if (!predResp.ok) {
-    predictErr.value = true
-    uni.showToast({ title: '预判加载失败，请重试', icon: 'none' })
-    return
-  }
-  const model = toMarketTracePresentation(report, date, predResp.r?.items?.[0] ?? null)
-  if (model) {
-    presentation.value = model
-  } else {
-    // 拉到了但未命中 completed/预判为 null → 展示占位（无失败）即可
-    presentation.value = toMarketTracePresentation(report, date, null)
   }
 }
 
@@ -323,41 +243,4 @@ onUnload(stopRefreshTimer)
   font-weight: 500;
 }
 
-.markdown-section { padding: 0 $spacing-base; margin-top: $spacing-base; }
-.markdown-section .section-title {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: $spacing-sm; background: $bg-soft; border-radius: $r-md;
-}
-.title-text { font-size: 26rpx; font-weight: 500; color: $text-color-title; }
-.toggle-icon { font-size: 24rpx; color: $text-color-secondary; transition: transform 0.2s; }
-.toggle-icon.is-open { transform: rotate(180deg); }
-.markdown-card {
-  margin-top: $spacing-sm; padding: $spacing-base;
-  background: $bg-card; border-radius: $r-md; box-shadow: $shadow-card;
-}
-
-.prediction-placeholder {
-  margin: 0 $spacing-base $spacing-sm;
-  padding: $spacing-base;
-  background: $bg-card;
-  border-radius: $r-md;
-  box-shadow: $shadow-card;
-}
-
-.prediction-placeholder-text {
-  font-size: $font-size-base;
-  color: $text-color-secondary;
-}
-
-.prediction-retry {
-  display: inline-block;
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  color: $primary;
-  text-decoration: underline;
-}
-.report-html { display: block; color: $text-color; font-size: 24rpx; line-height: 1.7; }
-.report-html :deep(.md-h2) { margin: 12rpx 0; color: $text-color-title; font-size: 28rpx; font-weight: 600; }
-.report-html :deep(.md-h1) { margin: 12rpx 0; color: $text-color-title; font-size: 30rpx; font-weight: 600; }
-.report-html :deep(.md-h3) { margin: 10rpx 0; color: $text-color-title; font-size: 26rpx; font-weight: 600; }
 </style>
