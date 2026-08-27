@@ -355,6 +355,8 @@ import Card from '@/shared/components/Card.vue'
 | `KLineChart.vue` | [组件库] 无对应，从 analytics 提升 | 通用 K 线渲染（H5/APP-PLUS renderjs+klinecharts，MP-WEIXIN uCharts 画布），Props `{ title: string; data: TrendKLineData }` |
 | `AudioPlayer.vue` | [组件库] | 通用音频播放器（H5 HTMLAudioElement / App+小程序 InnerAudioContext 运行时分流），Props `{ src; title?; cover?; autoplay?; initialTime? }`，Emits `play`/`pause`/`ended`/`timeupdate`；卸载/换源时先 stop 再 destroy 确保音频立即停止（全局互斥抢占依赖此行为） |
 | `FloatingPodcast.vue` | App 专属 | 播报悬浮球/播放条（页面容器 MainTabs/SubPageCard/SubPageCard2 内渲染），消费 podcast store；渲染权跟随 `store.activePage === pageKey`（仅当前前台页面实例渲染 AudioPlayer，避免多实例双播放）。**注意：uni-app 的 onShow/onHide 是页面实例级钩子，子组件注册的永不触发——页面容器必须用 Vue 的 `onActivated`/`onDeactivated`（KeepAlive 缓存树内子组件可触发）维护 activePage，失活用 `clearActivePage(pageKey)` 防止旧页事件覆盖新页** |
+| `InsightTag.vue` | [组件库] | 洞察之眼标签（type ∈ emotion/fund/event/market，size ∈ sm/md/lg），MarketInsightCard 内由 InsightCard 使用 |
+| `InsightCard.vue` | [组件库] | 洞见卡（title/trace/forecast/time/theme/showMeta/confidence，emit click），市场洞见页 MarketInsightCard 复用 |
 
 **已引入但尚未在生产页面使用的组件**（已存在于 `shared/components/` 并通过 barrel export 导出，需要时直接 `import { ... } from '@/shared/components'`）：
 `Switch` `Rate` `Progress` `Skeleton` `Toast` `ActionSheet` `Modal` `Steps` `StatCard` `ListCell` `QuoteHeader` `Gauge` `Sparkline` `DataTable` `IndexCard` `Timeline` `ChatBubble` `StreamingText` `InsightListCard` `StockItem`
