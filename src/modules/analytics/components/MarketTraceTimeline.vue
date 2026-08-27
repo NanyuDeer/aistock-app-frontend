@@ -75,6 +75,12 @@ const props = defineProps<{
 
 const primaryCause = computed(() => props.presentation.primaryCause)
 
+/** 参考来源标签（基于过滤后标签，Task 2 过滤后原始 ID 可能为空但已有标签） */
+const readableEvidence = computed(() => {
+  const pc = props.presentation.primaryCause
+  return pc ? labelEvidenceList(pc.supportingEvidence) : []
+})
+
 const titleText = computed(() => {
   if (!props.presentation.primaryCause) return '主因'
   return '主因'
