@@ -2,6 +2,23 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-27 — 午间报切换修复 + 盘中要点从 details 解析 + 卡片样式统一
+
+**开发者**: Aria
+
+### 修复
+- 晨/晚报切换后路由不更新（URL 停在进入时类型）→ `switchType` 状态切换 + H5 `history.replaceState` 同步 URL 类型参数（不重建页面）
+- 切回午间报后残留晨报 Agent 洞见 → `fetchReportFor` 午间报分支先清空 items/report/eveningViewModel，杜绝类型间数据串扰
+- 晚报切回午间报盘中要点卡片消失 → 根因：后端 `display_report` 只返回 `details`（markdown），不返回结构化 `sections` 字段，前端只消费 `sections`（恒空）→ 盘中要点从未渲染。修复：`middayReport.ts` 新增 `parseSectionsFromDetails` 从 details「## 第N部分：标题」解析分段摘要（标题去前缀、结论为要点合并），`parseMiddayReport` 在 sections 为空时兜底；结论加 `-webkit-line-clamp: 3` 截断；保留 loadSeq 竞态守卫
+
+### 改进
+- 盘中研判标题方标「盘」→ 早报同款 ★ 星标；盘中要点分段卡片改洞见卡同款布局（左侧方标 + 右侧标题/结论随 body 缩进）；风险提示标题字号/字重统一 28rpx/600（红色保留）；风险编号列表项加 20rpx 左缩进
+
+### 验证
+- `npx tsc --noEmit` 通过；`parseSectionsFromDetails` 用真实后端 details 解析出「上午盘面回顾/午后前瞻」2 个分段
+
+---
+
 ## [xusiyun] 2026-08-27 — 修复事件原文详情页顶部状态栏遮挡
 
 **开发者**: xusiyun
