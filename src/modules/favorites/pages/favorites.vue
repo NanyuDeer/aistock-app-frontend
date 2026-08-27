@@ -1,6 +1,10 @@
 <template>
   <SubPageCard title="自选" active-panel="favorites">
-    <view class="favorites-content">
+    <!-- 当前登录状态下数据未就绪时显示 loading，避免闪现残留的 mock/过期数据 -->
+    <view v-if="!favoritesStore.hasCurrentData()" class="favorites-loading">
+      <LoadingState text="加载自选股中..." />
+    </view>
+    <view v-else class="favorites-content">
       <view v-if="favoritesStore.syncError" class="sync-error" @tap="retrySync">
         <text>同步失败，点击重试</text>
       </view>
@@ -84,6 +88,8 @@
                 <text class="stock-code">{{ stock.symbol }}</text>
                 <text v-if="stock.margin" class="tag-margin">融</text>
                 <text v-if="stock.specialAlert" class="tag-alert">特别提醒</text>
+                <!-- Phase 4-2：问 AI → 跳转对话页并预填单股问句（.stop 避免触发行点击进详情） -->
+                <text class="ask-ai-btn" @tap.stop="askAi(stock)">问 AI</text>
               </view>
             </view>
             <view class="stock-right">
@@ -124,8 +130,10 @@
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
+import { buildStockQuestion } from '@/shared/utils/chatSuggestions'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import LoadingState from '@/shared/components/LoadingState.vue'
 
 /* ===== 类型定义 ===== */
 interface StockItem {
@@ -168,11 +176,17 @@ const stocks = computed<StockItem[]>(() => {
     name: stock.name,
     price: stock.price || 0,
     changePercent: stock.changePercent || 0,
-    changeAmount: stock.price && stock.changePercent ? stock.price * stock.changePercent / 100 : 0,
+    changeAmount: calculateChangeAmount(stock.price || 0, stock.changePercent || 0),
     margin: false,
     specialAlert: false,
   }))
 })
+
+function calculateChangeAmount(price: number, changePercent: number): number {
+  if (!Number.isFinite(price) || !Number.isFinite(changePercent) || price <= 0 || changePercent <= -100) return 0
+  const prevClose = price / (1 + changePercent / 100)
+  return price - prevClose
+}
 
 const sortedStocks = computed(() => {
   const list = [...stocks.value]
@@ -269,6 +283,13 @@ function goDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
 }
 
+/** Phase 4-2：问 AI → 跳转对话页，q 参数预填单股问句（对话页 onLoad 自动发送/预填） */
+function askAi(stock: StockItem) {
+  uni.navigateTo({
+    url: `/pages-sub-app/chat/index?q=${encodeURIComponent(buildStockQuestion(stock.name))}`,
+  })
+}
+
 function goSearch() {
   uni.navigateTo({ url: '/modules/favorites/pages/search' })
 }
@@ -276,6 +297,10 @@ function goSearch() {
 
 <style lang="scss" scoped>
 @import '@/shared/styles/variables.scss';
+
+.favorites-loading {
+  padding: 160rpx 0;
+}
 
 .favorites-content {
   padding: 0 24rpx 24rpx;
@@ -502,6 +527,15 @@ function goSearch() {
   background: rgba(244, 63, 94, 0.1);
   padding: 1rpx 6rpx;
   border-radius: 4rpx;
+}
+
+/* Phase 4-2：问 AI 入口（与 tag 同尺寸 pill，主色区分，可点按） */
+.ask-ai-btn {
+  font-size: 18rpx;
+  color: $primary;
+  background: rgba(77, 124, 254, 0.1);
+  padding: 1rpx 10rpx;
+  border-radius: 8rpx;
 }
 
 .stock-right {

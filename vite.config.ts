@@ -70,8 +70,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true
         },
         // 其他 Agent 路由 → Python FastAPI（端口 8080）
+        // ws: true 支持 /api/agent/ws/* WebSocket 升级（AI 对话流式输出），
+        // 与服务器 Caddy 配置等价：本地 dev server → 线上 Caddy → 127.0.0.1:8080
         '/api/agent': {
           target: agentTarget,
+          ws: true,
           changeOrigin: true
         },
         '/api': {

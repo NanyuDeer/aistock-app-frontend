@@ -4,6 +4,7 @@
  */
 import request from '../request'
 import { isInvalidValue } from '@/shared/utils/format'
+import type { TrendKLineData } from './trend-score'
 
 export interface StockQuote {
   symbol: string
@@ -19,6 +20,15 @@ export interface StockQuote {
   amount: number
 }
 
+/** A 股指数行情（纯数字 6 位代码，000001 语义=上证指数，与个股接口语义分离，spec §2.6） */
+export interface CnIndexQuote {
+  index: string
+  name: string
+  price: number | null
+  changePercent: number | null
+  changeAmount: number | null
+}
+
 export interface KLineItem {
   date: string
   open: number
@@ -26,6 +36,11 @@ export interface KLineItem {
   high: number
   low: number
   volume: number
+  amount?: number
+  amplitude?: number
+  change?: number
+  changePercent?: number
+  turnoverRate?: number
 }
 
 // ---- 趋势股评分接口类型 ----
@@ -121,6 +136,52 @@ export interface FavoriteStock {
   addedAt?: string | null
 }
 
+// ---- 股票列表搜索接口类型 ----
+export interface StockListItem {
+  symbol: string
+  name: string
+  market: string
+  industry: string
+}
+
+export interface StockListResult {
+  list: StockListItem[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+interface StockListPayload {
+  数据源?: string
+  当前页?: number
+  每页数量?: number
+  总数量?: number
+  总页数?: number
+  股票列表?: Array<{
+    股票代码?: string
+    股票简称?: string
+    市场代码?: string
+    所属行业?: string
+  }>
+}
+
+function normalizeStockList(payload: StockListPayload | null | undefined): StockListResult {
+  const rawList = payload?.股票列表 || []
+  return {
+    list: rawList.map((item) => ({
+      symbol: String(item.股票代码 || '').trim(),
+      name: String(item.股票简称 || ''),
+      market: String(item.市场代码 || ''),
+      industry: String(item.所属行业 || ''),
+    })).filter((item) => item.symbol),
+    total: Number(payload?.总数量) || 0,
+    page: Number(payload?.当前页) || 1,
+    pageSize: Number(payload?.每页数量) || 0,
+    totalPages: Number(payload?.总页数) || 0,
+  }
+}
+
 interface FavoriteStockPayload {
   股票代码?: string
   股票简称?: string | null
@@ -154,6 +215,15 @@ function normalizeFavorites(payload: UserFavoritesPayload | null | undefined): F
 export interface WindLeaderAiAnalysis {
   persistence?: string
   persistence_reason?: string
+  long_term_days?: number
+  long_confidence?: number
+  logic_type?: string
+  long_reason?: string
+  short_term_days?: number
+  short_heat?: number
+  heat_stage?: string
+  short_reason?: string
+  driver_type?: string
   heat_transfer?: boolean
   transfer_direction?: string
   transfer_reason?: string
@@ -201,22 +271,32 @@ export interface WindLeaderSector {
   code?: string
   name: string
   type?: string
+  /** 短线风口 / 长线风口 / 长线+短线风口 / 均不成立（AI 八字段推导），缺省按 short 兼容存量 */
+  cycle?: 'short' | 'long' | 'both' | 'none'
   frequency?: number | string
+  freq20?: number
+  freq_delta?: number
   avg_change?: number
   today_change?: number
-  amount_trend?: number
   net_inflow?: number
+  driver_type?: string
+  ma60_status?: string
+  vol_trend?: string
+  turnover?: number
+  limit_up_count?: number
+  max_boards?: number
   score?: number
   leading_stock?: string
   leading_change?: number
   up_count?: number
   down_count?: number
-  driver?: string
   ai_analysis?: WindLeaderAiAnalysis | string | null
   main_stocks?: WindLeaderStock[]
   upstream_stocks?: WindLeaderStock[]
   downstream_stocks?: WindLeaderStock[]
   leading_stock_info?: WindLeaderStock | null
+  /** 长期趋势龙头：板块成分股中 trend_scores 评分最高（长线榜展示，无命中回退 main_stocks 最高分） */
+  long_leader?: WindLeaderStock | null
   flow_data?: WindLeaderFlowData | null
 }
 
@@ -265,10 +345,40 @@ function normalizeHotBurstHistory(records: HotBurstHistoryRecord[] | undefined):
   }))
 }
 
+/** OCR 图片输入（后端 StockOcrService.normalizeImages 支持 { data, mime } 对象） */
+export interface OcrImageInput {
+  /** 图片 base64 内容（不含 data: 前缀） */
+  data: string
+  /** MIME 类型，压缩后统一 image/jpeg */
+  mime: string
+}
+
+/** OCR 识别结果中的单只股票（后端已用 stocks 表归一化代码/名称） */
+export interface OcrStockItem {
+  '股票简称': string
+  '股票代码': string
+}
+
 export const stockApi = {
-  /** 获取股票列表 */
-  getStockList(params?: { keyword?: string; page?: number; size?: number }) {
-    return request.get('/cn/stocks', { params })
+  /** 获取股票列表（支持 keyword 模糊搜索 symbol/name/pinyin） */
+  getStockList(params?: { keyword?: string; page?: number; pageSize?: number }) {
+    return request.get<StockListPayload>('/cn/stocks', { params }).then(normalizeStockList)
+  },
+
+  /** OCR 识图识别股票（对接 POST /api/cn/stocks/ocr，返回每张图的股票数组） */
+  ocrStocksFromImages(images: OcrImageInput[], hint?: string) {
+    return request.post<OcrStockItem[][]>(
+      '/cn/stocks/ocr',
+      {
+        images,
+        hint,
+        batchConcurrency: 2,
+        maxImagesPerRequest: 4,
+        timeoutMs: 90000,
+      },
+      // 覆盖默认 15s 超时：VLM 识图较慢，单独设长超时
+      { timeout: 100000 }
+    )
   },
 
   /** 获取个股实时行情（activity 级别，含完整数据） */
@@ -302,6 +412,23 @@ export const stockApi = {
     })
   },
 
+  /**
+   * A 股指数行情（纯数字 6 位代码；000001 语义=上证指数，与个股接口语义分离，spec §2.6）
+   */
+  getCnIndexQuotes(symbols: string[]) {
+    return request.get('/cn/index/quotes', { params: { symbols: symbols.join(',') } }).then((res: Record<string, unknown>) => {
+      const data = (res.data as Record<string, unknown>) || res
+      const list = (data['行情'] as Record<string, unknown>[]) || []
+      return list.map((q: Record<string, unknown>) => ({
+        index: String(q['指数代码'] || ''),
+        name: String(q['指数简称'] || ''),
+        price: q['最新价'] != null ? Number(q['最新价']) : null,
+        changePercent: q['涨跌幅'] != null ? Number(q['涨跌幅']) : null,
+        changeAmount: q['涨跌额'] != null ? Number(q['涨跌额']) : null,
+      }))
+    })
+  },
+
   /** 批量获取核心行情（返回适配后的数组） */
   getCoreQuotes(symbols: string[]) {
     return request.get('/cn/stock/quotes/core', { params: { symbols: symbols.join(',') } }).then((res: Record<string, unknown>) => {
@@ -317,10 +444,11 @@ export const stockApi = {
   },
 
   /** 获取 K 线数据 */
-  getKLine(symbol: string, params?: { period?: 'daily' | 'weekly' | 'yearly' | string; count?: number }) {
+  getKLine(symbol: string, params?: { period?: 'daily' | 'weekly' | 'monthly' | string; count?: number }) {
     const kltMap: Record<string, number> = {
       daily: 101,
       weekly: 102,
+      monthly: 103,
       yearly: 103,
     }
     const klt = kltMap[params?.period || 'daily'] || 101
@@ -342,6 +470,11 @@ export const stockApi = {
         high: Number(k['最高价'] ?? k['high'] ?? 0),
         low: Number(k['最低价'] ?? k['low'] ?? 0),
         volume: Number(k['成交量'] ?? k['volume'] ?? 0),
+        amount: Number(k['成交额'] ?? k['amount'] ?? 0),
+        amplitude: Number(k['振幅'] ?? k['amplitude'] ?? 0),
+        change: Number(k['涨跌额'] ?? k['change'] ?? 0),
+        changePercent: Number(k['涨跌幅'] ?? k['changePercent'] ?? 0),
+        turnoverRate: Number(k['换手率'] ?? k['turnoverRate'] ?? 0),
       }))
       return mapped
     })
@@ -357,6 +490,11 @@ export const stockApi = {
     return request.get(`/cn/stocks/${symbol}/news`, { params })
   },
 
+  /** 获取自选股资讯（异动捕手/个股情报列表） */
+  getFavoritesNews(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
+    return request.get('/cn/favorites/news', { params }).then((res: Record<string, unknown>) => res)
+  },
+
   /** 获取趋势股评分（四维：技术面/行业赛道景气/消息面催化/基本面，含一票否决检查） */
   getTrendScore(symbol: string) {
     return request.get(`/cn/stocks/${symbol}/trend-score`).then((res: Record<string, unknown>) => normalizeTrendScore(res))
@@ -367,9 +505,18 @@ export const stockApi = {
     return request.get(`/cn/tags/${tagCode}/leaders`)
   },
 
-  /** 获取风口龙头（长线风口，返回 hot_sectors 数组） */
+  /** 获取风口龙头（长线风口，返回 hot_sectors 数组）
+   *  timeout 放宽到 30s：服务器 getAnalysis 缓存 miss 时会实时抓取成分股行情，响应可达 8s+ */
   getWindLeaders(limit = 8) {
-    return request.get<WindLeaderResponse>('/cn/wind-leaders', { params: { limit } })
+    return request.get<WindLeaderResponse>('/cn/wind-leaders', { params: { limit }, timeout: 30000 })
+  },
+
+  /** 获取板块日 K 线（同花顺 bk_ 源，近 N 日，默认 120；服务器需抓取同花顺，放宽超时） */
+  getBoardKline(code: string, days = 120) {
+    return request.get<TrendKLineData>('/cn/wind-leaders/board-kline', {
+      params: { code, days },
+      timeout: 30000,
+    })
   },
 
   /** 获取机构调研热门股（共振检测） */
@@ -426,12 +573,12 @@ export const stockApi = {
   },
 
   /** 获取业绩预测列表 */
-  getProfitForecastList(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
+  getProfitForecastList(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; symbols?: string }) {
     return request.get('/cn/stocks/profit-forecast', { params })
   },
 
   /** 搜索业绩预测 */
-  searchProfitForecast(params?: { keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string }) {
+  searchProfitForecast(params?: { keyword?: string; page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; symbols?: string }) {
     return request.get('/cn/stocks/profit-forecast/search', { params })
   },
 
@@ -501,9 +648,12 @@ export const stockApi = {
 
   /** 获取个股异动事件（趋势风口） */
   getStockEvents(symbol: string, params?: { cycle?: string; limit?: number }) {
-    return request.get(`/cn/trend-hotspots/events/${symbol}`, { params }).then((res: Record<string, unknown>) => {
+    return request.get(`/cn/stock-monitors/events/${symbol}`, { params }).then((res: Record<string, unknown>) => {
       const data = (res.data as Record<string, unknown>) || res
-      const events = (data['events'] as unknown[]) || []
+      const events = (data['events'] as unknown[])
+        || (data.events as unknown[])
+        || (res.events as unknown[])
+        || []
       return Array.isArray(events) ? events : []
     })
   },

@@ -12,7 +12,6 @@
 import { ref, computed } from 'vue'
 import type { EventItem, EventListParams } from '../types'
 import { getEventList } from '../api/eventApi'
-import { enrichAffectedIndustries } from '../api/eventService'
 import { DEFAULT_PAGE_SIZE } from '../constants'
 
 export function useEventList() {
@@ -60,29 +59,19 @@ export function useEventList() {
 
       const res = await getEventList(params)
 
-      // 客户端过滤：按事件类型筛选
+      // 方案A（2026-08-14）：事件类型由服务端筛选 + 服务端分页（getEventList 透传
+      // eventType），前端不再对分页结果做 eventType 二次过滤——否则第 1 页恰好无该
+      // 类型时列表为空且 hasMore 失效（旧 bug）。
       let filtered = res.events
-      if (activeType.value !== '全部') {
-        filtered = filtered.filter(e => e.eventType === activeType.value)
-      }
 
       // 客户端过滤：仅已关注
       if (filterParams.value.followedOnly) {
         filtered = filtered.filter(e => e.isFollowed)
       }
 
-      // 【临时方案】补充 Top5 受影响行业数据
-      // 未来删除：当后端列表接口直接返回 affectedIndustries 后删除此段代码
-      let enrichedEvents: EventItem[]
-      try {
-        // 【关键】enrichAffectedIndustries 返回全新的数组
-        // 每个事件对象也是新的引用，确保 Vue 响应式系统检测到变化
-        enrichedEvents = await enrichAffectedIndustries(filtered)
-      } catch (err) {
-        // 异常处理：补充失败时使用原数据
-        console.warn('[useEventList] 补充 affectedIndustries 失败:', err)
-        enrichedEvents = filtered
-      }
+      // 第三阶段：列表接口已直出 chain_summary，adapter 已生成 affectedIndustries，
+      // 不再调用 enrichAffectedIndustries（N+1 补数）。旧兼容逻辑保留在 eventService 中备用。
+      const enrichedEvents = filtered
 
       // 根据页码判断是覆盖还是追加
       if (page === 1) {
@@ -92,10 +81,10 @@ export function useEventList() {
         events.value = [...events.value, ...enrichedEvents]
       }
 
-      // 更新分页信息（基于过滤后的结果估算）
+      // 更新分页信息（total/hasMore 直接采用服务端筛选后结果）
       currentPage.value = res.page
-      total.value = filtered.length
-      hasMore.value = res.hasMore && filtered.length > 0
+      total.value = res.total
+      hasMore.value = res.hasMore
     } catch (err) {
       error.value = (err as Error).message || '加载事件列表失败'
     } finally {

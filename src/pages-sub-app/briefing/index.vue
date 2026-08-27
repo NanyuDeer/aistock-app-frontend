@@ -25,13 +25,21 @@
           </view>
           <view class="audio-info">
             <text class="audio-status">{{ audioStatusText }}</text>
-            <text class="audio-meta">AI 早报音频 · 播报详情 ›</text>
+            <text class="audio-meta">{{ audioLabelText }} · 播报详情 ›</text>
           </view>
           <text class="audio-arrow">›</text>
         </view>
 
-        <!-- 头条卡片：今日最重要研判 -->
-        <view v-if="headlineItem" class="headline-card">
+        <!-- 大盘洞见卡片（原市场异象）：参考早报「今日头条」卡片设计，紧跟音频播报下方（仅晚报展示，有异象时显示） -->
+        <template v-if="broadcastType === 'evening' && eveningViewModel">
+          <EveningAnomalyCard
+            v-if="eveningViewModel.anomaly.hasAnomaly && eveningViewModel.attributionConclusion"
+            :conclusion="eveningViewModel.attributionConclusion"
+          />
+        </template>
+
+        <!-- 头条卡片：今日最重要研判（仅晨报展示） -->
+        <view v-if="headlineItem && broadcastType !== 'evening'" class="headline-card">
           <view class="headline-label">
             <text class="headline-star">★</text>
             <text class="headline-label-text">今日头条</text>
@@ -47,8 +55,8 @@
           </view>
         </view>
 
-        <!-- Agent 洞见列表 -->
-        <view v-if="insightItems.length" class="section-label">
+        <!-- Agent 洞见列表（晚报场景下即使无数据也保留分区标题，保持与早报一致的页面结构） -->
+        <view v-if="insightItems.length || broadcastType === 'evening'" class="section-label">
           <text class="section-label-text">Agent 洞见</text>
           <view class="section-line" />
         </view>
@@ -65,7 +73,6 @@
                 {{ sentimentLabel(entry.item.sentiment) }}
               </text>
             </view>
-            <text v-if="entry.item.source !== 'hot_burst'" class="insight-title">{{ entry.item.title }}</text>
             <text class="insight-conclusion">{{ entry.item.conclusion }}</text>
             <view v-if="entry.item.relatedTags.length" class="insight-tags">
               <text
@@ -95,6 +102,22 @@
             </view>
           </view>
         </view>
+        </template>
+
+        <!-- 晚报专属卡片：大盘行情 + 板块行情（仅晚报展示，排布在 Agent 洞见之后；大盘洞见卡片已移至音频下方） -->
+        <template v-if="broadcastType === 'evening' && eveningViewModel">
+          <!-- 大盘行情卡片（指数 + 涨跌家数） -->
+          <EveningMarketIndexCard
+            v-if="eveningViewModel.presentation && (eveningViewModel.presentation.phenomenon.indexPerformance.length || eveningViewModel.breadth)"
+            :indexes="eveningViewModel.presentation.phenomenon.indexPerformance"
+            :breadth="eveningViewModel.breadth"
+          />
+
+          <!-- 板块行情卡片（早报风格） -->
+          <EveningSectorsCard
+            v-if="eveningViewModel.presentation && (eveningViewModel.presentation.sectorRanking.topGainers.length || eveningViewModel.presentation.sectorRanking.topLosers.length)"
+            :presentation="eveningViewModel.presentation"
+          />
         </template>
 
         <!-- 异动公告强调 -->
@@ -154,10 +177,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { agentApi, type BriefType, type BroadcastV1 } from '@/shared/api/modules/agent'
-import { API_BASE_URL } from '@/shared/utils/constants'
+import { agentApi, type BriefType, type BriefV1, type BroadcastV1, type MarketTraceReviewRecord } from '@/shared/api/modules/agent'
 import {
   SOURCE_LABELS,
   SOURCE_ICONS,
@@ -174,14 +196,24 @@ import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { getEventList } from '@/modules/chat/event/api/eventApi'
+import { usePodcastStore } from '@/shared/store/modules/podcast'
+import EveningAnomalyCard from './components/EveningAnomalyCard.vue'
+import EveningMarketIndexCard from './components/EveningMarketIndexCard.vue'
+import EveningSectorsCard from './components/EveningSectorsCard.vue'
+import {
+  buildEveningCardViewModel,
+  type EveningCardViewModel,
+} from '@/shared/utils/eveningBriefCards'
 
 const currentDate = ref('')
 const broadcastType = ref<BriefType>('morning')
 const loading = ref(true)
 const report = ref<BroadcastV1 | null>(null)
 const items = ref<BriefingItem[]>([])
-const isPlaying = ref(false)
-const audioContext = ref<UniApp.InnerAudioContext | null>(null)
+/** 播放状态来自悬浮窗 store（FloatingPodcast AudioPlayer 事件同步），页面内按钮与悬浮球状态一致 */
+const isPlaying = computed(() => podcastStore.playing)
+/** 悬浮播报 store：音频统一由全局悬浮窗承载，跨页切换状态不丢 */
+const podcastStore = usePodcastStore()
 
 /** 无当日报告时最多向前回退的自然日数（覆盖周末与长假缺口）。 */
 const MAX_FALLBACK_DAYS = 7
@@ -189,6 +221,8 @@ const MAX_FALLBACK_DAYS = 7
 const isFallback = ref(false)
 /** 用户请求的原始日期，当日无报告时用于回退提示。 */
 const requestedDate = ref('')
+/** 晚报卡片 ViewModel（仅晚报分支使用） */
+const eveningViewModel = ref<EveningCardViewModel | null>(null)
 
 const subtitleText = computed(() => {
   const typeLabel = broadcastType.value === 'morning' ? '晨报' : '晚报'
@@ -202,6 +236,11 @@ const audioPath = computed(() => {
   return report.value?.audio_path || null
 })
 
+/** 音频入口文案：根据播报类型动态展示"AI 早报音频"或"AI 晚报音频" */
+const audioLabelText = computed(() => {
+  return broadcastType.value === 'morning' ? 'AI 早报音频' : 'AI 晚报音频'
+})
+
 const audioStatusText = computed(() => {
   if (!audioPath.value) return '语音生成中...'
   return isPlaying.value ? '播放中' : '点击播放'
@@ -212,8 +251,15 @@ const headlineItem = computed(() => {
   return items.value.find((item) => item.isHeadline) || null
 })
 
-/** 洞见列表（非头条非异动） */
+/** 洞见列表（非头条非异动）
+ *  晚报场景下头条卡片不展示，且为避免与下方「大盘洞见/大盘行情/板块行情」
+ *  专属卡片内容重复，洞见列表仅保留「收盘复盘」摘要；归因结论与市场快照
+ *  分别由 EveningAnomalyCard / EveningMarketIndexCard + EveningSectorsCard 展示。 */
+const REVIEW_SUMMARY_TITLE = '收盘复盘'
 const insightItems = computed(() => {
+  if (broadcastType.value === 'evening') {
+    return items.value.filter((item) => !item.isAlert && item.title === REVIEW_SUMMARY_TITLE)
+  }
   return items.value.filter((item) => !item.isHeadline && !item.isAlert)
 })
 
@@ -302,38 +348,44 @@ function goDetail() {
   })
 }
 
+/**
+ * 播放/暂停：音频统一由全局悬浮窗（FloatingPodcast）承载。
+ * 播放状态、进度、暂停/继续都在悬浮窗内，页面切到详情/返回后状态不丢。
+ */
 function togglePlay() {
   if (!audioPath.value) {
     uni.showToast({ title: '语音生成中', icon: 'none' })
     return
   }
-
-  if (!audioContext.value) {
-    // 从 audio_path 提取文件名
-    const filename = audioPath.value.split('/').pop() || ''
-    const audioUrl = `${API_BASE_URL}/agent/audio/${filename}`
-    audioContext.value = uni.createInnerAudioContext()
-    audioContext.value.src = audioUrl
-    audioContext.value.onEnded(() => {
-      isPlaying.value = false
-    })
-    audioContext.value.onError(() => {
-      isPlaying.value = false
-      uni.showToast({ title: '音频播放失败', icon: 'none' })
-    })
+  const filename = audioPath.value.split('/').pop() || ''
+  const key = `briefing-${broadcastType.value}-${currentDate.value}`
+  if (podcastStore.playing) {
+    podcastStore.pause()
+    return
   }
-
-  if (isPlaying.value) {
-    audioContext.value.pause()
-    isPlaying.value = false
-  } else {
-    audioContext.value.play()
-    isPlaying.value = true
+  // 已就绪同源音频 → 续播（不重置 src）；否则重新开始播放
+  if (podcastStore.status === 'ready' && podcastStore.cacheKey === key) {
+    podcastStore.resume()
+    return
   }
+  const label = broadcastType.value === 'morning' ? 'AI 早报' : 'AI 晚报'
+  // 传相对路径：FloatingPodcast 按 API 前缀（/api）拼接完整地址，与 generatePodcast 返回格式一致
+  podcastStore.playDirect(`/api/agent/audio/${filename}`, key, label, 0)
 }
 
-function changeDate(delta: number) {
-  currentDate.value = addCalendarDays(currentDate.value, delta)
+/** 前一天/后一天：按交易日历跳档，自动跳过非交易日；接口异常时退回自然日加减 */
+async function changeDate(delta: number) {
+  try {
+    currentDate.value = delta > 0
+      ? await agentApi.getNextTradingDay(currentDate.value)
+      : await agentApi.getPreviousTradingDay(currentDate.value)
+  } catch (err) {
+    console.error('切换交易日失败，退回自然日加减:', err)
+    currentDate.value = addCalendarDays(currentDate.value, delta)
+  }
+  // 手动切换后退出"回退最近可用报告"状态
+  isFallback.value = false
+  requestedDate.value = ''
   loadReport()
 }
 
@@ -351,30 +403,58 @@ function switchType(type: BriefType) {
  */
 async function fetchReportFor(date: string): Promise<boolean> {
   try {
-    const [broadcastRes, briefRes] = await Promise.allSettled([
+    // 晚报分支：并行加载 broadcast + brief + review
+    // 晨报分支：保持原逻辑（broadcast + brief），不加载 review
+    const requests: Promise<unknown>[] = [
       agentApi.getBroadcast(broadcastType.value, date),
       agentApi.getBrief(broadcastType.value, date),
-    ])
+    ]
+    if (broadcastType.value === 'evening') {
+      requests.push(agentApi.getMarketTraceReview(date))
+    }
+
+    const [broadcastRes, briefRes, reviewRes] = await Promise.allSettled(requests)
 
     // 仅消费通过严格校验的 Broadcast v1，避免跨日期或旧结构数据混入。
     if (broadcastRes.status === 'fulfilled') {
-      report.value = parseBroadcastReport(broadcastRes.value, broadcastType.value, date)
+      report.value = parseBroadcastReport(broadcastRes.value as BroadcastV1, broadcastType.value, date)
     } else {
       report.value = null
     }
 
     // Brief v1 已是前端展示报告的事实层，校验后转换为现有卡片展示格式。
     if (briefRes.status === 'fulfilled' && briefRes.value) {
-      const brief = parseBriefingReport(briefRes.value, broadcastType.value)
+      const brief = parseBriefingReport(briefRes.value as BriefV1, broadcastType.value)
       items.value = parseBriefingItemsFromBrief(brief)
+
+      // 晚报分支：组装 eveningViewModel（异象判定 + 行情数据）
+      if (broadcastType.value === 'evening') {
+        const review = reviewRes && reviewRes.status === 'fulfilled'
+          ? (reviewRes.value as MarketTraceReviewRecord)
+          : null
+        eveningViewModel.value = buildEveningCardViewModel(brief, review, date)
+      } else {
+        eveningViewModel.value = null
+      }
     } else {
       items.value = []
+      // brief 加载失败时，晚报分支仍尝试用 review 组装 ViewModel，
+      // 让行情卡片在 brief 不可用时能独立展示（buildEveningCardViewModel 支持 brief=null）。
+      if (broadcastType.value === 'evening') {
+        const review = reviewRes && reviewRes.status === 'fulfilled'
+          ? (reviewRes.value as MarketTraceReviewRecord)
+          : null
+        eveningViewModel.value = buildEveningCardViewModel(null, review, date)
+      } else {
+        eveningViewModel.value = null
+      }
     }
 
     return report.value !== null || items.value.length > 0
   } catch {
     report.value = null
     items.value = []
+    eveningViewModel.value = null
     return false
   }
 }
@@ -382,11 +462,8 @@ async function fetchReportFor(date: string): Promise<boolean> {
 async function loadReport() {
   if (!currentDate.value) return
   loading.value = true
-  // 停止当前播放
-  if (audioContext.value && isPlaying.value) {
-    audioContext.value.stop()
-    isPlaying.value = false
-  }
+  // 切换日期/类型：暂停悬浮窗播放（避免旧报告音频继续，用户可手动续播）
+  podcastStore.pause()
 
   const requested = currentDate.value
   isFallback.value = false
@@ -423,13 +500,6 @@ onLoad((options) => {
   // （上海时间）期间 UTC 仍是前一天，会取到错误的播报。
   currentDate.value = opts.date || shanghaiDateString()
   loadReport()
-})
-
-onUnmounted(() => {
-  if (audioContext.value) {
-    audioContext.value.destroy()
-    audioContext.value = null
-  }
 })
 </script>
 
@@ -608,7 +678,7 @@ onUnmounted(() => {
   &.event { background: #d97706; }
   &.trend { background: #7c3aed; }
   &.alert { background: #e04545; }
-  &.review { background: #64748b; }
+  &.review { background: #e04545; }
   &.hot_burst { background: #0891b2; }
   &.wind_leader { background: $primary; }
 }
@@ -632,9 +702,11 @@ onUnmounted(() => {
 }
 
 .insight-source {
-  font-size: 24rpx;
+  /* 统一为单标题：来源标签升级为标题样式（替代原条目标题） */
+  font-size: 28rpx;
   font-weight: 600;
-  color: $ink-soft;
+  color: $ink;
+  line-height: 1.4;
 }
 
 .sentiment-badge {
@@ -657,15 +729,6 @@ onUnmounted(() => {
     background: rgba(148, 163, 184, 0.10);
     color: #64748b;
   }
-}
-
-.insight-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: $ink;
-  line-height: 1.4;
-  display: block;
-  margin-bottom: 8rpx;
 }
 
 .insight-conclusion {

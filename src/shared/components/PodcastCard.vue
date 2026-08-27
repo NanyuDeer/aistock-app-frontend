@@ -32,10 +32,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { agentApi } from '@/shared/api/modules/agent'
+import { API_BASE_URL } from '@/shared/utils/constants'
 import SvgIcon from './SvgIcon.vue'
 import { Card, Button, LoadingState, AudioPlayer } from './index'
 
 type PodcastStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+/** 播报文本最大长度（约1分钟播报时长），与后端 generate-podcast 校验一致 */
+const MAX_PODCAST_TEXT_LENGTH = 250
 
 const props = withDefaults(defineProps<{
   /** 播报文本（podcast_brief），必填 */
@@ -58,13 +62,19 @@ const previewText = computed(() => {
   return t.length > 60 ? t.slice(0, 60) + '...' : t
 })
 
-/** 拼接完整音频 URL（后端返回的是 /api/agent/audio/xxx.mp3 相对路径） */
+/** 完整音频 URL（后端返回的是 /api/agent/audio/xxx.mp3 相对路径） */
 const fullAudioUrl = computed(() => {
   if (!audioUrl.value) return ''
-  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  const base = API_BASE_URL
   // audioUrl 形如 /api/agent/audio/xxx.mp3，需去掉前缀 /api 后拼接 base
   const path = audioUrl.value.replace(/^\/api/, '')
   return `${base}${path}`
+})
+
+/** 传给后端的播报文本：裁剪到 250 字，避免后端拒绝超长文本（约1分钟时长上限） */
+const podcastTextForRequest = computed(() => {
+  const t = props.text || ''
+  return t.length > MAX_PODCAST_TEXT_LENGTH ? t.slice(0, MAX_PODCAST_TEXT_LENGTH) : t
 })
 
 async function generate() {
@@ -72,7 +82,7 @@ async function generate() {
   status.value = 'loading'
   errorMsg.value = ''
   try {
-    const res = await agentApi.generatePodcast(props.text, props.cacheKey)
+    const res = await agentApi.generatePodcast(podcastTextForRequest.value, props.cacheKey)
     audioUrl.value = res.audio_url
     status.value = 'ready'
   } catch (e: unknown) {

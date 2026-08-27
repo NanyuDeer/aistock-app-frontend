@@ -14,7 +14,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { rpxToVw } from '@/shared/utils/rpx'
+import { rpxToPx } from '@/shared/utils/rpx'
 
 type RateType = 'gold' | 'primary' | 'up'
 
@@ -34,7 +34,8 @@ const props = withDefaults(defineProps<{
   /** 是否显示 "x/max" 文字 */
   showText?: boolean
 }>(), {
-  modelValue: 3,
+  // 默认 0 星（无评分不点亮）；调用方必须显式传入有效评分，禁止默认固定星级
+  modelValue: 0,
   max: 5,
   size: '32rpx',
   gap: 4,
@@ -43,9 +44,9 @@ const props = withDefaults(defineProps<{
   showText: false
 })
 
-/** rpx → vw 转换（H5 预览环境内联样式不识别 rpx） */
-const computedSize = computed(() => rpxToVw(props.size))
-const computedGap = computed(() => rpxToVw(props.gap + 'rpx'))
+/** rpx → 固定 px 转换（按项目 390px 设计基准；星星为固定设计尺寸，不随视口缩放） */
+const computedSize = computed(() => rpxToPx(props.size))
+const computedGap = computed(() => rpxToPx(props.gap + 'rpx'))
 
 /** 星星样式：尺寸 + 背景图（用 CSS background-image 替代 <image> 标签） */
 function starStyle(isActive: boolean): Record<string, string> {

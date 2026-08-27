@@ -16,6 +16,10 @@
           <text v-else class="meta-unverified">暂不可验证</text>
           <text class="meta-dot">·</text>
           <text class="meta-time">{{ detail.event.publishTime }}</text>
+          <template v-if="detail.event.eventType">
+            <text class="meta-dot">·</text>
+            <text class="meta-type">{{ detail.event.eventType }}</text>
+          </template>
         </view>
         <!-- 评级徽章：Step 1 完成后展示 -->
         <view
@@ -53,7 +57,7 @@
         v-for="(step, index) in analysisSteps"
         :key="step.id"
         :id="'step-' + step.id"
-        :step-number="step.id"
+        :step-number="step.displayNumber"
         :title="step.title"
         :status="step.status"
         :explanation="(step.content.explanation as string) || ''"
@@ -79,7 +83,7 @@
 
 <script setup lang="ts">
 import { onMounted, watch, nextTick, computed } from 'vue'
-import type { EventDetailResponse } from '../types'
+import type { EventDetailResponse, HistoryEvent } from '../types'
 import { useAiReasoning } from '../composables/useAiReasoning'
 import { EmptyState } from '@/shared/components'
 import AiAnalysisSection from './AiAnalysisSection.vue'
@@ -151,8 +155,27 @@ const mainSteps = computed(() => visibleSteps.value.filter(s => s.id === 1))
 /** Step 2: 投资逻辑解析（过渡） */
 const logicStep = computed(() => visibleSteps.value.find(s => s.id === 2))
 
-/** Step 3~5: 深度分析 */
-const analysisSteps = computed(() => visibleSteps.value.filter(s => s.id >= 3))
+/**
+ * 历史验证是否包含有效内容。
+ * 有效：存在至少一条 title / year / industryChange 任一非空（仅空白字符视为空）的历史事件；
+ * 无效：undefined / null / 空数组 / 数组内全部项为空（含占位/缺字段）→ 隐藏整个"历史验证"模块，
+ *       避免页面出现只有标题的空区域。
+ */
+function hasValidHistory(events?: HistoryEvent[]): boolean {
+  if (!Array.isArray(events) || events.length === 0) return false
+  return events.some((ev) => {
+    if (!ev || typeof ev !== 'object') return false
+    return [ev.title, ev.year, ev.industryChange]
+      .some((v) => typeof v === 'string' && v.trim() !== '')
+  })
+}
+
+/** Step 3~5: 深度分析（显示序号连续化：02/03/04 —— 因 02 为无编号的过渡模块投资逻辑解析）
+ *  历史验证(5) 无有效内容时整体隐藏（含模块标题/内容区/分割线），避免空白区域 */
+const analysisSteps = computed(() => visibleSteps.value
+  .filter(s => s.id >= 3)
+  .map(s => ({ ...s, displayNumber: s.id - 1 }))
+  .filter(s => s.id !== 5 || hasValidHistory(props.detail?.historyEvents)))
 
 // ===== 自动滚动到当前步骤（仅滚动 scroll-view 容器，避免触发外层页面滚动导致 fixed 导航栏移位） =====
 watch(currentStep, async (stepId) => {
@@ -259,7 +282,14 @@ watch(currentStep, async (stepId) => {
   color: $ink-mute;
 }
 
-/* 评级徽章：复用 InvestmentSummaryCard 的语义色（A股：positive=绿/跌，negative=红/涨） */
+/* 事件类型标签：与卡片 EVENT_TYPE_COLORS 语义一致，使用中性色 */
+.meta-type {
+  font-size: 22rpx;
+  color: $primary;
+}
+
+/* 评级徽章：A股红涨绿跌——偏积极(positive)=红，偏谨慎(negative)=绿。
+   注：--ev-negative 变量存 $up(红/涨)，--ev-positive 变量存 $down(绿/跌)，故交叉引用 */
 .hero-rating {
   display: inline-flex;
   align-self: flex-start;
@@ -268,20 +298,20 @@ watch(currentStep, async (stepId) => {
   margin-top: 16rpx;
 }
 .rating-positive {
-  background: var(--ev-positive-soft);
-  border: 2rpx solid var(--ev-positive-soft);
+  background: var(--ev-negative-soft);
+  border: 2rpx solid var(--ev-negative-soft);
 }
-.rating-positive .rating-text { color: var(--ev-positive); }
+.rating-positive .rating-text { color: var(--ev-negative); }
 .rating-neutral {
   background: rgba(148, 163, 184, 0.12);
   border: 2rpx solid rgba(148, 163, 184, 0.18);
 }
 .rating-neutral .rating-text { color: var(--ev-text-tertiary); }
 .rating-negative {
-  background: var(--ev-negative-soft);
-  border: 2rpx solid rgba(229, 77, 94, 0.2);
+  background: var(--ev-positive-soft);
+  border: 2rpx solid var(--ev-positive-soft);
 }
-.rating-negative .rating-text { color: var(--ev-negative); }
+.rating-negative .rating-text { color: var(--ev-positive); }
 .rating-text {
   font-size: 22rpx;
   font-weight: 600;

@@ -6,6 +6,9 @@ dist/
 *.local
 .env.local
 .env.*.local
+# env 文件不上传（仅保留 .env.example 模板）
+env/.env.development
+env/.env.production
 .idea/
 .vscode/*
 !.vscode/extensions.json
@@ -13,3 +16,8 @@ dist/
 .trae/
 changelog-pending.md
 .worktrees/
+
+# Superpowers 审查/计划文档（2026-08-02 决策：代码仓库只留代码，计划文档不跟踪）
+docs/superpowers/
+# SDD scratch（任务简报/报告/diff 临时文件，不入库）
+.superpowers/

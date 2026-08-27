@@ -14,49 +14,6 @@
           <SvgIcon class="avatar" name="robot-line" size="40rpx" color="#0b5fff" />
           <view class="bubble">
             <text class="bubble-text">{{ msg.content }}</text>
-            <!-- 股票行情卡片 -->
-            <view
-              v-if="msg.skillResult?.data?.symbol && msg.skillResult?.data?.price !== undefined"
-              class="quote-card"
-              @tap="goStockDetail(msg.skillResult.data.symbol)"
-            >
-              <view class="quote-card-top">
-                <view class="quote-card-info">
-                  <text class="quote-card-name">{{ msg.skillResult.data.name }}</text>
-                  <text class="quote-card-code">{{ msg.skillResult.data.symbol }}</text>
-                </view>
-                <view class="quote-card-price-wrap">
-                  <text :class="['quote-card-price', (msg.skillResult.data.changePercent ?? 0) >= 0 ? 'up' : 'down']">
-                    {{ Number(msg.skillResult.data.price).toFixed(2) }}
-                  </text>
-                  <text :class="['quote-card-change', (msg.skillResult.data.changePercent ?? 0) >= 0 ? 'up' : 'down']">
-                    {{ (msg.skillResult.data.changePercent ?? 0) >= 0 ? '+' : '' }}{{ Number(msg.skillResult.data.changePercent).toFixed(2) }}%
-                  </text>
-                </view>
-              </view>
-              <view v-if="msg.skillResult.data.high !== undefined" class="quote-card-detail">
-                <text class="detail-item">高 {{ Number(msg.skillResult.data.high).toFixed(2) }}</text>
-                <text class="detail-item">低 {{ Number(msg.skillResult.data.low).toFixed(2) }}</text>
-                <text class="detail-item">开 {{ Number(msg.skillResult.data.open).toFixed(2) }}</text>
-              </view>
-            </view>
-            <!-- 资金流向卡片 -->
-            <view
-              v-else-if="msg.skillResult?.data?.netAmount !== undefined || msg.skillResult?.data?.net_amount !== undefined"
-              class="flow-card"
-            >
-              <text class="flow-card-title">资金流向</text>
-              <view class="flow-card-row">
-                <text class="flow-label">主力净流入</text>
-                <text :class="['flow-value', getFlowClass(msg.skillResult.data)]">
-                  {{ formatFlowAmount(msg.skillResult.data) }}
-                </text>
-              </view>
-            </view>
-            <!-- 纯文本 Skill 结果 -->
-            <view v-else-if="msg.skillResult?.narrative && msg.skillResult.type === 'text'" class="skill-text-card">
-              <text class="skill-text">{{ msg.skillResult.narrative }}</text>
-            </view>
           </view>
         </view>
       </view>
@@ -128,24 +85,6 @@ function quickAsk(text: string) {
 
 function goBack() {
   uni.navigateBack()
-}
-
-function goStockDetail(symbol: string) {
-  if (!symbol) return
-  uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
-}
-
-function getFlowClass(data: any): string {
-  const net = data?.netAmount ?? data?.net_amount ?? 0
-  return net >= 0 ? 'up' : 'down'
-}
-
-function formatFlowAmount(data: any): string {
-  const net = data?.netAmount ?? data?.net_amount ?? 0
-  const abs = Math.abs(net)
-  if (abs >= 100000000) return (net / 100000000).toFixed(2) + '亿'
-  if (abs >= 10000) return (net / 10000).toFixed(2) + '万'
-  return net.toFixed(2) + '元'
 }
 
 function scrollToBottom() {

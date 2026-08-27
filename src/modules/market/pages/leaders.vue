@@ -1,13 +1,31 @@
 <template>
-  <SubPageCard title="长线风口">
+  <SubPageCard title="风口龙头">
     <template #header-right>
-      <view class="history-btn" @tap="goPushHistory">
-        <text class="history-btn-text">历史推送</text>
+      <view class="header-right-actions">
+        <view class="header-podcast-btn" @tap="openPodcast('风口龙头播报')">
+          <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
+        </view>
+        <view class="history-btn" @tap="goPushHistory">
+          <text class="history-btn-text">历史推送</text>
+        </view>
       </view>
     </template>
     <view class="leaders-content">
       <!-- 引导卡片：点击查看今日分析报告 -->
       <GuideCard title="点击查看今日分析报告" icon-name="file-line" theme="brand" @click="goAgentReport" />
+
+      <!-- 长线/短线风口两档切换 -->
+      <view v-if="sectors.length" class="cycle-tabs">
+        <view
+          v-for="opt in CYCLE_OPTIONS"
+          :key="opt.value"
+          class="cycle-tab"
+          :class="{ active: activeCycle === opt.value }"
+          @tap="activeCycle = opt.value as 'long' | 'short'"
+        >
+          <text class="cycle-tab-text">{{ opt.label }}</text>
+        </view>
+      </view>
 
       <Card v-if="errorMessage" class="state-section">
         <EmptyState :title="errorMessage" description="请检查网络连接后重新加载">
@@ -17,40 +35,49 @@
         </EmptyState>
       </Card>
 
-      <LoadingState v-else-if="loading && !sectors.length" text="正在加载长线风口数据..." />
+      <LoadingState v-else-if="loading && !sectors.length" text="正在加载风口龙头数据..." />
 
-      <EmptyState v-else-if="!sectors.length" title="暂无长线风口数据" description="数据更新后将在这里展示" />
+      <EmptyState v-else-if="!sectors.length" title="暂无风口龙头数据" description="数据更新后将在这里展示" />
 
       <!-- 风口概念泡泡图 -->
-      <view v-if="sectors.length" class="bubble-card">
+      <view v-if="displaySectors.length" class="bubble-card">
         <view class="bubble-title-row">
-          <text class="bubble-title">风口概念</text>
-          <text class="bubble-hint">泡泡越大持续性越强</text>
+          <text class="bubble-title">{{ activeCycle === 'long' ? '长线风口概念' : '短线风口概念' }}</text>
+          <text class="bubble-hint">泡泡越大持续越久，颜色越深确定性越高</text>
         </view>
         <view class="bubble-wrap" :style="{ height: bubbleHeight + 'px' }">
-          <view
-            v-for="(b, idx) in bubbleLayout"
-            :key="idx"
-            class="bubble-item"
-            :style="bubbleItemStyle(b)"
-            @tap="selectBubble(b)"
-          >
-            <text class="bubble-name" :style="{ fontSize: b.fontSize + 'px' }">{{ b.name }}</text>
-            <text
-              class="bubble-change"
-              :style="{ fontSize: (b.fontSize - 3) + 'px' }"
-              :class="b.change >= 0 ? 'up' : 'down'"
+          <!-- bubble-layer 尺寸 = 泡泡群包围盒（自适应），由 bubble-wrap flex 居中：
+               不依赖容器宽度测量，任何设备/缩放下泡泡群水平垂直居中 -->
+          <view v-if="bubbleLayout.items.length" class="bubble-layer" :style="bubbleLayerStyle">
+            <view
+              v-for="(b, idx) in bubbleLayout.items"
+              :key="idx"
+              class="bubble-item"
+              :style="bubbleItemStyle(b)"
+              @tap="selectBubble(b)"
             >
-              {{ b.change >= 0 ? '+' : '' }}{{ b.change.toFixed(2) }}%
-            </text>
+              <text class="bubble-name" :style="{ fontSize: b.fontSize + 'px' }">{{ b.name }}</text>
+              <text
+                class="bubble-change"
+                :style="{ fontSize: (b.fontSize - 3) + 'px' }"
+              >
+                {{ b.days }}天
+              </text>
+            </view>
           </view>
         </view>
       </view>
 
+      <EmptyState
+        v-else-if="sectors.length"
+        :title="cycleEmptyTitle"
+        description="该档位暂无板块数据"
+      />
+
       <!-- 板块列表（入口卡片，点击进入板块详情子页面） -->
-      <view v-if="sectors.length" class="sector-list">
+      <view v-if="displaySectors.length" class="sector-list">
       <view
-        v-for="(sector, idx) in sectors"
+        v-for="(sector, idx) in displaySectors"
         :key="sector.code || idx"
         class="stats-card sector-entry"
         @tap="goSectorDetail(sector)"
@@ -61,16 +88,21 @@
             <Badge size="sm">No.{{ idx + 1 }}</Badge>
             <text class="stats-name">{{ sector.name }}</text>
             <Tag
-              v-if="persistenceText(sector)"
-              :type="persistenceTagType(sector)"
+              v-if="activeCycle === 'long' && logicTypeText(sector)"
+              :type="logicTypeTagType(sector)"
               size="sm"
-            >{{ persistenceText(sector) }}</Tag>
+            >{{ logicTypeText(sector) }}</Tag>
+            <Tag
+              v-if="activeCycle === 'short' && heatStageText(sector)"
+              :type="heatStageTagType(sector)"
+              size="sm"
+            >{{ heatStageText(sector) }}</Tag>
           </view>
-          <Badge v-if="sector.frequency" size="sm">上榜 {{ sector.frequency }} 次</Badge>
+          <Badge v-if="boardCount(sector) > 0" size="sm">上榜 {{ boardCount(sector) }} 次</Badge>
         </view>
         <!-- 统计行 -->
-        <StatGrid class="leader-stat-grid" :items="sectorStatItems(sector)" :columns="4" />
-        <!-- 单只龙头股详细行情（跨板块去重） -->
+        <StatGrid class="leader-stat-grid" :items="sectorStatItems(sector)" :columns="3" />
+        <!-- 龙头股（分档：长线=趋势龙头 / 短线=短线领涨），跨板块去重 -->
         <view v-if="getSectorLeader(sector)" class="leader-mini-row" @tap.stop="goStockDetail(getSectorLeader(sector)!.code)">
           <view class="leader-mini-left">
             <text class="leader-mini-name">{{ getSectorLeader(sector)!.name }}</text>
@@ -110,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, getCurrentInstance } from 'vue'
+import { ref, computed, getCurrentInstance, watch, nextTick } from 'vue'
 import { onShow, onReady } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderAiAnalysis, WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
@@ -119,6 +151,10 @@ import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
+import { useReportPodcast } from '@/shared/utils/useReportPodcast'
+import { calcBubbleColor, calcBubbleRadius, getSectorDays, getSectorStrength } from '@/modules/market/utils/windLeaderBubble'
+
+const { loadPodcast, openPodcast } = useReportPodcast('wind_leader')
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -130,11 +166,46 @@ const favoriteSet = ref<Set<string>>(new Set())
 interface Bubble {
   name: string
   change: number
-  score: number
-  persistence: string
-  radius: number  // px 半径
+  days: number     // 该档位持续天数（长线=long_term_days，短线=short_term_days）
+  radius: number   // px 半径
+  color: string    // 泡泡填充色（长线蓝系=置信度，短线橙红系=热度）
   fontSize: number
 }
+
+// ===== 长线/短线风口两档切换（无"全部"档；both 同时归属两档） =====
+const CYCLE_OPTIONS = [
+  { label: '长线风口榜', value: 'long' },
+  { label: '短线风口榜', value: 'short' },
+]
+
+const activeCycle = ref<'long' | 'short'>('long')
+
+/** 当前档位展示的板块：短线榜按上榜次数（近10日 freq20）→ 热度（short_heat）降序、长线榜按 long_term_days 降序，各取 top8。
+ * 先过滤掉该档位天数为 0 的板块（另一链被裁剪或长短线均不成立的板块），
+ * 宁少勿滥，避免短线档塞满 0 天补位板块。
+ * 短线排序与后端 applyDualRankings 口径一致（上榜次数-热度），不依赖后端返回顺序。 */
+const displaySectors = computed(() =>
+  [...sectors.value]
+    .filter(s => getSectorDays(s, activeCycle.value) > 0)
+    .sort((a, b) => {
+      if (activeCycle.value === 'short') {
+        // 短线榜：上榜次数（近10日 freq20）降序，相同按短线热度（short_heat）降序
+        const freqDiff = Number(b.freq20 ?? 0) - Number(a.freq20 ?? 0)
+        if (freqDiff !== 0) return freqDiff
+        return getSectorStrength(b, 'short') - getSectorStrength(a, 'short')
+      }
+      // 长线榜：长线影响天数降序，同天数按近120日上榜次数 frequency 降序
+      const daysDiff = getSectorDays(b, 'long') - getSectorDays(a, 'long')
+      if (daysDiff !== 0) return daysDiff
+      return Number(b.frequency ?? 0) - Number(a.frequency ?? 0)
+    })
+    .slice(0, 8)
+)
+
+/** 切换档位为空时的标题 */
+const cycleEmptyTitle = computed(() =>
+  activeCycle.value === 'long' ? '暂无长线风口数据' : '暂无短线风口数据'
+)
 
 // 泡泡布局结果
 interface BubbleLayout extends Bubble {
@@ -159,7 +230,7 @@ try {
 // onReady 中测量 .bubble-wrap 的实际渲染宽度并修正 containerWidth。
 // 上面 getSystemInfoSync() 只能拿到 windowWidth，无法感知 App 端 zoom:1.2 缩放等
 // 导致的实际容器宽度差异，这里用 boundingClientRect 拿到真实渲染宽度兜底。
-onReady(() => {
+function measureBubbleWidth() {
   const instance = getCurrentInstance()
   const query = uni.createSelectorQuery()
   if (instance?.proxy) {
@@ -176,43 +247,43 @@ onReady(() => {
       }
     })
     .exec()
-})
-
-// 根据持续性决定半径，放大泡泡尺寸
-function calcRadius(persistence: string, score: number): number {
-  let base = 26 // 短期
-  if (persistence.includes('长期')) base = 58
-  else if (persistence.includes('中期')) base = 42
-  // score 微调
-  base += (score - 50) * 0.08
-  return Math.max(22, Math.min(65, Math.round(base)))
 }
 
+onReady(measureBubbleWidth)
+
+// sectors 异步加载完成后，.bubble-wrap 才进入 DOM（v-if="sectors.length"），
+// onReady 时测量不到，需在数据首次到达后重新测量。
+watch(sectors, (val) => {
+  if (val.length) {
+    nextTick(measureBubbleWidth)
+  }
+})
+
 const bubbleData = computed<Bubble[]>(() => {
-  const source = sectors.value.slice(0, 10).map(s => ({
-    name: s.name,
-    change: s.today_change ?? 0,
-    score: s.score ?? 50,
-    persistence: typeof s.ai_analysis === 'object'
-      ? s.ai_analysis?.persistence || '短期'
-      : '短期',
-  }))
-  return source.map(s => {
-    const r = calcRadius(s.persistence, s.score)
+  const kind = activeCycle.value
+  return displaySectors.value.slice(0, 10).map(s => {
+    const days = getSectorDays(s, kind)
+    const strength = getSectorStrength(s, kind)
+    const r = calcBubbleRadius(kind, days)
     return {
-      ...s,
+      name: s.name,
+      change: s.today_change ?? 0,
+      days,
       radius: r,
+      color: calcBubbleColor(kind, strength),
       fontSize: r > 50 ? 14 : (r > 38 ? 12 : 10),
     }
   })
 })
 
 // force simulation：碰撞检测 + 居中 + 自适应缩放（确定性布局，同数据同结果）
-// 核心改进：迭代后增加"质心居中"步骤，确保泡泡群整体居中于画布
-const bubbleLayout = computed<BubbleLayout[]>(() => {
+// 最终输出为"泡泡群包围盒 layer"（layerW/layerH）+ 泡泡相对 layer 左上角的坐标；
+// .bubble-wrap 用 flex 把 layer 居中 → 泡泡群在任何设备/缩放下都水平垂直居中，
+// 不再依赖容器宽度测量（containerWidth 仅用于碰撞模拟，不影响最终居中）。
+const bubbleLayout = computed<{ layerW: number; layerH: number; items: BubbleLayout[] }>(() => {
   const items = bubbleData.value
-  if (!items.length) return []
-  const W = containerWidth.value // 动态容器宽度，匹配实际画布大小
+  if (!items.length) return { layerW: 0, layerH: 0, items: [] }
+  const W = containerWidth.value // 估算容器宽度（仅碰撞/边界模拟用）
   const H = bubbleHeight
   const cx = W / 2
   const cy = H / 2
@@ -288,56 +359,62 @@ const bubbleLayout = computed<BubbleLayout[]>(() => {
     }
   }
 
-  // 最终包围盒居中 + 自适应缩放（单次计算，确定性结果）
-  // 1. 计算所有泡泡的包围盒
-  // 2. 计算缩放比例使包围盒恰好放入画布（含 padding）
-  // 3. 以包围盒中心为原点缩放位置和半径，再平移到画布中心
-  if (nodes.length > 0) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-    for (const n of nodes) {
-      minX = Math.min(minX, n.x - n.radius)
-      maxX = Math.max(maxX, n.x + n.radius)
-      minY = Math.min(minY, n.y - n.radius)
-      maxY = Math.max(maxY, n.y + n.radius)
-    }
-    const bboxCx = (minX + maxX) / 2
-    const bboxCy = (minY + maxY) / 2
-    const bboxW = maxX - minX
-    const bboxH = maxY - minY
-
-    // 计算缩放比例：画布留 8px padding，取宽高方向较小值，不超过 1（不放大）
-    const padding = 8
-    const scaleX = bboxW > 0 ? (W - padding * 2) / bboxW : 1
-    const scaleY = bboxH > 0 ? (H - padding * 2) / bboxH : 1
-    const fitScale = Math.min(1, scaleX, scaleY)
-
-    // 以包围盒中心为原点缩放，然后平移到画布中心
-    for (const n of nodes) {
-      n.radius *= fitScale
-      n.x = cx + (n.x - bboxCx) * fitScale
-      n.y = cy + (n.y - bboxCy) * fitScale
-    }
+  // 包围盒自适应缩放：以包围盒中心为原点等比缩放，使泡泡群放入画布（含 padding）
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const n of nodes) {
+    minX = Math.min(minX, n.x - n.radius)
+    maxX = Math.max(maxX, n.x + n.radius)
+    minY = Math.min(minY, n.y - n.radius)
+    maxY = Math.max(maxY, n.y + n.radius)
+  }
+  const bboxCx = (minX + maxX) / 2
+  const bboxCy = (minY + maxY) / 2
+  const bboxW = maxX - minX
+  const bboxH = maxY - minY
+  const padding = 8
+  const scaleX = bboxW > 0 ? (W - padding * 2) / bboxW : 1
+  const scaleY = bboxH > 0 ? (H - padding * 2) / bboxH : 1
+  const fitScale = Math.min(1, scaleX, scaleY)
+  for (const n of nodes) {
+    n.radius *= fitScale
+    n.x = cx + (n.x - bboxCx) * fitScale
+    n.y = cy + (n.y - bboxCy) * fitScale
   }
 
-  return nodes.map(n => ({ ...n, x: n.x, y: n.y }))
+  // 缩放后的最终包围盒（layer 内容尺寸），泡泡坐标转换为相对 layer 左上角偏移
+  let minX2 = Infinity, maxX2 = -Infinity, minY2 = Infinity, maxY2 = -Infinity
+  for (const n of nodes) {
+    minX2 = Math.min(minX2, n.x - n.radius)
+    maxX2 = Math.max(maxX2, n.x + n.radius)
+    minY2 = Math.min(minY2, n.y - n.radius)
+    maxY2 = Math.max(maxY2, n.y + n.radius)
+  }
+  const layerW = Math.max(0, Math.ceil(maxX2 - minX2 + padding * 2))
+  const layerH = Math.max(0, Math.ceil(maxY2 - minY2 + padding * 2))
+  const offsetX = minX2 - padding
+  const offsetY = minY2 - padding
+  return {
+    layerW,
+    layerH,
+    items: nodes.map(n => ({ ...n, x: n.x - offsetX, y: n.y - offsetY })),
+  }
 })
 
-// 颜色：基于score，从浅蓝到深蓝（匹配网页版）
+/** bubble-layer 尺寸：泡泡群包围盒 + padding（由 bubble-wrap flex 居中） */
+const bubbleLayerStyle = computed(() => ({
+  width: bubbleLayout.value.layerW + 'px',
+  height: bubbleLayout.value.layerH + 'px',
+}))
+
+// 颜色：长线蓝系（置信度）/ 短线橙红系（热度），深浅由 calcBubbleColor 按强度色阶插值
 function bubbleItemStyle(b: BubbleLayout) {
-  const ratio = Math.max(0, Math.min(1, (b.score - 40) / 60))
-  // 浅蓝 #bfdbfe → 深蓝 #1d4ed8
-  const r = Math.round(191 + (29 - 191) * ratio)
-  const g = Math.round(219 + (78 - 219) * ratio)
-  const bl = Math.round(254 + (216 - 254) * ratio)
-  const fillColor = `rgb(${r}, ${g}, ${bl})`
   return {
     width: b.radius * 2 + 'px',
     height: b.radius * 2 + 'px',
     left: b.x - b.radius + 'px',
     top: b.y - b.radius + 'px',
-    background: fillColor,
+    background: b.color,
     borderColor: '#ffffff',
-    opacity: '0.9',
   }
 }
 
@@ -357,7 +434,7 @@ async function loadData() {
   if (loading.value) return
   loading.value = true
   try {
-    const data = await stockApi.getWindLeaders(10)
+    const data = await stockApi.getWindLeaders(40)
     const hotSectors = Array.isArray(data?.hot_sectors) ? data.hot_sectors : []
     sectors.value = hotSectors.filter(
       (sector): sector is WindLeaderSector => Boolean(sector && typeof sector.name === 'string' && sector.name.trim())
@@ -365,6 +442,8 @@ async function loadData() {
     updateTime.value = typeof data?.update_time === 'string' ? data.update_time : ''
     errorMessage.value = ''
     loadFavorites()
+    // 龙头股行情补全（非阻塞）：long_leader（趋势龙头，来自 trend_scores）可能缺 price/change_pct
+    void enrichLeaderQuotes()
   } catch {
     sectors.value = []
     updateTime.value = ''
@@ -411,36 +490,38 @@ function formatPct(val?: number | null): string {
 }
 
 function formatNetInflow(val?: number | null): string {
-  if (val === undefined || val === null) return '--'
+  // 与 Web 前端口径一致：0 视为无数据（moneyflow 缺失时后端回填 0），避免显示误导性的"0万"
+  if (val === undefined || val === null || val === 0) return '--'
   if (Math.abs(val) >= 10000) return (val / 10000).toFixed(2) + '亿'
   return Math.round(val) + '万'
 }
 
-// 持续性标签提取（只显示"短期"/"中期"/"长期"）
-function persistenceText(sector: WindLeaderSector): string {
-  const ai = sector.ai_analysis
+// ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
+/** 上榜次数：短线档显示近10日 freq20，长线档显示近120日 frequency */
+function boardCount(s: WindLeaderSector): number {
+  return activeCycle.value === 'short' ? Number(s.freq20 ?? 0) : Number(s.frequency ?? 0)
+}
+
+/** 短线热度阶段标签（heat_stage：启动期/发酵期/高潮期/衰退期），高潮期用 warning 色、其余品牌色 */
+function heatStageText(s: WindLeaderSector): string {
+  const ai = s.ai_analysis
   if (!ai || typeof ai === 'string') return ''
-  const raw = (ai as WindLeaderAiAnalysis).persistence || ''
-  if (raw.includes('长期')) return '长期'
-  if (raw.includes('中期')) return '中期'
-  if (raw.includes('短期')) return '短期'
-  return raw
+  return ai.heat_stage || ''
 }
 
-function persistenceClass(sector: WindLeaderSector): string {
-  const tag = persistenceText(sector)
-  if (tag.includes('长期')) return 'long-term'
-  if (tag.includes('中期')) return 'mid-term'
-  if (tag.includes('短期')) return 'short-term'
-  return ''
+function heatStageTagType(s: WindLeaderSector): 'down' | 'warning' {
+  return heatStageText(s) === '高潮期' ? 'warning' : 'down'
 }
 
-function persistenceTagType(sector: WindLeaderSector): 'down' | 'neutral' | 'warning' {
-  const tag = persistenceText(sector)
-  if (tag.includes('长期')) return 'down'
-  if (tag.includes('中期')) return 'neutral'
-  if (tag.includes('短期')) return 'warning'
-  return 'neutral'
+/** 长线逻辑类型标签（logic_type：政策/业绩/资金/无支撑），无支撑用 warning 色、其余品牌色 */
+function logicTypeText(s: WindLeaderSector): string {
+  const ai = s.ai_analysis
+  if (!ai || typeof ai === 'string') return ''
+  return ai.logic_type || ''
+}
+
+function logicTypeTagType(s: WindLeaderSector): 'down' | 'warning' {
+  return logicTypeText(s) === '无支撑' ? 'warning' : 'down'
 }
 
 function sectorStatItems(sector: WindLeaderSector): StatGridItem[] {
@@ -450,26 +531,32 @@ function sectorStatItems(sector: WindLeaderSector): StatGridItem[] {
     { label: '今日涨幅', value: (todayChange >= 0 ? '+' : '') + formatPct(sector.today_change), color: todayChange >= 0 ? 'up' : 'down' },
     { label: '均涨幅', value: (avgChange >= 0 ? '+' : '') + formatPct(sector.avg_change), color: avgChange >= 0 ? 'up' : 'down' },
     { label: '净流入', value: formatNetInflow(sector.net_inflow) },
-    { label: '领涨股', value: sector.leading_stock || sector.leading_stock_info?.name || '--' },
   ]
 }
 
-// 从板块中提取龙头股列表：优先合并 leading_stock_info 和 main_stocks，去重后按 score 降序
+// 从板块中提取龙头股候选列表：长线档优先 long_leader（趋势龙头），短线档优先 leading_stock_info（短线领涨），
+// 再补充 main_stocks（去重后按 score 降序）。消除"领涨股/龙头股"双概念歧义，统一展示一只龙头股。
 function getTopStocks(sector: WindLeaderSector): WindLeaderStock[] {
   const seen = new Set<string>()
   const stocks: WindLeaderStock[] = []
-  // 优先取 leading_stock_info
-  if (sector.leading_stock_info?.code) {
-    stocks.push(sector.leading_stock_info)
-    seen.add(sector.leading_stock_info.code)
+  const push = (s?: WindLeaderStock | null) => {
+    if (s?.code && !seen.has(s.code)) {
+      stocks.push(s)
+      seen.add(s.code)
+    }
+  }
+  // 分档首选：长线=趋势龙头(long_leader)，短线=龙头股(leading_stock_info)
+  if (activeCycle.value === 'long') {
+    push(sector.long_leader)
+    push(sector.leading_stock_info)
+  } else {
+    push(sector.leading_stock_info)
+    push(sector.long_leader)
   }
   // 补充 main_stocks（去重）
   if (sector.main_stocks) {
-    for (const s of sector.main_stocks) {
-      if (s?.code && !seen.has(s.code)) {
-        stocks.push(s)
-        seen.add(s.code)
-      }
+    for (const s of [...sector.main_stocks].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))) {
+      push(s)
     }
   }
   return stocks
@@ -496,6 +583,42 @@ const sectorLeaderMap = computed<Record<string, WindLeaderStock | null>>(() => {
 
 function getSectorLeader(sector: WindLeaderSector): WindLeaderStock | null {
   return sectorLeaderMap.value[sector.name] || null
+}
+
+/**
+ * 龙头股行情补全：long_leader（趋势龙头，来自 trend_scores）等候选股可能缺 price/change_pct，
+ * 批量拉取实时行情回填缺失字段，保证龙头行价格/涨跌幅展示完整。
+ */
+async function enrichLeaderQuotes() {
+  const codes: string[] = []
+  const seen = new Set<string>()
+  for (const s of sectors.value) {
+    for (const c of getTopStocks(s)) {
+      if (c?.code && !seen.has(c.code) && (c.price == null || c.change_pct == null)) {
+        seen.add(c.code)
+        codes.push(c.code)
+      }
+    }
+  }
+  if (!codes.length) return
+  try {
+    const quotes = await stockApi.getCoreQuotes(codes)
+    const qMap = new Map(quotes.map(q => [q.symbol, q]))
+    for (const s of sectors.value) {
+      const patch = (c?: WindLeaderStock | null) => {
+        if (!c?.code) return
+        const q = qMap.get(c.code)
+        if (!q) return
+        if (c.price == null) c.price = q.price
+        if (c.change_pct == null) c.change_pct = q.changePercent
+      }
+      patch(s.long_leader)
+      patch(s.leading_stock_info)
+      if (s.main_stocks) s.main_stocks.forEach(patch)
+    }
+  } catch {
+    // 行情补全失败不影响主流程展示
+  }
 }
 
 function getAnalysisRows(a: WindLeaderAiAnalysis | string | null | undefined): Array<{ label: string; value: string; risk?: boolean }> {
@@ -539,6 +662,8 @@ function goSectorDetail(sector: WindLeaderSector) {
 
 onShow(() => {
   loadData()
+  // 静默预拉取播报稿，保证标题栏播报按钮可即时使用
+  void loadPodcast()
 })
 </script>
 
@@ -587,6 +712,15 @@ onShow(() => {
 .bubble-wrap {
   position: relative;
   width: 100%;
+  /* 泡泡群（bubble-layer）由 flex 居中：不依赖容器宽度测量，任意设备/缩放下水平垂直居中 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 泡泡群包围盒（尺寸=泡泡包围盒+padding，由脚本计算）；泡泡绝对定位相对本层 */
+.bubble-layer {
+  position: relative;
 }
 
 .bubble-item {
@@ -629,6 +763,39 @@ onShow(() => {
   gap: 20rpx;
 }
 
+/* 长线/短线风口两档切换 */
+.cycle-tabs {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.cycle-tab {
+  flex: 1;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+  background: $bg-card;
+}
+
+.cycle-tab.active {
+  border-color: $primary-color;
+  background: rgba(11, 95, 255, 0.06);
+}
+
+.cycle-tab-text {
+  font-size: 28rpx;
+  color: $text-color-secondary;
+}
+
+.cycle-tab.active .cycle-tab-text {
+  color: $primary-color;
+  font-weight: 600;
+}
+
 /* stats-card 卡片（与板块详情页一致） */
 .stats-card {
   position: relative;
@@ -638,11 +805,6 @@ onShow(() => {
   padding: 28rpx;
   margin-bottom: 20rpx;
   box-shadow: $shadow-sm;
-}
-
-/* 第四格是“领涨股”名称，较长时比数值字号略小以保持单行。 */
-:deep(.leader-stat-grid .as-stat-grid__item:nth-child(4) .as-stat-grid__value) {
-  font-size: 24rpx;
 }
 
 .stats-header {
@@ -960,6 +1122,21 @@ onShow(() => {
 .update-time-text {
   font-size: 22rpx;
   color: #9ca3af;
+}
+
+/* 标题栏右侧按钮容器 + 播报按钮（与趋势股评分页一致，横向排列） */
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.header-podcast-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .history-btn {

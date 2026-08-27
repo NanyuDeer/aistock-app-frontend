@@ -2,15 +2,39 @@
  * 全局常量
  */
 
-// API 基础地址
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+// API 基础地址：H5/小程序走同源或 dev server 代理，用相对路径 /api；
+// App 端必须使用完整 URL——env 缺失时兜底线上地址，避免打包 App 全部接口请求失败
+export const API_BASE_URL = (() => {
+  // #ifdef APP-PLUS
+  return import.meta.env.VITE_API_BASE_URL || 'https://gupiao-api.yaozhineng.com/api'
+  // #endif
+  // #ifndef APP-PLUS
+  return import.meta.env.VITE_API_BASE_URL || '/api'
+  // #endif
+})()
 
 // WebSocket 地址（Node.js 服务）
-export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:3000/ws'
+export const WS_BASE_URL = (() => {
+  // #ifdef APP-PLUS
+  return import.meta.env.VITE_WS_BASE_URL || 'wss://gupiao-api.yaozhineng.com/ws'
+  // #endif
+  // #ifndef APP-PLUS
+  return import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:3000/ws'
+  // #endif
+})()
 
 // Agent Python 后端 WebSocket 地址（后端路由前缀 /api/agent + /ws/chat）
-// 本地开发默认 8080，可通过 VITE_AGENT_WS_BASE 环境变量覆盖
-export const AGENT_WS_BASE_URL = import.meta.env.VITE_AGENT_WS_BASE || 'ws://localhost:8080/api/agent/ws'
+// 端口走 env 分层：本地开发默认 8000（env/.env.development 注入），
+// 生产由 env/.env.production 注入 wss://gupiao-api.yaozhineng.com/api/agent/ws；
+// 此处 fallback 仅在 env 缺失时兜底：App 端兜底线上，其余平台对齐本地开发约定
+export const AGENT_WS_BASE_URL = (() => {
+  // #ifdef APP-PLUS
+  return import.meta.env.VITE_AGENT_WS_BASE || 'wss://gupiao-api.yaozhineng.com/api/agent/ws'
+  // #endif
+  // #ifndef APP-PLUS
+  return import.meta.env.VITE_AGENT_WS_BASE || 'ws://localhost:8000/api/agent/ws'
+  // #endif
+})()
 
 // 平台标识
 export const PLATFORM = {

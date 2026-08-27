@@ -4,7 +4,17 @@
  */
 import Request from 'luch-request'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+// API 基础地址：H5/小程序走同源或 dev server 代理，用相对路径 /api；
+// App 端请求不走 dev server proxy，必须使用完整 URL——env 缺失时兜底线上地址，
+// 避免打包 App 时误用相对路径导致全部接口请求失败（表现为"打包 App 无后端数据"）
+const BASE_URL = (() => {
+  // #ifdef APP-PLUS
+  return import.meta.env.VITE_API_BASE_URL || 'https://gupiao-api.yaozhineng.com/api'
+  // #endif
+  // #ifndef APP-PLUS
+  return import.meta.env.VITE_API_BASE_URL || '/api'
+  // #endif
+})()
 
 const http = new Request({
   baseURL: BASE_URL,
@@ -63,8 +73,8 @@ http.interceptors.response.use(
  * 支持泛型：request.get<T>(url, { params })
  */
 const request = {
-  get<T = any>(url: string, config: { params?: any; headers?: any } = {}): Promise<T> {
-    return http.get(url, { params: config.params, header: config.headers }) as unknown as Promise<T>
+  get<T = any>(url: string, config: { params?: any; headers?: any; timeout?: number } = {}): Promise<T> {
+    return http.get(url, { params: config.params, header: config.headers, timeout: config.timeout }) as unknown as Promise<T>
   },
   post<T = any>(url: string, data?: any, config: { headers?: any; timeout?: number } = {}): Promise<T> {
     return http.post(url, data, { header: config.headers, timeout: config.timeout }) as unknown as Promise<T>

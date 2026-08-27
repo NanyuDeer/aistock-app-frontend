@@ -30,7 +30,7 @@
             </text>
           </view>
         </view>
-        <view class="stock-tags-row">
+        <view v-if="hasStockHeaderTags" class="stock-tags-row">
           <view v-if="stockInfo?.industry" class="stock-tag">
             <text class="tag-label">行业</text>
             <text class="tag-value">{{ stockInfo.industry }}</text>
@@ -39,9 +39,9 @@
             <text class="tag-label">地域</text>
             <text class="tag-value">{{ stockInfo.regionBoard }}</text>
           </view>
-          <view class="stock-tag">
+          <view v-if="stockInfo?.listingDate" class="stock-tag">
             <text class="tag-label">上市</text>
-            <text class="tag-value">{{ stockInfo?.listingDate || '--' }}</text>
+            <text class="tag-value">{{ stockInfo.listingDate }}</text>
           </view>
         </view>
         <view class="limit-inline">
@@ -59,30 +59,30 @@
             <text class="decision-kicker">综合决策</text>
           </view>
           <view class="decision-verdict">
-            <text :class="['decision-status', overallDecision.statusClass]">{{ overallDecision.status }}</text>
-            <text class="decision-period">{{ overallDecision.period }}</text>
+            <text :class="['decision-status', overallDecision.verdictClass]">{{ overallDecision.verdict }}</text>
+            <text :class="['decision-status', 'is-sub', overallDecision.periodDominanceClass]">{{ overallDecision.periodDominance }}</text>
           </view>
         </view>
         <text class="decision-summary">{{ overallDecision.summary }}</text>
         <view class="decision-next">
-          <text class="next-label">下一步</text>
+          <text class="next-label">观察重点</text>
           <text class="next-text">{{ overallDecision.nextStep }}</text>
         </view>
         <view class="decision-points">
-          <view class="decision-point" @tap="toggleDecisionPoint('opportunity')">
+          <view v-if="overallDecision.opportunity" class="decision-point" @tap="toggleDecisionPoint('opportunity')">
             <text class="point-label">机会</text>
-            <text :class="['point-text', { expanded: expandedDecisionPoint === 'opportunity' }]">{{ overallDecision.opportunity }}</text>
+            <text :class="['point-text', { expanded: expandedDecisionPoint === 'opportunity' }]">{{ expandedDecisionPoint === 'opportunity' ? overallDecision.opportunityFull : overallDecision.opportunity }}</text>
             <text class="point-more">{{ expandedDecisionPoint === 'opportunity' ? '收起' : '展开' }}</text>
           </view>
-          <view class="decision-point is-risk" @tap="toggleDecisionPoint('risk')">
+          <view v-if="overallDecision.risk" class="decision-point is-risk" @tap="toggleDecisionPoint('risk')">
             <text class="point-label">风险</text>
-            <text :class="['point-text', { expanded: expandedDecisionPoint === 'risk' }]">{{ overallDecision.risk }}</text>
+            <text :class="['point-text', { expanded: expandedDecisionPoint === 'risk' }]">{{ expandedDecisionPoint === 'risk' ? overallDecision.riskFull : overallDecision.risk }}</text>
             <text class="point-more">{{ expandedDecisionPoint === 'risk' ? '收起' : '展开' }}</text>
           </view>
         </view>
       </view>
 
-      <view v-if="isFavorite" class="major-event-alert" :class="{ 'is-muted': !latestMajorEvent }">
+      <view v-if="isFavorite && latestMajorEvent" class="major-event-alert">
         <view class="major-event-head">
           <text class="decision-kicker">最新重大异动</text>
           <text v-if="latestMajorEvent" :class="['major-impact', majorEventImpactClass]">
@@ -98,18 +98,18 @@
           </view>
         </template>
         <template v-else>
-          <text class="major-event-title">暂无重大利好或重大利空异动</text>
+          <text class="major-event-title">暂无数据</text>
           <view class="major-event-meta">
-            <text>持续监控中</text>
+            <text>暂无真实异动来源</text>
           </view>
         </template>
       </view>
 
       <!-- 2. 个股异动 -->
-      <view v-if="isFavorite && stockEvents.length" class="section-card">
+      <view v-if="isFavorite && displayedStockEvents.length" class="section-card">
         <text class="section-title">个股异动</text>
         <view class="event-list">
-          <view v-for="(evt, idx) in stockEvents" :key="idx" class="event-item">
+          <view v-for="(evt, idx) in displayedStockEvents" :key="idx" class="event-item">
             <view class="event-dot" :class="evt.change_type || evt.cycle || 'default'"></view>
             <view class="event-content">
               <text class="event-title">{{ evt.title || evt.change_type_name || evt.summary || '异动' }}</text>
@@ -134,18 +134,8 @@
 
       <!-- 4. 短线视图 -->
       <view v-show="activeView === 'short'" class="view-content">
-        <view class="section-card action-card">
-          <text class="section-title">短线跟踪</text>
-          <view class="short-action-list">
-            <view v-for="item in shortActionItems" :key="item.label" class="short-action-item">
-              <text class="action-label">{{ item.label }}</text>
-              <text class="action-value">{{ item.value }}</text>
-            </view>
-          </view>
-        </view>
-
         <!-- AI 资讯分析 -->
-        <view class="ai-analysis-card">
+        <view v-if="hasAiInfoCardData" class="ai-analysis-card">
           <view class="card-header">
             <text class="card-title">AI 资讯分析</text>
             <view class="card-header-actions">
@@ -199,12 +189,8 @@
                 </view>
               </view>
             </template>
-            <view v-else class="ai-empty">
-              <text class="ai-empty-text">暂无 AI 资讯分析</text>
-            </view>
-
-            <view class="info-news-divider"></view>
-            <view class="news-list">
+            <view v-if="newsList.length" class="info-news-divider"></view>
+            <view v-if="newsList.length" class="news-list">
               <view
                 v-for="(news, idx) in visibleNewsList"
                 :key="idx"
@@ -222,118 +208,154 @@
                   {{ newsExpanded ? '收起' : `查看全部 ${newsList.length} 条` }}
                 </text>
               </view>
-              <view v-if="!newsList.length" class="ai-empty">
-                <text class="ai-empty-text">暂无相关资讯</text>
-              </view>
           </view>
         </view>
         </view>
         <!-- K 线图 -->
-        <view class="section-card">
+        <view v-if="klineData.length || klineLoading" class="section-card">
           <text class="section-title">K线图</text>
           <KLineChart
-            v-if="klineData.length || klineLoading"
             :kline-data="klineData"
             title="K线图"
             :period="klinePeriod"
             :loading="klineLoading"
             @period-change="handleKLinePeriodChange"
           />
-          <view v-else class="ai-empty">
-            <text class="ai-empty-text">暂无K线数据</text>
-          </view>
         </view>
 
         <!-- 资金流向 -->
-        <view v-if="capitalFlowInfo && (capitalFlowInfo.mainInflow != null || (capitalFlowInfo.orders && capitalFlowInfo.orders.length))" class="section-card">
-          <text class="section-title">资金流向</text>
-          <!-- AI 增强标签 -->
-          <view v-if="capitalFlowInfo.tag" class="cf-ai-tag-row">
-            <text :class="['cf-ai-tag', capitalFlowInfo.tagClass || 'is-neutral']">{{ capitalFlowInfo.tag }}</text>
-            <view class="cf-tags-inline">
-              <text v-for="(t, i) in (capitalFlowInfo.tags || [])" :key="i" class="cf-tag-mini">{{ t }}</text>
-            </view>
-          </view>
-          <!-- 主力净流入 -->
-          <view class="cf-hero-card">
-            <text class="cf-hero-label">主力净流入</text>
-            <text :class="['cf-hero-card-value', (capitalFlowInfo.mainInflow ?? 0) >= 0 ? 'is-up' : 'is-down']">
-              {{ formatFlowAmount(capitalFlowInfo.mainInflow) }}
-            </text>
+        <view v-if="capitalFlowInfo" class="section-card">
+          <view class="cf-section-head">
+            <text class="section-title">资金流向</text>
+            <text v-if="capitalFlowInfo.tradeDate" class="cf-trade-date">截至 {{ formatTradeDate(capitalFlowInfo.tradeDate) }}</text>
           </view>
           <CapitalFlowCharts
-            :main-inflow="capitalFlowInfo.mainInflow"
-            :ratio="capitalFlowInfo.ratio"
-            :five-day="capitalFlowInfo.fiveDay"
+            :windows="capitalFlowInfo.windows || []"
             :streak="capitalFlowInfo.streak"
+            :tag="capitalFlowInfo.tag"
+            :tag-class="capitalFlowInfo.tagClass"
             :narrative="capitalFlowInfo.narrative"
-            :risk="capitalFlowInfo.risk"
-            :orders="capitalFlowInfo.orders || []"
-            :trend="capitalFlowInfo.trend || []"
-            :trend-dates="capitalFlowInfo.trendDates || []"
-            :trend-badge="capitalFlowInfo.trendBadge"
+            :summary="capitalFlowInfo.summary"
           />
         </view>
-
+        <view v-else class="section-card">
+          <text class="section-title">资金流向</text>
+          <view class="ai-empty">
+            <text class="ai-empty-text">暂无资金流数据</text>
+          </view>
+        </view>
         <!-- 交易数据 -->
-        <view class="section-card">
+        <view v-if="hasTradingData" class="section-card">
           <text class="section-title">交易数据</text>
-          <view class="detail-grid">
-            <view class="detail-item">
-              <text class="detail-label">最新价</text>
-              <text :class="['detail-value', quote.changePercent >= 0 ? 'up' : 'down']">{{ quote.price.toFixed(2) }}</text>
+
+          <!-- 今日价格区间：现价/昨收位置一目了然 -->
+          <view v-if="tdRange" class="td-range-card">
+            <view class="td-range-head">
+              <text :class="['td-range-price', quote.price >= quote.prevClose ? 'up' : 'down']">{{ quote.price.toFixed(2) }}</text>
+              <text :class="['td-range-change', quote.price >= quote.prevClose ? 'up' : 'down']">
+                {{ quote.price >= quote.prevClose ? '+' : '' }}{{ (quote.change ?? 0).toFixed(2) }}
+                ({{ quote.price >= quote.prevClose ? '+' : '' }}{{ (quote.changePercent ?? 0).toFixed(2) }}%)
+              </text>
             </view>
-            <view class="detail-item">
-              <text class="detail-label">涨跌幅</text>
-              <text :class="['detail-value', quote.changePercent >= 0 ? 'up' : 'down']">{{ quote.changePercent.toFixed(2) }}%</text>
+            <view class="td-range-track">
+              <view
+                :class="['td-range-marker', 'td-marker-now', quote.price >= quote.prevClose ? 'is-up' : 'is-down']"
+                :style="{ left: tdRange.now }"
+              ></view>
+              <view class="td-range-marker td-marker-prev" :style="{ left: tdRange.prev }"></view>
             </view>
-            <view class="detail-item">
-              <text class="detail-label">涨跌额</text>
-              <text :class="['detail-value', quote.change >= 0 ? 'up' : 'down']">{{ quote.change.toFixed(2) }}</text>
+            <view class="td-range-labels">
+              <text class="td-range-low">{{ quote.low.toFixed(2) }}</text>
+              <text class="td-range-mid">昨收 {{ quote.prevClose.toFixed(2) }}</text>
+              <text class="td-range-high">{{ quote.high.toFixed(2) }}</text>
             </view>
-            <view class="detail-item">
-              <text class="detail-label">成交量</text>
-              <text class="detail-value">{{ formatVolume(quote.volume) }}</text>
+            <view class="td-range-tip">
+              <text :class="['td-range-pos', quote.price >= quote.prevClose ? 'up' : 'down']">
+                现价处于今日区间 {{ tdRange.posPercent }}% 位置
+              </text>
             </view>
-            <view class="detail-item">
-              <text class="detail-label">成交额</text>
-              <text class="detail-value">{{ formatAmount(quote.amount) }}</text>
+          </view>
+
+          <!-- 量价 -->
+          <view class="td-group">
+            <text class="td-group-title">量价</text>
+            <view class="td-grid">
+              <view class="td-cell">
+                <text class="td-label">成交量</text>
+                <view class="td-value-row">
+                  <text class="td-value">{{ formatVolumeValue(quote.volume) }}</text>
+                  <text v-if="formatVolumeUnit(quote.volume)" class="td-unit">{{ formatVolumeUnit(quote.volume) }}</text>
+                </view>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">成交额</text>
+                <text class="td-value">{{ formatAmount(quote.amount) }}</text>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">换手率</text>
+                <text class="td-value">{{ (quote.turnoverRate ?? 0).toFixed(2) }}%</text>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">量比</text>
+                <view class="td-value-row">
+                  <text class="td-value">{{ (quote.volumeRatio ?? 0).toFixed(2) }}</text>
+                  <text :class="['td-tag', volumeRatioClass]">{{ volumeRatioText }}</text>
+                </view>
+              </view>
             </view>
-            <view class="detail-item">
-              <text class="detail-label">换手率</text>
-              <text class="detail-value">{{ quote.turnoverRate.toFixed(2) }}%</text>
+          </view>
+
+          <!-- 价格 -->
+          <view class="td-group">
+            <text class="td-group-title">价格</text>
+            <view class="td-grid">
+              <view class="td-cell">
+                <text class="td-label">今开</text>
+                <text :class="['td-value', priceClass(quote.open)]">{{ quote.open.toFixed(2) }}</text>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">昨收</text>
+                <text class="td-value">{{ quote.prevClose.toFixed(2) }}</text>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">最高</text>
+                <text :class="['td-value', priceClass(quote.high)]">{{ quote.high.toFixed(2) }}</text>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">最低</text>
+                <text :class="['td-value', priceClass(quote.low)]">{{ quote.low.toFixed(2) }}</text>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">均价</text>
+                <text :class="['td-value', priceClass(quote.avgPrice)]">{{ (quote.avgPrice ?? 0).toFixed(2) }}</text>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">振幅</text>
+                <text class="td-value">{{ (quote.amplitude ?? 0).toFixed(2) }}%</text>
+              </view>
             </view>
-            <view class="detail-item">
-              <text class="detail-label">量比</text>
-              <text class="detail-value">{{ (quote.volumeRatio ?? 0).toFixed(2) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="detail-label">今开</text>
-              <text :class="['detail-value', quote.open >= quote.prevClose ? 'up' : 'down']">{{ quote.open.toFixed(2) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="detail-label">最高</text>
-              <text class="detail-value up">{{ quote.high.toFixed(2) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="detail-label">最低</text>
-              <text class="detail-value down">{{ quote.low.toFixed(2) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="detail-label">昨收</text>
-              <text class="detail-value">{{ quote.prevClose.toFixed(2) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="detail-label">振幅</text>
-              <text class="detail-value">{{ quote.amplitude.toFixed(2) }}%</text>
-            </view>
-            <view class="detail-item">
-              <text class="detail-label">市盈率</text>
-              <text class="detail-value">{{ quote.peRatio.toFixed(2) }}</text>
-            </view>
-            <view class="detail-item">
-              <text class="detail-label">市净率</text>
-              <text class="detail-value">{{ quote.pbRatio.toFixed(2) }}</text>
+          </view>
+
+          <!-- 估值 -->
+          <view class="td-group">
+            <text class="td-group-title">估值</text>
+            <view class="td-grid">
+              <view class="td-cell">
+                <text class="td-label">市盈率</text>
+                <text class="td-value">{{ (quote.peRatio ?? 0).toFixed(2) }}</text>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">市净率</text>
+                <text class="td-value">{{ (quote.pbRatio ?? 0).toFixed(2) }}</text>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">流通市值</text>
+                <text class="td-value">{{ formatMarketValue(stockInfo?.floatMarketCap) }}</text>
+              </view>
+              <view class="td-cell">
+                <text class="td-label">总市值</text>
+                <text class="td-value">{{ formatMarketValue(stockInfo?.marketCap) }}</text>
+              </view>
             </view>
           </view>
         </view>
@@ -411,15 +433,15 @@
         </view>
 
         <!-- 财报分析 -->
-        <view class="section-card">
+        <view v-if="hasFinanceCardData" class="section-card">
           <view class="section-header">
             <text class="section-title">财报分析</text>
             <text v-if="semiAnnualReport?.reports?.length" class="section-sub">
               {{ semiAnnualReport.reports[0]?.end_date?.slice(0, 4) }}年半年报
             </text>
           </view>
-          <view v-if="semiAnnualReport" class="semi-grid">
-            <view v-if="semiAnnualReport.reports?.length" class="semi-table">
+          <view v-if="semiAnnualReport?.reports?.length" class="semi-grid">
+            <view class="semi-table">
               <view class="semi-row semi-header">
                 <text class="semi-cell semi-cell-label">财务指标</text>
                 <text class="semi-cell semi-cell-value">本期</text>
@@ -457,14 +479,11 @@
                 <text class="semi-cell semi-cell-value">--</text>
               </view>
             </view>
-            <view v-else class="semi-empty">
-              <text class="semi-empty-text">暂无半年报数据</text>
-            </view>
-            <view class="semi-footer">
+            <view v-if="disclosureUrl" class="semi-footer">
               <text class="semi-link" @tap="openDisclosureUrl">查看完整公告 ></text>
             </view>
           </view>
-          <view v-else class="finance-grid">
+          <view v-else-if="midMockData.finance.length" class="finance-grid">
             <view v-for="item in midMockData.finance" :key="item.label" class="finance-item">
               <text class="finance-label">{{ item.label }}</text>
               <text class="finance-value">{{ item.value }}</text>
@@ -474,7 +493,7 @@
         </view>
 
         <!-- 业绩预测 -->
-        <view class="section-card">
+        <view v-if="forecastLoading || hasForecastCardData" class="section-card">
           <view class="section-header">
             <text class="section-title">业绩预测</text>
             <view v-if="!forecastLoading" class="ai-refresh-btn" @tap="loadForecast(true)">
@@ -484,7 +503,7 @@
           <view v-if="forecastLoading" class="ai-loading">
             <text class="ai-loading-text">加载中...</text>
           </view>
-          <view v-else-if="forecastData && (forecastData.summary || (forecastData.predictions && forecastData.predictions.length))" class="forecast-content">
+          <view v-else class="forecast-content">
             <view v-if="forecastData.updateTime" class="forecast-update-time">
               <text class="forecast-update-label">更新时间：</text>
               <text class="forecast-update-value">{{ forecastData.updateTime }}</text>
@@ -563,9 +582,6 @@
               </view>
             </view>
           </view>
-          <view v-else class="ai-empty">
-            <text class="ai-empty-text">暂无业绩预测数据</text>
-          </view>
         </view>
 
       </view>
@@ -641,33 +657,16 @@
           </view>
         </view>
 
-        <!-- 趋势股模型（四维） -->
-        <view v-if="trendLoading || trendModel.hasModel || trendModel.isVetoed" class="section-card tenx-card">
+        <!-- 趋势股模型（四维）：仅当有真实趋势评分时展示 -->
+        <view v-if="trendModel.hasModel" class="section-card tenx-card">
           <view class="section-header">
             <text class="section-title">趋势股模型</text>
             <view v-if="trendModel.isReal" class="tenx-real-badge">
               <text class="tenx-real-text">实时数据</text>
             </view>
           </view>
-          <!-- 加载中 -->
-          <view v-if="trendLoading && !trendModel.hasModel && !trendModel.isVetoed" class="ai-loading">
-            <text class="ai-loading-text">加载趋势股评分...</text>
-          </view>
-          <!-- 一票否决 -->
-          <view v-else-if="trendModel.isVetoed" class="tenx-vetoed">
-            <view class="tenx-vetoed-icon">
-              <text class="tenx-vetoed-icon-text">!</text>
-            </view>
-            <text class="tenx-vetoed-title">一票否决</text>
-            <text class="tenx-vetoed-desc">{{ trendModel.aiConclusion }}</text>
-            <view v-if="trendVetoReasons.length" class="tenx-vetoed-reasons">
-              <view v-for="(reason, ridx) in trendVetoReasons" :key="ridx" class="tenx-vetoed-reason-item">
-                <text class="tenx-vetoed-reason-text">- {{ reason }}</text>
-              </view>
-            </view>
-          </view>
           <!-- 正常评分 -->
-          <view v-else>
+          <view>
             <view class="tenx-hero">
               <view class="tenx-score-wrap">
                 <text :class="['tenx-score', tenxScoreClass(trendModel.score)]">{{ trendModel.score }}</text>
@@ -754,7 +753,7 @@
         </view>
 
         <!-- 行业政策 -->
-        <view class="section-card">
+        <view v-if="visiblePolicyList.length" class="section-card">
           <text class="section-title">行业政策</text>
           <view class="policy-list">
             <view v-for="(policy, idx) in visiblePolicyList" :key="idx" class="policy-item">
@@ -768,7 +767,7 @@
         </view>
 
         <!-- 公司护城河 -->
-        <view class="section-card">
+        <view v-if="longMockData.moats.length" class="section-card">
           <text class="section-title">公司护城河</text>
           <view class="moat-grid">
             <view v-for="moat in longMockData.moats" :key="moat.title" class="moat-item">
@@ -782,7 +781,7 @@
         </view>
 
         <!-- 年报对比 -->
-        <view class="section-card">
+        <view v-if="longMockData.annual.length" class="section-card">
           <text class="section-title">年报对比</text>
           <view class="annual-grid">
             <view v-for="item in longMockData.annual" :key="item.label" class="annual-item">
@@ -892,7 +891,7 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive } from 'vue'
-import { onLoad, onShow } from '@dcloudio/uni-app'
+import { onLoad, onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
@@ -918,7 +917,7 @@ const forecastData = ref<any>(null)
 const forecastLoading = ref(false)
 const forecastDetailExpanded = ref(false)
 const klineData = ref<any[]>([])
-type KLinePeriod = 'daily' | 'weekly' | 'yearly'
+type KLinePeriod = 'daily' | 'weekly' | 'monthly'
 const klinePeriod = ref<KLinePeriod>('daily')
 const klineLoading = ref(false)
 const trendScoreData = ref<any>(null)
@@ -931,6 +930,9 @@ const historyPagination = ref({ page: 1, pageSize: 10, total: 0, totalPages: 1 }
 const selectedHistoryRecord = ref<any>(null)
 const favoritesStore = useFavoritesStore()
 const isFavorite = computed(() => favoritesStore.isFavorite(symbol.value))
+const hasStockHeaderTags = computed(() => Boolean(
+  stockInfo.value?.industry || stockInfo.value?.regionBoard || stockInfo.value?.listingDate
+))
 
 // 周期切换
 type ViewKey = 'short' | 'mid' | 'long'
@@ -963,11 +965,69 @@ const {
   midMockData,
   longMockData,
   trendModel,
-  trendVetoed,
-  trendVetoReasons,
 } = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef)
 
 const visibleNewsList = computed(() => newsExpanded.value ? newsList.value : newsList.value.slice(0, 3))
+const hasAiInfoCardData = computed(() => Boolean(
+  aiLoading.value || aiAnalysis.value?.conclusion || newsList.value.length
+))
+const hasTradingData = computed(() => {
+  const q = quote.value
+  if (!q) return false
+  return ['price', 'volume', 'amount', 'turnoverRate', 'volumeRatio', 'open', 'high', 'low', 'prevClose', 'amplitude', 'peRatio', 'pbRatio']
+    .some(key => toDecisionNumber(q[key]) !== null)
+})
+
+/** 今日价格区间：现价/昨收在最低-最高之间的位置（百分比） */
+const tdRange = computed(() => {
+  const q = quote.value
+  if (!q || !(q.high > q.low)) return null
+  const range = q.high - q.low
+  const pct = (value: any) => {
+    const num = toDecisionNumber(value)
+    if (num === null) return '50%'
+    return `${Math.max(0, Math.min(100, ((num - q.low) / range) * 100)).toFixed(1)}%`
+  }
+  const price = toDecisionNumber(q.price)
+  const posPercent = price === null ? 0 : Math.round(((price - q.low) / range) * 100)
+  return { now: pct(q.price), prev: pct(q.prevClose), posPercent }
+})
+
+const volumeRatioClass = computed(() => {
+  const vr = toDecisionNumber(quote.value?.volumeRatio)
+  if (vr === null) return ''
+  if (vr >= 1.5) return 'is-hot'
+  if (vr <= 0.8) return 'is-cold'
+  return 'is-normal'
+})
+
+const volumeRatioText = computed(() => {
+  const vr = toDecisionNumber(quote.value?.volumeRatio)
+  if (vr === null) return ''
+  if (vr >= 1.5) return '放量'
+  if (vr <= 0.8) return '缩量'
+  return '常态'
+})
+
+function priceClass(value: any): string {
+  const num = toDecisionNumber(value)
+  const prev = toDecisionNumber(quote.value?.prevClose)
+  if (num === null || prev === null) return ''
+  if (num > prev) return 'up'
+  if (num < prev) return 'down'
+  return ''
+}
+
+const hasFinanceCardData = computed(() => Boolean(
+  semiAnnualReport.value?.reports?.length || midMockData.value.finance.length
+))
+const hasForecastCardData = computed(() => Boolean(
+  forecastData.value?.summary
+  || (Array.isArray(forecastData.value?.predictions) && forecastData.value.predictions.length)
+  || (Array.isArray(forecastData.value?.detailIndicators) && forecastData.value.detailIndicators.length)
+  || forecastChartItems.value.length
+  || forecastYearRows.value.length
+))
 const visiblePolicyList = computed(() => policyExpanded.value ? longMockData.value.policies : longMockData.value.policies.slice(0, 2))
 const policyNeedsExpand = computed(() => (
   longMockData.value.policies.length > 2
@@ -976,30 +1036,26 @@ const policyNeedsExpand = computed(() => (
 
 // 资金流向归一化（对齐网页端 capitalFlowInfo）
 const capitalFlowInfo = computed(() => {
-  const source = capitalFlow.value || {
-    tag: '观察',
-    tagClass: 'is-neutral',
-    mainInflow: 0,
-    ratio: '--',
-    fiveDay: 0,
-    streak: '观察中',
-    trendBadge: '趋势：资金温和观察',
-    narrative: '暂无资金流向数据...',
-    risk: '数据加载中',
-    trend: [],
-    trendDates: [],
-    orders: [],
-  }
-  const orders = (source.orders || []).map((item: any) => ({
-    ...item,
-    width: Math.max(8, Math.round((Math.abs(Number(item.value) || 0) / Math.max(0.01, ...(source.orders || []).map((o: any) => Math.abs(Number(o.value) || 0)))) * 88)),
-  }))
-  return {
-    ...source,
-    tags: [`占比 ${source.ratio}`, `5日 ${formatFlowAmount(source.fiveDay)}`, source.streak || '观察中'],
-    orders,
-  }
+  const source = capitalFlow.value
+  if (!hasRealCapitalFlow(source)) return null
+  return source
 })
+
+function hasRealCapitalFlow(source: any): boolean {
+  if (!source || typeof source !== 'object') return false
+  const hasNumber = ['mainInflow', 'fiveDay', 'ratio'].some(key => {
+    const value = source[key]
+    if (value === null || value === undefined || value === '' || value === '--') return false
+    const parsed = Number(String(value).replace(/[^\d.-]/g, ''))
+    return Number.isFinite(parsed) && parsed !== 0
+  })
+  const hasList = ['orders', 'trend', 'trendDates'].some(key => Array.isArray(source[key]) && source[key].length > 0)
+  const hasText = ['tag', 'streak', 'trendBadge', 'narrative', 'risk'].some(key => {
+    const value = String(source[key] || '').trim()
+    return value && value !== '--' && !/暂无|加载中|观察中/.test(value)
+  })
+  return hasNumber || hasList || hasText
+}
 
 // 业绩预测详表年份列
 const forecastDetailYearKeys = computed<string[]>(() => {
@@ -1146,17 +1202,6 @@ const midRiskTags = computed(() => extractTagsFromArray(midAiAnalysis.value.risk
 const longBasisTags = computed(() => extractTagsFromArray(longAiAnalysis.value.basis))
 const longAdviceTags = computed(() => extractTagsFromArray(longAiAnalysis.value.advice))
 const longRiskTags = computed(() => extractTagsFromArray(longAiAnalysis.value.riskTips))
-const shortActionItems = computed(() => {
-  const low = formatMetricText(quote.value?.low)
-  const high = formatMetricText(quote.value?.high)
-  const volumeRatio = formatMetricText(quote.value?.volumeRatio)
-  const amount = formatAmount(quote.value?.amount || 0)
-  return [
-    { label: '风险线', value: low === '--' ? '先等关键支撑位明确，跌破后短线转弱' : `跌破 ${low} 后短线转弱，先控制仓位` },
-    { label: '观察区间', value: high === '--' || low === '--' ? '重点观察日内高低点和回踩承接' : `${low} - ${high} 内看承接，突破再确认强度` },
-    { label: '量能条件', value: volumeRatio === '--' ? `成交额 ${amount}，继续看资金是否接力` : `量比 ${volumeRatio}，成交额 ${amount}，明日重点看放量后的承接` },
-  ]
-})
 const midActionItems = computed(() => {
   const conclusion = String(midAiAnalysis.value.conclusion || '')
   const hasRisk = midRiskTags.value.length > 0
@@ -1188,7 +1233,7 @@ const longActionItems = computed(() => {
     {
       label: '长期判断',
       value: hasVeto
-        ? '当前存在一票否决项，不适合直接放入长期核心池。'
+        ? '当前存在硬性风险（ST、流动性不足等），不适合直接放入长期核心池。'
         : score >= 75
           ? '具备长期观察价值，但仍要确认盈利质量和行业空间能否持续。'
           : '长期确定性还不充分，更适合作为观察池标的。',
@@ -1206,6 +1251,10 @@ const longActionItems = computed(() => {
   ]
 })
 const latestMajorEvent = computed(() => stockEvents.value[0] || null)
+const displayedStockEvents = computed(() => {
+  const latestKey = getEventIdentity(latestMajorEvent.value)
+  return stockEvents.value.filter((event, index) => index !== 0 && getEventIdentity(event) !== latestKey)
+})
 const majorEventImpactClass = computed(() => {
   const impact = getEventImpact(latestMajorEvent.value)
   if (impact.includes('利好')) return 'is-positive'
@@ -1213,19 +1262,40 @@ const majorEventImpactClass = computed(() => {
   return 'is-neutral'
 })
 
-const overallDecision = computed(() => {
+const legacyOverallDecision = computed(() => {
   const conclusion = String(aiAnalysis.value?.conclusion || '').trim()
   const changePercent = toDecisionNumber(quote.value?.changePercent)
   const score = Number(trendModel.value?.score || 0)
-  const flow = Number(capitalFlowInfo.value?.mainInflow || 0)
+  const capital = capitalFlowInfo.value || {}
+  const flow = Number(capital.mainInflow || 0)
+  const fiveDayFlow = toDecisionNumber(capital.fiveDay)
+  const flowText = [
+    capital.tag,
+    capital.tagClass,
+    capital.streak,
+    capital.trendBadge,
+    capital.narrative,
+    capital.risk,
+  ].map(item => String(item || '')).join(' ')
+  const isBearishFlow = flow < 0
+    || (fiveDayFlow !== null && fiveDayFlow < 0)
+    || /bear|流出|撤离|连卖|派发|减仓|接盘|承压|破位/.test(flowText)
+  const isBullishFlow = flow > 0
+    && !isBearishFlow
+    && (changePercent === null || changePercent >= 0)
   const majorImpact = getEventImpact(latestMajorEvent.value)
+  const majorSummary = String(latestMajorEvent.value?.summary || '')
+  const isBearishEvent = majorImpact.includes('利空')
+    || /骤降|下跌|走弱|回落|承压|破位|风险|利空|减仓|流出|撤离/.test(majorSummary)
   const hasBearSignal = majorImpact.includes('利空')
     || /看空|卖出|利空|回避/.test(conclusion)
+    || isBearishEvent
+    || isBearishFlow
     || (changePercent !== null && changePercent <= -5)
   const hasBullSignal = majorImpact.includes('利好')
     || /看多|买入|利好/.test(conclusion)
     || score >= 75
-    || (flow > 0 && changePercent !== null && changePercent >= 0)
+    || isBullishFlow
 
   let status = '等待确认'
   let statusClass = 'is-neutral'
@@ -1242,22 +1312,36 @@ const overallDecision = computed(() => {
   if (/短|short/i.test(horizon) || (changePercent !== null && Math.abs(changePercent) >= 5)) period = '短线观察'
   if (/长|long/i.test(horizon) || score >= 82) period = '长线观察'
 
-  const opportunitySource = latestMajorEvent.value?.summary
-    || capitalFlowInfo.value?.narrative
-    || logicTags.value[0]?.tag
-    || trendModel.value?.description
-  const riskSource = (majorImpact.includes('利空') && latestMajorEvent.value?.summary)
+  const hasMixedSignal = hasBearSignal && hasBullSignal
+  const hasPositiveSignal = hasBullSignal
+  const opportunitySource = hasPositiveSignal
+    ? ((majorImpact.includes('利好') && getEventDecisionPoint(latestMajorEvent.value, '机会'))
+      || (isBullishFlow && getFlowOpportunityPoint(capital))
+      || logicTags.value[0]?.tag
+      || (conclusion ? `短线资讯分析：${conclusion}` : '')
+      || trendModel.value?.description)
+    : ''
+  const riskSource = (isBearishEvent && getEventDecisionPoint(latestMajorEvent.value, '风险'))
+    || (isBearishFlow && getFlowDecisionPoint(capital))
     || riskTags.value[0]?.tag
-    || capitalFlowInfo.value?.risk
+    || capital.risk
     || '留意趋势破坏和消息兑现风险'
 
   let summary = '当前信号还不够明确，暂不急于操作，继续观察资金、趋势和消息变化。'
   let nextStep = '先观察资金承接和价格位置'
   if (hasBearSignal) {
-    summary = changePercent !== null && changePercent <= -5
+    summary = hasMixedSignal && isBearishFlow
+      ? '短线资讯或事件逻辑偏利好，但主力资金仍在流出，当前不能只按利好处理，先看资金是否回流承接。'
+      : isBearishFlow
+      ? '主力资金持续流出或出现派发迹象，当前先按风险处理，等待资金流出收敛后再判断。'
+      : changePercent !== null && changePercent <= -5
       ? '跌幅已经偏大，短线先控制风险，等待价格企稳和资金回流后再判断。'
       : '出现利空或偏弱信号，当前不宜加仓，先观察风险是否继续扩散。'
-    nextStep = changePercent !== null && changePercent <= -5
+    nextStep = hasMixedSignal && isBearishFlow
+      ? '利好先看资金是否回流承接'
+      : isBearishFlow
+      ? '先看主力流出是否收敛'
+      : changePercent !== null && changePercent <= -5
       ? '等价格企稳和资金回流'
       : '先看利空是否继续扩散'
   } else if (hasBullSignal) {
@@ -1273,9 +1357,9 @@ const overallDecision = computed(() => {
     nextStep = '重点看利好后的资金承接'
   } else if (majorImpact.includes('利空')) {
     nextStep = '先确认利空影响是否扩散'
-  } else if (period.includes('长')) {
+  } else if (!hasBearSignal && period.includes('长')) {
     nextStep = '跟踪模型评分和基本面变化'
-  } else if (period.includes('中')) {
+  } else if (!hasBearSignal && period.includes('中')) {
     nextStep = '跟踪趋势延续和业绩预期'
   }
 
@@ -1285,8 +1369,229 @@ const overallDecision = computed(() => {
     period,
     summary,
     nextStep,
-    opportunity: toPlainDecisionPoint(opportunitySource, '关注资金承接、趋势延续和消息催化能否兑现'),
+    opportunity: opportunitySource ? toPlainDecisionPoint(opportunitySource, '') : '',
     risk: toPlainDecisionPoint(riskSource, '警惕冲高回落、趋势破位或利好兑现后的承接不足'),
+  }
+})
+
+const overallDecision = computed(() => {
+  const conclusion = String(aiAnalysis.value?.conclusion || '').trim()
+  const changePercent = toDecisionNumber(quote.value?.changePercent)
+  const capital = capitalFlowInfo.value
+  const flow = capital ? Number(capital.mainInflow || 0) : 0
+  const fiveDayFlow = capital ? toDecisionNumber(capital.fiveDay) : null
+  const flowText = capital
+    ? [
+      capital.tag,
+      capital.tagClass,
+      capital.streak,
+      capital.trendBadge,
+      capital.narrative,
+      capital.risk,
+    ].map(item => String(item || '')).join(' ')
+    : ''
+  const hasUnconfirmedFlowSignal = /观察中|未确认|待确认|分歧|承接不足|承接偏弱|承压|转弱/.test(flowText)
+  const hasBullishFlowSignal = Boolean(capital) && !hasUnconfirmedFlowSignal && (
+    flow > 0
+    || (fiveDayFlow !== null && fiveDayFlow > 0)
+    || /bull|净流入|连买|增仓|加仓|吸筹|回流|承接改善/.test(flowText)
+  )
+  const isBearishFlow = Boolean(capital) && (
+    flow < 0
+    || (fiveDayFlow !== null && fiveDayFlow < 0)
+    || /bear|净流出|流出|撤离|连卖|派发|减仓|破位|承接不足|承接偏弱|承压|转弱/.test(flowText)
+  )
+  const isBullishFlow = hasBullishFlowSignal && !isBearishFlow
+  const majorImpact = getEventImpact(latestMajorEvent.value)
+  const majorSummary = String(latestMajorEvent.value?.summary || latestMajorEvent.value?.title || '')
+  const isBearishEvent = majorImpact.includes('利空')
+    || /下跌|走弱|回落|承压|破位|风险|利空|减仓|流出|撤离|亏损|下修|处罚|问询/.test(majorSummary)
+  const isBullishEvent = majorImpact.includes('利好')
+    || /上涨|走强|突破|利好|增长|中标|订单|回购|增持|预增/.test(majorSummary)
+  const forecastYoy = toDecisionNumber(forecastData.value?.netProfitYoy)
+  const revenueYoy = toDecisionNumber(semiAnnualReport.value?.total_revenue_yoy)
+  const profitYoy = toDecisionNumber(semiAnnualReport.value?.n_income_yoy ?? semiAnnualReport.value?.n_income_attr_p_yoy)
+  const trend = trendModel.value || {}
+  const trendScore = Number(trend.score || 0)
+  type DecisionSignal = { period: '短线' | '中线' | '长线'; brief: string; full: string }
+  const opportunitySignals: DecisionSignal[] = []
+  const riskSignals: DecisionSignal[] = []
+  const isBullishConclusion = /看多|买入|增持|利好|积极|推荐/.test(conclusion)
+  const isBearishConclusion = /看空|卖出|减持|利空|回避|谨慎/.test(conclusion)
+  const hasHardShortRisk = isBearishEvent || isBearishConclusion || (changePercent !== null && changePercent <= -5)
+  const hasShortOpportunity = isBullishEvent || isBullishConclusion || isBullishFlow
+
+  // 机会信号：短文案（含关键数字）+ 完整说明
+  if (!hasHardShortRisk && isBullishEvent) {
+    const full = getEventDecisionPoint(latestMajorEvent.value, '机会')
+    opportunitySignals.push(buildPeriodSignal('短线', '利好事件催化', full))
+  }
+  if (!hasHardShortRisk && isBullishConclusion) {
+    opportunitySignals.push(buildPeriodSignal('短线', '资讯研判正面', getConclusionDecisionPoint(conclusion, '机会')))
+  }
+  if (!hasHardShortRisk && isBullishFlow) {
+    opportunitySignals.push(buildPeriodSignal('短线', getFlowOpportunityShort(capital), getFlowOpportunityPoint(capital)))
+  }
+  if (forecastYoy !== null && forecastYoy > 0) {
+    opportunitySignals.push(buildPeriodSignal('中线', `业绩预增${formatSignedPercent(forecastYoy)}`, `业绩预测净利润同比${formatSignedPercent(forecastYoy)}`))
+  }
+  if (profitYoy !== null && profitYoy > 0) {
+    opportunitySignals.push(buildPeriodSignal('中线', `半年利润大增${formatSignedPercent(profitYoy)}`, `半年度利润同比${formatSignedPercent(profitYoy)}`))
+  }
+  if (trend.isReal && !trend.isVetoed && trendScore >= 75) {
+    opportunitySignals.push(buildPeriodSignal('长线', `趋势评分${trendScore}分`, trend.description || `趋势模型评分${trendScore}分`))
+  }
+
+  // 风险信号：短文案（含关键数字）+ 完整说明
+  if (isBearishEvent) {
+    riskSignals.push(buildPeriodSignal('短线', '利空事件压制', getEventDecisionPoint(latestMajorEvent.value, '风险')))
+  }
+  if (isBearishConclusion) {
+    riskSignals.push(buildPeriodSignal('短线', '资讯研判负面', getConclusionDecisionPoint(conclusion, '风险')))
+  }
+  if (!hasShortOpportunity && isBearishFlow) {
+    riskSignals.push(buildPeriodSignal('短线', getFlowRiskShort(capital), getFlowDecisionPoint(capital)))
+  }
+  if (changePercent !== null && changePercent <= -5) {
+    riskSignals.push(buildPeriodSignal('短线', `单日跌${formatSignedPercent(changePercent)}`, `股价单日跌幅${formatSignedPercent(changePercent)}，先防情绪扩散`))
+  }
+  if (forecastYoy !== null && forecastYoy < 0) {
+    riskSignals.push(buildPeriodSignal('中线', `业绩预减${formatSignedPercent(forecastYoy)}`, `业绩预测净利润同比${formatSignedPercent(forecastYoy)}`))
+  }
+  if (revenueYoy !== null && revenueYoy < 0) {
+    riskSignals.push(buildPeriodSignal('中线', `营收下滑${formatSignedPercent(revenueYoy)}`, `半年度营收同比${formatSignedPercent(revenueYoy)}`))
+  }
+  if (profitYoy !== null && profitYoy < 0) {
+    riskSignals.push(buildPeriodSignal('中线', `半年利润下滑${formatSignedPercent(profitYoy)}`, `半年度利润同比${formatSignedPercent(profitYoy)}`))
+  }
+  if (isBearishTrendSignal(trend)) {
+    riskSignals.push(buildPeriodSignal('长线', '趋势走弱', trend.aiConclusion || trend.description || '趋势模型提示需留意'))
+  }
+
+  // 机会与风险：默认显示简短文案（含关键数字），展开显示完整说明
+  const opportunity = listSignalsBriefly(opportunitySignals)
+  const opportunityFull = listSignalsFull(opportunitySignals)
+  const risk = listSignalsBriefly(riskSignals)
+  const riskFull = listSignalsFull(riskSignals)
+  const hasBullSignal = Boolean(opportunity)
+  const hasBearSignal = Boolean(risk)
+
+  // 按短中长线统计机会与风险信号，用于生成综合总结和右上角标签
+  const periodOpp: Record<string, string[]> = { 短线: [], 中线: [], 长线: [] }
+  const periodRiskMap: Record<string, string[]> = { 短线: [], 中线: [], 长线: [] }
+  opportunitySignals.forEach(s => { periodOpp[s.period].push(s.brief) })
+  riskSignals.forEach(s => { periodRiskMap[s.period].push(s.brief) })
+  const shortOpp = periodOpp['短线'].length > 0
+  const shortRsk = periodRiskMap['短线'].length > 0
+  const midOpp = periodOpp['中线'].length > 0
+  const midRsk = periodRiskMap['中线'].length > 0
+  const longOpp = periodOpp['长线'].length > 0
+  const longRsk = periodRiskMap['长线'].length > 0
+  const oppCount = [shortOpp, midOpp, longOpp].filter(Boolean).length
+  const rskCount = [shortRsk, midRsk, longRsk].filter(Boolean).length
+
+  // 右上角标签：状态描述型，不直接给操作指令（统一四字）
+  let verdict = '静待时机'
+  let verdictClass = 'is-neutral'
+  if (oppCount === 0 && rskCount === 0) {
+    verdict = '静待时机'
+    verdictClass = 'is-neutral'
+  } else if (oppCount >= 2 && rskCount === 0) {
+    verdict = '强势共振'
+    verdictClass = 'is-positive'
+  } else if (rskCount >= 2 && oppCount === 0) {
+    verdict = '风险共振'
+    verdictClass = 'is-risk'
+  } else if (hasBearSignal && hasBullSignal) {
+    verdict = '多空交织'
+    verdictClass = 'is-neutral'
+  } else if (hasBullSignal) {
+    verdict = '信号偏多'
+    verdictClass = 'is-positive'
+  } else {
+    verdict = '信号偏弱'
+    verdictClass = 'is-risk'
+  }
+  let status = '等待确认'
+  let statusClass = 'is-neutral'
+  if (hasBearSignal && !hasBullSignal) {
+    status = '控制风险'
+    statusClass = 'is-risk'
+  } else if (hasBullSignal && !hasBearSignal) {
+    status = '继续跟踪'
+    statusClass = 'is-positive'
+  }
+
+  // 总结 = 现状与理由 + 明确态度；观察重点 = 观察对象 + 触发条件（各一句话）
+  let summary: string
+  let nextStep: string
+  if (oppCount === 0 && rskCount === 0) {
+    summary = '短中长线暂无明确方向信号，事件、资金与业绩数据支撑不足，建议先观望等待验证'
+    nextStep = '重点观察最新异动、主力资金流向与财报数据更新，出现明确方向信号后再做决策'
+  } else if (oppCount >= 2 && rskCount === 0) {
+    summary = '短中长线信号共振偏多，资金、业绩与趋势方向一致，强度较高，建议维持关注'
+    nextStep = '重点观察回踩量能与关键均线支撑，缩量企稳或放量突破后再考虑分批介入'
+  } else if (rskCount >= 2 && oppCount === 0) {
+    summary = '短中长线信号共振偏空，资金流出叠加业绩承压，风险尚未释放完，建议减仓或回避'
+    nextStep = '重点观察价格能否企稳、主力资金是否回流，风险信号转好后再评估是否介入'
+  } else if (shortOpp && (midOpp || longOpp) && (midRsk || longRsk)) {
+    summary = '短线偏多但中长线存在隐忧，持续性存疑，冲高容易回落，建议轻仓观望'
+    nextStep = '重点观察中长线风险是否消化、短线能否持续放量，方向明朗后再考虑操作'
+  } else if (shortRsk && (midOpp || longOpp)) {
+    summary = '短线承压但中长线逻辑仍在，属阶段性调整，基本面未破坏，建议暂不追高'
+    nextStep = '重点观察短线价格能否企稳、主力资金是否回流，调整结束后再评估介入'
+  } else if (shortOpp && midRsk) {
+    summary = '短线反弹但中线业绩承压，反弹空间有限，追高风险较大，建议轻仓观望'
+    nextStep = '重点观察反弹量能与持续性，冲高乏力时即减仓离场，切忌追高'
+  } else if (hasBearSignal && hasBullSignal) {
+    summary = '多空信号并存，消息面与资金面方向不一致，方向尚不明朗，建议轻仓观望'
+    nextStep = '重点观察资金与消息方向能否趋同，方向一致后再考虑操作'
+  } else if (hasBullSignal) {
+    summary = '偏多信号但未形成多周期共振，强度一般，上行需量能确认，建议轻仓跟踪'
+    nextStep = '重点观察回踩是否缩量企稳、量能是否配合，站稳关键均线后再考虑加仓'
+  } else {
+    summary = '偏弱信号但未全面走弱，仍有企稳可能，不宜急于抄底，建议控制仓位暂不介入'
+    nextStep = '重点观察风险是否收敛、资金流出是否止住，出现企稳信号后再评估是否介入'
+  }
+
+  // 右上角周期标签：短/中/长线哪个占主导（四字）
+  const periodNets: Record<string, number> = { 短线: 0, 中线: 0, 长线: 0 }
+  opportunitySignals.forEach(s => { periodNets[s.period] += 1 })
+  riskSignals.forEach(s => { periodNets[s.period] -= 1 })
+  const sortedPeriods = (Object.keys(periodNets) as Array<'短线' | '中线' | '长线'>)
+    .map(p => ({ period: p, net: periodNets[p] }))
+    .sort((a, b) => b.net - a.net)
+  const topPeriod = sortedPeriods[0]
+  const secondPeriod = sortedPeriods[1]
+  const bottomPeriod = sortedPeriods[sortedPeriods.length - 1]
+  let periodDominance = '周期均衡'
+  let periodDominanceClass = 'is-neutral'
+  if (topPeriod.net >= 1 && topPeriod.net - secondPeriod.net >= 1) {
+    periodDominance = `${topPeriod.period}占优`
+    periodDominanceClass = 'is-positive'
+  } else if (topPeriod.net <= -1 && topPeriod.net - secondPeriod.net <= -1) {
+    periodDominance = `${topPeriod.period}承压`
+    periodDominanceClass = 'is-risk'
+  } else if (topPeriod.net > 0 && bottomPeriod.net < 0) {
+    periodDominance = '周期分歧'
+    periodDominanceClass = 'is-neutral'
+  }
+
+  const baseDecision = legacyOverallDecision.value
+  return {
+    status: baseDecision.status,
+    statusClass: baseDecision.statusClass,
+    period: baseDecision.period,
+    verdict,
+    verdictClass,
+    periodDominance,
+    periodDominanceClass,
+    summary,
+    nextStep,
+    opportunity,
+    opportunityFull,
+    risk,
+    riskFull,
   }
 })
 
@@ -1294,13 +1599,158 @@ function toggleDecisionPoint(type: 'opportunity' | 'risk') {
   expandedDecisionPoint.value = expandedDecisionPoint.value === type ? null : type
 }
 
-function formatMetricText(value: any, digits = 2): string {
-  if (value === null || value === undefined || value === '') return '--'
-  if (typeof value === 'number') return Number.isFinite(value) ? value.toFixed(digits) : '--'
-  const text = String(value).trim()
-  if (!text || text === '--') return '--'
-  const num = Number(text.replace(/[,%]/g, ''))
-  return Number.isFinite(num) ? num.toFixed(digits) : text
+function getEventIdentity(event: any): string {
+  if (!event) return ''
+  return [
+    event.id,
+    event.event_id,
+    event.title || event.summary || event.change_type_name,
+    event.event_time || event.event_time_display,
+  ].filter(Boolean).map(item => String(item).trim()).join('|')
+}
+
+function getEventDecisionPoint(event: any, type: '机会' | '风险'): string {
+  if (!event) return ''
+  const impact = getEventImpact(event) || event.change_type_name || ''
+  const title = String(event.summary || event.title || event.change_type_name || '').trim()
+  const summary = title ? `，${compactText(title, '', 42)}` : ''
+  const direction = type === '机会' ? '利好' : '利空'
+  const impactText = impact && impact !== direction ? `：${impact}` : ''
+  return `最新异动偏${direction}${impactText}${summary}`
+}
+
+function getConclusionDecisionPoint(conclusion: string, type: '机会' | '风险'): string {
+  const direction = type === '机会' ? '正面' : '负面'
+  const text = compactText(conclusion, '', 24)
+  if (!text || text === '利好' || text === '利空') return `资讯研判偏${direction}`
+  return `资讯研判偏${direction}：${text}`
+}
+
+function getFlowDecisionPoint(capital: any): string {
+  const tag = String(capital?.tag || '').trim()
+  const streak = String(capital?.streak || '').trim()
+  const text = [tag, streak, capital?.risk, capital?.narrative].map(item => String(item || '')).join(' ')
+  const flow = toDecisionNumber(capital?.mainInflow)
+  const fiveDayFlow = toDecisionNumber(capital?.fiveDay)
+  if (flow !== null && flow < 0) return `主力资金净流出${formatFlowAmount(Math.abs(flow))}`
+  if (fiveDayFlow !== null && fiveDayFlow < 0) return `近5日资金净流出${formatFlowAmount(Math.abs(fiveDayFlow))}`
+  if (/承接不足|承接偏弱|承压|转弱/.test(text)) return '资金承接偏弱，短线先观察是否继续走弱'
+  if (/流出|撤离|连卖|派发|减仓|破位/.test(text)) {
+    return [tag, streak].filter(value => value && !/观察中|未确认|待确认/.test(value)).join('，') || '资金出现流出或派发迹象'
+  }
+  return ''
+}
+
+function getFlowOpportunityPoint(capital: any): string {
+  const tag = String(capital?.tag || '').trim()
+  const streak = String(capital?.streak || '').trim()
+  const text = [tag, streak, capital?.risk, capital?.narrative].map(item => String(item || '')).join(' ')
+  if (/观察中|未确认|待确认|分歧|承接不足|承接偏弱|承压|转弱/.test(text)) return ''
+  const parts = [tag, streak].filter(value => value && !/观察中|未确认|待确认/.test(value)).join('、')
+  return parts ? `资金面${parts}` : '资金面主力净流入为正'
+}
+
+function isBearishTrendSignal(trend: any): boolean {
+  if (!trend?.isReal) return false
+  const text = [
+    trend.description,
+    trend.aiConclusion,
+    trend.recommendation,
+    trend.risk,
+    trend.riskTips,
+  ].map(item => String(item || '')).join(' ')
+  return /一票否决|利空|看空|走弱|下行|下滑|恶化|破位|低迷|退潮|衰退|不及预期|风险/.test(text)
+}
+
+function buildPeriodSignal(period: '短线' | '中线' | '长线', brief: string, full?: string): { period: '短线' | '中线' | '长线'; brief: string; full: string } {
+  const briefText = stripDecisionPunctuation(brief)
+  const fullText = stripDecisionPunctuation(full || brief)
+  return { period, brief: briefText, full: fullText }
+}
+
+// 资金流向机会短文案（含金额）
+function getFlowOpportunityShort(capital: any): string {
+  const flow = toDecisionNumber(capital?.mainInflow)
+  if (flow !== null && flow > 0) return `主力净流入${formatFlowAmount(flow)}`
+  return '主力资金净流入'
+}
+
+// 资金流向风险短文案（含金额）
+function getFlowRiskShort(capital: any): string {
+  const flow = toDecisionNumber(capital?.mainInflow)
+  const fiveDayFlow = toDecisionNumber(capital?.fiveDay)
+  if (flow !== null && flow < 0) return `主力净流出${formatFlowAmount(Math.abs(flow))}`
+  if (fiveDayFlow !== null && fiveDayFlow < 0) return `近5日净流出${formatFlowAmount(Math.abs(fiveDayFlow))}`
+  return '主力资金净流出'
+}
+
+function stripDecisionPunctuation(text: string): string {
+  return String(text || '').replace(/[。；;，,\s]+$/g, '').trim()
+}
+
+function summarizeDecisionSignals(items: string[]): string {
+  const grouped = new Map<string, string[]>()
+  items.filter(Boolean).forEach(item => {
+    const matched = item.match(/^(短线|中线|长线)：(.+)$/)
+    if (!matched) {
+      const text = stripDecisionPunctuation(item)
+      if (text) grouped.set(text, grouped.get(text) || [])
+      return
+    }
+    const period = matched[1]
+    const text = stripDecisionPunctuation(matched[2])
+    if (text) grouped.set(period, [...(grouped.get(period) || []), text])
+  })
+  const clauses = [...grouped.entries()]
+    .slice(0, 3)
+    .map(([period, texts]) => {
+      const text = texts.filter(Boolean).slice(0, 2).join('；')
+      return text ? `${period}：${text}` : period
+    })
+    .filter(Boolean)
+  return clauses.join('；')
+}
+
+// 简短罗列关键信息：去重后用顿号分隔，每项最多16字，最多4项
+function listSignalsBriefly(items: { period: string; brief: string; full: string }[]): string {
+  const seen = new Set<string>()
+  const texts = items
+    .map(s => s.brief)
+    .filter(text => {
+      if (!text || seen.has(text)) return false
+      seen.add(text)
+      return true
+    })
+    .slice(0, 4)
+    .map(text => (text.length > 16 ? `${text.slice(0, 16)}…` : text))
+  return texts.join('、')
+}
+
+// 完整说明罗列：按周期分组，每项显示完整说明
+function listSignalsFull(items: { period: string; brief: string; full: string }[]): string {
+  const grouped = new Map<string, string[]>()
+  items.forEach(s => {
+    const text = stripDecisionPunctuation(s.full)
+    if (text) {
+      const arr = grouped.get(s.period) || []
+      if (!arr.includes(text)) arr.push(text)
+      grouped.set(s.period, arr)
+    }
+  })
+  return [...grouped.entries()]
+    .slice(0, 3)
+    .map(([period, texts]) => `${period}：${texts.slice(0, 2).join('；')}`)
+    .filter(Boolean)
+    .join('；')
+}
+
+function dedupeStrings(items: string[]): string[] {
+  return [...new Set(items.filter(Boolean))]
+}
+
+function formatSignedPercent(value: number): string {
+  const prefix = value > 0 ? '+' : ''
+  return `${prefix}${value.toFixed(2)}%`
 }
 
 function compactText(value: any, fallback = '--', maxLength = 72): string {
@@ -1331,6 +1781,16 @@ function getEventImpact(event: any): string {
 
 onShow(() => {
   void favoritesStore.fetchFavorites({ silent: true })
+  startQuotePolling()
+  if (!loading.value) void refreshQuoteData()
+})
+
+onHide(() => {
+  stopQuotePolling()
+})
+
+onUnload(() => {
+  stopQuotePolling()
 })
 
 onLoad((options: any) => {
@@ -1388,6 +1848,7 @@ async function loadData() {
     if (klineRes.status === 'fulfilled') {
       klineData.value = Array.isArray(klineRes.value) ? klineRes.value : []
     }
+    applyLiveQuoteToKline()
     // 非阻塞加载 AI 分析、业绩预测和趋势股评分
     loadAiAnalysis()
     loadForecast(false)
@@ -1419,7 +1880,7 @@ async function loadTrendScore() {
 }
 
 function getKLineCount(period: KLinePeriod): number {
-  if (period === 'yearly') return 240
+  if (period === 'monthly') return 240
   if (period === 'weekly') return 50
   return 60
 }
@@ -1430,20 +1891,88 @@ async function handleKLinePeriodChange(period: KLinePeriod) {
   await loadKLineData()
 }
 
-async function loadKLineData() {
+async function loadKLineData(silent = false) {
   if (!symbol.value) return
-  klineLoading.value = true
+  if (!silent) klineLoading.value = true
   try {
     const data = await stockApi.getKLine(symbol.value, {
       period: klinePeriod.value,
       count: getKLineCount(klinePeriod.value),
     })
     klineData.value = Array.isArray(data) ? data : []
+    applyLiveQuoteToKline()
   } catch (err) {
     console.error('[StockDetail] kline load error:', err)
     klineData.value = []
   } finally {
-    klineLoading.value = false
+    if (!silent) klineLoading.value = false
+  }
+}
+
+let quoteTimer: ReturnType<typeof setInterval> | null = null
+
+function toDateCompact(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`
+}
+
+/** 用实时行情更新日 K 最后一根：当天已有 bar 则替换，否则追加今日实时 bar */
+function applyLiveQuoteToKline() {
+  const q = quote.value
+  if (!q || klinePeriod.value !== 'daily') return
+  const bars = klineData.value
+  if (!Array.isArray(bars) || !bars.length) return
+  const price = toDecisionNumber(q.price)
+  if (price === null || price <= 0) return
+  const today = toDateCompact(new Date())
+  const last = bars[bars.length - 1]
+  const lastDate = String(last?.date || '').replace(/-/g, '')
+  const open = toDecisionNumber(q.open) ?? price
+  const high = Math.max(toDecisionNumber(q.high) ?? price, price)
+  const low = Math.min(toDecisionNumber(q.low) ?? price, price)
+  const liveBar = {
+    ...(last || {}),
+    date: today,
+    open,
+    high,
+    low,
+    close: price,
+    volume: toDecisionNumber(q.volume) ?? last?.volume ?? 0,
+    change: toDecisionNumber(q.change) ?? 0,
+    changePercent: toDecisionNumber(q.changePercent) ?? 0,
+  }
+  if (lastDate === today) {
+    klineData.value = [...bars.slice(0, -1), liveBar]
+  } else {
+    const next = [...bars, liveBar]
+    if (next.length > getKLineCount('daily') + 1) next.shift()
+    klineData.value = next
+  }
+}
+
+/** 1 分钟刷新：行情 + K 线（静默，避免加载动画闪烁） */
+async function refreshQuoteData() {
+  if (!symbol.value) return
+  try {
+    const data = await stockApi.getQuote(symbol.value)
+    if (data) quote.value = data
+  } catch {
+    // 刷新失败保留旧行情，下次轮询重试
+  }
+  await loadKLineData(true)
+}
+
+function startQuotePolling() {
+  stopQuotePolling()
+  quoteTimer = setInterval(() => {
+    void refreshQuoteData()
+  }, 60 * 1000)
+}
+
+function stopQuotePolling() {
+  if (quoteTimer !== null) {
+    clearInterval(quoteTimer)
+    quoteTimer = null
   }
 }
 
@@ -1629,6 +2158,12 @@ function formatEventTime(time: string | Date): string {
   return str.substring(5, 16) || str
 }
 
+function formatTradeDate(value: string): string {
+  const text = String(value || '').replace(/-/g, '')
+  if (text.length >= 8) return `${text.slice(4, 6)}-${text.slice(6, 8)}`
+  return text || ''
+}
+
 function formatVolume(vol: number): string {
   if (!vol) return '--'
   if (vol >= 100000000) return (vol / 100000000).toFixed(2) + '亿股'
@@ -1636,11 +2171,33 @@ function formatVolume(vol: number): string {
   return vol + '手'
 }
 
+function formatVolumeValue(vol: number): string {
+  if (!vol) return '--'
+  if (vol >= 100000000) return (vol / 100000000).toFixed(2)
+  if (vol >= 10000) return (vol / 10000).toFixed(2)
+  return String(vol)
+}
+
+function formatVolumeUnit(vol: number): string {
+  if (!vol) return ''
+  if (vol >= 100000000) return '亿股'
+  if (vol >= 10000) return '万股'
+  return '手'
+}
+
 function formatAmount(amt: number): string {
   if (!amt) return '--'
   if (Math.abs(amt) >= 100000000) return (amt / 100000000).toFixed(2) + '亿'
   if (Math.abs(amt) >= 10000) return (amt / 10000).toFixed(2) + '万'
   return amt.toFixed(2) + '元'
+}
+
+function formatMarketValue(value: any): string {
+  if (value === null || value === undefined || value === '') return '--'
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return '--'
+  const yuanValue = Math.abs(num) < 100000000 ? num * 10000 : num
+  return formatAmount(yuanValue)
 }
 
 function formatSemiAmount(amt: number): string {
@@ -1933,6 +2490,21 @@ function goChat() {
   &.is-neutral {
     color: $primary;
     background: $primary-50;
+  }
+
+  &.is-risk {
+    color: $down;
+    background: $down-soft;
+  }
+}
+
+.decision-status.is-sub {
+  background: $bg-deep;
+  color: $ink-soft;
+
+  &.is-positive {
+    color: $up;
+    background: $up-soft;
   }
 
   &.is-risk {
@@ -2356,6 +2928,26 @@ function goChat() {
   display: block;
 }
 
+.cf-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  margin-bottom: 14rpx;
+
+  .section-title {
+    margin-bottom: 0;
+  }
+}
+
+.cf-trade-date {
+  flex-shrink: 0;
+  font-size: 20rpx;
+  line-height: 1.4;
+  font-weight: 600;
+  color: $ink-mute;
+}
+
 .action-card {
   border-left: 6rpx solid $primary;
 }
@@ -2489,8 +3081,141 @@ function goChat() {
   color: $ink-faint;
 }
 
-/* 交易数据网格 */
-.detail-grid {
+/* 交易数据 */
+.td-range-card {
+  padding: 20rpx;
+  border-radius: 14rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  margin-bottom: 22rpx;
+}
+
+.td-range-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.td-range-price {
+  font-size: 44rpx;
+  line-height: 1.1;
+  font-weight: 800;
+
+  &.up {
+    color: $up;
+  }
+
+  &.down {
+    color: $down;
+  }
+}
+
+.td-range-change {
+  font-size: 24rpx;
+  line-height: 1.4;
+  font-weight: 700;
+
+  &.up {
+    color: $up;
+  }
+
+  &.down {
+    color: $down;
+  }
+}
+
+.td-range-track {
+  position: relative;
+  height: 14rpx;
+  margin: 4rpx 8rpx 14rpx;
+  border-radius: 7rpx;
+  background: linear-gradient(90deg, $down-soft 0%, $bg-deep 45%, $up-soft 100%);
+}
+
+.td-range-marker {
+  position: absolute;
+  top: -5rpx;
+  width: 5rpx;
+  height: 24rpx;
+  border-radius: 3rpx;
+  transform: translateX(-2.5rpx);
+
+  &.td-marker-now {
+    &.is-up {
+      background: $up;
+    }
+
+    &.is-down {
+      background: $down;
+    }
+  }
+
+  &.td-marker-prev {
+    background: $warning;
+  }
+}
+
+.td-range-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.td-range-low,
+.td-range-high {
+  font-size: 22rpx;
+  line-height: 1.4;
+  font-weight: 700;
+  color: $ink-soft;
+}
+
+.td-range-mid {
+  font-size: 20rpx;
+  line-height: 1.4;
+  font-weight: 600;
+  color: $ink-mute;
+}
+
+.td-range-tip {
+  margin-top: 12rpx;
+  padding-top: 12rpx;
+  border-top: 1rpx dashed $line-soft;
+}
+
+.td-range-pos {
+  font-size: 22rpx;
+  line-height: 1.4;
+  font-weight: 700;
+
+  &.up {
+    color: $up;
+  }
+
+  &.down {
+    color: $down;
+  }
+}
+
+.td-group {
+  margin-bottom: 20rpx;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.td-group-title {
+  display: block;
+  margin-bottom: 12rpx;
+  font-size: 22rpx;
+  line-height: 1.4;
+  font-weight: 700;
+  color: $ink-mute;
+}
+
+.td-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rpx;
@@ -2499,26 +3224,72 @@ function goChat() {
   overflow: hidden;
 }
 
-.detail-item {
+.td-cell {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20rpx 24rpx;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6rpx;
+  padding: 18rpx 20rpx;
   background: $bg-card;
 }
 
-.detail-label {
-  font-size: 26rpx;
+.td-label {
+  font-size: 22rpx;
+  line-height: 1.4;
   color: $ink-mute;
 }
 
-.detail-value {
+.td-value {
   font-size: 28rpx;
+  line-height: 1.25;
+  font-weight: 700;
   color: $ink;
-  font-weight: 500;
 
-  &.up { color: $up; }
-  &.down { color: $down; }
+  &.up {
+    color: $up;
+  }
+
+  &.down {
+    color: $down;
+  }
+}
+
+.td-value-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  min-width: 0;
+}
+
+.td-unit {
+  font-size: 20rpx;
+  line-height: 1.3;
+  font-weight: 500;
+  color: $ink-mute;
+}
+
+.td-tag {
+  flex-shrink: 0;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  font-size: 20rpx;
+  line-height: 1.4;
+  font-weight: 700;
+
+  &.is-hot {
+    color: $warning;
+    background: $warning-soft;
+  }
+
+  &.is-cold {
+    color: $ink-soft;
+    background: $bg-deep;
+  }
+
+  &.is-normal {
+    color: $ink-mute;
+    background: $bg-deep;
+  }
 }
 
 /* 资金流向 */

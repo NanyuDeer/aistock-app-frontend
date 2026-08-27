@@ -293,7 +293,7 @@ async function fetchData(append = false) {
     if (!res) throw new Error('API 返回为空')
 
     // 响应拦截器已提取 data，res 即为数据对象
-    const reportList: any[] = (res['报告列表'] || []).filter(item => {
+    const reportList: any[] = (res['报告列表'] || []).filter((item: any) => {
       const type = item['报告类型'] || '';
       return type === '正式报告' || type === '快报/预告';
     })

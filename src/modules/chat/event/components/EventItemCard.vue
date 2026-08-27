@@ -11,23 +11,29 @@
         </Tag>
         <text class="card-time">{{ formatTime(event.publishTime) }}</text>
       </view>
-      <Rate :modelValue="event.importance" :readonly="true" type="gold" size="18rpx" :gap="2" />
+      <!-- 重要程度星级：由 chain 最大 impactStrength 映射；无有效评分时隐藏（不显示假评分） -->
+      <Rate v-if="event.importance" :modelValue="event.importance" :readonly="true" type="gold" size="18rpx" :gap="2" />
     </view>
 
     <!-- 事件标题（最多2行，点击跳转新闻） -->
     <text class="card-title" @tap.stop="$emit('view-news', event)">{{ event.title }}</text>
 
-    <!-- Top5 影响行业（排序后取前5，不换行） -->
-    <view class="card-top5">
-      <text
-        v-for="ind in top5Industries"
-        :key="ind.name"
-        class="top5-item"
-        :class="'t5-' + ind.sentiment"
-      >
-        {{ ind.name }}<text class="t5-arrow">{{ ind.sentiment === 'bullish' ? '↑' : ind.sentiment === 'bearish' ? '↓' : '→' }}</text>
-      </text>
-    </view>
+    <!-- Top5 影响行业（排序后取前5，横向滑动查看完整名称，隐藏滚动条；空数据展示降级文案） -->
+    <scroll-view scroll-x :show-scrollbar="false" class="card-top5">
+      <!-- uni-app scroll-view 内部有 .uni-scroll-view-content 包裹层，
+           横向滚动必须由内层容器承载 flex 行布局（外层直接 flex 无效） -->
+      <view class="card-top5-inner">
+        <text v-if="top5Industries.length === 0" class="top5-empty">暂无明确行业影响</text>
+        <text
+          v-for="ind in top5Industries"
+          :key="ind.name"
+          class="top5-item"
+          :class="'t5-' + ind.sentiment"
+        >
+          {{ ind.name }}<text class="t5-arrow">{{ ind.sentiment === 'bullish' ? '↑' : ind.sentiment === 'bearish' ? '↓' : '→' }}</text>
+        </text>
+      </view>
+    </scroll-view>
 
     <!-- AI 摘要 + 操作按钮 -->
     <view class="card-bottom">
@@ -227,22 +233,38 @@ function formatTime(time: string): string {
   overflow: hidden;
 }
 
-/* ========== Top5 影响行业 ========== */
+/* ========== Top5 影响行业（最多5个：横向滑动一行展示，名称不压缩，隐藏滚动条） ========== */
 .card-top5 {
-  display: flex;
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 12rpx;
+}
+
+/* 内层 flex 行容器：承载横向布局，宽度超出即产生横向滚动 */
+.card-top5-inner {
+  display: inline-flex;
   flex-wrap: nowrap;
   gap: 6rpx;
-  margin-bottom: 12rpx;
-  overflow: hidden;
+}
+
+/* 空行业降级文案（情况3：chain 为空时展示，不暴露系统内部异常） */
+.top5-empty {
+  font-size: 22rpx;
+  font-weight: 500;
+  color: $ink-mute;
+  white-space: nowrap;
 }
 
 .top5-item {
-  font-size: 20rpx;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 22rpx;
   font-weight: 600;
+  line-height: 1.5;
   padding: 4rpx 12rpx;
   border-radius: $r-xs;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .t5-arrow {

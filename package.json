@@ -2,7 +2,7 @@
   "name": "aistock-app-frontend",
   "version": "0.1.0",
   "private": true,
-  "description": "AI Stock App - uni-app 多端客户端（App/H5/小程序）",
+  "description": "洞见 App - uni-app 多端客户端（App/H5/小程序）",
   "scripts": {
     "dev:h5": "uni",
     "dev:app": "uni -p app",

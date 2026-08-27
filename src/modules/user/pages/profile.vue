@@ -42,6 +42,11 @@
               <Switch v-model="settings.leader_push" @change="(val) => onSettingChange('leader_push', val)" />
             </template>
           </ListCell>
+          <ListCell title="自选股洞察推送" description="自选股触发涨停雷达时推送洞察" :border="true">
+            <template #value>
+              <Switch v-model="settings.watchlist_insight_push" @change="(val) => onSettingChange('watchlist_insight_push', val)" />
+            </template>
+          </ListCell>
         </Card>
       </view>
 
@@ -66,6 +71,17 @@
               <text class="fav-date">{{ formatDate(stock.addedAt || '') }}</text>
             </template>
           </ListCell>
+        </Card>
+      </view>
+
+      <!-- B8：AI 个性化服务说明 + 删除权（2026-08-12 验收裁决） -->
+      <view v-if="isLoggedIn" class="section">
+        <text class="section-title">AI 个性化服务</text>
+        <Card>
+          <view class="ai-personal-section">
+            <text class="as-desc">AI 对话可能参考您的投资偏好与风险偏好进行个性化回答（昵称/投资偏好/风险偏好）。您可随时删除上述个性化信息，删除后 AI 将按通用方式回答。</text>
+            <Button type="danger" block @click="handleDeleteProfile">删除我的个性化信息</Button>
+          </view>
         </Card>
       </view>
 
@@ -99,6 +115,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { authApi, type UserSettings } from '@/shared/api/modules/auth'
+import { deleteUserProfile } from '@/shared/api/modules/profile'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { Switch, ListCell, Card, Tag, Button } from '@/shared/components'
@@ -107,11 +124,12 @@ const userStore = useUserStore()
 const favoritesStore = useFavoritesStore()
 const isLoggedIn = computed(() => userStore.isLoggedIn())
 const userInfo = computed(() => userStore.userInfo)
-// 默认全部关闭，由 API 返回值覆盖
+// 自选股洞察推送默认开启，其余默认关闭（区分策略）；由 API 返回值覆盖
 const DEFAULT_SETTINGS: UserSettings = {
   stock_push: false,
   outbreak_push: false,
   leader_push: false,
+  watchlist_insight_push: true,
 }
 const settings = ref<UserSettings>({ ...DEFAULT_SETTINGS })
 const favoriteStocks = computed(() => favoritesStore.stocks)
@@ -140,6 +158,8 @@ async function loadSettings() {
       stock_push: map.stock_push ?? false,
       outbreak_push: map.outbreak_push ?? false,
       leader_push: map.leader_push ?? false,
+      // PRD：自选股洞察推送默认开启；后端无该记录（首次进入）时回退为开启
+      watchlist_insight_push: map.watchlist_insight_push ?? true,
     }
   } catch (e) {
     // API 未实现或失败时，保持默认值
@@ -176,6 +196,23 @@ function handleLogout() {
   })
 }
 
+// B8：PIPL 删除权——确认后删除用户画像，删除后 AI 按通用方式回答
+function handleDeleteProfile() {
+  uni.showModal({
+    title: '确认删除',
+    content: '删除后 AI 将按通用方式回答，且不可恢复',
+    success: async (res) => {
+      if (!res.confirm) return
+      try {
+        await deleteUserProfile()
+        uni.showToast({ title: '已删除', icon: 'success' })
+      } catch {
+        uni.showToast({ title: '删除失败，请重试', icon: 'none' })
+      }
+    }
+  })
+}
+
 function goLogin() {
   uni.navigateTo({ url: '/modules/user/pages/login' })
 }
@@ -185,7 +222,7 @@ function goFavorites() {
 }
 
 function goAbout() {
-  uni.showToast({ title: 'AI Stock v2.1', icon: 'none' })
+  uni.showToast({ title: '洞见 v2.1', icon: 'none' })
 }
 
 function goStockDetail(symbol: string) {
@@ -288,6 +325,19 @@ function formatDate(dateStr: string): string {
 .section-count {
   font-size: 24rpx;
   color: #9ca3af;
+}
+
+/* ===== AI 个性化服务 ===== */
+.ai-personal-section {
+  display: flex;
+  flex-direction: column;
+  gap: $s-3;
+}
+
+.as-desc {
+  font-size: $font-size-sm;
+  line-height: $lh-loose;
+  color: $ink-soft;
 }
 
 /* ===== 设置卡片 ===== */
