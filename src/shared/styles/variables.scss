@@ -238,3 +238,22 @@ $primary-active-bg: linear-gradient(135deg, #f5f9ff, #eef3ff);
 /* ===== Safe Area (移动端适配) ===== */
 $safe-top: env(safe-area-inset-top, 0px);
 $safe-bottom: env(safe-area-inset-bottom, 0px);
+
+// ===== 洞察之眼（insight）Design Token（同步自 aistock-component-lib） =====
+$insight-emotion: #e54d5e;
+$insight-emotion-light: #ff8f9f;
+$insight-emotion-deep: #8f2435;
+$insight-emotion-soft: rgba(229, 77, 94, 0.10);
+$insight-fund: #c89020;
+$insight-fund-light: #f0c75a;
+$insight-fund-deep: #8a6411;
+$insight-fund-soft: rgba(200, 144, 32, 0.12);
+$insight-event: #00b8ff;
+$insight-event-light: #5ad4ff;
+$insight-event-deep: #0078a8;
+$insight-event-soft: rgba(0, 184, 255, 0.10);
+$insight-market: #0b5fff;
+$insight-market-light: #4d8bff;
+$insight-market-deep: #0a2e6f;
+$insight-market-soft: rgba(11, 95, 255, 0.08);
+$insight-card-dark-gradient: linear-gradient(150deg, #0a2e6f 0%, #0948cc 100%);

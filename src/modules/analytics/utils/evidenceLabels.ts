@@ -47,14 +47,23 @@ export function labelEvidenceId(id: string): string {
 }
 
 /**
- * 将证据 ID 列表转换为关键词列表（去重，保持首次出现顺序，过滤空）。
+ * 标签是否为可读中文标签（含至少一个汉字）。
+ * 用于过滤 labelEvidenceId 兜底截断产生的英文字段名（如 close/pct_change），
+ * 这类"字典字段"对用户无展示意义。
+ */
+export function isReadableEvidenceLabel(label: string): boolean {
+  return /[\u4e00-\u9fff]/.test(label || '')
+}
+
+/**
+ * 将证据 ID 列表转换为关键词列表（去重，保持首次出现顺序，过滤空与非汉字字典字段）。
  */
 export function labelEvidenceList(ids: string[]): string[] {
   const seen = new Set<string>()
   const result: string[] = []
   for (const id of ids) {
     const label = labelEvidenceId(id)
-    if (label && !seen.has(label)) {
+    if (label && isReadableEvidenceLabel(label) && !seen.has(label)) {
       seen.add(label)
       result.push(label)
     }
