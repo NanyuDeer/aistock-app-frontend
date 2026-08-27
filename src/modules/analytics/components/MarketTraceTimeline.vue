@@ -54,9 +54,9 @@
         </view>
       </view>
 
-      <view v-if="primaryCause.supportingEvidence.length" class="evidence-block">
+      <view v-if="readableEvidence.length" class="evidence-block">
         <text class="evidence-label">参考来源：</text>
-        <text class="evidence-text">{{ labelEvidenceList(primaryCause.supportingEvidence).join('、') }}</text>
+        <text class="evidence-text">{{ readableEvidence.join('、') }}</text>
       </view>
     </Card>
   </view>
