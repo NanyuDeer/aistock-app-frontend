@@ -58,12 +58,22 @@ test('toMarketInsightBrief: 无预判时 forecast 兜底', () => {
   assert.equal(brief!.forecast, '暂无预判')
 })
 
-test('toMarketInsightBrief: 超长文案截断', () => {
+test('toMarketInsightBrief: 超长文案完整展示（不截断省略）', () => {
+  const summary = '这是一段远超三十个字符的非常非常长的现象描述，用来验证简短卡片不再截断省略'
+  const longConclusion = '半导体国产替代提速推动板块普涨，叠加政策催化与资金回流，市场情绪持续修复，进入中线观察区间'
+  const longAttribution = '短线情绪延续并可能放大波动，中线关注政策落地与业绩验证的共振效应，长线维持谨慎乐观'
   const brief = toMarketInsightBrief(makePresentation({
-    phenomenon: { ...makePresentation().phenomenon, summary: '这是一段超过三十个字符的非常长的现象描述用来验证截断逻辑是否正确生效' },
+    phenomenon: { ...makePresentation().phenomenon, summary },
+    primaryCause: { ...makePresentation().primaryCause!, conclusion: longConclusion },
+    prediction: { ...makePresentation().prediction!, attributionSummary: longAttribution },
   }))
-  assert.ok(brief!.title.length <= 31) // 30 字 + 省略号
-  assert.match(brief!.title, /…$/)
+  assert.ok(brief)
+  assert.equal(brief!.title, summary)
+  assert.equal(brief!.trace, `产业技术供应：${longConclusion}`)
+  assert.equal(brief!.forecast, longAttribution)
+  assert.ok(!brief!.title.includes('…'))
+  assert.ok(!brief!.trace.includes('…'))
+  assert.ok(!brief!.forecast.includes('…'))
 })
 
 test('toMarketInsightBrief: null 输入返回 null', () => {

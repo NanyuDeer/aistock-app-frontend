@@ -12,27 +12,23 @@ export interface MarketInsightBrief {
 
 const CONFIDENCE_LABELS: Record<string, string> = { high: '高', medium: '中', low: '低' }
 
-/** 按字符截断（非字节），超长加省略号 */
-function clip(text: string, max: number): string {
-  const t = (text || '').trim()
-  if (!t) return ''
-  return t.length > max ? t.slice(0, max) + '…' : t
-}
-
 /**
  * 从 MarketTracePresentation 提炼简短洞见三段文案（现象/溯源/预判）。
  * 纯前端提炼，不调 LLM、不改后端。任何字段缺失走兜底文案，不抛异常。
+ *
+ * 简短卡展示**完整文案**、不做字符截断：现象/溯源/预判是面向所有用户的基础内容，
+ * 必须看全；「展开详情」才是后续付费升级的增值入口（见 MarketInsightCard.canViewFullReport）。
  */
 export function toMarketInsightBrief(
   p: MarketTracePresentation | null | undefined,
 ): MarketInsightBrief | null {
   if (!p) return null
-  const title = clip(p.phenomenon.summary || p.phenomenon.kindLabel || '当日市场行情综述', 30)
+  const title = (p.phenomenon.summary || p.phenomenon.kindLabel || '当日市场行情综述').trim()
   const trace = p.primaryCause
-    ? clip(`${p.primaryCause.categoryLabel}：${p.primaryCause.conclusion}`, 40)
+    ? `${p.primaryCause.categoryLabel}：${p.primaryCause.conclusion}`.trim()
     : '证据不足，主因待验证'
   const forecast = p.prediction
-    ? clip(p.prediction.attributionSummary || '见展开详情', 40)
+    ? (p.prediction.attributionSummary?.trim() || '见展开详情')
     : '暂无预判'
   const confidence = p.confidence ? (CONFIDENCE_LABELS[p.confidence] ?? '') : ''
   const time = (p.reportDate || '').slice(5).replace('-', '.') // YYYY-MM-DD → MM.DD

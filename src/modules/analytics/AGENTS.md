@@ -10,7 +10,7 @@
 - `pages/forecast.vue`：业绩预测。
 - `pages/trend-score.vue`：趋势评分排行榜与本地搜索。
 - `pages/trend-score-detail.vue`：单股技术面、赛道景气、消息面、基本面四维详情。
-- `pages/traceability.vue`：市场洞见页（2026-08-27 改造：从完整归因报告改为简短洞察卡）。现只渲染 MarketInsightCard（InsightCard 简短洞见卡 + 现象/溯源/预判三块展开详情，展开入口 `canViewFullReport` 付费墙预留）；数据流保留并行拉复盘报告 + `predictionApi.list({source_id: 'review:<date>'})`（预测接口失败降级 null，不拖垮主内容），prediction 供预判展开块，无预判时 brief 兜底"暂无预判"、展开时预判块不渲染（已移除原 20:30 空态占位）。
+- `pages/traceability.vue`：市场洞见页（2026-08-27 改造：从完整归因报告改为简短洞察卡）。现只渲染 MarketInsightCard（InsightCard 简短洞见卡 + 现象/溯源/预判三块展开详情；简短卡完整展示三段文案、不截断——基础内容向所有用户看全；展开入口 `canViewFullReport` 付费墙预留）；数据流保留并行拉复盘报告 + `predictionApi.list({source_id: 'review:<date>'})`（预测接口失败降级 null，不拖垮主内容），prediction 供预判展开块，无预判时 brief 兜底"暂无预判"、展开时预判块不渲染（已移除原 20:30 空态占位）。
 - `pages/prediction-history.vue`：历史预测跟踪列表页（B2.1：命中率统计栏 + 全部/进行中/已结束筛选 + 预测卡片，卡片含 prediction_status 与三档进度；skipped 记录仅在"全部"可见，显示"已跳过"标签不渲染 horizon）。
 - `pages/prediction-detail.vue`：预测详情页（B2.1：复用 MarketTracePrediction 展示预测内容 + PredictionVerification 展示验证结果；badge 增加 skipped 分支显示"已跳过"）。
 
