@@ -2,6 +2,22 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-08-26 — AI 投顾追问面板（回答后底部建议追问 + 输入框）
+
+**开发者**: 37588
+
+### 新增
+- 追问面板：回答打字机完成后底部弹出建议追问胶囊 + 输入框；点胶囊发送追问 → 面板收起、输入栏恢复；无 questions（deep 降级/闸门/澄清）不弹面板；× 收起恢复 quick-skills 行，消息 footer「查看追问」弱入口可恢复；上滑（followPaused）不自动弹、弱入口可恢复
+- ChatMessage 增加 `questions?: string[]`（WS/HTTP 容缺消费，`[]` 与 `undefined` 均视为无建议）；FollowupSuggestChips 组件自组件库复制接入；面板状态机 + 打字机完成信号触发（typingMsgKey → null 才展示，F2 守卫）
+
+### 改进
+- 新发送轮/发送追问收起面板；立即展示路径保留 pending（× 收起后 footer 弱入口可恢复）；删除气泡胶囊与 parseFollowupQuestions 解析器（单一追问面板范式）
+
+### 验证
+- vitest useChatStream 48/48 + node:test chat/index 49/49 + tsc/vue-tsc 0 错误
+
+---
+
 ## [master] 2026-08-26 — 悬浮播报 App 端面板定位修复
 
 **开发者**: Aria

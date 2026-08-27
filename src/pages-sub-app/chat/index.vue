@@ -64,31 +64,6 @@
                 class="bubble-html streaming-blink"
               />
 
-              <!-- 改进 20（批次 1）：引导追问按钮化——「你可以问我：…」引导句渲染为可点击快捷追问
-                   （点击即发，复用 quickAsk）；保守解析命中才渲染（正文剔除引导行），未命中回退
-                   下方既有纯文本分支（绝不渲染错按钮） -->
-              <template v-else-if="followupOf(msg)">
-                <template v-for="(sec, si) in getSections(followupBody(msg)) ?? []" :key="si">
-                  <mp-html v-if="!sec.title" :content="markdownToHtml(sec.body)" class="bubble-html" />
-                  <SectionCard v-else :variant="sec.variant" :title="sec.title" :body="sec.body" />
-                </template>
-                <mp-html
-                  v-if="!getSections(followupBody(msg))"
-                  :content="markdownToHtml(followupBody(msg))"
-                  class="bubble-html"
-                />
-                <view class="followup-questions">
-                  <view
-                    v-for="q in followupQuestions(msg)"
-                    :key="q"
-                    class="followup-question"
-                    @tap="quickAsk(q)"
-                  >
-                    <text class="followup-question-text">{{ q }}</text>
-                  </view>
-                </view>
-              </template>
-
               <!-- 改进 14：分节卡片化渲染（有分节时 SectionCard 列表，无分节时回退 mp-html） -->
               <template v-else-if="msg.content">
                 <template v-for="(sec, si) in getSections(msg.content) ?? []" :key="si">
@@ -124,6 +99,15 @@
                 >
                   <SvgIcon name="refresh-line" size="24rpx" color="#0b5fff" />
                   <text class="retry-btn-text">重试</text>
+                </view>
+                <!-- Task 8：追问面板弱入口（pending 且未展示时，消息尾部可恢复面板） -->
+                <view
+                  v-if="panelState.pending && !panelState.visible && msg.timestamp === panelState.messageId"
+                  class="panel-restore-btn"
+                  @tap="restorePanel"
+                >
+                  <SvgIcon name="chat-follow-up-line" size="24rpx" color="#0b5fff" />
+                  <text class="panel-restore-text">查看追问</text>
                 </view>
               </view>
 
@@ -179,8 +163,8 @@
         <text class="back-to-latest-text">回到最新</text>
       </view>
 
-      <!-- 快捷 Skills -->
-      <view class="quick-skills">
+      <!-- 快捷 Skills（追问面板可见时替换为底部建议行） -->
+      <view v-if="!panelState.visible" class="quick-skills">
         <view class="skill-btn" @tap="quickAsk('今日大盘怎么样')">
           <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
           <text class="skill-btn-text">大盘</text>
@@ -197,6 +181,15 @@
         <view class="skill-btn" @tap="quickAsk('今天的龙头股有哪些')">
           <SvgIcon name="trophy-line" size="28rpx" color="#0b5fff" />
           <text class="skill-btn-text">龙头</text>
+        </view>
+      </view>
+      <!-- 追问面板（2026-08-26）：回答完成后的建议追问替换快捷技能行；× 收起保留 pending（footer 弱入口可恢复） -->
+      <view v-else class="suggest-row">
+        <view class="suggest-chips-wrap">
+          <FollowupSuggestChips :items="panelQuestions" @select="onPanelSelect" />
+        </view>
+        <view class="suggest-collapse" @tap="dismissPanel">
+          <SvgIcon name="close-line" size="28rpx" color="#9aa3b2" />
         </view>
       </view>
 
@@ -290,10 +283,10 @@ import ReasoningPanel from './ReasoningPanel.vue'
 import CardRenderer from './cards/CardRenderer.vue'
 import SectionCard from './cards/SectionCard.vue'
 import FeedbackBar from '@/shared/components/FeedbackBar.vue'
+import FollowupSuggestChips from '@/shared/components/FollowupSuggestChips.vue'
 import ConfirmSheet from '@/shared/components/ConfirmSheet.vue'
 import MessageActionMenu, { type MenuItem } from './MessageActionMenu.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
-import { parseFollowupQuestions, type FollowupParse } from '@/shared/utils/parseFollowupQuestions'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
@@ -307,7 +300,10 @@ import {
 } from '@/shared/utils/speechInput'
 import type { SpeechRecognitionResult } from '@/shared/utils/speechInput'
 
-const chatStream = useChatStream({ onBeforeStream: () => resetFollow() })
+// FIX-2（final review）：onBeforeStream = 页面"新一轮启动"钩子（覆盖 send/quickAsk/rerunDeep/
+// retry/resume-none 兜底/confirm fresh run 全部发送路径）——复位跟随 + 更新轮次锚点（本轮新鲜
+// 回答 timestamp ≥ 锚点才自动弹面板；会话切换恢复的旧消息早于锚点 → 不弹）
+const chatStream = useChatStream({ onBeforeStream: () => { resetFollow(); roundAnchor.value = Date.now() } })
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const favoritesStore = useFavoritesStore()
@@ -682,6 +678,9 @@ function startTypewriterIfNeeded() {
 
 watch(isStreaming, (v) => {
   if (v) {
+    // Task 8：新发送轮 → 收起追问面板（先清 pending 再清 typingMsgKey，
+    // 防 watch(typingMsgKey) 以 null 信号误复活上一轮未完成建议）
+    clearPanel()
     // Phase 4-2 改进 13：confirm_response 后后端 fresh run 开始流式 → 弹框完成使命（waiting 态结束），关闭
     confirmVisible.value = false
     // 新一轮开始：重置"本轮是否出现过真流式文本"，并停掉上一条未播完的打字机
@@ -705,6 +704,104 @@ watch(isStreaming, (v) => {
     startTypewriterIfNeeded()
   }
 })
+
+// ===== 追问面板（2026-08-26，Task 8）：豆包/元宝式底部建议追问 =====
+// pending：本轮存在可展示建议但未达展示条件（打字机未完成 / followPaused）；
+// visible：面板显示；messageId：面板归属消息（最新带 questions 的 assistant 消息）。
+const panelState = ref<{ visible: boolean; messageId: number | null; pending: boolean }>({
+  visible: false, messageId: null, pending: false,
+})
+
+// FIX-2（final review）：轮次锚点 = 本页实例当前轮启动时刻（useChatStream onBeforeStream 置位；
+// 页面创建时取 Date.now()）。会话切换恢复的历史消息（switchSession 重入 displayMessages 的
+// 旧消息，timestamp 早于锚点）不自动弹面板，仅记 pending（footer 弱入口）；仅当前轮新鲜回答
+// （timestamp ≥ 锚点）才满足自动展示条件。
+const roundAnchor = ref(Date.now())
+
+// FIX-3（final review）：会话切换（同页实例 A→B→A，无新发送）→ 收起面板并重置轮次锚点。
+// 锚点仅随发送前移：切走再切回时，A 的旧回答（timestamp ≥ 旧锚点）会以「恢复历史」重入
+// displayMessages 并通过锚点守卫误自动弹面板——在切换时刻清面板 + 重置锚点，恢复消息至多
+// 保留 pending（footer 弱入口），不自动弹。必须注册于 display-messages 收口 watch 之前，
+// 保证同一次 flush 中本 watch 回调先执行（锚点已重置）再轮到收口 watch 的锚点判定。
+watch(chatStream.sessionId, () => {
+  clearPanel()
+  roundAnchor.value = Date.now()
+})
+
+/** F2：面板立即展示判定（纯函数）——questions 存在 且 打字机已完成 且 未暂停跟随 */
+function shouldShowPanel(hasQuestions: boolean, typingActive: boolean, followPaused: boolean): boolean {
+  return hasQuestions && !typingActive && !followPaused
+}
+
+/** 消息终态落地统一收口：done/HTTP append 后置检查（不依赖 watch(isStreaming) 边沿） */
+function onAnswerSettled(msg: ChatMessage) {
+  if (!msg.questions || msg.questions.length === 0) return
+  panelState.value = { visible: false, messageId: msg.timestamp, pending: true }
+}
+
+/** light 分支打字机完成信号 → 展示面板（正文已完整呈现，完成信号不先于正文） */
+watch(typingMsgKey, (k) => {
+  if (k !== null || !panelState.value.pending) return
+  if (!followPaused.value) panelState.value.visible = true
+})
+
+/**
+ * 统一收口（F2）：最后一条消息落地 → 记 pending；打字机未播且未暂停跟随才立即展示。
+ * 时序修正（Vue 3.5 实测）：watch 回调按依赖变更入队顺序执行，而非创建顺序——
+ * DONE 处理内先 appendMessage 后 streaming=false，故本 watch 先于 watch(isStreaming)
+ * 入队并先执行，此时打字机尚未启动（typingMsgKey 仍为 null）。因此展示判定延后一帧
+ * （nextTick）：届时 isStreaming watch 已启动打字机（静态 light 场景）→ 等
+ * typingMsgKey→null 完成信号；D9 伪流式 light / deep 真流式 / HTTP 降级无打字机 → 展示。
+ */
+watch(
+  () => displayMessages.value[displayMessages.value.length - 1]?.timestamp,
+  (ts, prev) => {
+    if (ts === prev) return
+    const last = displayMessages.value[displayMessages.value.length - 1]
+    const hasQuestions = !!last?.questions?.length
+    if (!last || last.role !== 'assistant' || !hasQuestions) return
+    onAnswerSettled(last) // 统一收口：记 pending（打字机未完成 / followPaused 时等待）
+    // FIX-2（final review）：历史恢复（switchSession 重入的旧消息）不自动弹面板——
+    // 消息早于本轮锚点 → 仅保留 pending 弱入口，跳过展示判定；仅当前轮新鲜回答自动展示
+    if (last.timestamp < roundAnchor.value) return
+    nextTick(() => {
+      if (shouldShowPanel(hasQuestions, typingMsgKey.value !== null, followPaused.value)) {
+        // 展示：仅置 visible，保留 onAnswerSettled 写入的 pending（× 收起后可经 footer 弱入口恢复）
+        panelState.value.visible = true
+      }
+    })
+  }
+)
+
+/** 发送追问 / 新消息到达 → 收起并清 pending */
+function clearPanel() {
+  panelState.value = { visible: false, messageId: null, pending: false }
+}
+
+/** × 收起（非丢弃）：清 visible 留 pending（footer 弱入口可恢复） */
+function dismissPanel() {
+  panelState.value.visible = false
+}
+
+/** footer「查看追问」弱入口恢复 */
+function restorePanel() {
+  if (panelState.value.pending && panelState.value.messageId !== null) {
+    panelState.value.visible = true
+  }
+}
+
+/** 面板建议 = panelState.messageId 对应消息的 questions（消息被删/缺失 → 空数组） */
+const panelQuestions = computed(() => {
+  const id = panelState.value.messageId
+  if (id === null) return []
+  return displayMessages.value.find((m) => m.timestamp === id)?.questions ?? []
+})
+
+/** 点击建议追问：收起面板并发送（复用 quickAsk） */
+function onPanelSelect(q: string) {
+  clearPanel()
+  quickAsk(q)
+}
 
 function handleSend() {
   const content = inputText.value.trim()
@@ -882,6 +979,8 @@ function handleMessageAction(item: MenuItem) {
       break
     case 'delete':
       chatStore.removeMessage(msg.timestamp)
+      // FIX-4（final review）：删除的是追问面板归属消息 → 收起面板（防残留空面板）
+      if (panelState.value.messageId === msg.timestamp) clearPanel()
       break
     case 'select-text':
       // 进入选中态：自行关闭菜单，保留 menuTarget 供 copySelection 整条兜底复制
@@ -970,6 +1069,7 @@ async function onHoldEnd() {
 
 function quickAsk(text: string) {
   if (isStreaming.value) return
+  clearPanel() // Task 8：点任何快捷入口即收起追问面板
   upsertSessionMeta(text)
   chatStream.send(text)
 }
@@ -1007,25 +1107,6 @@ function getSections(content: string): MarkdownSection[] | null {
   if (parsed.length === 0) return null
   if (parsed.length === 1 && !parsed[0].title) return null
   return parsed
-}
-
-// ── 改进 20（批次 1）：引导追问按钮化辅助函数 ──
-// 模板无法缓存单条消息的解析结果，提供三个薄函数多次调用（与 getSections 同模式）；
-// followupOf 是唯一解析入口（含角色/空内容守卫），body/questions 由其派生，保证一致性。
-
-function followupOf(msg: ChatMessage): FollowupParse | null {
-  if (msg.role !== 'assistant' || !msg.content) return null
-  return parseFollowupQuestions(msg.content)
-}
-
-/** 剔除引导行后的正文（供分节渲染）；未命中返回空串（配合 v-else-if 不会到达） */
-function followupBody(msg: ChatMessage): string {
-  return followupOf(msg)?.body ?? ''
-}
-
-/** 解析出的快捷追问条目；未命中返回空数组 */
-function followupQuestions(msg: ChatMessage): string[] {
-  return followupOf(msg)?.questions ?? []
 }
 
 /**
@@ -1213,19 +1294,6 @@ onUnmounted(() => {
 :deep(.md-table th) { background: $bg-soft; font-size: 24rpx; padding: 8rpx; border: 1rpx solid $line; }
 :deep(.md-table td) { font-size: 24rpx; padding: 8rpx; border: 1rpx solid $line; }
 
-/* 批次 4（改进 20 升级）：引导追问胶囊按钮（点击即发，复用 quickAsk；对齐豆包浅色胶囊） */
-.followup-questions {
-  display: flex; flex-direction: column; gap: 12rpx;
-  margin-top: 16rpx;
-}
-.followup-question {
-  display: inline-flex; align-items: center; align-self: flex-start; max-width: 100%;
-  background: $primary-50; color: $primary;
-  border-radius: 999rpx; padding: 14rpx 24rpx;
-}
-.followup-question:active { opacity: 0.7; }
-.followup-question-text { font-size: 24rpx; color: $primary; line-height: 1.4; }
-
 /* 流式光标动画（mp-html 内嵌 ▊ 字符的闪烁效果） */
 :deep(.streaming-blink) {
   animation: blink 1s step-end infinite;
@@ -1257,6 +1325,22 @@ onUnmounted(() => {
   padding: 8rpx 20rpx; font-size: 24rpx;
 }
 .skill-btn-text { font-size: 24rpx; color: $primary; }
+
+/* Task 8：追问面板建议行（替换快捷技能行；× 收起右侧，非丢弃——footer 弱入口可恢复） */
+.suggest-row {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+.suggest-chips-wrap { flex: 1; min-width: 0; }
+.suggest-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 20rpx;
+  flex-shrink: 0;
+}
 
 .input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
 .input-wrap { position: relative; flex: 1; min-width: 0; }
@@ -1340,5 +1424,19 @@ onUnmounted(() => {
   margin-left: 8rpx;
   color: $primary;
   font-size: 24rpx;
+}
+
+/* Task 8：追问面板弱入口（消息尾部「查看追问」，pending 未展示时出现；浅色胶囊弱化） */
+.panel-restore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 6rpx 20rpx;
+  background: rgba(77, 124, 254, 0.08);
+  border-radius: 20rpx;
+}
+.panel-restore-text {
+  font-size: 22rpx;
+  color: $primary;
 }
 </style>

@@ -339,3 +339,275 @@ describe('index.vue 滚动改造（5B）运行时行为', () => {
     wrapper.unmount()
   })
 })
+
+// ─── 追问面板（2026-08-26，Task 8）：panelState 触发状态机运行时行为 ───
+// 与 index.spec.ts（node:test 源码字符串断言）互补：本组用例用既有 mount 基建做真实运行时断言。
+// 触发机制：displayMessages 直接 push（无打字机/无流式的终态落地）模拟 D9/deep/HTTP append；
+// WS 静态 DONE（无 text 事件 → hadStreamText=false）驱动 light 分支打字机完成信号链路。
+
+/** 通过页面输入框发送一轮并喂入 light 静态 DONE（无 text 事件 → 打字机启动） */
+async function sendAndDoneLight(wrapper: any, content: string, questions: string[]) {
+  await wrapper.find('input').setValue('你好')
+  await wrapper.find('.send-btn').trigger('tap')
+  await flushPromises()
+  await vi.waitFor(() => { expect(mockSocketSend).toHaveBeenCalledTimes(1) })
+  mockSocketCbs.onMessageCbs[0]({ data: JSON.stringify({ type: 'done', content, questions }) })
+  await flushPromises()
+  await nextTick()
+}
+
+describe('index.vue 追问面板（Task 8）运行时行为', () => {
+  // 独立 describe（与 5B/G6 分组并列）→ 需自带复位：对齐外层 beforeEach（messages/socket 单例/计数）
+  beforeEach(() => {
+    const stream = useChatStream() as any
+    stream.messages.value = []
+    stream.sessionId.value = ''
+    mockSocketCbs.onMessageCbs.length = 0
+    mockSocketCbs.onCloseCbs.length = 0
+    mockSocketCbs.onErrorCbs.length = 0
+    mockSocketSend.mockClear()
+    agentApiMock.sendMessage.mockReset()
+    agentApiMock.upsertChatSession.mockReset()
+    chatStoreMocks.createSession.mockClear()
+    stream._testReset()
+    lifecycleMocks.onLoad.mockReset()
+    lifecycleMocks.onShow.mockReset()
+    lifecycleMocks.onReady.mockReset()
+    Object.keys(uniEventHandlers).forEach(k => delete uniEventHandlers[k])
+  })
+
+  afterEach(() => {
+    useChatStream()._testReset()
+  })
+
+  it('回答含 questions 且打字机未启动/未暂停跟随 → 立即替换快捷技能行展示建议', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+
+    const stream = useChatStream() as any
+    stream.messages.value.push({
+      role: 'assistant', content: '回答', timestamp: Date.now(), questions: ['追问一', '追问二'],
+    })
+    await flushPromises()
+    await nextTick()
+
+    expect(wrapper.find('.quick-skills').exists()).toBe(false)
+    const chips = wrapper.find('.as-followup-chips')
+    expect(chips.exists()).toBe(true)
+    expect(chips.text()).toContain('追问一')
+    expect(chips.text()).toContain('追问二')
+    wrapper.unmount()
+  })
+
+  it('立即展示路径（无打字机直接落地）× 收起 → pending 保留（footer 弱入口可恢复面板）', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    const stream = useChatStream() as any
+    stream.messages.value.push({
+      role: 'assistant', content: '回答', timestamp: Date.now(), questions: ['追问一', '追问二'],
+    })
+    await flushPromises()
+    await nextTick()
+
+    // 无打字机 + 未暂停跟随 → 立即展示面板
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+
+    // × 收起（非丢弃）：面板消失、quick-skills 回来；pending 保留 → 弱入口可见
+    await wrapper.find('.suggest-collapse').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    expect(wrapper.find('.panel-restore-btn').exists()).toBe(true)
+
+    // 弱入口恢复面板
+    await wrapper.find('.panel-restore-btn').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('无 questions 的 assistant 消息不触发面板（quick-skills 保持）', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    const stream = useChatStream() as any
+    stream.messages.value.push({ role: 'assistant', content: '无追问', timestamp: Date.now() })
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    expect(wrapper.find('.panel-restore-btn').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('followPaused（上滑暂停跟随）时不自动弹面板 → footer 弱入口保留，点按恢复', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    // far → 暂停跟随（既有 5B 用例 2 同款触发）
+    await wrapper.find('scroll-view').trigger('scroll', { detail: { scrollTop: 0, scrollHeight: 2000 } })
+    expect(wrapper.find('.back-to-latest').exists()).toBe(true)
+
+    const stream = useChatStream() as any
+    stream.messages.value.push({
+      role: 'assistant', content: '回答', timestamp: Date.now(), questions: ['追问一', '追问二'],
+    })
+    await flushPromises()
+    await nextTick()
+
+    // 未自动弹面板（pending=true, visible=false）；弱入口可见
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    expect(wrapper.find('.panel-restore-btn').exists()).toBe(true)
+
+    // 弱入口恢复
+    await wrapper.find('.panel-restore-btn').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('light 静态 DONE（打字机播放中）→ 仅 pending 不展示；打字机完成 → 自动展示', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    await sendAndDoneLight(wrapper, '回答', ['追问一', '追问二'])
+
+    // 打字机播放中：面板未展示（pending），弱入口可见
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    expect(wrapper.find('.panel-restore-btn').exists()).toBe(true)
+
+    // 打字机完成（content 2 字 → 1 tick @30ms）→ typingMsgKey→null → 面板自动展示
+    await vi.waitFor(() => { expect(wrapper.find('.as-followup-chips').exists()).toBe(true) }, { timeout: 3000 })
+    wrapper.unmount()
+  })
+
+  it('× 收起保留 pending（footer 弱入口可恢复）；再点弱入口恢复面板', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    await sendAndDoneLight(wrapper, '回答', ['追问一', '追问二'])
+    await vi.waitFor(() => { expect(wrapper.find('.as-followup-chips').exists()).toBe(true) }, { timeout: 3000 })
+
+    // × 收起：面板消失、quick-skills 回来；pending 保留 → 弱入口可见
+    await wrapper.find('.suggest-collapse').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    expect(wrapper.find('.panel-restore-btn').exists()).toBe(true)
+
+    // 弱入口恢复面板
+    await wrapper.find('.panel-restore-btn').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('点击建议追问 → 收起面板并发送（quickAsk 链路）', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    const stream = useChatStream() as any
+    stream.messages.value.push({
+      role: 'assistant', content: '回答', timestamp: Date.now(), questions: ['追问一', '追问二'],
+    })
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+
+    await wrapper.find('.as-followup-chip').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+
+    // 发送链路：socket send 携带点击的建议文本
+    await vi.waitFor(() => { expect(mockSocketSend).toHaveBeenCalledTimes(1) })
+    const payload = JSON.parse(mockSocketSend.mock.calls[0][0].data) as { message?: string }
+    expect(payload.message).toBe('追问一')
+    wrapper.unmount()
+  })
+
+  it('新一轮发送立即收起面板（防上一轮建议在流式期间悬挂）', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    const stream = useChatStream() as any
+    stream.messages.value.push({
+      role: 'assistant', content: '回答', timestamp: Date.now(), questions: ['追问一'],
+    })
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+
+    // 页面输入框发送新问题 → watch(isStreaming v=true) 收起面板
+    await wrapper.find('input').setValue('新问题')
+    await wrapper.find('.send-btn').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('会话切换恢复历史（旧消息重入 displayMessages）→ 不自动弹面板，仅保留弱入口/pending', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    const stream = useChatStream() as any
+    // 模拟 switchSession 恢复：displayMessages 整体替换为持久化历史（末条 assistant 含 questions，
+    // 时间戳早于页面实例轮次锚点 → 判定为历史恢复而非当前轮新鲜回答）
+    stream.messages.value = [
+      { role: 'user', content: '旧问题', timestamp: Date.now() - 61000 },
+      { role: 'assistant', content: '旧回答', timestamp: Date.now() - 60000, questions: ['历史追问'] },
+    ]
+    await flushPromises()
+    await nextTick()
+
+    // 不自动弹面板（visible 保持 false）；quick-skills 不被替换
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    // pending + 消息归属保留 → footer 弱入口可见
+    expect(wrapper.find('.panel-restore-btn').exists()).toBe(true)
+
+    // 弱入口恢复面板（pending 未丢失，历史建议仍可点）
+    await wrapper.find('.panel-restore-btn').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+    expect(wrapper.find('.as-followup-chips').text()).toContain('历史追问')
+    wrapper.unmount()
+  })
+
+  it('同页实例会话切换（A→B→A）：切回后旧回答不自动弹面板，仅保留弱入口/pending', async () => {
+    const wrapper = mount(ChatIndex)
+    await flushPromises()
+    // 锚点 = mount 时 Date.now()；小延迟保证下方"新鲜回答"严格晚于初始锚点
+    await new Promise((r) => setTimeout(r, 20))
+    const stream = useChatStream() as any
+
+    // 会话 A：新鲜回答（timestamp ≥ 锚点）→ 面板自动展示
+    const answerTs = Date.now() - 1
+    stream.messages.value.push({ role: 'assistant', content: '回答', timestamp: answerTs, questions: ['追问一'] })
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+
+    // 切到会话 B（无新发送）→ watch(sessionId) 收起面板并重置锚点
+    stream.sessionId.value = 'session_B'
+    stream.messages.value = []
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+
+    // 切回会话 A：旧回答（answerTs 早于切换时重置的锚点）以"恢复历史"重入 displayMessages
+    stream.sessionId.value = 'session_A'
+    stream.messages.value = [{ role: 'assistant', content: '旧回答', timestamp: answerTs, questions: ['追问一'] }]
+    await flushPromises()
+    await nextTick()
+
+    // 不自动弹面板（visible 保持 false）；weak entry 保留
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(false)
+    expect(wrapper.find('.quick-skills').exists()).toBe(true)
+    expect(wrapper.find('.panel-restore-btn').exists()).toBe(true)
+
+    // 弱入口仍可恢复（pending 未丢失）
+    await wrapper.find('.panel-restore-btn').trigger('tap')
+    await flushPromises()
+    expect(wrapper.find('.as-followup-chips').exists()).toBe(true)
+    wrapper.unmount()
+  })
+})

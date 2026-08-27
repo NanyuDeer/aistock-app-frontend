@@ -327,6 +327,8 @@ export function useChatStream(options?: { onBeforeStream?: () => void }) {
           // P11 T2：DONE 附带 token_usage/cards（计划 B 线 2 新增可选字段；HTTP 降级/旧协议缺失时 undefined）
           const usage = data.token_usage as TokenUsage | null | undefined
           const cards = data.cards as ChatCard[] | null | undefined
+          // 追问面板：DONE 附带 questions（HTTP 降级/旧协议缺失时 undefined，前端容缺）
+          const questions = data.questions as string[] | undefined
           progressSteps.value = []
           streamingText.value = ''
           chatStore.appendMessage({
@@ -336,6 +338,7 @@ export function useChatStream(options?: { onBeforeStream?: () => void }) {
             lastDeepReport: data.last_deep_report ?? undefined,
             cards: cards ?? undefined,
             tokenUsage: usage ?? undefined,
+            questions,           // 新增
             execSteps,
             reasoningSteps,
             timestamp: Date.now()
@@ -690,6 +693,8 @@ export function useChatStream(options?: { onBeforeStream?: () => void }) {
           cards: (result.cards as ChatCard[] | undefined) ?? undefined,
           // P10 线 2 缺口修复：HTTP 降级路径同样透出 token_usage（非流式接口已补返回；缺失 undefined 兼容）
           tokenUsage: (result.token_usage as TokenUsage | undefined) ?? undefined,
+          // 追问面板：HTTP 降级路径透出 questions（非流式接口已补返回；缺失 undefined 兼容）
+          questions: (result.questions as string[] | undefined) ?? undefined,
           progressSteps: savedSteps,
           timestamp: Date.now()
         })
