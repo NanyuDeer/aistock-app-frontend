@@ -47,8 +47,8 @@
         <MarketTraceTimeline :presentation="presentation" />
       </view>
 
-      <!-- 预判（forecast 强相关） -->
-      <view class="detail-section">
+      <!-- 预判（forecast 强相关；prediction 为空时整个展开块不渲染） -->
+      <view v-if="presentation.prediction" class="detail-section">
         <text class="section-title">预判</text>
         <MarketTracePrediction :prediction="presentation.prediction" />
       </view>
