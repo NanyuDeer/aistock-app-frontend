@@ -46,6 +46,20 @@
           </view>
         </view>
 
+        <!-- 洞见卡：复用主因归因结论作一句话 + 证据引用作溯源（预判后续由情报 agent LLM 产出） -->
+        <InsightCard
+          v-if="insightData.content"
+          type="event"
+          :title="insightData.content"
+          trace-label="依据"
+          forecast-label="展望"
+          :trace="insightData.trace"
+          :forecast="insightData.forecast"
+          :time="insightData.time"
+          theme="light"
+          class="insight-in-page"
+        />
+
         <!-- 主因判定卡（标题行徽标组 + 蓝横幅结论 + 证据引用，与异动页对齐） -->
         <template v-if="detail.primary_driver">
           <view class="hero-card">
@@ -126,6 +140,7 @@ import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { watchlistInsightApi, type WatchlistInsight, type InsightEvidenceItem } from '@/shared/api/modules/insight'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import InsightCard from '@/shared/components/InsightCard.vue'
 
 const detail = ref<WatchlistInsight | null>(null)
 const loading = ref(true)
@@ -144,6 +159,22 @@ const driverQuotes = computed<Array<{ label: string; quote: string; isPrimary: b
     if (d.evidence_quote) items.push({ label: d.label, quote: d.evidence_quote, isPrimary: false })
   }
   return items
+})
+
+/**
+ * 洞见卡数据：主因归因结论作一句话标题，证据引用作「溯源」。
+ * 「预判」本轮留空，后续由情报 agent 的 LLM 直接产出溯源/预判全文。
+ */
+const insightData = computed(() => {
+  const pd = detail.value?.primary_driver
+  if (!pd) return { content: '', trace: '', forecast: '', time: '' }
+  const trace = driverQuotes.value.find(q => q.isPrimary)?.quote || detail.value?.display_report?.details || ''
+  return {
+    content: pd.label || detail.value?.title || '',
+    trace,
+    forecast: '',
+    time: fmtDate(detail.value?.trade_date).slice(5),
+  }
 })
 
 /** 涨停/异动方向：up → 红涨，down → 绿跌 */
@@ -243,6 +274,10 @@ onLoad(async (query) => {
 .page-insight-detail {
   padding: $s-3;
   background: $bg-page;
+}
+
+.insight-in-page {
+  margin-bottom: $s-3;
 }
 
 .state {

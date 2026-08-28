@@ -89,19 +89,22 @@ async function fetchData(strictTarget?: string) {
     const candidates = strictTarget ? [strictTarget] : traceDateCandidates(date.value, 3)
 
     for (const cdate of candidates) {
-      const [record, predResp] = await Promise.all([
-        agentApi.getMarketTraceReview(cdate),
-        predictionApi
-          .list({ source_id: `review:${cdate}` })
-          .then((r) => ({ ok: true as const, r }))
-          .catch(() => ({ ok: false as const, r: null })),
-      ])
+      // 先取报告，再用报告真实日期关联预测：后端 review 查询会回退返回最近可用报告
+      // （如请求 08-28 返回 08-27 报告），预测记录以报告真实日期落库（source_id=review:{report_date}），
+      // 若按请求日期查会查空 → 预判显示"暂无预判"
+      const record = await agentApi.getMarketTraceReview(cdate)
+      const predDate = record?.report_date || cdate
+      const predResp = await predictionApi
+        .list({ source_id: `review:${predDate}` })
+        .then((r) => ({ ok: true as const, r }))
+        .catch(() => ({ ok: false as const, r: null }))
 
       // 找到已完成报告：采用该日期，并透传 prediction 供预判块展示
       if (record && record.status === 'completed') {
         const model = toMarketTracePresentation(record, cdate, predResp.ok ? (predResp.r?.items?.[0] ?? null) : null)
         if (model) {
-          displayedDate.value = cdate
+          // 采用报告真实日期展示（请求日无报告时后端回退到最近可用报告，标签跟随真实日期）
+          displayedDate.value = record.report_date
           // 清除此前候选日残留的 'pending'，确保已采用的历史报告正常展示
           reportAvailability.value = null
           presentation.value = model

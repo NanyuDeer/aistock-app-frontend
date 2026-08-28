@@ -41,6 +41,16 @@
       </view>
     </view>
 
+    <!-- ===== 洞见卡：业绩一句话 + 优势/风险/建议 ===== -->
+    <InsightCard
+      v-if="reportInsight.content"
+      type="fund"
+      :title="reportInsight.content"
+      :lines="reportInsight.lines"
+      theme="light"
+      class="report-insight-card"
+    />
+
     <!-- ===== 模块3：四维分析评分（仅数据完整可评分时显示，无法评分的删去该模块） ===== -->
     <view v-if="aiScoreData?.dataStatus === 'complete'" class="section">
       <AiAnalysis :loading="scoreLoading" :data="aiScoreData" />
@@ -101,6 +111,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { Tag, Button } from '@/shared/components'
 import LoadingState from '@/shared/components/LoadingState.vue'
+import InsightCard from '@/shared/components/InsightCard.vue'
 import AiAnalysis from '@/modules/analytics/components/ai-analysis.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 
@@ -190,6 +201,31 @@ const displayColumns = computed(() => displayPeriods.value)
 // ===== AI 四维评分 =====
 const scoreLoading = ref(false)
 const aiScoreData = ref<any>(null)
+
+/**
+ * 业绩洞见卡数据。
+ * title=结论一句话；lines=优势/风险/建议 多行（risk 用金色高亮）。
+ * 风险按评分生成：`risks` 非空才显示「风险」行，无则整行隐藏（不做占位兜底）。
+ */
+const reportInsight = computed(() => {
+  const ai = aiScoreData.value
+  if (!ai || ai.conclusion == null) return { content: '', lines: [] }
+  const period = stock.value?.period ? `（${stock.value.period}）` : ''
+  const lines: Array<{ key: string; text: string; tone?: 'default' | 'positive' | 'risk' }> = []
+  if (Array.isArray(ai.strengths) && ai.strengths.length) {
+    lines.push({ key: '优势', text: ai.strengths.join('；'), tone: 'positive' })
+  }
+  if (Array.isArray(ai.risks) && ai.risks.length) {
+    lines.push({ key: '风险', text: ai.risks.join('；'), tone: 'risk' })
+  }
+  if (ai.advice) {
+    lines.push({ key: '建议', text: ai.advice })
+  }
+  return {
+    content: ai.conclusion ? `${ai.conclusion}${period}` : '',
+    lines,
+  }
+})
 
 // ===== 表格数据 =====
 /** PeriodData 中数值型字段（排除 key/label 等字符串字段） */
@@ -409,6 +445,10 @@ onLoad((opts?: Record<string, string>) => {
 <style lang="scss" scoped>
 /* ===== 页面底色层：标签+分数双红→浅红底，双绿→浅绿底，其余→浅蓝底 =====
    作为全屏底层背景（z-index 0），SubPageCard 背景透明，白色卡片浮于浅色底之上 */
+
+.report-insight-card {
+  margin: 0 24rpx 24rpx;
+}
 .glow-overlay {
   position: fixed;
   top: 0;
