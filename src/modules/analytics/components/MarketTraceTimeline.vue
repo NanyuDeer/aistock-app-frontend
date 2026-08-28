@@ -1,9 +1,5 @@
 <template>
   <view class="timeline-section">
-    <view class="section-title">
-      <text class="title-text">{{ titleText }}</text>
-    </view>
-
     <!-- 证据不足态：主因缺失提示卡片 -->
     <Card v-if="!primaryCause" class="insufficient-card">
       <view class="insufficient-icon">
@@ -80,19 +76,12 @@ const readableEvidence = computed(() => {
   const pc = props.presentation.primaryCause
   return pc ? labelEvidenceList(pc.supportingEvidence) : []
 })
-
-const titleText = computed(() => {
-  if (!props.presentation.primaryCause) return '主因'
-  return '主因'
-})
 </script>
 
 <style lang="scss" scoped>
 @use '@/shared/styles/variables.scss' as *;
 
 .timeline-section { padding: 0 $spacing-base; margin-bottom: $spacing-sm; }
-.section-title { display: flex; align-items: center; margin: $spacing-base 0 $spacing-sm; }
-.title-text { font-size: 28rpx; font-weight: 600; color: $text-color-title; }
 
 /* 证据不足提示卡片 */
 .insufficient-card { margin: 0; display: flex; align-items: flex-start; gap: $spacing-sm; }
