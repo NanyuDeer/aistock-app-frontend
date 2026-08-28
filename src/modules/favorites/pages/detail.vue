@@ -1,11 +1,11 @@
 <template>
-  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol" :scroll-into-view="scrollIntoView">
-    <view class="page-detail">
-    <view v-if="loading" class="loading">
+  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol" :scroll-top="detailScrollTop">
+    <view class="page-detail" :class="{ 'page-detail--anchoring': anchorNavigating }">
+    <view v-if="loading || anchorNavigating" class="loading">
       <text class="loading-text">加载中...</text>
     </view>
 
-    <template v-else-if="quote">
+    <template v-if="quote">
       <!-- 1. 股票头部 -->
       <view class="stock-header">
         <view class="stock-name-row">
@@ -55,26 +55,25 @@
 
       <view class="decision-card">
         <view class="decision-head">
-          <view>
-            <text class="decision-kicker">综合决策</text>
-          </view>
+          <InsightTag type="market" size="sm">综合洞见</InsightTag>
           <view class="decision-verdict">
             <text :class="['decision-status', overallDecision.verdictClass]">{{ overallDecision.verdict }}</text>
             <text :class="['decision-status', 'is-sub', overallDecision.periodDominanceClass]">{{ overallDecision.periodDominance }}</text>
           </view>
         </view>
         <text class="decision-summary">{{ overallDecision.summary }}</text>
+        <view class="decision-divider" />
         <view class="decision-next">
-          <text class="next-label">观察重点</text>
+          <text class="next-label">重点</text>
           <text class="next-text">{{ overallDecision.nextStep }}</text>
         </view>
         <view class="decision-points">
-          <view v-if="overallDecision.opportunity" class="decision-point" @tap="toggleDecisionPoint('opportunity')">
+          <view v-if="overallDecision.opportunity" class="decision-point decision-point--opportunity" @tap="toggleDecisionPoint('opportunity')">
             <text class="point-label">机会</text>
             <text :class="['point-text', { expanded: expandedDecisionPoint === 'opportunity' }]">{{ expandedDecisionPoint === 'opportunity' ? overallDecision.opportunityFull : overallDecision.opportunity }}</text>
             <text class="point-more">{{ expandedDecisionPoint === 'opportunity' ? '收起' : '展开' }}</text>
           </view>
-          <view v-if="overallDecision.risk" class="decision-point is-risk" @tap="toggleDecisionPoint('risk')">
+          <view v-if="overallDecision.risk" class="decision-point decision-point--risk" @tap="toggleDecisionPoint('risk')">
             <text class="point-label">风险</text>
             <text :class="['point-text', { expanded: expandedDecisionPoint === 'risk' }]">{{ expandedDecisionPoint === 'risk' ? overallDecision.riskFull : overallDecision.risk }}</text>
             <text class="point-more">{{ expandedDecisionPoint === 'risk' ? '收起' : '展开' }}</text>
@@ -82,7 +81,7 @@
         </view>
       </view>
 
-      <view id="detail-anchor-stock-info" class="detail-anchor"></view>
+      <view id="detail-anchor-stock-info">
       <view v-if="isFavorite" class="major-event-alert">
         <view class="major-event-head">
           <text class="decision-kicker">最新重大异动</text>
@@ -101,6 +100,7 @@
         <template v-else>
           <text class="major-event-title">暂无数据</text>
         </template>
+      </view>
       </view>
 
       <!-- 2. 个股异动 -->
@@ -434,8 +434,7 @@
         </view>
 
         <!-- 财报分析 -->
-        <view id="detail-anchor-performance-report" class="detail-anchor"></view>
-        <view v-if="hasFinanceCardData" class="section-card">
+        <view v-if="hasFinanceCardData" id="detail-anchor-performance-report" class="section-card">
           <view class="section-header">
             <text class="section-title">财报分析</text>
             <text v-if="semiAnnualReport?.reports?.length" class="section-sub">
@@ -495,8 +494,7 @@
         </view>
 
         <!-- 业绩预测 -->
-        <view id="detail-anchor-forecast" class="detail-anchor"></view>
-        <view v-if="forecastLoading || hasForecastCardData" class="section-card">
+        <view v-if="forecastLoading || hasForecastCardData" id="detail-anchor-forecast" class="section-card">
           <view class="section-header">
             <text class="section-title">业绩预测</text>
             <view v-if="!forecastLoading" class="ai-refresh-btn" @tap="loadForecast(true)">
@@ -885,7 +883,7 @@
       </view>
     </view>
 
-    <view v-else-if="!loading && !quote" class="empty">
+    <view v-if="!loading && !quote && !anchorNavigating" class="empty">
       <text class="empty-text">未找到股票数据</text>
     </view>
     </view>
@@ -899,6 +897,7 @@ import { stockApi } from '@/shared/api/modules/stock'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import InsightTag from '@/shared/components/InsightTag.vue'
 import KLineChart from '@/modules/favorites/components/KLineChart.vue'
 import ForecastProfitChart from '@/modules/favorites/components/ForecastProfitChart.vue'
 import CapitalFlowCharts from '@/modules/favorites/components/CapitalFlowCharts.vue'
@@ -920,7 +919,8 @@ const forecastData = ref<any>(null)
 const forecastLoading = ref(false)
 const forecastDetailExpanded = ref(false)
 const detailAnchor = ref<DetailAnchor | ''>('')
-const scrollIntoView = ref('')
+const detailScrollTop = ref(0)
+const anchorNavigating = ref(false)
 const klineData = ref<any[]>([])
 type KLinePeriod = 'daily' | 'weekly' | 'monthly'
 const klinePeriod = ref<KLinePeriod>('daily')
@@ -970,12 +970,44 @@ function viewForAnchor(anchor: DetailAnchor): ViewKey {
 async function scrollToDetailAnchor() {
   const anchor = detailAnchor.value
   if (!anchor) return
-  activeView.value = viewForAnchor(anchor)
-  await nextTick()
-  scrollIntoView.value = ''
-  setTimeout(() => {
-    scrollIntoView.value = `detail-anchor-${anchor}`
-  }, 120)
+  try {
+    await nextTick()
+    await nextTick()
+    detailScrollTop.value = 0
+    await waitForDetailLayout()
+
+    // 图表等组件在 nextTick 后仍可能完成一次异步布局，按当前位置连续校正，
+    // 保证锚点卡片最终贴齐内容区顶部。
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const offset = await getAnchorOffset(anchor)
+      if (offset === null || Math.abs(offset) < 1) break
+      detailScrollTop.value = Math.max(0, detailScrollTop.value + offset)
+      await nextTick()
+      await waitForDetailLayout()
+    }
+  } finally {
+    anchorNavigating.value = false
+  }
+}
+
+function waitForDetailLayout() {
+  return new Promise<void>(resolve => setTimeout(resolve, 50))
+}
+
+function getAnchorOffset(anchor: DetailAnchor): Promise<number | null> {
+  return new Promise(resolve => {
+    const query = uni.createSelectorQuery()
+    query.select('.as-sub2__scroll').boundingClientRect()
+    query.select(`#detail-anchor-${anchor}`).boundingClientRect()
+    query.exec((result: any[]) => {
+      const [container, target] = result || []
+      if (!container || !target) {
+        resolve(null)
+        return
+      }
+      resolve(Number(target.top || 0) - Number(container.top || 0))
+    })
+  })
 }
 
 // AI 洞见 composable（接入真实 trend-score 数据）
@@ -1834,8 +1866,14 @@ onUnload(() => {
 onLoad((options: any) => {
   symbol.value = options?.symbol || ''
   detailAnchor.value = normalizeDetailAnchor(options?.anchor)
+  if (detailAnchor.value) {
+    activeView.value = viewForAnchor(detailAnchor.value)
+    anchorNavigating.value = true
+  }
   if (symbol.value) {
     loadData()
+  } else {
+    anchorNavigating.value = false
   }
 })
 
@@ -1888,16 +1926,21 @@ async function loadData() {
       klineData.value = Array.isArray(klineRes.value) ? klineRes.value : []
     }
     applyLiveQuoteToKline()
-    // 非阻塞加载 AI 分析、业绩预测和趋势股评分
-    loadAiAnalysis()
-    loadForecast(false)
-    loadTrendScore()
-    loadIndustryHealth()
+    // 中线卡片上方的异步内容会改变锚点位置，完成后再执行锚定。
+    const aiTask = loadAiAnalysis()
+    const forecastTask = loadForecast(false)
+    const trendTask = loadTrendScore()
+    const industryTask = loadIndustryHealth()
+    if (detailAnchor.value === 'forecast') {
+      await Promise.all([aiTask, forecastTask, trendTask, industryTask])
+    } else if (detailAnchor.value === 'performance-report') {
+      await Promise.all([aiTask, trendTask, industryTask])
+    }
   } catch (err) {
     console.error('[StockDetail] load error:', err)
   } finally {
+    if (detailAnchor.value) await scrollToDetailAnchor()
     loading.value = false
-    void scrollToDetailAnchor()
   }
 }
 
@@ -2299,6 +2342,7 @@ function goChat() {
 @import '@/shared/styles/variables.scss';
 
 .page-detail {
+  position: relative;
   padding: 24rpx;
   background: $bg-soft;
   box-sizing: border-box;
@@ -2307,9 +2351,16 @@ function goChat() {
   margin: 0 auto;
 }
 
-.detail-anchor {
-  height: 1rpx;
-  overflow: hidden;
+.page-detail--anchoring > :not(.loading) {
+  visibility: hidden;
+}
+
+.page-detail--anchoring > .loading {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
 }
 
 .loading, .empty {
@@ -2468,8 +2519,16 @@ function goChat() {
 .decision-card {
   display: flex;
   flex-direction: column;
-  gap: 18rpx;
-  border-top: 4rpx solid $primary;
+  gap: $s-2;
+  border-radius: $r-lg;
+  box-shadow: $shadow-xs;
+}
+
+/* 洞见卡风格：结论前的渐变分隔线，替代原先顶部主题色条 */
+.decision-divider {
+  height: 2rpx;
+  margin: $s-1 0;
+  background: linear-gradient(90deg, $primary-100, rgba($primary-100, 0));
 }
 
 .decision-head {
@@ -2490,39 +2549,20 @@ function goChat() {
 
 .decision-summary {
   display: block;
-  font-size: 28rpx;
-  line-height: 1.6;
+  font-size: $font-size-lg;
+  line-height: $lh-tight;
   font-weight: 600;
-  color: $ink-soft;
-}
-
-.decision-next {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-  padding: 16rpx 18rpx;
-  border-radius: 14rpx;
-  background: $bg-soft;
-}
-
-.next-label {
-  flex-shrink: 0;
-  padding: 4rpx 10rpx;
-  border-radius: 8rpx;
-  background: $primary-50;
-  color: $primary;
-  font-size: 22rpx;
-  line-height: 1.35;
-  font-weight: 800;
-}
-
-.next-text {
-  min-width: 0;
   color: $ink;
-  font-size: 27rpx;
-  line-height: 1.45;
-  font-weight: 700;
 }
+
+/* 重点：横幅卡（蓝），与机会/风险(point-) 同卡片化结构 */
+.decision-next {
+  --banner-bg: #{$insight-market};
+  --banner-glow: rgba(11, 95, 255, 0.18);
+}
+
+/* 重点行横幅卡排版统一走全局 insight-banner mixin */
+@include insight-banner('.decision-next', '.next-label', '.next-text');
 
 .decision-verdict {
   flex-shrink: 0;
@@ -2580,63 +2620,38 @@ function goChat() {
   font-weight: 700;
 }
 
+/* 机会/风险：横幅卡（机会绿/风险红），保留展开交互 */
 .decision-points {
   display: flex;
   flex-direction: column;
-  border-top: 1rpx solid $line-soft;
+  gap: 16rpx;
 }
 
 .decision-point {
-  display: grid;
-  grid-template-columns: 64rpx minmax(0, 1fr) 56rpx;
-  gap: 14rpx;
-  align-items: start;
-  padding: 18rpx 0;
-  border-bottom: 1rpx solid $line-soft;
+  --banner-bg: #{$down};
+  --banner-glow: rgba(24, 160, 88, 0.18);
 
-  &.is-risk {
-    .point-label {
-      color: $down;
-      background: $down-soft;
-    }
-  }
-
-  &:last-child {
-    border-bottom: 0;
-    padding-bottom: 0;
+  &.decision-point--risk {
+    --banner-bg: #{$up};
+    --banner-glow: rgba(229, 77, 94, 0.18);
   }
 }
 
-.point-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 56rpx;
-  height: 38rpx;
-  border-radius: 8rpx;
-  background: $up-soft;
-  font-size: 24rpx;
-  line-height: 1.4;
-  font-weight: 800;
-  color: $up;
-}
+/* 机会/风险：走洞见解横幅卡全局排版，保留展开交互 */
+@include insight-banner('.decision-point', '.point-label', '.point-text');
 
 .point-more {
-  flex-shrink: 0;
-  font-size: 22rpx;
-  line-height: 38rpx;
-  font-weight: 700;
+  display: block;
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  font-weight: 600;
   text-align: right;
-  color: $ink-mute;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .point-text {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 26rpx;
-  line-height: 1.55;
-  font-weight: 600;
-  color: $ink-soft;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 

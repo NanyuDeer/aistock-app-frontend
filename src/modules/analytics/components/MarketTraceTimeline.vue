@@ -54,9 +54,9 @@
         </view>
       </view>
 
-      <view v-if="primaryCause.supportingEvidence.length" class="evidence-block">
+      <view v-if="readableEvidence.length" class="evidence-block">
         <text class="evidence-label">参考来源：</text>
-        <text class="evidence-text">{{ labelEvidenceList(primaryCause.supportingEvidence).join('、') }}</text>
+        <text class="evidence-text">{{ readableEvidence.join('、') }}</text>
       </view>
     </Card>
   </view>
@@ -74,6 +74,12 @@ const props = defineProps<{
 }>()
 
 const primaryCause = computed(() => props.presentation.primaryCause)
+
+/** 参考来源标签（基于过滤后标签，Task 2 过滤后原始 ID 可能为空但已有标签） */
+const readableEvidence = computed(() => {
+  const pc = props.presentation.primaryCause
+  return pc ? labelEvidenceList(pc.supportingEvidence) : []
+})
 
 const titleText = computed(() => {
   if (!props.presentation.primaryCause) return '主因'

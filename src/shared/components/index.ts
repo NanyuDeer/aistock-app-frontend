@@ -32,6 +32,7 @@ export { default as EmptyState } from './EmptyState.vue'
 // ===== 反馈类组件 =====
 export { default as Toast } from './Toast.vue'
 export { default as Modal } from './Modal.vue'
+export { default as ConfirmModal } from './ConfirmModal.vue'
 export { default as ActionSheet } from './ActionSheet.vue'
 export { default as BottomSheet } from './BottomSheet.vue'
 
@@ -56,6 +57,8 @@ export { default as UpdateModal } from './UpdateModal.vue'
 export { default as InsightListCard } from './InsightListCard.vue'
 export { default as GuideCard } from './GuideCard.vue'
 export { default as StatGrid } from './StatGrid.vue'
+export { default as InsightTag } from './InsightTag.vue'
+export { default as InsightCard } from './InsightCard.vue'
 
 /**
  * InsightListItem 类型定义

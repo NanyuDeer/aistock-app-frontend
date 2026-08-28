@@ -12,7 +12,7 @@
       'as-card--flat': flat,
       'as-card--flush': flush
     }"
-    @click="handleClick"
+    @tap="handleClick"
   >
     <view v-if="title || $slots.header" class="as-card__header">
       <view class="as-card__header-content">

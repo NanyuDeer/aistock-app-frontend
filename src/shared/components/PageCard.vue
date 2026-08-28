@@ -22,11 +22,12 @@
         <slot name="header-right" />
       </view>
       <!-- 用 flex:1 撑满剩余空间，footer 自然固定在底部 -->
+      <!-- 原生滚动：enhanced 在 H5 端注册 passive touchmove 监听并 preventDefault，
+           触发浏览器 Warning（Unable to preventDefault inside passive event listener），
+           回归 scroll-y 原生滚动（与首页 MainTabs 一致） -->
       <scroll-view
         scroll-y
         class="as-page-wrapper__body"
-        :enhanced="true"
-        :bounces="false"
       >
         <slot />
       </scroll-view>

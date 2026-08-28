@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { labelEvidenceId, labelEvidenceList } from './evidenceLabels'
+import { labelEvidenceId, labelEvidenceList, isReadableEvidenceLabel } from './evidenceLabels'
 
 test('labelEvidenceId: 精确匹配 global_markets → 全球市场', () => {
   assert.equal(labelEvidenceId('global_markets'), '全球市场')
@@ -68,4 +68,19 @@ test('labelEvidenceList: 跨风格去重（大写下划线 + 小写点路径同�
 
 test('labelEvidenceList: 空数组返回空数组', () => {
   assert.deepEqual(labelEvidenceList([]), [])
+})
+
+test('isReadableEvidenceLabel: 汉字标签可读', () => {
+  assert.equal(isReadableEvidenceLabel('新闻'), true)
+})
+
+test('isReadableEvidenceLabel: 纯英文/数字标签不可读', () => {
+  assert.equal(isReadableEvidenceLabel('close'), false)
+  assert.equal(isReadableEvidenceLabel('pct_change'), false)
+  assert.equal(isReadableEvidenceLabel(''), false)
+})
+
+test('labelEvidenceList: 过滤兜底截断的非汉字标签', () => {
+  const ids = ['NEWS_001', 'a_share.indexes.000001', 'unknown.path.close', 'MAIN_FORCE_ALL']
+  assert.deepEqual(labelEvidenceList(ids), ['新闻', '指数表现', '主力资金'])
 })

@@ -56,6 +56,20 @@
         </view>
       </view>
 
+      <!-- ===== 洞见卡：主因结论作一句话 + 主链作溯源 + 建议跟踪作预判 ===== -->
+      <InsightCard
+        v-if="insightData.content"
+        type="event"
+        :title="insightData.content"
+        trace-label="依据"
+        forecast-label="跟踪"
+        :trace="insightData.trace"
+        :forecast="insightData.forecast"
+        :time="insightData.time"
+        theme="light"
+        class="insight-in-page"
+      />
+
       <!-- ===== 归因状态 ===== -->
       <view
         v-if="analysis && analysis.processing_status === 'processing'"
@@ -176,6 +190,7 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockTraceApi, type StockTraceEvent, type StockTraceAnalysisResponse, type TraceChain, type TraceEvidence } from '@/shared/api/modules/stockTrace'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import InsightCard from '@/shared/components/InsightCard.vue'
 
 const detail = ref<StockTraceEvent | null>(null)
 const analysis = ref<StockTraceAnalysisResponse | null>(null)
@@ -257,6 +272,23 @@ const candidateCards = computed(() => allCandidates.value.slice(1))
 
 /** 待验证问题（收尾区块；建议追踪已按 2026-08-25 决策移除） */
 const unresolvedQuestions = computed<string[]>(() => artifact.value?.artifactJson.unresolved_questions ?? [])
+
+/**
+ * 洞见卡数据：主因结论作一句话标题、主链声明作「溯源」、建议跟踪作「预判」。
+ * 后续由 stock_trace agent 的 LLM 直接产出溯源/预判全文。
+ */
+const insightData = computed(() => {
+  const cause = primaryCause.value
+  if (!cause?.verdict) return { content: '', trace: '', forecast: '', time: '' }
+  const chain = primaryChains.value[0]
+  const trace = chain?.nodes?.map(n => n.claim).filter(Boolean).join(' → ') || ''
+  return {
+    content: cause.verdict,
+    trace,
+    forecast: suggestedActions.value?.[0] || '',
+    time: detail.value?.triggered_at ? fmtTime(detail.value.triggered_at).slice(5) : '',
+  }
+})
 
 /** 主因卡头部右侧：证据条数 + 归因状态 */
 const evidenceCountLabel = computed(() => {
@@ -369,6 +401,10 @@ onLoad(async (query) => {
 .page-insight-detail {
   padding: $s-3;
   background: $bg-page;
+}
+
+.insight-in-page {
+  margin-bottom: $s-3;
 }
 
 .state-wrap {

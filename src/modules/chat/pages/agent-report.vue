@@ -1,18 +1,11 @@
 <template>
   <SubPageCard2 :title="pageTitle" :subtitle="pageSubtitle">
-    <!-- 右上角：详情模式下显示导出按钮（播报按钮保留自身条件），避免深层链接无 podcast_brief 时导出按钮被隐藏 -->
-    <template v-if="isDetail || podcastBriefForFloating" #header-right>
+    <!-- 右上角：仅播报按钮（导出功能已移除，报告改为 App 内阅读） -->
+    <template v-if="podcastBriefForFloating" #header-right>
       <view class="header-right-actions">
-        <view v-if="podcastBriefForFloating" class="header-podcast-btn" @tap="openFloatingPodcast">
+        <view class="header-podcast-btn" @tap="openFloatingPodcast">
           <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
         </view>
-        <Button
-          v-if="isDetail"
-          type="primary"
-          size="sm"
-          :loading="exporting"
-          @click="handleExportPdf"
-        >导出 PDF</Button>
       </view>
     </template>
 
@@ -422,6 +415,17 @@
         </view>
       </view>
     </template>
+
+    <!-- VIP 会员弹窗：非会员进入报告详情前阻断并引导开通 -->
+    <Modal v-model:visible="vipModalVisible" title="会员专属内容" :mask-closable="false">
+      <text class="vip-modal-desc">AI 深度报告为会员专属内容，开通会员后即可查看全部报告详情。</text>
+      <template #footer>
+        <view class="vip-modal-actions">
+          <Button size="sm" plain @click="vipModalVisible = false">取消</Button>
+          <Button size="sm" type="primary" @click="goVip">去开通</Button>
+        </view>
+      </template>
+    </Modal>
   </SubPageCard2>
 </template>
 
@@ -436,13 +440,8 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
 import { useUserStore } from '@/shared/store/modules/user'
-import { LoadingState, EmptyState, Card, Tag, Button } from '@/shared/components'
+import { LoadingState, EmptyState, Card, Tag, Button, Modal } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
-// PDF 导出（仅 H5/Dom 环境可用，见 handleExportPdf 中 document 守卫）。
-// 必须在模块顶部静态 import：若在函数内用动态 import()，会触发 code-splitting，
-// 与 App(app-plus) 的 iife 输出格式冲突（"iife output formats are not supported for code-splitting builds"）。
-import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
 
 // ===== Markdown 分区解析工具（参考 hot-burst-report 模式）=====
 function escapeRegExp(value: string): string {
@@ -555,6 +554,7 @@ interface AgentMeta {
 
 const AGENT_META: Record<string, AgentMeta> = {
   morning: { title: '今日晨报', icon: 'sun-line', color: '#f0a020', bgColor: '#f0a020', desc: '每日开盘前市场概览' },
+  midday: { title: '午间报', icon: 'sun-cloudy-line', color: '#ff8f1f', bgColor: '#ff8f1f', desc: '午间市场快评与异动解读' },
   wind_leader: { title: '风口龙头', icon: 'windy-line', color: '#0b5fff', bgColor: '#0b5fff', desc: '长短线风口与龙头股追踪' },
   hot_burst: { title: '机构调研', icon: 'eye-line', color: '#00b8ff', bgColor: '#00b8ff', desc: '机构推荐热门股分析' },
   trend_score: { title: '趋势股评分', icon: 'line-chart-line', color: '#18a058', bgColor: '#18a058', desc: '趋势形态评分排名' },
@@ -563,10 +563,11 @@ const AGENT_META: Record<string, AgentMeta> = {
 }
 
 /** 概览模式下的 Agent 顺序（不含 broadcast，用户不需要在概览中看到双人播报） */
-const OVERVIEW_ORDER = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review']
+const OVERVIEW_ORDER = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'midday', 'review']
 
 const titleMap: Record<string, string> = {
   morning: '今日晨报',
+  midday: '午间报',
   wind_leader: '风口龙头分析',
   hot_burst: '机构调研分析',
   trend_score: '趋势股评分分析',
@@ -606,63 +607,16 @@ const isOverview = computed(() => !selectedIntent.value && !intent.value)
 /** 是否可以返回概览（从概览进入详情时） */
 const canBackToOverview = computed(() => !intent.value && !!selectedIntent.value)
 
-/** 当前是否为详情模式（概览 → 显示单个报告） */
-const isDetail = computed(() => !isOverview.value)
-
-/** 用户信息 store（导出 PDF 会员门禁） */
+/** 用户信息 store（VIP 会员内容门禁） */
 const userStore = useUserStore()
 
-/** 导出 PDF 进行中标记 */
-const exporting = ref(false)
+/** VIP 会员弹窗：非会员进入报告详情前阻断 */
+const vipModalVisible = ref(false)
 
-/** 会员导出当前报告为多页 A4 PDF；非会员提示开通 */
-async function handleExportPdf() {
-  if (exporting.value) return
-  const vip = userStore.userInfo?.isVip
-  if (!vip) {
-    uni.showToast({ title: '开通会员后可导出 PDF', icon: 'none' })
-    return
-  }
-  // 非 H5/无 DOM 环境不可导出（document 访问移入容错）
-  if (typeof document === 'undefined') {
-    uni.showToast({ title: '报告内容未就绪', icon: 'none' })
-    return
-  }
-  exporting.value = true
-  uni.showLoading({ title: '正在生成 PDF...', mask: true })
-  try {
-    const target = document.querySelector('.report-body') as HTMLElement | null
-    if (!target) {
-      uni.showToast({ title: '报告内容未就绪', icon: 'none' })
-      return
-    }
-    const canvas = await html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
-    const pdf = new jsPDF('p', 'mm', 'a4')
-    const pageW = pdf.internal.pageSize.getWidth()
-    const pageH = pdf.internal.pageSize.getHeight()
-    const imgW = pageW
-    const imgH = (canvas.height * imgW) / canvas.width
-    // 整幅图只编码一次，供所有分页复用（避免每页重复 toDataURL）
-    const imgData = canvas.toDataURL('image/jpeg', 0.95)
-    pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH)
-    let heightLeft = imgH - pageH
-    let position = -pageH
-    while (heightLeft > 0) {
-      pdf.addPage()
-      pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH)
-      heightLeft -= pageH
-      position -= pageH
-    }
-    const fname = `报告-${effectiveIntent.value || date.value}-${date.value}.pdf`
-    pdf.save(fname)
-    uni.showToast({ title: '报告已导出', icon: 'success' })
-  } catch (e) {
-    console.error('[agent-report] 导出 PDF 失败', e)
-    uni.showToast({ title: '导出失败，请重试', icon: 'none' })
-  } finally {
-    exporting.value = false
-    uni.hideLoading()
-  }
+/** 非会员点击"去开通"：跳转 VIP 开通页 */
+function goVip() {
+  vipModalVisible.value = false
+  uni.navigateTo({ url: '/modules/user/pages/vip' })
 }
 
 /** 当前生效的 intent */
@@ -854,6 +808,8 @@ async function loadAllReports() {
   loading.value = true
   loadingText.value = '正在加载今日分析...'
 
+  // midday 与其余 Agent 一致走 /agent/report/:intent/:date（Node DB analysis_reports），
+  // 由 report_date 匹配判断"已更新/待生成"并展示摘要
   const results = await Promise.allSettled(
     OVERVIEW_ORDER.map((agentIntent) => agentApi.getReport(agentIntent, date.value))
   )
@@ -920,8 +876,12 @@ async function loadReport() {
   }
 }
 
-/** 点击简报卡片，进入详情 */
+/** 点击简报卡片，进入详情（非会员阻断并引导开通） */
 function selectAgent(agentIntent: string) {
+  if (!userStore.userInfo?.isVip) {
+    vipModalVisible.value = true
+    return
+  }
   selectedIntent.value = agentIntent
   report.value = null
   loadReport()
@@ -958,9 +918,17 @@ async function changeDate(delta: number) {
 
 onLoad((options) => {
   const requestedIntent = options?.intent || ''
-  intent.value = isPublicReportIntent(requestedIntent) ? requestedIntent : ''
+  const urlIntent = isPublicReportIntent(requestedIntent) ? requestedIntent : ''
   date.value = options?.date || shanghaiDateString()
 
+  if (urlIntent && !userStore.userInfo?.isVip) {
+    // 深层链接直达报告详情：非会员不得进入详情，回退展示概览并在入页时弹会员开通提示
+    vipModalVisible.value = true
+    loadAllReports()
+    return
+  }
+
+  intent.value = urlIntent
   if (intent.value) {
     // 从 URL 参数直接进入详情
     loadReport()
@@ -981,7 +949,7 @@ onBackPress(() => {
 </script>
 
 <style lang="scss" scoped>
-/* 标题栏右侧：播报按钮 + 概览按钮 */
+/* 标题栏右侧：播报按钮 */
 .header-right-actions {
   display: flex;
   align-items: center;
@@ -1485,5 +1453,19 @@ onBackPress(() => {
 .date-btn-text {
   font-size: 24rpx;
   color: $primary;
+}
+
+/* VIP 会员弹窗 */
+.vip-modal-desc {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: $ink-soft;
+}
+
+.vip-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 20rpx;
 }
 </style>

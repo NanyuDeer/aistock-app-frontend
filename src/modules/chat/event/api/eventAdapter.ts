@@ -267,8 +267,8 @@ function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventI
     // 来源信息：优先 source_name，缺失时回退 URL/domain 解析
     sourceInfo: buildSourceInfoWithName(backendEvent.source_name, backendEvent.source),
 
-    // 字段名映射
-    aiSummary: backendEvent.summary,
+    // 字段名映射：AI一句话总结 = 投资判断结论（conclusion）优先，旧数据回退事件理解摘要（summary）
+    aiSummary: backendEvent.conclusion || backendEvent.summary,
 
     // 事件类型：真实值（白名单校验），缺失/非法回退默认
     eventType: normalizeEventType(backendEvent.event_type),

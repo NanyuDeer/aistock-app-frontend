@@ -38,7 +38,7 @@
     <!-- AI 摘要 + 操作按钮 -->
     <view class="card-bottom">
       <view class="card-ai-summary" v-if="event.aiSummary">
-        <Badge type="primary" :dot="false" size="sm" class="ai-badge">AI</Badge>
+        <Badge type="primary" :dot="false" size="sm" class="ai-badge">洞见</Badge>
         <text class="ai-text">{{ event.aiSummary }}</text>
       </view>
       <view class="card-actions">
@@ -57,7 +57,7 @@
           class="detail-btn"
           @click.stop="$emit('view-detail', event)"
         >
-          AI解析
+          洞见
         </Button>
       </view>
     </view>
