@@ -79,7 +79,7 @@
         <view v-if="primaryCause" class="section main-cause">
           <!-- 标题行：主因 + 右侧徽标组（归类标签 + 置信度 + 已确认） -->
           <view class="main-title-row">
-            <text class="section-title main-title">主因</text>
+            <text class="section-title main-title">支撑性主因</text>
             <view class="title-right">
               <text class="cat-badge">{{ layerText(primaryCause.layer) }}</text>
               <text v-if="confidence" class="badge is-gold">{{ confidenceText(confidence.level) }}</text>
@@ -112,9 +112,9 @@
           </view>
         </view>
 
-        <!-- 候选解释：卡片列表（仅支撑性主因，主因外的各层候选） -->
+        <!-- 候选归因：卡片列表（主因外的支撑性/偏弱候选） -->
         <view v-if="candidateCards.length" class="section">
-          <text class="section-title">支撑性主因</text>
+          <text class="section-title">候选归因</text>
           <view class="cand-list">
             <view v-for="c in candidateCards" :key="c.layer" class="cand-card">
               <view class="cand-header">
@@ -126,20 +126,12 @@
           </view>
         </view>
 
-        <!-- 未解问题：待验证 + 建议 -->
-        <view v-if="unresolvedQuestions.length || suggestedActions.length" class="section question-card">
+        <!-- 未解问题：待验证 -->
+        <view v-if="unresolvedQuestions.length" class="section question-card">
           <text class="section-title">未解问题</text>
-          <view v-if="unresolvedQuestions.length">
-            <view v-for="q in unresolvedQuestions" :key="q" class="risk-item">
-              <text class="risk-dot">·</text>
-              <text class="risk-text">{{ q }}</text>
-            </view>
-          </view>
-          <view v-if="suggestedActions.length" class="suggest-block">
-            <text class="suggest-label">建议跟踪</text>
-            <view class="suggest-chips">
-              <text v-for="a in suggestedActions" :key="a" class="suggest-chip">{{ a }}</text>
-            </view>
+          <view v-for="q in unresolvedQuestions" :key="q" class="risk-item">
+            <text class="risk-dot">·</text>
+            <text class="risk-text">{{ q }}</text>
           </view>
         </view>
 
@@ -221,8 +213,8 @@ function fmtAmount(price?: number, pct?: number): string {
 const artifact = computed(() => analysis.value?.artifact)
 
 /**
- * 全部归因候选（五层）：直接取 artifactJson.candidates（含偏弱/证据不足/排除的各层判定结论）。
- * movementView.alternatives 只含 supported 候选，证据不足时为空会导致候选区信息缺失。
+ * 候选归因（五层）：取 artifactJson.candidates，只保留支撑性（supported）与偏弱（weak）。
+ * 证据不足（insufficient）/反向排除（rejected）的维度不展示（2026-08-25 决策）；主因候选排到最前。
  */
 const allCandidates = computed(() => {
   const art = artifact.value
@@ -232,7 +224,9 @@ const allCandidates = computed(() => {
   const primaryCandidateId = art?.artifactJson.chains?.find((ch) => ch.chainId === primaryChainId)?.candidateId
   const primary = candidates.find((c) => c.candidateId === primaryCandidateId)
   const rest = candidates.filter((c) => c.candidateId !== primaryCandidateId)
-  return [primary, ...rest].filter((c): c is NonNullable<typeof c> => !!c)
+  return [primary, ...rest]
+    .filter((c): c is NonNullable<typeof c> => !!c)
+    .filter((c) => c.status === 'supported' || c.status === 'weak')
 })
 
 /** 主因链（备选链信息由归因候选全量覆盖，统一不展示） */
@@ -258,12 +252,11 @@ const confidence = computed<{ score: number; level: string } | null>(() => {
 /** 主因聚焦层：归因候选首项（allCandidates 已把主因候选排到最前） */
 const primaryCause = computed(() => allCandidates.value[0] ?? null)
 
-/** 候选解释列表：除主因外的各层候选，作备选/排除卡片展示 */
+/** 候选归因列表：除主因外的支撑性/偏弱候选卡片 */
 const candidateCards = computed(() => allCandidates.value.slice(1))
 
-/** 待验证问题 + 建议跟踪动作（收尾区块） */
+/** 待验证问题（收尾区块；建议追踪已按 2026-08-25 决策移除） */
 const unresolvedQuestions = computed<string[]>(() => artifact.value?.artifactJson.unresolved_questions ?? [])
-const suggestedActions = computed<string[]>(() => artifact.value?.artifactJson.suggested_actions ?? [])
 
 /** 主因卡头部右侧：证据条数 + 归因状态 */
 const evidenceCountLabel = computed(() => {
