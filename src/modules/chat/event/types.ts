@@ -301,6 +301,8 @@ export interface EventArticle {
   title: string
   /** 来源名称 */
   source: string
+  /** 来源中文名（后端已处理：优先 source_name，缺失/未知时兜底为"未知来源"） */
+  sourceName?: string
   /** 发布时间 */
   publishTime: string
   /** 正文内容（优先来自 event_scrape 既有正文；为空表示暂无原文） */

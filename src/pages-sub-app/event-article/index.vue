@@ -30,8 +30,13 @@
       <view class="article-body">
         <text class="article-title">{{ article?.title }}</text>
         <view class="article-meta">
-          <text class="article-source">{{ article?.source }}</text>
+          <text class="article-source">{{ article?.sourceName || '未知来源' }}</text>
           <text class="article-time">{{ formatDateTime(article?.publishTime) }}</text>
+        </view>
+        <!-- 原文链接：复制图标 + 完整 URL，紧挨同一行；点击图标复制链接，供用户在浏览器打开 -->
+        <view v-if="article?.sourceUrl" class="article-link-row" hover-class="article-link-row--hover" @tap="copySourceUrl">
+          <SvgIcon name="file-copy-line" size="28rpx" color="#a6adb6" />
+          <text class="article-link-url" selectable>{{ article.sourceUrl }}</text>
         </view>
         <view class="article-divider" />
         <text v-if="article?.content" class="article-content" selectable>{{ article?.content }}</text>
@@ -56,6 +61,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getEventArticle } from '@/modules/chat/event/api/eventApi'
 import { formatDateTime } from '@/shared/utils/datetime'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 import type { EventArticle } from '@/modules/chat/event/types'
 
 /** 当前 eventId */
@@ -94,6 +100,24 @@ function goBack() {
   }
 }
 
+/** 复制原文链接到剪贴板（uni-app 跨端：APP/H5 均支持），供用户在浏览器打开；不自动跳转 */
+function copySourceUrl(): void {
+  const url = article.value?.sourceUrl
+  if (!url) {
+    uni.showToast({ title: '暂无原文链接', icon: 'none' })
+    return
+  }
+  uni.setClipboardData({
+    data: url,
+    success: () => {
+      uni.showToast({ title: '复制成功，可在浏览器打开', icon: 'none' })
+    },
+    fail: () => {
+      uni.showToast({ title: '复制失败，请重试', icon: 'none' })
+    },
+  })
+}
+
 async function loadArticle() {
   if (!eventId.value) {
     error.value = '缺少事件参数'
@@ -124,9 +148,15 @@ onLoad((query) => {
 
 <style lang="scss" scoped>
 .article-page {
-  height: 100vh;
+  /* 用 fixed 铺满视口而非 height:100vh，避免 APP 端 page{zoom:1.2} 下 100vh 视觉放大导致底部被裁 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: #f5f6f8;
 }
 
@@ -229,9 +259,12 @@ onLoad((query) => {
   color: #1f2329;
 }
 
-/* 正文滚动区 */
+/* 正文滚动区：min-height:0 关键——flex 子项默认 min-height:auto 不会被压缩，
+   长正文会把 scroll-view 撑到超过容器、内部无法滚动、底部被裁；0 后 scroll-view 收缩到
+   剩余空间并激活内部滚动（与 chat 页 .message-list、SubPageCard2 同款方案） */
 .article-scroll {
   flex: 1;
+  min-height: 0;
   width: 100%;
 }
 
@@ -299,5 +332,29 @@ onLoad((query) => {
 .article-empty-text {
   font-size: 28rpx;
   color: #8a9099;
+}
+
+/* 原文链接行：复制图标 + URL 紧挨同一行；小字号弱色，不抢正文视觉层级 */
+.article-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 12rpx;
+  min-width: 0;
+
+  &--hover {
+    opacity: 0.6;
+  }
+}
+
+.article-link-url {
+  flex: 1;
+  min-width: 0;
+  font-size: 22rpx;
+  color: #a6adb6;
+  line-height: 1.5;
+  /* 超长 URL 自动换行，不横向溢出页面 */
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 </style>
