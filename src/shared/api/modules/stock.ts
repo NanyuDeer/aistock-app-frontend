@@ -654,6 +654,16 @@ export const stockApi = {
     return request.get(`/cn/stocks/${symbol}/analysis/history`, { params }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
+  /** 获取中/长线 AI 洞见（从缓存读取） */
+  getMidLongAnalysis(symbol: string, timeframe: 'mid' | 'long') {
+    return request.get(`/cn/stocks/${symbol}/mid-long/${timeframe}`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+  },
+
+  /** 创建中/长线 AI 洞见（触发后端 LLM 生成） */
+  createMidLongAnalysis(symbol: string, timeframe: 'mid' | 'long') {
+    return request.post(`/cn/stocks/${symbol}/mid-long/${timeframe}`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+  },
+
   /** 获取股票基础信息（行业、地域板块、上市时间、股本、市值等） */
   getStockInfos(symbol: string) {
     return request.get('/cn/stock/infos', { params: { symbols: symbol } }).then((res: Record<string, unknown>) => {
