@@ -186,6 +186,14 @@
 ### 说明
 - VIP 判定沿用 `userInfo.isVip`（后端 `/users/me` 的 `is_vip` 归一化）；未登录按非会员处理
 
+## [junliang] 2026-08-27 — 统一午尾盘异动与涨停雷达详情展示逻辑 + 候选归因板块调整
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/favorites/pages/insight-detail.vue`（涨停雷达详情）：归因明细（次要因素行）改为候选归因卡片列表，与午尾盘异动详情页同款 cand-card——统一两端展示逻辑；"主因判定"标签改为"支持性主因"；`.section-title` 与价格异动页样式对齐
+- `src/modules/favorites/pages/insight-detail-move.vue`（午尾盘异动详情）：板块名称调整——"主因"→"支持性主因"、原"支持性主因"区→"候选归因"；候选归因过滤由仅 supported 扩为 supported+weak（证据不足/反向排除不展示）；移除"建议跟踪"区块（2026-08-25 决策）
+
 ---
 
 ## [master] 2026-08-25 — 发布流程文档补全 + 修复「已装 0.1.1 仍反复弹更新」
