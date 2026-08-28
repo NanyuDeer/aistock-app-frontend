@@ -340,7 +340,10 @@ async function fetchAnalysisData(sym: string) {
   loading.value = true
   error.value = false
   try {
-    const res: any = await stockApi.getReportAnalysis({ symbol: sym })
+    const res: any = await stockApi.getReportAnalysis({
+      symbol: sym,
+      endDate: options?.endDate || undefined,
+    })
     if (!res) throw new Error('API 返回为空')
     const data = (res.data as Record<string, unknown>) || res
     const reportPeriod = String(data['报告期'] || '')
