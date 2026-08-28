@@ -31,6 +31,19 @@
         </view>
       </view>
 
+      <!-- Insight：洞见卡置顶（为什么 + 后续预判） -->
+      <InsightCard
+        v-if="insightCard.content"
+        type="event"
+        :title="insightCard.content"
+        trace-label="动因"
+        forecast-label="展望"
+        :trace="insightCard.trace"
+        :forecast="insightCard.forecast"
+        :time="insightCard.time"
+        class="event-insight-card"
+      />
+
       <!-- Step 1: AI投资机会 -->
       <AiAnalysisSection
         v-for="(step, index) in mainSteps"
@@ -86,7 +99,7 @@ import { onMounted, watch, nextTick, computed } from 'vue'
 import type { EventDetailResponse, HistoryEvent } from '../types'
 import { useAiReasoning } from '../composables/useAiReasoning'
 import { formatDateTime } from '@/shared/utils/datetime'
-import { EmptyState } from '@/shared/components'
+import { EmptyState, InsightCard } from '@/shared/components'
 import AiAnalysisSection from './AiAnalysisSection.vue'
 import AiEventUnderstanding from './AiEventUnderstanding.vue'
 import AiTransmissionAnalysis from './transmission/AiTransmissionAnalysis.vue'
@@ -124,6 +137,30 @@ const ratingLabel = computed(() => {
     case 'positive': return '★ 整体偏积极'
     case 'negative': return '★ 整体偏谨慎'
     default: return '★ 整体中性'
+  }
+})
+
+/**
+ * 事件洞见卡数据（为什么 + 后续预判）。
+ * 数据源：AI 投资总结 investmentSummary —— 一句话结论作标题，
+ * 核心要点作「溯源」、关注方向/风险作「预判」。
+ * 后续由事件 agent 的 LLM 直接产出、溯源/预判全文。
+ */
+const insightCard = computed(() => {
+  const summary = props.detail?.investmentSummary
+  if (!summary) return { content: '', trace: '', forecast: '', time: '' }
+  const trace = summary.keyPoints?.[0] || summary.conclusion || ''
+  const forecast = summary.focusIndustries?.[0]?.reason
+    || summary.opportunities?.[0]
+    || summary.risks?.[0]
+    || ''
+  return {
+    content: summary.conclusion || '',
+    trace,
+    forecast,
+    time: props.detail?.event?.publishTime
+      ? formatDateTime(props.detail.event.publishTime).slice(5, 16)
+      : '',
   }
 })
 
@@ -200,6 +237,10 @@ watch(currentStep, async (stepId) => {
 
 <style lang="scss" scoped>
 .ai-event-report { padding: 0 0 48rpx; }
+
+.event-insight-card {
+  margin-bottom: 24rpx;
+}
 
 .report-content {
   padding: 16rpx 24rpx 0;

@@ -21,11 +21,11 @@
  * 系统标志组件：瞳孔即洞见类型，全站洞见入口统一使用。
  * 瞳孔语义：虚线外环=数据流，虹膜渐变=数据汇聚，瞳孔+高光=AI 看穿本质。
  */
-type InsightType = 'emotion' | 'fund' | 'event' | 'market'
+type InsightType = 'emotion' | 'fund' | 'event' | 'market' | 'trend'
 type InsightSize = 'sm' | 'md' | 'lg'
 
 withDefaults(defineProps<{
-  /** 洞见类型：emotion 情绪 / fund 资金 / event 事件 / market 市场 */
+  /** 洞见类型：emotion 情绪 / fund 资金 / event 事件 / market 市场 / trend 趋势 */
   type?: InsightType
   /** 尺寸 */
   size?: InsightSize
@@ -40,9 +40,9 @@ withDefaults(defineProps<{
   display: inline-flex;
   align-items: center;
   gap: $s-1;
-  padding: 4rpx 16rpx;
+  padding: 6rpx 18rpx;
   border-radius: $r-full;
-  font-size: $font-size-xs;
+  font-size: $font-size-base;
   font-weight: 600;
   line-height: $lh-tight;
   vertical-align: middle;
@@ -141,25 +141,32 @@ withDefaults(defineProps<{
   --iris-deep: #{$insight-market-deep};
 }
 
+.as-insight-tag--trend {
+  background: $insight-trend-soft;
+  color: $insight-trend-deep;
+  --iris-light: #{$insight-trend-light};
+  --iris-deep: #{$insight-trend-deep};
+}
+
 /* ===== Sizes ===== */
 .as-insight-tag--sm {
-  padding: 2rpx 12rpx;
-  font-size: 20rpx;
+  padding: 4rpx 16rpx;
+  font-size: $font-size-base;
 
   .as-insight-tag__eye {
-    width: 24rpx;
-    height: 24rpx;
+    width: 28rpx;
+    height: 28rpx;
     border-width: 1rpx;
   }
 }
 
 .as-insight-tag--lg {
-  padding: 6rpx 20rpx;
-  font-size: $font-size-sm;
+  padding: 8rpx 22rpx;
+  font-size: $font-size-lg;
 
   .as-insight-tag__eye {
-    width: 40rpx;
-    height: 40rpx;
+    width: 44rpx;
+    height: 44rpx;
   }
 }
 </style>

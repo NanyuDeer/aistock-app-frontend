@@ -48,6 +48,17 @@
         </view>
       </view>
 
+      <!-- 趋势洞见卡：结论一句话 + 溯源/预判（来自 trend_score agent 评分数据），与评分卡保持间距 -->
+      <InsightCard
+        v-if="trendInsight.title"
+        type="trend"
+        :title="trendInsight.title"
+        :trace="trendInsight.trace"
+        :forecast="trendInsight.forecast"
+        theme="light"
+        class="trend-insight-card"
+      />
+
       <view class="dimension-list">
         <view v-for="(dimension, index) in detail.dimensions" :key="dimension.name" class="dimension-card">
           <view class="dimension-header" @tap="expandDimension(index)">
@@ -264,6 +275,7 @@ import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { formatDateTime, formatDate } from '@/shared/utils/datetime'
 import KLineChart from '@/shared/components/KLineChart.vue'
+import InsightCard from '@/shared/components/InsightCard.vue'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 
 const symbol = ref('')
@@ -292,6 +304,43 @@ const ratingMeaning = computed(() => {
     D: '观望',
   }
   return labels[grade] || ''
+})
+
+/** 趋势洞见卡数据：title=结论一句话；trace=溯源（最强维度/驱动）；forecast=预判（评级含义+预期趋势） */
+const trendInsight = computed(() => {
+  const d = detail.value
+  if (!d) return { title: '', trace: '', forecast: '' }
+  const title = trendAnalysis.value
+  const dims = d.dimensions || []
+  const sortedDims = [...dims].sort((a, b) => b.score - a.score || b.weight - a.weight)
+  const top = sortedDims[0]
+
+  // 溯源：驱动趋势的最强维度（及其权重）
+  const traceParts: string[] = []
+  if (top) {
+    traceParts.push(`${top.name}维度驱动最强（${top.score}分，权重${top.weight}%）`)
+  }
+  const sectorName = trackDetail.value?.sectorName
+  if (sectorName) {
+    traceParts.push(`所处赛道「${sectorName}」提供支撑`)
+  }
+  const trace = traceParts.join('；')
+
+  // 预判：评级含义 + 预期趋势
+  const gradeAdvice: Record<string, string> = {
+    S: '强趋势，可重点跟踪',
+    A: '趋势已成，关注回踩确认',
+    B: '趋势酝酿，观察突破信号',
+    C: '弱趋势，谨慎参与',
+    D: '观望为主',
+  }
+  const forecastParts: string[] = []
+  const grade = gradeAdvice[String(d.label || '').toUpperCase()]
+  if (grade) forecastParts.push(grade)
+  if (d.expectedMultiple) forecastParts.push(`预期${d.expectedMultiple}趋势`)
+  const forecast = forecastParts.join('，')
+
+  return { title, trace, forecast }
 })
 
 const pageTitle = computed(() => `${stockName.value || symbol.value} · 趋势评分`)
@@ -476,6 +525,10 @@ onShow(() => {
 .nav-monitor-button.active { color: $bg-color-grey; background: $brand-color; }
 .nav-monitor-button.disabled { opacity: 0.55; }
 .nav-monitor-button text { white-space: nowrap; }
+
+.trend-insight-card {
+  margin: 32rpx 0 24rpx;
+}
 
 // H5 的 scroll-view 会再生成一层真正的滚动容器；关闭滚动锚定，
 // 避免展开维度详情时浏览器为保持底部锚点而自动改变 scrollTop。

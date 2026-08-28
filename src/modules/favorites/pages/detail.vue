@@ -55,26 +55,25 @@
 
       <view class="decision-card">
         <view class="decision-head">
-          <view>
-            <text class="decision-kicker">综合决策</text>
-          </view>
+          <InsightTag type="market" size="sm">综合洞见</InsightTag>
           <view class="decision-verdict">
             <text :class="['decision-status', overallDecision.verdictClass]">{{ overallDecision.verdict }}</text>
             <text :class="['decision-status', 'is-sub', overallDecision.periodDominanceClass]">{{ overallDecision.periodDominance }}</text>
           </view>
         </view>
         <text class="decision-summary">{{ overallDecision.summary }}</text>
+        <view class="decision-divider" />
         <view class="decision-next">
-          <text class="next-label">观察重点</text>
+          <text class="next-label">重点</text>
           <text class="next-text">{{ overallDecision.nextStep }}</text>
         </view>
         <view class="decision-points">
-          <view v-if="overallDecision.opportunity" class="decision-point" @tap="toggleDecisionPoint('opportunity')">
+          <view v-if="overallDecision.opportunity" class="decision-point decision-point--opportunity" @tap="toggleDecisionPoint('opportunity')">
             <text class="point-label">机会</text>
             <text :class="['point-text', { expanded: expandedDecisionPoint === 'opportunity' }]">{{ expandedDecisionPoint === 'opportunity' ? overallDecision.opportunityFull : overallDecision.opportunity }}</text>
             <text class="point-more">{{ expandedDecisionPoint === 'opportunity' ? '收起' : '展开' }}</text>
           </view>
-          <view v-if="overallDecision.risk" class="decision-point is-risk" @tap="toggleDecisionPoint('risk')">
+          <view v-if="overallDecision.risk" class="decision-point decision-point--risk" @tap="toggleDecisionPoint('risk')">
             <text class="point-label">风险</text>
             <text :class="['point-text', { expanded: expandedDecisionPoint === 'risk' }]">{{ expandedDecisionPoint === 'risk' ? overallDecision.riskFull : overallDecision.risk }}</text>
             <text class="point-more">{{ expandedDecisionPoint === 'risk' ? '收起' : '展开' }}</text>
@@ -898,6 +897,7 @@ import { stockApi } from '@/shared/api/modules/stock'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import InsightTag from '@/shared/components/InsightTag.vue'
 import KLineChart from '@/modules/favorites/components/KLineChart.vue'
 import ForecastProfitChart from '@/modules/favorites/components/ForecastProfitChart.vue'
 import CapitalFlowCharts from '@/modules/favorites/components/CapitalFlowCharts.vue'
@@ -2519,8 +2519,16 @@ function goChat() {
 .decision-card {
   display: flex;
   flex-direction: column;
-  gap: 18rpx;
-  border-top: 4rpx solid $primary;
+  gap: $s-2;
+  border-radius: $r-lg;
+  box-shadow: $shadow-xs;
+}
+
+/* 洞见卡风格：结论前的渐变分隔线，替代原先顶部主题色条 */
+.decision-divider {
+  height: 2rpx;
+  margin: $s-1 0;
+  background: linear-gradient(90deg, $primary-100, rgba($primary-100, 0));
 }
 
 .decision-head {
@@ -2541,39 +2549,20 @@ function goChat() {
 
 .decision-summary {
   display: block;
-  font-size: 28rpx;
-  line-height: 1.6;
+  font-size: $font-size-lg;
+  line-height: $lh-tight;
   font-weight: 600;
-  color: $ink-soft;
-}
-
-.decision-next {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-  padding: 16rpx 18rpx;
-  border-radius: 14rpx;
-  background: $bg-soft;
-}
-
-.next-label {
-  flex-shrink: 0;
-  padding: 4rpx 10rpx;
-  border-radius: 8rpx;
-  background: $primary-50;
-  color: $primary;
-  font-size: 22rpx;
-  line-height: 1.35;
-  font-weight: 800;
-}
-
-.next-text {
-  min-width: 0;
   color: $ink;
-  font-size: 27rpx;
-  line-height: 1.45;
-  font-weight: 700;
 }
+
+/* 重点：横幅卡（蓝），与机会/风险(point-) 同卡片化结构 */
+.decision-next {
+  --banner-bg: #{$insight-market};
+  --banner-glow: rgba(11, 95, 255, 0.18);
+}
+
+/* 重点行横幅卡排版统一走全局 insight-banner mixin */
+@include insight-banner('.decision-next', '.next-label', '.next-text');
 
 .decision-verdict {
   flex-shrink: 0;
@@ -2631,63 +2620,38 @@ function goChat() {
   font-weight: 700;
 }
 
+/* 机会/风险：横幅卡（机会绿/风险红），保留展开交互 */
 .decision-points {
   display: flex;
   flex-direction: column;
-  border-top: 1rpx solid $line-soft;
+  gap: 16rpx;
 }
 
 .decision-point {
-  display: grid;
-  grid-template-columns: 64rpx minmax(0, 1fr) 56rpx;
-  gap: 14rpx;
-  align-items: start;
-  padding: 18rpx 0;
-  border-bottom: 1rpx solid $line-soft;
+  --banner-bg: #{$down};
+  --banner-glow: rgba(24, 160, 88, 0.18);
 
-  &.is-risk {
-    .point-label {
-      color: $down;
-      background: $down-soft;
-    }
-  }
-
-  &:last-child {
-    border-bottom: 0;
-    padding-bottom: 0;
+  &.decision-point--risk {
+    --banner-bg: #{$up};
+    --banner-glow: rgba(229, 77, 94, 0.18);
   }
 }
 
-.point-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 56rpx;
-  height: 38rpx;
-  border-radius: 8rpx;
-  background: $up-soft;
-  font-size: 24rpx;
-  line-height: 1.4;
-  font-weight: 800;
-  color: $up;
-}
+/* 机会/风险：走洞见解横幅卡全局排版，保留展开交互 */
+@include insight-banner('.decision-point', '.point-label', '.point-text');
 
 .point-more {
-  flex-shrink: 0;
-  font-size: 22rpx;
-  line-height: 38rpx;
-  font-weight: 700;
+  display: block;
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  font-weight: 600;
   text-align: right;
-  color: $ink-mute;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .point-text {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 26rpx;
-  line-height: 1.55;
-  font-weight: 600;
-  color: $ink-soft;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 
