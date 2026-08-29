@@ -64,7 +64,7 @@
         <template v-if="detail.primary_driver">
           <view class="hero-card">
             <view class="hero-head">
-              <text class="hero-tag">主因判定</text>
+              <text class="hero-tag">支撑性主因</text>
               <view class="hero-chips">
                 <text :class="['cat-badge', 'cat-' + detail.primary_driver.category]">{{ categoryText(detail.primary_driver.category) }}</text>
                 <text
@@ -91,14 +91,18 @@
           </view>
         </template>
 
-        <!-- 归因明细（次要因素，与价格异动五层归因同视觉） -->
-        <view v-if="detail.secondary_drivers?.length" class="sec-title">归因明细</view>
-        <view v-if="detail.secondary_drivers?.length" class="rows">
-          <view v-for="d in detail.secondary_drivers" :key="d.label" class="row">
-            <view class="dot"></view>
-            <text class="row-text">{{ d.label }}</text>
-            <text class="row-cat">{{ categoryText(d.category) }}</text>
-            <text v-if="d.confidence" class="badge" :class="confClass(d.confidence)">{{ confidenceText(d.confidence) }}</text>
+        <!-- 候选归因：次要因素卡片列表（与价格异动页同款） -->
+        <view v-if="detail.secondary_drivers?.length" class="section">
+          <text class="section-title">候选归因</text>
+          <view class="cand-list">
+            <view v-for="d in detail.secondary_drivers" :key="d.label" class="cand-card">
+              <view class="cand-header">
+                <text class="cand-label">{{ d.label }}</text>
+                <text class="cand-tag is-weak">{{ categoryText(d.category) }}</text>
+                <text v-if="d.confidence" class="badge" :class="confClass(d.confidence)">{{ confidenceText(d.confidence) }}</text>
+              </view>
+              <text v-if="d.evidence_quote" class="cand-text">{{ d.evidence_quote }}</text>
+            </view>
           </view>
         </view>
 
@@ -287,8 +291,9 @@ onLoad(async (query) => {
   color: $ink-soft;
 }
 
-/* ===== 区块标题 ===== */
-.sec-title {
+/* ===== 区块标题（section-title 与 sec-title 同款，对齐价格异动页） ===== */
+.sec-title,
+.section-title {
   display: flex;
   align-items: center;
   margin-bottom: $s-2;
@@ -529,45 +534,19 @@ onLoad(async (query) => {
   overflow-wrap: anywhere;
 }
 
-/* ===== 归因明细（次要因素，与价格异动矩阵同视觉） ===== */
-.rows {
-  background: $bg-card;
-  border-radius: $r-md;
-  padding: 0 $s-3;
-  box-shadow: $shadow-sm;
-  margin-bottom: $s-3;
+/* ===== 候选归因：卡片列表（与价格异动页同款） ===== */
+.cand-list { display: flex; flex-direction: column; gap: $s-2; }
+.cand-card { padding: $s-3; background: $bg-soft; border-radius: $r-md; }
+.cand-header { display: flex; align-items: center; gap: $s-2; margin-bottom: $s-1; }
+.cand-label { font-size: $font-size-sm; font-weight: 600; color: $ink; flex: 1; }
+.cand-tag {
+  font-size: $font-size-xs; color: $primary; background: $primary-50;
+  padding: 2rpx 12rpx; border-radius: $r-sm; flex-shrink: 0;
+  &.is-weak { color: $warning; background: $warning-bg; }
+  &.is-rejected { color: $white; background: $ink-mute; }
+  &.is-insufficient { color: $ink-soft; background: $bg-soft; }
 }
-
-.row {
-  display: flex;
-  align-items: center;
-  padding: $s-3 0;
-  border-bottom: 2rpx solid $line;
-  &:last-child { border-bottom: none; }
-}
-
-.row-text {
-  font-size: $font-size-sm;
-  color: $ink;
-  flex: 1;
-  min-width: 0;
-}
-
-.row-cat {
-  font-size: $font-size-xs;
-  color: $ink-mute;
-  flex-shrink: 0;
-  margin-right: $s-2;
-}
-
-/* 归因明细行首圆点：与价格异动五层归因色块同源 */
-.dot {
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
-  background: $primary;
-  flex-shrink: 0;
-}
+.cand-text { display: block; font-size: $font-size-xs; color: $ink-soft; line-height: 1.5; }
 
 /* 置信度徽标（高置信=金 / 中低=蓝 / 已确认=绿），与主因卡 meta 共用 */
 .badge {
