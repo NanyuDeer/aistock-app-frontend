@@ -438,6 +438,59 @@ export interface BroadcastV1 {
   audio_path: string | null
 }
 
+/** 节奏大师（report_type=rhythm_master，契约 #6：顶层 target_date/basis_date/refresh_slot） */
+export interface RhythmEvent {
+  date: string
+  type: 'delivery' | 'earnings' | 'seed' | 'macro'
+  title: string
+  importance: 'high' | 'medium' | 'low'
+  source: 'L1' | 'L2' | 'L3' | 'L4'
+  event_time?: string | null
+  result?: string | null
+}
+export interface RhythmBranch {
+  condition: {
+    kind: 'interval' | 'enum'
+    indicator: string
+    lo?: number | null
+    hi?: number | null
+    unit?: string
+    label?: string
+    value?: string
+  }
+  conclusion: { direction: 'bullish' | 'bearish' | 'neutral'; range?: string; validity: number; note?: string }
+  event_ref?: { event_date: string; title: string }
+}
+export interface RhythmCard {
+  score?: number | null
+  level?: string | null
+  position_band: { min?: number | null; max?: number | null; text: string }
+  phase?: string | null
+  phase_evidence?: Record<string, unknown>
+  temperature_series: { date: string; score: number }[]
+  event_window: RhythmEvent[]
+  event_source_missing?: boolean
+  event_high_hint?: string
+  conflict: boolean
+  conflict_detail?: string
+  branches: RhythmBranch[]
+  data_missing?: string[]
+}
+export interface RhythmMasterContent {
+  display_report?: { summary?: string; details?: string; risks?: string[] }
+  schema_version?: string
+  target_date?: string
+  basis_date?: string
+  refresh_slot?: 'after_close' | 'morning' | 'midday'
+  rhythm_card?: RhythmCard
+}
+export interface RhythmMasterReport {
+  report_type: string
+  report_date: string
+  created_at?: string
+  content?: RhythmMasterContent
+}
+
 export const agentApi = {
   /**
    * 发送对话消息（非流式，降级方案）
@@ -589,6 +642,11 @@ export const agentApi = {
   /** 读取大盘复盘报告。 */
   getMarketTraceReview(date: string) {
     return request.get<MarketTraceReviewRecord | null>(`/agent/report/review/${date}`)
+  },
+
+  /** 节奏大师三时点版本读取（契约 #4）：返回 { date, versions: [{refresh_slot, created_at, content}] } */
+  getRhythmMaster(date: string) {
+    return request.get(`/agent/rhythm-master/${date}`)
   },
 
   /**
