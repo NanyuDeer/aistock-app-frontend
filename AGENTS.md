@@ -35,6 +35,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 | 业绩分析 | `modules/analytics` | 业绩预测、业绩报告列表、财报详情 | — |
 | 用户 | `modules/user` | 个人中心、登录设置、更新日志 | [user/AGENTS.md](./src/modules/user/AGENTS.md) |
 | 资讯 | `modules/news` | 公告、新闻详情 | [news/AGENTS.md](./src/modules/news/AGENTS.md) |
+| 节奏大师 | `modules/rhythm` | 节奏状态卡详情页 + 首页入口卡片 + 归档入口 | [rhythm/AGENTS.md](./src/modules/rhythm/AGENTS.md) |
 
 ### App 专属分包（pages-sub-app/）
 
@@ -118,7 +119,8 @@ src/
 │   ├── chat/            # AI 对话
 │   ├── market/          # 行情
 │   ├── user/            # 用户
-│   └── news/            # 资讯
+│   ├── news/            # 资讯
+│   └── rhythm/          # 节奏大师（节奏状态卡详情页 + 首页入口卡片 + 归档入口）
 ├── pages-sub-app/       # App 专属分包
 ├── pages-sub-mp/        # 小程序专属分包
 ├── assets/icons/        # SVG 图标库（大量预置图标）
@@ -305,7 +307,7 @@ import Card from '@/shared/components/Card.vue'
 
 | 模块文件 | 说明 | 后端路径 |
 |---------|------|---------|
-| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`；**P0 身份鉴权：`createAgentWebSocket` URL 带 `?token=`（app-api 桥接验签）、`sendMessage` 不再携带 `user_id`（服务端注入）**；**批次 2：`getChatAnalysisReport(reportId)` 深度分析报告详情查询（`/api/agent/report/chat/:reportId`，显式解包返回 `ChatAnalysisReport | null`）+ `ChatAnalysisReport` 类型（`content.display_report` 双层结构）**；**午间报（2026-08-24）：`MiddayReportRecord` 类型（`content.display_report` + `content.audio_path` 可选，方案 A）**） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
+| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`；**P0 身份鉴权：`createAgentWebSocket` URL 带 `?token=`（app-api 桥接验签）、`sendMessage` 不再携带 `user_id`（服务端注入）**；**批次 2：`getChatAnalysisReport(reportId)` 深度分析报告详情查询（`/api/agent/report/chat/:reportId`，显式解包返回 `ChatAnalysisReport | null`）+ `ChatAnalysisReport` 类型（`content.display_report` 双层结构）**；**午间报（2026-08-24）：`MiddayReportRecord` 类型（`content.display_report` + `content.audio_path` 可选，方案 A）**；**节奏大师（2026-08-30）：`RhythmMasterReport`/`RhythmSlot` 系列类型 + `getRhythmMaster(date)`（`/api/agent/rhythm-master/:date`，三时点 refresh_slot 版本）**） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
 | `auth.ts` | 认证（登录、用户信息） | `/api/auth/wechat/*` |
 | `briefing.ts` | 早晚报结构化（BriefingItem/BriefingSummary 类型 + 降级解析适配器） | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |
