@@ -121,6 +121,12 @@ export default defineConfig(({ mode }) => {
           target: apiTarget,
           changeOrigin: true
         },
+        // 节奏大师三时点报告读取 → Node.js app-api（publicRouter）
+        // 必须置于 /api/agent 兜底（Python 8080）之前，否则被转发到 agent-py 404
+        '/api/agent/rhythm-master': {
+          target: apiTarget,
+          changeOrigin: true
+        },
         '/api/agent/audio': {
           target: apiTarget,
           changeOrigin: true
