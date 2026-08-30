@@ -6,14 +6,14 @@
 <template>
   <view class="as-gcb">
     <view class="as-gcb__row">
-      <!-- 交易按钮：在交易面板页时变为下拉箭头，点击返回 -->
+      <!-- 报告按钮：今日分析概览/报告归档入口（交易功能未接入前的占位去向） -->
       <view
         class="as-gcb__side-btn"
         :class="{ 'as-gcb__side-btn--active': activePanel === 'trade' }"
         @tap="handleTrade"
       >
         <view v-if="activePanel === 'trade'" class="as-gcb__side-arrow"></view>
-        <text v-else class="as-gcb__side-text">交易</text>
+        <text v-else class="as-gcb__side-text">报告</text>
       </view>
 
       <!-- AI 对话入口胶囊 -->
@@ -80,7 +80,7 @@ const handleTrade = () => {
     uni.navigateBack()
     return
   }
-  // 今日分析概览临时占位（spec §8：交易功能未接入，后续交易接入时再调整去向）
+  // 报告归档入口（今日分析概览；交易功能未接入，后续交易接入时再调整去向，spec §8）
   uni.navigateTo({ url: '/modules/chat/pages/agent-report' })
 }
 
