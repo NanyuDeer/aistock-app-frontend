@@ -45,3 +45,10 @@ test('未指定日期时 fallbackDate 仍取最近交易日（含当天若为交
 test('未使用的 RhythmMasterReport import 已删除', () => {
   assert.doesNotMatch(pageSource, /RhythmMasterReport/)
 })
+
+test('F2：主请求 getRhythmMaster 包 try/catch（网络错误不 unhandled rejection，落 EmptyState）', () => {
+  const loadVersions = pageSource.match(/async function loadVersions[\s\S]*?\n\}/)?.[0] ?? ''
+  assert.match(loadVersions, /try \{/)
+  assert.match(loadVersions, /res = await agentApi\.getRhythmMaster\(d\)/)
+  assert.match(loadVersions, /} catch \{/)
+})

@@ -75,7 +75,13 @@ function todayStr(): string {
 async function loadVersions(date?: string) {
   const d = date || (await fallbackDate())
   if (!d) { isFallback.value = true; return }
-  const res: unknown = await agentApi.getRhythmMaster(d)
+  let res: unknown
+  try {
+    res = await agentApi.getRhythmMaster(d)
+  } catch {
+    // F2：网络/服务错误不抛 unhandled rejection，保持空态（EmptyState）
+    return
+  }
   // 响应拦截器（shared/api/request.ts）已解包 {code,data} 信封：code===0 时直接 return data，
   // 故 getRhythmMaster 的解析值即 {date, versions}，没有 .data 字段，这里直接取 .versions。
   const list = (res as { date?: string; versions?: RhythmMasterVersion[] }).versions ?? []

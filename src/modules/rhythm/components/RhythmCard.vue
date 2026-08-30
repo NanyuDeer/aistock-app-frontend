@@ -38,10 +38,12 @@
     <view class="rc-empty" v-else>
       <text>今日无事件（正常交易日）</text>
     </view>
+    <!-- I1（验收 3）：high 事件前置提示（after_close 基准卡与增量分支均写入，空串不渲染） -->
+    <view class="rc-hint" v-if="card.event_high_hint"><text>{{ card.event_high_hint }}</text></view>
     <view class="rc-branches" v-if="card.branches && card.branches.length">
       <view class="rc-branch" v-for="(b, i) in card.branches" :key="i">
         <text class="rc-branch-cond">{{ b.condition.label || b.condition.value || b.condition.indicator }}</text>
-        <text class="rc-branch-concl">{{ directionLabel(b.conclusion.direction) }}：{{ b.conclusion.range || b.conclusion.note }}</text>
+        <text class="rc-branch-concl">{{ branchConclusionText(b) }}</text>
       </view>
     </view>
     <view class="rc-missing" v-if="card.data_missing && card.data_missing.length">
@@ -54,7 +56,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Tag } from '@/shared/components'
-import type { RhythmCard as RhythmCardData } from '@/shared/api/modules/agent'
+import type { RhythmBranch, RhythmCard as RhythmCardData } from '@/shared/api/modules/agent'
 
 const props = withDefaults(
   defineProps<{ card: RhythmCardData; title?: string; slot?: string }>(),
@@ -74,6 +76,15 @@ const slotLabel = computed(() => {
 function directionLabel(d: string): string {
   const m: Record<string, string> = { bullish: '偏多', bearish: '偏空', neutral: '中性' }
   return m[d] ?? d
+}
+
+function branchConclusionText(b: RhythmBranch): string {
+  // G15：事件分支公布前（enum + range 为空）direction 恒为占位 bullish，不展示方向标签，
+  // 只展示 note（"结果待公布…"），避免被误读为预判方向；有 range 时正常展示 direction + range。
+  if (b.condition.kind === 'enum' && !b.conclusion.range) {
+    return b.conclusion.note || '结果待公布'
+  }
+  return `${directionLabel(b.conclusion.direction)}：${b.conclusion.range || b.conclusion.note}`
 }
 
 function tempBarHeight(score: number): string {
@@ -101,6 +112,7 @@ function tempBarHeight(score: number): string {
 .rc-evt { display: flex; align-items: center; gap: 12rpx; margin-bottom: 8rpx; }
 .rc-evt-date { font-size: 24rpx; color: $primary-700; }
 .rc-evt-title { font-size: 26rpx; color: $ink; flex: 1; }
+.rc-hint { font-size: 26rpx; color: $warning; margin: 8rpx 0 12rpx; }
 .rc-branch { margin-bottom: 8rpx; }
 .rc-branch-cond { font-size: 26rpx; color: $ink; font-weight: 500; }
 .rc-branch-concl { font-size: 26rpx; color: $ink-soft; margin-left: 12rpx; }
