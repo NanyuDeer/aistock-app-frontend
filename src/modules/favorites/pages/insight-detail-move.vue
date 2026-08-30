@@ -274,8 +274,8 @@ const candidateCards = computed(() => allCandidates.value.slice(1))
 const unresolvedQuestions = computed<string[]>(() => artifact.value?.artifactJson.unresolved_questions ?? [])
 
 /**
- * 洞见卡数据：主因结论作一句话标题、主链声明作「溯源」、建议跟踪作「预判」。
- * 后续由 stock_trace agent 的 LLM 直接产出溯源/预判全文。
+ * 洞见卡数据：主因结论作一句话标题、主链声明作「溯源」。
+ * 预判（forecast）已按 2026-08-25 决策随「建议跟踪」区块一并移除，恒为空。
  */
 const insightData = computed(() => {
   const cause = primaryCause.value
@@ -285,7 +285,7 @@ const insightData = computed(() => {
   return {
     content: cause.verdict,
     trace,
-    forecast: suggestedActions.value?.[0] || '',
+    forecast: '',
     time: detail.value?.triggered_at ? fmtTime(detail.value.triggered_at).slice(5) : '',
   }
 })
