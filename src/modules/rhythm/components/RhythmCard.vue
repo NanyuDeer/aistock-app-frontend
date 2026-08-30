@@ -8,7 +8,9 @@
       <text class="rc-score" v-if="card.score != null">{{ card.score }}</text>
       <text class="rc-band-text">{{ card.position_band.text }}</text>
     </view>
-    <view class="rc-phase" v-if="card.phase">
+    <!-- phase 缺失时也渲染该行：phaseLabel 兜底为"数据缺失（沿用前值）"（简报语义），
+         否则 computed 的兜底分支因外层 v-if 不可达成为死代码 -->
+    <view class="rc-phase">
       <text>情绪周期：{{ phaseLabel }}（实验性判定）</text>
     </view>
     <view class="rc-temp" v-if="card.temperature_series && card.temperature_series.length">

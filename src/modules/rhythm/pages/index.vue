@@ -29,9 +29,15 @@ import { onLoad } from '@dcloudio/uni-app'
 import { EmptyState } from '@/shared/components'
 import RhythmCard from '../components/RhythmCard.vue'
 import { agentApi } from '@/shared/api/modules/agent'
-import type { RhythmMasterContent, RhythmMasterReport } from '@/shared/api/modules/agent'
+import type { RhythmMasterContent } from '@/shared/api/modules/agent'
 
-const versions = ref<{ refresh_slot: string; created_at?: string; content?: RhythmMasterContent }[]>([])
+interface RhythmMasterVersion {
+  refresh_slot: string
+  created_at?: string
+  content?: RhythmMasterContent
+}
+
+const versions = ref<RhythmMasterVersion[]>([])
 const activeSlot = ref('')
 const targetDate = ref('')
 const isFallback = ref(false)
@@ -70,12 +76,15 @@ async function loadVersions(date?: string) {
   const d = date || (await fallbackDate())
   if (!d) { isFallback.value = true; return }
   const res: unknown = await agentApi.getRhythmMaster(d)
-  const data = (res as { data?: { versions?: { refresh_slot: string; created_at?: string; content?: RhythmMasterContent }[] } })?.data
-  const list = data?.versions ?? []
+  // 响应拦截器（shared/api/request.ts）已解包 {code,data} 信封：code===0 时直接 return data，
+  // 故 getRhythmMaster 的解析值即 {date, versions}，没有 .data 字段，这里直接取 .versions。
+  const list = (res as { date?: string; versions?: RhythmMasterVersion[] }).versions ?? []
   if (!list.length) {
     if (isFallback.value) return
     isFallback.value = true
-    const prev = await fallbackDate()
+    // 回退取"严格早于 d"的前一交易日：getRecentTradingDays 含当天（若当天为交易日），
+    // 当日无报告时 prev===d 会导致回退失效，故改用 getPreviousTradingDay。
+    const prev = await previousTradingDay(d)
     if (prev && prev !== d) return loadVersions(prev)
     return
   }
@@ -84,10 +93,18 @@ async function loadVersions(date?: string) {
   targetDate.value = d
 }
 
+/** 未指定日期时：取今天（若为交易日）否则最近交易日 */
 async function fallbackDate(): Promise<string | undefined> {
   try {
     const t = await agentApi.getRecentTradingDays(todayStr(), 1)
     return t?.[0]
+  } catch { return undefined }
+}
+
+/** 严格早于指定日期的前一个交易日（回退取前值用，避免 getRecentTradingDays 含当天导致 prev===d） */
+async function previousTradingDay(date: string): Promise<string | undefined> {
+  try {
+    return await agentApi.getPreviousTradingDay(date)
   } catch { return undefined }
 }
 
