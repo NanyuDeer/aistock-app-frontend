@@ -17,7 +17,15 @@
         </view>
       </view>
       <view class="fallback" v-if="isFallback">非交易日/当日无报告，沿用前值（{{ basisLabel }}）</view>
-      <RhythmCard v-if="content" :card="content.rhythm_card!" :title="cardTitle" :slot="content.refresh_slot" />
+      <RhythmCard
+        v-if="content"
+        :card="content.rhythm_card!"
+        :title="cardTitle"
+        :slot="content.refresh_slot"
+        :target-date="content.target_date"
+        :basis-date="content.basis_date"
+        :refresh-slot="content.refresh_slot"
+      />
       <EmptyState v-else title="节奏状态暂不可用" />
     </scroll-view>
   </view>
@@ -125,8 +133,9 @@ function goBack() { uni.navigateBack() }
 .back { font-size: 40rpx; color: $ink; padding-right: 24rpx; }
 .nav-title { font-size: 34rpx; font-weight: 600; color: $ink; }
 .content { flex: 1; padding: 24rpx 32rpx; }
-.slots { display: flex; gap: 16rpx; margin-bottom: 24rpx; }
-.slot { padding: 12rpx 28rpx; border-radius: 999rpx; background: $bg-card; font-size: 26rpx; color: $ink-soft; }
+/* 三时点分段切换（设计稿：surface 底 + 边框 + pill，active 主色填充） */
+.slots { display: flex; gap: 8rpx; background: $bg-card; border: 1rpx solid $line; border-radius: 999rpx; padding: 6rpx; margin-bottom: 24rpx; }
+.slot { flex: 1; text-align: center; padding: 12rpx 0; border-radius: 999rpx; font-size: 24rpx; color: $ink-soft; font-weight: 500; }
 .slot.active { background: $primary; color: #fff; }
 .fallback { margin-bottom: 16rpx; font-size: 24rpx; color: $warning; }
 </style>
