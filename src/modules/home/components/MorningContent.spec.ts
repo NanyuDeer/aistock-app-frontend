@@ -23,3 +23,11 @@ test('首页展示真实缺失来源，且零条 Brief 不显示为关键线索'
   assert.match(componentSource, /report\?\.missing_sources\.join\('、'\)/)
   assert.match(componentSource, /v-if="briefingClueCount > 0"/)
 })
+
+test('首页卡片替换为节奏大师（今日分析概览移至交易入口占位）', () => {
+  assert.match(componentSource, /节奏大师/)
+  assert.match(componentSource, /modules\/rhythm\/pages\/index/)
+  assert.match(componentSource, /getRhythmMaster/)
+  // 今日分析概览已从首页卡片移除
+  assert.ok(!/今日分析概览/.test(componentSource))
+})

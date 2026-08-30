@@ -80,7 +80,8 @@ const handleTrade = () => {
     uni.navigateBack()
     return
   }
-  uni.showToast({ title: '交易功能开发中', icon: 'none' })
+  // 今日分析概览临时占位（spec §8：交易功能未接入，后续交易接入时再调整去向）
+  uni.navigateTo({ url: '/modules/chat/pages/agent-report' })
 }
 
 const handleFavorites = () => {
