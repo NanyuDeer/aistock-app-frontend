@@ -361,6 +361,15 @@
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
+    },
+    {
+      "path": "modules/rhythm/pages/calendar",
+      "style": {
+        "navigationBarTitleText": "节奏日历",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
     }
   ],
   "subPackages": [

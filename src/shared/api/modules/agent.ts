@@ -649,6 +649,12 @@ export const agentApi = {
     return request.get(`/agent/rhythm-master/${date}`)
   },
 
+  /** 节奏日历热力图聚合（契约 #7）：最近 N 个交易日 after_close 收盘基准档位。
+   *  返回 { days: [{date, refresh_slot, level, score, basis_date}] }，level 可空（灰格）。 */
+  getRhythmMasterCalendar(days = 60) {
+    return request.get('/agent/rhythm-master/calendar', { params: { days } })
+  },
+
   /**
    * 交易日历：严格早于 date 的前一个交易日（YYYY-MM-DD）。
    * 前端"前一天/后一天"跳档时跳过周末/法定节假日。
