@@ -820,7 +820,9 @@ async function loadAllReports() {
       if (agentIntent === OVERVIEW_RHYTHM) {
         try {
           const res: unknown = await agentApi.getRhythmMaster(date.value)
-          const versions = (res as { data?: { versions?: { content?: unknown }[] } })?.data?.versions
+          // 响应拦截器（request.ts）已解包 {code,data} 信封：code===0 时直接 return data，
+          // 故 getRhythmMaster 解析值即 {date, versions}，没有 .data 字段，这里直接取 .versions
+          const versions = (res as { versions?: { content?: unknown }[] }).versions ?? []
           return { intent: agentIntent, report: versions?.length ? ({ content: versions[0].content, report_date: date.value }) : null }
         } catch { return { intent: agentIntent, report: null } }
       }

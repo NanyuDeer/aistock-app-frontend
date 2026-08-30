@@ -372,22 +372,19 @@ async function loadTraceReports() {
 /** 节奏大师卡片摘要：目标交易日 + 节奏档位（取最近交易日最新版本 rhythm_card） */
 const rhythmSummary = ref<{ title: string; band: string } | null>(null)
 
-function todayStr(): string {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-
 async function loadRhythm() {
   try {
-    const today = todayStr()
+    // shanghaiDateString 固定 UTC+8 取上海自然日（与 loadTraceReports 同口径），不依赖设备本地时区
+    const today = shanghaiDateString()
     let date: string | undefined
     try {
       date = (await agentApi.getRecentTradingDays(today, 1))?.[0]
     } catch { date = undefined }
     if (!date) return
     const res: unknown = await agentApi.getRhythmMaster(date)
-    const versions = (res as { data?: { versions?: { refresh_slot?: string; content?: { rhythm_card?: { level?: string; position_band?: { text?: string }; target_date?: string } } }[] } })?.data?.versions
+    // 响应拦截器（request.ts）已解包 {code,data} 信封：code===0 时直接 return data，
+    // 故 getRhythmMaster 解析值即 {date, versions}，没有 .data 字段，这里直接取 .versions
+    const versions = (res as { versions?: { refresh_slot?: string; content?: { rhythm_card?: { level?: string; position_band?: { text?: string }; target_date?: string } } }[] }).versions ?? []
     const latest = versions?.[0]
     const card = latest?.content?.rhythm_card
     if (!latest || !card) return

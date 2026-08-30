@@ -31,3 +31,18 @@ test('首页卡片替换为节奏大师（今日分析概览移至交易入口�
   // 今日分析概览已从首页卡片移除
   assert.ok(!/今日分析概览/.test(componentSource))
 })
+
+test('loadRhythm 解包行为：拦截器已解包 {code,data} 信封，直接取 .versions（mock getRhythmMaster 返回 {date, versions}）', () => {
+  // 从源码提取解包行并模拟执行：响应拦截器（request.ts）code===0 时 return data，
+  // 故 getRhythmMaster 解析值即 {date, versions}，无 .data 字段；?.data?.versions 写法会导致 versions 恒为 undefined
+  const unwrapLine = componentSource.match(/const versions = \(res as \{.*\}\)\.versions \?\? \[\]/)?.[0]
+  assert.ok(unwrapLine, 'loadRhythm 应存在直接解包 .versions ?? [] 的表达式（而非 ?.data?.versions）')
+  const js = unwrapLine.replace(/\(res as \{[^]*?\}\)/, '(res)')
+  const unwrap = new Function('res', `${js}\nreturn versions`) as (res: unknown) => unknown[]
+  const versions = [{ refresh_slot: 'after_close' }, { refresh_slot: 'morning' }]
+  // mock agentApi.getRhythmMaster 返回 {date, versions:[...]} → versions 被填充
+  assert.deepEqual(unwrap({ date: '2026-08-28', versions }), versions)
+  // versions 缺失/空 → 兜底 []
+  assert.deepEqual(unwrap({ date: '2026-08-28' }), [])
+  assert.deepEqual(unwrap({ date: '2026-08-28', versions: [] }), [])
+})
