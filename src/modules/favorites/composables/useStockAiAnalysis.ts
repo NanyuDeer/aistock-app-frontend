@@ -15,6 +15,13 @@ interface AiAnalysisView {
   riskTips: TagItem[]
 }
 
+interface MidLongAnalysisApiData {
+  结论: string
+  核心逻辑: string
+  风险提示: string
+  投资建议?: string
+}
+
 interface StockAiAnalysisContext {
   quote?: Record<string, any> | null
   stockInfo?: Record<string, any> | null
@@ -199,8 +206,8 @@ function buildMoatsFromTrend(trendApiData: TrendScoreData | null) {
   return []
 }
 
-function cleanExplanation(text: string): string {
-  return text
+function cleanExplanation(text: string, maxLen = 50): string {
+  const cleaned = text
     .replace(/\[`([^`]*)`\]\([^)]+\)/g, '$1')   // [`text`](url) → text
     .replace(/\[([^\]]*)\]\([^)]+\)/g, '$1')      // [text](url) → text
     .replace(/`{1,3}([^`]*)`{1,3}/g, '$1')        // `text` 或 ```text``` → text
@@ -209,6 +216,7 @@ function cleanExplanation(text: string): string {
     .replace(/^#+\s*/gm, '')                        // 去掉行首 ### 
     .replace(/\s+/g, ' ')                           // 多余空白合并
     .trim()
+  return cleaned.length > maxLen ? cleaned.substring(0, maxLen) : cleaned
 }
 
 export function extractTagFromText(text: string): TagItem {
@@ -250,12 +258,44 @@ export function extractTagsFromArray(arr: (string | TagItem | { tag?: string; de
   }).filter(t => t.tag)
 }
 
+function cleanCoreLogicText(text: string): string {
+  return text
+    .replace(/[^:\n]+::/g, '')
+    .replace(/\n{2,}/g, '\n')
+    .trim()
+}
+
+function convertApiToAiAnalysis(data: MidLongAnalysisApiData | null): AiAnalysisView | null {
+  if (!data) return null
+  const conclusion = String(data.结论 || '')
+  const coreLogic = String(data.核心逻辑 || '')
+  const riskWarning = String(data.风险提示 || '')
+  const adviceText = String(data.投资建议 || '')
+  if (!conclusion) return null
+  const basis = extractTagsFromText(coreLogic)
+  const riskTips = extractTagsFromText(riskWarning)
+  const advice = extractTagsFromText(adviceText)
+  let badgeClass = 'is-hold'
+  if (conclusion.includes('持有可顺势') || conclusion.includes('弹性') || conclusion.includes('积极')) badgeClass = 'is-bull'
+  else if (conclusion.includes('观察') || conclusion.includes('稳健')) badgeClass = 'is-hold'
+  return {
+    conclusion,
+    badgeClass,
+    logic: cleanCoreLogicText(coreLogic),
+    basis,
+    advice,
+    riskTips,
+  }
+}
+
 export function useStockAiAnalysis(
   symbolRef: Ref<string>,
   quoteRef: Ref<{ name?: string; industry?: string } | null>,
   trendScoreDataRef?: Ref<TrendScoreData | null>,
   contextRef?: Ref<StockAiAnalysisContext | null>,
-  industryHealthRef?: Ref<IndustryHealthData | null>
+  industryHealthRef?: Ref<IndustryHealthData | null>,
+  midAnalysisRef?: Ref<MidLongAnalysisApiData | null>,
+  longAnalysisRef?: Ref<MidLongAnalysisApiData | null>,
 ) {
   const profileScore = computed(() => 0)
   const profileTheme = computed(() => quoteRef.value?.industry || '成长赛道')
@@ -286,6 +326,10 @@ export function useStockAiAnalysis(
   })
 
   const midAiAnalysis = computed<AiAnalysisView>(() => {
+    const apiData = midAnalysisRef?.value
+    const apiView = convertApiToAiAnalysis(apiData || null)
+    if (apiView) return apiView
+
     const dimensions = trendApiData.value && !trendVetoed.value ? (trendApiData.value.dimensions || []) : []
     const sortedDims = [...dimensions].sort((a, b) => (b.score || 0) - (a.score || 0))
     const focus = sortedDims.length
@@ -382,6 +426,10 @@ export function useStockAiAnalysis(
   })
 
   const longAiAnalysis = computed<AiAnalysisView>(() => {
+    const apiData = longAnalysisRef?.value
+    const apiView = convertApiToAiAnalysis(apiData || null)
+    if (apiView) return apiView
+
     const dimensions = trendApiData.value && !trendVetoed.value ? (trendApiData.value.dimensions || []) : []
     const sortedDims = [...dimensions].sort((a, b) => (b.score || 0) - (a.score || 0))
     const focus = sortedDims.length
