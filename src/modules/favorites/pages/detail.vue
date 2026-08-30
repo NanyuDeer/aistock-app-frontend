@@ -373,15 +373,6 @@
             <view class="ai-conclusion">
               <text :class="['conclusion-badge', midAiAnalysis.badgeClass]">{{ midAiAnalysis.conclusion }}</text>
             </view>
-            <view class="ai-logic">
-              <text class="ai-logic-text">{{ midAiAnalysis.logic }}</text>
-            </view>
-            <view class="ai-action-list">
-              <view v-for="item in midActionItems" :key="item.label" class="ai-action-item">
-                <text class="ai-action-label">{{ item.label }}</text>
-                <text class="ai-action-text">{{ item.value }}</text>
-              </view>
-            </view>
             <view v-if="midBasisTags.length" class="ai-section">
               <text class="ai-section-title">研判依据</text>
               <view class="research-tags">
@@ -597,15 +588,6 @@
           <view class="card-body">
             <view class="ai-conclusion">
               <text :class="['conclusion-badge', longAiAnalysis.badgeClass]">{{ longAiAnalysis.conclusion }}</text>
-            </view>
-            <view class="ai-logic">
-              <text class="ai-logic-text">{{ longAiAnalysis.logic }}</text>
-            </view>
-            <view class="ai-action-list">
-              <view v-for="item in longActionItems" :key="item.label" class="ai-action-item">
-                <text class="ai-action-label">{{ item.label }}</text>
-                <text class="ai-action-text">{{ item.value }}</text>
-              </view>
             </view>
             <view v-if="longBasisTags.length" class="ai-section">
               <text class="ai-section-title">研判依据</text>
@@ -926,6 +908,8 @@ type KLinePeriod = 'daily' | 'weekly' | 'monthly'
 const klinePeriod = ref<KLinePeriod>('daily')
 const klineLoading = ref(false)
 const trendScoreData = ref<any>(null)
+const midAnalysisData = ref<any>(null)
+const longAnalysisData = ref<any>(null)
 const trendLoading = ref(false)
 const industryHealthData = ref<any>(null)
 // 历史 AI 评价
@@ -1014,6 +998,8 @@ function getAnchorOffset(anchor: DetailAnchor): Promise<number | null> {
 const symbolRef = computed(() => symbol.value)
 const quoteRef = computed(() => ({ name: quote.value?.name, industry: stockInfo.value?.industry || quote.value?.industry }))
 const trendScoreDataRef = computed(() => trendScoreData.value)
+const midAnalysisDataRef = computed(() => midAnalysisData.value)
+const longAnalysisDataRef = computed(() => longAnalysisData.value)
 const industryHealthDataRef = computed(() => industryHealthData.value)
 const stockAiContextRef = computed(() => ({
   quote: quote.value,
@@ -1027,7 +1013,7 @@ const {
   midMockData,
   longMockData,
   trendModel,
-} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef, industryHealthDataRef)
+} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef, industryHealthDataRef, midAnalysisDataRef, longAnalysisDataRef)
 
 const visibleNewsList = computed(() => newsExpanded.value ? newsList.value : newsList.value.slice(0, 3))
 const hasAiInfoCardData = computed(() => Boolean(
@@ -1264,54 +1250,6 @@ const midRiskTags = computed(() => extractTagsFromArray(midAiAnalysis.value.risk
 const longBasisTags = computed(() => extractTagsFromArray(longAiAnalysis.value.basis))
 const longAdviceTags = computed(() => extractTagsFromArray(longAiAnalysis.value.advice))
 const longRiskTags = computed(() => extractTagsFromArray(longAiAnalysis.value.riskTips))
-const midActionItems = computed(() => {
-  const conclusion = String(midAiAnalysis.value.conclusion || '')
-  const hasRisk = midRiskTags.value.length > 0
-  const isPositive = /看多|买入|增持|积极|继续/.test(conclusion)
-  return [
-    {
-      label: '当前判断',
-      value: isPositive
-        ? '中线逻辑仍可跟踪，但需要继续等业绩和行业数据验证。'
-        : '中线信号还不够强，先降低预期，等待更明确的基本面确认。',
-    },
-    {
-      label: '下一步验证',
-      value: '重点看业绩预期是否上修、行业景气是否延续，以及回调时成交量是否收缩。',
-    },
-    {
-      label: '风险判断',
-      value: hasRisk
-        ? `如果 ${midRiskTags.value[0]?.tag} 开始兑现，中线逻辑就需要降级。`
-        : '如果业绩预期下修、回调放量或行业热度降温，中线逻辑需要降级。',
-    },
-  ]
-})
-const longActionItems = computed(() => {
-  const score = Number(trendModel.value?.score || 0)
-  const hasVeto = Boolean(trendModel.value?.isVetoed)
-  const risk = longRiskTags.value[0]?.tag
-  return [
-    {
-      label: '长期判断',
-      value: hasVeto
-        ? '当前存在硬性风险（ST、流动性不足等），不适合直接放入长期核心池。'
-        : score >= 75
-          ? '具备长期观察价值，但仍要确认盈利质量和行业空间能否持续。'
-          : '长期确定性还不充分，更适合作为观察池标的。',
-    },
-    {
-      label: '长期跟踪',
-      value: '重点跟踪 ROE、收入增速、利润率、竞争格局和估值消化情况。',
-    },
-    {
-      label: '移出条件',
-      value: risk
-        ? `如果 ${risk} 兑现，或收入增速和利润率连续走弱，应降低长期关注级别。`
-        : '如果增长放缓、利润率下滑、竞争格局恶化或估值明显透支，应降低长期关注级别。',
-    },
-  ]
-})
 const latestMajorEvent = computed(() => stockEvents.value[0] || null)
 const displayedStockEvents = computed(() => {
   const latestKey = getEventIdentity(latestMajorEvent.value)
@@ -1926,11 +1864,12 @@ async function loadData() {
       klineData.value = Array.isArray(klineRes.value) ? klineRes.value : []
     }
     applyLiveQuoteToKline()
-    // 中线卡片上方的异步内容会改变锚点位置，完成后再执行锚定。
+// 中线卡片上方的异步内容会改变锚点位置，完成后再执行锚定。
     const aiTask = loadAiAnalysis()
     const forecastTask = loadForecast(false)
     const trendTask = loadTrendScore()
     const industryTask = loadIndustryHealth()
+    loadMidLongAnalysis()
     if (detailAnchor.value === 'forecast') {
       await Promise.all([aiTask, forecastTask, trendTask, industryTask])
     } else if (detailAnchor.value === 'performance-report') {
@@ -1971,6 +1910,40 @@ async function loadIndustryHealth() {
     industryHealthData.value = res
   } catch {
     industryHealthData.value = null
+  }
+}
+
+async function loadMidLongAnalysis() {
+  if (!symbol.value) return
+  try {
+    const [midRes, longRes] = await Promise.allSettled([
+      stockApi.getMidLongAnalysis(symbol.value, 'mid'),
+      stockApi.getMidLongAnalysis(symbol.value, 'long'),
+    ])
+    if (midRes.status === 'fulfilled') {
+      midAnalysisData.value = midRes.value
+    } else {
+      // 无缓存时自动触发 LLM 生成
+      try {
+        const created = await stockApi.createMidLongAnalysis(symbol.value, 'mid')
+        midAnalysisData.value = created
+      } catch {
+        midAnalysisData.value = null
+      }
+    }
+    if (longRes.status === 'fulfilled') {
+      longAnalysisData.value = longRes.value
+    } else {
+      try {
+        const created = await stockApi.createMidLongAnalysis(symbol.value, 'long')
+        longAnalysisData.value = created
+      } catch {
+        longAnalysisData.value = null
+      }
+    }
+  } catch {
+    midAnalysisData.value = null
+    longAnalysisData.value = null
   }
 }
 
@@ -2882,16 +2855,6 @@ function goChat() {
   color: $ink-faint;
 }
 
-.ai-logic {
-  margin-bottom: 20rpx;
-}
-
-.ai-logic-text {
-  font-size: 28rpx;
-  color: $ink-soft;
-  line-height: 1.7;
-}
-
 .ai-section {
   margin-bottom: 20rpx;
 
@@ -3063,39 +3026,6 @@ function goChat() {
   line-height: 1.5;
   color: $ink;
   font-weight: 700;
-}
-
-.ai-action-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-  margin: 18rpx 0 22rpx;
-}
-
-.ai-action-item {
-  display: grid;
-  grid-template-columns: 128rpx minmax(0, 1fr);
-  gap: 14rpx;
-  align-items: start;
-  padding: 16rpx 18rpx;
-  border-radius: 14rpx;
-  background: $bg-soft;
-  border: 1rpx solid $line-soft;
-}
-
-.ai-action-label {
-  color: $primary;
-  font-size: 24rpx;
-  line-height: 1.45;
-  font-weight: 800;
-}
-
-.ai-action-text {
-  min-width: 0;
-  color: $ink-soft;
-  font-size: 26rpx;
-  line-height: 1.55;
-  font-weight: 600;
 }
 
 .section-header {
