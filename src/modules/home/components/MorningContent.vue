@@ -120,16 +120,16 @@
           </view>
         </Card>
 
-        <Card class="feature-card" clickable @tap="goAgentReport">
+        <Card class="feature-card" clickable @tap="goRhythm">
           <view class="feature-header">
-            <text class="feature-title">今日分析概览</text>
+            <text class="feature-title">节奏大师</text>
             <text class="feature-more">›</text>
           </view>
-          <text class="feature-sub">Agent报告更新状态</text>
-          <view class="feature-list">
-            <view v-for="(item, idx) in aiReports.slice(0, 3)" :key="idx" class="feature-item">
-              <text class="item-name">{{ item.name }}</text>
-              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
+          <text class="feature-sub">目标交易日节奏状态卡</text>
+          <view class="feature-list" v-if="rhythmSummary">
+            <view class="feature-item">
+              <text class="feature-label">{{ rhythmSummary.title }}</text>
+              <text class="feature-value">{{ rhythmSummary.band }}</text>
             </view>
           </view>
         </Card>
@@ -332,8 +332,6 @@ async function loadChainEvents() {
   }
 }
 
-const aiReports = ref<LeaderStockPreview[]>([])
-
 const traceReports = ref<LeaderStockPreview[]>([])
 
 /**
@@ -371,40 +369,31 @@ async function loadTraceReports() {
   })
 }
 
-/** Agent 报告状态预览：检查 4 个 agent（晨报/风口龙头/机构调研/趋势股评分），最多显示3个已更新，不足则补"待更新" */
-const AGENT_REPORT_LABELS: Array<{ intent: string; name: string }> = [
-  { intent: 'morning', name: '晨报' },
-  { intent: 'wind_leader', name: '风口龙头' },
-  { intent: 'hot_burst', name: '机构调研' },
-  { intent: 'trend_score', name: '趋势股评分' },
-]
+/** 节奏大师卡片摘要：目标交易日 + 节奏档位（取最近交易日最新版本 rhythm_card） */
+const rhythmSummary = ref<{ title: string; band: string } | null>(null)
 
-async function loadAiReports() {
-  const today = shanghaiDateString()
-  const results = await Promise.allSettled(
-    AGENT_REPORT_LABELS.map(item => agentApi.getReport(item.intent, today))
-  )
+async function loadRhythm() {
+  try {
+    // shanghaiDateString 固定 UTC+8 取上海自然日（与 loadTraceReports 同口径），不依赖设备本地时区
+    const today = shanghaiDateString()
+    let date: string | undefined
+    try {
+      date = (await agentApi.getRecentTradingDays(today, 1))?.[0]
+    } catch { date = undefined }
+    if (!date) return
+    const res: unknown = await agentApi.getRhythmMaster(date)
+    // 响应拦截器（request.ts）已解包 {code,data} 信封：code===0 时直接 return data，
+    // 故 getRhythmMaster 解析值即 {date, versions}，没有 .data 字段，这里直接取 .versions
+    const versions = (res as { versions?: { refresh_slot?: string; content?: { rhythm_card?: { level?: string; position_band?: { text?: string }; target_date?: string } } }[] }).versions ?? []
+    const latest = versions?.[0]
+    const card = latest?.content?.rhythm_card
+    if (!latest || !card) return
+    rhythmSummary.value = { title: `目标日 ${card.target_date ?? date} 节奏`, band: `${card.level ?? ''} ${card.position_band?.text ?? ''}`.trim() }
+  } catch { rhythmSummary.value = null }
+}
 
-  const updated: LeaderStockPreview[] = []
-  AGENT_REPORT_LABELS.forEach((item, idx) => {
-    const r = results[idx]
-    const hasReport = r.status === 'fulfilled' && r.value &&
-      !!(r.value as { content?: unknown })?.content
-    if (hasReport) {
-      updated.push({ name: item.name, tag: '已更新', tagType: 'buy' })
-    }
-  })
-
-  // 最多显示3个：已更新优先，不足补"待更新"
-  const display: LeaderStockPreview[] = updated.slice(0, 3)
-  for (const item of AGENT_REPORT_LABELS) {
-    if (display.length >= 3) break
-    if (!updated.some(u => u.name === item.name)) {
-      display.push({ name: item.name, tag: '待更新', tagType: 'wash' })
-    }
-  }
-
-  aiReports.value = display
+function goRhythm() {
+  uni.navigateTo({ url: '/modules/rhythm/pages/index' })
 }
 
 /**
@@ -426,7 +415,7 @@ function itemTagType(tagType: LeaderStockPreview['tagType']): 'up' | 'down' | 'n
 onShow(() => {
   briefingRefresh()
   loadLeaderSectors()
-  loadAiReports()
+  loadRhythm()
   loadChainEvents()
   loadTraceReports()
 })
@@ -464,10 +453,6 @@ function goEventDetail(eventId?: string) {
 
 function goTraceability() {
   uni.navigateTo({ url: '/modules/analytics/pages/traceability' })
-}
-
-function goAgentReport() {
-  uni.navigateTo({ url: '/modules/chat/pages/agent-report' })
 }
 
 function goTrackDetail() {
@@ -794,6 +779,24 @@ function goLogin() {
 
 .item-name.placeholder {
   color: $ink-mute;
+}
+
+/* 节奏大师卡片：左标题 + 右档位值 */
+.feature-label {
+  font-size: $font-size-sm;
+  color: $ink-soft;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.feature-value {
+  font-size: $font-size-sm;
+  color: $primary;
+  font-weight: 500;
+  flex-shrink: 0;
 }
 
 /* ===== 重磅事件跟踪 ===== */
