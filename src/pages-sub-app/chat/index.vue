@@ -32,7 +32,17 @@
             <text class="empty-guide-close-text">不再显示</text>
           </view>
         </view>
-        <view v-for="(msg, idx) in displayMessages" :key="idx" class="message-item" :class="msg.role">
+        <view
+          v-for="(msg, idx) in displayMessages"
+          :key="idx"
+          class="message-item"
+          :class="[msg.role, { selectable: msg.timestamp === selectingMsgTimestamp }]"
+          :data-ts="msg.timestamp"
+          @touchstart="onMsgTouchStart($event, msg)"
+          @touchmove="onMsgTouchMove"
+          @touchend="onMsgTouchEnd"
+          @touchcancel="onMsgTouchCancel"
+        >
           <!-- 用户消息 -->
           <text v-if="msg.role === 'user'" class="msg-content user">{{ msg.content }}</text>
 
@@ -53,31 +63,6 @@
                 :content="markdownToHtml(typedText + ' ▊')"
                 class="bubble-html streaming-blink"
               />
-
-              <!-- 改进 20（批次 1）：引导追问按钮化——「你可以问我：…」引导句渲染为可点击快捷追问
-                   （点击即发，复用 quickAsk）；保守解析命中才渲染（正文剔除引导行），未命中回退
-                   下方既有纯文本分支（绝不渲染错按钮） -->
-              <template v-else-if="followupOf(msg)">
-                <template v-for="(sec, si) in getSections(followupBody(msg)) ?? []" :key="si">
-                  <mp-html v-if="!sec.title" :content="markdownToHtml(sec.body)" class="bubble-html" />
-                  <SectionCard v-else :variant="sec.variant" :title="sec.title" :body="sec.body" />
-                </template>
-                <mp-html
-                  v-if="!getSections(followupBody(msg))"
-                  :content="markdownToHtml(followupBody(msg))"
-                  class="bubble-html"
-                />
-                <view class="followup-questions">
-                  <view
-                    v-for="q in followupQuestions(msg)"
-                    :key="q"
-                    class="followup-question"
-                    @tap="quickAsk(q)"
-                  >
-                    <text class="followup-question-text">{{ q }}</text>
-                  </view>
-                </view>
-              </template>
 
               <!-- 改进 14：分节卡片化渲染（有分节时 SectionCard 列表，无分节时回退 mp-html） -->
               <template v-else-if="msg.content">
@@ -114,6 +99,15 @@
                 >
                   <SvgIcon name="refresh-line" size="24rpx" color="#0b5fff" />
                   <text class="retry-btn-text">重试</text>
+                </view>
+                <!-- Task 8：追问面板弱入口（pending 且未展示时，消息尾部可恢复面板） -->
+                <view
+                  v-if="panelState.pending && !panelState.visible && msg.timestamp === panelState.messageId"
+                  class="panel-restore-btn"
+                  @tap="restorePanel"
+                >
+                  <SvgIcon name="chat-follow-up-line" size="24rpx" color="#0b5fff" />
+                  <text class="panel-restore-text">查看追问</text>
                 </view>
               </view>
 
@@ -169,8 +163,8 @@
         <text class="back-to-latest-text">回到最新</text>
       </view>
 
-      <!-- 快捷 Skills -->
-      <view class="quick-skills">
+      <!-- 快捷 Skills（追问面板可见时替换为底部建议行） -->
+      <view v-if="!panelState.visible" class="quick-skills">
         <view class="skill-btn" @tap="quickAsk('今日大盘怎么样')">
           <SvgIcon name="line-chart-line" size="28rpx" color="#0b5fff" />
           <text class="skill-btn-text">大盘</text>
@@ -189,15 +183,59 @@
           <text class="skill-btn-text">龙头</text>
         </view>
       </view>
+      <!-- 追问面板（2026-08-26）：回答完成后的建议追问替换快捷技能行；× 收起保留 pending（footer 弱入口可恢复） -->
+      <view v-else class="suggest-row">
+        <view class="suggest-chips-wrap">
+          <FollowupSuggestChips :items="panelQuestions" @select="onPanelSelect" />
+        </view>
+        <view class="suggest-collapse" @tap="dismissPanel">
+          <SvgIcon name="close-line" size="28rpx" color="#9aa3b2" />
+        </view>
+      </view>
 
       <!-- 输入框 -->
       <view class="input-bar">
-        <input v-model="inputText" placeholder="输入消息..." class="input" @confirm="handleSend" />
-        <!-- Phase 4-2 Task 2：语音输入（仅支持平台显示；tap 切换：点击开始聆听，再点结束） -->
-        <view v-if="speechSupported" class="mic-btn" :class="{ active: isListening }" @tap="handleMicTap">
-          <SvgIcon name="mic-line" size="40rpx" :color="isListening ? '#ffffff' : '#0b5fff'" />
+        <!-- 左：模式切换（键盘 / 按住说话）—— 仅语音受支持时显示 -->
+        <view v-if="speechSupported" class="mode-btn" @tap="toggleInputMode">
+          <SvgIcon
+            :name="inputMode === 'voice' ? 'keyboard-line' : 'mic-line'"
+            size="36rpx"
+            color="#0b5fff"
+          />
         </view>
-        <!-- Phase 2 Part 2：生成中「发送」替换为「停止」（与 isStreaming 联动） -->
+
+        <!-- 中：text 模式 = 文本输入框（mic 图标内嵌输入框右侧，点击录音） -->
+        <view v-if="inputMode === 'text'" class="input-wrap">
+          <input
+            v-model="inputText"
+            placeholder="输入消息..."
+            class="input"
+            @confirm="handleSend"
+          />
+          <!-- 内嵌右侧麦克风：常态灰色与 GlobalChatBar 输入框内图标一致；录音激活时蓝色圆底白图标 -->
+          <view
+            v-if="speechSupported"
+            class="input-mic-btn"
+            :class="{ active: isListening }"
+            @tap.stop="handleMicTap"
+          >
+            <SvgIcon name="mic-line" size="36rpx" :color="isListening ? '#ffffff' : '#9ca3af'" />
+          </view>
+        </view>
+
+        <!-- 中：voice 模式 = 按住说话 -->
+        <view
+          v-else
+          class="hold-talk"
+          :class="{ holding }"
+          @touchstart="onHoldStart"
+          @touchend="onHoldEnd"
+          @touchcancel="onHoldEnd"
+        >
+          <text class="hold-talk-text">{{ holding ? '松开结束' : '按住 说话' }}</text>
+        </view>
+
+        <!-- 发送 / 停止（保留原逻辑） -->
         <button v-if="isStreaming" @tap="chatStream.stop()" class="stop-btn">停止</button>
         <button v-else @tap="handleSend" :disabled="isStreaming" class="send-btn">发送</button>
       </view>
@@ -213,6 +251,21 @@
       @select="handleConfirmSelect"
       @close="handleConfirmClose"
     />
+
+    <!-- 批次 4：消息长按原位浮动菜单（无遮罩、无模糊、不跳页） -->
+    <MessageActionMenu
+      :visible="menuVisible"
+      :x="menuPos.x"
+      :y="menuPos.y"
+      :items="menuItems"
+      @select="handleMessageAction"
+      @close="closeMenu"
+    />
+
+    <!-- 批次 4：选中文字态浮出「复制已选」栏（仅 App 原生手柄圈选后出现） -->
+    <view v-if="selectingActive && hasSelection" class="copy-selection-bar" @tap="copySelection">
+      <text class="copy-selection-text">复制已选</text>
+    </view>
   </SubPageCard2>
 </template>
 
@@ -221,7 +274,7 @@ import { ref, nextTick, watch, computed, onUnmounted } from 'vue'
 import { onLoad, onShow, onReady } from '@dcloudio/uni-app'
 import { useChatStream, type ConfirmOption } from '@/shared/utils/useChatStream'
 import { markdownToHtml } from '@/shared/utils/markdown'
-import { isNearBottom } from '@/shared/utils/scrollFollow'
+import { measureProximity, clampScrollTop } from '@/shared/utils/scrollFollow'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
@@ -230,9 +283,10 @@ import ReasoningPanel from './ReasoningPanel.vue'
 import CardRenderer from './cards/CardRenderer.vue'
 import SectionCard from './cards/SectionCard.vue'
 import FeedbackBar from '@/shared/components/FeedbackBar.vue'
+import FollowupSuggestChips from '@/shared/components/FollowupSuggestChips.vue'
 import ConfirmSheet from '@/shared/components/ConfirmSheet.vue'
+import MessageActionMenu, { type MenuItem } from './MessageActionMenu.vue'
 import { parseMarkdownSections, type MarkdownSection } from '@/shared/utils/parseMarkdownSections'
-import { parseFollowupQuestions, type FollowupParse } from '@/shared/utils/parseFollowupQuestions'
 import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
@@ -244,14 +298,20 @@ import {
   startSpeechRecognition,
   stopSpeechRecognition,
 } from '@/shared/utils/speechInput'
+import type { SpeechRecognitionResult } from '@/shared/utils/speechInput'
 
-const chatStream = useChatStream()
+// FIX-2（final review）：onBeforeStream = 页面"新一轮启动"钩子（覆盖 send/quickAsk/rerunDeep/
+// retry/resume-none 兜底/confirm fresh run 全部发送路径）——复位跟随 + 更新轮次锚点（本轮新鲜
+// 回答 timestamp ≥ 锚点才自动弹面板；会话切换恢复的旧消息早于锚点 → 不弹）
+const chatStream = useChatStream({ onBeforeStream: () => { resetFollow(); roundAnchor.value = Date.now() } })
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const favoritesStore = useFavoritesStore()
 
 // P9：无当前会话时自动新建（保证 messagesBySession 有当前会话载体；切换会话返回本页不重复触发，onLoad 仅一次）
 onLoad((options: Record<string, string> | undefined) => {
+  // G6（2026-08-17）：详情类跳转出口经全局事件通知本页记录阅读位置
+  uni.$on('chat:leave-context', leaveChatContext)
   if (!chatStore.sessionId) chatStore.createSession()
   const q = options?.q
   if (!q) return
@@ -263,7 +323,6 @@ onLoad((options: Record<string, string> | undefined) => {
     } else {
       inputText.value = q
     }
-    scrollToBottom()
   })
 })
 
@@ -350,6 +409,9 @@ watch(pendingConfirm, (v) => {
     confirmVisible.value = true
     confirmWaiting.value = false
     startConfirmTimer()
+    // 5B（2026-08-17）：confirm_request 到达 = 第 4 个"新交互"入口——复位跟随
+    // 并滚底展示确认框（防阶段 2 fresh run 回答在视口外生长）。
+    resetFollow()
     scrollToBottom()
   } else {
     clearConfirmTimer()
@@ -385,17 +447,81 @@ function handleConfirmClose() {
 }
 
 const inputText = ref('')
+/** 输入模式：text=键盘输入 / voice=按住说话（微信式） */
+const inputMode = ref<'text' | 'voice'>('text')
+/** 是否正在按住说话录制中 */
+const holding = ref(false)
+/** 进行中的按住说话识别 Promise（touchend 结算） */
+let pendingHoldRecognition: Promise<SpeechRecognitionResult> | null = null
 const scrollTop = ref(0)
 
 // Phase 4-2 Task 2：语音输入（平台支持才显示麦克风按钮；isListening 为 UI 镜像，模块状态见 speechInput）
 const speechSupported = isSpeechInputSupported()
 const isListening = ref(false)
 
+// ===== G6 跳转-返回恢复阅读位置（2026-08-17 分歧 #5 收敛：仅 D 出口接线） =====
+// 语义：详情类跳转（改进 23 个股详情）返回时恢复跳转前滚动位置；
+// 会话列表入口与 onHide（前后台）不置位——「会话列表返回=贴底」先例不破；
+// B/C（改进 19 报告详情）不接线，维持既有贴底行为（批次 2 已上线功能不改）。
+const savedScrollTop = ref(0)
+// G6：是否需在下次 onShow 恢复阅读位置（仅 D 出口置位）
+const pendingRestore = ref(false)
+let savedMessageCount = 0
+
+/** 详情跳转前记录阅读位置（由 uni.$emit('chat:leave-context') 触发，navigateTo success 回调发射） */
+function leaveChatContext() {
+  savedScrollTop.value = currentScrollTop
+  savedMessageCount = displayMessages.value.length
+  pendingRestore.value = true
+}
+
+/** 两段式恢复：先 nextTick 设值，50ms 幂等第二次（抗 mp-html 异步渲染）；
+ * 期间 restoreInProgress=true 抑制 onScroll（防小程序端编程式滚动触发 @scroll 回跳）；
+ * 完成后进入暂停跟随态（followPaused=true）——L167「回到最新」按钮兜底，
+ * 用户滚动至近底部时 onScroll isNearBottom 自动恢复跟随。 */
+function restorePosition(target: number) {
+  restoreInProgress.value = true
+  const apply = () => {
+    scrollTop.value = clampScrollTop(
+      target,
+      currentScrollHeight,
+      viewportH.value || DEFAULT_VIEWPORT_PX,
+    )
+  }
+  nextTick(apply)
+  setTimeout(() => {
+    nextTick(() => {
+      apply()
+      restoreInProgress.value = false
+      followPaused.value = true
+    })
+  }, 50)
+}
+
 // 每次进入页面（含从会话列表返回、切会话）默认停留在对话最下方
 onShow(() => {
-  // 改进 16：进入页面默认贴底跟随（重置上滑暂停态，防旧会话残留暂停状态）
-  followPaused.value = false
-  scrollToBottom()
+  // G6（2026-08-17 分歧 #5 收敛）：详情类跳转返回 → 无新推进时恢复阅读位置；
+  // 否则维持既有"回场景=贴底"语义（会话列表返回/首次进入/前后台切换）。
+  if (pendingRestore.value) {
+    pendingRestore.value = false
+    const hasNewProgress =
+      isStreaming.value ||
+      chatStream.hasPendingRun() ||
+      displayMessages.value.length !== savedMessageCount
+    if (hasNewProgress) {
+      // 对话已推进 → 放弃恢复走贴底（新消息优先，硬约束 #6）
+      followPaused.value = false
+      scrollToBottom()
+    } else {
+      restorePosition(savedScrollTop.value)
+      // 恢复分支不执行下方 resume 续跑（已判定无 pending run）
+      return
+    }
+  } else {
+    // 改进 16：进入页面默认贴底跟随（重置上滑暂停态，防旧会话残留暂停状态）
+    followPaused.value = false
+    scrollToBottom()
+  }
   // 问题 15：回页时若存在未完成轮（最后一条是 user）且连接已断开 → 自动 resume 续跑
   if (chatStream.hasPendingRun() && !chatStream.isConnected()) {
     void chatStream.resume()
@@ -425,11 +551,30 @@ let followTimer: ReturnType<typeof setInterval> | null = null
 // 150ms 定时器已停、打字机滚动被 scrollToBottomIfFollowing 守卫（内容仍生长、位置不动）；
 // 「回到最新」按钮点击后恢复跟随。
 const followPaused = ref(false)
+// 5B（2026-08-17 design-debate 定案）：resetFollow 纯复位——仅清暂停态与增量
+// 去重签名，不滚底、不启定时器。所有新发送路径均经 streaming.value=true
+// （useChatStream _stream / sendConfirmResponse），watch(isStreaming, v=true)
+// 是唯一滚底+定时器收口点（硬约束 #3）；此处再滚即双发，spy===1 断言失败。
+function resetFollow() {
+  followPaused.value = false
+  lastFollowSig = ''
+}
 // scroll-view 视口高度（onReady 测量；测量失败/测试环境用默认值兜底，判定仍可用）
 const viewportH = ref(0)
 const DEFAULT_VIEWPORT_PX = 600
 
+// 5B/G6（2026-08-17）：onScroll 最近一次测量的滚动位置/内容高度缓存——
+// G6 恢复原位的数据源（原 scrollTop ref 被 onScroll 局部 const 遮蔽，从不更新）。
+let currentScrollTop = 0
+let currentScrollHeight = 0
+// G6（2026-08-17 分歧 #5 收敛）：恢复执行窗口标志——期间忽略 onScroll，
+// 防小程序端 scroll-top 赋值触发 @scroll → resumeFollow 回跳闪烁。
+const restoreInProgress = ref(false)
+
 function onScroll(e: unknown) {
+  if (restoreInProgress.value) return
+  // 选中文字态下滚动列表即退出选中态，避免手柄残留
+  if (selectingMsgTimestamp.value !== null) exitSelectMode()
   const detail = ((e as { detail?: unknown } | null)?.detail ?? {}) as {
     scrollTop?: unknown
     scrollHeight?: unknown
@@ -437,9 +582,13 @@ function onScroll(e: unknown) {
   const scrollTop = Number(detail.scrollTop) || 0
   const scrollHeight = Number(detail.scrollHeight) || 0
   const viewport = viewportH.value || DEFAULT_VIEWPORT_PX
-  if (isNearBottom(scrollTop, scrollHeight, viewport)) {
+  currentScrollTop = scrollTop
+  if (scrollHeight > 0) currentScrollHeight = scrollHeight
+  // 5B：三态判定——near 恢复跟随；far 暂停跟随；unknown（测失败）保持当前状态不变
+  const proximity = measureProximity(scrollTop, scrollHeight, viewport)
+  if (proximity === 'near') {
     if (followPaused.value) resumeFollow()
-  } else if (!followPaused.value) {
+  } else if (proximity === 'far' && !followPaused.value) {
     pauseFollow()
   }
 }
@@ -529,14 +678,18 @@ function startTypewriterIfNeeded() {
 
 watch(isStreaming, (v) => {
   if (v) {
+    // Task 8：新发送轮 → 收起追问面板（先清 pending 再清 typingMsgKey，
+    // 防 watch(typingMsgKey) 以 null 信号误复活上一轮未完成建议）
+    clearPanel()
     // Phase 4-2 改进 13：confirm_response 后后端 fresh run 开始流式 → 弹框完成使命（waiting 态结束），关闭
     confirmVisible.value = false
     // 新一轮开始：重置"本轮是否出现过真流式文本"，并停掉上一条未播完的打字机
     hadStreamText = false
     stopTypewriter()
     typingMsgKey.value = null
-    // 改进 16：上滑暂停跟随后新一轮不强制钉底（等待「回到最新」按钮恢复）；
-    // 恢复跟随态时立即滚底并重启 150ms 定时器
+    // 5B（2026-08-17 定案）：任何发送/点选确认交互已在发送路径前置 resetFollow
+    // （followPaused=false），此处守卫保留作双保险——仅当暂停态由 onScroll 上滑
+    // 触发且尚未发新消息时（如 G6 恢复原位后的暂停跟随态）才生效，不钉底。
     if (followPaused.value) return
     scrollToBottom()
     if (followTimer) clearInterval(followTimer)
@@ -552,13 +705,290 @@ watch(isStreaming, (v) => {
   }
 })
 
+// ===== 追问面板（2026-08-26，Task 8）：豆包/元宝式底部建议追问 =====
+// pending：本轮存在可展示建议但未达展示条件（打字机未完成 / followPaused）；
+// visible：面板显示；messageId：面板归属消息（最新带 questions 的 assistant 消息）。
+const panelState = ref<{ visible: boolean; messageId: number | null; pending: boolean }>({
+  visible: false, messageId: null, pending: false,
+})
+
+// FIX-2（final review）：轮次锚点 = 本页实例当前轮启动时刻（useChatStream onBeforeStream 置位；
+// 页面创建时取 Date.now()）。会话切换恢复的历史消息（switchSession 重入 displayMessages 的
+// 旧消息，timestamp 早于锚点）不自动弹面板，仅记 pending（footer 弱入口）；仅当前轮新鲜回答
+// （timestamp ≥ 锚点）才满足自动展示条件。
+const roundAnchor = ref(Date.now())
+
+// FIX-3（final review）：会话切换（同页实例 A→B→A，无新发送）→ 收起面板并重置轮次锚点。
+// 锚点仅随发送前移：切走再切回时，A 的旧回答（timestamp ≥ 旧锚点）会以「恢复历史」重入
+// displayMessages 并通过锚点守卫误自动弹面板——在切换时刻清面板 + 重置锚点，恢复消息至多
+// 保留 pending（footer 弱入口），不自动弹。必须注册于 display-messages 收口 watch 之前，
+// 保证同一次 flush 中本 watch 回调先执行（锚点已重置）再轮到收口 watch 的锚点判定。
+watch(chatStream.sessionId, () => {
+  clearPanel()
+  roundAnchor.value = Date.now()
+})
+
+/** F2：面板立即展示判定（纯函数）——questions 存在 且 打字机已完成 且 未暂停跟随 */
+function shouldShowPanel(hasQuestions: boolean, typingActive: boolean, followPaused: boolean): boolean {
+  return hasQuestions && !typingActive && !followPaused
+}
+
+/** 消息终态落地统一收口：done/HTTP append 后置检查（不依赖 watch(isStreaming) 边沿） */
+function onAnswerSettled(msg: ChatMessage) {
+  if (!msg.questions || msg.questions.length === 0) return
+  panelState.value = { visible: false, messageId: msg.timestamp, pending: true }
+}
+
+/** light 分支打字机完成信号 → 展示面板（正文已完整呈现，完成信号不先于正文） */
+watch(typingMsgKey, (k) => {
+  if (k !== null || !panelState.value.pending) return
+  if (!followPaused.value) panelState.value.visible = true
+})
+
+/**
+ * 统一收口（F2）：最后一条消息落地 → 记 pending；打字机未播且未暂停跟随才立即展示。
+ * 时序修正（Vue 3.5 实测）：watch 回调按依赖变更入队顺序执行，而非创建顺序——
+ * DONE 处理内先 appendMessage 后 streaming=false，故本 watch 先于 watch(isStreaming)
+ * 入队并先执行，此时打字机尚未启动（typingMsgKey 仍为 null）。因此展示判定延后一帧
+ * （nextTick）：届时 isStreaming watch 已启动打字机（静态 light 场景）→ 等
+ * typingMsgKey→null 完成信号；D9 伪流式 light / deep 真流式 / HTTP 降级无打字机 → 展示。
+ */
+watch(
+  () => displayMessages.value[displayMessages.value.length - 1]?.timestamp,
+  (ts, prev) => {
+    if (ts === prev) return
+    const last = displayMessages.value[displayMessages.value.length - 1]
+    const hasQuestions = !!last?.questions?.length
+    if (!last || last.role !== 'assistant' || !hasQuestions) return
+    onAnswerSettled(last) // 统一收口：记 pending（打字机未完成 / followPaused 时等待）
+    // FIX-2（final review）：历史恢复（switchSession 重入的旧消息）不自动弹面板——
+    // 消息早于本轮锚点 → 仅保留 pending 弱入口，跳过展示判定；仅当前轮新鲜回答自动展示
+    if (last.timestamp < roundAnchor.value) return
+    nextTick(() => {
+      if (shouldShowPanel(hasQuestions, typingMsgKey.value !== null, followPaused.value)) {
+        // 展示：仅置 visible，保留 onAnswerSettled 写入的 pending（× 收起后可经 footer 弱入口恢复）
+        panelState.value.visible = true
+      }
+    })
+  }
+)
+
+/** 发送追问 / 新消息到达 → 收起并清 pending */
+function clearPanel() {
+  panelState.value = { visible: false, messageId: null, pending: false }
+}
+
+/** × 收起（非丢弃）：清 visible 留 pending（footer 弱入口可恢复） */
+function dismissPanel() {
+  panelState.value.visible = false
+}
+
+/** footer「查看追问」弱入口恢复 */
+function restorePanel() {
+  if (panelState.value.pending && panelState.value.messageId !== null) {
+    panelState.value.visible = true
+  }
+}
+
+/** 面板建议 = panelState.messageId 对应消息的 questions（消息被删/缺失 → 空数组） */
+const panelQuestions = computed(() => {
+  const id = panelState.value.messageId
+  if (id === null) return []
+  return displayMessages.value.find((m) => m.timestamp === id)?.questions ?? []
+})
+
+/** 点击建议追问：收起面板并发送（复用 quickAsk） */
+function onPanelSelect(q: string) {
+  clearPanel()
+  quickAsk(q)
+}
+
 function handleSend() {
   const content = inputText.value.trim()
   if (!content || isStreaming.value) return
   inputText.value = ''
   upsertSessionMeta(content)
   chatStream.send(content)
-  scrollToBottom()
+}
+
+// ── 长按手势：手动触摸监听（350ms 按住 + 10px 位移取消，修复滑动误触） ──
+const LONG_PRESS_MS = 350
+const MOVE_CANCEL_PX = 10
+const menuPos = ref({ x: 0, y: 0 })
+/** 选中文字模式：记录正在圈选的消息 timestamp；null = 非选中态 */
+const selectingMsgTimestamp = ref<number | null>(null)
+/** 是否已圈选出非空文本（供「复制已选」按钮显隐/交互） */
+const hasSelection = ref(false)
+/** 处于选中文字态（非 null）时浮出「复制已选」栏 */
+const selectingActive = computed(() => selectingMsgTimestamp.value !== null)
+
+function handleSelectText(msg: ChatMessage) {
+  menuTarget.value = msg
+  selectingMsgTimestamp.value = msg.timestamp
+  menuVisible.value = false
+  ensureSelectionListener()
+  nextTick(() => {
+    // App webview：程序化选中该消息文本，使原生拖拽手柄出现（仅 App 有 document；MP/H5 无需选中态）
+    // #ifdef APP-PLUS
+    const el = document.querySelector<HTMLElement>(`[data-ts="${msg.timestamp}"]`)
+    selectMessageText(el)
+    // #endif
+  })
+}
+
+function selectMessageText(el: HTMLElement | null) {
+  // #ifdef APP-PLUS
+  if (!el) return
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  let first: Text | null = null
+  let last: Text | null = null
+  while (walker.nextNode()) {
+    const t = walker.currentNode as Text
+    if (!t.textContent || !t.textContent.trim()) continue
+    if (!first) first = t
+    last = t
+  }
+  if (!first || !last) return
+  const range = document.createRange()
+  range.setStart(first, 0)
+  range.setEnd(last, last.textContent!.length)
+  const sel = window.getSelection()
+  sel?.removeAllRanges()
+  sel?.addRange(range)
+  hasSelection.value = true
+  // #endif
+}
+
+let selectionBound = false
+
+function ensureSelectionListener() {
+  // #ifdef APP-PLUS
+  if (selectionBound) return
+  document.addEventListener('selectionchange', onMessageSelectChange)
+  selectionBound = true
+  // #endif
+}
+
+function onMessageSelectChange() {
+  // #ifdef APP-PLUS
+  const sel = window.getSelection()
+  const text = sel?.toString() ?? ''
+  hasSelection.value = !!text.trim()
+  // #endif
+}
+
+function copySelection() {
+  const msg = menuTarget.value
+  // #ifdef APP-PLUS
+  const sel = window.getSelection()?.toString() ?? ''
+  if (sel.trim()) {
+    uni.setClipboardData({ data: sel })
+  } else if (msg?.content) {
+    uni.setClipboardData({ data: msg.content })
+  }
+  // #endif
+  exitSelectMode()
+}
+
+function exitSelectMode() {
+  selectingMsgTimestamp.value = null
+  hasSelection.value = false
+  // #ifdef APP-PLUS
+  window.getSelection()?.removeAllRanges()
+  // #endif
+}
+
+let lpTimer: ReturnType<typeof setTimeout> | null = null
+let lpStartX = 0
+let lpStartY = 0
+
+function onMsgTouchStart(e: TouchEvent, msg: ChatMessage) {
+  if (isStreaming.value) return
+  const t = e.touches[0]
+  lpStartX = t.clientX
+  lpStartY = t.clientY
+  lpTimer = setTimeout(() => {
+    lpTimer = null
+    openMessageActions(msg, lpStartX, lpStartY)
+  }, LONG_PRESS_MS)
+}
+
+function onMsgTouchMove(e: TouchEvent) {
+  const t = e.touches[0]
+  const dx = Math.abs(t.clientX - lpStartX)
+  const dy = Math.abs(t.clientY - lpStartY)
+  if (dx > MOVE_CANCEL_PX || dy > MOVE_CANCEL_PX) cancelLongPress()
+}
+
+function onMsgTouchEnd() {
+  cancelLongPress()
+}
+
+function onMsgTouchCancel() {
+  cancelLongPress()
+}
+
+function cancelLongPress() {
+  if (lpTimer) {
+    clearTimeout(lpTimer)
+    lpTimer = null
+  }
+}
+
+// ── 批次 4（消息长按操作：复制/删除/重发到输入框；全体消息可用） ──
+const menuVisible = ref(false)
+const menuItems = ref<MenuItem[]>([])
+/** 当前长按选中的消息（timestamp 定位；删除/复制/重发都基于它） */
+const menuTarget = ref<ChatMessage | null>(null)
+
+/** 长按消息 → 组装操作菜单并原位弹出。复制/删除/重发对 user 与 assistant 消息同样适用：
+ *  - 复制：剪贴板复制文本
+ *  - 重发：回填输入框（可编辑后再发，走正常 send，后端按新消息追加——规避加性历史截断问题）
+ *  - 删除：本地隐藏删除（后端 LangGraph 线程保持不变）
+ */
+function openMessageActions(msg: ChatMessage, clientX = 0, clientY = 0) {
+  if (isStreaming.value) return // 流式中禁长按，避免打断正在生成的回答
+  menuTarget.value = msg
+  menuPos.value = { x: clientX, y: clientY }
+  menuItems.value = [
+    { label: '复制', value: 'copy' },
+    // #ifdef APP-PLUS
+    { label: '选中文字', value: 'select-text' },
+    // #endif
+    { label: '重发', value: 'resend' },
+    { label: '删除', value: 'delete', danger: true },
+  ]
+  menuVisible.value = true
+}
+
+function closeMenu() {
+  menuVisible.value = false
+}
+
+function handleMessageAction(item: MenuItem) {
+  const msg = menuTarget.value
+  if (!msg) return
+  switch (item.value) {
+    case 'copy':
+      uni.setClipboardData({ data: msg.content })
+      break
+    case 'resend':
+      // 回填输入框并切到文本模式；由用户确认/编辑后点发送，上下文字段由新 send 重建
+      inputMode.value = 'text'
+      inputText.value = msg.content
+      break
+    case 'delete':
+      chatStore.removeMessage(msg.timestamp)
+      // FIX-4（final review）：删除的是追问面板归属消息 → 收起面板（防残留空面板）
+      if (panelState.value.messageId === msg.timestamp) clearPanel()
+      break
+    case 'select-text':
+      // 进入选中态：自行关闭菜单，保留 menuTarget 供 copySelection 整条兜底复制
+      handleSelectText(msg)
+      return
+  }
+  menuTarget.value = null
+  menuVisible.value = false
 }
 
 /**
@@ -602,11 +1032,46 @@ function showListeningToast() {
   uni.showToast({ title: '正在聆听…，再次点击结束', icon: 'none', duration: 10000 })
 }
 
+/**
+ * Phase 4-2 Task 2（Task 4 扩展）：模式切换（键盘 ⇄ 按住说话，微信式）。
+ * 语音不受支持时不显示切换钮（模板 v-if="speechSupported"），此处再兜底。
+ */
+function toggleInputMode() {
+  if (!speechSupported) return
+  inputMode.value = inputMode.value === 'text' ? 'voice' : 'text'
+}
+
+/** 按住说话：touchstart → 开始录制（同步手势内启动识别），touchend/touchcancel → 停止并回填 */
+async function onHoldStart() {
+  if (holding.value || isStreaming.value) return
+  holding.value = true
+  // 复用既有 isListening 作为 UI 高亮（右 mic 按钮与 hold-talk 同源）
+  isListening.value = true
+  // startSpeechRecognition 需在同步手势内调用；返回 Promise 供 touchend 结算
+  pendingHoldRecognition = startSpeechRecognition()
+}
+
+async function onHoldEnd() {
+  if (!holding.value) return
+  holding.value = false
+  isListening.value = false
+  stopSpeechRecognition() // 提前结束并结算（小程序 stop 触发 onStop；H5 提前收结果）
+  const pending = pendingHoldRecognition
+  pendingHoldRecognition = null
+  if (!pending) return
+  const result = await pending
+  if (result.ok) {
+    inputText.value = result.text
+  } else {
+    uni.showToast({ title: result.error, icon: 'none' })
+  }
+}
+
 function quickAsk(text: string) {
   if (isStreaming.value) return
+  clearPanel() // Task 8：点任何快捷入口即收起追问面板
   upsertSessionMeta(text)
   chatStream.send(text)
-  scrollToBottom()
 }
 
 /**
@@ -644,25 +1109,6 @@ function getSections(content: string): MarkdownSection[] | null {
   return parsed
 }
 
-// ── 改进 20（批次 1）：引导追问按钮化辅助函数 ──
-// 模板无法缓存单条消息的解析结果，提供三个薄函数多次调用（与 getSections 同模式）；
-// followupOf 是唯一解析入口（含角色/空内容守卫），body/questions 由其派生，保证一致性。
-
-function followupOf(msg: ChatMessage): FollowupParse | null {
-  if (msg.role !== 'assistant' || !msg.content) return null
-  return parseFollowupQuestions(msg.content)
-}
-
-/** 剔除引导行后的正文（供分节渲染）；未命中返回空串（配合 v-else-if 不会到达） */
-function followupBody(msg: ChatMessage): string {
-  return followupOf(msg)?.body ?? ''
-}
-
-/** 解析出的快捷追问条目；未命中返回空数组 */
-function followupQuestions(msg: ChatMessage): string[] {
-  return followupOf(msg)?.questions ?? []
-}
-
 /**
  * Phase 4-2 Task 3：回答气泡尾部反馈入口显隐——仅 assistant 真实回复
  * （error/cancelled/空内容无反馈价值，且与「重试」按钮互斥不重叠展示）。
@@ -683,13 +1129,14 @@ function rerunDeep(idx: number) {
     const prev = displayMessages.value[i]
     if (prev && prev.role === 'user') {
       chatStream.send(prev.content, { forceDeep: true })
-      scrollToBottom()
       return
     }
   }
 }
 
 onUnmounted(() => {
+  uni.$off('chat:leave-context', leaveChatContext)
+  cancelLongPress()
   if (followTimer) {
     clearInterval(followTimer)
     followTimer = null
@@ -698,11 +1145,47 @@ onUnmounted(() => {
   clearConfirmTimer()
   // 问题 15：不再 disconnect —— socket 为模块级单例，跨页面存活，
   // 后台任务继续生成，回页经 onShow resume 补全
+  // 批次 4：退出页面移除选中文字监听（仅 App 绑定过）
+  // #ifdef APP-PLUS
+  document.removeEventListener('selectionchange', onMessageSelectChange)
+  // #endif
 })
 </script>
 
 <style lang="scss" scoped>
 @use '@/shared/styles/variables.scss' as *;
+
+/* 批次 4：选中文字态——默认禁选中，选中态恢复文本可选（原生拖拽手柄圈选，仅 App） */
+/* #ifdef APP-PLUS */
+.message-item .msg-content,
+.message-item .bubble {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.message-item.selectable .msg-content,
+.message-item.selectable .bubble {
+  user-select: text;
+  -webkit-user-select: text;
+}
+/* #endif */
+
+/* 「复制已选」浮栏：居中悬浮在列表底部上方 */
+.copy-selection-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 120rpx;
+  z-index: $z-popover;
+  padding: $s-2 $s-4;
+  background: $bg-card;
+  border-radius: $r-full;
+  box-shadow: $shadow-card;
+}
+
+.copy-selection-text {
+  font-size: $font-size-md;
+  color: $primary;
+}
 
 /* P9：会话入口按钮（导航栏右侧） */
 .sessions-entry {
@@ -811,18 +1294,6 @@ onUnmounted(() => {
 :deep(.md-table th) { background: $bg-soft; font-size: 24rpx; padding: 8rpx; border: 1rpx solid $line; }
 :deep(.md-table td) { font-size: 24rpx; padding: 8rpx; border: 1rpx solid $line; }
 
-/* 改进 20：引导追问快捷按钮（点击即发，复用 quickAsk） */
-.followup-questions {
-  display: flex; flex-direction: column; gap: 12rpx;
-  margin-top: 16rpx; padding-top: 16rpx; border-top: 1rpx solid $line;
-}
-.followup-question {
-  display: inline-flex; align-items: center;
-  background: $primary-50; color: $primary;
-  border-radius: $r-md; padding: 12rpx 20rpx;
-}
-.followup-question-text { font-size: 24rpx; color: $primary; }
-
 /* 流式光标动画（mp-html 内嵌 ▊ 字符的闪烁效果） */
 :deep(.streaming-blink) {
   animation: blink 1s step-end infinite;
@@ -855,16 +1326,49 @@ onUnmounted(() => {
 }
 .skill-btn-text { font-size: 24rpx; color: $primary; }
 
-.input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
-.input { flex: 1; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
+/* Task 8：追问面板建议行（替换快捷技能行；× 收起右侧，非丢弃——footer 弱入口可恢复） */
+.suggest-row {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+.suggest-chips-wrap { flex: 1; min-width: 0; }
+.suggest-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 20rpx;
+  flex-shrink: 0;
+}
 
-/* Phase 4-2 Task 2：语音输入麦克风按钮（与输入框等高；active=聆听中，品牌色高亮） */
-.mic-btn {
+.input-bar { display: flex; gap: 12rpx; padding: 16rpx 20rpx; background: #ffffff; box-shadow: 0 -2rpx 8rpx rgba(0, 0, 0, 0.04); align-items: stretch; flex-shrink: 0; }
+.input-wrap { position: relative; flex: 1; min-width: 0; }
+.input { width: 100%; background: $bg-soft; border-radius: 12rpx; padding: 16rpx; color: $ink; font-size: 28rpx; min-height: 72rpx; box-sizing: border-box; }
+/* mic 图标内嵌输入框右侧：absolute 定位，input 需预留右侧空间避免文字被图标遮挡 */
+.input-mic-btn {
+  position: absolute; right: 10rpx; top: 50%; transform: translateY(-50%);
+  width: 52rpx; height: 52rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.input-mic-btn.active { background: $primary; }
+
+/* Phase 4-2 Task 2（Task 4 扩展）：左侧模式切换（键盘 / 按住说话），与 mic-btn 同规格 */
+.mode-btn {
   display: flex; align-items: center; justify-content: center;
   width: 72rpx; min-height: 72rpx; border-radius: 12rpx;
   background: $bg-soft; flex-shrink: 0;
 }
-.mic-btn.active { background: $primary; }
+
+/* 按住说话按钮（微信式；touchstart/touchend 驱动，holding 高亮） */
+.hold-talk {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  min-height: 72rpx; border-radius: 12rpx;
+  background: $bg-soft; color: $ink-soft;
+  border: 2rpx solid $line;
+  &.holding { background: $primary-50; color: $primary; border-color: $primary; }
+}
+.hold-talk-text { font-size: 28rpx; }
 
 .send-btn { background: $primary; color: #fff; border-radius: 12rpx; padding: 0 30rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; }
 
@@ -920,5 +1424,19 @@ onUnmounted(() => {
   margin-left: 8rpx;
   color: $primary;
   font-size: 24rpx;
+}
+
+/* Task 8：追问面板弱入口（消息尾部「查看追问」，pending 未展示时出现；浅色胶囊弱化） */
+.panel-restore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 6rpx 20rpx;
+  background: rgba(77, 124, 254, 0.08);
+  border-radius: 20rpx;
+}
+.panel-restore-text {
+  font-size: 22rpx;
+  color: $primary;
 }
 </style>

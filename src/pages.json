@@ -54,19 +54,28 @@
     {
       "path": "modules/favorites/pages/insight",
       "style": {
-        "navigationBarTitleText": "自选股洞察"
+        "navigationBarTitleText": "自选股洞察",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/favorites/pages/insight-detail",
       "style": {
-        "navigationBarTitleText": "洞察详情"
+        "navigationBarTitleText": "洞察详情",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
       "path": "modules/favorites/pages/insight-detail-move",
       "style": {
-        "navigationBarTitleText": "洞察详情"
+        "navigationBarTitleText": "洞察详情",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
@@ -77,6 +86,15 @@
         "enablePullDownRefresh": false,
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
+      }
+    },
+    {
+      "path": "modules/favorites/pages/favorites-grid",
+      "style": {
+        "navigationBarTitleText": "多股同列",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     },
     {
@@ -207,6 +225,24 @@
       }
     },
     {
+      "path": "modules/user/pages/account-security",
+      "style": {
+        "navigationBarTitleText": "账号与安全",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
+      "path": "modules/user/pages/vip",
+      "style": {
+        "navigationBarTitleText": "会员中心",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
       "path": "modules/analytics/pages/index",
       "style": {
         "navigationBarTitleText": "洞察",
@@ -230,6 +266,16 @@
         "navigationBarTitleText": "趋势评分详情",
         "navigationStyle": "custom",
         "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "modules/fear-greed/pages/index",
+      "style": {
+        "navigationBarTitleText": "恐贪指数",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false,
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-bottom", "animationDuration": 300 }
       }
     },
     {
@@ -300,10 +346,28 @@
     {
       "path": "modules/chat/pages/event/detail",
       "style": {
-        "navigationBarTitleText": "AI事件传导解析",
+        "navigationBarTitleText": "事件机会洞见",
         "navigationStyle": "custom",
         "disableScroll": true,
         "h5": { "titleNView": false },
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
+      "path": "modules/rhythm/pages/index",
+      "style": {
+        "navigationBarTitleText": "节奏大师",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
+      "path": "modules/rhythm/pages/calendar",
+      "style": {
+        "navigationBarTitleText": "节奏日历",
+        "navigationStyle": "custom",
+        "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
       }
     }
@@ -379,6 +443,13 @@
             "disableScroll": true,
             "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
           }
+        },
+        {
+          "path": "webview/index",
+          "style": {
+            "navigationBarTitleText": "网页",
+            "navigationStyle": "custom"
+          }
         }
       ]
     },
@@ -405,6 +476,9 @@
     "disableScroll": true,
     "app-plus": {
       "bounce": "none"
-    }
+    },
+    "rpxCalcMaxDeviceWidth": 1024,
+    "rpxCalcBaseDeviceWidth": 375,
+    "rpxCalcIncludeWidth": 750
   }
 }

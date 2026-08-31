@@ -162,6 +162,13 @@ const closeIcon = computed(() => {
   pointer-events: auto;
 }
 
+/* 隐藏态（未 is-visible）时弹窗整体不可见但仍占据 DOM：
+   若不关闭 pointer-events，opacity:0 的 dialog 会继续拦截下方页面的点击，
+   导致屏幕中央的卡片（如首页"机构推荐热门股"）点不开。 */
+.as-modal:not(.is-visible) .as-modal__dialog {
+  pointer-events: none;
+}
+
 .as-modal__wrap--bottom .as-modal__dialog {
   border-radius: $r-xl $r-xl 0 0;
   transform: translateY(100%);

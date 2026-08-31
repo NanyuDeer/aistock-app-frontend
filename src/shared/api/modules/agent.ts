@@ -80,6 +80,7 @@ export interface ChatMessage {
   reasoningSteps?: ReasoningStep[]   // NEW: AI 思考链
   cards?: ChatCard[]                 // P11: DONE 下发的结构化卡片（HTTP 降级/旧协议缺失）
   tokenUsage?: TokenUsage            // P11: DONE 下发的本轮 token 用量（会话本地累加用）
+  questions?: string[]               // 追问面板（2026-08-26）：DONE 下发 2-4 条建议追问，缺失=无建议
   timestamp: number
   /** Phase 4-2 Task 3：本地赞/踩反馈（v1 纯前端本地、按 message_id 持久化，不落库；同消息可改选/取消） */
   feedback?: 'up' | 'down'
@@ -351,6 +352,28 @@ export interface ChatAnalysisReport {
 }
 
 export type BriefType = 'morning' | 'evening'
+
+/** 午间报报告 DB 记录（GET /api/agent/report/midday/:date 返回；方案 A 契约） */
+export interface MiddayReportRecord {
+  id?: string | number
+  report_type: string
+  report_date: string
+  status?: string
+  data_source?: string | null
+  created_at?: string
+  content: {
+    display_report?: {
+      summary?: string
+      details?: string
+      stocks?: string[]
+      risks?: string[]
+    }
+    podcast_brief?: string
+    schema_version?: string
+    /** 方案 A：音频回填到同一份 midday 报告的 content.audio_path；未生成音频时缺失/null */
+    audio_path?: string | null
+  }
+}
 export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review'] as const
 export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
 
@@ -413,6 +436,59 @@ export interface BroadcastV1 {
   missing_sources: string[]
   dialogue: BroadcastDialogueLine[]
   audio_path: string | null
+}
+
+/** 节奏大师（report_type=rhythm_master，契约 #6：顶层 target_date/basis_date/refresh_slot） */
+export interface RhythmEvent {
+  date: string
+  type: 'delivery' | 'earnings' | 'seed' | 'macro'
+  title: string
+  importance: 'high' | 'medium' | 'low'
+  source: 'L1' | 'L2' | 'L3' | 'L4'
+  event_time?: string | null
+  result?: string | null
+}
+export interface RhythmBranch {
+  condition: {
+    kind: 'interval' | 'enum'
+    indicator: string
+    lo?: number | null
+    hi?: number | null
+    unit?: string
+    label?: string
+    value?: string
+  }
+  conclusion: { direction: 'bullish' | 'bearish' | 'neutral'; range?: string; validity: number; note?: string }
+  event_ref?: { event_date: string; title: string }
+}
+export interface RhythmCard {
+  score?: number | null
+  level?: string | null
+  position_band: { min?: number | null; max?: number | null; text: string }
+  phase?: string | null
+  phase_evidence?: Record<string, unknown>
+  temperature_series: { date: string; score: number }[]
+  event_window: RhythmEvent[]
+  event_source_missing?: boolean
+  event_high_hint?: string
+  conflict: boolean
+  conflict_detail?: string
+  branches: RhythmBranch[]
+  data_missing?: string[]
+}
+export interface RhythmMasterContent {
+  display_report?: { summary?: string; details?: string; risks?: string[] }
+  schema_version?: string
+  target_date?: string
+  basis_date?: string
+  refresh_slot?: 'after_close' | 'morning' | 'midday'
+  rhythm_card?: RhythmCard
+}
+export interface RhythmMasterReport {
+  report_type: string
+  report_date: string
+  created_at?: string
+  content?: RhythmMasterContent
 }
 
 export const agentApi = {
@@ -566,6 +642,17 @@ export const agentApi = {
   /** 读取大盘复盘报告。 */
   getMarketTraceReview(date: string) {
     return request.get<MarketTraceReviewRecord | null>(`/agent/report/review/${date}`)
+  },
+
+  /** 节奏大师三时点版本读取（契约 #4）：返回 { date, versions: [{refresh_slot, created_at, content}] } */
+  getRhythmMaster(date: string) {
+    return request.get(`/agent/rhythm-master/${date}`)
+  },
+
+  /** 节奏日历热力图聚合（契约 #7）：最近 N 个交易日 after_close 收盘基准档位。
+   *  返回 { days: [{date, refresh_slot, level, score, basis_date}] }，level 可空（灰格）。 */
+  getRhythmMasterCalendar(days = 60) {
+    return request.get('/agent/rhythm-master/calendar', { params: { days } })
   },
 
   /**

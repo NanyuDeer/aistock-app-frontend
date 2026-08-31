@@ -20,7 +20,7 @@
                 v-for="(item, idx) in captureRows"
                 :key="idx"
                 :title="item?.stock_name || '\u3000'"
-                :description="item ? `${captureDetail(item)} · ${formatTime(item.trade_date || item.created_at || '')}` : '\u3000'"
+                :description="item ? `${item.detailText} · ${item.dateText}` : '\u3000'"
                 :clickable="!!item"
                 @click="item && goTrace(item.event_id, item.event_type)"
               >
@@ -82,6 +82,7 @@ import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
+import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { useUserStore } from '@/shared/store/modules/user'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
@@ -107,13 +108,75 @@ const intelTabItems = [
   { label: '利空', value: 'negative' as const },
 ]
 
-// 自选股洞察：展示自选股涨停雷达事件的归因结果（后端由 cron 周期采集 + LLM 归因）
-const captureList = ref<WatchlistInsight[]>([])
+// 自选股洞察：统一展示模型（涨停雷达 insight + 价格异动 stocktrace 融合）
+interface CaptureItem {
+  event_id: string
+  event_type: 'limit_up_radar' | 'price'
+  stock_name: string
+  direction: 'up' | 'down'
+  /** 描述文案：主因：xxx / 主因待验证 / 归因中 / 待归因 */
+  detailText: string
+  /** MM-DD 日期 */
+  dateText: string
+  /** 事件时间戳（融合列表按此倒序排列） */
+  sortTime: number
+}
+
+const captureList = ref<CaptureItem[]>([])
+
+/** 格式化时间为 MM-DD（本地时区） */
+function fmtDateMMDD(t?: string): string {
+  if (!t) return '--'
+  const date = new Date(t)
+  if (Number.isNaN(date.getTime())) return '--'
+  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/** 涨停雷达（insight 链路）→ 统一模型 */
+function fromInsight(w: WatchlistInsight): CaptureItem {
+  let detailText = '归因中'
+  if (w.attribution_status === 'unconfirmed') detailText = '主因待验证'
+  else if (w.attribution_status === 'confirmed' && w.primary_driver?.label) detailText = `主因：${w.primary_driver.label}`
+  const date = w.trade_date || w.created_at
+  return {
+    event_id: w.event_id,
+    event_type: 'limit_up_radar',
+    stock_name: w.stock_name,
+    direction: w.direction,
+    detailText,
+    dateText: fmtDateMMDD(date),
+    sortTime: date ? new Date(date).getTime() : 0,
+  }
+}
+
+/** 价格异动（stocktrace 链路）→ 统一模型 */
+function fromMovement(m: StockTraceEvent): CaptureItem {
+  let detailText = '待归因'
+  if (m.primary_cause) detailText = `主因：${m.primary_cause}`
+  else if (m.movement_view?.primaryCandidate?.verdict) detailText = `主因：${m.movement_view.primaryCandidate.verdict}`
+  else if (m.analysis_status === 'completed') detailText = '归因完成'
+  else if (m.analysis_status === 'processing') detailText = '归因中'
+  return {
+    event_id: m.event_id,
+    event_type: 'price',
+    stock_name: m.stock_name,
+    direction: m.direction,
+    detailText,
+    dateText: fmtDateMMDD(m.triggered_at),
+    sortTime: m.triggered_at ? new Date(m.triggered_at).getTime() : 0,
+  }
+}
 
 async function loadCaptureList() {
-  // 自选股洞察真实数据：接口失败/空数据时展示空状态（EmptyState 兜底）
+  // 并行拉取涨停雷达（insights）与价格异动（movements），单个失败不影响另一个
   try {
-    captureList.value = await watchlistInsightApi.getInsights()
+    const [insights, page] = await Promise.all([
+      watchlistInsightApi.getInsights().catch(() => [] as WatchlistInsight[]),
+      stockTraceApi.list(3).catch(() => ({ items: [] as StockTraceEvent[] })),
+    ])
+    // 融合后按事件时间倒序：最新异动（含今日价格异动）优先展示
+    captureList.value = [...insights.map(fromInsight), ...page.items.map(fromMovement)]
+      .sort((a, b) => b.sortTime - a.sortTime)
   } catch {
     captureList.value = []
   }
@@ -191,8 +254,8 @@ const intelRows = computed<Array<IntelItem | null>>(() => {
  * 卡片纵向长度不随数据量变化（避免只有 1 条资讯时卡片变矮）
  */
 const CAPTURE_ROW_COUNT = 4
-const captureRows = computed<Array<WatchlistInsight | null>>(() => {
-  const rows: Array<WatchlistInsight | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
+const captureRows = computed<Array<CaptureItem | null>>(() => {
+  const rows: Array<CaptureItem | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
   while (rows.length < CAPTURE_ROW_COUNT) rows.push(null)
   return rows
 })
@@ -215,21 +278,6 @@ function badgeLabel(direction: 'up' | 'down'): string {
 /** 异动方向 → Tag type：涨→up(红)，跌→down(绿) */
 function captureTagType(direction: 'up' | 'down'): 'up' | 'down' {
   return direction
-}
-
-/** 格式化洞察主因：已确认展示主因 label；unconfirmed 展示待验证；其余为归因中 */
-function captureDetail(item: WatchlistInsight): string {
-  if (item.attribution_status === 'unconfirmed') return '主因待验证'
-  if (item.attribution_status === 'confirmed' && item.primary_driver?.label) return `主因：${item.primary_driver.label}`
-  return '归因中'
-}
-
-/** 格式化日期为 MM-DD（trade_date 为 UTC ISO，取本地月日） */
-function formatTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '--'
-  // trade_date 为日期，展示 MM-DD
-  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 /** Segmented 的 change 回调（emit string|number），收敛回窄联合类型 */
@@ -297,7 +345,7 @@ watch(
   }
 }
 
-/* 灰色卡片容器：参考 InsightListCard 设计 */
+/* 灰色卡片容器：参考 InsightListCard 设计；与首页今日专属卡片一致的按压动效 */
 .module-card {
   background: $bg-soft;
   border: 2rpx solid $line;
@@ -306,6 +354,12 @@ watch(
   position: relative;
   overflow: hidden;
   box-shadow: $shadow-card;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: $shadow-sm;
+  }
 }
 
 /* 顶部装饰条 */
@@ -358,7 +412,7 @@ watch(
   flex-shrink: 0;
 }
 
-/* ===== 异动捕手 / 个股情报 列表区域（ListCell，样式一致） ===== */
+/* ===== 自选股洞察 / 个股情报 列表区域（ListCell，样式一致） ===== */
 .capture-list,
 .intel-list {
   background: $bg-card;

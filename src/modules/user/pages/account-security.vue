@@ -1,0 +1,319 @@
+<template>
+  <SubPageCard2 title="账号与安全" no-chat-bar>
+    <view class="security-content">
+      <!-- 当前绑定状态 -->
+      <view class="section">
+        <text class="section-title">当前绑定</text>
+        <Card flush>
+          <ListCell title="微信" :description="wechatDesc" :border="true">
+            <template #prefix>
+              <SvgIcon name="wechat" size="36rpx" color="#22c55e" />
+            </template>
+            <template #value>
+              <Tag v-if="hasWechat" type="up" size="sm">已绑定</Tag>
+              <Tag v-else type="gray" size="sm">未绑定</Tag>
+            </template>
+          </ListCell>
+          <ListCell title="邮箱" :description="emailDesc">
+            <template #prefix>
+              <SvgIcon name="mail-line" size="36rpx" color="#0b5fff" />
+            </template>
+            <template #value>
+              <Tag v-if="hasEmail" type="up" size="sm">已绑定</Tag>
+              <Tag v-else type="gray" size="sm">未绑定</Tag>
+            </template>
+          </ListCell>
+        </Card>
+      </view>
+
+      <!-- 绑定设置 -->
+      <view class="section">
+        <text class="section-title">绑定设置</text>
+        <Card flush>
+          <ListCell
+            v-if="!hasEmail"
+            title="绑定邮箱"
+            description="绑定后可用邮箱验证码登录"
+            clickable
+            showArrow
+            :border="true"
+            @click="startBind('email')"
+          >
+            <template #prefix>
+              <SvgIcon name="mail-line" size="36rpx" color="#4b5a7a" />
+            </template>
+          </ListCell>
+          <ListCell
+            v-if="!hasWechat"
+            title="绑定微信"
+            description="绑定后可用微信登录，保留微信账号数据"
+            clickable
+            showArrow
+            @click="startBind('wechat')"
+          >
+            <template #prefix>
+              <SvgIcon name="wechat" size="36rpx" color="#4b5a7a" />
+            </template>
+          </ListCell>
+        </Card>
+      </view>
+
+      <!-- 绑定表单（内联展开） -->
+      <view v-if="bindMode" class="section">
+        <Card>
+          <view class="bind-form">
+            <text class="bind-form-title">
+              {{ bindMode === 'wechat' ? '绑定微信（验证归属）' : '绑定邮箱' }}
+            </text>
+            <view class="form-row">
+              <SvgIcon name="mail-line" size="36rpx" color="#9ca3af" />
+              <Input
+                v-model="bindEmail"
+                placeholder="请输入邮箱"
+                class="form-input"
+              />
+            </view>
+            <view class="form-row">
+              <SvgIcon name="lock-line" size="36rpx" color="#9ca3af" />
+              <Input
+                v-model="bindCode"
+                type="number"
+                :maxlength="6"
+                placeholder="请输入验证码"
+                class="form-input"
+              />
+              <Button
+                class="form-code-btn"
+                :disabled="countdown > 0 || !isValidEmail"
+                size="sm"
+                @click="handleSendEmail"
+              >
+                {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
+              </Button>
+            </view>
+            <view class="bind-form-actions">
+              <Button block :loading="binding" @click="handleBind">确认绑定</Button>
+              <Button type="ghost" block @click="cancelBind">取消</Button>
+            </view>
+          </view>
+        </Card>
+      </view>
+
+      <!-- 绑定说明 -->
+      <view class="section">
+        <Card>
+          <text class="as-desc">
+            邮箱登录的账户也可以绑定微信：绑定后即可用微信登录，原有微信账号（自选股、推送设置等）信息将保留在本账户中。
+            若提示「该微信已绑定其他账户」，请先用该微信登录一次，再在「账号与安全」页绑定邮箱。
+          </text>
+        </Card>
+      </view>
+    </view>
+  </SubPageCard2>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useUserStore } from '@/shared/store/modules/user'
+import { authApi } from '@/shared/api/modules/auth'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
+import Input from '@/shared/components/Input.vue'
+import { ListCell, Card, Tag, Button } from '@/shared/components'
+
+const userStore = useUserStore()
+
+const hasWechat = computed(() => !!userStore.userInfo?.openid)
+const hasEmail = computed(() => !!userStore.userInfo?.email)
+const wechatDesc = computed(() => {
+  const nickname = userStore.userInfo?.nickname
+  return hasWechat.value ? (nickname || '已绑定微信') : '未绑定'
+})
+const emailDesc = computed(() => {
+  const email = userStore.userInfo?.email
+  return hasEmail.value && email ? maskEmail(email) : '未绑定'
+})
+
+/** 邮箱脱敏：use***@163.com */
+function maskEmail(email: string): string {
+  const [name, domain] = email.split('@')
+  if (!domain) return email
+  const head = name.slice(0, 3)
+  return `${head}***@${domain}`
+}
+
+// 绑定表单状态
+const bindMode = ref<'email' | 'wechat' | ''>('')
+const bindEmail = ref('')
+const bindCode = ref('')
+const wxCode = ref('')
+const countdown = ref(0)
+const binding = ref(false)
+const isValidEmail = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bindEmail.value))
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+
+function startBind(mode: 'email' | 'wechat') {
+  bindMode.value = mode
+  bindEmail.value = ''
+  bindCode.value = ''
+  wxCode.value = ''
+  // 绑定微信：先获取微信授权 code（App/小程序），H5 端扫码登录无法直接取 code，提示走微信登录
+  if (mode === 'wechat') {
+    // #ifdef H5
+    uni.showToast({ title: '请在微信端登录后绑定邮箱', icon: 'none' })
+    bindMode.value = ''
+    return
+    // #endif
+    // #ifndef H5
+    uni.login({
+      provider: 'weixin',
+      success: (res) => {
+        wxCode.value = res.code || ''
+      },
+      fail: () => {
+        uni.showToast({ title: '微信授权失败，请重试', icon: 'none' })
+      },
+    })
+    // #endif
+  }
+}
+
+function cancelBind() {
+  bindMode.value = ''
+  bindEmail.value = ''
+  bindCode.value = ''
+  wxCode.value = ''
+  stopCountdown()
+}
+
+function stopCountdown() {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+}
+
+/** 发送验证码 */
+async function handleSendEmail() {
+  if (!isValidEmail.value) {
+    uni.showToast({ title: '请输入正确的邮箱', icon: 'none' })
+    return
+  }
+  try {
+    await authApi.sendEmailCode(bindEmail.value)
+    uni.showToast({ title: '验证码已发送，请查收邮箱', icon: 'none' })
+    countdown.value = 60
+    stopCountdown()
+    countdownTimer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) stopCountdown()
+    }, 1000)
+  } catch (e: any) {
+    uni.showToast({ title: e?.data?.message || '发送失败，请稍后再试', icon: 'none' })
+  }
+}
+
+/** 确认绑定 */
+async function handleBind() {
+  if (!isValidEmail.value) {
+    uni.showToast({ title: '请输入正确的邮箱', icon: 'none' })
+    return
+  }
+  if (!bindCode.value) {
+    uni.showToast({ title: '请输入验证码', icon: 'none' })
+    return
+  }
+  if (bindMode.value === 'wechat' && !wxCode.value) {
+    uni.showToast({ title: '微信授权未完成，请重试', icon: 'none' })
+    return
+  }
+  binding.value = true
+  try {
+    if (bindMode.value === 'wechat') {
+      await authApi.bindWechat(bindEmail.value, bindCode.value, wxCode.value)
+    } else {
+      await authApi.bindEmail(bindEmail.value, bindCode.value)
+    }
+    binding.value = false
+    stopCountdown()
+    await userStore.fetchUserInfo()
+    uni.showToast({ title: '绑定成功', icon: 'success' })
+    cancelBind()
+  } catch (e: any) {
+    binding.value = false
+    // e.data.message（后端业务 message）优先，e.message 兜底；取不到再显示通用文案
+    uni.showToast({ title: e?.data?.message || e?.message || '绑定失败，请重试', icon: 'none' })
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+.security-content {
+  padding: 32rpx 24rpx 48rpx;
+}
+
+.section {
+  margin-bottom: 32rpx;
+}
+
+.section-title {
+  display: block;
+  font-size: 28rpx;
+  color: $ink;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+/* ===== 绑定表单 ===== */
+.bind-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.bind-form-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: $ink;
+  margin-bottom: 24rpx;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.form-input {
+  flex: 1;
+}
+
+.form-code-btn {
+  flex-shrink: 0;
+  min-width: 180rpx;
+}
+
+/* 验证码倒计时禁用态：整体 opacity 会让白字变浅灰看不清，
+   改为背景手动淡化（保持"按钮颜色变淡"）＋文字固定纯白保证可读 */
+.form-code-btn.is-disabled {
+  opacity: 1;
+  background: rgba(11, 95, 255, 0.4);
+  box-shadow: none;
+}
+.form-code-btn.is-disabled :deep(.as-btn__text) {
+  color: #ffffff;
+}
+
+.bind-form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  margin-top: 8rpx;
+}
+
+.as-desc {
+  font-size: $font-size-sm;
+  line-height: $lh-loose;
+  color: $ink-soft;
+}
+</style>

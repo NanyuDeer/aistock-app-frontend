@@ -489,11 +489,12 @@ function formatPct(val?: number | null): string {
   return Number(val).toFixed(2) + '%'
 }
 
-function formatNetInflow(val?: number | null): string {
-  // 与 Web 前端口径一致：0 视为无数据（moneyflow 缺失时后端回填 0），避免显示误导性的"0万"
+function formatAmount(val?: number | null): string {
+  // 成交额（元，同花顺实时；原净流入 net_inflow 已下线）。0 视为无数据，避免显示误导性的"0元"
   if (val === undefined || val === null || val === 0) return '--'
-  if (Math.abs(val) >= 10000) return (val / 10000).toFixed(2) + '亿'
-  return Math.round(val) + '万'
+  if (Math.abs(val) >= 1e8) return (val / 1e8).toFixed(2) + '亿'
+  if (Math.abs(val) >= 10000) return (val / 10000).toFixed(0) + '万'
+  return Math.round(val) + '元'
 }
 
 // ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
@@ -530,7 +531,7 @@ function sectorStatItems(sector: WindLeaderSector): StatGridItem[] {
   return [
     { label: '今日涨幅', value: (todayChange >= 0 ? '+' : '') + formatPct(sector.today_change), color: todayChange >= 0 ? 'up' : 'down' },
     { label: '均涨幅', value: (avgChange >= 0 ? '+' : '') + formatPct(sector.avg_change), color: avgChange >= 0 ? 'up' : 'down' },
-    { label: '净流入', value: formatNetInflow(sector.net_inflow) },
+    { label: '成交额', value: formatAmount(sector.amount) },
   ]
 }
 

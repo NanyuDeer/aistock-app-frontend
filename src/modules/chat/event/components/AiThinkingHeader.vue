@@ -6,7 +6,7 @@
         <SvgIcon name="arrow-left-line" size="28rpx" :color="iconArrow" />
       </view>
       <SvgIcon name="robot-line" size="30rpx" :color="iconPrimary" />
-      <text class="header-title">AI事件分析</text>
+      <text class="header-title">事件机会洞见</text>
     </view>
 
     <!-- 第二行：思考日志（Steps 步骤指示器） -->

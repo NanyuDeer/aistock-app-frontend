@@ -28,6 +28,48 @@
           <StatGrid :items="sectorStatItems" :columns="3" />
         </Card>
 
+        <!-- 改动2+5: AI 分析 + 层级流向图 SVG（洞见样式：板块洞见标签 + 流向图线上 + 传递信息线下）置于K线上方 -->
+        <view v-if="analysisRows.length || flowChartData" class="ai-card">
+          <view class="ai-card-head">
+            <InsightTag type="market" size="sm">板块洞见</InsightTag>
+          </view>
+
+          <!-- 层级流向图 SVG（主因配图，置于横线上方） -->
+          <view v-if="flowChartData" class="flow-chart-box">
+            <text class="flow-chart-title">层级流向图</text>
+            <!-- #ifdef H5 || APP-PLUS -->
+            <!-- H5 + App 统一走 renderjs 视图层 DOM 注入 SVG（v-html 在 App webview 不渲染切线注入的 svg） -->
+            <view
+              :id="flowHostId"
+              class="flow-chart-svg"
+              :data="flowChartSvgModel"
+              :change:data="flowView.render"
+            />
+            <!-- #endif -->
+            <!-- #ifndef H5 || APP-PLUS -->
+            <view class="flow-chart-fallback">
+              <text class="flow-chart-fallback-text">{{ flowChartTextSummary }}</text>
+            </view>
+            <!-- #endif -->
+          </view>
+
+          <view class="ai-card-divider" />
+
+          <!-- 传递信息（蓝色卡片：持续原因/传递方向/传递判断 分隔线分开；风险提示独立红色横幅） -->
+          <view v-if="analysisRows.length" class="transfer-info-box">
+            <view v-if="mainRows.length" class="ai-blue-card">
+              <view v-for="(row, idx) in mainRows" :key="idx" class="ai-blue-row">
+                <text class="ai-label">{{ row.label }}</text>
+                <text class="ai-value">{{ row.value }}</text>
+              </view>
+            </view>
+            <view v-if="riskRow" class="ai-row ai-row--risk">
+              <text class="ai-label">风险提示</text>
+              <text class="ai-value">{{ riskRow.value }}</text>
+            </view>
+          </view>
+        </view>
+
         <!-- 板块K线（近120日，同花顺板块指数日线）；加载失败(数据为null)时整卡隐藏 -->
         <Card v-if="sector.code && (klineLoading || boardKline)" class="kline-card">
           <text class="section-title">板块K线 · 近120日</text>
@@ -46,32 +88,6 @@
             <text class="count-arrow">↓</text>
             <text class="count-num">{{ sector.down_count || 0 }}</text>
             <text class="count-label">下跌</text>
-          </view>
-        </view>
-
-        <!-- 改动2+5: AI 分析 + 层级流向图 SVG -->
-        <view v-if="analysisRows.length || flowChartData" class="ai-card">
-          <text class="section-title">AI 分析</text>
-
-          <!-- 层级流向图 SVG -->
-          <view v-if="flowChartData" class="flow-chart-box">
-            <text class="flow-chart-title">层级流向图</text>
-            <!-- #ifdef H5 -->
-            <view v-html="flowChartSvg" class="flow-chart-svg"></view>
-            <!-- #endif -->
-            <!-- #ifndef H5 -->
-            <view class="flow-chart-fallback">
-              <text class="flow-chart-fallback-text">{{ flowChartTextSummary }}</text>
-            </view>
-            <!-- #endif -->
-          </view>
-
-          <!-- 传递信息（移除持续性，已移到统计卡片头部） -->
-          <view v-if="analysisRows.length" class="transfer-info-box">
-            <view v-for="(row, idx) in analysisRows" :key="idx" class="ai-row">
-              <text class="ai-label">{{ row.label }}</text>
-              <text :class="['ai-value', row.risk ? 'risk' : '']">{{ row.value }}</text>
-            </view>
           </view>
         </view>
 
@@ -254,12 +270,14 @@
 </template>
 
 <script setup lang="ts">
+// @ts-nocheck -- uni-app renderjs module (flowView) 在正常 vue-tsc 上下文之外编译；首行声明以抑制整 SFC 交叉诊断。
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderSector, WindLeaderAiAnalysis, WindLeaderFlowData, WindLeaderStock } from '@/shared/api/modules/stock'
 import type { TrendKLineData } from '@/shared/api/modules/trend-score'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import InsightTag from '@/shared/components/InsightTag.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, StatGrid, Modal, KLineChart } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
 
@@ -284,11 +302,13 @@ function formatPct(value: unknown): string {
   return num.toFixed(2) + '%'
 }
 
-function formatNetInflow(value: unknown): string {
+function formatAmount(value: unknown): string {
+  // 成交额（元，同花顺实时；原净流入 net_inflow 已下线）
   const num = toFiniteNumber(value)
   if (num === null) return '--'
-  if (Math.abs(num) >= 10000) return (num / 10000).toFixed(2) + '亿'
-  return Math.round(num) + '万'
+  if (Math.abs(num) >= 1e8) return (num / 1e8).toFixed(2) + '亿'
+  if (Math.abs(num) >= 10000) return (num / 10000).toFixed(0) + '万'
+  return Math.round(num) + '元'
 }
 
 // 改动1: 持续性标签提取到统计卡片头部（只显示"短期"/"中期"/"长期"）
@@ -327,29 +347,34 @@ const sectorStatItems = computed<StatGridItem[]>(() => {
   return [
     { label: '今日涨幅', value: (todayChange >= 0 ? '+' : '') + formatPct(s.today_change), color: todayChange >= 0 ? 'up' : 'down' },
     { label: '均涨幅', value: (avgChange >= 0 ? '+' : '') + formatPct(s.avg_change), color: avgChange >= 0 ? 'up' : 'down' },
-    { label: '净流入', value: formatNetInflow(s.net_inflow) },
+    { label: '成交额', value: formatAmount(s.amount) },
   ]
 })
 
 interface AnalysisRow {
   label: string
   value: string
-  risk: boolean
 }
+
+/** 蓝色卡片行：持续原因/传递方向/传递判断（排除风险提示） */
+const mainRows = computed(() => analysisRows.value.filter(r => r.label !== '风险提示'))
+
+/** 风险提示独立红色横幅（无则隐藏） */
+const riskRow = computed(() => analysisRows.value.find(r => r.label === '风险提示') ?? null)
 
 // 改动2: 移除持续性行（已移到头部），保留剩余4项
 const analysisRows = computed<AnalysisRow[]>(() => {
   if (!sector.value?.ai_analysis) return []
   const ai = sector.value.ai_analysis
   if (typeof ai === 'string') {
-    return [{ label: '分析', value: ai, risk: false }]
+    return [{ label: '分析', value: ai }]
   }
   const rows: AnalysisRow[] = []
   const obj = ai as WindLeaderAiAnalysis
-  if (obj.persistence_reason) rows.push({ label: '持续原因', value: obj.persistence_reason, risk: false })
-  if (obj.transfer_direction) rows.push({ label: '传递方向', value: obj.transfer_direction, risk: false })
-  if (obj.transfer_reason) rows.push({ label: '传递判断', value: obj.transfer_reason, risk: false })
-  if (obj.risk_warning) rows.push({ label: '风险提示', value: obj.risk_warning, risk: true })
+  if (obj.persistence_reason) rows.push({ label: '持续原因', value: obj.persistence_reason })
+  if (obj.transfer_direction) rows.push({ label: '传递方向', value: obj.transfer_direction })
+  if (obj.transfer_reason) rows.push({ label: '传递判断', value: obj.transfer_reason })
+  if (obj.risk_warning) rows.push({ label: '风险提示', value: obj.risk_warning })
   return rows
 })
 
@@ -575,6 +600,13 @@ function goStockDetail(symbol: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
 }
 
+// ===== renderjs 视图层 DOM 注入：解决 v-html 在 App webview 不渲染 SVG =====
+const flowHostId = `flow_chart_${Date.now()}_${Math.floor(Math.random() * 10000)}`
+const flowChartSvgModel = computed(() => ({
+  hostId: flowHostId,
+  html: flowChartSvg.value,
+}))
+
 // ===== 理由详情弹窗：理由列单行截断，点击查看完整信息（名称/行业/价格/理由） =====
 const modalVisible = ref(false)
 const modalStock = ref<WindLeaderStock | null>(null)
@@ -624,6 +656,26 @@ onLoad((options) => {
   sectorName.value = decodeURIComponent(name)
   loadData()
 })
+</script>
+
+<!-- renderjs 分支：H5 + App 均注入真实 SVG DOM（v-html 在 App webview 不渲染切线注入的 svg）。
+     经 wrap 容器解析再取出 svg，规避 iOS WebKit 对 innerHTML 注入 SVG 命名空间不生效的已知坑。 -->
+<script module="flowView" lang="renderjs">
+// @ts-nocheck -- renderjs 由 uni-app 编译器作为独立的视图层模块编译。
+export default {
+  methods: {
+    render(model) {
+      if (!model || !model.hostId) return
+      const host = document.getElementById(model.hostId)
+      if (!host || !model.html) return
+      host.innerHTML = ''
+      const wrap = document.createElement('div')
+      wrap.innerHTML = model.html
+      const svg = wrap.querySelector('svg')
+      if (svg) host.appendChild(svg)
+    },
+  },
+}
 </script>
 
 <style lang="scss" scoped>
@@ -767,7 +819,20 @@ onLoad((options) => {
   border-radius: $r-lg;
   padding: 24rpx 28rpx;
   margin-bottom: 20rpx;
-  box-shadow: $shadow-sm;
+  box-shadow: $shadow-xs;
+}
+
+/* 洞见样式：标签头 + 渐变分隔线 */
+.ai-card-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: $s-3;
+}
+
+.ai-card-divider {
+  height: 2rpx;
+  margin: $s-2 0;
+  background: linear-gradient(90deg, $primary-100, rgba($primary-100, 0));
 }
 
 .section-title {
@@ -817,43 +882,41 @@ onLoad((options) => {
   line-height: 1.6;
 }
 
-/* 传递信息（对齐 Web 前端 hs-transfer-info） */
+/* 传递信息（蓝色卡片：持续原因/传递方向/传递判断 同卡分隔线分开；风险提示独立红色横幅） */
 .transfer-info-box {
-  background: #f8fafc;
-  border-radius: 8rpx;
-  padding: 16rpx 20rpx;
-}
-
-.ai-row {
   display: flex;
-  gap: 8rpx;
-  margin-bottom: 12rpx;
-  line-height: 1.5;
-
-  &:last-child { margin-bottom: 0; }
+  flex-direction: column;
+  gap: 16rpx;
 }
 
-.ai-label {
-  font-size: 24rpx;
-  color: #2563eb;
-  font-weight: 600;
-  flex-shrink: 0;
-  width: 120rpx;
+/* 蓝色卡片容器（同一卡内多行，分隔线分开） */
+/* 注意：CSS 自定义属性声明内 Sass 不自动插值 SCSS 变量，需用插值语法写入变量值 */
+.ai-blue-card {
+  --banner-bg: #{$insight-market};
+  --banner-glow: rgba(11, 95, 255, 0.18);
 }
 
-.ai-value {
-  font-size: 24rpx;
-  color: $ink-soft;
-  flex: 1;
-
-  &.risk {
-    color: #dc2626;
-    background: #fef2f2;
-    padding: 2rpx 10rpx;
-    border-radius: 4rpx;
-    display: inline-block;
-  }
+/* 行内留白：上下给足呼吸感，避免拥挤 */
+.ai-blue-row {
+  padding: 12rpx 0;
 }
+
+/* 行间分隔线（从第二行起加顶线） */
+.ai-blue-row + .ai-blue-row {
+  border-top: 1rpx solid rgba(255, 255, 255, 0.18);
+}
+
+/* 蓝卡内行排版统一走全局 insight-banner mixin */
+@include insight-banner('.ai-blue-card', '.ai-blue-row .ai-label', '.ai-blue-row .ai-value');
+
+/* 风险提示：独立红色横幅 */
+.ai-row--risk {
+  --banner-bg: #{$up};
+  --banner-glow: rgba(229, 77, 94, 0.18);
+}
+
+/* 风险横幅排版统一走全局 insight-banner mixin */
+@include insight-banner('.ai-row', '.ai-label', '.ai-value');
 
 /* ===== 个股列表（Card 提供 bg/border/shadow，仅保留间距） ===== */
 .stocks-card {

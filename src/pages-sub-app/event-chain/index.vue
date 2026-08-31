@@ -10,7 +10,7 @@
             v-if="headlinePositive"
             type="positive"
             :title="headlinePositive.title"
-            :importance="headlinePositive.importance >= 4 ? 'major' : 'normal'"
+            :importance="(headlinePositive.importance ?? 0) >= 4 ? 'major' : 'normal'"
             :industries="headlinePositive.affectedIndustries"
             :event-id="headlinePositive.eventId"
             @click="handleHeadlineClick"
@@ -19,7 +19,7 @@
             v-if="headlineNegative"
             type="negative"
             :title="headlineNegative.title"
-            :importance="headlineNegative.importance >= 4 ? 'major' : 'normal'"
+            :importance="(headlineNegative.importance ?? 0) >= 4 ? 'major' : 'normal'"
             :industries="headlineNegative.affectedIndustries"
             :event-id="headlineNegative.eventId"
             @click="handleHeadlineClick"
@@ -111,7 +111,6 @@ import Segmented from '@/shared/components/Segmented.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
 import { EVENT_TYPES } from '@/modules/chat/event/constants'
-import { openExternalUrl } from '@/shared/utils/openExternalUrl'
 
 // ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
 const tabItems = [{ label: '全部', value: '全部' }, ...EVENT_TYPES.map(v => ({ label: v, value: v }))]
@@ -150,16 +149,16 @@ function eventDirection(event: EventItem): 'positive' | 'negative' | null {
 const headlinePositive = computed<EventItem | null>(() => {
   return (
     events.value
-      .filter((e) => e.importance >= 4 && eventDirection(e) === 'positive')
-      .sort((a, b) => b.importance - a.importance)[0] ?? null
+      .filter((e) => (e.importance ?? 0) >= 4 && eventDirection(e) === 'positive')
+      .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0))[0] ?? null
   )
 })
 
 const headlineNegative = computed<EventItem | null>(() => {
   return (
     events.value
-      .filter((e) => e.importance >= 4 && eventDirection(e) === 'negative')
-      .sort((a, b) => b.importance - a.importance)[0] ?? null
+      .filter((e) => (e.importance ?? 0) >= 4 && eventDirection(e) === 'negative')
+      .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0))[0] ?? null
   )
 })
 
@@ -175,7 +174,7 @@ onMounted(() => {
 
 // ========== 事件处理 ==========
 
-/** 重大事件卡片点击 - 进入事件详情（与列表页一致；不跳原文，不改动 EventHeadlineCard 行为） */
+/** 重大事件卡片点击 → 跳转到事件详情页（与事件传导列表页重大卡片行为一致） */
 function handleHeadlineClick(eventId: string) {
   uni.navigateTo({
     url: `/modules/chat/pages/event/detail?id=${eventId}`
@@ -194,12 +193,19 @@ function goToDetail(event: EventItem) {
   })
 }
 
-/** 点击事件标题 → 打开原文；无合法原文 URL 时降级进入事件详情 */
+/** 点击事件标题 → 跨端跳转原文：H5 新标签打开，APP 内 web-view 打开；无链接友好提示 */
 function goToNews(event: EventItem) {
-  // 原文 URL 来自后端透传的 content.source（event.sourceInfo.url），
-  // 不再依赖 event.newsId（该字段从未被赋值，getNewsArticle 亦未实现）。
-  if (openExternalUrl(event.sourceInfo?.url)) return
-  goToDetail(event)
+  const url = event.sourceInfo?.url
+  if (!url) {
+    uni.showToast({ title: '暂无原文链接', icon: 'none' })
+    return
+  }
+  // #ifdef H5
+  window.open(url, '_blank')
+  // #endif
+  // #ifndef H5
+  uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
+  // #endif
 }
 
 /** 关注/取消关注 */
@@ -222,11 +228,19 @@ async function handleFollow(event: EventItem) {
 .tab-scroll {
   width: 100%;
   white-space: nowrap;
-  padding: 16rpx 0 8rpx;
+  padding: 16rpx 12rpx 8rpx;
+  background: $bg-deep; /* 浅蓝背景横贯整行，覆盖全部事件类型标签（含右侧需滚动到的「监管变化/公司公告」） */
+  border-radius: 16rpx;
 }
 
 .tab-scroll :deep(.as-segmented) {
   display: inline-flex;
+  background: transparent; /* 背景移交 .tab-scroll，避免只包内容宽度 */
+}
+
+/* 事件类型筛选：选中态文字由主题蓝 $primary 改为行业标签灰 $ink-soft */
+.tab-scroll :deep(.as-segmented__item.is-active) {
+  color: $ink-soft;
 }
 
 // ========== AI 关注焦点区域 ==========
@@ -245,9 +259,14 @@ async function handleFollow(event: EventItem) {
 
 .headline-cards {
   display: flex;
-  flex-direction: row;
-  gap: 8rpx;
-  align-items: stretch;
+  flex-direction: column; /* 最大利好 / 最大利空 纵向排列 */
+  min-width: 0;
+  /* 卡片间距用 margin 实现（见下方），不依赖 flex gap（部分旧 Android WebView 不渲染 gap） */
+}
+
+/* 双卡纵向排列：第二张卡片起顶部留 8rpx 间距 */
+.headline-cards :deep(.headline-card + .headline-card) {
+  margin-top: 8rpx;
 }
 
 /* 单个重大事件：单卡占满内容宽度（EventHeadlineCard 根节点 flex:1 自动填充） */

@@ -38,6 +38,9 @@ $accent-100: #b3ecff;
 $gold: #d4a843;
 $gold-light: #e8c878;
 $gold-deep: #a67c1f;
+/* 预判横幅柔底（浅金）：浅底 + 深金字 + 同色系描边 */
+$gold-soft-bg: #fff4de;
+$gold-soft-border: #f0d9a8;
 $gold-soft: rgba(212, 168, 67, 0.12);
 
 /* ===== Background ===== */
@@ -238,3 +241,79 @@ $primary-active-bg: linear-gradient(135deg, #f5f9ff, #eef3ff);
 /* ===== Safe Area (移动端适配) ===== */
 $safe-top: env(safe-area-inset-top, 0px);
 $safe-bottom: env(safe-area-inset-bottom, 0px);
+
+// ===== 洞察之眼（insight）Design Token（同步自 aistock-component-lib） =====
+$insight-emotion: #e54d5e;
+$insight-emotion-light: #ff8f9f;
+$insight-emotion-deep: #8f2435;
+$insight-emotion-soft: rgba(229, 77, 94, 0.10);
+$insight-fund: #c89020;
+$insight-fund-light: #f0c75a;
+$insight-fund-deep: #8a6411;
+$insight-fund-soft: rgba(200, 144, 32, 0.12);
+$insight-event: #00b8ff;
+$insight-event-light: #5ad4ff;
+$insight-event-deep: #0078a8;
+$insight-event-soft: rgba(0, 184, 255, 0.10);
+$insight-market: #0b5fff;
+$insight-market-light: #4d8bff;
+$insight-market-deep: #0a2e6f;
+$insight-market-soft: rgba(11, 95, 255, 0.08);
+$insight-trend: #7c3aed;
+$insight-trend-light: #a78bfa;
+$insight-trend-deep: #5b21b6;
+$insight-trend-soft: rgba(124, 58, 237, 0.10);
+$insight-card-dark-gradient: linear-gradient(150deg, #0a2e6f 0%, #0948cc 100%);
+
+/* ===== 洞见解 line（key+text 统一排版） =====
+ * 洞见卡（InsightCard）及个股详情 next/point、板块 ai 等"左关键词 + 右正文"复刻行
+ * 统一 @include 本 mixin：一处调整字号/字重/颜色/行高，全站同步生效。
+ * 语义色（机会/风险/优势/预判等）由各页 @include 后用更具体的后代选择器覆盖即可。 */
+@mixin insight-line($key: '.insight-line__key', $text: '.insight-line__text') {
+  #{$key} {
+    flex-shrink: 0;
+    font-size: 22rpx;
+    font-weight: 600;
+    color: $primary;
+    line-height: $lh-base;
+    padding-top: 2rpx;
+  }
+
+  #{$text} {
+    flex: 1;
+    font-size: $font-size-base;
+    color: $ink-soft;
+    line-height: $lh-base;
+    font-weight: 400;
+  }
+}
+
+/* ===== 洞见解横幅卡（key+text 卡片化，同"归因结论"样式） =====
+ * 将"左关键词 + 右正文"升级为整块彩色横幅卡：顶部小字关键词 + 底部白字正文。
+ * 底色由调用方用 CSS 变量 --banner-bg 指定（默认 $primary），语义色修饰类见各组件。
+ * 与 insight-line 互斥使用：横幅卡用本 mixin，普通行用 insight-line。 */
+@mixin insight-banner($line: '.insight-banner', $key: '.insight-banner__key', $text: '.insight-banner__text') {
+  #{$line} {
+    background: var(--banner-bg, $primary);
+    border-radius: $r-sm;
+    padding: 16rpx 20rpx;
+    box-shadow: 0 4rpx 12rpx var(--banner-glow, rgba(11, 95, 255, 0.18));
+  }
+
+  #{$key} {
+    display: block;
+    font-size: 20rpx;
+    font-weight: 600;
+    letter-spacing: 2rpx;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 4rpx;
+  }
+
+  #{$text} {
+    display: block;
+    font-size: 26rpx;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: $lh-base;
+  }
+}

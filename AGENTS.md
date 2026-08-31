@@ -30,17 +30,18 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 |------|------|---------|-----------------|
 | 首页 | `modules/home` | 早点听、市场概览、长线风口、异动捕手 | [home/AGENTS.md](./src/modules/home/AGENTS.md) |
 | 自选股 | `modules/favorites` | 自选股列表、特别提醒、股票详情、搜索、异动监控 | [favorites/AGENTS.md](./src/modules/favorites/AGENTS.md) |
-| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示、会话管理（P9 多会话）、深度分析报告详情页（批次 2，2026-08-13：`pages/chat-report-detail.vue`，对话内深度卡跳转查看完整报告） | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
+| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示、会话管理（P9 多会话）、深度分析报告详情页（批次 2，2026-08-13：`pages/chat-report-detail.vue`，对话内深度卡跳转查看完整报告）、**追问面板（回答后底部建议追问 + 输入框，questions 结构化下发，2026-08-26）** | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
 | 行情 | `modules/market` | 龙头股、重磅消息、板块标签、异动捕手、长线风口 | [market/AGENTS.md](./src/modules/market/AGENTS.md) |
 | 业绩分析 | `modules/analytics` | 业绩预测、业绩报告列表、财报详情 | — |
 | 用户 | `modules/user` | 个人中心、登录设置、更新日志 | [user/AGENTS.md](./src/modules/user/AGENTS.md) |
 | 资讯 | `modules/news` | 公告、新闻详情 | [news/AGENTS.md](./src/modules/news/AGENTS.md) |
+| 节奏大师 | `modules/rhythm` | 节奏状态卡详情页 + 首页入口卡片 + 归档入口 | [rhythm/AGENTS.md](./src/modules/rhythm/AGENTS.md) |
 
 ### App 专属分包（pages-sub-app/）
 
 | 页面 | 文件 | 说明 |
 |------|------|------|
-| 早点听 | `briefing/index.vue` | 结构化早晚报（音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期。音频纳入全局播报互斥（podcast store acquireExternal）：播放前注册、暂停/结束/卸载注销 |
+| 早点听 | `briefing/index.vue` | 晨报/午间报/晚报三 Tab（午间报=盘中报，2026-08-24）。晨/晚报：音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页。午间报：走 `agentApi.getReport('midday', date)` 渲染 `content.display_report`（summary/details/risks，样式参考晨报头条卡片），音频读 `content.audio_path`（可选——后端有音频才渲染音频条并经 podcast store 播放，无音频只展示文字、不跳详情页仅播放）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期。音频纳入全局播报互斥（podcast store acquireExternal）：播放前注册、暂停/结束/卸载注销 |
 | 持仓管理 | `portfolio/index.vue` | 持仓分析 |
 | 事件传导链 | `event-chain/index.vue` | 事件传导链路可视化 |
 | 估值分析 | `valuation/index.vue` | 个股估值 |
@@ -118,7 +119,8 @@ src/
 │   ├── chat/            # AI 对话
 │   ├── market/          # 行情
 │   ├── user/            # 用户
-│   └── news/            # 资讯
+│   ├── news/            # 资讯
+│   └── rhythm/          # 节奏大师（节奏状态卡详情页 + 首页入口卡片 + 归档入口）
 ├── pages-sub-app/       # App 专属分包
 ├── pages-sub-mp/        # 小程序专属分包
 ├── assets/icons/        # SVG 图标库（大量预置图标）
@@ -278,6 +280,7 @@ import Card from '@/shared/components/Card.vue'
 | H5 完整性 | H5 用于 App 预览，必须具备完整 App 功能（无阉割） |
 | 布局 | 用 `position:fixed`，禁止 `100vh` |
 | 样式单位 | 使用 SCSS + rpx 单位 |
+| 多端适配 | 宽屏（平板/折叠屏展开/横屏，windowWidth>700px）用 `useAdaptiveScreen` 的 `isWide` 做布局切换；页面根容器（MainTabs/SubPageCard/SubPageCard2）宽屏限宽 1200px 居中；H5 开发环境右下角有画布切换按钮（手机 390×693 → 平板竖屏 860×900 → 平板横屏 1194×834 → 大屏 1024×768），调 H5 大屏布局时先切换画布 |
 | 浅色主题 | 背景 `#f5f7fb`，卡片白色 `#ffffff` |
 | Design Token | 所有颜色/字号/圆角必须用 `shared/styles/variables.scss` 中的变量，禁止硬编码（如 `#4d7cfe` 用 `$brand-color`） |
 | App 端 envDir | `vite.config.ts` 必须配置 `envDir: 'env'`，否则 App 打包时 env 文件不加载，所有 API 请求失败 |
@@ -304,7 +307,7 @@ import Card from '@/shared/components/Card.vue'
 
 | 模块文件 | 说明 | 后端路径 |
 |---------|------|---------|
-| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`；**P0 身份鉴权：`createAgentWebSocket` URL 带 `?token=`（app-api 桥接验签）、`sendMessage` 不再携带 `user_id`（服务端注入）**；**批次 2：`getChatAnalysisReport(reportId)` 深度分析报告详情查询（`/api/agent/report/chat/:reportId`，显式解包返回 `ChatAnalysisReport | null`）+ `ChatAnalysisReport` 类型（`content.display_report` 双层结构）**） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
+| `agent.ts` | Agent 反代（SSE 流式对话、分析报告查询、音频服务；P3-fix 新增 `ReasoningStep` 类型 + `ChatMessage.reasoningSteps`，WS reasoning 协议契约；P9 会话管理：`ChatSessionMeta` 类型 + `listChatSessions`/`upsertChatSession`/`deleteChatSession`；**P0 身份鉴权：`createAgentWebSocket` URL 带 `?token=`（app-api 桥接验签）、`sendMessage` 不再携带 `user_id`（服务端注入）**；**批次 2：`getChatAnalysisReport(reportId)` 深度分析报告详情查询（`/api/agent/report/chat/:reportId`，显式解包返回 `ChatAnalysisReport | null`）+ `ChatAnalysisReport` 类型（`content.display_report` 双层结构）**；**午间报（2026-08-24）：`MiddayReportRecord` 类型（`content.display_report` + `content.audio_path` 可选，方案 A）**；**节奏大师（2026-08-30）：`RhythmMasterReport`/`RhythmSlot` 系列类型 + `getRhythmMaster(date)`（`/api/agent/rhythm-master/:date`，三时点 refresh_slot 版本）**） | `/api/agent/*`；P9 会话 `/api/chat/sessions` |
 | `auth.ts` | 认证（登录、用户信息） | `/api/auth/wechat/*` |
 | `briefing.ts` | 早晚报结构化（BriefingItem/BriefingSummary 类型 + 降级解析适配器） | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |
@@ -313,6 +316,7 @@ import Card from '@/shared/components/Card.vue'
 | `prediction.ts` | 历史预测跟踪（B2.1：列表+统计/详情） | `/api/predictions`、`/api/predictions/:id` |
 | `push.ts` | 推送 | `/api/push/*` |
 | `stock.ts` | 股票行情 | `/api/cn/stock-quote/*` |
+| `stockTrace.ts` | 自选股尾盘价格异动归因（stocktrace 完整链路）；`StockTraceEvent.primary_cause`（`string \| null`）为 LLM 生成的 ≤20 字简短主因短语，列表/卡片展示"主因：xxx"用，无归因结果为 `null` | `/api/cn/favorites/movements*` |
 | `valuation.ts` | 估值分析 | `/api/valuation/*` |
 
 ### 6.3 WebSocket
@@ -353,6 +357,8 @@ import Card from '@/shared/components/Card.vue'
 | `KLineChart.vue` | [组件库] 无对应，从 analytics 提升 | 通用 K 线渲染（H5/APP-PLUS renderjs+klinecharts，MP-WEIXIN uCharts 画布），Props `{ title: string; data: TrendKLineData }` |
 | `AudioPlayer.vue` | [组件库] | 通用音频播放器（H5 HTMLAudioElement / App+小程序 InnerAudioContext 运行时分流），Props `{ src; title?; cover?; autoplay?; initialTime? }`，Emits `play`/`pause`/`ended`/`timeupdate`；卸载/换源时先 stop 再 destroy 确保音频立即停止（全局互斥抢占依赖此行为） |
 | `FloatingPodcast.vue` | App 专属 | 播报悬浮球/播放条（页面容器 MainTabs/SubPageCard/SubPageCard2 内渲染），消费 podcast store；渲染权跟随 `store.activePage === pageKey`（仅当前前台页面实例渲染 AudioPlayer，避免多实例双播放）。**注意：uni-app 的 onShow/onHide 是页面实例级钩子，子组件注册的永不触发——页面容器必须用 Vue 的 `onActivated`/`onDeactivated`（KeepAlive 缓存树内子组件可触发）维护 activePage，失活用 `clearActivePage(pageKey)` 防止旧页事件覆盖新页** |
+| `InsightTag.vue` | [组件库] | 洞察之眼标签（type ∈ emotion/fund/event/market，size ∈ sm/md/lg），MarketInsightCard 内由 InsightCard 使用 |
+| `InsightCard.vue` | [组件库] | 洞见卡（title/trace/forecast/time/theme/showMeta/confidence，emit click），市场洞见页 MarketInsightCard 复用 |
 
 **已引入但尚未在生产页面使用的组件**（已存在于 `shared/components/` 并通过 barrel export 导出，需要时直接 `import { ... } from '@/shared/components'`）：
 `Switch` `Rate` `Progress` `Skeleton` `Toast` `ActionSheet` `Modal` `Steps` `StatCard` `ListCell` `QuoteHeader` `Gauge` `Sparkline` `DataTable` `IndexCard` `Timeline` `ChatBubble` `StreamingText` `InsightListCard` `StockItem`
@@ -372,6 +378,7 @@ import Card from '@/shared/components/Card.vue'
 | `useWebSocket` | WebSocket 连接管理 |
 | `useTimer` | 定时器管理 |
 | `usePushNotification` | 推送通知 |
+| `useAdaptiveScreen` | 多端适配（2026-08-26）：判断宽屏（平板/折叠屏展开/横屏，默认阈值 700px）+ `uni.onWindowResize` 监听窗口变化（折叠屏展开/收起实时响应）。H5 调试画布切换为 tablet/landscape 时返回模拟设备宽度 |
 
 ## 9. 常用命令
 

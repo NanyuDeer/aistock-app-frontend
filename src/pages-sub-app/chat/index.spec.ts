@@ -92,8 +92,8 @@ test('Phase 4-2 语音输入：麦克风按钮仅支持平台显示（speechInpu
 })
 
 test('Phase 4-2 语音输入：识别文本回填 inputText（可编辑），不自动发送', () => {
-  // tap 切换：isListening 时结束识别，否则开始识别并回填
-  assert.match(pageSource, /@tap="handleMicTap"/)
+  // tap 切换：isListening 时结束识别，否则开始识别并回填（.stop 阻止冒泡，避免误触输入区其他处理）
+  assert.match(pageSource, /@tap(\.stop)?="handleMicTap"/)
   assert.match(pageSource, /stopSpeechRecognition\(\)/)
   assert.match(pageSource, /inputText\.value = result\.text/)
   // 回填后必须走用户手动发送（handleSend 只被发送按钮/确认键触发），识别回调内禁止直接 chatStream.send
@@ -173,25 +173,50 @@ test('改进18：示例问题覆盖六大类（大盘/个股/资金/对比/新�
   assert.match(pageSource, /市盈率是什么/)
 })
 
-// ─── 改进 20（批次 1，2026-08-13）：引导追问按钮化 ───
-
-test('改进20：引导追问按钮化（parseFollowupQuestions 接入 + 按钮点击即发）', () => {
-  assert.match(pageSource, /parseFollowupQuestions/)
-  assert.match(pageSource, /followup-questions/)
-  assert.match(pageSource, /@tap="quickAsk\(q\)"/)
-})
-
-test('改进20：解析失败回退纯文本（followupOf 返回 null 时走既有 msg.content 渲染）', () => {
-  assert.match(pageSource, /function followupOf\(msg: ChatMessage\)/)
-  assert.match(pageSource, /v-else-if="msg\.content"/)
-})
-
 // ─── 改进 16（批次 1，2026-08-13）：对话滚动交互（豆包式） ───
 
-test('改进16：scroll-view 上滑检测接入（@scroll + isNearBottom 距底判定）', () => {
+test('改进16：scroll-view 上滑检测接入（@scroll + measureProximity 三态判定）', () => {
   assert.match(pageSource, /@scroll="onScroll"/)
-  assert.match(pageSource, /isNearBottom/)
+  assert.match(pageSource, /measureProximity/)
   assert.match(pageSource, /followPaused/)
+})
+
+test('5B：resetFollow 纯复位（无滚底/无定时器——硬约束 #3）', () => {
+  assert.match(pageSource, /function resetFollow\(\)/)
+  // 函数体内不得出现滚底或定时器（纯复位：仅 followPaused=false + lastFollowSig=''）
+  assert.doesNotMatch(pageSource, /function resetFollow\(\)[\s\S]{0,200}scrollToBottom/)
+  assert.doesNotMatch(pageSource, /function resetFollow\(\)[\s\S]{0,200}followTimer/)
+})
+
+test('5B：useChatStream 接线 onBeforeStream → resetFollow + 轮次锚点更新（FIX-2 全发送路径覆盖）', () => {
+  assert.match(pageSource, /useChatStream\(\{ onBeforeStream: \(\) => \{ resetFollow\(\); roundAnchor\.value = Date\.now\(\) \} \}\)/)
+})
+
+test('5B：四处显式滚底已删除，watch(isStreaming) v=true 唯一收口（spy===1）', () => {
+  // handleSend / quickAsk / rerunDeep 函数体内不再有显式 scrollToBottom()
+  assert.doesNotMatch(pageSource, /function handleSend\(\)[\s\S]{0,300}scrollToBottom\(\)/)
+  assert.doesNotMatch(pageSource, /function quickAsk\([\s\S]{0,300}scrollToBottom\(\)/)
+  assert.doesNotMatch(pageSource, /function rerunDeep\([\s\S]{0,300}scrollToBottom\(\)/)
+  // onLoad nextTick 回调（send(q) 路径）不再有显式滚底——由 watch(isStreaming) v=true 收口
+  assert.doesNotMatch(pageSource, /void chatStream\.send\(q\)[\s\S]{0,120}scrollToBottom\(\)/)
+  // watch(isStreaming) v=true 分支 = 唯一滚底+定时器收口点
+  assert.match(pageSource, /watch\(isStreaming[\s\S]{0,600}scrollToBottom\(\)[\s\S]{0,120}followTimer = setInterval/)
+})
+
+test('5B：watch(pendingConfirm) v=true 复位跟随 + 滚底（confirm_request=第 4 个新交互入口）', () => {
+  assert.match(pageSource, /watch\(pendingConfirm[\s\S]{0,600}resetFollow\(\)[\s\S]{0,80}scrollToBottom\(\)/)
+})
+
+test('5B：onScroll 三态接入（restoreInProgress 守卫 + 位置/高度缓存 + measureProximity）', () => {
+  assert.match(pageSource, /restoreInProgress\.value\) return/)
+  assert.match(pageSource, /let currentScrollTop = 0/)
+  assert.match(pageSource, /let currentScrollHeight = 0/)
+  assert.match(pageSource, /currentScrollTop = scrollTop/)
+  assert.match(pageSource, /if \(scrollHeight > 0\) currentScrollHeight = scrollHeight/)
+  assert.match(pageSource, /const proximity = measureProximity\(scrollTop, scrollHeight, viewport\)/)
+  // 三态：near 恢复 / far 暂停 / unknown 保持（scrollHeight<=0 不谎称贴底）
+  assert.match(pageSource, /proximity === 'near'/)
+  assert.match(pageSource, /proximity === 'far'/)
 })
 
 test('改进16：「回到最新」悬浮按钮（上滑暂停后显示，点击回底 + 恢复跟随）', () => {
@@ -204,4 +229,140 @@ test('改进16：暂停跟随期间不钉底（定时器/打字机滚动均走 s
   assert.match(pageSource, /scrollToBottomIfFollowing/)
   assert.match(pageSource, /if \(followPaused\.value\) return/)
   assert.match(pageSource, /followPaused\.value = false/)
+})
+
+// ─── G6（2026-08-17 分歧 #5 收敛）：跳转-返回恢复阅读位置（仅 D 出口接线） ───
+
+test('G6：leaveChatContext 记录阅读位置（savedScrollTop/savedMessageCount/pendingRestore）', () => {
+  assert.match(pageSource, /function leaveChatContext\(\)/)
+  assert.match(pageSource, /savedScrollTop\.value = currentScrollTop/)
+  assert.match(pageSource, /savedMessageCount = displayMessages\.value\.length/)
+  assert.match(pageSource, /pendingRestore\.value = true/)
+})
+
+test('G6：restorePosition 两段式恢复（restoreInProgress + 50ms 幂等第二次 + followPaused=true）', () => {
+  assert.match(pageSource, /function restorePosition\(target: number\)/)
+  // 恢复窗口开启：restoreInProgress=true 抑制 onScroll（防编程式滚动回跳）
+  assert.match(pageSource, /restoreInProgress\.value = true/)
+  // 两段式：nextTick 先设值；50ms 后 nextTick 内幂等第二次
+  assert.match(pageSource, /nextTick\(apply\)/)
+  assert.match(pageSource, /setTimeout\(\(\) => \{\s*nextTick\(\(\) => \{\s*apply\(\)/)
+  // 完成：关恢复窗口 + 进入暂停跟随态（L167「回到最新」按钮兜底）
+  assert.match(pageSource, /restoreInProgress\.value = false/)
+  assert.match(pageSource, /followPaused\.value = true/)
+  // 恢复目标经 clampScrollTop 钳制（不超过可滚最大值）
+  assert.match(pageSource, /clampScrollTop\(\s*target,\s*currentScrollHeight,\s*viewportH\.value \|\| DEFAULT_VIEWPORT_PX,\s*\)/)
+})
+
+test('G6：onLoad 注册 / onUnmount 注销 chat:leave-context 事件（成对）', () => {
+  assert.match(pageSource, /uni\.\$on\('chat:leave-context', leaveChatContext\)/)
+  assert.match(pageSource, /uni\.\$off\('chat:leave-context', leaveChatContext\)/)
+})
+
+test('G6：onShow 恢复分支（pendingRestore 消费 + hasNewProgress 放弃条件 + restorePosition + return 跳过 resume）', () => {
+  assert.match(pageSource, /if \(pendingRestore\.value\)/)
+  assert.match(pageSource, /pendingRestore\.value = false/)
+  // 放弃条件三连：streaming || hasPendingRun || 消息数变化（硬约束 #6）
+  assert.match(pageSource, /isStreaming\.value \|\|/)
+  assert.match(pageSource, /chatStream\.hasPendingRun\(\)/)
+  assert.match(pageSource, /displayMessages\.value\.length !== savedMessageCount/)
+  // 无新推进 → 恢复原位
+  assert.match(pageSource, /restorePosition\(savedScrollTop\.value\)/)
+  // 恢复分支 return，不执行下方 resume 续跑
+  assert.match(pageSource, /restorePosition\(savedScrollTop\.value\)[\s\S]{0,200}return/)
+})
+
+test('G6：clampScrollTop import 已接入（scrollFollow 双导出）', () => {
+  assert.match(pageSource, /import \{ measureProximity, clampScrollTop \} from '@\/shared\/utils\/scrollFollow'/)
+})
+
+test('G6：goSessions 不置位 pendingRestore（仅 D 出口接线，会话列表返回仍贴底）', () => {
+  assert.doesNotMatch(pageSource, /goSessions[\s\S]{0,150}pendingRestore/)
+})
+
+// ─── 批次 4（2026）：消息长按操作 ───
+
+test('批次4：消息项长按接入（message-item @touchstart → 打开操作菜单）', () => {
+  assert.match(pageSource, /@touchstart="onMsgTouchStart\(\$event, msg\)"/)
+  assert.match(pageSource, /function openMessageActions\(msg: ChatMessage, clientX = 0, clientY = 0\)/)
+})
+
+test('批次4：长按菜单含复制/选中文字/删除/重发（MessageActionMenu 接入 + 危险项删除）', () => {
+  assert.match(pageSource, /<MessageActionMenu/)
+  assert.match(pageSource, /\{ label: '复制', value: 'copy' \}/)
+  assert.match(pageSource, /\{ label: '选中文字', value: 'select-text' \}/)
+  assert.match(pageSource, /\{ label: '重发', value: 'resend' \}/)
+  assert.match(pageSource, /\{ label: '删除', value: 'delete', danger: true \}/)
+})
+
+test('批次4：选中文字态（原生手柄圈选复制片段，仅 App）', () => {
+  assert.match(pageSource, /user-select: text/)
+  assert.match(pageSource, /copy-selection-bar/)
+  assert.match(pageSource, /function handleSelectText\(msg: ChatMessage\)/)
+  assert.match(pageSource, /case 'select-text':/)
+})
+
+test('批次4：复制走剪贴板 / 重发回填输入框可编辑 / 删除调用 store.removeMessage', () => {
+  assert.match(pageSource, /uni\.setClipboardData\(\{ data: msg\.content \}\)/)
+  assert.match(pageSource, /inputText\.value = msg\.content/)
+  assert.match(pageSource, /function handleMessageAction\(item: MenuItem\)/)
+  assert.match(pageSource, /chatStore\.removeMessage\(msg\.timestamp\)/)
+  assert.match(pageSource, /isStreaming\.value\) return \/\/ 流式中禁长按/)
+})
+
+// ─── 追问面板（2026-08-26，Task 8）：panelState 状态机 + 替换 quick-skills + 打字机完成信号 ───
+
+test('Task8：追问面板状态机已接入（panelState 类型 + 状态函数 + 纯函数判定）', () => {
+  assert.match(pageSource, /const panelState = ref<\{ visible: boolean; messageId: number \| null; pending: boolean \}>\(/)
+  assert.match(pageSource, /function onAnswerSettled\(msg: ChatMessage\)/)
+  assert.match(pageSource, /function clearPanel\(\)/)
+  assert.match(pageSource, /function dismissPanel\(\)/)
+  assert.match(pageSource, /function restorePanel\(\)/)
+  assert.match(pageSource, /function shouldShowPanel\(hasQuestions: boolean, typingActive: boolean, followPaused: boolean\)/)
+})
+
+test('Task8：display-messages 收口 watch（最后一条 assistant 且 questions 非空才处理；打字机完成 + 未暂停才立即展示）', () => {
+  assert.match(pageSource, /displayMessages\.value\[displayMessages\.value\.length - 1\]\?\.timestamp/)
+  assert.match(pageSource, /if \(ts === prev\) return/)
+  assert.match(pageSource, /last\.role !== 'assistant' \|\| !hasQuestions/)
+  assert.match(pageSource, /onAnswerSettled\(last\)/)
+  assert.match(pageSource, /shouldShowPanel\(hasQuestions, typingMsgKey\.value !== null, followPaused\.value\)/)
+})
+
+test('Task8：display-messages 收口 watch 定义于 watch(isStreaming) 之后（结构性事实）', () => {
+  // final review 修正：Vue 3.5 的 watch 回调按依赖变更入队顺序执行（非创建顺序），
+  // 旧名「同 flush 先启动打字机」的机制表述已过时；真正守卫是展示判定 nextTick 延后一帧。
+  // 本测试仅保留可验证的结构性事实：display 收口 watch 在源码中定义于 watch(isStreaming) 之后。
+  const isStreamingIdx = pageSource.search(/watch\(isStreaming,/)
+  const displayWatchIdx = pageSource.search(/displayMessages\.value\[displayMessages\.value\.length - 1\]\?\.timestamp/)
+  assert.ok(isStreamingIdx !== -1 && displayWatchIdx !== -1)
+  assert.ok(isStreamingIdx < displayWatchIdx)
+})
+
+test('Task8：typingMsgKey→null 完成信号展示面板（pending 且未暂停跟随）', () => {
+  assert.match(pageSource, /watch\(typingMsgKey, \(k\) => \{/)
+  assert.match(pageSource, /if \(k !== null \|\| !panelState\.value\.pending\) return/)
+  assert.match(pageSource, /if \(!followPaused\.value\) panelState\.value\.visible = true/)
+})
+
+test('Task8：quick-skills 行被面板替换（v-if/v-else + FollowupSuggestChips + × 收起）', () => {
+  assert.match(pageSource, /<view v-if="!panelState\.visible" class="quick-skills">/)
+  assert.match(pageSource, /<FollowupSuggestChips :items="panelQuestions" @select="onPanelSelect" \/>/)
+  assert.match(pageSource, /@tap="dismissPanel"/)
+  assert.match(pageSource, /import FollowupSuggestChips from '@\/shared\/components\/FollowupSuggestChips\.vue'/)
+})
+
+test('Task8：footer「查看追问」弱入口（pending && !visible && 消息归属）→ restorePanel；建议点击 → clearPanel + quickAsk', () => {
+  assert.match(pageSource, /panelState\.pending && !panelState\.visible && msg\.timestamp === panelState\.messageId/)
+  assert.match(pageSource, /@tap="restorePanel"/)
+  assert.match(pageSource, /function onPanelSelect\(q: string\)/)
+  assert.match(pageSource, /clearPanel\(\)[\s\S]{0,80}quickAsk\(q\)/)
+})
+
+test('Task8：新发送轮收起面板（watch(isStreaming) v=true 先清 pending 防 typingMsgKey 复活旧建议）', () => {
+  assert.match(pageSource, /if \(v\) \{[\s\S]{0,200}clearPanel\(\)/)
+})
+
+test('Task8：quickAsk 发送入口清面板', () => {
+  assert.match(pageSource, /function quickAsk\(text: string\)[\s\S]{0,120}clearPanel\(\)/)
 })

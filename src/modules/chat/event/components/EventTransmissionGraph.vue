@@ -15,7 +15,7 @@
       <!-- 关键变量节点 -->
       <view class="graph-node var-node">
         <text class="node-type-label">关键变量</text>
-        <view v-for="(v, vi) in data.variables.slice(0, 2)" :key="vi" class="var-item">
+        <view v-for="(v, vi) in data.variables" :key="vi" class="var-item">
           <text class="var-item-name">{{ v.name }}</text>
           <text class="var-item-dir" :class="'dir-' + v.direction">
             {{ v.direction === 'bullish' ? '↑' : v.direction === 'bearish' ? '↓' : '→' }}
@@ -28,15 +28,25 @@
         <text class="arrow-head">▼</text>
       </view>
 
-      <!-- 核心行业节点 -->
+      <!-- 核心影响行业节点：无上下游时，其余核心影响行业并入本框，仅保留一个"核心影响行业"字样 -->
       <view class="graph-node core-node" :class="'node-' + coreDirection">
-        <text class="node-type-label">核心行业</text>
-        <text class="node-main-text">{{ data.coreIndustry?.name || '核心行业' }}</text>
-        <text class="node-impact-text">{{ data.coreIndustry?.impact || '' }}</text>
+        <text class="node-type-label">核心影响行业</text>
+        <template v-if="coreList.length">
+          <view v-for="(item, i) in coreList" :key="item.key" class="core-item">
+            <view class="industry-name-wrap">
+              <text class="node-main-text" :class="dirTextClass(item.direction)">{{ item.name }}</text>
+              <text class="direction-arrow" :class="dirTextClass(item.direction)">{{ arrow(item.direction) }}</text>
+            </view>
+            <!-- 注释性说明（小号） -->
+            <text class="node-impact-text" v-if="item.note">{{ item.note }}</text>
+            <view class="core-item-sep" v-if="i < coreList.length - 1" />
+          </view>
+        </template>
+        <text v-else class="node-main-text">核心影响行业</text>
       </view>
 
-      <!-- 上下游分叉 -->
-      <view class="branch-section" v-if="upChain.length || downChain.length">
+      <!-- 上下游分叉（存在 L2 上下游时保持原有完整图谱） -->
+      <view class="branch-section" v-if="hasUpDown">
         <view class="branch-trunk">
           <view class="arrow-line-bar" />
         </view>
@@ -65,7 +75,8 @@
           </view>
         </view>
       </view>
-    </view>
+
+      </view>
 
     <!-- AI 总结语 -->
     <view class="graph-summary">
@@ -103,9 +114,58 @@ const upChain = computed<TransmissionChainNode[]>(() =>
   (props.data?.chain || []).filter(c => c.relation.includes('上游'))
 )
 
+/** 行业传导方向 → 涨跌箭头（A股：bullish=涨=↑，bearish=跌=↓） */
+function arrow(direction: TransmissionChainNode['direction']): string {
+  if (direction === 'bullish') return '↑'
+  if (direction === 'bearish') return '↓'
+  return '→'
+}
+
+/** 行业传导方向 → 涨跌配色类名（A股：bullish=涨=红，bearish=跌=绿） */
+function dirTextClass(direction: TransmissionChainNode['direction']): string {
+  if (direction === 'bullish') return 'text-bullish'
+  if (direction === 'bearish') return 'text-bearish'
+  return 'text-neutral'
+}
+
 const downChain = computed<TransmissionChainNode[]>(() =>
   (props.data?.chain || []).filter(c => c.relation.includes('下游'))
 )
+
+/** 是否存在上下游传导（存在 L2 上下游节点），有则保留完整图谱 */
+const hasUpDown = computed(() => upChain.value.length > 0 || downChain.value.length > 0)
+
+/** 核心影响行业展项：名称 + 涨跌方向 + 一句影响说明 */
+interface CoreDisplayItem {
+  key: string
+  name: string
+  note: string
+  direction: TransmissionChainNode['direction']
+}
+
+/**
+ * 核心影响行业合并列表（无上下游 L1-only 场景）：
+ * 首个为核心影响行业（首要核心行业），其后为其他 L1 核心影响行业——
+ * 全部并入首个"核心影响行业"框内展示，避免重复多个"核心影响行业"字样。
+ * 存在上下游（L2）时保持完整图谱，其余 L1 不并入（不改变既有分叉结构）。
+ */
+const coreList = computed<CoreDisplayItem[]>(() => {
+  const list: CoreDisplayItem[] = []
+  const primary = props.data?.coreIndustry
+  if (primary?.name?.trim()) {
+    list.push({ key: 'primary', name: primary.name.trim(), note: primary.impact || '', direction: coreDirection.value })
+  }
+  if (!hasUpDown.value) {
+    const seen = new Set(list.map(x => x.name))
+    for (const c of props.data?.chain || []) {
+      const name = c.industry.trim()
+      if (c.level !== 1 || !name || seen.has(name)) continue
+      seen.add(name)
+      list.push({ key: `c-${name}`, name, note: c.reason || '', direction: c.direction })
+    }
+  }
+  return list
+})
 </script>
 
 <style scoped lang="scss">
@@ -146,7 +206,41 @@ const downChain = computed<TransmissionChainNode[]>(() =>
 .node-type-label { font-size: 18rpx; color: var(--ev-text-muted); font-weight: 500; }
 .node-main-text { font-size: 24rpx; font-weight: 700; color: var(--ev-text-primary); text-align: center; }
 .node-main-text.small { font-size: 20rpx; }
-.node-impact-text { font-size: 20rpx; color: var(--ev-text-tertiary); text-align: center; }
+/* 注释性说明：小号、弱化，与页面 ci-reason/chain-reason 一致 */
+.node-impact-text { font-size: 20rpx; color: var(--ev-text-muted); text-align: center; line-height: 1.5; }
+
+/* 合并框内单个核心影响行业展项 */
+.core-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.core-item-sep {
+  width: 60rpx;
+  height: 1rpx;
+  background: rgba(148, 163, 184, 0.3);
+  margin: 4rpx 0;
+}
+
+/* 行业名 + 涨跌箭头（横向并排） */
+.industry-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.direction-arrow {
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* 行业涨跌配色：A股 红涨绿跌 */
+.text-bullish { color: var(--ev-negative); }
+.text-bearish { color: var(--ev-positive); }
+.text-neutral { color: var(--ev-text-primary); }
 
 /* 变量子项 */
 .var-item { display: flex; align-items: center; gap: 8rpx; }

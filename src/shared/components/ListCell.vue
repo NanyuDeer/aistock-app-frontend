@@ -73,6 +73,12 @@ const handleClick = () => {
   border-top: 2rpx solid $line-soft;
 }
 
+/* H5 悬停时光标变可点击，与 Card 组件的 .is-clickable 保持一致 */
+.as-list-cell.is-clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
 .as-list-cell.is-clickable:active {
   background: $bg-soft;
 }

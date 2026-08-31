@@ -1,9 +1,5 @@
 <template>
   <view class="timeline-section">
-    <view class="section-title">
-      <text class="title-text">{{ titleText }}</text>
-    </view>
-
     <!-- 证据不足态：主因缺失提示卡片 -->
     <Card v-if="!primaryCause" class="insufficient-card">
       <view class="insufficient-icon">
@@ -54,9 +50,9 @@
         </view>
       </view>
 
-      <view v-if="primaryCause.supportingEvidence.length" class="evidence-block">
+      <view v-if="readableEvidence.length" class="evidence-block">
         <text class="evidence-label">参考来源：</text>
-        <text class="evidence-text">{{ labelEvidenceList(primaryCause.supportingEvidence).join('、') }}</text>
+        <text class="evidence-text">{{ readableEvidence.join('、') }}</text>
       </view>
     </Card>
   </view>
@@ -75,9 +71,10 @@ const props = defineProps<{
 
 const primaryCause = computed(() => props.presentation.primaryCause)
 
-const titleText = computed(() => {
-  if (!props.presentation.primaryCause) return '主因'
-  return '主因'
+/** 参考来源标签（基于过滤后标签，Task 2 过滤后原始 ID 可能为空但已有标签） */
+const readableEvidence = computed(() => {
+  const pc = props.presentation.primaryCause
+  return pc ? labelEvidenceList(pc.supportingEvidence) : []
 })
 </script>
 
@@ -85,8 +82,6 @@ const titleText = computed(() => {
 @use '@/shared/styles/variables.scss' as *;
 
 .timeline-section { padding: 0 $spacing-base; margin-bottom: $spacing-sm; }
-.section-title { display: flex; align-items: center; margin: $spacing-base 0 $spacing-sm; }
-.title-text { font-size: 28rpx; font-weight: 600; color: $text-color-title; }
 
 /* 证据不足提示卡片 */
 .insufficient-card { margin: 0; display: flex; align-items: flex-start; gap: $spacing-sm; }

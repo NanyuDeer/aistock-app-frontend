@@ -12,7 +12,7 @@ export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(storage.get(STORAGE_KEYS.USER_INFO))
   const settings = ref<UserSettings>({})
 
-  const isLoggedIn = () => !!token.value || !!userInfo.value?.openid
+  const isLoggedIn = () => !!token.value || !!userInfo.value?.id
 
   function clearSession() {
     token.value = ''
@@ -50,6 +50,44 @@ export const useUserStore = defineStore('user', () => {
     await fetchUserInfo()
   }
 
+  /** 手机号 + 短信验证码登录（无账户自动创建；dev 验证码 123456） */
+  async function smsLogin(phone: string, code: string) {
+    const result: any = await authApi.smsLogin(phone, code)
+    token.value = result.token
+    storage.set(STORAGE_KEYS.TOKEN, result.token)
+    if (result.userInfo) {
+      userInfo.value = {
+        id: result.userInfo.id,
+        openid: result.userInfo.openid || '',
+        phone: result.userInfo.phone || '',
+        nickname: result.userInfo.nickname || '',
+        avatar: result.userInfo.avatar || result.userInfo.avatar_url || '',
+      }
+      storage.set(STORAGE_KEYS.USER_INFO, userInfo.value)
+    }
+    await fetchUserInfo()
+    return userInfo.value
+  }
+
+  /** 邮箱 + 验证码登录（无账户自动创建；dev 验证码 123456） */
+  async function emailLogin(email: string, code: string) {
+    const result: any = await authApi.emailLogin(email, code)
+    token.value = result.token
+    storage.set(STORAGE_KEYS.TOKEN, result.token)
+    if (result.userInfo) {
+      userInfo.value = {
+        id: result.userInfo.id,
+        openid: result.userInfo.openid || '',
+        email: result.userInfo.email || '',
+        nickname: result.userInfo.nickname || '',
+        avatar: result.userInfo.avatar || result.userInfo.avatar_url || '',
+      }
+      storage.set(STORAGE_KEYS.USER_INFO, userInfo.value)
+    }
+    await fetchUserInfo()
+    return userInfo.value
+  }
+
   /** 扫码登录成功后，存储 token 并获取用户信息 */
   async function handleScanLoginSuccess(scanData?: { token?: string; openid?: string }) {
     try {
@@ -68,9 +106,13 @@ export const useUserStore = defineStore('user', () => {
 
   async function fetchUserInfo() {
     const info = await authApi.getUserInfo()
-    userInfo.value = info
-    storage.set(STORAGE_KEYS.USER_INFO, info)
-    return info
+    // is_vip 归一化为 isVip（2026-08-24 报告导出会员解锁；后端未升级缺省按非会员）
+    userInfo.value = {
+      ...info,
+      isVip: !!info.is_vip || !!info.isVip,
+    }
+    storage.set(STORAGE_KEYS.USER_INFO, userInfo.value)
+    return userInfo.value
   }
 
   async function restoreSession() {
@@ -118,6 +160,8 @@ export const useUserStore = defineStore('user', () => {
     isLoggedIn,
     login,
     wxLogin,
+    smsLogin,
+    emailLogin,
     handleScanLoginSuccess,
     fetchUserInfo,
     restoreSession,

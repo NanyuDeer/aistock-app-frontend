@@ -1,11 +1,11 @@
 <template>
-  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol">
-    <view class="page-detail">
-    <view v-if="loading" class="loading">
+  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol" :scroll-top="detailScrollTop">
+    <view class="page-detail" :class="{ 'page-detail--anchoring': anchorNavigating }">
+    <view v-if="loading || anchorNavigating" class="loading">
       <text class="loading-text">加载中...</text>
     </view>
 
-    <template v-else-if="quote">
+    <template v-if="quote">
       <!-- 1. 股票头部 -->
       <view class="stock-header">
         <view class="stock-name-row">
@@ -55,26 +55,25 @@
 
       <view class="decision-card">
         <view class="decision-head">
-          <view>
-            <text class="decision-kicker">综合决策</text>
-          </view>
+          <InsightTag type="market" size="sm">综合洞见</InsightTag>
           <view class="decision-verdict">
             <text :class="['decision-status', overallDecision.verdictClass]">{{ overallDecision.verdict }}</text>
             <text :class="['decision-status', 'is-sub', overallDecision.periodDominanceClass]">{{ overallDecision.periodDominance }}</text>
           </view>
         </view>
         <text class="decision-summary">{{ overallDecision.summary }}</text>
+        <view class="decision-divider" />
         <view class="decision-next">
-          <text class="next-label">观察重点</text>
+          <text class="next-label">重点</text>
           <text class="next-text">{{ overallDecision.nextStep }}</text>
         </view>
         <view class="decision-points">
-          <view v-if="overallDecision.opportunity" class="decision-point" @tap="toggleDecisionPoint('opportunity')">
+          <view v-if="overallDecision.opportunity" class="decision-point decision-point--opportunity" @tap="toggleDecisionPoint('opportunity')">
             <text class="point-label">机会</text>
             <text :class="['point-text', { expanded: expandedDecisionPoint === 'opportunity' }]">{{ expandedDecisionPoint === 'opportunity' ? overallDecision.opportunityFull : overallDecision.opportunity }}</text>
             <text class="point-more">{{ expandedDecisionPoint === 'opportunity' ? '收起' : '展开' }}</text>
           </view>
-          <view v-if="overallDecision.risk" class="decision-point is-risk" @tap="toggleDecisionPoint('risk')">
+          <view v-if="overallDecision.risk" class="decision-point decision-point--risk" @tap="toggleDecisionPoint('risk')">
             <text class="point-label">风险</text>
             <text :class="['point-text', { expanded: expandedDecisionPoint === 'risk' }]">{{ expandedDecisionPoint === 'risk' ? overallDecision.riskFull : overallDecision.risk }}</text>
             <text class="point-more">{{ expandedDecisionPoint === 'risk' ? '收起' : '展开' }}</text>
@@ -82,7 +81,8 @@
         </view>
       </view>
 
-      <view v-if="isFavorite && latestMajorEvent" class="major-event-alert">
+      <view id="detail-anchor-stock-info">
+      <view v-if="isFavorite" class="major-event-alert">
         <view class="major-event-head">
           <text class="decision-kicker">最新重大异动</text>
           <text v-if="latestMajorEvent" :class="['major-impact', majorEventImpactClass]">
@@ -99,23 +99,24 @@
         </template>
         <template v-else>
           <text class="major-event-title">暂无数据</text>
-          <view class="major-event-meta">
-            <text>暂无真实异动来源</text>
-          </view>
         </template>
+      </view>
       </view>
 
       <!-- 2. 个股异动 -->
       <view v-if="isFavorite && displayedStockEvents.length" class="section-card">
         <text class="section-title">个股异动</text>
         <view class="event-list">
-          <view v-for="(evt, idx) in displayedStockEvents" :key="idx" class="event-item">
+          <view v-for="(evt, idx) in displayedStockEventsVisible" :key="idx" class="event-item">
             <view class="event-dot" :class="evt.change_type || evt.cycle || 'default'"></view>
             <view class="event-content">
               <text class="event-title">{{ evt.title || evt.change_type_name || evt.summary || '异动' }}</text>
               <text v-if="evt.event_time || evt.event_time_display" class="event-time">{{ evt.event_time_display || formatEventTime(evt.event_time) }}</text>
             </view>
           </view>
+        </view>
+        <view v-if="hasMoreEvents" class="event-toggle" @tap="eventListExpanded = !eventListExpanded">
+          <text class="event-toggle-text">{{ eventListExpanded ? '收起' : '展开查看全部' }}</text>
         </view>
       </view>
 
@@ -134,10 +135,10 @@
 
       <!-- 4. 短线视图 -->
       <view v-show="activeView === 'short'" class="view-content">
-        <!-- AI 资讯分析 -->
+        <!-- AI 资讯洞见 -->
         <view v-if="hasAiInfoCardData" class="ai-analysis-card">
           <view class="card-header">
-            <text class="card-title">AI 资讯分析</text>
+            <text class="card-title">AI 资讯洞见</text>
             <view class="card-header-actions">
               <view class="ai-history-btn" @tap="openHistoryDialog">
                 <text class="history-icon">历史</text>
@@ -157,18 +158,18 @@
                 <text v-if="aiAnalysis.analysisDate" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
               </view>
               <view v-if="logicTags.length" class="ai-section">
-                <text class="ai-section-title">核心逻辑</text>
+                <text class="ai-section-title">研判依据</text>
                 <view class="research-tags">
                   <view
                     v-for="(tag, i) in logicTags"
                     :key="'lg'+i"
-                    :class="['research-tag', 'is-logic', { 'is-expanded': expandedTag === 'logic' && expandedTagIdx === i }]"
-                    @tap="toggleTagExpand('logic', i)"
+                    :class="['research-tag', 'is-basis', { 'is-expanded': expandedTag === 'shortLogic' && expandedTagIdx === i }]"
+                    @tap="toggleTagExpand('shortLogic', i)"
                   >
                     <text class="research-tag-text">{{ tag.tag }}</text>
                   </view>
                 </view>
-                <view v-if="expandedTag === 'logic'" class="tag-detail">
+                <view v-if="expandedTag === 'shortLogic'" class="tag-detail basis">
                   <text class="tag-detail-text">{{ logicTags[expandedTagIdx]?.full }}</text>
                 </view>
               </view>
@@ -178,13 +179,13 @@
                   <view
                     v-for="(tag, i) in riskTags"
                     :key="'rk'+i"
-                    :class="['research-tag', 'is-risk', { 'is-expanded': expandedTag === 'risk' && expandedTagIdx === i }]"
-                    @tap="toggleTagExpand('risk', i)"
+                    :class="['research-tag', 'is-risk', { 'is-expanded': expandedTag === 'shortRisk' && expandedTagIdx === i }]"
+                    @tap="toggleTagExpand('shortRisk', i)"
                   >
                     <text class="research-tag-text">{{ tag.tag }}</text>
                   </view>
                 </view>
-                <view v-if="expandedTag === 'risk'" class="tag-detail risk">
+                <view v-if="expandedTag === 'shortRisk'" class="tag-detail risk">
                   <text class="tag-detail-text">{{ riskTags[expandedTagIdx]?.full }}</text>
                 </view>
               </view>
@@ -363,23 +364,14 @@
 
       <!-- 5. 中线视图 -->
       <view v-show="activeView === 'mid'" class="view-content">
-        <!-- 中线 AI 研判 -->
+        <!-- 中线 AI 洞见 -->
         <view class="ai-analysis-card">
           <view class="card-header">
-            <text class="card-title">中线AI研判</text>
+            <text class="card-title">中线AI洞见</text>
           </view>
           <view class="card-body">
             <view class="ai-conclusion">
               <text :class="['conclusion-badge', midAiAnalysis.badgeClass]">{{ midAiAnalysis.conclusion }}</text>
-            </view>
-            <view class="ai-logic">
-              <text class="ai-logic-text">{{ midAiAnalysis.logic }}</text>
-            </view>
-            <view class="ai-action-list">
-              <view v-for="item in midActionItems" :key="item.label" class="ai-action-item">
-                <text class="ai-action-label">{{ item.label }}</text>
-                <text class="ai-action-text">{{ item.value }}</text>
-              </view>
             </view>
             <view v-if="midBasisTags.length" class="ai-section">
               <text class="ai-section-title">研判依据</text>
@@ -433,7 +425,7 @@
         </view>
 
         <!-- 财报分析 -->
-        <view v-if="hasFinanceCardData" class="section-card">
+        <view v-if="hasFinanceCardData" id="detail-anchor-performance-report" class="section-card">
           <view class="section-header">
             <text class="section-title">财报分析</text>
             <text v-if="semiAnnualReport?.reports?.length" class="section-sub">
@@ -493,7 +485,7 @@
         </view>
 
         <!-- 业绩预测 -->
-        <view v-if="forecastLoading || hasForecastCardData" class="section-card">
+        <view v-if="forecastLoading || hasForecastCardData" id="detail-anchor-forecast" class="section-card">
           <view class="section-header">
             <text class="section-title">业绩预测</text>
             <view v-if="!forecastLoading" class="ai-refresh-btn" @tap="loadForecast(true)">
@@ -588,23 +580,14 @@
 
       <!-- 6. 长线视图 -->
       <view v-show="activeView === 'long'" class="view-content">
-        <!-- 长线 AI 研判 -->
+        <!-- 长线 AI 洞见 -->
         <view class="ai-analysis-card">
           <view class="card-header">
-            <text class="card-title">长线AI研判</text>
+            <text class="card-title">长线AI洞见</text>
           </view>
           <view class="card-body">
             <view class="ai-conclusion">
               <text :class="['conclusion-badge', longAiAnalysis.badgeClass]">{{ longAiAnalysis.conclusion }}</text>
-            </view>
-            <view class="ai-logic">
-              <text class="ai-logic-text">{{ longAiAnalysis.logic }}</text>
-            </view>
-            <view class="ai-action-list">
-              <view v-for="item in longActionItems" :key="item.label" class="ai-action-item">
-                <text class="ai-action-label">{{ item.label }}</text>
-                <text class="ai-action-text">{{ item.value }}</text>
-              </view>
             </view>
             <view v-if="longBasisTags.length" class="ai-section">
               <text class="ai-section-title">研判依据</text>
@@ -882,7 +865,7 @@
       </view>
     </view>
 
-    <view v-else-if="!loading && !quote" class="empty">
+    <view v-if="!loading && !quote && !anchorNavigating" class="empty">
       <text class="empty-text">未找到股票数据</text>
     </view>
     </view>
@@ -890,12 +873,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive } from 'vue'
+import { computed, nextTick, ref, reactive } from 'vue'
 import { onLoad, onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import InsightTag from '@/shared/components/InsightTag.vue'
 import KLineChart from '@/modules/favorites/components/KLineChart.vue'
 import ForecastProfitChart from '@/modules/favorites/components/ForecastProfitChart.vue'
 import CapitalFlowCharts from '@/modules/favorites/components/CapitalFlowCharts.vue'
@@ -916,12 +900,18 @@ const stockEvents = ref<any[]>([])
 const forecastData = ref<any>(null)
 const forecastLoading = ref(false)
 const forecastDetailExpanded = ref(false)
+const detailAnchor = ref<DetailAnchor | ''>('')
+const detailScrollTop = ref(0)
+const anchorNavigating = ref(false)
 const klineData = ref<any[]>([])
 type KLinePeriod = 'daily' | 'weekly' | 'monthly'
 const klinePeriod = ref<KLinePeriod>('daily')
 const klineLoading = ref(false)
 const trendScoreData = ref<any>(null)
+const midAnalysisData = ref<any>(null)
+const longAnalysisData = ref<any>(null)
 const trendLoading = ref(false)
+const industryHealthData = ref<any>(null)
 // 历史 AI 评价
 const historyVisible = ref(false)
 const historyLoading = ref(false)
@@ -936,6 +926,7 @@ const hasStockHeaderTags = computed(() => Boolean(
 
 // 周期切换
 type ViewKey = 'short' | 'mid' | 'long'
+type DetailAnchor = 'stock-info' | 'forecast' | 'performance-report'
 const activeView = ref<ViewKey>('short')
 const viewTabs: { key: ViewKey; label: string; desc: string }[] = [
   { key: 'short', label: '短线', desc: '日/周' },
@@ -949,10 +940,67 @@ function selectActiveView(key: ViewKey) {
   activeView.value = key
 }
 
-// AI 研判 composable（接入真实 trend-score 数据）
+function normalizeDetailAnchor(value: unknown): DetailAnchor | '' {
+  const anchor = String(value || '').trim()
+  return anchor === 'stock-info' || anchor === 'forecast' || anchor === 'performance-report'
+    ? anchor
+    : ''
+}
+
+function viewForAnchor(anchor: DetailAnchor): ViewKey {
+  return anchor === 'stock-info' ? 'short' : 'mid'
+}
+
+async function scrollToDetailAnchor() {
+  const anchor = detailAnchor.value
+  if (!anchor) return
+  try {
+    await nextTick()
+    await nextTick()
+    detailScrollTop.value = 0
+    await waitForDetailLayout()
+
+    // 图表等组件在 nextTick 后仍可能完成一次异步布局，按当前位置连续校正，
+    // 保证锚点卡片最终贴齐内容区顶部。
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const offset = await getAnchorOffset(anchor)
+      if (offset === null || Math.abs(offset) < 1) break
+      detailScrollTop.value = Math.max(0, detailScrollTop.value + offset)
+      await nextTick()
+      await waitForDetailLayout()
+    }
+  } finally {
+    anchorNavigating.value = false
+  }
+}
+
+function waitForDetailLayout() {
+  return new Promise<void>(resolve => setTimeout(resolve, 50))
+}
+
+function getAnchorOffset(anchor: DetailAnchor): Promise<number | null> {
+  return new Promise(resolve => {
+    const query = uni.createSelectorQuery()
+    query.select('.as-sub2__scroll').boundingClientRect()
+    query.select(`#detail-anchor-${anchor}`).boundingClientRect()
+    query.exec((result: any[]) => {
+      const [container, target] = result || []
+      if (!container || !target) {
+        resolve(null)
+        return
+      }
+      resolve(Number(target.top || 0) - Number(container.top || 0))
+    })
+  })
+}
+
+// AI 洞见 composable（接入真实 trend-score 数据）
 const symbolRef = computed(() => symbol.value)
 const quoteRef = computed(() => ({ name: quote.value?.name, industry: stockInfo.value?.industry || quote.value?.industry }))
 const trendScoreDataRef = computed(() => trendScoreData.value)
+const midAnalysisDataRef = computed(() => midAnalysisData.value)
+const longAnalysisDataRef = computed(() => longAnalysisData.value)
+const industryHealthDataRef = computed(() => industryHealthData.value)
 const stockAiContextRef = computed(() => ({
   quote: quote.value,
   stockInfo: stockInfo.value,
@@ -965,7 +1013,7 @@ const {
   midMockData,
   longMockData,
   trendModel,
-} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef)
+} = useStockAiAnalysis(symbolRef, quoteRef, trendScoreDataRef, stockAiContextRef, industryHealthDataRef, midAnalysisDataRef, longAnalysisDataRef)
 
 const visibleNewsList = computed(() => newsExpanded.value ? newsList.value : newsList.value.slice(0, 3))
 const hasAiInfoCardData = computed(() => Boolean(
@@ -1202,59 +1250,19 @@ const midRiskTags = computed(() => extractTagsFromArray(midAiAnalysis.value.risk
 const longBasisTags = computed(() => extractTagsFromArray(longAiAnalysis.value.basis))
 const longAdviceTags = computed(() => extractTagsFromArray(longAiAnalysis.value.advice))
 const longRiskTags = computed(() => extractTagsFromArray(longAiAnalysis.value.riskTips))
-const midActionItems = computed(() => {
-  const conclusion = String(midAiAnalysis.value.conclusion || '')
-  const hasRisk = midRiskTags.value.length > 0
-  const isPositive = /看多|买入|增持|积极|继续/.test(conclusion)
-  return [
-    {
-      label: '当前判断',
-      value: isPositive
-        ? '中线逻辑仍可跟踪，但需要继续等业绩和行业数据验证。'
-        : '中线信号还不够强，先降低预期，等待更明确的基本面确认。',
-    },
-    {
-      label: '下一步验证',
-      value: '重点看业绩预期是否上修、行业景气是否延续，以及回调时成交量是否收缩。',
-    },
-    {
-      label: '风险判断',
-      value: hasRisk
-        ? `如果 ${midRiskTags.value[0]?.tag} 开始兑现，中线逻辑就需要降级。`
-        : '如果业绩预期下修、回调放量或行业热度降温，中线逻辑需要降级。',
-    },
-  ]
-})
-const longActionItems = computed(() => {
-  const score = Number(trendModel.value?.score || 0)
-  const hasVeto = Boolean(trendModel.value?.isVetoed)
-  const risk = longRiskTags.value[0]?.tag
-  return [
-    {
-      label: '长期判断',
-      value: hasVeto
-        ? '当前存在硬性风险（ST、流动性不足等），不适合直接放入长期核心池。'
-        : score >= 75
-          ? '具备长期观察价值，但仍要确认盈利质量和行业空间能否持续。'
-          : '长期确定性还不充分，更适合作为观察池标的。',
-    },
-    {
-      label: '长期跟踪',
-      value: '重点跟踪 ROE、收入增速、利润率、竞争格局和估值消化情况。',
-    },
-    {
-      label: '移出条件',
-      value: risk
-        ? `如果 ${risk} 兑现，或收入增速和利润率连续走弱，应降低长期关注级别。`
-        : '如果增长放缓、利润率下滑、竞争格局恶化或估值明显透支，应降低长期关注级别。',
-    },
-  ]
-})
 const latestMajorEvent = computed(() => stockEvents.value[0] || null)
 const displayedStockEvents = computed(() => {
   const latestKey = getEventIdentity(latestMajorEvent.value)
   return stockEvents.value.filter((event, index) => index !== 0 && getEventIdentity(event) !== latestKey)
 })
+// 个股异动列表展开/收起：默认仅展示前 3 条
+const EVENT_PREVIEW_COUNT = 3
+const eventListExpanded = ref(false)
+const displayedStockEventsVisible = computed(() => {
+  const all = displayedStockEvents.value
+  return eventListExpanded.value ? all : all.slice(0, EVENT_PREVIEW_COUNT)
+})
+const hasMoreEvents = computed(() => displayedStockEvents.value.length > EVENT_PREVIEW_COUNT)
 const majorEventImpactClass = computed(() => {
   const impact = getEventImpact(latestMajorEvent.value)
   if (impact.includes('利好')) return 'is-positive'
@@ -1318,7 +1326,7 @@ const legacyOverallDecision = computed(() => {
     ? ((majorImpact.includes('利好') && getEventDecisionPoint(latestMajorEvent.value, '机会'))
       || (isBullishFlow && getFlowOpportunityPoint(capital))
       || logicTags.value[0]?.tag
-      || (conclusion ? `短线资讯分析：${conclusion}` : '')
+      || (conclusion ? `短线资讯洞见：${conclusion}` : '')
       || trendModel.value?.description)
     : ''
   const riskSource = (isBearishEvent && getEventDecisionPoint(latestMajorEvent.value, '风险'))
@@ -1795,8 +1803,15 @@ onUnload(() => {
 
 onLoad((options: any) => {
   symbol.value = options?.symbol || ''
+  detailAnchor.value = normalizeDetailAnchor(options?.anchor)
+  if (detailAnchor.value) {
+    activeView.value = viewForAnchor(detailAnchor.value)
+    anchorNavigating.value = true
+  }
   if (symbol.value) {
     loadData()
+  } else {
+    anchorNavigating.value = false
   }
 })
 
@@ -1849,13 +1864,21 @@ async function loadData() {
       klineData.value = Array.isArray(klineRes.value) ? klineRes.value : []
     }
     applyLiveQuoteToKline()
-    // 非阻塞加载 AI 分析、业绩预测和趋势股评分
-    loadAiAnalysis()
-    loadForecast(false)
-    loadTrendScore()
+// 中线卡片上方的异步内容会改变锚点位置，完成后再执行锚定。
+    const aiTask = loadAiAnalysis()
+    const forecastTask = loadForecast(false)
+    const trendTask = loadTrendScore()
+    const industryTask = loadIndustryHealth()
+    loadMidLongAnalysis()
+    if (detailAnchor.value === 'forecast') {
+      await Promise.all([aiTask, forecastTask, trendTask, industryTask])
+    } else if (detailAnchor.value === 'performance-report') {
+      await Promise.all([aiTask, trendTask, industryTask])
+    }
   } catch (err) {
     console.error('[StockDetail] load error:', err)
   } finally {
+    if (detailAnchor.value) await scrollToDetailAnchor()
     loading.value = false
   }
 }
@@ -1876,6 +1899,51 @@ async function loadTrendScore() {
     }
   } finally {
     trendLoading.value = false
+  }
+}
+
+async function loadIndustryHealth() {
+  const industry = stockInfo.value?.industry
+  if (!industry) return
+  try {
+    const res = await stockApi.getIndustryHealth(industry)
+    industryHealthData.value = res
+  } catch {
+    industryHealthData.value = null
+  }
+}
+
+async function loadMidLongAnalysis() {
+  if (!symbol.value) return
+  try {
+    const [midRes, longRes] = await Promise.allSettled([
+      stockApi.getMidLongAnalysis(symbol.value, 'mid'),
+      stockApi.getMidLongAnalysis(symbol.value, 'long'),
+    ])
+    if (midRes.status === 'fulfilled') {
+      midAnalysisData.value = midRes.value
+    } else {
+      // 无缓存时自动触发 LLM 生成
+      try {
+        const created = await stockApi.createMidLongAnalysis(symbol.value, 'mid')
+        midAnalysisData.value = created
+      } catch {
+        midAnalysisData.value = null
+      }
+    }
+    if (longRes.status === 'fulfilled') {
+      longAnalysisData.value = longRes.value
+    } else {
+      try {
+        const created = await stockApi.createMidLongAnalysis(symbol.value, 'long')
+        longAnalysisData.value = created
+      } catch {
+        longAnalysisData.value = null
+      }
+    }
+  } catch {
+    midAnalysisData.value = null
+    longAnalysisData.value = null
   }
 }
 
@@ -2132,7 +2200,7 @@ function openNews(news: any) {
     window.open(url, '_blank')
     // #endif
     // #ifndef H5
-    uni.navigateTo({ url: `/modules/chat/pages/webview?url=${encodeURIComponent(url)}` })
+    uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
     // #endif
   } else {
     uni.showToast({ title: '暂无详情', icon: 'none' })
@@ -2247,12 +2315,25 @@ function goChat() {
 @import '@/shared/styles/variables.scss';
 
 .page-detail {
+  position: relative;
   padding: 24rpx;
   background: $bg-soft;
   box-sizing: border-box;
   width: 100%;
   max-width: 430px;
   margin: 0 auto;
+}
+
+.page-detail--anchoring > :not(.loading) {
+  visibility: hidden;
+}
+
+.page-detail--anchoring > .loading {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
 }
 
 .loading, .empty {
@@ -2411,8 +2492,16 @@ function goChat() {
 .decision-card {
   display: flex;
   flex-direction: column;
-  gap: 18rpx;
-  border-top: 4rpx solid $primary;
+  gap: $s-2;
+  border-radius: $r-lg;
+  box-shadow: $shadow-xs;
+}
+
+/* 洞见卡风格：结论前的渐变分隔线，替代原先顶部主题色条 */
+.decision-divider {
+  height: 2rpx;
+  margin: $s-1 0;
+  background: linear-gradient(90deg, $primary-100, rgba($primary-100, 0));
 }
 
 .decision-head {
@@ -2433,39 +2522,20 @@ function goChat() {
 
 .decision-summary {
   display: block;
-  font-size: 28rpx;
-  line-height: 1.6;
+  font-size: $font-size-lg;
+  line-height: $lh-tight;
   font-weight: 600;
-  color: $ink-soft;
-}
-
-.decision-next {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-  padding: 16rpx 18rpx;
-  border-radius: 14rpx;
-  background: $bg-soft;
-}
-
-.next-label {
-  flex-shrink: 0;
-  padding: 4rpx 10rpx;
-  border-radius: 8rpx;
-  background: $primary-50;
-  color: $primary;
-  font-size: 22rpx;
-  line-height: 1.35;
-  font-weight: 800;
-}
-
-.next-text {
-  min-width: 0;
   color: $ink;
-  font-size: 27rpx;
-  line-height: 1.45;
-  font-weight: 700;
 }
+
+/* 重点：横幅卡（蓝），与机会/风险(point-) 同卡片化结构 */
+.decision-next {
+  --banner-bg: #{$insight-market};
+  --banner-glow: rgba(11, 95, 255, 0.18);
+}
+
+/* 重点行横幅卡排版统一走全局 insight-banner mixin */
+@include insight-banner('.decision-next', '.next-label', '.next-text');
 
 .decision-verdict {
   flex-shrink: 0;
@@ -2523,63 +2593,38 @@ function goChat() {
   font-weight: 700;
 }
 
+/* 机会/风险：横幅卡（机会绿/风险红），保留展开交互 */
 .decision-points {
   display: flex;
   flex-direction: column;
-  border-top: 1rpx solid $line-soft;
+  gap: 16rpx;
 }
 
 .decision-point {
-  display: grid;
-  grid-template-columns: 64rpx minmax(0, 1fr) 56rpx;
-  gap: 14rpx;
-  align-items: start;
-  padding: 18rpx 0;
-  border-bottom: 1rpx solid $line-soft;
+  --banner-bg: #{$down};
+  --banner-glow: rgba(24, 160, 88, 0.18);
 
-  &.is-risk {
-    .point-label {
-      color: $down;
-      background: $down-soft;
-    }
-  }
-
-  &:last-child {
-    border-bottom: 0;
-    padding-bottom: 0;
+  &.decision-point--risk {
+    --banner-bg: #{$up};
+    --banner-glow: rgba(229, 77, 94, 0.18);
   }
 }
 
-.point-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 56rpx;
-  height: 38rpx;
-  border-radius: 8rpx;
-  background: $up-soft;
-  font-size: 24rpx;
-  line-height: 1.4;
-  font-weight: 800;
-  color: $up;
-}
+/* 机会/风险：走洞见解横幅卡全局排版，保留展开交互 */
+@include insight-banner('.decision-point', '.point-label', '.point-text');
 
 .point-more {
-  flex-shrink: 0;
-  font-size: 22rpx;
-  line-height: 38rpx;
-  font-weight: 700;
+  display: block;
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  font-weight: 600;
   text-align: right;
-  color: $ink-mute;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .point-text {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 26rpx;
-  line-height: 1.55;
-  font-weight: 600;
-  color: $ink-soft;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 
@@ -2731,7 +2776,7 @@ function goChat() {
   margin-bottom: 16rpx;
 }
 
-/* AI 研判卡片 */
+/* AI 洞见卡片 */
 .ai-analysis-card {
   background: $bg-card;
   border: 2rpx solid $line;
@@ -2808,16 +2853,6 @@ function goChat() {
 .analysis-date {
   font-size: 22rpx;
   color: $ink-faint;
-}
-
-.ai-logic {
-  margin-bottom: 20rpx;
-}
-
-.ai-logic-text {
-  font-size: 28rpx;
-  color: $ink-soft;
-  line-height: 1.7;
 }
 
 .ai-section {
@@ -2993,39 +3028,6 @@ function goChat() {
   font-weight: 700;
 }
 
-.ai-action-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-  margin: 18rpx 0 22rpx;
-}
-
-.ai-action-item {
-  display: grid;
-  grid-template-columns: 128rpx minmax(0, 1fr);
-  gap: 14rpx;
-  align-items: start;
-  padding: 16rpx 18rpx;
-  border-radius: 14rpx;
-  background: $bg-soft;
-  border: 1rpx solid $line-soft;
-}
-
-.ai-action-label {
-  color: $primary;
-  font-size: 24rpx;
-  line-height: 1.45;
-  font-weight: 800;
-}
-
-.ai-action-text {
-  min-width: 0;
-  color: $ink-soft;
-  font-size: 26rpx;
-  line-height: 1.55;
-  font-weight: 600;
-}
-
 .section-header {
   display: flex;
   align-items: center;
@@ -3044,6 +3046,19 @@ function goChat() {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
+}
+
+.event-toggle {
+  margin-top: 20rpx;
+  padding: 16rpx 0;
+  text-align: center;
+  border-top: 2rpx solid $line;
+}
+
+.event-toggle-text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: $primary;
 }
 
 .event-item {

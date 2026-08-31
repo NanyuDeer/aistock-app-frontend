@@ -57,8 +57,12 @@ const emit = defineEmits<{
 const focused = ref(false)
 
 const handleInput = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  emit('update:modelValue', target.value)
+  // uni-app H5 把输入值放在 event.detail.value；App/小程序同理。
+  // 旧实现读 event.target.value 在 H5 上是 undefined，导致 v-model 永远收不到值（按钮禁用等连锁问题）。
+  // 双通道兜底：优先 detail.value（uni-app 标准），回退 target.value（原生 H5 事件）。
+  const customEvent = event as Event & { detail?: { value?: string } }
+  const value = customEvent.detail?.value ?? (event.target as HTMLInputElement | null)?.value ?? ''
+  emit('update:modelValue', value)
 }
 
 const handleFocus = (event: FocusEvent) => {
@@ -85,7 +89,7 @@ const handleClear = () => {
   align-items: center;
   background: $bg-card;
   border: 2rpx solid $line;
-  border-radius: $r-lg;
+  border-radius: $r-md;
   padding: 0 $s-3;
   width: 100%;
   transition: all $t-base;
@@ -143,11 +147,26 @@ const handleClear = () => {
   border: none;
   outline: none;
   background: transparent;
-  padding: $s-3 0;
+  padding: 0;
   font-size: $font-size-base;
   color: $ink;
   width: 100%;
   min-width: 0;
+  /* 固定输入高度，避免 uni-h5 内部原生 input 高度塌缩为 0 导致无法点击 */
+  height: 88rpx;
+  box-sizing: border-box;
+}
+
+/* uni-h5 将 input 渲染为 uni-input > .uni-input-wrapper > input.uni-input-input，
+   必须让内部元素填满容器，否则原生 input 高度为 0、点击命中区缺失 */
+.as-input__inner :deep(.uni-input-wrapper) {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.as-input__inner :deep(.uni-input-input) {
+  height: 100%;
 }
 
 .as-input__inner::placeholder {

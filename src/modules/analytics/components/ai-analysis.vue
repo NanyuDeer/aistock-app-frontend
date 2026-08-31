@@ -128,36 +128,6 @@
           </view>
         </view>
       </view>
-
-      <!-- 优势与风险 -->
-      <view class="strength-risk">
-        <view class="strength-col">
-          <text class="col-title strength-title">核心优势</text>
-          <view v-if="data.strengths.length === 0" class="no-risk">
-            <view class="placeholder-row" />
-          </view>
-          <view v-for="(s, i) in data.strengths" :key="'s' + i" class="list-item">
-            <view class="dot strength-dot" />
-            <text class="item-text">{{ s }}</text>
-          </view>
-        </view>
-        <view class="risk-col">
-          <text class="col-title risk-title">潜在风险</text>
-          <view v-if="data.risks.length === 0" class="no-risk">
-            <text class="no-risk-text">暂无明显风险</text>
-          </view>
-          <view v-for="(r, i) in data.risks" :key="'r' + i" class="list-item">
-            <view class="dot risk-dot" />
-            <text class="item-text">{{ r }}</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 洞见条 -->
-      <view class="advice-bar" v-if="data.advice">
-        <text class="advice-title">洞见：</text>
-        <text class="advice-text">{{ data.advice }}</text>
-      </view>
     </template>
   </view>
 </template>
@@ -395,73 +365,6 @@ function formatMetricKey(key: string): string {
     font-size: 11px;
     color: $ink-mute;
     line-height: 1.6;
-  }
-}
-
-// 优势与风险
-.strength-risk {
-  display: flex;
-  gap: 12px;
-  padding: 4px 0;
-
-  .strength-col,
-  .risk-col {
-    flex: 1;
-  }
-
-  .col-title {
-    font-size: 12px;
-    font-weight: 600;
-    margin-bottom: 4px;
-    display: block;
-  }
-
-  .strength-title {
-    color: $down;
-  }
-
-  .risk-title {
-    color: $warning;
-  }
-
-  .list-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    margin-bottom: 2px;
-  }
-
-  .dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    margin-top: 8px;
-  }
-
-  .strength-dot {
-    background: $down;
-  }
-
-  .risk-dot {
-    background: $warning;
-  }
-
-  .item-text {
-    font-size: 12px;
-    color: $ink-soft;
-    line-height: 1.8;
-  }
-
-  .no-risk {
-    .no-risk-text {
-      font-size: 12px;
-      color: $ink-mute;
-    }
-  }
-
-  .placeholder-row {
-    height: 18px;
   }
 }
 

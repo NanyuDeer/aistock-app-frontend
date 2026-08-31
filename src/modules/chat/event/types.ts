@@ -358,4 +358,9 @@ export interface FocusEventViewModel {
   industries: string[]
   /** 影响行业完整对象（含涨跌方向，供顶部卡片箭头/颜色展示） */
   affectedIndustries?: AffectedIndustry[]
+  /** 来源信息（含原文 URL，供标题跳转原文） */
+  sourceInfo?: {
+    name: string
+    url?: string
+  }
 }

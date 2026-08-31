@@ -29,6 +29,17 @@ export type SpeechRecognitionResult =
   | { ok: true; text: string }
   | { ok: false; error: string }
 
+/** 将 DataURL（`data:...;base64,<data>`）解码为 ArrayBuffer。
+ * 保留纯函数（plus.io.FileReader 曾用它），App 端现改用 uploadFile 直传路径不再需要。 */
+export function dataUrlToArrayBuffer(dataUrl: string): ArrayBuffer {
+  const idx = dataUrl.indexOf(',')
+  if (idx < 0) throw new Error('非法 DataURL')
+  const bin = atob(dataUrl.slice(idx + 1))
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes.buffer as ArrayBuffer
+}
+
 /** 模块级识别状态（核心函数驱动；页面可读作录制/识别中指示） */
 export const speechRecognitionState = shallowRef<SpeechRecognitionState>('idle')
 
@@ -38,6 +49,28 @@ const APP_UNSUPPORTED_HINT = '当前版本暂不支持语音输入'
 export const EMPTY_TRANSCRIPT_HINT = '未识别到语音'
 const APP_RECORD_FAIL_HINT = '录音失败，请重试'
 const APP_UPLOAD_FAIL_HINT = '语音识别服务异常'
+
+/**
+ * 解析 uni.uploadFile 的 ASR 响应（App 真机 success 的 res.data 是字符串而非对象，
+ * 直接当对象读 body?.message 会得到 undefined → 吞成笼统文案）。
+ * 统一 JSON.parse 兜底后透出后端真实 message（错误透出硬约束）。
+ * 纯函数导出供单测；uploadAudioFile 的 success 回调消费。
+ */
+export function parseAsrUploadResult(data: unknown, statusCode: number): SpeechRecognitionResult {
+  let body: { code?: number; message?: string; text?: string } | null = null
+  if (typeof data === 'string') {
+    try {
+      body = JSON.parse(data) as { code?: number; message?: string; text?: string }
+    } catch {
+      body = null
+    }
+  } else if (data && typeof data === 'object') {
+    body = data as { code?: number; message?: string; text?: string }
+  }
+  if (statusCode === 200 && typeof body?.text === 'string') return { ok: true, text: body.text }
+  if (statusCode === 401) return { ok: false, error: '请先登录' }
+  return { ok: false, error: body?.message || APP_UPLOAD_FAIL_HINT }
+}
 
 /** 进行中的识别会话的停止回调（stopSpeechRecognition 触发；onend/onerror/onStop 后清空） */
 let activeStop: (() => void) | null = null
@@ -184,7 +217,7 @@ export function mpRecognize(deps: MpSpeechDeps): Promise<SpeechRecognitionResult
 
 /** uni-app App 端录音管理器的最小接口（uni.getRecorderManager() 返回值形态） */
 export interface AppRecorderManagerLike {
-  /** format 有效值 aac/mp3/wav/PCM/amr（App）；sampleRate 有效值 8000/16000/44100（amr 用 8000，AMR-NB 窄带） */
+  /** format 有效值 aac/mp3/wav/PCM/amr（App）；sampleRate 有效值 8000/16000/44100 */
   start(options: { format: string; sampleRate?: number }): void
   stop(): void
   onStart: (() => void) | null
@@ -196,10 +229,10 @@ export interface AppRecorderManagerLike {
 export interface AppSpeechDeps {
   /** 录音管理器工厂（不可用时返回 null） */
   getRecorderManager(): AppRecorderManagerLike | null
-  /** 读取录音临时文件为 ArrayBuffer */
-  readFileAsArrayBuffer(tempFilePath: string): Promise<ArrayBuffer>
-  /** 上传音频到 app-api（JWT 携带于内部），返回判别联合 */
-  uploadAudio(arrayBuffer: ArrayBuffer): Promise<SpeechRecognitionResult>
+  /** 上传录音临时文件（App 端 uni.uploadFile 原生上传，绕开 readFile 框架缺陷——
+   * uni.getFileSystemManager().readFile 的 nativeFileManager + plus.io.FileReader 的
+   * WebSocket is not defined 两个引擎坑，见 docs/2026-08-18-app-voice-asr-troubleshooting.md） */
+  uploadAudioFile(tempFilePath: string): Promise<SpeechRecognitionResult>
 }
 
 /** APP 单次识别（@internal 测试钩子：依赖注入；公共入口见 startSpeechRecognition） */
@@ -226,8 +259,7 @@ export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResu
       activeStop = null
       setState('recognizing')
       try {
-        const arrayBuffer = await deps.readFileAsArrayBuffer(res.tempFilePath)
-        const result = await deps.uploadAudio(arrayBuffer)
+        const result = await deps.uploadAudioFile(res.tempFilePath)
         if (result.ok && !result.text.trim()) {
           setState('error')
           resolve({ ok: false, error: EMPTY_TRANSCRIPT_HINT })
@@ -235,9 +267,13 @@ export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResu
         }
         setState(result.ok ? 'idle' : 'error')
         resolve(result)
-      } catch {
+      } catch (err) {
         setState('error')
-        resolve({ ok: false, error: APP_RECORD_FAIL_HINT })
+        const reason = err instanceof Error ? err.message : (err ? String(err) : '')
+        // 诊断（2026-08-18→19）：上传异常统一透出（uploadAudioFile 已自身捕获不 reject，
+        // 此 catch 为兜底；不再有 readFile 阶段——App 直传文件路径根治真机读取崩溃）
+        console.error('[asr] App 录音上传失败:', err)
+        resolve({ ok: false, error: reason ? `录音上传失败：${reason}` : APP_RECORD_FAIL_HINT })
       }
     }
     manager.onError = (res) => {
@@ -248,16 +284,21 @@ export function appRecognize(deps: AppSpeechDeps): Promise<SpeechRecognitionResu
     // App 端交互：点按开始，再点结束（stop() → onStop 结算）
     activeStop = () => manager.stop()
     try {
-      // 录音格式 amr + 8kHz（与后端火山 ASR audio.format='amr', rate=8000 一致）：
+      // 录音格式 amr + 8kHz（HTML5+ 原生格式；后端 asrController 用 ffmpeg 转 PCM 16k 送火山 V3）：
+      // - 2026-08-19 两次踩坑：format:'pcm' 在 Android 产出「假 pcm 实为 AMR-WB」（线上魔数取证
+      //   #!AMR-WB），V3 按 pcm 解析为空 →「未识别到语音」；改回 amr 后由后端转码，两端原生支持
       // - 弃用 mp3：部分 Android ROM 缺 libmp3lame 编码器，start({format:'mp3'}) 真机直接抛错（真机实测"录音失败"）
       // - 弃用 wav：uni-app App 端底层是 HTML5+ plus.audio.getRecorder，Android 不真正支持 wav，
-      //   生成「假 .wav 实为 amr」的无效文件，onStop 后 readFile 读临时文件失败 → "录音失败，请重试"（真机复现根因）
-      // - 选 amr：Android/iOS HTML5+ 原生支持（AMR-NB 窄带固定 8k），无需额外编码器，火山 V2 ASR 原生支持 format='amr'
+      //   生成「假 .wav 实为 amr」的无效文件（同 pcm 的坑）
+      // - 选 amr：Android/iOS HTML5+ 原生支持（AMR-NB 窄带固定 8k），无需额外编码器
       manager.start({ format: 'amr', sampleRate: 8000 })
-    } catch {
+    } catch (err) {
       activeStop = null
       setState('error')
-      resolve({ ok: false, error: APP_RECORD_FAIL_HINT })
+      const reason = err instanceof Error ? err.message : (err ? String(err) : '')
+      // 诊断（2026-08-18）：真机「录音失败」跨设备复现，透出真实原因以区分 start 失败 vs readFile 失败
+      console.error('[asr] App 录音启动失败:', err)
+      resolve({ ok: false, error: reason ? `录音启动失败：${reason}` : APP_RECORD_FAIL_HINT })
     }
   })
 }
@@ -289,59 +330,28 @@ function getAppDeps(): AppSpeechDeps | null {
     // G2 防护：真机缺 Record 模块/录音权限时 uni.getRecorderManager() 可能抛错或返回 null，
     // 壳层必须兜底为 null（走 startAppRecognition 的错误态），不得同步炸穿 handleMicTap
     const recorder = uni.getRecorderManager()
-    const fs = uni.getFileSystemManager?.()
     return {
       getRecorderManager: () => bridgeRecorder(recorder),
-      readFileAsArrayBuffer: (tempFilePath) =>
-        new Promise<ArrayBuffer>((resolve, reject) => {
-          fs.readFile({
+      // App 端直传录音文件路径（uni.uploadFile → 底层 plus.uploader 原生上传）——
+      // 根治 readFile 的两个引擎缺陷：① uni.getFileSystemManager().readFile 的 nativeFileManager；
+      // ② plus.io.FileReader 在部分真机内核触发 WebSocket is not defined（try/catch 兜不住引擎内部）。
+      // 见 docs/2026-08-18-app-voice-asr-troubleshooting.md
+      uploadAudioFile: (tempFilePath) =>
+        new Promise<SpeechRecognitionResult>((resolve) => {
+          const token = uni.getStorageSync('token') as string | undefined
+          uni.uploadFile({
+            url: `${API_BASE_URL}/agent/asr`,
             filePath: tempFilePath,
+            name: 'file',
+            header: token ? { Authorization: `Bearer ${token}` } : {},
             success: (res) => {
-              // data 类型为 string | ArrayBuffer：先按 string（base64）收窄，避免联合类型 instanceof 报错
-              if (typeof res.data === 'string') {
-                // base64 字符串（部分平台 readFile 无 arrayBuffer 选项时返回 base64）
-                const bin = atob(res.data)
-                const bytes = new Uint8Array(bin.length)
-                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-                resolve(bytes.buffer as ArrayBuffer)
-              } else if (res.data instanceof ArrayBuffer) {
-                resolve(res.data)
-              } else {
-                reject(new Error('读取录音文件失败'))
-              }
+              // 2026-08-19：res.data 在 App 端是字符串（需 JSON.parse 兜底），
+              // parseAsrUploadResult 负责透出后端真实 message，禁止吞成笼统文案。
+              resolve(parseAsrUploadResult(res.data, res.statusCode))
             },
-            fail: reject,
+            fail: () => resolve({ ok: false, error: APP_UPLOAD_FAIL_HINT }),
           })
         }),
-      uploadAudio: async (arrayBuffer) => {
-        // 二进制 body（非 multipart）：uni.request 直接发 ArrayBuffer + audio/amr（与录音格式 amr 一致）
-        const token = uni.getStorageSync('token') as string | undefined
-        try {
-          const res = await new Promise<UniNamespace.RequestSuccessCallbackResult>((resolve, reject) => {
-            uni.request({
-              url: `${API_BASE_URL}/agent/asr`,
-              method: 'POST',
-              data: arrayBuffer,
-              header: {
-                'Content-Type': 'audio/amr',
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              },
-              success: resolve,
-              fail: reject,
-            })
-          })
-          const body = (res.data ?? {}) as { code?: number; message?: string; text?: string }
-          if (res.statusCode === 200 && typeof body?.text === 'string') {
-            return { ok: true, text: body.text }
-          }
-          if (res.statusCode === 401) {
-            return { ok: false, error: '请先登录' }
-          }
-          return { ok: false, error: body?.message || APP_UPLOAD_FAIL_HINT }
-        } catch {
-          return { ok: false, error: APP_UPLOAD_FAIL_HINT }
-        }
-      },
     }
   } catch {
     return null

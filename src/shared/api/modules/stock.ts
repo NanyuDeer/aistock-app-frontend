@@ -83,6 +83,21 @@ export interface TrendScoreData {
   rawData: unknown
 }
 
+// ---- 行业景气指数接口类型 ----
+export interface IndustryHealthData {
+  industry: string
+  tsCode: string
+  resolvedName: string
+  updatedAt: string
+  score: number
+  level: 'high' | 'medium' | 'low'
+  months: string[]
+  values: number[]
+  trend: 'up' | 'down' | 'flat'
+  details: { label: string; desc: string }[]
+  memberCount: number | null
+}
+
 // ---- 业绩预测接口类型 ----
 export interface ForecastPrediction {
   year: string
@@ -278,7 +293,8 @@ export interface WindLeaderSector {
   freq_delta?: number
   avg_change?: number
   today_change?: number
-  net_inflow?: number
+  /** 板块当日成交额（元，同花顺 bk_ 实时；原 net_inflow 净流入已下线） */
+  amount?: number
   driver_type?: string
   ma60_status?: string
   vol_trend?: string
@@ -351,6 +367,16 @@ export interface OcrImageInput {
   data: string
   /** MIME 类型，压缩后统一 image/jpeg */
   mime: string
+}
+
+/** 返回 N 个自然日前的 YYYYMMDD（分钟级 K 线限定拉取范围用，避免 Tushare 全量历史分钟数据） */
+function daysAgoYYYYMMDD(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}${m}${day}`
 }
 
 /** OCR 识别结果中的单只股票（后端已用 stocks 表归一化代码/名称） */
@@ -443,17 +469,28 @@ export const stockApi = {
     })
   },
 
-  /** 获取 K 线数据 */
-  getKLine(symbol: string, params?: { period?: 'daily' | 'weekly' | 'monthly' | string; count?: number }) {
+  /** 获取 K 线数据（minute/five 为分钟级 klt=1，多股同列宫格用；日/周/月为蜡烛线） */
+  getKLine(symbol: string, params?: { period?: 'minute' | 'five' | 'daily' | 'weekly' | 'monthly' | string; count?: number }) {
+    const p = params?.period || 'daily'
     const kltMap: Record<string, number> = {
+      minute: 1,
+      five: 1,
       daily: 101,
       weekly: 102,
       monthly: 103,
       yearly: 103,
     }
-    const klt = kltMap[params?.period || 'daily'] || 101
+    const klt = kltMap[p] || 101
+    // 分钟级数据（klt=1）必须限定 startDate：服务端无 startDate 时 Tushare 会拉全历史分钟数据（上万条）导致超时。
+    // 分时取近 3 个自然日（覆盖周末/节假日，MiniKLine 只取最近交易日序列），五日取近 9 个自然日（约 5 个交易日）。
+    let startDate: string | undefined
+    if (p === 'minute') startDate = daysAgoYYYYMMDD(3)
+    else if (p === 'five') startDate = daysAgoYYYYMMDD(9)
+    const defaultCount = p === 'minute' ? 300 : p === 'five' ? 1500 : 120
+    const qParams: Record<string, unknown> = { symbol, klt, fqt: 1, limit: params?.count || defaultCount }
+    if (startDate) qParams.startDate = startDate
     return request.get<Record<string, unknown>>('/cn/stock/quotes/kline', {
-      params: { symbol, klt, fqt: 1, limit: params?.count || 120 }
+      params: qParams
     }).then((res: Record<string, unknown>) => {
       const data = (res.data as Record<string, unknown>) || res
       const payload = (data.data as Record<string, unknown>) || data
@@ -498,6 +535,11 @@ export const stockApi = {
   /** 获取趋势股评分（四维：技术面/行业赛道景气/消息面催化/基本面，含一票否决检查） */
   getTrendScore(symbol: string) {
     return request.get(`/cn/stocks/${symbol}/trend-score`).then((res: Record<string, unknown>) => normalizeTrendScore(res))
+  },
+
+  /** 获取行业景气指数（基于板块成分股近7个月涨跌幅） */
+  getIndustryHealth(industryName: string) {
+    return request.get<IndustryHealthData>(`/cn/industry/${encodeURIComponent(industryName)}/health`)
   },
 
   /** 获取板块龙头（指定板块 code） */
@@ -572,6 +614,11 @@ export const stockApi = {
     return request.delete<UserFavoritesPayload>('/users/me/favorites', { data: { symbols } }).then(normalizeFavorites)
   },
 
+  /** 保存自选股排序（symbols 顺序即最终展示顺序，编辑态点"完成"时调用） */
+  saveFavoritesOrder(symbols: string[]) {
+    return request.put<UserFavoritesPayload>('/users/me/favorites/order', { symbols }).then(normalizeFavorites)
+  },
+
   /** 获取业绩预测列表 */
   getProfitForecastList(params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: string; symbols?: string }) {
     return request.get('/cn/stocks/profit-forecast', { params })
@@ -605,6 +652,16 @@ export const stockApi = {
   /** 获取个股 AI 分析历史 */
   getStockAnalysisHistory(symbol: string, params?: { page?: number; pageSize?: number }) {
     return request.get(`/cn/stocks/${symbol}/analysis/history`, { params }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+  },
+
+  /** 获取中/长线 AI 洞见（从缓存读取） */
+  getMidLongAnalysis(symbol: string, timeframe: 'mid' | 'long') {
+    return request.get(`/cn/stocks/${symbol}/mid-long/${timeframe}`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+  },
+
+  /** 创建中/长线 AI 洞见（触发后端 LLM 生成） */
+  createMidLongAnalysis(symbol: string, timeframe: 'mid' | 'long') {
+    return request.post(`/cn/stocks/${symbol}/mid-long/${timeframe}`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 获取股票基础信息（行业、地域板块、上市时间、股本、市值等） */

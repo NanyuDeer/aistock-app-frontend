@@ -10,12 +10,12 @@
           <text
             v-if="detail.event.sourceInfo?.url"
             class="meta-link"
-            @tap="openSourceUrl(detail.event.sourceInfo!.url!)"
+            @tap="openArticle"
           >{{ detail.event.sourceInfo.name }}</text>
           <text v-else-if="detail.event.source" class="meta-text">{{ detail.event.source }}</text>
           <text v-else class="meta-unverified">暂不可验证</text>
           <text class="meta-dot">·</text>
-          <text class="meta-time">{{ detail.event.publishTime }}</text>
+          <text class="meta-time">{{ formatDateTime(detail.event.publishTime) }}</text>
           <template v-if="detail.event.eventType">
             <text class="meta-dot">·</text>
             <text class="meta-type">{{ detail.event.eventType }}</text>
@@ -30,6 +30,17 @@
           <text class="rating-text">{{ ratingLabel }}</text>
         </view>
       </view>
+
+      <!-- Insight：洞见卡置顶（为什么 + 后续预判） -->
+      <InsightCard
+        v-if="insightCard.content"
+        type="event"
+        :title="insightCard.content"
+        :trace="insightCard.trace"
+        :forecast="insightCard.forecast"
+        :time="insightCard.time"
+        class="event-insight-card"
+      />
 
       <!-- Step 1: AI投资机会 -->
       <AiAnalysisSection
@@ -85,7 +96,8 @@
 import { onMounted, watch, nextTick, computed } from 'vue'
 import type { EventDetailResponse, HistoryEvent } from '../types'
 import { useAiReasoning } from '../composables/useAiReasoning'
-import { EmptyState } from '@/shared/components'
+import { formatDateTime } from '@/shared/utils/datetime'
+import { EmptyState, InsightCard } from '@/shared/components'
 import AiAnalysisSection from './AiAnalysisSection.vue'
 import AiEventUnderstanding from './AiEventUnderstanding.vue'
 import AiTransmissionAnalysis from './transmission/AiTransmissionAnalysis.vue'
@@ -104,10 +116,10 @@ const {
   visibleSteps, isAllCompleted, currentStep, currentStepTitle,
   startAnalysis,
 } = useAiReasoning([
-  { title: 'AI投资机会' },
+  { title: '投资机会洞见' },
   { title: '投资逻辑解析' },
   { title: '事件理解' },
-  { title: 'AI影响传导推理' },
+  { title: '事件影响传导推理' },
   { title: '历史验证' },
 ])
 
@@ -126,6 +138,30 @@ const ratingLabel = computed(() => {
   }
 })
 
+/**
+ * 事件洞见卡数据（为什么 + 后续预判）。
+ * 数据源：AI 投资总结 investmentSummary —— 一句话结论作标题，
+ * 核心要点作「溯源」、关注方向/风险作「预判」。
+ * 后续由事件 agent 的 LLM 直接产出、溯源/预判全文。
+ */
+const insightCard = computed(() => {
+  const summary = props.detail?.investmentSummary
+  if (!summary) return { content: '', trace: '', forecast: '', time: '' }
+  const trace = summary.keyPoints?.[0] || summary.conclusion || ''
+  const forecast = summary.focusIndustries?.[0]?.reason
+    || summary.opportunities?.[0]
+    || summary.risks?.[0]
+    || ''
+  return {
+    content: summary.conclusion || '',
+    trace,
+    forecast,
+    time: props.detail?.event?.publishTime
+      ? formatDateTime(props.detail.event.publishTime).slice(5, 16)
+      : '',
+  }
+})
+
 watch(thinkingSubtitle, (text) => {
   emit('update:subtitle', text)
 }, { immediate: true })
@@ -135,17 +171,18 @@ onMounted(() => {
   startAnalysis()
 })
 
-/** 打开来源 URL（H5 新窗口，App 用系统浏览器） */
-function openSourceUrl(url: string): void {
+/** 打开来源原文 → 跨端跳转：H5 新标签打开，APP 内 web-view 打开；无链接友好提示 */
+function openArticle(): void {
+  const url = props.detail?.event?.sourceInfo?.url
+  if (!url) {
+    uni.showToast({ title: '暂无原文链接', icon: 'none' })
+    return
+  }
   // #ifdef H5
   window.open(url, '_blank')
   // #endif
   // #ifndef H5
-  // 非 H5 平台复制 URL 到剪贴板并提示
-  uni.setClipboardData({
-    data: url,
-    success: () => uni.showToast({ title: '来源链接已复制', icon: 'none' }),
-  })
+  uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
   // #endif
 }
 
@@ -205,6 +242,10 @@ watch(currentStep, async (stepId) => {
 
 <style lang="scss" scoped>
 .ai-event-report { padding: 0 0 48rpx; }
+
+.event-insight-card {
+  margin-bottom: 24rpx;
+}
 
 .report-content {
   padding: 16rpx 24rpx 0;

@@ -5,7 +5,9 @@
 
 ## 页面
 - `pages/login.vue` - 登录页
-- `pages/profile.vue` - 个人中心
+- `pages/profile.vue` - 个人中心（菜单顺序：自选股 → 账号与安全 → 对话引导 → 版本更新 → 关于；对话引导重置先弹确认窗、关于弹版本信息窗，2026-08-26）
+- `pages/account-security.vue` - 账号与安全（绑定邮箱/微信，使用 SubPageCard2 白色导航栏容器）
+- `pages/vip.vue` - 会员中心（SubPageCard2）
 - `pages/update-logs.vue` - 更新日志
 
 ## 组件
@@ -20,7 +22,7 @@
 ## 依赖的 shared/ 中的类型
 - `@/shared/store/modules/user` - 用户状态管理
 - `@/shared/api/modules/auth` - 认证 API 及 UserInfo/UserSettings 类型
-- `@/shared/components/SubPageCard.vue` - 子页面容器
+- `@/shared/components/SubPageCard.vue` / `SubPageCard2.vue` - 子页面容器（profile 用 v1，account-security/vip 用 v2）
 - `@/shared/components/SvgIcon.vue` - 图标组件
 
 ## 开发注意事项
