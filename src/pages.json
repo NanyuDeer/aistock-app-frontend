@@ -377,15 +377,6 @@
       "root": "pages-sub-app",
       "pages": [
         {
-          "path": "event-article/index",
-          "style": {
-            "navigationBarTitleText": "原文详情",
-            "navigationStyle": "custom",
-            "disableScroll": true,
-            "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
-          }
-        },
-        {
           "path": "chat/index",
           "style": {
             "navigationBarTitleText": "AI 投顾",

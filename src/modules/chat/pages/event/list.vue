@@ -13,7 +13,9 @@
             :importance="positiveEvent.importance"
             :industries="positiveEvent.affectedIndustries ?? []"
             :event-id="positiveEvent.eventId"
+            :source-info="positiveEvent.sourceInfo"
             @click="handleHeadlineClick"
+            @view-news="goToNewsFromHeadline"
           />
           <EventHeadlineCard
             v-if="negativeEvent"
@@ -22,7 +24,9 @@
             :importance="negativeEvent.importance"
             :industries="negativeEvent.affectedIndustries ?? []"
             :event-id="negativeEvent.eventId"
+            :source-info="negativeEvent.sourceInfo"
             @click="handleHeadlineClick"
+            @view-news="goToNewsFromHeadline"
           />
         </view>
       </view>
@@ -174,11 +178,29 @@ function goToDetail(event: EventItem) {
   })
 }
 
-/** 点击事件标题 → 进入 APP 原文详情页（不跳外部网页，不依赖 WebView） */
+/** 点击事件标题 → 跨端跳转原文：H5 新标签打开，APP 内 web-view 打开；无链接友好提示 */
 function goToNews(event: EventItem) {
-  uni.navigateTo({
-    url: `/pages-sub-app/event-article/index?eventId=${event.eventId}`,
-  })
+  const url = event.sourceInfo?.url
+  openNewsUrl(url)
+}
+
+/** 重大事件卡片标题 → 跳转原文（已校验过 URL，直接打开） */
+function goToNewsFromHeadline(url: string) {
+  openNewsUrl(url)
+}
+
+/** 跨端打开原文链接：H5 新标签，APP 内 web-view；无链接友好提示 */
+function openNewsUrl(url?: string) {
+  if (!url) {
+    uni.showToast({ title: '暂无原文链接', icon: 'none' })
+    return
+  }
+  // #ifdef H5
+  window.open(url, '_blank')
+  // #endif
+  // #ifndef H5
+  uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
+  // #endif
 }
 
 /** 关注/取消关注 */
@@ -199,18 +221,26 @@ async function handleFollow(event: EventItem) {
 .tab-scroll {
   width: 100%;
   white-space: nowrap;
-  padding: 16rpx 0 8rpx;
+  padding: 16rpx 12rpx 8rpx;
+  background: #e6eef9; /* 浅蓝背景横贯整行，覆盖全部事件类型标签（含右侧需滚动到的「监管变化/公司公告」） */
+  border-radius: 16rpx;
 }
 
 .tab-scroll :deep(.as-segmented) {
   display: inline-flex;
   flex-direction: row;
   flex-wrap: nowrap;
+  background: transparent; /* 背景移交 .tab-scroll，避免只包内容宽度 */
 }
 
 .tab-scroll :deep(.as-segmented__item) {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+/* 事件类型筛选：选中态文字由主题蓝改为行业标签灰 $ink-soft (#4b5a7a) */
+.tab-scroll :deep(.as-segmented__item.is-active) {
+  color: #4b5a7a;
 }
 
 /* ========== AI 关注焦点区域 ========== */
