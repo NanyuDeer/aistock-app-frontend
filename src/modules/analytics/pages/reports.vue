@@ -34,42 +34,41 @@
 
         <!-- 筛选 + 排序 单行 -->
         <view class="filter-sort-bar">
-          <view class="left-section">
-            <!-- 报告类型筛选：正式报告 / 快报 点击切换 -->
-            <view class="report-type-group">
-              <text
-                :class="['report-type-btn', reportType === 'formal' ? 'active' : '']"
-                @tap="setReportType('formal')"
-              >正式报告</text>
-              <text
-                :class="['report-type-btn', reportType === 'express' ? 'active' : '']"
-                @tap="setReportType('express')"
-              >快报</text>
-            </view>
-
-            <!-- 排序模式切换：四维评分 / 业绩 -->
-            <view class="sort-mode-group">
-              <text
-                :class="['sort-mode-btn', sortMode === 'score' ? 'active' : '']"
-                @tap="setSortMode('score')"
-              >四维评分</text>
-              <text
-                :class="['sort-mode-btn', sortMode === 'performance' ? 'active' : '']"
-                @tap="setSortMode('performance')"
-              >业绩</text>
-            </view>
+          <!-- 报告类型筛选：正式报告 / 快报 点击切换 -->
+          <view class="report-type-group">
+            <text
+              :class="['report-type-btn', reportType === 'formal' ? 'active' : '']"
+              @tap="setReportType('formal')"
+            >正式报告</text>
+            <text
+              :class="['report-type-btn', reportType === 'express' ? 'active' : '']"
+              @tap="setReportType('express')"
+            >快报</text>
           </view>
 
-          <!-- 升降序按钮 -->
-          <view class="sort-order">
-            <text
-              :class="['order-btn', sortAsc === false ? 'active' : '']"
-              @tap="setOrder(false)"
-            >降序</text>
-            <text
-              :class="['order-btn', sortAsc === true ? 'active' : '']"
-              @tap="setOrder(true)"
-            >升序</text>
+          <!-- 排序字段：更新时间 / 四维评分 / 业绩，选中项放大（其他项滑动缩小），选中项显示上下双三角 -->
+          <view class="sort-field-group">
+            <view
+              v-for="f in sortFields"
+              :key="f.key"
+              :class="['sort-field-item', sortField === f.key ? 'active' : '']"
+              @tap="setSortField(f.key)"
+            >
+              <text class="sort-field-text">{{ f.label }}</text>
+              <!-- 选中项显示上下三角：上=从低到高，下=从高到低 -->
+              <view v-if="sortField === f.key" class="sort-arrows">
+                <view
+                  class="sort-arrow-up"
+                  :class="{ active: sortAsc }"
+                  @tap.stop="setSortField(f.key, true)"
+                />
+                <view
+                  class="sort-arrow-down"
+                  :class="{ active: !sortAsc }"
+                  @tap.stop="setSortField(f.key, false)"
+                />
+              </view>
+            </view>
           </view>
         </view>
       </view>
@@ -188,9 +187,16 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 // 报告类型筛选（formal=正式报告 / express=快报）
 const reportType = ref<'formal' | 'express'>('formal')
 
-// 排序模式（score=四维评分 / performance=业绩，业绩排序逻辑暂留空）
-const sortMode = ref<'score' | 'performance'>('performance')
-const sortAsc = ref(false)           // true=升序, false=降序（仅四维评分模式生效）
+// 排序字段（updateTime=更新时间 / score=四维评分 / performance=业绩）
+const sortField = ref<'updateTime' | 'score' | 'performance'>('updateTime')
+const sortAsc = ref(false)           // true=从低到高（上箭头）, false=从高到低（下箭头）
+
+// 排序字段按钮配置（均匀分布展示）
+const sortFields = [
+  { key: 'updateTime', label: '更新时间' },
+  { key: 'score', label: '四维评分' },
+  { key: 'performance', label: '业绩' },
+] as const
 
 // ===== 持久化 =====
 function loadPersistedState() {
@@ -198,7 +204,7 @@ function loadPersistedState() {
     const saved = uni.getStorageSync(STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      if (parsed.sortMode === 'score' || parsed.sortMode === 'performance') sortMode.value = parsed.sortMode
+      if (parsed.sortField === 'updateTime' || parsed.sortField === 'score' || parsed.sortField === 'performance') sortField.value = parsed.sortField
       if (typeof parsed.sortAsc === 'boolean') sortAsc.value = parsed.sortAsc
       if (parsed.reportType === 'formal' || parsed.reportType === 'express') reportType.value = parsed.reportType
     }
@@ -208,7 +214,7 @@ function loadPersistedState() {
 function savePersistedState() {
   try {
     uni.setStorageSync(STORAGE_KEY, JSON.stringify({
-      sortMode: sortMode.value,
+      sortField: sortField.value,
       sortAsc: sortAsc.value,
       reportType: reportType.value,
     }))
@@ -221,18 +227,24 @@ const hasMore = computed(() => {
   return shown > 0 && shown < total.value
 })
 
-// 排序模式 → 后端 sortBy / sortOrder 参数（仅四维评分模式使用）
+// 排序字段 → 后端 sortBy / sortOrder 参数（业绩模式单独走排行榜接口）
 function sortParams(): { sortBy: string; sortOrder: string } {
-  // 四维评分模式：按 AI 评分排序（升降序按钮生效）
-  return { sortBy: 'ai_score', sortOrder: sortAsc.value ? 'asc' : 'desc' }
+  // 更新时间→ann_date，四维评分→ai_score（升降序由箭头控制）
+  return {
+    sortBy: sortField.value === 'updateTime' ? 'ann_date' : 'ai_score',
+    sortOrder: sortAsc.value ? 'asc' : 'desc',
+  }
 }
 
-// 前端排序：按当前模式的评分（AI 评分 / 业绩评分）升降序排序
+// 前端排序：按当前排序字段（更新时间 / AI 评分 / 业绩评分）升降序排序
 const filteredList = computed(() => {
   const asc = sortAsc.value
   return [...rawList.value].sort((a, b) => {
-    const valA = sortMode.value === 'score' ? (a.aiScore ?? -1) : (a.perfScore ?? -1)
-    const valB = sortMode.value === 'score' ? (b.aiScore ?? -1) : (b.perfScore ?? -1)
+    if (sortField.value === 'updateTime') {
+      return asc ? a.updateTime.localeCompare(b.updateTime) : b.updateTime.localeCompare(a.updateTime)
+    }
+    const valA = sortField.value === 'score' ? (a.aiScore ?? -1) : (a.perfScore ?? -1)
+    const valB = sortField.value === 'score' ? (b.aiScore ?? -1) : (b.perfScore ?? -1)
     return asc ? valA - valB : valB - valA
   })
 })
@@ -259,7 +271,7 @@ async function fetchData(append = false) {
   try {
     const kw = keyword.value.trim()
 
-    if (sortMode.value === 'performance') {
+    if (sortField.value === 'performance') {
       // 业绩模式：调用排行榜接口（多因子评分排序）
       const rankParams: any = { sortBy: 'score', sortOrder: sortAsc.value ? 'asc' : 'desc', reportType: reportType.value, page: page.value, pageSize }
       if (kw) rankParams.keyword = kw
@@ -506,16 +518,17 @@ function setReportType(type: 'formal' | 'express') {
   fetchData(false)
 }
 
-// ===== 排序模式切换 =====
-function setSortMode(mode: 'score' | 'performance') {
-  if (sortMode.value === mode) return
-  sortMode.value = mode
-  savePersistedState()
-  fetchData(false)
-}
-
-function setOrder(asc: boolean) {
-  sortAsc.value = asc
+// ===== 排序字段切换 =====
+/** 设置排序字段；asc 参数存在表示点击箭头（同时设置升降序方向） */
+function setSortField(field: 'updateTime' | 'score' | 'performance', asc?: boolean) {
+  if (asc !== undefined) {
+    sortField.value = field
+    sortAsc.value = asc
+  } else {
+    // 点击文字：仅切换字段，保持当前方向
+    if (sortField.value === field) return
+    sortField.value = field
+  }
   savePersistedState()
   fetchData(false)
 }
@@ -527,9 +540,9 @@ function switchTo(tab: string) {
 }
 
 // ===== 通用 =====
-/** 卡片右上角展示的分数：四维评分模式显示 AI 评分，业绩模式显示业绩评分 */
+/** 卡片右上角展示的分数：四维评分/更新时间模式显示 AI 评分，业绩模式显示业绩评分 */
 function displayScore(item: ReportItem): number | null {
-  return sortMode.value === 'score' ? item.aiScore : item.perfScore
+  return sortField.value === 'performance' ? item.perfScore : item.aiScore
 }
 
 function scoreClass(score: number): string {
@@ -665,62 +678,77 @@ fetchData(false)
   }
 }
 
-.left-section {
+/* 排序字段组：占满剩余空间，三项分布（无方框） */
+.sort-field-group {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 8rpx;
-  flex-shrink: 0;
+  margin-left: 12rpx;
+  min-width: 0;
 }
 
-.sort-mode-group {
+/* 未选中：flex:1 均匀分布；选中：flex-grow 放大，带动其他项滑动缩小 */
+.sort-field-item {
+  flex: 1 1 0%;
   display: flex;
-  gap: 0;
-  flex-shrink: 0;
-  border-radius: 10rpx;
-  overflow: hidden;
-  border: 1rpx solid #e0e3e8;
-}
-
-.sort-mode-btn {
-  font-size: 22rpx;
-  color: $ink-soft;
-  padding: 8rpx 16rpx;
-  background: #f9fafb;
-  font-weight: 500;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  padding: 8rpx 0;
+  min-width: 0;
+  transition: flex-grow 0.3s ease;
 
   &.active {
-    color: #fff;
-    background: $primary;
-  }
-
-  &:first-child {
-    border-right: 1rpx solid #e0e3e8;
+    flex-grow: 1.6;
   }
 }
 
-.sort-order {
+/* 未选中：小号灰色文字 */
+.sort-field-text {
+  font-size: 20rpx;
+  color: #9ca3af;
+  font-weight: 400;
+  white-space: nowrap;
+  transition: font-size 0.3s ease, color 0.3s ease;
+}
+
+/* 选中：放大、主色 */
+.sort-field-item.active .sort-field-text {
+  font-size: 26rpx;
+  color: $primary;
+  font-weight: 600;
+}
+
+/* 选中项上下双三角：上=从低到高，下=从高到低 */
+.sort-arrows {
   display: flex;
-  gap: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 3rpx;
   flex-shrink: 0;
-  border-radius: 10rpx;
-  overflow: hidden;
-  border: 1rpx solid #e0e3e8;
 }
 
-.order-btn {
-  font-size: 22rpx;
-  color: $ink-soft;
-  padding: 8rpx 16rpx;
-  background: #f9fafb;
-  font-weight: 500;
+.sort-arrow-up,
+.sort-arrow-down {
+  width: 0;
+  height: 0;
+  border-left: 5rpx solid transparent;
+  border-right: 5rpx solid transparent;
+}
+
+.sort-arrow-up {
+  border-bottom: 6rpx solid #9ca3af;
 
   &.active {
-    color: #fff;
-    background: $primary;
+    border-bottom-color: $primary;
   }
+}
 
-  &:first-child {
-    border-right: 1rpx solid #e0e3e8;
+.sort-arrow-down {
+  border-top: 6rpx solid #9ca3af;
+
+  &.active {
+    border-top-color: $primary;
   }
 }
 
