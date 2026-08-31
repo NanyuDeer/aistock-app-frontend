@@ -2,6 +2,19 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-08-31 — 登录页恢复「手机号验证码登录」入口（阿里云短信认证）
+
+**开发者**: Aria
+
+### 新增
+- `login.vue`：登录方式增加「手机号验证码登录」入口按钮（`phone-line` 图标）；新增手机号表单（phone + smsCode，`handleSendSms`/`handlePhoneLogin`，手机号格式校验 `^1[3-9]\d{9}$`，60s 倒计时），与邮箱表单共享 `smsCode`/`countdown`
+- `user.ts` store：新增 `smsLogin(phone, code)`（复用 `authApi.smsLogin`，存 token/userInfo 后 `fetchUserInfo`）并导出
+
+### 说明
+- 仅 App 端（aistock-app-frontend）；Web 端登录方式不变。`vue-tsc --noEmit` 通过
+
+---
+
 ## [master] 2026-08-31 — 洞见卡标签统一 + VIP 弹窗/会员页优化 + 登录验证码可读性修复
 
 **开发者**: Aria
