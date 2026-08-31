@@ -21,7 +21,7 @@
       <MarketTracePhenomenon :presentation="presentation" />
 
       <!-- 溯源（trace 强相关） -->
-      <view class="detail-section">
+      <view class="trace-section">
         <text class="section-title">溯源</text>
         <MarketTraceTimeline :presentation="presentation" />
       </view>
@@ -73,6 +73,16 @@ function toggle() {
 .toggle-icon.is-open { transform: rotate(180deg); }
 
 .detail-sections { display: flex; flex-direction: column; gap: $spacing-base; margin-top: $spacing-xs; }
-.detail-section { padding: $spacing-base; background: $bg-card; border-radius: $r-md; box-shadow: $shadow-card; }
-.section-title { display: block; font-size: 28rpx; font-weight: 600; color: $text-color-title; margin-bottom: $spacing-sm; }
+
+/* 溯源分区：与现象/预判一致——标题在卡外，时间线子卡直接铺满，避免"白卡包白卡"且子卡变窄 */
+.trace-section { display: flex; flex-direction: column; }
+.section-title { display: block; font-size: 28rpx; font-weight: 600; color: $text-color-title; margin: $spacing-base 0 $spacing-sm; }
+
+/* 卡片宽度统一：父容器 market-insight-card 已有水平 padding，子组件自带 `padding: 0 $spacing-base`
+   会再次缩进导致现象/溯源/预判卡比洞见卡左右各窄 24rpx，这里覆盖为 0 使所有卡片外边界与洞见卡对齐 */
+.detail-sections :deep(.phenomenon-section),
+.detail-sections :deep(.timeline-section),
+.detail-sections :deep(.prediction-section) {
+  padding: 0;
+}
 </style>
