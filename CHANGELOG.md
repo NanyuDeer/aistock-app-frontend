@@ -2,6 +2,12 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [junliang] 2026-08-28 — 修复异动详情页渲染崩溃（suggestedActions 残留引用）
+
+**开发者**: Aria
+
+### 修复
+- `src/modules/favorites/pages/insight-detail-move.vue`：洞见卡 computed 中 `forecast` 引用已删除的 `suggestedActions`（2026-08-25 移除"建议跟踪"时漏删）→ `ReferenceError` 导致详情页渲染崩溃白屏。修复为 `forecast` 恒为空（与移除建议跟踪的决策一致），并同步注释
 ## [changer] 2026-08-30 — 节奏大师语义修正 + 日历热力图总览（design-debate）
 
 **开发者**: changer-collab
