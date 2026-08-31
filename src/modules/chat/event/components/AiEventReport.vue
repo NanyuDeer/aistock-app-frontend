@@ -36,8 +36,6 @@
         v-if="insightCard.content"
         type="event"
         :title="insightCard.content"
-        trace-label="动因"
-        forecast-label="展望"
         :trace="insightCard.trace"
         :forecast="insightCard.forecast"
         :time="insightCard.time"
