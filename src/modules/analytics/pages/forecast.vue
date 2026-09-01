@@ -32,31 +32,37 @@
           </view>
         </view>
 
-        <view class="sort-bar">
-          <picker
-            mode="selector"
-            :range="sortFieldLabels"
-            :value="sortFieldIndex"
-            @change="onSortFieldChange"
-          >
-            <view class="sort-picker">
-              <text class="sort-picker-text">{{ currentSortLabel }}</text>
-              <SvgIcon name="arrow-down-s" size="24rpx" color="#4b5a7a" />
-            </view>
-          </picker>
+        <!-- 筛选 + 排序 单行：自选股放最前，排序字段按钮均匀分布 -->
+        <view class="filter-sort-bar">
+          <!-- 自选股筛选 -->
           <text
             :class="['fav-btn', favoritesOnly ? 'active' : '']"
             @tap="toggleFavoritesOnly"
           >自选股</text>
-          <view class="sort-order">
-            <text
-              :class="['order-btn', sortOrder === 'desc' ? 'active' : '']"
-              @tap="switchOrder('desc')"
-            >降序</text>
-            <text
-              :class="['order-btn', sortOrder === 'asc' ? 'active' : '']"
-              @tap="switchOrder('asc')"
-            >升序</text>
+
+          <!-- 排序字段：选中项放大（其他项滑动缩小），选中项显示上下双三角 -->
+          <view class="sort-field-group">
+            <view
+              v-for="f in sortFields"
+              :key="f.key"
+              :class="['sort-field-item', activeSort === f.key ? 'active' : '']"
+              @tap="setSortField(f.key)"
+            >
+              <text class="sort-field-text">{{ f.label }}</text>
+              <!-- 选中项显示上下三角：上=从低到高，下=从高到低 -->
+              <view v-if="activeSort === f.key" class="sort-arrows">
+                <view
+                  class="sort-arrow-up"
+                  :class="{ active: sortAsc }"
+                  @tap.stop="setSortField(f.key, true)"
+                />
+                <view
+                  class="sort-arrow-down"
+                  :class="{ active: !sortAsc }"
+                  @tap.stop="setSortField(f.key, false)"
+                />
+              </view>
+            </view>
           </view>
         </view>
       </view>
@@ -167,7 +173,7 @@ interface RawForecastItem {
 
 const keyword = ref('')
 const activeSort = ref('update_time')
-const sortOrder = ref('desc')
+const sortAsc = ref(false)      // true=从低到高（上箭头）, false=从高到低（下箭头）
 const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref(false)
@@ -186,51 +192,31 @@ const emptyText = computed(() => {
   return favoritesOnly.value ? '自选股中暂无业绩预测数据' : '暂无业绩预测数据'
 })
 
+// 排序字段按钮配置（均匀分布展示，更新时间放自选股后第一位）
 const sortFields = [
+  { key: 'update_time', label: '更新时间' },
   { key: 'net_profit_forecast', label: '净利润预测' },
   { key: 'eps_forecast', label: 'EPS预测' },
   { key: 'net_profit_growth', label: '净利润增长' },
   { key: 'eps_growth', label: 'EPS增长' },
-  { key: 'update_time', label: '更新时间' },
 ]
-
-const sortFieldLabels = computed(() => sortFields.map(f => f.label))
-
-const sortFieldIndex = computed(() => {
-  const idx = sortFields.findIndex(f => f.key === activeSort.value)
-  return idx >= 0 ? idx : 0
-})
-
-const currentSortLabel = computed(() => {
-  const f = sortFields.find(f => f.key === activeSort.value)
-  return f ? f.label : '净利润预测'
-})
-
-function onSortFieldChange(e: any) {
-  const idx = e.detail.value
-  const key = sortFields[idx]?.key
-  if (key) switchSort(key)
-}
 
 // 搜索结果缓存，避免每次输入都重新过滤
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const hasMore = computed(() => list.value.length < total.value)
 
-function switchSort(key: string) {
-  if (activeSort.value === key) {
-    sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
-  } else {
+/** 设置排序字段；asc 参数存在表示点击箭头（同时设置升降序方向） */
+function setSortField(key: string, asc?: boolean) {
+  if (asc !== undefined) {
     activeSort.value = key
-    sortOrder.value = 'desc'
+    sortAsc.value = asc
+  } else {
+    // 点击文字：仅切换字段，保持当前方向
+    if (activeSort.value === key) return
+    activeSort.value = key
   }
   // 切换排序后刷新数据
-  fetchData()
-}
-
-function switchOrder(order: 'asc' | 'desc') {
-  if (sortOrder.value === order) return
-  sortOrder.value = order
   fetchData()
 }
 
@@ -249,7 +235,7 @@ async function fetchData(append = false) {
       page: page.value,
       pageSize,
       sortBy: activeSort.value,
-      sortOrder: sortOrder.value,
+      sortOrder: sortAsc.value ? 'asc' : 'desc',
     }
     if (favoritesOnly.value) {
       params.symbols = favoritesSymbols.value.join(',')
@@ -424,59 +410,15 @@ onShow(() => {
   padding: 8rpx;
 }
 
-/* 排序方式栏 */
-.sort-bar {
+/* 筛选+排序单行：自选股 + 排序字段按钮 */
+.filter-sort-bar {
   display: flex;
   align-items: center;
-  gap: 12rpx;
   margin-bottom: 24rpx;
   padding: 12rpx 16rpx;
   background: #ffffff;
   border-radius: 16rpx;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-}
-
-.sort-picker {
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-  padding: 10rpx 20rpx;
-  border-radius: 10rpx;
-  background: #f0f2f5;
-  min-width: 140rpx;
-}
-
-.sort-picker-text {
-  font-size: 24rpx;
-  color: $primary;
-  font-weight: 500;
-}
-
-.sort-order {
-  display: flex;
-  gap: 0;
-  flex-shrink: 0;
-  margin-left: auto;
-  border-radius: 10rpx;
-  overflow: hidden;
-  border: 1rpx solid #e0e3e8;
-}
-
-.order-btn {
-  font-size: 22rpx;
-  color: $ink-soft;
-  padding: 8rpx 16rpx;
-  background: #f9fafb;
-  font-weight: 500;
-
-  &.active {
-    color: #fff;
-    background: $primary;
-  }
-
-  &:first-child {
-    border-right: 1rpx solid #e0e3e8;
-  }
 }
 
 .fav-btn {
@@ -493,6 +435,80 @@ onShow(() => {
     color: #fff;
     background: $primary;
     border-color: $primary;
+  }
+}
+
+/* 排序字段组：占满剩余空间，五项分布（无方框） */
+.sort-field-group {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  margin-left: 12rpx;
+  min-width: 0;
+}
+
+/* 未选中：flex:1 均匀分布；选中：flex-grow 放大，带动其他项滑动缩小 */
+.sort-field-item {
+  flex: 1 1 0%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  padding: 8rpx 0;
+  min-width: 0;
+  transition: flex-grow 0.3s ease;
+
+  &.active {
+    flex-grow: 1.6;
+  }
+}
+
+/* 未选中：小号灰色文字 */
+.sort-field-text {
+  font-size: 20rpx;
+  color: #9ca3af;
+  font-weight: 400;
+  white-space: nowrap;
+  transition: font-size 0.3s ease, color 0.3s ease;
+}
+
+/* 选中：放大、主色 */
+.sort-field-item.active .sort-field-text {
+  font-size: 26rpx;
+  color: $primary;
+  font-weight: 600;
+}
+
+/* 选中项上下双三角：上=从低到高，下=从高到低 */
+.sort-arrows {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3rpx;
+  flex-shrink: 0;
+}
+
+.sort-arrow-up,
+.sort-arrow-down {
+  width: 0;
+  height: 0;
+  border-left: 5rpx solid transparent;
+  border-right: 5rpx solid transparent;
+}
+
+.sort-arrow-up {
+  border-bottom: 6rpx solid #9ca3af;
+
+  &.active {
+    border-bottom-color: $primary;
+  }
+}
+
+.sort-arrow-down {
+  border-top: 6rpx solid #9ca3af;
+
+  &.active {
+    border-top-color: $primary;
   }
 }
 
