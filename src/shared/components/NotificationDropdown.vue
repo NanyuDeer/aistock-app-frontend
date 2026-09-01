@@ -30,6 +30,11 @@
         <view v-else-if="!nextCursor && items.length" class="notification-panel__footer">没有更多消息</view>
       </scroll-view>
     </view>
+    <NotificationInsightModal
+      :visible="detailOpen"
+      :notification="selectedNotification"
+      @close="closeDetail"
+    />
   </view>
 </template>
 
@@ -37,6 +42,7 @@
 import { computed, ref, watch, onActivated, onMounted } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
+import NotificationInsightModal from '@/shared/components/NotificationInsightModal.vue'
 import { notificationApi, type UserNotification } from '@/shared/api/modules/notifications'
 import { useNotificationSocket } from '@/shared/utils/useNotificationSocket'
 import { useUserStore } from '@/shared/store/modules/user'
@@ -50,6 +56,8 @@ const unavailable = ref(false)
 const items = ref<UserNotification[]>([])
 const unreadCount = ref(0)
 const nextCursor = ref<string | null>(null)
+const detailOpen = ref(false)
+const selectedNotification = ref<UserNotification | null>(null)
 const loggedIn = computed(() => userStore.isLoggedIn())
 let latestLoadRequest = 0
 let notificationRevision = 0
@@ -149,12 +157,17 @@ function loadMore() {
 
 async function openItem(item: UserNotification) {
   await markRead(item)
-  close()
-  if (item.targetPath) uni.navigateTo({ url: item.targetPath })
+  selectedNotification.value = item
+  detailOpen.value = true
 }
 
 function close() {
   open.value = false
+}
+
+function closeDetail() {
+  detailOpen.value = false
+  selectedNotification.value = null
 }
 
 watch(() => [userStore.token, userStore.userInfo?.openid] as const, ([token, openid]) => {

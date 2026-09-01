@@ -6,7 +6,10 @@
   >
     <!-- 头部：瞳孔 + 类型标签 + 时间 -->
     <view class="as-insight-card__head">
-      <InsightTag :type="type" size="sm">{{ typeLabel }}</InsightTag>
+      <view class="as-insight-card__head-tags">
+        <InsightTag :type="type" size="sm">{{ typeLabel }}</InsightTag>
+        <text v-if="headBadge" class="as-insight-card__head-badge">{{ headBadge }}</text>
+      </view>
       <text v-if="time" class="as-insight-card__time">{{ time }}</text>
     </view>
 
@@ -87,6 +90,8 @@ const props = withDefaults(defineProps<{
   lines?: InsightLine[]
   /** 时间，如 '08-21 · 09:10' */
   time?: string
+  /** 头部类型标签右侧的补充标识，例如“涨停雷达” */
+  headBadge?: string
   /** 主题：light 亮色列表卡 / dark 深蓝研报卡 */
   theme?: InsightTheme
   /** 是否显示底部 meta（置信度 + INSIGHT 角标） */
@@ -101,6 +106,7 @@ const props = withDefaults(defineProps<{
   forecastLabel: '预判',
   lines: () => [],
   time: '',
+  headBadge: '',
   theme: 'light',
   showMeta: false,
   confidence: ''
@@ -152,6 +158,21 @@ const handleClick = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.as-insight-card__head-tags {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+}
+
+.as-insight-card__head-badge {
+  padding: 4rpx 12rpx;
+  border-radius: $r-full;
+  background: $primary-50;
+  color: $primary;
+  font-size: $font-size-xs;
+  font-weight: 600;
 }
 
 .as-insight-card__time {
