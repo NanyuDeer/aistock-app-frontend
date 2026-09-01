@@ -24,6 +24,30 @@ export interface PredictionVerificationEntry {
   actual: string
   reason: string
   verified_at: string
+  /** early_exit 标记：type === 'early_exit' 的 entry 无 result，不参与 verified 判定（A1） */
+  type?: string
+  early_exit?: Record<string, unknown>
+  /** Spec A §4.2：condition 验证 entry 附加字段（condition_index/condition_met/threshold/target_type） */
+  condition_index?: number
+  condition_met?: boolean | null
+  threshold?: string
+  target_type?: string
+  [key: string]: unknown
+}
+
+/** 条件锚点（Spec A：direction 自挂，不依赖 horizons[].direction） */
+export interface PredictionConditionAnchor {
+  horizon: PredictionHorizonKey
+  threshold?: string
+  metric?: string
+  direction?: 'bullish' | 'bearish' | 'neutral'
+}
+
+/** 条件化预判单条（2.0 旧记录缺失） */
+export interface PredictionCondition {
+  condition: string
+  scenario: string
+  anchor?: PredictionConditionAnchor
 }
 
 /** 预测记录（对齐后端 PredictionRecord + 补 report_date） */
@@ -40,6 +64,7 @@ export interface PredictionRecord {
     prediction_status: 'confirmed' | 'hypothesis' | 'insufficient'
     attribution_summary?: string | null
     horizons?: PredictionHorizonRecord[]
+    conditions?: PredictionCondition[]
     evolution_narrative?: string
     evolution_steps?: Array<{ label: string; text: string }>
     risks?: Array<{ factor: string; invalidation: string }>

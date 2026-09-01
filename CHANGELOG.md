@@ -2,6 +2,22 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-01 — 条件化预判改造前端（Spec A，三端全量收尾）
+
+**开发者**: Aria
+
+### 新增
+- `src/shared/api/modules/agent.ts` + `prediction.ts`：新增 `MarketTracePredictionAnchor`/`MarketTracePredictionCondition`/`PredictionCondition`/`PredictionConditionAnchor`；`MarketTracePrediction` 增加可选 `conditions`，`PredictionVerificationEntry` 扩展 `condition_index/condition_met/threshold/target_type`
+- `marketTraceReview.ts`：`PredictionPresentation` 增加 `conditions`，`toPredictionPresentation` 映射后端 conditions
+- `predictionHistory.ts`：新增 `ConditionStage` 与 `conditionStage(record, index)` 按 `c{i}` key 读取条件验证（独立于 horizon）
+- `MarketTracePrediction.vue`：新增条件化预判块（condition+scenario+anchor 芯片），2.0 旧记录 conditions 空不渲染
+- `PredictionVerification.vue`：新增条件化预判验证渲染（按 c{i}），融合 A1 early_exit 失效信号，horizon 验证保持兼容
+
+### 测试
+- `predictionHistory.spec.ts` 新增 `conditionStage` 用例；`marketTraceReview.spec.ts` 新增 conditions 映射与空兜底；`marketInsightBrief.spec.ts` 补 `conditions` 字段；node:test 28 通过，Spec A 相关 `vue-tsc --noEmit` 通过
+
+---
+
 ## [master] 2026-08-31 — 登录页恢复「手机号验证码登录」入口（阿里云短信认证）
 
 **开发者**: Aria
