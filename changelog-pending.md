@@ -1,5 +1,10 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-02 板块四环弱溯源还原 + 条件卡内文本拆分（全粒度）
+- `src/modules/market/pages/sector-loop.vue`：还原弱溯源原文（不再替换为短标签），改用**溯源横幅样式**（浅蓝底 + “溯源” key，对齐洞见卡）展示在预判块上方；头行第 2 行只保留来源 tag + 右侧日期/验证文案。
+- `src/shared/utils/conditionalForecast.ts`（新增）：`expandConditionalBranches`——把 scenario 内嵌“；若X则Y”的对冲/后续情形拆成独立条件条目（方向/锚点置空随主卡），解决一张条件卡里多段文本“杂糅”。
+- `src/shared/utils/sectorInsight.ts` / `src/modules/analytics/components/MarketTracePrediction.vue`：板块与大盘条件化预判映射统一接入拆分器（板块洞见卡/四环列表/大盘预测详情同源）。
+
 ## 2026-09-02 板块四环列表改版（主因置顶 + 行内条件化预判块）
 - `src/modules/market/pages/sector-loop.vue`：卡片列表重构——大盘溯源主因（review_primary/both）**置顶分组**（红强调描边 + “大盘溯源·主因板块”标题），下接“风口板块（长线）”；行卡＝第 1 行（板块名+当日涨跌+方向 pill 同行，长名单行省略）+ 第 2 行（来源 tag+溯源短句两行截断，验证/日期副文案靠卡片右侧）+ 预判详情区（复用共享 ConditionalForecastBlock，无预判/无期段分支不渲染空块）。
 - `src/shared/utils/sectorInsight.ts`：新增 `sectorPredictionToStructured`（板块预测→通用条件化预判块结构化，单一映射源）；`SectorInsightCard.vue` 改为复用。

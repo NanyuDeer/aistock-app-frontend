@@ -2,6 +2,7 @@
  * 板块研判（sector-insight 聚合）辅助工具：候选匹配 + 本地日期。
  */
 import type { SectorInsightCandidate, SectorInsightPrediction } from '@/shared/api/modules/agent'
+import { expandConditionalBranches } from '@/shared/utils/conditionalForecast'
 
 /** 条件化预判块（ConditionalForecastBlock）的输入形态（与 InsightCard.structured 结构性一致） */
 export interface SectorStructuredForecast {
@@ -37,7 +38,7 @@ export function sectorPredictionToStructured(p: SectorInsightPrediction | null |
         confidence: h.confidence
       })) ?? [],
     conditions:
-      p.conditions?.map((c) => ({
+      (p.conditions ?? []).flatMap(expandConditionalBranches).map((c) => ({
         horizon: c.horizon,
         direction: c.direction,
         condition: c.condition,

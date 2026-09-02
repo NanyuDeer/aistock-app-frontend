@@ -71,18 +71,23 @@
                   </view>
                 </view>
 
-                <!-- 第 2 行：来源 tag + 溯源短句；验证/日期副文案靠卡片右侧 -->
+                <!-- 第 2 行：来源 tag；验证/日期副文案靠卡片右侧 -->
                 <view class="sl-row__subline">
                   <view v-if="row.tag" class="sl-tag" :class="row.tag.cls">
                     <text class="sl-tag__text">{{ row.tag.text }}</text>
                   </view>
-                  <text v-if="row.summary" class="sl-row__summary">{{ row.summary }}</text>
                   <text
                     v-if="row.pred?.sub"
                     :class="['sl-sub', 'sl-sub--right', row.pred.sub.cls]"
                   >{{ row.pred.sub.text }}</text>
                   <text v-else-if="!row.pred" class="sl-sub sl-sub--muted sl-sub--right">未预判</text>
                 </view>
+              </view>
+
+              <!-- 溯源横幅（对齐洞见卡溯源样式，展示在预判上方） -->
+              <view v-if="row.summary" class="sl-trace">
+                <text class="sl-trace__key">溯源</text>
+                <text class="sl-trace__text">{{ row.summary }}</text>
               </view>
 
               <!-- 预判详情区：复用组件库条件化预判格式（分支/期段/点亮），行样式白卡 -->
@@ -222,16 +227,6 @@ function predModel(p: SectorInsightPrediction | null | undefined): PredModel | n
   return { pill, sub }
 }
 
-/** 溯源摘要精简：命中"无单一触发事件/检索未找到明确触发"弱结论时，替换为短标签（弱结论精简展示） */
-function traceSummary(summary: string | null | undefined): string {
-  const s = (summary ?? '').trim()
-  if (!s) return ''
-  if (/(未出现可明确解释当日行情|未找到.{0,8}(明确|单一|独立)?触发|无单一.{0,8}触发事件)/.test(s)) {
-    return '当日无单一明确触发事件（溯源证据不足）'
-  }
-  return s
-}
-
 function buildRow(c: SectorInsightCandidate): RowVM {
   const isPrimary = c.source === 'review_primary' || c.source === 'both'
   const structured = sectorPredictionToStructured(c.prediction)
@@ -240,7 +235,7 @@ function buildRow(c: SectorInsightCandidate): RowVM {
     name: c.name,
     source: c.source,
     tag: tagModel(c),
-    summary: traceSummary(c.trace?.summary),
+    summary: c.trace?.summary ?? '',
     pct: pctModel(c),
     pred: predModel(c.prediction),
     isPrimary,
@@ -525,17 +520,31 @@ onLoad(async (options) => {
   min-width: 0;
 }
 
-/* 溯源短句：两行截断 */
-.sl-row__summary {
+/* 溯源横幅（对齐洞见卡溯源样式：浅蓝底 + 溯源 key） */
+.sl-trace {
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+  padding: 10rpx 14rpx;
+  border-radius: $r-sm;
+  background: $primary-50;
+  border: 1rpx solid rgba(11, 95, 255, 0.12);
+}
+
+.sl-trace__key {
+  flex-shrink: 0;
+  font-size: $font-size-xs;
+  font-weight: 600;
+  color: $primary;
+  line-height: 1.6;
+}
+
+.sl-trace__text {
   flex: 1;
   min-width: 0;
   font-size: $font-size-xs;
   color: $ink-soft;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
+  line-height: 1.6;
 }
 
 /* 右区（第 1 行方向 pill）：与板块名同行右端 */

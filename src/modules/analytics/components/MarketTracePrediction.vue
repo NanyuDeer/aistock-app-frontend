@@ -66,6 +66,7 @@
 import { computed } from 'vue'
 import Card from '@/shared/components/Card.vue'
 import ConditionalForecastBlock from '@/shared/components/ConditionalForecastBlock.vue'
+import { expandConditionalBranches } from '@/shared/utils/conditionalForecast'
 import type { PredictionPresentation } from '../utils/marketTraceReview'
 
 const props = defineProps<{
@@ -127,17 +128,21 @@ const condStructured = computed(() => {
       direction: h.direction,
       confidence: h.confidence
     })),
-    conditions: p.conditions.map((c) => ({
+    conditions: p.conditions.flatMap((c) => {
       // anchor.horizon 缺失时默认挂 short（沿用旧分组语义）；anchor 阈值/指标缺失则不渲染 chip
-      horizon: toHorizonKey(c.anchor?.horizon) ?? 'short',
-      direction: toDirectionKey(c.anchor?.direction),
-      condition: c.condition,
-      scenario: c.scenario,
-      anchor: c.anchor && (c.anchor.threshold || c.anchor.metric)
-        ? { metric: c.anchor.metric || undefined, threshold: c.anchor.threshold || undefined }
-        : undefined,
-      met: undefined
-    }))
+      const built = {
+        horizon: toHorizonKey(c.anchor?.horizon) ?? 'short',
+        direction: toDirectionKey(c.anchor?.direction),
+        condition: c.condition,
+        scenario: c.scenario,
+        anchor: c.anchor && (c.anchor.threshold || c.anchor.metric)
+          ? { metric: c.anchor.metric || undefined, threshold: c.anchor.threshold || undefined }
+          : undefined,
+        met: undefined
+      }
+      // scenario 内嵌“；若X则Y”的对冲情形拆成独立分支卡（方向/锚点随主条件保留给主卡）
+      return expandConditionalBranches(built)
+    })
   }
 })
 
