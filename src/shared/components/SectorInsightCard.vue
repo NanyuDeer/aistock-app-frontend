@@ -26,6 +26,7 @@
 import { computed } from 'vue'
 import InsightCard from './InsightCard.vue'
 import { LoadingState } from '@/shared/components'
+import { sectorPredictionToStructured } from '@/shared/utils/sectorInsight'
 import type { SectorInsightCandidate } from '@/shared/api/modules/agent'
 
 /**
@@ -71,30 +72,8 @@ const timeLabel = computed(() => {
   return `${Number(m[2])}/${Number(m[3])}`
 })
 
-/** InsightCard 条件化预判结构化数据（映射自聚合接口 horizons/conditions/met） */
-const structured = computed(() => {
-  const p = props.candidate?.prediction
-  if (!p || !p.present) return null
-  return {
-    horizons:
-      p.horizons?.map((h) => ({
-        horizon: h.horizon,
-        remaining: h.remaining,
-        direction: h.direction,
-        confidence: h.confidence
-      })) ?? [],
-    conditions:
-      p.conditions?.map((c) => ({
-        horizon: c.horizon,
-        direction: c.direction,
-        condition: c.condition,
-        scenario: c.scenario,
-        met: c.met ?? undefined
-      })) ?? [],
-    dueLabel: p.dueLabel ?? undefined,
-    verification: p.verification ?? null
-  }
-})
+/** InsightCard 条件化预判结构化数据（映射自聚合接口 horizons/conditions/met；与 sector-loop 共用映射工具） */
+const structured = computed(() => sectorPredictionToStructured(props.candidate?.prediction))
 </script>
 
 <style lang="scss" scoped>

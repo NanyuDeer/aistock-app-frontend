@@ -46,31 +46,51 @@
           <text class="sl-chain__go">›</text>
         </view>
 
-        <!-- 白卡列表行：左=板块名+来源tag，中=溯源+行情，右=预判概要 -->
+        <!-- 卡片列表：大盘溯源·主因置顶分组；行内展开预判（复用共享条件化预判块格式） -->
         <view class="sl-list">
-          <view v-for="row in rows" :key="row.key" class="sl-row" @tap="onRowTap(row)">
-            <view class="sl-row__left">
-              <text class="sl-row__name">{{ row.name }}</text>
-              <view v-if="row.tag" class="sl-tag" :class="row.tag.cls">
-                <text class="sl-tag__text">{{ row.tag.text }}</text>
+          <template v-for="(row, idx) in rows" :key="row.key">
+            <view v-if="row.isPrimary" class="sl-group-title">大盘溯源 · 主因板块</view>
+            <view v-else-if="idx > 0 && rows[idx - 1].isPrimary" class="sl-group-title">风口板块（长线）</view>
+
+            <view
+              class="sl-row"
+              :class="{ 'sl-row--primary': row.isPrimary }"
+              @tap="onRowTap(row)"
+            >
+              <view class="sl-row__head">
+                <!-- 第 1 行：板块名 + 当日涨跌 + 方向 pill（全部同行） -->
+                <view class="sl-row__mainline">
+                  <view class="sl-row__namewrap">
+                    <text class="sl-row__name">{{ row.name }}</text>
+                    <text v-if="row.pct" :class="['sl-row__pct', row.pct.cls]">{{ row.pct.text }}</text>
+                  </view>
+                  <view v-if="row.pred?.pill" class="sl-row__right">
+                    <view class="sl-pill" :class="row.pred.pill.cls">
+                      <text class="sl-pill__text">{{ row.pred.pill.text }}</text>
+                    </view>
+                  </view>
+                </view>
+
+                <!-- 第 2 行：来源 tag + 溯源短句；验证/日期副文案靠卡片右侧 -->
+                <view class="sl-row__subline">
+                  <view v-if="row.tag" class="sl-tag" :class="row.tag.cls">
+                    <text class="sl-tag__text">{{ row.tag.text }}</text>
+                  </view>
+                  <text v-if="row.summary" class="sl-row__summary">{{ row.summary }}</text>
+                  <text
+                    v-if="row.pred?.sub"
+                    :class="['sl-sub', 'sl-sub--right', row.pred.sub.cls]"
+                  >{{ row.pred.sub.text }}</text>
+                  <text v-else-if="!row.pred" class="sl-sub sl-sub--muted sl-sub--right">未预判</text>
+                </view>
+              </view>
+
+              <!-- 预判详情区：复用组件库条件化预判格式（分支/期段/点亮），行样式白卡 -->
+              <view v-if="row.structured" class="sl-row__fc" @tap.stop>
+                <ConditionalForecastBlock :structured="row.structured" />
               </view>
             </view>
-
-            <view class="sl-row__mid">
-              <text v-if="row.summary" class="sl-row__summary">{{ row.summary }}</text>
-              <text v-if="row.pct" :class="['sl-row__pct', row.pct.cls]">{{ row.pct.text }}</text>
-            </view>
-
-            <view class="sl-row__right">
-              <template v-if="row.pred">
-                <view v-if="row.pred.pill" class="sl-pill" :class="row.pred.pill.cls">
-                  <text class="sl-pill__text">{{ row.pred.pill.text }}</text>
-                </view>
-                <text v-if="row.pred.sub" :class="['sl-sub', row.pred.sub.cls]">{{ row.pred.sub.text }}</text>
-              </template>
-              <text v-else class="sl-sub sl-sub--muted">未预判</text>
-            </view>
-          </view>
+          </template>
         </view>
       </template>
     </view>
@@ -88,7 +108,9 @@ import type {
 } from '@/shared/api/modules/agent'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { LoadingState, EmptyState, Button, Card } from '@/shared/components'
-import { todayDateStr } from '@/shared/utils/sectorInsight'
+import ConditionalForecastBlock from '@/shared/components/ConditionalForecastBlock.vue'
+import { todayDateStr, sectorPredictionToStructured } from '@/shared/utils/sectorInsight'
+import type { SectorStructuredForecast } from '@/shared/utils/sectorInsight'
 
 /** 回看窗口：近 7 个交易日（含当日若为交易日） */
 const RECENT_DAYS = 7
@@ -157,6 +179,10 @@ interface RowVM {
   summary: string
   pct: PillModel | null
   pred: PredModel | null
+  /** 大盘溯源主因候选（review_primary/both）——置顶分组 */
+  isPrimary: boolean
+  /** 预判结构化数据（存在分支/期段才渲染详情块） */
+  structured: SectorStructuredForecast | null
 }
 
 /** 来源 tag：wind_leader→风口(蓝) / review_primary→大盘主因(红) / both→风口 · 主因(红) */
@@ -196,19 +222,38 @@ function predModel(p: SectorInsightPrediction | null | undefined): PredModel | n
   return { pill, sub }
 }
 
+/** 溯源摘要精简：命中"无单一触发事件/检索未找到明确触发"弱结论时，替换为短标签（弱结论精简展示） */
+function traceSummary(summary: string | null | undefined): string {
+  const s = (summary ?? '').trim()
+  if (!s) return ''
+  if (/(未出现可明确解释当日行情|未找到.{0,8}(明确|单一|独立)?触发|无单一.{0,8}触发事件)/.test(s)) {
+    return '当日无单一明确触发事件（溯源证据不足）'
+  }
+  return s
+}
+
 function buildRow(c: SectorInsightCandidate): RowVM {
+  const isPrimary = c.source === 'review_primary' || c.source === 'both'
+  const structured = sectorPredictionToStructured(c.prediction)
   return {
     key: c.ts_code,
     name: c.name,
     source: c.source,
     tag: tagModel(c),
-    summary: c.trace?.summary ?? '',
+    summary: traceSummary(c.trace?.summary),
     pct: pctModel(c),
-    pred: predModel(c.prediction)
+    pred: predModel(c.prediction),
+    isPrimary,
+    // 仅当预判含期段/分支时渲染条件化预判块，避免空块（纯概要行保持轻量）
+    structured: structured && (structured.horizons?.length || structured.conditions?.length) ? structured : null
   }
 }
 
-const rows = computed<RowVM[]>(() => (sectorInsight.value?.candidates ?? []).map(buildRow))
+/** 行序：大盘溯源主因置顶，其余风口板块保持原序 */
+const rows = computed<RowVM[]>(() => {
+  const list = (sectorInsight.value?.candidates ?? []).map(buildRow)
+  return [...list.filter((r) => r.isPrimary), ...list.filter((r) => !r.isPrimary)]
+})
 
 /** 主因候选（首个 review_primary/both）——归因链与"仅主因"行跳转共用 */
 const primaryRow = computed<RowVM | null>(() => {
@@ -373,10 +418,19 @@ onLoad(async (options) => {
   gap: 20rpx;
 }
 
+/* ===== 分组标题 ===== */
+.sl-group-title {
+  font-size: $font-size-sm;
+  font-weight: 600;
+  color: $ink-soft;
+  padding: 4rpx 8rpx 0;
+}
+
+/* ===== 卡片行 ===== */
 .sl-row {
   display: flex;
-  align-items: center;
-  gap: 20rpx;
+  flex-direction: column;
+  gap: 16rpx;
   padding: 24rpx 28rpx;
   background: $bg-card;
   border: 2rpx solid $line;
@@ -389,24 +443,61 @@ onLoad(async (options) => {
   }
 }
 
-/* 左区：板块名 + 来源 tag */
-.sl-row__left {
-  flex-shrink: 0;
-  max-width: 200rpx;
+/* 大盘溯源·主因：置顶首卡 + 红强调描边 */
+.sl-row--primary {
+  border-color: rgba(229, 77, 94, 0.35);
+  box-shadow: 0 4rpx 20rpx rgba(229, 77, 94, 0.08);
+}
+
+/* 预判详情区（条件化预判块，占满卡宽） */
+.sl-row__fc {
+  min-width: 0;
+}
+
+/* 头行（最多两行）：第 1 行 板块名+涨跌 | 右预判概要；第 2 行 来源 tag+溯源 */
+.sl-row__head {
   display: flex;
   flex-direction: column;
   gap: 10rpx;
 }
 
+.sl-row__mainline {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+/* 板块名 + 涨跌同行：名过长单行省略（如 共封装光学(CPO)），不挤占换行 */
+.sl-row__namewrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10rpx;
+}
+
 .sl-row__name {
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: $font-size-md;
   font-weight: 600;
   color: $ink;
   line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sl-row__pct {
+  flex-shrink: 0;
+  font-size: $font-size-sm;
+  font-weight: 600;
+  font-family: $font-mono;
 }
 
 .sl-tag {
   align-self: flex-start;
+  flex-shrink: 0;
   padding: 2rpx 12rpx;
   border-radius: 8rpx;
 }
@@ -427,16 +518,17 @@ onLoad(async (options) => {
   line-height: 1.6;
 }
 
-/* 中区：溯源短句 + 当日行情 */
-.sl-row__mid {
-  flex: 1;
-  min-width: 0;
+.sl-row__subline {
   display: flex;
-  flex-direction: column;
-  gap: 6rpx;
+  align-items: center;
+  gap: 10rpx;
+  min-width: 0;
 }
 
+/* 溯源短句：两行截断 */
 .sl-row__summary {
+  flex: 1;
+  min-width: 0;
   font-size: $font-size-xs;
   color: $ink-soft;
   line-height: 1.5;
@@ -446,19 +538,11 @@ onLoad(async (options) => {
   overflow: hidden;
 }
 
-.sl-row__pct {
-  font-size: $font-size-md;
-  font-weight: 600;
-  font-family: $font-mono;
-}
-
-/* 右区：预判概要 */
+/* 右区（第 1 行方向 pill）：与板块名同行右端 */
 .sl-row__right {
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8rpx;
+  align-items: center;
 }
 
 .sl-pill {
@@ -488,6 +572,12 @@ onLoad(async (options) => {
   font-size: $font-size-xs;
   line-height: 1.4;
   white-space: nowrap;
+}
+
+.sl-sub--right {
+  margin-left: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .sl-sub--hit {

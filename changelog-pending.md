@@ -1,5 +1,10 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-02 板块四环列表改版（主因置顶 + 行内条件化预判块）
+- `src/modules/market/pages/sector-loop.vue`：卡片列表重构——大盘溯源主因（review_primary/both）**置顶分组**（红强调描边 + “大盘溯源·主因板块”标题），下接“风口板块（长线）”；行卡＝第 1 行（板块名+当日涨跌+方向 pill 同行，长名单行省略）+ 第 2 行（来源 tag+溯源短句两行截断，验证/日期副文案靠卡片右侧）+ 预判详情区（复用共享 ConditionalForecastBlock，无预判/无期段分支不渲染空块）。
+- `src/shared/utils/sectorInsight.ts`：新增 `sectorPredictionToStructured`（板块预测→通用条件化预判块结构化，单一映射源）；`SectorInsightCard.vue` 改为复用。
+- 弱溯源精简：`traceSummary` 命中“未出现可明确解释当日行情/无单一触发事件”时替换为短标签“当日无单一明确触发事件（溯源证据不足）”。
+
 ## 2026-09-02 H5 dev 板块四环「加载失败」修复（vite 代理）
 - `vite.config.ts`：新增 `/api/agent/sector-insight` 代理 → Node.js app-api（sectorInsightRouter 是 Node 本地路由非 Python）。此前缺失导致 H5 dev 将其落入 `/api/agent` 兜底（→ agent-py 8080）404 → 板块四环页/溯源主因板块显示「加载失败」（线上复现根因，2026-09-02）。置于 Python 兜底之前，与 trading-calendar 同款模式。
 

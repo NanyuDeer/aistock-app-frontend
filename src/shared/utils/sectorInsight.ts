@@ -1,7 +1,53 @@
 /**
  * 板块研判（sector-insight 聚合）辅助工具：候选匹配 + 本地日期。
  */
-import type { SectorInsightCandidate } from '@/shared/api/modules/agent'
+import type { SectorInsightCandidate, SectorInsightPrediction } from '@/shared/api/modules/agent'
+
+/** 条件化预判块（ConditionalForecastBlock）的输入形态（与 InsightCard.structured 结构性一致） */
+export interface SectorStructuredForecast {
+  horizons?: Array<{
+    horizon: 'short' | 'mid' | 'long'
+    remaining?: string
+    direction?: 'bullish' | 'bearish' | 'neutral'
+    confidence?: 'high' | 'medium' | 'low'
+  }>
+  conditions?: Array<{
+    horizon: 'short' | 'mid' | 'long'
+    direction?: 'bullish' | 'bearish' | 'neutral'
+    condition: string
+    scenario: string
+    met?: boolean | null
+  }>
+  dueLabel?: string
+  verification?: 'pending' | 'hit' | 'miss' | null
+}
+
+/**
+ * 板块预测 → 通用条件化预判块结构化数据。
+ * 供板块洞见卡（SectorInsightCard）与板块四环列表（sector-loop）复用，避免两处映射漂移。
+ */
+export function sectorPredictionToStructured(p: SectorInsightPrediction | null | undefined): SectorStructuredForecast | null {
+  if (!p || !p.present) return null
+  return {
+    horizons:
+      p.horizons?.map((h) => ({
+        horizon: h.horizon,
+        remaining: h.remaining,
+        direction: h.direction,
+        confidence: h.confidence
+      })) ?? [],
+    conditions:
+      p.conditions?.map((c) => ({
+        horizon: c.horizon,
+        direction: c.direction,
+        condition: c.condition,
+        scenario: c.scenario,
+        met: c.met ?? undefined
+      })) ?? [],
+    dueLabel: p.dueLabel ?? undefined,
+    verification: p.verification ?? null
+  }
+}
 
 /** 剥离交易所后缀（如 881101.TI → 881101） */
 function stripExchangeSuffix(code: string): string {
