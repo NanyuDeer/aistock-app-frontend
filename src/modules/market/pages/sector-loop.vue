@@ -1,23 +1,30 @@
 <template>
   <SubPageCard title="板块四环">
     <view class="sl-content">
-      <!-- 日期回看：左右步进 ± 1 交易日，中间点开日期列表（替代横向滚动胶囊，远日期易达） -->
+      <!-- 日期回看：今日 / 昨天 一键 + “日期 ▾”下拉选交易日（跳过非交易日） -->
       <view v-if="tradingDays.length > 1" class="sl-datebar">
-        <view class="sl-datebar__btn" :class="{ 'is-disabled': !canOlder }" @tap="stepDate(-1)">
-          <text class="sl-datebar__arrow">‹</text>
+        <view class="sl-datebar__pill" :class="{ 'is-on': insightDate === todayStr }" @tap="pickDate(todayStr)">
+          <text class="sl-datebar__pill-text">今日</text>
         </view>
-        <view class="sl-datebar__cur" @tap="pickerOpen = true">
-          <text class="sl-datebar__cur-text">{{ dayLabel(insightDate) }}</text>
-          <text v-if="insightDate === todayStr" class="sl-datebar__today-tag">今日</text>
+        <view
+          class="sl-datebar__pill"
+          :class="{ 'is-on': insightDate === yesterdayDate }"
+          @tap="pickDate(yesterdayDate)"
+        >
+          <text class="sl-datebar__pill-text">昨天</text>
+        </view>
+        <view
+          class="sl-datebar__pill sl-datebar__pick"
+          :class="{ 'is-on': insightDate !== todayStr && insightDate !== yesterdayDate }"
+          @tap="pickerOpen = true"
+        >
+          <text class="sl-datebar__pill-text">{{ dayLabel(insightDate) }}</text>
           <text class="sl-datebar__caret">▾</text>
-        </view>
-        <view class="sl-datebar__btn" :class="{ 'is-disabled': !canNewer }" @tap="stepDate(1)">
-          <text class="sl-datebar__arrow">›</text>
         </view>
       </view>
       <view v-else-if="insightDate" class="sl-datebar">
-        <view class="sl-datebar__cur is-static">
-          <text class="sl-datebar__cur-text">{{ dayLabel(insightDate) }}</text>
+        <view class="sl-datebar__pill sl-datebar__pick is-static">
+          <text class="sl-datebar__pill-text">{{ dayLabel(insightDate) }}</text>
         </view>
       </view>
 
@@ -162,24 +169,20 @@ const pickerOpen = ref(false)
 /** 列表展示用：新→旧倒序（tradingDays 为升序） */
 const sheetDays = computed(() => [...tradingDays.value].reverse())
 
-const curIdx = computed(() => tradingDays.value.findIndex((d) => d === insightDate.value))
-const canOlder = computed(() => curIdx.value > 0)
-const canNewer = computed(
-  () => curIdx.value >= 0 && curIdx.value < tradingDays.value.length - 1
-)
+/** “昨天”=最近一个已完结交易日：今日在列则取前一日，否则取列表末位（最近交易日） */
+const yesterdayDate = computed(() => {
+  const list = tradingDays.value
+  if (!list.length) return ''
+  const todayIdx = list.indexOf(todayStr)
+  if (todayIdx > 0) return list[todayIdx - 1]
+  return list[list.length - 1] ?? ''
+})
 const hasToday = computed(() => tradingDays.value.includes(todayStr))
 
-/** 左右步进（-1=更早，1=更晚） */
-function stepDate(dir: -1 | 1) {
-  const next = curIdx.value + dir
-  if (next < 0 || next >= tradingDays.value.length || loading.value) return
-  pickDate(tradingDays.value[next])
-}
-
-/** 选择日期（浮层/步进共用） */
+/** 选择日期（胶囊/浮层共用） */
 function pickDate(day: string) {
   pickerOpen.value = false
-  if (day === insightDate.value) return
+  if (!day || day === insightDate.value) return
   void selectDate(day)
 }
 
@@ -369,70 +372,49 @@ onLoad(async (options) => {
   padding: 24rpx;
 }
 
-/* ===== 日期回看：步进按钮 + 中间日期（点开列表浮层） ===== */
+/* ===== 日期回看：今日 / 昨天 胶囊 + “日期 ▾”下拉 ===== */
 .sl-datebar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 20rpx;
+  gap: 14rpx;
   margin-bottom: 24rpx;
 }
 
-.sl-datebar__btn {
-  width: 60rpx;
-  height: 60rpx;
-  display: flex;
+.sl-datebar__pill {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: $r-sm;
+  gap: 6rpx;
+  padding: 10rpx 30rpx;
+  border-radius: 999rpx;
   background: $bg-card;
   border: 2rpx solid $line;
+  flex: 1;
 
-  &.is-disabled {
-    opacity: 0.35;
+  &:active {
+    opacity: 0.75;
   }
 }
 
-.sl-datebar__arrow {
-  font-size: 40rpx;
-  line-height: 1;
-  color: $ink;
-  margin-top: -4rpx;
+.sl-datebar__pill.is-on {
+  color: $primary;
+  background: rgba(11, 95, 255, 0.08);
+  border-color: $primary;
 }
 
-.sl-datebar__cur {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  min-width: 220rpx;
-  padding: 10rpx 26rpx;
-  border-radius: 999rpx;
-  background: rgba(11, 95, 255, 0.06);
-  border: 2rpx solid rgba(11, 95, 255, 0.28);
-
-  &.is-static {
-    background: $bg-card;
-    border-color: $line;
-  }
+.sl-datebar__pill.is-static {
+  cursor: default;
+  pointer-events: none;
 }
 
-.sl-datebar__cur-text {
-  font-size: $font-size-md;
+.sl-datebar__pill-text {
+  font-size: $font-size-sm;
   font-weight: 600;
-  color: $primary;
-}
-
-.sl-datebar__cur.is-static .sl-datebar__cur-text {
   color: $ink;
 }
 
-.sl-datebar__today-tag {
-  font-size: $font-size-xs;
-  font-weight: 500;
+.sl-datebar__pill.is-on .sl-datebar__pill-text {
   color: $primary;
-  background: rgba(11, 95, 255, 0.1);
-  padding: 2rpx 10rpx;
-  border-radius: 999rpx;
 }
 
 .sl-datebar__caret {
