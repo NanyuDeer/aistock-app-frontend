@@ -159,15 +159,18 @@ const error = ref(false)
 /** 日期选择浮层开关 */
 const pickerOpen = ref(false)
 
-/** 列表展示用：新→旧倒序（tradingDays 为升序） */
-const sheetDays = computed(() => [...tradingDays.value].reverse())
+/** 交易日序列统一按升序（接口可能返回降序，此处归一化，YYYY-MM-DD 字典序=时间序） */
+const ascDays = computed(() => [...tradingDays.value].sort())
+
+/** 列表展示用：新→旧倒序（基于升序归一） */
+const sheetDays = computed(() => [...ascDays.value].reverse())
 
 /** 近三个交易日（升序截尾），作为快捷日期按钮 */
-const recentThree = computed(() => tradingDays.value.slice(-3))
+const recentThree = computed(() => ascDays.value.slice(-3))
 
 /** 交易日多于 3 天时展示“更多”下拉入口 */
-const hasMoreDays = computed(() => tradingDays.value.length > 3)
-const hasToday = computed(() => tradingDays.value.includes(todayStr))
+const hasMoreDays = computed(() => ascDays.value.length > 3)
+const hasToday = computed(() => ascDays.value.includes(todayStr))
 
 /** 进入数据切换（日期按钮/下拉共用） */
 function setInsight(day: string) {
@@ -350,8 +353,8 @@ onLoad(async (options) => {
   if (preset && !tradingDays.value.includes(preset)) {
     tradingDays.value = [...tradingDays.value, preset].sort()
   }
-  // 页面默认选最近交易日；更多下拉可回看更早交易日
-  const initial = preset || tradingDays.value[tradingDays.value.length - 1] || todayDateStr()
+  // 页面默认选最近交易日（升序末位）；更多下拉可回看更早交易日
+  const initial = preset || ascDays.value[ascDays.value.length - 1] || todayDateStr()
   insightDate.value = initial
   await load(initial)
 })
@@ -372,16 +375,16 @@ onLoad(async (options) => {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 14rpx;
+  gap: 12rpx;
 }
 
 .sl-datebar__pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6rpx;
+  gap: 4rpx;
   flex: none;
-  width: 176rpx;
+  width: 140rpx;
   padding: 10rpx 0;
   border-radius: 999rpx;
   background: $bg-card;
@@ -418,11 +421,11 @@ onLoad(async (options) => {
   color: $primary;
 }
 
-/* 第三个下拉按钮（与今日/昨天等宽；含绝对定位窄下拉） */
+/* 第三个下拉按钮（与日期按钮等宽；含绝对定位窄下拉） */
 .sl-datebar__pickwrap {
   position: relative;
   flex: none;
-  width: 176rpx;
+  width: 140rpx;
   min-width: 0;
   display: flex;
 }
