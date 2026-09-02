@@ -13,3 +13,6 @@
 - `src/modules/market/pages/sector-detail.vue`：AI 分析卡**洞见化回退**（还原 commit 3c319a2 前的 "AI 分析"标题 + 灰底传递行 + 风险红字样式，洞见语义让位给板块洞见卡）；新增板块洞见卡嵌入（loadSectorInsight：最近交易日 getSectorInsight → findSectorCandidate 按 code/name 匹配），位于 AI 分析卡之后、K线卡之前
 - `src/shared/utils/sectorInsight.ts`（新增）：`findSectorCandidate`（code/.TI/name 匹配）+ `todayDateStr()`
 - 文档：modules/market/AGENTS.md、modules/analytics/AGENTS.md、根 AGENTS.md §7 组件表同步（InsightCard 升级说明 + SectorInsightCard 新增）
+
+## 2026-09-02 大盘条件化预判前端展示升级（MarketTracePrediction）
+- `src/modules/analytics/components/MarketTracePrediction.vue`：条件化预判区由"蓝缘平铺列表"升级为**按期段（短/中/长，按 anchor.horizon 分组）的分支卡**——每组含档位标题 + 该档基准方向 pill（取 horizons 同期 direction）+ 互斥分支（序号 + 若[条件] → 方向 pill + scenario + anchor 阈值/指标 chips）；不再用洞见组件（prediction-detail/市场洞见展开两页面共用本组件，大盘条件化预判 now 后即自动展示分组分支）。注释定位"大盘/板块/个股有条件化预判同构展示"。
