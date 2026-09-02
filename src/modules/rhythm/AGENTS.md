@@ -30,6 +30,7 @@
 | `event_window` | `RhythmEvent[]` | 事件窗口（delivery/earnings/seed/macro） |
 | `event_source_missing` | boolean? | 事件源缺失标记（缺失时展示缺源提示） |
 | `event_high_hint` | string? | 高影响事件提示文案 |
+| `next_event_anchor` | `{ title, event_date, days_until, note }?` | 下一重大事件锚点（窗口内首条 high 事件 + 距运行日自然日差；`note` ∈ 今日/明日/N 天后；无锚点整块不渲染） |
 | `conflict` / `conflict_detail` | boolean / string? | 多空冲突标记与详情 |
 | `branches` | `RhythmBranch[]` | 条件分支（interval/enum 条件 → 结论 direction/range/validity） |
 | `data_missing` | string[]? | 缺失数据项清单 |
