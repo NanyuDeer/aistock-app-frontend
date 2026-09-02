@@ -17,6 +17,8 @@ export interface SectorStructuredForecast {
     direction?: 'bullish' | 'bearish' | 'neutral'
     condition: string
     scenario: string
+    /** 简洁展示关键词（新数据携带） */
+    keywords?: string[]
     met?: boolean | null
   }>
   dueLabel?: string
@@ -43,6 +45,7 @@ export function sectorPredictionToStructured(p: SectorInsightPrediction | null |
         direction: c.direction,
         condition: c.condition,
         scenario: c.scenario,
+        keywords: c.keywords ?? [],
         met: c.met ?? undefined
       })) ?? [],
     dueLabel: p.dueLabel ?? undefined,

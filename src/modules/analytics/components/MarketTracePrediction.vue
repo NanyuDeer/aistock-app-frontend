@@ -15,10 +15,12 @@
       </view>
 
       <!-- 条件化预判：大盘/板块/个股一切有条件化预判统一用 ConditionalForecastBlock
-           （2026-09-02 从 InsightCard structured 抽取的通用预判块；2.0 旧记录为空数组不渲染） -->
+           （2026-09-02 从 InsightCard structured 抽取的通用预判块；2.0 旧记录为空数组不渲染）
+           prediction-detail 需长句原文 → 强制 sentence 模式（tags 模式供洞见/列表等简洁场景） -->
       <ConditionalForecastBlock
         v-if="prediction.conditions.length > 0"
         :structured="condStructured"
+        condition-display="sentence"
       />
 
       <view v-for="(h, idx) in prediction.horizons" :key="`h-${idx}`" class="horizon-item">

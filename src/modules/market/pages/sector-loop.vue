@@ -2,53 +2,55 @@
   <SubPageCard title="板块四环">
     <view class="sl-content">
       <!-- 日期回看：今日 / 昨天 一键 + “日期 ▾”下拉选交易日（跳过非交易日） -->
-      <view v-if="tradingDays.length > 1" class="sl-datebar">
-        <view class="sl-datebar__pill" :class="{ 'is-on': insightDate === todayStr }" @tap="pickDate(todayStr)">
-          <text class="sl-datebar__pill-text">今日</text>
-        </view>
-        <view
-          class="sl-datebar__pill"
-          :class="{ 'is-on': insightDate === yesterdayDate }"
-          @tap="pickDate(yesterdayDate)"
-        >
-          <text class="sl-datebar__pill-text">昨天</text>
-        </view>
-        <view
-          class="sl-datebar__pill sl-datebar__pick"
-          :class="{ 'is-on': insightDate !== todayStr && insightDate !== yesterdayDate }"
-          @tap="pickerOpen = true"
-        >
-          <text class="sl-datebar__pill-text">{{ dayLabel(insightDate) }}</text>
-          <text class="sl-datebar__caret">▾</text>
-        </view>
-      </view>
-      <view v-else-if="insightDate" class="sl-datebar">
-        <view class="sl-datebar__pill sl-datebar__pick is-static">
-          <text class="sl-datebar__pill-text">{{ dayLabel(insightDate) }}</text>
-        </view>
-      </view>
-
-      <!-- 日期选择浮层：最近 20 个交易日可回看 -->
-      <view v-if="pickerOpen" class="sl-mask" @tap="pickerOpen = false"></view>
-      <view v-if="pickerOpen" class="sl-sheet">
-        <view class="sl-sheet__hd">
-          <text class="sl-sheet__title">选择交易日</text>
-          <text v-if="hasToday" class="sl-sheet__action" @tap="jumpToday">回今天</text>
-          <text v-else class="sl-sheet__action" @tap="pickerOpen = false">关闭</text>
-        </view>
-        <scroll-view scroll-y class="sl-sheet__list" :show-scrollbar="false">
-          <view
-            v-for="d in sheetDays"
-            :key="d"
-            class="sl-sheet__item"
-            :class="{ 'is-active': d === insightDate }"
-            @tap="pickDate(d)"
-          >
-            <text class="sl-sheet__item-date">{{ d }}</text>
-            <text v-if="d === insightDate" class="sl-sheet__item-mark">✓</text>
-            <text v-else-if="d === todayStr" class="sl-sheet__item-mark is-today">今日</text>
+      <view class="sl-datewrap">
+        <view v-if="tradingDays.length > 1" class="sl-datebar">
+          <view class="sl-datebar__pill" :class="{ 'is-on': insightDate === todayStr }" @tap="pickDate(todayStr)">
+            <text class="sl-datebar__pill-text">今日</text>
           </view>
-        </scroll-view>
+          <view
+            class="sl-datebar__pill"
+            :class="{ 'is-on': insightDate === yesterdayDate }"
+            @tap="pickDate(yesterdayDate)"
+          >
+            <text class="sl-datebar__pill-text">昨天</text>
+          </view>
+          <view
+            class="sl-datebar__pill sl-datebar__pick"
+            :class="{ 'is-on': insightDate !== todayStr && insightDate !== yesterdayDate }"
+            @tap="pickerOpen = !pickerOpen"
+          >
+            <text class="sl-datebar__pill-text">{{ dayLabel(insightDate) }}</text>
+            <text class="sl-datebar__caret">▾</text>
+          </view>
+        </view>
+        <view v-else-if="insightDate" class="sl-datebar">
+          <view class="sl-datebar__pill sl-datebar__pick is-static">
+            <text class="sl-datebar__pill-text">{{ dayLabel(insightDate) }}</text>
+          </view>
+        </view>
+
+        <!-- 下拉选择（仅交易日；点外部/选完关闭） -->
+        <view v-if="pickerOpen" class="sl-dd-mask" @tap="pickerOpen = false"></view>
+        <view v-if="pickerOpen" class="sl-sheet sl-sheet--dd">
+          <view class="sl-sheet__hd">
+            <text class="sl-sheet__title">选择交易日</text>
+            <text v-if="hasToday" class="sl-sheet__action" @tap="jumpToday">回今天</text>
+            <text v-else class="sl-sheet__action" @tap="pickerOpen = false">关闭</text>
+          </view>
+          <scroll-view scroll-y class="sl-sheet__list" :show-scrollbar="false">
+            <view
+              v-for="d in sheetDays"
+              :key="d"
+              class="sl-sheet__item"
+              :class="{ 'is-active': d === insightDate }"
+              @tap="pickDate(d)"
+            >
+              <text class="sl-sheet__item-date">{{ d }}</text>
+              <text v-if="d === insightDate" class="sl-sheet__item-mark">✓</text>
+              <text v-else-if="d === todayStr" class="sl-sheet__item-mark is-today">今日</text>
+            </view>
+          </scroll-view>
+        </view>
       </view>
 
       <!-- 加载中（首载 / 切日） -->
@@ -178,6 +180,14 @@ const yesterdayDate = computed(() => {
   return list[list.length - 1] ?? ''
 })
 const hasToday = computed(() => tradingDays.value.includes(todayStr))
+
+/** 默认日期：前前个交易日（今日/前一日数据常未完成或正在重跑，回看一个稳定日）；不足 3 个则取最近 */
+const defaultDate = computed(() => {
+  const l = tradingDays.value
+  if (!l.length) return todayStr
+  const idx = l.length >= 3 ? l.length - 3 : l.length - 1
+  return l[idx] ?? todayStr
+})
 
 /** 选择日期（胶囊/浮层共用） */
 function pickDate(day: string) {
@@ -360,8 +370,8 @@ onLoad(async (options) => {
   if (preset && !tradingDays.value.includes(preset)) {
     tradingDays.value = [...tradingDays.value, preset].sort()
   }
-  // 默认最近交易日（序列末位），有预设日期则优先
-  const initial = preset || tradingDays.value[tradingDays.value.length - 1] || todayDateStr()
+  // 默认前前交易日（数据稳定），有预设日期则优先
+  const initial = preset || defaultDate.value
   insightDate.value = initial
   await load(initial)
 })
@@ -373,11 +383,15 @@ onLoad(async (options) => {
 }
 
 /* ===== 日期回看：今日 / 昨天 胶囊 + “日期 ▾”下拉 ===== */
+.sl-datewrap {
+  position: relative;
+  margin-bottom: 24rpx;
+}
+
 .sl-datebar {
   display: flex;
   align-items: center;
   gap: 14rpx;
-  margin-bottom: 24rpx;
 }
 
 .sl-datebar__pill {
@@ -422,24 +436,28 @@ onLoad(async (options) => {
   color: $primary;
 }
 
-/* ===== 日期选择浮层 ===== */
-.sl-mask {
+/* ===== 日期下拉（absolute，紧随日期胶囊下方；mask 负责点外部关闭） ===== */
+.sl-dd-mask {
   position: fixed;
   inset: 0;
-  background: rgba(16, 24, 40, 0.45);
   z-index: 90;
 }
 
-.sl-sheet {
-  position: fixed;
+.sl-sheet--dd {
+  position: absolute;
+  top: calc(100% + 8rpx);
   left: 0;
   right: 0;
-  bottom: 0;
   z-index: 91;
-  background: $bg-page;
-  border-radius: 24rpx 24rpx 0 0;
-  padding: 24rpx 24rpx 24rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-md;
+  padding: 8rpx 20rpx 14rpx;
+  box-shadow: 0 8rpx 28rpx rgba(16, 24, 40, 0.12);
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  overflow: hidden;
 }
 
 .sl-sheet__hd {
@@ -462,7 +480,9 @@ onLoad(async (options) => {
 }
 
 .sl-sheet__list {
-  max-height: 58vh;
+  flex: 1 1 auto;
+  height: 0;
+  min-height: 0;
 }
 
 .sl-sheet__item {

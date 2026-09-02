@@ -212,6 +212,8 @@ export interface MarketTracePredictionCondition {
   condition: string
   scenario: string
   anchor?: MarketTracePredictionAnchor
+  /** 简洁展示用关键词（2026-09-02 起新数据携带：1~2 个，单条 ≤10 字）；旧记录无 */
+  keywords?: string[]
 }
 
 export interface MarketTracePrediction {
@@ -538,6 +540,8 @@ export interface SectorInsightCondition {
   direction?: SectorDirection
   condition: string
   scenario: string
+  /** 简洁展示用关键词（2026-09-02 起新数据携带：1~2 个，单条 ≤10 字）；旧记录无 */
+  keywords?: string[]
   /** 该条件是否已触发（验证回填），缺省 null=待观察 */
   met?: boolean | null
 }

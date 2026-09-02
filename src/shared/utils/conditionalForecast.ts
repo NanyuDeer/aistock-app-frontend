@@ -17,6 +17,8 @@ export interface BranchLike {
   direction?: string | null
   met?: boolean | null
   anchor?: unknown
+  /** 简洁展示关键词（新数据携带）；对冲拆分分支无 → 置空 */
+  keywords?: string[]
 }
 
 /** 以“；若”/“;若”切分 scenario 为多段（保留各段文本，前导分隔符去除） */
@@ -68,6 +70,7 @@ export function expandConditionalBranches<T extends BranchLike>(cond: T): T[] {
       direction: oppositeDirection(cond.direction),
       met: undefined,
       anchor: undefined,
+      keywords: undefined,
     }
     return extra as T
   })

@@ -48,8 +48,15 @@
             <view class="as-insight-card__sc-if">
               <text class="as-insight-card__sc-no">{{ idx + 1 }}</text>
               <text class="as-insight-card__sc-prefix">若</text>
-              <!-- 条件长句原文（供详细报告展示）；简洁关键词经 keywords 字段另行透传 -->
-              <text class="as-insight-card__sc-cond">{{ condMain(cond.condition) }}</text>
+              <!-- 双模式：tags=有 keywords 则标签流（否则长句兜底）；sentence=强制长句原文（预测详情页用） -->
+              <view v-if="useKeywords(cond)" class="as-insight-card__sc-ktags">
+                <text
+                  v-for="(k, ki) in cond.keywords"
+                  :key="ki"
+                  class="as-insight-card__sc-chip"
+                >{{ k }}</text>
+              </view>
+              <text v-else class="as-insight-card__sc-cond">{{ condMain(cond.condition) }}</text>
             </view>
             <view class="as-insight-card__sc-then">
               <text v-if="cond.direction" class="as-insight-card__dir" :class="dirClass(cond.direction)">
@@ -115,6 +122,8 @@ interface StructuredCondition {
   condition: string
   /** 条件满足后的走势预判（含幅度/目标位等，展示原文） */
   scenario: string
+  /** 简洁展示用关键词（1~2 个，单条 ≤10 字；仅新数据携带，旧记录无 → 走长句兜底） */
+  keywords?: string[]
   /** 验证锚点（可选透传：threshold/metric 以 chip 展示） */
   anchor?: { metric?: string; threshold?: string }
   /** 该条件是否已触发（验证回填）：true=已触发（分支点亮）/ false=未触发（置灰）/ 缺省=待观察常态 */
@@ -134,9 +143,17 @@ interface InsightStructuredForecast {
 const props = withDefaults(defineProps<{
   /** 条件化预判结构化数据（null → 整块不渲染） */
   structured: InsightStructuredForecast | null
+  /** 条件行显示模式：tags=有 keywords 显示关键词标签（无则长句兜底）；sentence=强制长句原文（预测详情页用） */
+  conditionDisplay?: 'tags' | 'sentence'
 }>(), {
-  structured: null
+  structured: null,
+  conditionDisplay: 'tags'
 })
+
+/** 该条件是否以关键词标签展示（tags 模式且有 keywords） */
+function useKeywords(cond: StructuredCondition): boolean {
+  return props.conditionDisplay === 'tags' && Boolean(cond.keywords?.length)
+}
 
 // ===== 期段状态 =====
 const HORIZON_ORDER: HorizonKey[] = ['short', 'mid', 'long']
@@ -468,6 +485,25 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 .as-insight-card__sc-prefix {
   color: $ink-mute;
   flex-shrink: 0;
+}
+
+/* 条件关键词标签流（tags 模式；长句模式不受影响） */
+.as-insight-card__sc-ktags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: $s-1;
+  align-items: center;
+}
+
+.as-insight-card__sc-chip {
+  font-size: $font-size-xs;
+  font-weight: 600;
+  color: $gold-deep;
+  background: rgba($white, 0.72);
+  border: 1rpx solid rgba($gold-deep, 0.35);
+  border-radius: $r-xs;
+  padding: 1rpx 12rpx;
+  line-height: $lh-tight;
 }
 
 /* 条件句：预判块内唯一金色加粗文字段（展示主干长句，括号补充不渲染） */

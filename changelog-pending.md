@@ -1,5 +1,10 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-02 预判块双模式 + 日期下拉改版（板块四环）
+- `ConditionalForecastBlock.vue`：条件行**双模式**——`conditionDisplay='tags'`（默认）：有 `keywords` 显示关键词标签流（无则长句兜底）；`'sentence'`：强制长句原文（prediction-detail 大盘详细报告用）。组件库同步。
+- API/映射：`keywords?: string[]` 透传（agent.ts Market/Sector Condition、prediction.ts PredictionCondition、sectorInsight 映射/条件拆分），新数据（LLM 已按 prompt 输出 ≤10 字 keywords）在板块洞见卡/四环列表以标签展示，长句仍在详细页。
+- `sector-loop.vue`：日期回看改**下拉菜单**（absolute 面板 + 点外关闭，仅交易日，回今天）；**默认显示前前交易日**（今日/昨日数据常未完成或重跑不稳定）；今日/昨天胶囊语义保留。
+
 ## 2026-09-02 预判条件卡改版：条件句 → 关键词 chip（金色块语言内）
 - `src/shared/components/ConditionalForecastBlock.vue`：条件行由整句金色文字改为 **关键词 chip 流**（condChips 按 且/并且/并/、/，/； 切 1~3 个；括号细节仍剔除）；期段切换/基准/方向 pill/幅度置灰/触发点亮蓝签全部原样保留。同步至组件库同文件。
 
