@@ -293,6 +293,17 @@ async function handleBind() {
   min-width: 180rpx;
 }
 
+/* 验证码倒计时禁用态：整体 opacity 会让白字变浅灰看不清，
+   改为背景手动淡化（保持"按钮颜色变淡"）＋文字固定纯白保证可读 */
+.form-code-btn.is-disabled {
+  opacity: 1;
+  background: rgba(11, 95, 255, 0.4);
+  box-shadow: none;
+}
+.form-code-btn.is-disabled :deep(.as-btn__text) {
+  color: #ffffff;
+}
+
 .bind-form-actions {
   display: flex;
   flex-direction: column;

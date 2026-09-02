@@ -199,10 +199,27 @@ export interface MarketTracePredictionStep {
   text: string
 }
 
+/** 条件锚点（Spec A：验证锚点，direction 自挂，不依赖 horizons[].direction） */
+export interface MarketTracePredictionAnchor {
+  horizon: 'short' | 'mid' | 'long'
+  threshold?: string
+  metric?: string
+  direction?: 'bullish' | 'bearish' | 'neutral'
+}
+
+/** 条件化预判单条（Spec A：condition + scenario + anchor） */
+export interface MarketTracePredictionCondition {
+  condition: string
+  scenario: string
+  anchor?: MarketTracePredictionAnchor
+}
+
 export interface MarketTracePrediction {
   schema_version?: string
   prediction_status: 'confirmed' | 'hypothesis' | 'insufficient'
   horizons?: MarketTracePredictionHorizon[]
+  /** 条件化预判（Spec A §3.1；2.0 旧记录缺失） */
+  conditions?: MarketTracePredictionCondition[]
   evolution_narrative?: string
   /** 结构化演化步骤（前端时间轴渲染）；旧记录可能缺失 */
   evolution_steps?: MarketTracePredictionStep[]

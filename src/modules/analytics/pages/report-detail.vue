@@ -51,8 +51,8 @@
       class="report-insight-card"
     />
 
-    <!-- ===== 模块3：四维分析评分（仅数据完整可评分时显示，无法评分的删去该模块） ===== -->
-    <view v-if="aiScoreData?.dataStatus === 'complete'" class="section">
+    <!-- ===== 模块3：四维分析评分（数据不足/不完整/完整均展示，由 AiAnalysis 组件内部区分状态） ===== -->
+    <view v-if="aiScoreData?.dataStatus" class="section">
       <AiAnalysis :loading="scoreLoading" :data="aiScoreData" />
     </view>
 
@@ -307,12 +307,26 @@ function scoreLevelOf(score: number | null | undefined): 'red' | 'blue' | 'green
   return 'green'
 }
 
-/** 页面光晕：标签与分数双红→红光，双绿→绿光，其余情况（双蓝/不同色/无分数）→蓝光 */
+/**
+ * 页面光晕：与正式报告一致的配色逻辑
+ * 标签与分数双红→红光，双绿→绿光；标签无等级（快报"预告"兜底）时退化为按评分着色；
+ * 无评分（数据不完整）时按头部标签等级着色，避免与页面标签语义矛盾。
+ */
 const glowClass = computed(() => {
   const tagLevel = tagLevelOf(stock.value.tag)
   const scoreLevel = scoreLevelOf(aiScoreData.value?.score)
   if (tagLevel === 'red' && scoreLevel === 'red') return 'glow-red'
   if (tagLevel === 'green' && scoreLevel === 'green') return 'glow-green'
+  // 标签无等级（快报"预告"等）时：按评分等级着色，保证红/蓝/绿三色齐全
+  if (tagLevel == null && scoreLevel) {
+    if (scoreLevel === 'red') return 'glow-red'
+    if (scoreLevel === 'green') return 'glow-green'
+    return 'glow-blue'
+  }
+  // 无评分（数据不完整）时：按头部标签等级着色，与页面 Tag 语义一致
+  if (scoreLevel == null && (tagLevel === 'red' || tagLevel === 'green')) {
+    return tagLevel === 'red' ? 'glow-red' : 'glow-green'
+  }
   return 'glow-blue'
 })
 

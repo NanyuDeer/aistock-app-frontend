@@ -416,16 +416,16 @@
       </view>
     </template>
 
-    <!-- VIP 会员弹窗：非会员进入报告详情前阻断并引导开通 -->
-    <Modal v-model:visible="vipModalVisible" title="会员专属内容" :mask-closable="false">
-      <text class="vip-modal-desc">AI 深度报告为会员专属内容，开通会员后即可查看全部报告详情。</text>
-      <template #footer>
-        <view class="vip-modal-actions">
-          <Button size="sm" plain @click="vipModalVisible = false">取消</Button>
-          <Button size="sm" type="primary" @click="goVip">去开通</Button>
-        </view>
-      </template>
-    </Modal>
+    <!-- VIP 会员弹窗：非会员进入报告详情前阻断并引导开通（样式对齐版本更新弹窗） -->
+    <ConfirmModal
+      v-model:visible="vipModalVisible"
+      title="会员专属内容"
+      content="AI 深度报告为会员专属内容，开通会员后即可查看全部报告详情。"
+      confirm-text="去开通"
+      cancel-text="取消"
+      :mask-closable="false"
+      @confirm="goVip"
+    />
   </SubPageCard2>
 </template>
 
@@ -440,7 +440,7 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
 import { useUserStore } from '@/shared/store/modules/user'
-import { LoadingState, EmptyState, Card, Tag, Button, Modal } from '@/shared/components'
+import { LoadingState, EmptyState, Card, Tag, ConfirmModal } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 // ===== Markdown 分区解析工具（参考 hot-burst-report 模式）=====
@@ -1475,19 +1475,5 @@ onBackPress(() => {
 .date-btn-text {
   font-size: 24rpx;
   color: $primary;
-}
-
-/* VIP 会员弹窗 */
-.vip-modal-desc {
-  display: block;
-  font-size: 28rpx;
-  line-height: 1.7;
-  color: $ink-soft;
-}
-
-.vip-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 20rpx;
 }
 </style>

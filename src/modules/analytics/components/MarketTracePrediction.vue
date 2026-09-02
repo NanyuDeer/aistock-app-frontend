@@ -14,6 +14,25 @@
         <text class="summary-text">{{ prediction.attributionSummary }}</text>
       </view>
 
+      <!-- 条件化预判（Spec A §4.3：condition + scenario + anchor；2.0 旧记录为空数组不渲染） -->
+      <view v-if="prediction.conditions.length > 0" class="conditions-block">
+        <text class="conditions-label">条件化预判</text>
+        <view v-for="(cond, idx) in prediction.conditions" :key="`c-${idx}`" class="condition-item">
+          <view class="condition-row">
+            <view class="condition-index">{{ idx + 1 }}</view>
+            <view class="condition-body">
+              <text class="condition-text">{{ cond.condition }}</text>
+              <text class="scenario-text">{{ cond.scenario }}</text>
+              <view v-if="cond.anchor" class="anchor-meta">
+                <text class="anchor-chip">{{ horizonLabel(cond.anchor.horizon) }}</text>
+                <text v-if="cond.anchor.threshold" class="anchor-chip">{{ cond.anchor.threshold }}</text>
+                <text class="anchor-chip" :class="anchorDirectionClass(cond.anchor.direction)">{{ directionText(cond.anchor.direction) }}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
       <view v-for="(h, idx) in prediction.horizons" :key="`h-${idx}`" class="horizon-item">
         <view class="horizon-head">
           <view class="tag horizon-tag">{{ horizonLabel(h.horizon) }}</view>
@@ -129,6 +148,13 @@ function directionClass(direction: string): string {
   return 'direction-neutral'
 }
 
+/** 条件锚点方向（chip 只染字体色，不复用 directionClass 的底色） */
+function anchorDirectionClass(direction: string): string {
+  if (direction === 'bullish') return 'anchor-chip-bullish'
+  if (direction === 'bearish') return 'anchor-chip-bearish'
+  return 'anchor-chip-neutral'
+}
+
 function confidenceClass(confidence: string): string {
   if (confidence === 'high') return 'confidence-high'
   if (confidence === 'medium') return 'confidence-medium'
@@ -195,6 +221,50 @@ function confidenceText(confidence: string): string {
   font-size: 28rpx;
   color: $text-color-title;
 }
+
+/* 条件化预判（Spec A §4.3） */
+.conditions-block {
+  margin-bottom: $spacing-sm;
+  border-top: 2rpx solid $line;
+  border-left: 6rpx solid $primary;
+  padding: $spacing-sm 0 $spacing-sm $spacing-base;
+  background: $primary-50;
+  border-radius: 0 $r-sm $r-sm 0;
+}
+
+.conditions-label {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: $text-color-title;
+  margin-bottom: $spacing-xs;
+}
+
+.condition-item { margin-bottom: $spacing-sm; }
+.condition-item:last-child { margin-bottom: 0; }
+
+.condition-row { display: flex; gap: $spacing-sm; }
+
+.condition-index {
+  width: 32rpx; height: 32rpx; border-radius: $r-full;
+  background: $primary; color: $white;
+  font-size: 22rpx; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 2rpx; flex-shrink: 0;
+}
+
+.condition-body { flex: 1; display: flex; flex-direction: column; gap: 4rpx; }
+.condition-text { font-size: 26rpx; font-weight: 500; color: $text-color-title; }
+.scenario-text { font-size: 26rpx; color: $text-color-secondary; }
+
+.anchor-meta { display: flex; gap: $spacing-xs; flex-wrap: wrap; margin-top: 4rpx; }
+.anchor-chip {
+  padding: 2rpx 14rpx; border-radius: $r-md; background: $white;
+  font-size: 22rpx; color: $text-color-tertiary; border: 1rpx solid $line-soft;
+}
+.anchor-chip-bullish { color: $up; border-color: rgba(229, 77, 94, 0.25); }
+.anchor-chip-bearish { color: $down; border-color: rgba(24, 160, 88, 0.25); }
+.anchor-chip-neutral { color: $primary; border-color: $primary-100; }
 
 .horizon-item {
   padding: $spacing-sm 0;

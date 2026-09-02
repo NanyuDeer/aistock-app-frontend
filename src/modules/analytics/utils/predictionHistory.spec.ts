@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { horizonStage, overallStatus, computeStats } from './predictionHistory'
-import type { PredictionRecord } from '@/shared/api/modules/prediction'
+import { horizonStage, overallStatus, computeStats, conditionStage } from './predictionHistory'
+import type { PredictionRecord, PredictionVerificationEntry } from '@/shared/api/modules/prediction'
 
 const TODAY = '2026-08-10'
 
@@ -87,4 +87,38 @@ test('computeStats：skipped 记录单独计数，不计 pending/verified', () =
   assert.equal(stats.pendingCount, 1)
   assert.equal(stats.verifiedCount, 1)
   assert.equal(stats.hitRate, 1)
+})
+
+// ===== Spec A §4.3：conditionStage — condition 验证按 c{i} key 读取 =====
+
+const condRecord = (
+  verification: Partial<Record<string, PredictionVerificationEntry>> = {},
+): PredictionRecord =>
+  baseRecord({
+    schema_version: '3.0',
+    prediction: {
+      prediction_status: 'hypothesis',
+      attribution_summary: null,
+      conditions: [
+        { condition: '若放量站稳前高', scenario: '则趋势延续', anchor: { horizon: 'short', threshold: '+5%', direction: 'bullish' } },
+        { condition: '若缩量跌破5日线', scenario: '则短期转弱', anchor: { horizon: 'short', threshold: '-3%', direction: 'bearish' } },
+      ],
+    },
+    verification,
+  })
+
+test('conditionStage：verification 无 c{i} → pending', () => {
+  assert.equal(conditionStage(condRecord({}), 0).kind, 'pending')
+})
+
+test('conditionStage：verification 有 c0 → verified', () => {
+  const entry = { horizon: 'c0', result: 'hit', actual: '+5.2%', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' } as const
+  const stage = conditionStage(condRecord({ c0: entry }), 0)
+  assert.deepEqual(stage, { kind: 'verified', result: 'hit', entry })
+})
+
+test('conditionStage：condition_index 与 c{i} 对齐，c1 独立读取', () => {
+  const entry = { horizon: 'c1', result: 'miss', actual: '-1.0%', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' } as const
+  assert.equal(conditionStage(condRecord({ c1: entry }), 0).kind, 'pending')
+  assert.equal(conditionStage(condRecord({ c1: entry }), 1).kind, 'verified')
 })

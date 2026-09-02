@@ -143,6 +143,8 @@ export async function getFocusEvents(): Promise<FocusEventViewModel[]> {
         industries: industries.map((i) => i.name),
         // 保留完整行业对象（含涨跌方向），供顶部卡片箭头/颜色展示
         affectedIndustries: industries,
+        // 转发来源信息（含原文 URL），供顶部卡片标题跳转原文
+        sourceInfo: event.sourceInfo,
       }
     })
   } catch (err) {
