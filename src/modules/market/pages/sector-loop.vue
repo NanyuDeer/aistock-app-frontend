@@ -165,8 +165,8 @@ const ascDays = computed(() => [...tradingDays.value].sort())
 /** 列表展示用：新→旧倒序（基于升序归一） */
 const sheetDays = computed(() => [...ascDays.value].reverse())
 
-/** 近三个交易日（升序截尾），作为快捷日期按钮 */
-const recentThree = computed(() => ascDays.value.slice(-3))
+/** 近三个交易日（新→旧 展示序：9/3 · 9/2 · 9/1） */
+const recentThree = computed(() => [...ascDays.value.slice(-3)].reverse())
 
 /** 交易日多于 3 天时展示“更多”下拉入口 */
 const hasMoreDays = computed(() => ascDays.value.length > 3)
