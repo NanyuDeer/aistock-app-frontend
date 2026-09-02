@@ -11,7 +11,8 @@
       <view class="rc-bandline">
         <text class="rc-score" v-if="card.score != null">{{ card.score }}</text>
         <text class="rc-level" :class="levelMeta.cls" v-if="levelMeta.label">{{ levelMeta.label }}</text>
-        <text class="rc-pos">{{ card.position_band.text }}</text>
+        <!-- G2 背离纪律：冲突时隐藏确定性仓位建议，只出区间与提示（design-debate A3/N4） -->
+        <text class="rc-pos" v-if="card.position_band.text && !card.conflict">{{ card.position_band.text }}</text>
       </view>
       <view class="rc-scale">
         <view v-for="(s, i) in bandSegs" :key="i" class="rc-seg" :class="s.cls"></view>
@@ -79,12 +80,21 @@
     <view class="rc-sec" v-if="card.branches && card.branches.length">
       <text class="rc-sec-title">关键节点分支</text>
       <view class="rc-branch" v-for="(b, i) in card.branches" :key="i">
+        <!-- 触发条件：如"收盘站上 3994 压力位"（engine 注入，G19） -->
         <text class="rc-branch-cond">{{ branchCondText(b) }}</text>
         <view class="rc-branch-concl">
-          <text class="rc-dir" :class="directionMeta(b).cls" v-if="directionMeta(b).show">{{ directionMeta(b).label }}</text>
-          <text class="rc-range" v-if="b.conclusion.range">{{ b.conclusion.range }}</text>
+          <text class="rc-dir" :class="directionMeta(b).cls">{{ directionMeta(b).label }}</text>
+          <!-- 目标参考区间：触发后的目标空间（design-debate A1：锚定突破后空间，非触发条件本身） -->
+          <view class="rc-range-row" v-if="b.conclusion.range">
+            <text class="rc-range-tag">目标区间</text>
+            <text class="rc-range">{{ b.conclusion.range }}</text>
+          </view>
           <text class="rc-note">{{ branchNoteText(b) }}</text>
         </view>
+      </view>
+      <!-- 点位来源脚注（design-debate A2/A4：直引公式，消除"为什么是压力/支撑"困惑） -->
+      <view class="rc-footnote" v-if="showFootnote">
+        支撑位 = 近 20 日最低价 与 20 日均线×0.97 取较大者；压力位 = 近 20 日最高价 与 20 日均线×1.03 取较小者（以当日收盘数据计算）
       </view>
     </view>
 
@@ -189,6 +199,11 @@ function branchNoteText(b: RhythmBranch): string {
   if (b.conclusion.range) return b.conclusion.note || ''
   return b.conclusion.note || '结果待公布'
 }
+
+// 点位来源脚注：仅点位分支（indicator=上证指数点位）显示（design-debate A2/A4）
+const showFootnote = computed(() =>
+  (props.card.branches ?? []).some((b) => b.condition.indicator === '上证指数点位')
+)
 
 // ── 温度迷你柱 ──
 function tempBarHeight(score: number): string {

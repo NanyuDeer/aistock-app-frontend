@@ -123,15 +123,23 @@ async function previousTradingDay(date: string): Promise<string | undefined> {
 }
 
 function switchSlot(s: string) { activeSlot.value = s }
-function goBack() { uni.navigateBack() }
+function goBack() {
+  // H5 直接以 URL 打开详情页时无上级页面栈（getCurrentPages 深度=1），navigateBack 会静默失败
+  if (getCurrentPages().length > 1) {
+    uni.navigateBack()
+  } else {
+    uni.reLaunch({ url: '/modules/home/pages/index' })
+  }
+}
 </script>
 
 <style lang="scss" scoped>
 @import '@/shared/styles/variables.scss';
 .page { display: flex; flex-direction: column; height: 100%; background: $bg-page; }
-.nav { display: flex; align-items: center; padding: 24rpx 32rpx; background: $bg-card; }
-.back { font-size: 40rpx; color: $ink; padding-right: 24rpx; }
+.nav { display: flex; align-items: baseline; gap: 16rpx; padding: 24rpx 32rpx; background: $bg-card; }
+.back { font-size: 40rpx; color: $ink; padding-right: 8rpx; }
 .nav-title { font-size: 34rpx; font-weight: 600; color: $ink; }
+.nav-cal { margin-left: auto; font-size: 26rpx; color: $primary; font-weight: 600; padding: 8rpx 16rpx; }
 .content { flex: 1; padding: 24rpx 32rpx; }
 /* 三时点分段切换（设计稿：surface 底 + 边框 + pill，active 主色填充） */
 .slots { display: flex; gap: 8rpx; background: $bg-card; border: 1rpx solid $line; border-radius: 999rpx; padding: 6rpx; margin-bottom: 24rpx; }

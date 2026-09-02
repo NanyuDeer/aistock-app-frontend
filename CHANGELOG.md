@@ -20,6 +20,21 @@
 
 ### 修复
 - `src/modules/favorites/pages/insight-detail-move.vue`：洞见卡 computed 中 `forecast` 引用已删除的 `suggestedActions`（2026-08-25 移除"建议跟踪"时漏删）→ `ReferenceError` 导致详情页渲染崩溃白屏。修复为 `forecast` 恒为空（与移除建议跟踪的决策一致），并同步注释
+## [changer] 2026-08-30 — 节奏大师语义修正 + 日历热力图总览（design-debate）
+
+**开发者**: changer-collab
+
+### 新增
+- 节奏日历热力图总览页 `pages/calendar.vue`：近 60 交易日网格（7 列按周），独立五档色板 + 图例，灰格=无报告/沿用前值，点格跳详情（带 date），H5 直开兜底
+- `agentApi.getRhythmMasterCalendar(days)` API（契约 #7）
+
+### 修复
+- `RhythmCard.vue` 分支语义：拆分"触发条件 / 目标参考区间"标签、点位来源脚注、`conflict=true` 隐藏仓位建议（G2 背离纪律）、空区间"结果待公布"占位
+- 详情页返回按钮 H5 直接 URL 打开时 `reLaunch` 回首页兜底
+- `vite.config.ts` 新增 `/api/agent/trading-calendar` 显式代理规则（修复本地 H5 节奏大师 fallbackDate 500）
+
+### 文档
+- `src/modules/rhythm/AGENTS.md` 更新（日历页/接口/分支语义/契约 #7）
 
 ---
 
