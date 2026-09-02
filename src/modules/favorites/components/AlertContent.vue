@@ -22,7 +22,7 @@
                 :title="item?.stock_name || '\u3000'"
                 :description="item ? `${item.detailText} · ${item.dateText}` : '\u3000'"
                 :clickable="!!item"
-                @click="item && goTrace(item.event_id, item.event_type)"
+                @click="item && goTrace(item.event_id)"
               >
                 <template #prefix>
                   <Tag v-if="item" :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
@@ -81,10 +81,8 @@ import Tag from '@/shared/components/Tag.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
-import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { useUserStore } from '@/shared/store/modules/user'
-import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -108,10 +106,10 @@ const intelTabItems = [
   { label: '利空', value: 'negative' as const },
 ]
 
-// 自选股洞察：统一展示模型（涨停雷达 insight + 价格异动 stocktrace 融合）
+// 自选股洞察：统一展示模型（仅来自 stocktrace 价格异动链路）
 interface CaptureItem {
   event_id: string
-  event_type: 'limit_up_radar' | 'price'
+  event_type: 'price'
   stock_name: string
   direction: 'up' | 'down'
   /** 描述文案：主因：xxx / 主因待验证 / 归因中 / 待归因 */
@@ -130,23 +128,6 @@ function fmtDateMMDD(t?: string): string {
   const date = new Date(t)
   if (Number.isNaN(date.getTime())) return '--'
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-/** 涨停雷达（insight 链路）→ 统一模型 */
-function fromInsight(w: WatchlistInsight): CaptureItem {
-  let detailText = '归因中'
-  if (w.attribution_status === 'unconfirmed') detailText = '主因待验证'
-  else if (w.attribution_status === 'confirmed' && w.primary_driver?.label) detailText = `主因：${w.primary_driver.label}`
-  const date = w.trade_date || w.created_at
-  return {
-    event_id: w.event_id,
-    event_type: 'limit_up_radar',
-    stock_name: w.stock_name,
-    direction: w.direction,
-    detailText,
-    dateText: fmtDateMMDD(date),
-    sortTime: date ? new Date(date).getTime() : 0,
-  }
 }
 
 /** 价格异动（stocktrace 链路）→ 统一模型 */
@@ -168,15 +149,10 @@ function fromMovement(m: StockTraceEvent): CaptureItem {
 }
 
 async function loadCaptureList() {
-  // 并行拉取涨停雷达（insights）与价格异动（movements），单个失败不影响另一个
+  // 2026-08-30 链路合并：涨停雷达事件已并入 stock-trace（movements），列表只消费 movements
   try {
-    const [insights, page] = await Promise.all([
-      watchlistInsightApi.getInsights().catch(() => [] as WatchlistInsight[]),
-      stockTraceApi.list(3).catch(() => ({ items: [] as StockTraceEvent[] })),
-    ])
-    // 融合后按事件时间倒序：最新异动（含今日价格异动）优先展示
-    captureList.value = [...insights.map(fromInsight), ...page.items.map(fromMovement)]
-      .sort((a, b) => b.sortTime - a.sortTime)
+    const page = await stockTraceApi.list(3).catch(() => ({ items: [] as StockTraceEvent[] }))
+    captureList.value = page.items.map(fromMovement).sort((a, b) => b.sortTime - a.sortTime)
   } catch {
     captureList.value = []
   }
@@ -290,9 +266,9 @@ function goAlertCatcher() {
   uni.navigateTo({ url: '/modules/favorites/pages/monitor' })
 }
 
-/** 洞察详情：按事件类型分流（涨停雷达 → insight-detail，价格异动 → insight-detail-move） */
-function goTrace(eventId: string, eventType?: string) {
-  navigateToInsightDetail(eventId, eventType)
+/** 洞察详情：统一跳转到 insight-detail-move（所有异动均为 stocktrace 价格事件） */
+function goTrace(eventId: string) {
+  uni.navigateTo({ url: `/modules/favorites/pages/insight-detail-move?event_id=${encodeURIComponent(eventId)}` })
 }
 
 /** 个股情报（原异动捕手/event-catcher，已改名） */
