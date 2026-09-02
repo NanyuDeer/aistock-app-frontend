@@ -185,12 +185,15 @@ const yesterdayDate = computed(() => {
 })
 const hasToday = computed(() => tradingDays.value.includes(todayStr))
 
-/** 默认日期：前前个交易日（今日/前一日数据常未完成或正在重跑，回看一个稳定日）；不足 3 个则取最近 */
+/** 默认按钮文案日期：相对“今天”的前前交易日（今天在列则今天往前 2；不在则最近已完结日前 2），固定不随快捷跳转变化 */
 const defaultDate = computed(() => {
   const l = tradingDays.value
   if (!l.length) return todayStr
-  const idx = l.length >= 3 ? l.length - 3 : l.length - 1
-  return l[idx] ?? todayStr
+  const todayIdx = l.indexOf(todayStr)
+  const anchor = todayIdx >= 0 ? todayIdx : l.length - 1
+  let idx = anchor - 2
+  if (idx < 0) idx = anchor >= 1 ? anchor - 1 : anchor
+  return l[idx] ?? l[l.length - 1] ?? todayStr
 })
 
 /** 进入数据切换（快捷胶囊用；同步按钮文案） */
@@ -200,10 +203,9 @@ function setInsight(day: string) {
   void load(day)
 }
 
-/** 今日 / 昨天 快捷跳转：更新按钮文案并加载 */
+/** 今日 / 昨天 快捷跳转：仅切换内容，不改“前前”按钮文案 */
 function pickQuick(day: string) {
   if (!day) return
-  dropLabel.value = day
   setInsight(day)
 }
 
@@ -405,6 +407,7 @@ onLoad(async (options) => {
 .sl-datebar {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 14rpx;
 }
 
@@ -413,11 +416,12 @@ onLoad(async (options) => {
   align-items: center;
   justify-content: center;
   gap: 6rpx;
-  padding: 10rpx 30rpx;
+  flex: none;
+  width: 176rpx;
+  padding: 10rpx 0;
   border-radius: 999rpx;
   background: $bg-card;
   border: 2rpx solid $line;
-  flex: 1;
 
   &:active {
     opacity: 0.75;
@@ -450,17 +454,17 @@ onLoad(async (options) => {
   color: $primary;
 }
 
-/* 第三个下拉按钮（含绝对定位的窄下拉面板） */
+/* 第三个下拉按钮（与今日/昨天等宽；含绝对定位窄下拉） */
 .sl-datebar__pickwrap {
   position: relative;
-  flex: 1;
+  flex: none;
+  width: 176rpx;
   min-width: 0;
   display: flex;
 }
 
 .sl-datebar__pickwrap .sl-datebar__pill {
   width: 100%;
-  flex: 1;
 }
 
 /* ===== 日期下拉（absolute，紧随日期胶囊下方；mask 负责点外部关闭） ===== */
@@ -475,7 +479,7 @@ onLoad(async (options) => {
   top: calc(100% + 8rpx);
   right: 0;
   left: auto;
-  width: 340rpx;
+  width: 300rpx;
   z-index: 91;
   background: $bg-card;
   border: 2rpx solid $line;
@@ -508,9 +512,8 @@ onLoad(async (options) => {
 }
 
 .sl-sheet__list {
-  flex: 1 1 auto;
-  height: 0;
-  min-height: 0;
+  height: 44vh;
+  overflow: hidden;
 }
 
 .sl-sheet__item {
