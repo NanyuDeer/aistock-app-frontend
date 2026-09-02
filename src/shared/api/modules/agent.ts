@@ -199,10 +199,27 @@ export interface MarketTracePredictionStep {
   text: string
 }
 
+/** 条件锚点（Spec A：验证锚点，direction 自挂，不依赖 horizons[].direction） */
+export interface MarketTracePredictionAnchor {
+  horizon: 'short' | 'mid' | 'long'
+  threshold?: string
+  metric?: string
+  direction?: 'bullish' | 'bearish' | 'neutral'
+}
+
+/** 条件化预判单条（Spec A：condition + scenario + anchor） */
+export interface MarketTracePredictionCondition {
+  condition: string
+  scenario: string
+  anchor?: MarketTracePredictionAnchor
+}
+
 export interface MarketTracePrediction {
   schema_version?: string
   prediction_status: 'confirmed' | 'hypothesis' | 'insufficient'
   horizons?: MarketTracePredictionHorizon[]
+  /** 条件化预判（Spec A §3.1；2.0 旧记录缺失） */
+  conditions?: MarketTracePredictionCondition[]
   evolution_narrative?: string
   /** 结构化演化步骤（前端时间轴渲染）；旧记录可能缺失 */
   evolution_steps?: MarketTracePredictionStep[]
@@ -471,6 +488,7 @@ export interface RhythmCard {
   event_window: RhythmEvent[]
   event_source_missing?: boolean
   event_high_hint?: string
+  next_event_anchor?: { title: string; event_date: string; days_until: number; note: string } | null
   conflict: boolean
   conflict_detail?: string
   branches: RhythmBranch[]
@@ -489,6 +507,71 @@ export interface RhythmMasterReport {
   report_date: string
   created_at?: string
   content?: RhythmMasterContent
+}
+
+/** 板块四环聚合（/api/agent/sector-insight/:date，2026-09-02）：单板块候选 */
+export interface SectorInsightQuote {
+  pct_change: number | null
+  amount: number | null
+  lead_stock: string | null
+}
+
+export interface SectorInsightTrace {
+  present: boolean
+  status?: 'completed' | 'insufficient'
+  summary: string | null
+  sectors: string[]
+}
+
+export type SectorDirection = 'bullish' | 'bearish' | 'neutral'
+export type SectorConfidence = 'high' | 'medium' | 'low'
+
+export interface SectorInsightHorizon {
+  horizon: 'short' | 'mid' | 'long'
+  remaining?: string
+  direction?: SectorDirection
+  confidence?: SectorConfidence
+}
+
+export interface SectorInsightCondition {
+  horizon: 'short' | 'mid' | 'long'
+  direction?: SectorDirection
+  condition: string
+  scenario: string
+  /** 该条件是否已触发（验证回填），缺省 null=待观察 */
+  met?: boolean | null
+}
+
+export interface SectorInsightPrediction {
+  present: boolean
+  status?: 'pending' | 'verified' | 'skipped'
+  dueLabel?: string | null
+  verification?: 'pending' | 'hit' | 'miss'
+  /** 概览方向/置信（取首档有值者），detail 在 horizons */
+  direction?: SectorDirection
+  confidence?: SectorConfidence
+  horizons?: SectorInsightHorizon[]
+  conditions?: SectorInsightCondition[]
+}
+
+export interface SectorInsightCandidate {
+  ts_code: string
+  name: string
+  category: 'industry' | 'concept'
+  source: 'wind_leader' | 'review_primary' | 'both'
+  cycle?: 'long' | 'short' | 'both' | null
+  quote: SectorInsightQuote | null
+  /** 仅 review_primary/both（读当日 sector_trace 报告）；wind_leader-only 恒 null */
+  trace: SectorInsightTrace | null
+  prediction: SectorInsightPrediction | null
+}
+
+export interface SectorInsightResponse {
+  date: string
+  hasData: boolean
+  candidates: SectorInsightCandidate[]
+  /** 归一失败板块（可选，便于排查） */
+  unresolved?: Array<{ name: string; source: string }>
 }
 
 export const agentApi = {
@@ -642,6 +725,11 @@ export const agentApi = {
   /** 读取大盘复盘报告。 */
   getMarketTraceReview(date: string) {
     return request.get<MarketTraceReviewRecord | null>(`/agent/report/review/${date}`)
+  },
+
+  /** 板块四环聚合（板块溯源+预判+验证 一览）：当日板块候选与各环节摘要。 */
+  getSectorInsight(date: string) {
+    return request.get<SectorInsightResponse>(`/agent/sector-insight/${date}`)
   },
 
   /** 节奏大师三时点版本读取（契约 #4）：返回 { date, versions: [{refresh_slot, created_at, content}] } */

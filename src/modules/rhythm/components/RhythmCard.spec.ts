@@ -64,3 +64,10 @@ test('情绪周期在 phase 缺失时兜底"数据缺失（沿用前值）"可�
   assert.match(source, /数据缺失（沿用前值）/)
   assert.match(source, /phaseMeta\.value\.label \|\| props\.card\.phase \|\| '数据缺失（沿用前值）'/)
 })
+
+test('P1：next_event_anchor 锚点条渲染（无锚点整块不渲染）', () => {
+  assert.match(source, /next_event_anchor/)
+  assert.match(source, /v-if="card\.next_event_anchor"/)
+  assert.match(source, /下一重大事件/)
+  assert.match(source, /rc-anchor/)
+})

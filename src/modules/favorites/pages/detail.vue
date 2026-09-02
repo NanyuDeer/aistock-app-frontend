@@ -140,10 +140,11 @@
           <view class="card-header">
             <text class="card-title">AI 资讯洞见</text>
             <view class="card-header-actions">
+              <text v-if="aiAnalysis.analysisDate && !isAiDateToday(aiAnalysis.analysisDate)" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
               <view class="ai-history-btn" @tap="openHistoryDialog">
                 <text class="history-icon">历史</text>
               </view>
-              <view v-if="!aiLoading" class="ai-refresh-btn" @tap="refreshAiAnalysis">
+              <view v-if="!aiLoading && !isAiDateToday(aiAnalysis.analysisDate)" class="ai-refresh-btn" @tap="refreshAiAnalysis">
                 <text class="refresh-icon">↻</text>
               </view>
             </view>
@@ -155,7 +156,6 @@
             <template v-else-if="aiAnalysis && aiAnalysis.conclusion">
               <view class="ai-conclusion">
                 <text :class="['conclusion-badge', aiConclusionClass]">{{ aiAnalysis.conclusion }}</text>
-                <text v-if="aiAnalysis.analysisDate" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
               </view>
               <view v-if="logicTags.length" class="ai-section">
                 <text class="ai-section-title">研判依据</text>
@@ -368,8 +368,18 @@
         <view class="ai-analysis-card">
           <view class="card-header">
             <text class="card-title">中线AI洞见</text>
+            <view class="card-header-actions">
+              <text v-if="midAnalysisDate && !isAiDateToday(midAnalysisDate)" class="analysis-date">{{ formatAiDate(midAnalysisDate) }}</text>
+              <view v-if="!midAnalysisLoading && !isAiDateToday(midAnalysisDate)" class="ai-refresh-btn" @tap="refreshMidAnalysis">
+                <text class="refresh-icon">↻</text>
+              </view>
+            </view>
           </view>
           <view class="card-body">
+            <view v-if="midAnalysisLoading" class="ai-loading">
+              <text class="ai-loading-text">正在生成AI分析...</text>
+            </view>
+            <template v-else>
             <view class="ai-conclusion">
               <text :class="['conclusion-badge', midAiAnalysis.badgeClass]">{{ midAiAnalysis.conclusion }}</text>
             </view>
@@ -421,6 +431,7 @@
                 <text class="tag-detail-text">{{ midRiskTags[expandedTagIdx]?.full }}</text>
               </view>
             </view>
+            </template>
           </view>
         </view>
 
@@ -584,8 +595,18 @@
         <view class="ai-analysis-card">
           <view class="card-header">
             <text class="card-title">长线AI洞见</text>
+            <view class="card-header-actions">
+              <text v-if="longAnalysisDate && !isAiDateToday(longAnalysisDate)" class="analysis-date">{{ formatAiDate(longAnalysisDate) }}</text>
+              <view v-if="!longAnalysisLoading && !isAiDateToday(longAnalysisDate)" class="ai-refresh-btn" @tap="refreshLongAnalysis">
+                <text class="refresh-icon">↻</text>
+              </view>
+            </view>
           </view>
           <view class="card-body">
+            <view v-if="longAnalysisLoading" class="ai-loading">
+              <text class="ai-loading-text">正在生成AI分析...</text>
+            </view>
+            <template v-else>
             <view class="ai-conclusion">
               <text :class="['conclusion-badge', longAiAnalysis.badgeClass]">{{ longAiAnalysis.conclusion }}</text>
             </view>
@@ -637,6 +658,7 @@
                 <text class="tag-detail-text">{{ longRiskTags[expandedTagIdx]?.full }}</text>
               </view>
             </view>
+            </template>
           </view>
         </view>
 
@@ -910,6 +932,10 @@ const klineLoading = ref(false)
 const trendScoreData = ref<any>(null)
 const midAnalysisData = ref<any>(null)
 const longAnalysisData = ref<any>(null)
+const midAnalysisLoading = ref(false)
+const longAnalysisLoading = ref(false)
+const midAnalysisDate = computed(() => midAnalysisData.value?.分析时间 || midAnalysisData.value?.analysis_time || '')
+const longAnalysisDate = computed(() => longAnalysisData.value?.分析时间 || longAnalysisData.value?.analysis_time || '')
 const trendLoading = ref(false)
 const industryHealthData = ref<any>(null)
 // 历史 AI 评价
@@ -1920,30 +1946,39 @@ async function loadMidLongAnalysis() {
       stockApi.getMidLongAnalysis(symbol.value, 'mid'),
       stockApi.getMidLongAnalysis(symbol.value, 'long'),
     ])
-    if (midRes.status === 'fulfilled') {
-      midAnalysisData.value = midRes.value
-    } else {
-      // 无缓存时自动触发 LLM 生成
-      try {
-        const created = await stockApi.createMidLongAnalysis(symbol.value, 'mid')
-        midAnalysisData.value = created
-      } catch {
-        midAnalysisData.value = null
-      }
-    }
-    if (longRes.status === 'fulfilled') {
-      longAnalysisData.value = longRes.value
-    } else {
-      try {
-        const created = await stockApi.createMidLongAnalysis(symbol.value, 'long')
-        longAnalysisData.value = created
-      } catch {
-        longAnalysisData.value = null
-      }
-    }
+    midAnalysisData.value = midRes.status === 'fulfilled' ? midRes.value : null
+    longAnalysisData.value = longRes.status === 'fulfilled' ? longRes.value : null
   } catch {
     midAnalysisData.value = null
     longAnalysisData.value = null
+  }
+}
+
+async function refreshMidAnalysis() {
+  if (!symbol.value || midAnalysisLoading.value) return
+  midAnalysisLoading.value = true
+  try {
+    const created = await stockApi.createMidLongAnalysis(symbol.value, 'mid')
+    midAnalysisData.value = created
+    uni.showToast({ title: '已刷新', icon: 'none' })
+  } catch {
+    uni.showToast({ title: '刷新失败', icon: 'none' })
+  } finally {
+    midAnalysisLoading.value = false
+  }
+}
+
+async function refreshLongAnalysis() {
+  if (!symbol.value || longAnalysisLoading.value) return
+  longAnalysisLoading.value = true
+  try {
+    const created = await stockApi.createMidLongAnalysis(symbol.value, 'long')
+    longAnalysisData.value = created
+    uni.showToast({ title: '已刷新', icon: 'none' })
+  } catch {
+    uni.showToast({ title: '刷新失败', icon: 'none' })
+  } finally {
+    longAnalysisLoading.value = false
   }
 }
 
@@ -2161,9 +2196,22 @@ function formatAiDate(dateStr: string): string {
   if (!dateStr) return ''
   try {
     const d = new Date(dateStr)
-    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
   } catch {
     return dateStr
+  }
+}
+
+function isAiDateToday(dateStr: string): boolean {
+  if (!dateStr) return false
+  try {
+    const d = new Date(dateStr)
+    const now = new Date()
+    return d.getFullYear() === now.getFullYear()
+      && d.getMonth() === now.getMonth()
+      && d.getDate() === now.getDate()
+  } catch {
+    return false
   }
 }
 

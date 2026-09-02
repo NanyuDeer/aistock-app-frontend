@@ -689,8 +689,8 @@ export const stockApi = {
   },
 
   /** 获取业绩预测（GET 只读） */
-  getForecast(symbol: string) {
-    return request.get(`/cn/stock/${symbol}/profit-forecast`).then((res: Record<string, unknown>) => normalizeForecast(res))
+  getForecast(symbol: string, params?: { version?: string }) {
+    return request.get(`/cn/stock/${symbol}/profit-forecast`, { params }).then((res: Record<string, unknown>) => normalizeForecast(res))
   },
 
   /** 触发更新业绩预测 */
@@ -740,7 +740,7 @@ export const stockApi = {
   },
 
   /** 获取 AI 四维评分 */
-  getAiScore(params: { symbol: string }) {
+  getAiScore(params: { symbol: string; endDate?: string; reportType?: string }) {
     return request.get('/cn/stocks/performance-reports/ai-analysis', { params })
   },
 

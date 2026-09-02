@@ -14,6 +14,15 @@
       <!-- 引导卡片：点击查看今日分析报告 -->
       <GuideCard title="点击查看今日分析报告" icon-name="file-line" theme="brand" @click="goAgentReport" />
 
+      <!-- 板块四环入口：板块溯源+预判+验证一览（跳板块四环页） -->
+      <view class="sector-pred-entry" @tap="goSectorLoop">
+        <view class="spe-left">
+          <text class="spe-title">板块预判</text>
+          <text class="spe-tag">今日</text>
+        </view>
+        <text class="spe-arrow">›</text>
+      </view>
+
       <!-- 长线/短线风口两档切换 -->
       <view v-if="sectors.length" class="cycle-tabs">
         <view
@@ -653,6 +662,11 @@ function goPushHistory() {
   uni.navigateTo({ url: '/modules/market/pages/push-history' })
 }
 
+// 跳转到板块四环页（板块溯源/预判/验证一览）
+function goSectorLoop() {
+  uni.navigateTo({ url: '/modules/market/pages/sector-loop' })
+}
+
 // 跳转到板块详情子页面，传递板块名称用于数据筛选
 function goSectorDetail(sector: WindLeaderSector) {
   if (!sector?.name) return
@@ -677,6 +691,51 @@ onShow(() => {
 .leaders-content > :first-child {
   margin-bottom: 20rpx;
 }
+
+/* ===== 板块四环入口行（白卡，跟随 GuideCard 之后） ===== */
+.sector-pred-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 28rpx;
+  margin-bottom: 20rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-lg;
+  box-shadow: $shadow-sm;
+  transition: transform 0.15s ease;
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.spe-left {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.spe-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: $ink;
+}
+
+.spe-tag {
+  font-size: 20rpx;
+  color: $primary;
+  background: rgba(11, 95, 255, 0.08);
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  font-weight: 500;
+}
+
+.spe-arrow {
+  font-size: 36rpx;
+  color: #9ca3af;
+}
+
 
 .state-section {
   margin-bottom: 24rpx;

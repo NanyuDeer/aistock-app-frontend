@@ -2,6 +2,67 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-09-02 — 节奏大师下一重大事件锚点 + 洞察详情引用修复
+
+**开发者**: changer-collab
+
+### 新增
+- `RhythmCard` 事件日历区块新增「下一重大事件」锚点条：渲染 `rhythm_card.next_event_anchor`（首条 high 事件 + 距运行日 N 天），`v-if` 控制无锚点整块不渲染（`components/RhythmCard.vue`）
+- `RhythmCard` 类型加可选字段 `next_event_anchor?: { title, event_date, days_until, note } | null`（旧报告零破坏）（`shared/api/modules/agent.ts`）
+
+### 修复
+- `insight-detail-move.vue`：删除残留 `suggestedActions` 引用（建议跟踪 2026-08-25 已移除，定义删除时漏删引用），修复 TS2304
+
+### 测试
+- `RhythmCard.spec.ts`：P1 锚点渲染源码断言（next_event_anchor / v-if / 下一重大事件 / rc-anchor）
+
+### 文档
+- `src/modules/rhythm/AGENTS.md`：渲染契约表追加 next_event_anchor 字段行
+
+## [master] 2026-09-01 — 条件化预判改造前端（Spec A，三端全量收尾）
+
+**开发者**: Aria
+
+### 新增
+- `src/shared/api/modules/agent.ts` + `prediction.ts`：新增 `MarketTracePredictionAnchor`/`MarketTracePredictionCondition`/`PredictionCondition`/`PredictionConditionAnchor`；`MarketTracePrediction` 增加可选 `conditions`，`PredictionVerificationEntry` 扩展 `condition_index/condition_met/threshold/target_type`
+- `marketTraceReview.ts`：`PredictionPresentation` 增加 `conditions`，`toPredictionPresentation` 映射后端 conditions
+- `predictionHistory.ts`：新增 `ConditionStage` 与 `conditionStage(record, index)` 按 `c{i}` key 读取条件验证（独立于 horizon）
+- `MarketTracePrediction.vue`：新增条件化预判块（condition+scenario+anchor 芯片），2.0 旧记录 conditions 空不渲染
+- `PredictionVerification.vue`：新增条件化预判验证渲染（按 c{i}），融合 A1 early_exit 失效信号，horizon 验证保持兼容
+
+### 测试
+- `predictionHistory.spec.ts` 新增 `conditionStage` 用例；`marketTraceReview.spec.ts` 新增 conditions 映射与空兜底；`marketInsightBrief.spec.ts` 补 `conditions` 字段；node:test 28 通过，Spec A 相关 `vue-tsc --noEmit` 通过
+
+---
+
+## [master] 2026-08-31 — 登录页恢复「手机号验证码登录」入口（阿里云短信认证）
+
+**开发者**: Aria
+
+### 新增
+- `login.vue`：登录方式增加「手机号验证码登录」入口按钮（`phone-line` 图标）；新增手机号表单（phone + smsCode，`handleSendSms`/`handlePhoneLogin`，手机号格式校验 `^1[3-9]\d{9}$`，60s 倒计时），与邮箱表单共享 `smsCode`/`countdown`
+- `user.ts` store：新增 `smsLogin(phone, code)`（复用 `authApi.smsLogin`，存 token/userInfo 后 `fetchUserInfo`）并导出
+
+### 说明
+- 仅 App 端（aistock-app-frontend）；Web 端登录方式不变。`vue-tsc --noEmit` 通过
+
+---
+
+## [master] 2026-08-31 — 洞见卡标签统一 + VIP 弹窗/会员页优化 + 登录验证码可读性修复
+
+**开发者**: Aria
+
+### 修复
+- `AiEventReport.vue` + `insight-detail.vue` + `insight-detail-move.vue`：移除三处自定义洞见标签（动因/展望、依据/展望、依据/跟踪），统一使用 InsightCard 默认「溯源/预判」，与全局洞见卡契约一致
+- `login.vue` + `account-security.vue`：验证码按钮禁用态整体 opacity 导致白字变浅灰看不清，改为取消整体透明度、背景手动淡化 + 文字固定纯白
+- `MarketInsightCard.vue`：通过 `:deep()` 覆盖子组件 section padding 为 0，并移除"溯源"外层白卡包装，使现象/溯源/预判卡外边界与洞见卡对齐（消除卡中卡）
+
+### 改进
+- `vip.vue`：会员身份卡由纵向居中改为横向布局——皇冠标识左对齐（渐变金色圆底），权益勾选标识加浅绿圆底，提升页面质感
+- `agent-report.vue` + `ConfirmModal.vue`：非会员引导开通弹窗统一为 ConfirmModal（560rpx + 等宽 secondary/primary 双按钮）；ConfirmModal 新增 `maskClosable` prop 透传（VIP 弹窗点遮罩不可关闭）
+
+---
+
 ## [junliang] 2026-08-30 — 涨停雷达并入 stock-trace：洞察列表统一 movements
 
 **开发者**: Aria
@@ -20,6 +81,7 @@
 
 ### 修复
 - `src/modules/favorites/pages/insight-detail-move.vue`：洞见卡 computed 中 `forecast` 引用已删除的 `suggestedActions`（2026-08-25 移除"建议跟踪"时漏删）→ `ReferenceError` 导致详情页渲染崩溃白屏。修复为 `forecast` 恒为空（与移除建议跟踪的决策一致），并同步注释
+
 ## [changer] 2026-08-30 — 节奏大师语义修正 + 日历热力图总览（design-debate）
 
 **开发者**: changer-collab
@@ -58,6 +120,16 @@
 
 ### 文档
 - AGENTS / README / LLM prompt 改造建议（字段契约、横幅卡语义色、板块洞见关键词）同步
+
+---
+
+## [changer] 2026-08-28 — 市场洞见展开详情渲染修复
+
+**开发者**: 37588
+
+### 重构
+- 展开详情现象块复用 MarketTracePhenomenon 完整卡片（严重度标签 + 指数表现/领涨领跌网格），移除手写现象块与领涨领跌代码，清理 detail computed / sectorNames 等无引用代码与样式
+- 溯源块删除冗余「主因」标题，结构收敛为「溯源 → 归因结论」；预判去掉外层「预判」标题，三块统一单层标题（核心现象 / 溯源 / 影响持续性预判）
 
 ---
 

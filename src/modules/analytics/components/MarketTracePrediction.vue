@@ -14,6 +14,13 @@
         <text class="summary-text">{{ prediction.attributionSummary }}</text>
       </view>
 
+      <!-- 条件化预判：大盘/板块/个股一切有条件化预判统一用 ConditionalForecastBlock
+           （2026-09-02 从 InsightCard structured 抽取的通用预判块；2.0 旧记录为空数组不渲染） -->
+      <ConditionalForecastBlock
+        v-if="prediction.conditions.length > 0"
+        :structured="condStructured"
+      />
+
       <view v-for="(h, idx) in prediction.horizons" :key="`h-${idx}`" class="horizon-item">
         <view class="horizon-head">
           <view class="tag horizon-tag">{{ horizonLabel(h.horizon) }}</view>
@@ -58,6 +65,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Card from '@/shared/components/Card.vue'
+import ConditionalForecastBlock from '@/shared/components/ConditionalForecastBlock.vue'
+import { expandConditionalBranches } from '@/shared/utils/conditionalForecast'
 import type { PredictionPresentation } from '../utils/marketTraceReview'
 
 const props = defineProps<{
@@ -93,6 +102,48 @@ const timelineSteps = computed<Array<{ label: string; text: string }>>(() => {
     .map(s => s.trim())
     .filter(Boolean)
     .map(s => ({ label: '', text: s }))
+})
+
+/** 条件化预判结构化数据（映射为通用预判块 ConditionalForecastBlock 输入，与板块/个股同构） */
+const HORIZON_KEYS = ['short', 'mid', 'long'] as const
+type HorizonKey = typeof HORIZON_KEYS[number]
+const DIRECTION_KEYS = ['bullish', 'bearish', 'neutral'] as const
+type DirectionKey = typeof DIRECTION_KEYS[number]
+
+function toHorizonKey(v: string | undefined): HorizonKey | undefined {
+  return v && (HORIZON_KEYS as readonly string[]).includes(v) ? (v as HorizonKey) : undefined
+}
+
+function toDirectionKey(v: string | undefined): DirectionKey | undefined {
+  return v && (DIRECTION_KEYS as readonly string[]).includes(v) ? (v as DirectionKey) : undefined
+}
+
+const condStructured = computed(() => {
+  const p = props.prediction
+  if (!p) return null
+  return {
+    horizons: p.horizons.map((h) => ({
+      horizon: h.horizon,
+      remaining: h.remainingEstimate || undefined,
+      direction: h.direction,
+      confidence: h.confidence
+    })),
+    conditions: p.conditions.flatMap((c) => {
+      // anchor.horizon 缺失时默认挂 short（沿用旧分组语义）；anchor 阈值/指标缺失则不渲染 chip
+      const built = {
+        horizon: toHorizonKey(c.anchor?.horizon) ?? 'short',
+        direction: toDirectionKey(c.anchor?.direction),
+        condition: c.condition,
+        scenario: c.scenario,
+        anchor: c.anchor && (c.anchor.threshold || c.anchor.metric)
+          ? { metric: c.anchor.metric || undefined, threshold: c.anchor.threshold || undefined }
+          : undefined,
+        met: undefined
+      }
+      // scenario 内嵌“；若X则Y”的对冲情形拆成独立分支卡（方向/锚点随主条件保留给主卡）
+      return expandConditionalBranches(built)
+    })
+  }
 })
 
 function horizonLabel(horizon: string): string {
