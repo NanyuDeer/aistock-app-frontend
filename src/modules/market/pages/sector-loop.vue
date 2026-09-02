@@ -1,29 +1,24 @@
 <template>
   <SubPageCard title="板块四环">
     <view class="sl-content">
-      <!-- 日期回看：今日 / 昨天 一键 + “日期 ▾”下拉选交易日（跳过非交易日） -->
+      <!-- 日期回看：近三个交易日按钮（准确日期）；更多→下拉选更早交易日 -->
       <view class="sl-datewrap">
-        <view v-if="tradingDays.length > 1" class="sl-datebar">
-          <view class="sl-datebar__pill" :class="{ 'is-on': insightDate === todayStr }" @tap="pickQuick(todayStr)">
-            <text class="sl-datebar__pill-text">今日</text>
-          </view>
+        <view class="sl-datebar">
           <view
+            v-for="d in recentThree"
+            :key="d"
             class="sl-datebar__pill"
-            :class="{ 'is-on': insightDate === yesterdayDate }"
-            @tap="pickQuick(yesterdayDate)"
+            :class="{ 'is-on': d === insightDate }"
+            @tap="setInsight(d)"
           >
-            <text class="sl-datebar__pill-text">昨天</text>
+            <text class="sl-datebar__pill-text">{{ dayLabel(d) }}</text>
           </view>
-          <view class="sl-datebar__pickwrap">
-            <view
-              class="sl-datebar__pill sl-datebar__pick"
-              :class="{ 'is-on': insightDate !== todayStr && insightDate !== yesterdayDate }"
-              @tap="pickerOpen = !pickerOpen"
-            >
-              <text class="sl-datebar__pill-text">{{ dayLabel(dropLabel || insightDate) }}</text>
+          <view v-if="hasMoreDays" class="sl-datebar__pickwrap">
+            <view class="sl-datebar__pill sl-datebar__more" @tap="pickerOpen = !pickerOpen">
+              <text class="sl-datebar__pill-text">更多</text>
               <text class="sl-datebar__caret">▾</text>
             </view>
-            <!-- 下拉（仅交易日；只落在本按钮下方；点外部关闭） -->
+            <!-- 下拉（仅交易日；落在按钮下方；点外部关闭） -->
             <view v-if="pickerOpen" class="sl-dd-mask" @tap="pickerOpen = false"></view>
             <view v-if="pickerOpen" class="sl-sheet sl-sheet--dd">
               <view class="sl-sheet__hd">
@@ -45,11 +40,6 @@
                 </view>
               </scroll-view>
             </view>
-          </view>
-        </view>
-        <view v-else-if="insightDate" class="sl-datebar">
-          <view class="sl-datebar__pill sl-datebar__pick is-static">
-            <text class="sl-datebar__pill-text">{{ dayLabel(dropLabel || insightDate) }}</text>
           </view>
         </view>
       </view>
@@ -169,51 +159,27 @@ const error = ref(false)
 /** 日期选择浮层开关 */
 const pickerOpen = ref(false)
 
-/** 下拉按钮文案（默认前前交易日；手动选择/快捷跳转后跟随所选） */
-const dropLabel = ref('')
-
 /** 列表展示用：新→旧倒序（tradingDays 为升序） */
 const sheetDays = computed(() => [...tradingDays.value].reverse())
 
-/** “昨天”=最近一个已完结交易日：今日在列则取前一日，否则取列表末位（最近交易日） */
-const yesterdayDate = computed(() => {
-  const list = tradingDays.value
-  if (!list.length) return ''
-  const todayIdx = list.indexOf(todayStr)
-  if (todayIdx > 0) return list[todayIdx - 1]
-  return list[list.length - 1] ?? ''
-})
+/** 近三个交易日（升序截尾），作为快捷日期按钮 */
+const recentThree = computed(() => tradingDays.value.slice(-3))
+
+/** 交易日多于 3 天时展示“更多”下拉入口 */
+const hasMoreDays = computed(() => tradingDays.value.length > 3)
 const hasToday = computed(() => tradingDays.value.includes(todayStr))
 
-/** 默认按钮文案日期：相对“今天”的前前交易日（今天在列则今天往前 2；不在则最近已完结日前 2），固定不随快捷跳转变化 */
-const defaultDate = computed(() => {
-  const l = tradingDays.value
-  if (!l.length) return todayStr
-  const todayIdx = l.indexOf(todayStr)
-  const anchor = todayIdx >= 0 ? todayIdx : l.length - 1
-  let idx = anchor - 2
-  if (idx < 0) idx = anchor >= 1 ? anchor - 1 : anchor
-  return l[idx] ?? l[l.length - 1] ?? todayStr
-})
-
-/** 进入数据切换（快捷胶囊用；同步按钮文案） */
+/** 进入数据切换（日期按钮/下拉共用） */
 function setInsight(day: string) {
   if (!day || day === insightDate.value || loading.value) return
   insightDate.value = day
   void load(day)
 }
 
-/** 今日 / 昨天 快捷跳转：仅切换内容，不改“前前”按钮文案 */
-function pickQuick(day: string) {
-  if (!day) return
-  setInsight(day)
-}
-
-/** 下拉列表选择：关闭浮层 → 更新文案 → 加载 */
+/** 下拉列表选择：关闭浮层 → 加载 */
 function pickFromList(day: string) {
   pickerOpen.value = false
   if (!day) return
-  dropLabel.value = day
   setInsight(day)
 }
 
@@ -255,9 +221,8 @@ function retry() {
   if (insightDate.value) void load(insightDate.value)
 }
 
-/** 日期胶囊文案：今天显示"今日"，其余 M/D（无前导零） */
+/** 日期按钮文案：M/D 准确日期（无前导零） */
 function dayLabel(day: string): string {
-  if (day === todayDateStr()) return '今日'
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
   if (!m) return day
   return `${Number(m[2])}/${Number(m[3])}`
@@ -385,10 +350,9 @@ onLoad(async (options) => {
   if (preset && !tradingDays.value.includes(preset)) {
     tradingDays.value = [...tradingDays.value, preset].sort()
   }
-  // 页面默认选“今天/最近交易日”；下拉按钮文案默认前前交易日
+  // 页面默认选最近交易日；更多下拉可回看更早交易日
   const initial = preset || tradingDays.value[tradingDays.value.length - 1] || todayDateStr()
   insightDate.value = initial
-  dropLabel.value = defaultDate.value
   await load(initial)
 })
 </script>
