@@ -2,6 +2,18 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [junliang] 2026-08-30 — 涨停雷达并入 stock-trace：洞察列表统一 movements
+
+**开发者**: Aria
+
+### 变更
+- 涨停雷达事件并入 stock-trace 链路后，自选股洞察卡片/列表统一只消费 `stockTraceApi.list`（movements）：
+  - `AlertContent.vue`（首页特别提醒）：移除并行拉取 `watchlistInsightApi.getInsights()` 与 `fromInsight`，`goTrace` 统一跳 `insight-detail-move`。
+  - `pages/insight.vue`（自选股洞察列表）：移除 `limit_up_radar` 卡片渲染与 insight-detail 跳转，统一 price 展示。
+- `insight-detail.vue`（涨停雷达详情）停用为入口，文件保留兼容历史链接；watchlist_insight_events 存量保留在库、不再展示。
+
+---
+
 ## [junliang] 2026-08-28 — 修复异动详情页渲染崩溃（suggestedActions 残留引用）
 
 **开发者**: Aria
@@ -31,16 +43,6 @@
 
 ### 文档
 - AGENTS / README / LLM prompt 改造建议（字段契约、横幅卡语义色、板块洞见关键词）同步
-
----
-
-## [changer] 2026-08-28 — 市场洞见展开详情渲染修复
-
-**开发者**: 37588
-
-### 重构
-- 展开详情现象块复用 MarketTracePhenomenon 完整卡片（严重度标签 + 指数表现/领涨领跌网格），移除手写现象块与领涨领跌代码，清理 detail computed / sectorNames 等无引用代码与样式
-- 溯源块删除冗余「主因」标题，结构收敛为「溯源 → 归因结论」；预判去掉外层「预判」标题，三块统一单层标题（核心现象 / 溯源 / 影响持续性预判）
 
 ---
 
