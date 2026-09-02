@@ -10,9 +10,11 @@
 - `pages/detail.vue` - 个股详情页
 - `pages/search.vue` - 股票搜索
 - `pages/monitor.vue` - 异动监控
-- `pages/insight.vue` - 自选股洞察（涨停雷达 + 价格异动融合列表）
-- `pages/insight-detail.vue` - 洞察详情（涨停雷达）
-- `pages/insight-detail-move.vue` - 洞察详情（价格异动，数据源为 stocktrace movements API）
+- `pages/insight.vue` - 自选股洞察（2026-08-30 起统一为 stock-trace movements 列表，涨停雷达事件已并入该链路）
+- `pages/insight-detail.vue` - 洞察详情（涨停雷达，**停用**——涨停雷达事件并入 stock-trace 后列表不再产生该类型，文件保留兼容历史直达链接）
+- `pages/insight-detail-move.vue` - 洞察详情（价格异动/涨停雷达统一入口，数据源为 stocktrace movements API）
+
+> **2026-08-30 链路合并**：涨停雷达命中不再建 watchlist_insight_events（存量保留不展示）；`AlertContent.vue`（首页特别提醒）与 `pages/insight.vue`（自选股洞察列表）均只消费 `stockTraceApi.list`（movements），`watchlistInsightApi.getInsights` 不再被列表页调用（monitor.vue 等存量入口保留历史引用）。
 
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。
