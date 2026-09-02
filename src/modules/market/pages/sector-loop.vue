@@ -14,8 +14,12 @@
             <text class="sl-datebar__pill-text">{{ dayLabel(d) }}</text>
           </view>
           <view v-if="hasMoreDays" class="sl-datebar__pickwrap">
-            <view class="sl-datebar__pill sl-datebar__more" @tap="pickerOpen = !pickerOpen">
-              <text class="sl-datebar__pill-text">更多</text>
+            <view
+              class="sl-datebar__pill sl-datebar__more"
+              :class="{ 'is-on': isFarDate }"
+              @tap="pickerOpen = !pickerOpen"
+            >
+              <text class="sl-datebar__pill-text">{{ morePillText }}</text>
               <text class="sl-datebar__caret">▾</text>
             </view>
             <!-- 下拉（仅交易日；落在按钮下方；点外部关闭） -->
@@ -171,6 +175,15 @@ const recentThree = computed(() => [...ascDays.value.slice(-3)].reverse())
 /** 交易日多于 3 天时展示“更多”下拉入口 */
 const hasMoreDays = computed(() => ascDays.value.length > 3)
 const hasToday = computed(() => ascDays.value.includes(todayStr))
+
+/** 当前选中日期不在近三日按钮内（经由“更多”下拉选中更早交易日） */
+const isFarDate = computed(() => {
+  const cur = insightDate.value
+  return !!cur && hasMoreDays.value && !recentThree.value.includes(cur)
+})
+
+/** “更多”按钮文案：选中远端日期时直接显示该日期，否则显示“更多” */
+const morePillText = computed(() => (isFarDate.value ? dayLabel(insightDate.value) : '更多'))
 
 /** 进入数据切换（日期按钮/下拉共用） */
 function setInsight(day: string) {
