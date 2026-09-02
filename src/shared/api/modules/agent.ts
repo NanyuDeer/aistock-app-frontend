@@ -471,6 +471,7 @@ export interface RhythmCard {
   event_window: RhythmEvent[]
   event_source_missing?: boolean
   event_high_hint?: string
+  next_event_anchor?: { title: string; event_date: string; days_until: number; note: string } | null
   conflict: boolean
   conflict_detail?: string
   branches: RhythmBranch[]
