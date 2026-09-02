@@ -179,6 +179,15 @@
       }
     },
     {
+      "path": "modules/market/pages/sector-loop",
+      "style": {
+        "navigationBarTitleText": "板块四环",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
       "path": "modules/chat/pages/agent-report",
       "style": {
         "navigationBarTitleText": "分析报告",
