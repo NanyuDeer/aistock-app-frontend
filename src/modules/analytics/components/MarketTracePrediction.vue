@@ -14,39 +14,12 @@
         <text class="summary-text">{{ prediction.attributionSummary }}</text>
       </view>
 
-      <!-- 条件化预判（Spec A §4.3 + 2026-09-02 通用格式升级：按 anchor.horizon 分组的分支——
-           大盘/板块/个股有条件化预判的同构展示；2.0 旧记录为空数组不渲染） -->
-      <view v-if="prediction.conditions.length > 0" class="conditions-block">
-        <text class="conditions-label">条件化预判</text>
-        <view v-for="grp in groupedConditions" :key="grp.horizon" class="cond-group">
-          <view class="cond-group-head">
-            <text class="cond-group-title">{{ horizonLabel(grp.horizon) }}</text>
-            <text v-if="grp.baseDirection" class="cond-group-base" :class="directionClass(grp.baseDirection)">
-              {{ directionText(grp.baseDirection) }}
-            </text>
-          </view>
-          <view
-            v-for="(cond, idx) in grp.items"
-            :key="`${grp.horizon}-${idx}`"
-            class="branch-item"
-          >
-            <view class="branch-if">
-              <text class="branch-index">{{ idx + 1 }}</text>
-              <text class="branch-cond">若 {{ cond.condition }}</text>
-            </view>
-            <view class="branch-then">
-              <text v-if="cond.anchor?.direction" class="branch-dir" :class="directionClass(cond.anchor.direction)">
-                {{ directionText(cond.anchor.direction) }}
-              </text>
-              <text class="branch-scenario">{{ cond.scenario }}</text>
-            </view>
-            <view v-if="cond.anchor" class="anchor-meta">
-              <text v-if="cond.anchor.threshold" class="anchor-chip">{{ cond.anchor.threshold }}</text>
-              <text v-if="cond.anchor.metric" class="anchor-chip">{{ cond.anchor.metric }}</text>
-            </view>
-          </view>
-        </view>
-      </view>
+      <!-- 条件化预判：大盘/板块/个股一切有条件化预判统一用 ConditionalForecastBlock
+           （2026-09-02 从 InsightCard structured 抽取的通用预判块；2.0 旧记录为空数组不渲染） -->
+      <ConditionalForecastBlock
+        v-if="prediction.conditions.length > 0"
+        :structured="condStructured"
+      />
 
       <view v-for="(h, idx) in prediction.horizons" :key="`h-${idx}`" class="horizon-item">
         <view class="horizon-head">
@@ -92,6 +65,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Card from '@/shared/components/Card.vue'
+import ConditionalForecastBlock from '@/shared/components/ConditionalForecastBlock.vue'
 import type { PredictionPresentation } from '../utils/marketTraceReview'
 
 const props = defineProps<{
@@ -129,38 +103,42 @@ const timelineSteps = computed<Array<{ label: string; text: string }>>(() => {
     .map(s => ({ label: '', text: s }))
 })
 
-/** 条件化预判按 anchor.horizon 分组的互斥分支（短/中/长），并附带该档基准方向 */
-interface ConditionGroup {
-  horizon: string
-  baseDirection?: string
-  items: Array<PredictionPresentation['conditions'][number]>
+/** 条件化预判结构化数据（映射为通用预判块 ConditionalForecastBlock 输入，与板块/个股同构） */
+const HORIZON_KEYS = ['short', 'mid', 'long'] as const
+type HorizonKey = typeof HORIZON_KEYS[number]
+const DIRECTION_KEYS = ['bullish', 'bearish', 'neutral'] as const
+type DirectionKey = typeof DIRECTION_KEYS[number]
+
+function toHorizonKey(v: string | undefined): HorizonKey | undefined {
+  return v && (HORIZON_KEYS as readonly string[]).includes(v) ? (v as HorizonKey) : undefined
 }
 
-const HORIZON_KEYS = ['short', 'mid', 'long']
+function toDirectionKey(v: string | undefined): DirectionKey | undefined {
+  return v && (DIRECTION_KEYS as readonly string[]).includes(v) ? (v as DirectionKey) : undefined
+}
 
-const groupedConditions = computed<ConditionGroup[]>(() => {
+const condStructured = computed(() => {
   const p = props.prediction
-  if (!p) return []
-  const groups: ConditionGroup[] = []
-  const byKey = new Map<string, ConditionGroup>()
-  for (const cond of p.conditions) {
-    const h = cond.anchor?.horizon ?? 'short'
-    let g = byKey.get(h)
-    if (!g) {
-      g = { horizon: h, items: [] }
-      byKey.set(h, g)
-      groups.push(g)
-    }
-    g.items.push(cond)
+  if (!p) return null
+  return {
+    horizons: p.horizons.map((h) => ({
+      horizon: h.horizon,
+      remaining: h.remainingEstimate || undefined,
+      direction: h.direction,
+      confidence: h.confidence
+    })),
+    conditions: p.conditions.map((c) => ({
+      // anchor.horizon 缺失时默认挂 short（沿用旧分组语义）；anchor 阈值/指标缺失则不渲染 chip
+      horizon: toHorizonKey(c.anchor?.horizon) ?? 'short',
+      direction: toDirectionKey(c.anchor?.direction),
+      condition: c.condition,
+      scenario: c.scenario,
+      anchor: c.anchor && (c.anchor.threshold || c.anchor.metric)
+        ? { metric: c.anchor.metric || undefined, threshold: c.anchor.threshold || undefined }
+        : undefined,
+      met: undefined
+    }))
   }
-  groups.sort(
-    (a, b) => HORIZON_KEYS.indexOf(a.horizon) - HORIZON_KEYS.indexOf(b.horizon),
-  )
-  for (const g of groups) {
-    const base = p.horizons.find((hh) => hh.horizon === g.horizon)
-    if (base?.direction) g.baseDirection = base.direction
-  }
-  return groups
 })
 
 function horizonLabel(horizon: string): string {
@@ -262,105 +240,6 @@ function confidenceText(confidence: string): string {
 .summary-text {
   font-size: 28rpx;
   color: $text-color-title;
-}
-
-/* 条件化预判（Spec A §4.3 + 2026-09-02 分支分组：大盘/板块/个股同构） */
-.conditions-block {
-  margin-bottom: $spacing-sm;
-}
-
-.conditions-label {
-  display: block;
-  font-size: 28rpx;
-  font-weight: 600;
-  color: $text-color-title;
-  margin-bottom: $spacing-sm;
-}
-
-/* 期段分组（短/中/长）：浅蓝底容器 + 档位标题 + 基准方向 */
-.cond-group {
-  background: $primary-50;
-  border-radius: $r-sm;
-  padding: $spacing-sm $spacing-base;
-  margin-bottom: $spacing-sm;
-}
-.cond-group:last-child { margin-bottom: 0; }
-
-.cond-group-head {
-  display: flex;
-  align-items: center;
-  gap: $spacing-xs;
-  margin-bottom: $spacing-xs;
-}
-
-.cond-group-title {
-  font-size: 24rpx;
-  font-weight: 600;
-  color: $primary;
-}
-
-.cond-group-base {
-  font-size: 22rpx;
-  font-weight: 600;
-  border-radius: $r-md;
-  padding: 2rpx 14rpx;
-}
-
-/* 分支卡：if 条件 → 方向 pill + 情景（互斥分支） */
-.branch-item {
-  background: $bg-card;
-  border: 1rpx solid $line;
-  border-left: 6rpx solid $primary-100;
-  border-radius: $r-sm;
-  padding: $spacing-sm $spacing-base;
-  margin-bottom: $spacing-xs;
-}
-.branch-item:last-child { margin-bottom: 0; }
-
-.branch-if {
-  display: flex;
-  align-items: baseline;
-  gap: $spacing-xs;
-  margin-bottom: 4rpx;
-}
-
-.branch-index {
-  color: $primary;
-  font-weight: 600;
-  font-size: 22rpx;
-  flex-shrink: 0;
-}
-
-.branch-cond {
-  font-size: 26rpx;
-  font-weight: 500;
-  color: $text-color-title;
-  flex: 1;
-}
-
-.branch-then {
-  display: flex;
-  align-items: baseline;
-  gap: $spacing-xs;
-  flex-wrap: wrap;
-}
-
-.branch-dir {
-  font-size: 22rpx;
-  font-weight: 600;
-  border-radius: $r-md;
-  padding: 2rpx 14rpx;
-}
-
-.branch-scenario {
-  font-size: 26rpx;
-  color: $text-color-secondary;
-}
-
-.anchor-meta { display: flex; gap: $spacing-xs; flex-wrap: wrap; margin-top: 4rpx; }
-.anchor-chip {
-  padding: 2rpx 14rpx; border-radius: $r-md; background: $white;
-  font-size: 22rpx; color: $text-color-tertiary; border: 1rpx solid $line-soft;
 }
 
 .horizon-item {
