@@ -2,6 +2,23 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-09-02 — 节奏大师下一重大事件锚点 + 洞察详情引用修复
+
+**开发者**: changer-collab
+
+### 新增
+- `RhythmCard` 事件日历区块新增「下一重大事件」锚点条：渲染 `rhythm_card.next_event_anchor`（首条 high 事件 + 距运行日 N 天），`v-if` 控制无锚点整块不渲染（`components/RhythmCard.vue`）
+- `RhythmCard` 类型加可选字段 `next_event_anchor?: { title, event_date, days_until, note } | null`（旧报告零破坏）（`shared/api/modules/agent.ts`）
+
+### 修复
+- `insight-detail-move.vue`：删除残留 `suggestedActions` 引用（建议跟踪 2026-08-25 已移除，定义删除时漏删引用），修复 TS2304
+
+### 测试
+- `RhythmCard.spec.ts`：P1 锚点渲染源码断言（next_event_anchor / v-if / 下一重大事件 / rc-anchor）
+
+### 文档
+- `src/modules/rhythm/AGENTS.md`：渲染契约表追加 next_event_anchor 字段行
+
 ## [master] 2026-09-01 — 条件化预判改造前端（Spec A，三端全量收尾）
 
 **开发者**: Aria
@@ -52,6 +69,7 @@
 
 ### 修复
 - `src/modules/favorites/pages/insight-detail-move.vue`：洞见卡 computed 中 `forecast` 引用已删除的 `suggestedActions`（2026-08-25 移除"建议跟踪"时漏删）→ `ReferenceError` 导致详情页渲染崩溃白屏。修复为 `forecast` 恒为空（与移除建议跟踪的决策一致），并同步注释
+
 ## [changer] 2026-08-30 — 节奏大师语义修正 + 日历热力图总览（design-debate）
 
 **开发者**: changer-collab

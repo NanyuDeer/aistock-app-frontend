@@ -273,7 +273,8 @@ const unresolvedQuestions = computed<string[]>(() => artifact.value?.artifactJso
 
 /**
  * 洞见卡数据：主因结论作一句话标题、主链声明作「溯源」。
- * 预判（forecast）已按 2026-08-25 决策随「建议跟踪」区块一并移除，恒为空。
+ * 预判（forecast）字段随建议跟踪一并移除（2026-08-25 决策），暂留空串；
+ * 后续由 stock_trace agent 的 LLM 直接产出溯源/预判全文。
  */
 const insightData = computed(() => {
   const cause = primaryCause.value
@@ -283,6 +284,7 @@ const insightData = computed(() => {
   return {
     content: cause.verdict,
     trace,
+    // 建议跟踪已移除、无数据源，空串兜底（InsightCard 对空 forecast 不渲染该行）
     forecast: '',
     time: detail.value?.triggered_at ? fmtTime(detail.value.triggered_at).slice(5) : '',
   }
