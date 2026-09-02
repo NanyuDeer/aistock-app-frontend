@@ -42,9 +42,17 @@ function parseElseSegment(segment: string): { condition: string; scenario: strin
   return { condition: parsed[1].trim(), scenario: parsed[2].trim() }
 }
 
+/** 主条件方向 → 对冲分支方向（主 bullish → bearish，反之亦然；neutral 保持中性） */
+function oppositeDirection(direction: BranchLike['direction']): BranchLike['direction'] {
+  if (direction === 'bullish') return 'bearish'
+  if (direction === 'bearish') return 'bullish'
+  if (direction === 'neutral') return 'neutral'
+  return undefined
+}
+
 /**
  * 把一个条件展开为多个条件：主条目（原 condition + 首段 scenario）+
- * 每条内嵌“若X则Y”对冲拆出的独立条目（direction/anchor 置空）。
+ * 每条内嵌“若X则Y”对冲拆出的独立条目（方向取主条件的反向，anchor 置空）。
  */
 export function expandConditionalBranches<T extends BranchLike>(cond: T): T[] {
   const segments = splitScenarioSegments(cond.scenario)
@@ -57,7 +65,7 @@ export function expandConditionalBranches<T extends BranchLike>(cond: T): T[] {
       ...cond,
       condition: parsed ? parsed.condition : seg.replace(/^若\s*/, '').trim() || cond.condition,
       scenario: parsed ? parsed.scenario : '',
-      direction: undefined,
+      direction: oppositeDirection(cond.direction),
       met: undefined,
       anchor: undefined,
     }

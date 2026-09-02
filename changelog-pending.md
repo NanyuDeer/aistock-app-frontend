@@ -1,5 +1,9 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-02 板块四环：日期筛选改版 + 对冲分支反向标签
+- `src/modules/market/pages/sector-loop.vue`：日期回看由横向胶囊改为「‹ 日期 › 步进 + 中间日期点开列表浮层（最近 20 交易日、一键回今天）」，远日期不再难翻。
+- `src/shared/utils/conditionalForecast.ts`：拆出的对冲分支 direction 取主条件反向（主 bullish→bearish），8-27 类历史数据拆卡后也能带看空/看多标签。
+
 ## 2026-09-02 板块四环弱溯源还原 + 条件卡内文本拆分（全粒度）
 - `src/modules/market/pages/sector-loop.vue`：还原弱溯源原文（不再替换为短标签），改用**溯源横幅样式**（浅蓝底 + “溯源” key，对齐洞见卡）展示在预判块上方；头行第 2 行只保留来源 tag + 右侧日期/验证文案。
 - `src/shared/utils/conditionalForecast.ts`（新增）：`expandConditionalBranches`——把 scenario 内嵌“；若X则Y”的对冲/后续情形拆成独立条件条目（方向/锚点置空随主卡），解决一张条件卡里多段文本“杂糅”。

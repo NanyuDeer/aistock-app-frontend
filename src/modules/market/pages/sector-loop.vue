@@ -1,20 +1,48 @@
 <template>
   <SubPageCard title="板块四环">
     <view class="sl-content">
-      <!-- 日期回看（近 7 交易日横向胶囊；交易日历接口失败时回退单日今天，不渲染导航） -->
-      <scroll-view v-if="tradingDays.length > 1" scroll-x class="sl-dates" :show-scrollbar="false">
-        <view class="sl-dates__inner">
-          <view
-            v-for="day in tradingDays"
-            :key="day"
-            class="sl-date"
-            :class="{ 'is-active': day === insightDate }"
-            @tap="selectDate(day)"
-          >
-            <text class="sl-date__text">{{ dayLabel(day) }}</text>
-          </view>
+      <!-- 日期回看：左右步进 ± 1 交易日，中间点开日期列表（替代横向滚动胶囊，远日期易达） -->
+      <view v-if="tradingDays.length > 1" class="sl-datebar">
+        <view class="sl-datebar__btn" :class="{ 'is-disabled': !canOlder }" @tap="stepDate(-1)">
+          <text class="sl-datebar__arrow">‹</text>
         </view>
-      </scroll-view>
+        <view class="sl-datebar__cur" @tap="pickerOpen = true">
+          <text class="sl-datebar__cur-text">{{ dayLabel(insightDate) }}</text>
+          <text v-if="insightDate === todayStr" class="sl-datebar__today-tag">今日</text>
+          <text class="sl-datebar__caret">▾</text>
+        </view>
+        <view class="sl-datebar__btn" :class="{ 'is-disabled': !canNewer }" @tap="stepDate(1)">
+          <text class="sl-datebar__arrow">›</text>
+        </view>
+      </view>
+      <view v-else-if="insightDate" class="sl-datebar">
+        <view class="sl-datebar__cur is-static">
+          <text class="sl-datebar__cur-text">{{ dayLabel(insightDate) }}</text>
+        </view>
+      </view>
+
+      <!-- 日期选择浮层：最近 20 个交易日可回看 -->
+      <view v-if="pickerOpen" class="sl-mask" @tap="pickerOpen = false"></view>
+      <view v-if="pickerOpen" class="sl-sheet">
+        <view class="sl-sheet__hd">
+          <text class="sl-sheet__title">选择交易日</text>
+          <text v-if="hasToday" class="sl-sheet__action" @tap="jumpToday">回今天</text>
+          <text v-else class="sl-sheet__action" @tap="pickerOpen = false">关闭</text>
+        </view>
+        <scroll-view scroll-y class="sl-sheet__list" :show-scrollbar="false">
+          <view
+            v-for="d in sheetDays"
+            :key="d"
+            class="sl-sheet__item"
+            :class="{ 'is-active': d === insightDate }"
+            @tap="pickDate(d)"
+          >
+            <text class="sl-sheet__item-date">{{ d }}</text>
+            <text v-if="d === insightDate" class="sl-sheet__item-mark">✓</text>
+            <text v-else-if="d === todayStr" class="sl-sheet__item-mark is-today">今日</text>
+          </view>
+        </scroll-view>
+      </view>
 
       <!-- 加载中（首载 / 切日） -->
       <view v-if="loading" class="sl-state">
@@ -117,14 +145,48 @@ import ConditionalForecastBlock from '@/shared/components/ConditionalForecastBlo
 import { todayDateStr, sectorPredictionToStructured } from '@/shared/utils/sectorInsight'
 import type { SectorStructuredForecast } from '@/shared/utils/sectorInsight'
 
-/** 回看窗口：近 7 个交易日（含当日若为交易日） */
-const RECENT_DAYS = 7
+/** 回看窗口：近 20 个交易日（含当日若为交易日），供步进与日期列表回看 */
+const RECENT_DAYS = 20
+
+const todayStr = todayDateStr()
 
 const tradingDays = ref<string[]>([])
 const insightDate = ref('')
 const sectorInsight = ref<SectorInsightResponse | null>(null)
 const loading = ref(false)
 const error = ref(false)
+
+/** 日期选择浮层开关 */
+const pickerOpen = ref(false)
+
+/** 列表展示用：新→旧倒序（tradingDays 为升序） */
+const sheetDays = computed(() => [...tradingDays.value].reverse())
+
+const curIdx = computed(() => tradingDays.value.findIndex((d) => d === insightDate.value))
+const canOlder = computed(() => curIdx.value > 0)
+const canNewer = computed(
+  () => curIdx.value >= 0 && curIdx.value < tradingDays.value.length - 1
+)
+const hasToday = computed(() => tradingDays.value.includes(todayStr))
+
+/** 左右步进（-1=更早，1=更晚） */
+function stepDate(dir: -1 | 1) {
+  const next = curIdx.value + dir
+  if (next < 0 || next >= tradingDays.value.length || loading.value) return
+  pickDate(tradingDays.value[next])
+}
+
+/** 选择日期（浮层/步进共用） */
+function pickDate(day: string) {
+  pickerOpen.value = false
+  if (day === insightDate.value) return
+  void selectDate(day)
+}
+
+/** 一键回今天 */
+function jumpToday() {
+  pickDate(todayStr)
+}
 
 /** 拉取可回看日期序列（近 7 交易日，末位最近）；失败回退单日今天 */
 async function loadTradingDays() {
@@ -307,40 +369,153 @@ onLoad(async (options) => {
   padding: 24rpx;
 }
 
-/* ===== 日期回看胶囊（横向滚动） ===== */
-.sl-dates {
-  width: 100%;
-  white-space: nowrap;
+/* ===== 日期回看：步进按钮 + 中间日期（点开列表浮层） ===== */
+.sl-datebar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20rpx;
   margin-bottom: 24rpx;
 }
 
-.sl-dates__inner {
-  display: inline-flex;
-  gap: 12rpx;
-  padding: 4rpx 0;
-}
-
-.sl-date {
-  flex-shrink: 0;
-  padding: 10rpx 22rpx;
-  border-radius: 999rpx;
+.sl-datebar__btn {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $r-sm;
   background: $bg-card;
   border: 2rpx solid $line;
+
+  &.is-disabled {
+    opacity: 0.35;
+  }
 }
 
-.sl-date.is-active {
-  background: rgba(11, 95, 255, 0.08);
-  border-color: $primary;
+.sl-datebar__arrow {
+  font-size: 40rpx;
+  line-height: 1;
+  color: $ink;
+  margin-top: -4rpx;
 }
 
-.sl-date__text {
+.sl-datebar__cur {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  min-width: 220rpx;
+  padding: 10rpx 26rpx;
+  border-radius: 999rpx;
+  background: rgba(11, 95, 255, 0.06);
+  border: 2rpx solid rgba(11, 95, 255, 0.28);
+
+  &.is-static {
+    background: $bg-card;
+    border-color: $line;
+  }
+}
+
+.sl-datebar__cur-text {
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: $primary;
+}
+
+.sl-datebar__cur.is-static .sl-datebar__cur-text {
+  color: $ink;
+}
+
+.sl-datebar__today-tag {
+  font-size: $font-size-xs;
+  font-weight: 500;
+  color: $primary;
+  background: rgba(11, 95, 255, 0.1);
+  padding: 2rpx 10rpx;
+  border-radius: 999rpx;
+}
+
+.sl-datebar__caret {
+  font-size: $font-size-xs;
+  color: $primary;
+}
+
+/* ===== 日期选择浮层 ===== */
+.sl-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.45);
+  z-index: 90;
+}
+
+.sl-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 91;
+  background: $bg-page;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 24rpx 24rpx 24rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+}
+
+.sl-sheet__hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4rpx 4rpx 20rpx;
+}
+
+.sl-sheet__title {
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: $ink;
+}
+
+.sl-sheet__action {
   font-size: $font-size-sm;
-  color: $ink-soft;
+  color: $primary;
+  padding: 8rpx 12rpx;
 }
 
-.sl-date.is-active .sl-date__text {
+.sl-sheet__list {
+  max-height: 58vh;
+}
+
+.sl-sheet__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 18rpx;
+  border-radius: $r-sm;
+}
+
+.sl-sheet__item + .sl-sheet__item {
+  border-top: 2rpx solid rgba(23, 43, 77, 0.06);
+}
+
+.sl-sheet__item.is-active {
+  background: rgba(11, 95, 255, 0.08);
+}
+
+.sl-sheet__item-date {
+  font-size: $font-size-sm;
+  color: $ink;
+}
+
+.sl-sheet__item.is-active .sl-sheet__item-date {
   color: $primary;
   font-weight: 600;
+}
+
+.sl-sheet__item-mark {
+  font-size: $font-size-xs;
+  color: $primary;
+}
+
+.sl-sheet__item-mark.is-today {
+  color: $stock-up-color;
 }
 
 /* ===== 状态区 ===== */
