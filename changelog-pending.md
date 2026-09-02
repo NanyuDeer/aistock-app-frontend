@@ -1,5 +1,8 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-02 预判条件卡改版：条件句 → 关键词 chip（金色块语言内）
+- `src/shared/components/ConditionalForecastBlock.vue`：条件行由整句金色文字改为 **关键词 chip 流**（condChips 按 且/并且/并/、/，/； 切 1~3 个；括号细节仍剔除）；期段切换/基准/方向 pill/幅度置灰/触发点亮蓝签全部原样保留。同步至组件库同文件。
+
 ## 2026-09-02 板块四环：日期筛选改版 + 对冲分支反向标签
 - `src/modules/market/pages/sector-loop.vue`：日期回看由横向胶囊改为「‹ 日期 › 步进 + 中间日期点开列表浮层（最近 20 交易日、一键回今天）」，远日期不再难翻。
 - `src/shared/utils/conditionalForecast.ts`：拆出的对冲分支 direction 取主条件反向（主 bullish→bearish），8-27 类历史数据拆卡后也能带看空/看多标签。

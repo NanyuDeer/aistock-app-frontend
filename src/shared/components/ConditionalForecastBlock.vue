@@ -48,7 +48,10 @@
             <view class="as-insight-card__sc-if">
               <text class="as-insight-card__sc-no">{{ idx + 1 }}</text>
               <text class="as-insight-card__sc-prefix">若</text>
-              <text class="as-insight-card__sc-cond">{{ condMain(cond.condition) }}</text>
+              <!-- 条件=关键词标签流（长句按且/并/、等切 chips；新 prompt 短句天然成 chip） -->
+              <template v-for="(chip, ci) in condChips(cond)" :key="ci">
+                <text class="as-insight-card__sc-chip">{{ chip }}</text>
+              </template>
             </view>
             <view class="as-insight-card__sc-then">
               <text v-if="cond.direction" class="as-insight-card__dir" :class="dirClass(cond.direction)">
@@ -246,6 +249,21 @@ function condMain(text: string): string {
     .filter((p) => p.kind === 'key')
     .map((p) => p.t)
     .join('')
+}
+
+/** 条件 → 关键词标签流：按 且/并且/以及/并/、/，/； 切为 1~3 个 chip；无切分则整句单 chip */
+function splitChips(text: string): string[] {
+  const parts = text
+    .split(/(?:并且|以及|且|并|[、，,；;])+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return parts.length ? parts : [text]
+}
+
+function condChips(cond: StructuredCondition): string[] {
+  const main = condMain(cond.condition)
+  if (!main) return []
+  return splitChips(main)
 }
 
 /**
@@ -469,10 +487,17 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   flex-shrink: 0;
 }
 
-/* 条件句：预判块内唯一金色加粗文字段（展示主干，括号补充不渲染） */
-.as-insight-card__sc-cond {
+/* 条件句：预判块内金色文字语言 → 关键词 chip（长句切成 1~3 个，一眼看懂） */
+.as-insight-card__sc-chip {
+  font-size: $font-size-xs;
   font-weight: 600;
   color: $gold-deep;
+  background: rgba($white, 0.72);
+  border: 1rpx solid rgba($gold-deep, 0.35);
+  border-radius: $r-xs;
+  padding: 1rpx 12rpx;
+  line-height: $lh-tight;
+  flex-shrink: 0;
 }
 
 .as-insight-card__sc-then {
