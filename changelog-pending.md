@@ -1,5 +1,12 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-03 App「已是最新」假阳修复收尾（真机验证通过）
+- 修复正式包更新判断：弃用 plus.android 反射（getPackageInfo 在正式包返回 null，读不到 versionCode），改用官方 `plus.runtime.version` 读 versionName + `compareVersion` 逐段比较。
+- 真机验证：装机 versionName=0.1.2，线上 0.1.3 → current=0.1.2，判定 would-prompt → 正确弹更新。修复生效。
+- 已移除全部诊断代码：updateDiag、profile 版本检测诊断弹窗、appUpdate-diag console 日志。
+- manifest.json 已恢复 0.1.3/103（供正式发布打包）。
+- 语义说明：比较从 versionCode 数值改为 versionName 字符串，`isNeverUpdate` 存储 key 仍用 versionCode；要求线上 version.json 的 versionName 与 App 打包 versionName 保持一致。
+
 ## 2026-09-03 修复正式包读取版本号=0（更新"已最新"假阳真根因，最终方案）
 - 真机诊断 `getPkg(0)=null`（plus.android 反射 getPackageManager().getPackageInfo 返回 null，flags=0/matchAll/getAttribute/longVersionCode 全无法读出）→ 弃用原生反射。
 - 改用官方 `plus.runtime.version` 读 versionName 字符串 + `compareVersion` 逐段比较：`getCurrentVersionName()`、`parseVersion`、`compareVersion`；checkAppUpdate 从 `versionCode<=` 数值比较改为 `versionName` 字符串比较；`isNeverUpdate` 仍用 `info.versionCode` 做存储 key。

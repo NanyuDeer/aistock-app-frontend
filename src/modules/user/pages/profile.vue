@@ -145,7 +145,7 @@ import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { authApi, type UserSettings } from '@/shared/api/modules/auth'
 import { deleteUserProfile } from '@/shared/api/modules/profile'
-import { checkAppUpdate, updateDiag } from '@/shared/utils/useAppUpdate'
+import { checkAppUpdate } from '@/shared/utils/useAppUpdate'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { Switch, ListCell, Card, Tag, Button, UpdateModal, ConfirmModal } from '@/shared/components'
@@ -289,13 +289,6 @@ function goAbout() {
 // 手动检查版本更新：不受 24h 节流限制；非 Android App 环境提示不支持
 async function checkUpdate() {
   const result = await checkAppUpdate({ manual: true })
-  // 真机正式包诊断：不读 console 也能看到判定走向（确认根因后移除本弹窗）
-  uni.showModal({
-    title: '版本检测诊断',
-    content: `线上 latest=${updateDiag.latest}\n本机 current=${updateDiag.current}\n判定=${updateDiag.lastResult}\n结果=${result}\n读取: ${updateDiag.versionCodeDetail || '无'}`,
-    showCancel: false,
-    confirmText: '知道了',
-  })
   if (result === 'latest') {
     uni.showToast({ title: '已是最新版本', icon: 'none' })
   } else if (result === 'not_supported') {
