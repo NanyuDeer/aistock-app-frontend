@@ -49,7 +49,7 @@
           >
             <text class="cal-date">{{ cell.date.slice(8) }}</text>
             <text class="cal-lev" v-if="cell.level">{{ LEVEL_SHORT[cell.level] ?? cell.level.slice(0, 1) }}</text>
-            <view v-if="mode === 'event'" class="ev-badge" :class="{ hasHigh: highCount(cell) > 0 }">
+            <view v-if="mode === 'event' && eventsOf(cell).length" class="ev-badge" :class="{ hasHigh: highCount(cell) > 0 }">
               <text v-if="highCount(cell) > 0" class="ev-badge-num">{{ highCount(cell) }}</text>
             </view>
           </view>
