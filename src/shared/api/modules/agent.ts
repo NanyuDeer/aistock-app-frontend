@@ -511,6 +511,27 @@ export interface RhythmMasterReport {
   content?: RhythmMasterContent
 }
 
+/** 每日收盘基准建议仓位（rhythm_card.position_band 透传；缺失/无仓位语义 = null，前端如实展示） */
+export interface RhythmPositionBand {
+  min?: number | null
+  max?: number | null
+  text?: string
+}
+
+/** 节奏日历热力图行（契约 #7）：恒取 after_close 收盘基准；level 可空 = 灰格（行缺失/沿用前值） */
+export interface RhythmCalendarDay {
+  date: string
+  refresh_slot: 'after_close'
+  level: string | null
+  score: number | null
+  basis_date: string | null
+  position_band: RhythmPositionBand | null
+}
+
+export interface RhythmCalendarResponse {
+  days: RhythmCalendarDay[]
+}
+
 /** 板块四环聚合（/api/agent/sector-insight/:date，2026-09-02）：单板块候选 */
 export interface SectorInsightQuote {
   pct_change: number | null
@@ -742,9 +763,10 @@ export const agentApi = {
   },
 
   /** 节奏日历热力图聚合（契约 #7）：最近 N 个交易日 after_close 收盘基准档位。
-   *  返回 { days: [{date, refresh_slot, level, score, basis_date}] }，level 可空（灰格）。 */
+   *  返回 { days: [{date, refresh_slot, level, score, basis_date, position_band}] }，
+   *  level 可空（灰格）；position_band 为空 = 该日无仓位语义（如实展示，不伪造）。 */
   getRhythmMasterCalendar(days = 60) {
-    return request.get('/agent/rhythm-master/calendar', { params: { days } })
+    return request.get<RhythmCalendarResponse>('/agent/rhythm-master/calendar', { params: { days } })
   },
 
   /**

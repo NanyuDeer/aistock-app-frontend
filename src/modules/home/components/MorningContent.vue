@@ -125,11 +125,20 @@
             <text class="feature-title">节奏大师</text>
             <text class="feature-more">›</text>
           </view>
-          <text class="feature-sub">目标交易日节奏状态卡</text>
-          <view class="feature-list" v-if="rhythmSummary">
-            <view class="feature-item">
-              <text class="feature-label">{{ rhythmSummary.title }}</text>
-              <text class="feature-value">{{ rhythmSummary.band }}</text>
+          <text class="feature-sub">近 {{ HOME_RHYTHM_DAYS }} 个交易日 · 收盘基准</text>
+          <!-- 近几日结论：每行 = 日期 + 档位 chip + 建议仓位；点行进该日详情（stop 防触整卡跳转） -->
+          <view class="feature-list" v-if="rhythmRows.length">
+            <view
+              v-for="r in rhythmRows"
+              :key="r.date"
+              class="feature-item rhythm-row"
+              @tap.stop="goRhythmDate(r.date)"
+            >
+              <text class="feature-label rhythm-date">{{ r.date.slice(5) }}</text>
+              <view class="rhythm-chip" :style="{ background: rhythmChipColor(r) }">
+                <text class="rhythm-chip-text">{{ rhythmLevelShort(r) }}</text>
+              </view>
+              <text class="feature-value rhythm-band">{{ r.band || (r.basis_date ? '沿用前值' : '无报告') }}</text>
             </view>
           </view>
         </Card>
@@ -369,31 +378,60 @@ async function loadTraceReports() {
   })
 }
 
-/** 节奏大师卡片摘要：目标交易日 + 节奏档位（取最近交易日最新版本 rhythm_card） */
-const rhythmSummary = ref<{ title: string; band: string } | null>(null)
+/** 首页节奏大师卡：近几日摘要（收盘基准档位 + 建议仓位），每行点入该日详情 */
+const HOME_RHYTHM_DAYS = 5
+interface RhythmHistoryRow {
+  date: string
+  level: string | null
+  score: number | null
+  basis_date: string | null
+  band: string
+}
+const rhythmRows = ref<RhythmHistoryRow[]>([])
 
-async function loadRhythm() {
+// 档位短码/色板（与节奏模块日历同源：ice 紫灰 / low 青 / normal 主蓝 / active 橙 / euphoria 红）
+const RHYTHM_LEVEL_SHORT: Record<string, string> = { ice: '冰', low: '低', normal: '常', active: '活', euphoria: '亢' }
+const RHYTHM_LEVEL_COLOR: Record<string, string> = {
+  ice: '#8a6fae',
+  low: '#2f9e9e',
+  normal: '#4d7cfe',
+  active: '#f59e0b',
+  euphoria: '#ef4444',
+}
+const RHYTHM_GREY = '#eceef1' // 无档位（行缺失/沿用前值）
+
+async function loadRhythmHistory() {
   try {
-    // shanghaiDateString 固定 UTC+8 取上海自然日（与 loadTraceReports 同口径），不依赖设备本地时区
-    const today = shanghaiDateString()
-    let date: string | undefined
-    try {
-      date = (await agentApi.getRecentTradingDays(today, 1))?.[0]
-    } catch { date = undefined }
-    if (!date) return
-    const res: unknown = await agentApi.getRhythmMaster(date)
-    // 响应拦截器（request.ts）已解包 {code,data} 信封：code===0 时直接 return data，
-    // 故 getRhythmMaster 解析值即 {date, versions}，没有 .data 字段，这里直接取 .versions
-    const versions = (res as { versions?: { refresh_slot?: string; content?: { rhythm_card?: { level?: string; position_band?: { text?: string }; target_date?: string } } }[] }).versions ?? []
-    const latest = versions?.[0]
-    const card = latest?.content?.rhythm_card
-    if (!latest || !card) return
-    rhythmSummary.value = { title: `目标日 ${card.target_date ?? date} 节奏`, band: `${card.level ?? ''} ${card.position_band?.text ?? ''}`.trim() }
-  } catch { rhythmSummary.value = null }
+    // 一次日历接口取数即可获得多日 level/score/position_band（契约 #7），避免逐日 getRhythmMaster 放大首页刷新成本
+    const res = await agentApi.getRhythmMasterCalendar(HOME_RHYTHM_DAYS)
+    const days = res?.days ?? []
+    // 接口"最近在前"（降序），卡片按时间正序展示（旧→新，最底=最新）
+    rhythmRows.value = [...days].reverse().map((d) => ({
+      date: d.date,
+      level: d.level,
+      score: d.score,
+      basis_date: d.basis_date,
+      band: d.position_band?.text ?? '',
+    }))
+  } catch {
+    rhythmRows.value = []
+  }
+}
+
+function rhythmChipColor(r: RhythmHistoryRow): string {
+  return (r.level && RHYTHM_LEVEL_COLOR[r.level]) || RHYTHM_GREY
+}
+function rhythmLevelShort(r: RhythmHistoryRow): string {
+  if (r.level) return RHYTHM_LEVEL_SHORT[r.level] ?? r.level.slice(0, 1)
+  return '沿'
 }
 
 function goRhythm() {
   uni.navigateTo({ url: '/modules/rhythm/pages/index' })
+}
+/** 点节奏卡某日摘要行：直达该交易日详情（无报告日由详情页回退链兜底） */
+function goRhythmDate(date: string) {
+  uni.navigateTo({ url: `/modules/rhythm/pages/index?date=${date}` })
 }
 
 /**
@@ -415,7 +453,7 @@ function itemTagType(tagType: LeaderStockPreview['tagType']): 'up' | 'down' | 'n
 onShow(() => {
   briefingRefresh()
   loadLeaderSectors()
-  loadRhythm()
+  loadRhythmHistory()
   loadChainEvents()
   loadTraceReports()
 })
@@ -781,22 +819,42 @@ function goLogin() {
   color: $ink-mute;
 }
 
-/* 节奏大师卡片：左标题 + 右档位值 */
-.feature-label {
-  font-size: $font-size-sm;
-  color: $ink-soft;
+/* 节奏大师卡片：近几日结论摘要行（日期 + 档位 chip + 建议仓位） */
+.rhythm-row {
+  justify-content: flex-start;
+}
+.rhythm-date {
+  flex: none;
+  width: 84rpx;
+  font-size: $font-size-xs;
+  color: $ink;
+  font-weight: 500;
+}
+.rhythm-chip {
+  flex: none;
+  width: 40rpx;
+  height: 34rpx;
+  border-radius: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rhythm-chip-text {
+  color: #fff;
+  font-size: 18rpx;
+  line-height: 1;
+}
+.rhythm-band {
   flex: 1;
   min-width: 0;
+  margin-left: 8rpx;
+  text-align: right;
+  font-size: $font-size-xs;
+  color: $primary;
+  font-weight: 500;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.feature-value {
-  font-size: $font-size-sm;
-  color: $primary;
-  font-weight: 500;
-  flex-shrink: 0;
 }
 
 /* ===== 重磅事件跟踪 ===== */
