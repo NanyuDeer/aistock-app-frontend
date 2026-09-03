@@ -1,5 +1,14 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-03 发布 0.1.3（versionCode 103）版本号升级
+- `src/manifest.json`：`versionName` 0.1.2 → 0.1.3，`versionCode` 102 → 103（打包依据）
+- 配套 aistock-frontend `public/download/version.json`：0.1.3 / 103 / `aistock-0.1.3.apk` / 更新文案与 releaseDate 2026-09-03（fileSize 待打包后按实际产物修正）
+
+## 2026-08-31 账号安全页补全手机号关联（绑定手机号 + 微信绑定支持手机号账户）
+- `src/modules/user/pages/account-security.vue`：当前绑定新增「手机号」状态行（脱敏 138****0000）；绑定设置新增「绑定手机号」入口；绑定表单三模式（phone/email/wechat）——绑定手机号/邮箱输入新身份，绑定微信改为**用当前账户已绑定身份证明归属**（邮箱优先、手机号次之，只读展示脱敏身份）；说明文案更新为三者互绑 + 冲突自动合并。
+- `src/shared/api/modules/auth.ts`：`sendSmsCode` 新增可选 `scenario`（bind → 100004 模板）；新增 `bindWechatByPhone`（手机号账户绑定微信）。
+- 配套后端（aistock-app-api）：`/api/auth/bind/wechat` 泛化支持 `email|phone` 双身份证明（手机号账户可绑微信）；删除 SmsAuthController.bindWechat 重复实现。
+
 ## 2026-09-02 预判块双模式 + 日期下拉改版（板块四环）
 - `ConditionalForecastBlock.vue`：条件行**双模式**——`conditionDisplay='tags'`（默认）：有 `keywords` 显示关键词标签流（无则长句兜底）；`'sentence'`：强制长句原文（prediction-detail 大盘详细报告用）。组件库同步。
 - API/映射：`keywords?: string[]` 透传（agent.ts Market/Sector Condition、prediction.ts PredictionCondition、sectorInsight 映射/条件拆分），新数据（LLM 已按 prompt 输出 ≤10 字 keywords）在板块洞见卡/四环列表以标签展示，长句仍在详细页。
