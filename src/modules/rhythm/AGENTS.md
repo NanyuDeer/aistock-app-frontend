@@ -27,7 +27,7 @@
 
 - `agentApi.getRhythmMasterCalendar(days)`：GET `/agent/rhythm-master/calendar?days=N`（N 默认 60，≤60 交易日），返回 `{ days: [{ date, refresh_slot, level, score, basis_date, position_band, events? }] }`，恒取 after\_close 收盘基准行（三时点 level 恒等）。**`position_band`（2026-09-02 扩展）：该日收盘基准建议仓位** **`{min?, max?, text?}`，行缺失/null = 无仓位语义（如实展示）**，供日历面板/详情页与首页近 5 日摘要使用。**`events`（2026-09-03 扩展）：该日 macro 事件行**（CN + US 隔夜按对外契约顺延；类型标可选 `events?` 以兼容缺省/降级响应——**后端恒下发，无事件 = `[]`**）
 
-- **洞见卡映射与去重（2026-09-03）**：详情页 RhythmCard 前插入统一摘要洞见卡（InsightCard，type=market / tag-text=节奏洞见）；洞见卡映射规则（owner 表 + structured 规则）与 RhythmCard 去重清单指向 spec §10（docs/superpowers/specs/2026-09-03-rhythm-calendar-inline-panel-design.md）
+- **洞见卡映射与去重（2026-09-03）**：详情页 RhythmCard 前插入统一摘要洞见卡（InsightCard，type=market / tag-text=节奏洞见）；洞见卡映射规则（owner 表 + structured 规则）与 RhythmCard 去重清单见实施计划 docs/superpowers/plans/2026-09-03-rhythm-calendar-inline-panel.md（Task 4/6）与 `utils/rhythmInsight.ts`（toRhythmInsight）
 
 - 三时点标识 `refresh_slot`：`'after_close' | 'morning' | 'midday'`
 
