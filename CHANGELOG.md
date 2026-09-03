@@ -2,6 +2,25 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-09-03 — 午间报「午后前瞻 → 机会/风险对位」（schema 2.1）
+
+**开发者**: 37588
+
+### 新增
+- 早点听午间报卡「午后前瞻」由长段落改为**机会提示/风险提示左右双栏**（`briefing/index.vue`）：机会 = `午后前瞻.opportunities`（4-5 个 ≤8 字 pill，蓝），风险 = `display_report.risks`（短词 pill，红）；LLM 无明确机会（空数组）时卡保留、仅渲染风险栏全宽；opportunities 与 risks 双空整卡隐藏；老数据（无 opportunities 键）回退段落流 + 底部独立风险卡
+
+### 改进
+- `shared/utils/middayReport.ts`：`MiddaySection.opportunities?` 可选字段；`normalizeSections` 保留条件放宽（opportunities 键存在即对位，空数组兼容）；`normalizeKeywords` 防御归一（trim/去空/最多 5 个/每项 ≤8 字截断）；risks 不做内容截断（老数据长句原样保留）
+- `shared/api/modules/agent.ts`：`MiddayReportRecord.content.display_report` 补可选 `sections[{ title?, conclusion?, opportunities? }]`
+
+### 测试
+- 新增 `shared/utils/middayReport.spec.ts`：新结构保留 / 空 opportunities 兼容 / 防御归一 / 老数据兼容（opportunities undefined）/ risks 不截断
+- `pages-sub-app/briefing/index.spec.ts`：追加双栏对位 / displaySections 过滤 / 空机会守卫 source 断言
+- `vue-tsc --noEmit` 零错误
+
+### 文档
+- 根 `AGENTS.md`：分包表「早点听」行与 §6.2 `agent.ts` 行补充 schema 2.1 对位契约（`content.display_report.sections[].opportunities` 可选）
+
 ## [changer] 2026-09-02 — 节奏大师页通用子页化 + 顶部日期条 + 首页近5日摘要卡
 
 **开发者**: changer-collab
