@@ -269,7 +269,7 @@ function tempValue(score: number): string {
 
 .rc-temp-bars { display: flex; align-items: flex-end; gap: 14rpx; height: 200rpx; }
 .rc-temp-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6rpx; }
-.rc-temp-bar { width: 26rpx; border-radius: 8rpx 8rpx 4rpx 4rpx; background: linear-gradient(180deg, $primary, lighten($primary, 28%)); }
+.rc-temp-bar { width: 26rpx; border-radius: 8rpx 8rpx 4rpx 4rpx; background: linear-gradient(180deg, $primary, $primary-300); }
 .rc-tval { font-size: 20rpx; color: $ink-soft; font-family: 'DIN Alternate', sans-serif; }
 .rc-temp-date { font-size: 20rpx; color: $ink-soft; }
 

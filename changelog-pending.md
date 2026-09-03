@@ -1,5 +1,50 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-03 App「已是最新」假阳修复收尾（真机验证通过）
+- 修复正式包更新判断：弃用 plus.android 反射（getPackageInfo 在正式包返回 null，读不到 versionCode），改用官方 `plus.runtime.version` 读 versionName + `compareVersion` 逐段比较。
+- 真机验证：装机 versionName=0.1.2，线上 0.1.3 → current=0.1.2，判定 would-prompt → 正确弹更新。修复生效。
+- 已移除全部诊断代码：updateDiag、profile 版本检测诊断弹窗、appUpdate-diag console 日志。
+- manifest.json 已恢复 0.1.3/103（供正式发布打包）。
+- 语义说明：比较从 versionCode 数值改为 versionName 字符串，`isNeverUpdate` 存储 key 仍用 versionCode；要求线上 version.json 的 versionName 与 App 打包 versionName 保持一致。
+
+## 2026-09-03 修复正式包读取版本号=0（更新"已最新"假阳真根因，最终方案）
+- 真机诊断 `getPkg(0)=null`（plus.android 反射 getPackageManager().getPackageInfo 返回 null，flags=0/matchAll/getAttribute/longVersionCode 全无法读出）→ 弃用原生反射。
+- 改用官方 `plus.runtime.version` 读 versionName 字符串 + `compareVersion` 逐段比较：`getCurrentVersionName()`、`parseVersion`、`compareVersion`；checkAppUpdate 从 `versionCode<=` 数值比较改为 `versionName` 字符串比较；`isNeverUpdate` 仍用 `info.versionCode` 做存储 key。
+- updateDiag.latest/current 改为 string（versionName）。
+- **待确认修复有效后移除诊断代码**（updateDiag、profile 弹窗、console 日志）。
+
+## 2026-09-03 修复正式包读取 versionCode=0（更新"已最新"假阳真根因，第 3 轮）
+- 真机诊断明细 `getPkg(matchAll)=ok` 后停止 + `current=0` → 上一版从 `importClass` 取 `PACKAGE_MATCH_ALL` 常量不可靠且 `try` 未抛异常但返回 null 时被误判为成功，未走 `flags=0` fallback。
+- 重写 [getCurrentVersionCode](`src/shared/utils/useAppUpdate.ts`)：flags 固定 0、校验返回值非空、读字段用 `plus.android.getAttribute`（longVersionCode→versionCode 回退），全程写 `updateDiag.versionCodeDetail`。
+- **待确认修复有效后移除诊断代码**。
+
+## 2026-09-03 修复正式包读取 versionCode=0（更新"已最新"假阳真根因）
+- 真机 UI 诊断确认：正式包 `latest=103, current=0` → 命中 `current<=0` 被判"已最新"。根因是 [getCurrentVersionCode](`src/shared/utils/useAppUpdate.ts`) 原生读取在正式 Android 返回 0。
+- 重构读取：`importClass('android.content.pm.PackageManager')` 后，先试 `getPackageInfo(pkg, PACKAGE_MATCH_ALL)`，失败回退 flags=0；versionCode 优先读 `longVersionCode`（Android 9+，long 类型），回退 `versionCode`；每步写入 `updateDiag.versionCodeDetail` 供真机定位。
+- profile 诊断弹窗追加显示 `读取:` 明细。
+- **待确认修复有效后移除诊断代码**（updateDiag、profile 弹窗、console 日志）。
+
+## 2026-09-03 App 更新"已是最新"假阳真机排障
+- 初版只在 `checkAppUpdate` 打 `[appUpdate-diag]` console 日志，但正式包无法读 console，故改为 **UI 弹窗诊断**：
+  - `src/shared/utils/useAppUpdate.ts`：新增导出 `updateDiag` 快照对象（latest/current/lastResult），比对处写入；保留 console 日志便于 logcat 侧看。
+  - `src/modules/user/pages/profile.vue`：`checkUpdate()` 手动检查后 `showModal` 弹出「版本检测诊断」（online latest / current / 判定 / 结果），正式包真机点「版本更新」即可看到，无需读 console。
+  - **确认根因后移除**：`updateDiag` 快照、profile 里的诊断弹窗、useAppUpdate 比对处的 console 诊断日志。
+
+## 2026-09-03 App 更新"已是最新"假阳真机排障日志
+- `src/shared/utils/useAppUpdate.ts`：`checkAppUpdate` 比对处增加 `[appUpdate-diag]` 诊断日志，打印线上 `latest`/本机 `current`/`isNever`/`manual`。真机打包含本行的包，点「版本更新」后读 console 即可锁定根因（线上已 0.1.3/103 时 current<=0 或 latest<=current 仍判已最新）。**确认根因后移除本日志**。
+
+## 2026-09-03 修复 0.1.3 更新不弹窗（version.json 缓存命中旧版本号）
+- `src/shared/api/modules/appUpdate.ts`：`fetchLatestVersion` 请求 URL 追加 `?t=${Date.now()}` cache-busting——version.json 带 Etag/Last-Modified，无绕过会命中 HTTP/App 层缓存旧的 `versionCode`（如 102），即使线上已是 103 也会被 `latest<=current` 误判为"已最新"而不弹更新。本修复随下一个包生效；存量包可用「个人中心」手动检查**暂时无果**（同一旧包拉取代码仍无时间戳），需重装含本修复的新包。
+
+## 2026-09-03 发布 0.1.3（versionCode 103）版本号升级
+- `src/manifest.json`：`versionName` 0.1.2 → 0.1.3，`versionCode` 102 → 103（打包依据）
+- 配套 aistock-frontend `public/download/version.json`：0.1.3 / 103 / `aistock-0.1.3.apk` / 更新文案与 releaseDate 2026-09-03（fileSize 待打包后按实际产物修正）
+
+## 2026-08-31 账号安全页补全手机号关联（绑定手机号 + 微信绑定支持手机号账户）
+- `src/modules/user/pages/account-security.vue`：当前绑定新增「手机号」状态行（脱敏 138****0000）；绑定设置新增「绑定手机号」入口；绑定表单三模式（phone/email/wechat）——绑定手机号/邮箱输入新身份，绑定微信改为**用当前账户已绑定身份证明归属**（邮箱优先、手机号次之，只读展示脱敏身份）；说明文案更新为三者互绑 + 冲突自动合并。
+- `src/shared/api/modules/auth.ts`：`sendSmsCode` 新增可选 `scenario`（bind → 100004 模板）；新增 `bindWechatByPhone`（手机号账户绑定微信）。
+- 配套后端（aistock-app-api）：`/api/auth/bind/wechat` 泛化支持 `email|phone` 双身份证明（手机号账户可绑微信）；删除 SmsAuthController.bindWechat 重复实现。
+
 ## 2026-09-02 预判块双模式 + 日期下拉改版（板块四环）
 - `ConditionalForecastBlock.vue`：条件行**双模式**——`conditionDisplay='tags'`（默认）：有 `keywords` 显示关键词标签流（无则长句兜底）；`'sentence'`：强制长句原文（prediction-detail 大盘详细报告用）。组件库同步。
 - API/映射：`keywords?: string[]` 透传（agent.ts Market/Sector Condition、prediction.ts PredictionCondition、sectorInsight 映射/条件拆分），新数据（LLM 已按 prompt 输出 ≤10 字 keywords）在板块洞见卡/四环列表以标签展示，长句仍在详细页。
