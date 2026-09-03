@@ -220,7 +220,7 @@ function hasAnchor(cond: StructuredCondition): boolean {
 
 // ===== 文案与样式映射 =====
 function horizonLabel(h: HorizonKey): string {
-  const map: Record<HorizonKey, string> = { short: '短', mid: '中', long: '长' }
+  const map: Record<HorizonKey, string> = { short: '短期', mid: '中期', long: '长期' }
   return map[h]
 }
 
