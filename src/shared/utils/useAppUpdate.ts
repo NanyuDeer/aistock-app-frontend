@@ -51,6 +51,8 @@ export const updateDiag = {
   /** 本机 versionCode（0 表示原生读取失败） */
   current: 0 as number,
   lastResult: '' as string,
+  /** 读取本机 versionCode 的详细过程/异常信息（定位根因） */
+  versionCodeDetail: '' as string,
 }
 
 /** 是否已对该版本选择「永久关闭」（不再提示） */
@@ -77,21 +79,76 @@ function isAndroidApp(): boolean {
  * 注意：plus.android 返回的是 Java 对象句柄，读字段必须走 plus.android.invoke(obj,'get','field')，
  * 不可直接 pkgInfo.versionCode 属性访问——否则会读不到值返回 0，
  * 被误判为「比线上旧」而反复弹出更新（0.1.1 用户装好后仍弹更新的根因）。
+ *
+ * 2026-09-03 修复：正式包真机返回 0（在线 latest=103、本机 current=0 被判"已最新"假阳）。
+ * 原实现 getPackageInfo(pkgName, 0) flags=0 在部分 Android 版本拿不到 versionCode，
+ * 且未 importClass。现改用 importClass + invoke 调用链，并优先尝试 longVersionCode（Android 9+）。
+ * 读取过程写入 updateDiag.versionCodeDetail 便于真机定位失败点。
  */
 function getCurrentVersionCode(): number {
   // #ifdef APP-PLUS
+  const detail: string[] = []
   try {
     const main = plus.android.runtimeMainActivity()
+    detail.push('main=ok')
     const pkgName = plus.android.invoke(main, 'getPackageName')
+    detail.push('pkgName=' + pkgName)
     const pm = plus.android.invoke(main, 'getPackageManager')
-    const pkgInfo = plus.android.invoke(pm, 'getPackageInfo', [pkgName, 0])
-    const versionCode = Number(plus.android.invoke(pkgInfo, 'get', 'versionCode'))
+    detail.push('pm=ok')
+
+    // importClass 确保能力级类可被后续 invoke/属性读取正确识别
+    const PackageManager = plus.android.importClass('android.content.pm.PackageManager') as unknown as {
+      PACKAGE_MATCH_ALL: number
+    }
+    detail.push('importPM=ok')
+
+    // 尝试 flags=PACKAGE_MATCH_ALL 而非 0，规避部分系统拿不到 versionCode
+    let pkgInfo: any = null
+    try {
+      pkgInfo = plus.android.invoke(pm, 'getPackageInfo', [pkgName, PackageManager.PACKAGE_MATCH_ALL])
+      detail.push('getPkg(matchAll)=ok')
+    } catch (e) {
+      detail.push('getPkg(matchAll)ERR=' + String((e && (e as Error).message) || e))
+      try {
+        pkgInfo = plus.android.invoke(pm, 'getPackageInfo', [pkgName, 0])
+        detail.push('getPkg(0)=ok')
+      } catch (e2) {
+        detail.push('getPkg(0)ERR=' + String((e2 && (e2 as Error).message) || e2))
+      }
+    }
+    if (!pkgInfo) {
+      updateDiag.versionCodeDetail = detail.join(' | ')
+      return 0
+    }
+    detail.push('pkgInfo=ok')
+
+    // Android 9+ versionCode 为 long，用 longVersionCode 读取兼兼容旧字段 versionCode
+    let versionCode = 0
+    try {
+      const longVersionCode = plus.android.invoke(pkgInfo, 'get', 'longVersionCode')
+      versionCode = Number(longVersionCode)
+      detail.push('longVersionCode=' + versionCode)
+    } catch (e) {
+      detail.push('longERR=' + String(((e) && (e as Error).message) || e))
+    }
+    if (!Number.isFinite(versionCode) || versionCode <= 0) {
+      try {
+        versionCode = Number(plus.android.invoke(pkgInfo, 'get', 'versionCode'))
+        detail.push('versionCode=' + versionCode)
+      } catch (e) {
+        detail.push('versionCodeERR=' + String((e && (e as Error).message) || e))
+      }
+    }
+    updateDiag.versionCodeDetail = detail.join(' | ')
     return Number.isFinite(versionCode) && versionCode > 0 ? versionCode : 0
   } catch (e) {
+    detail.push('TOP_ERR=' + String((e && (e as Error).message) || e))
+    updateDiag.versionCodeDetail = detail.join(' | ')
     console.warn('[useAppUpdate] 读取本机版本号失败:', e)
     return 0
   }
   // #endif
+  updateDiag.versionCodeDetail = 'not-app-plus'
   return 0
 }
 

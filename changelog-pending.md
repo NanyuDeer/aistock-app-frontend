@@ -1,5 +1,11 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-03 修复正式包读取 versionCode=0（更新"已最新"假阳真根因）
+- 真机 UI 诊断确认：正式包 `latest=103, current=0` → 命中 `current<=0` 被判"已最新"。根因是 [getCurrentVersionCode](`src/shared/utils/useAppUpdate.ts`) 原生读取在正式 Android 返回 0。
+- 重构读取：`importClass('android.content.pm.PackageManager')` 后，先试 `getPackageInfo(pkg, PACKAGE_MATCH_ALL)`，失败回退 flags=0；versionCode 优先读 `longVersionCode`（Android 9+，long 类型），回退 `versionCode`；每步写入 `updateDiag.versionCodeDetail` 供真机定位。
+- profile 诊断弹窗追加显示 `读取:` 明细。
+- **待确认修复有效后移除诊断代码**（updateDiag、profile 弹窗、console 日志）。
+
 ## 2026-09-03 App 更新"已是最新"假阳真机排障
 - 初版只在 `checkAppUpdate` 打 `[appUpdate-diag]` console 日志，但正式包无法读 console，故改为 **UI 弹窗诊断**：
   - `src/shared/utils/useAppUpdate.ts`：新增导出 `updateDiag` 快照对象（latest/current/lastResult），比对处写入；保留 console 日志便于 logcat 侧看。

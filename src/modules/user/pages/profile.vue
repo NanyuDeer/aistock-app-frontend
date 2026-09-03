@@ -292,7 +292,7 @@ async function checkUpdate() {
   // 真机正式包诊断：不读 console 也能看到判定走向（确认根因后移除本弹窗）
   uni.showModal({
     title: '版本检测诊断',
-    content: `线上 latest=${updateDiag.latest}\n本机 current=${updateDiag.current}\n判定=${updateDiag.lastResult}\n结果=${result}`,
+    content: `线上 latest=${updateDiag.latest}\n本机 current=${updateDiag.current}\n判定=${updateDiag.lastResult}\n结果=${result}\n读取: ${updateDiag.versionCodeDetail || '无'}`,
     showCancel: false,
     confirmText: '知道了',
   })
