@@ -41,7 +41,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 
 | 页面 | 文件 | 说明 |
 |------|------|------|
-| 早点听 | `briefing/index.vue` | 晨报/午间报/晚报三 Tab（午间报=盘中报，2026-08-24）。晨/晚报：音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页。午间报：走 `agentApi.getReport('midday', date)` 渲染 `content.display_report`（summary/details/risks，样式参考晨报头条卡片），音频读 `content.audio_path`（可选——后端有音频才渲染音频条并经 podcast store 播放，无音频只展示文字、不跳详情页仅播放）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期。音频纳入全局播报互斥（podcast store acquireExternal）：播放前注册、暂停/结束/卸载注销 |
+| 早点听 | `briefing/index.vue` | 晨报/午间报/晚报三 Tab（午间报=盘中报，2026-08-24）。晨/晚报：音频入口 + 3-5条结构化洞见，点击音频卡片进入详情页。午间报：走 `agentApi.getReport('midday', date)` 渲染 `content.display_report`（summary/details/risks，样式参考晨报头条卡片），音频读 `content.audio_path`（可选——后端有音频才渲染音频条并经 podcast store 播放，无音频只展示文字、不跳详情页仅播放）；午后前瞻为机会/风险双栏对位（opportunities ≤8字短词 4-5 个 + risks 短词，schema 2.1；老数据回退段落流）。非交易日/当日无报告时自动向前回退最近可用报告（最多 7 天）并标注日期。音频纳入全局播报互斥（podcast store acquireExternal）：播放前注册、暂停/结束/卸载注销 |
 | 持仓管理 | `portfolio/index.vue` | 持仓分析 |
 | 事件传导链 | `event-chain/index.vue` | 事件传导链路可视化 |
 | 估值分析 | `valuation/index.vue` | 个股估值 |
