@@ -1,5 +1,10 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-03 修复正式包读取 versionCode=0（更新"已最新"假阳真根因，第 3 轮）
+- 真机诊断明细 `getPkg(matchAll)=ok` 后停止 + `current=0` → 上一版从 `importClass` 取 `PACKAGE_MATCH_ALL` 常量不可靠且 `try` 未抛异常但返回 null 时被误判为成功，未走 `flags=0` fallback。
+- 重写 [getCurrentVersionCode](`src/shared/utils/useAppUpdate.ts`)：flags 固定 0、校验返回值非空、读字段用 `plus.android.getAttribute`（longVersionCode→versionCode 回退），全程写 `updateDiag.versionCodeDetail`。
+- **待确认修复有效后移除诊断代码**。
+
 ## 2026-09-03 修复正式包读取 versionCode=0（更新"已最新"假阳真根因）
 - 真机 UI 诊断确认：正式包 `latest=103, current=0` → 命中 `current<=0` 被判"已最新"。根因是 [getCurrentVersionCode](`src/shared/utils/useAppUpdate.ts`) 原生读取在正式 Android 返回 0。
 - 重构读取：`importClass('android.content.pm.PackageManager')` 后，先试 `getPackageInfo(pkg, PACKAGE_MATCH_ALL)`，失败回退 flags=0；versionCode 优先读 `longVersionCode`（Android 9+，long 类型），回退 `versionCode`；每步写入 `updateDiag.versionCodeDetail` 供真机定位。

@@ -76,14 +76,15 @@ function isAndroidApp(): boolean {
 
 /**
  * 读取本机已安装版本号（Android 原生 versionCode）。
- * 注意：plus.android 返回的是 Java 对象句柄，读字段必须走 plus.android.invoke(obj,'get','field')，
+ * 注意：plus.android 返回的是 Java 对象句柄，读字段必须走 plus.android.getAttribute（或 invoke(obj,'get','field')），
  * 不可直接 pkgInfo.versionCode 属性访问——否则会读不到值返回 0，
  * 被误判为「比线上旧」而反复弹出更新（0.1.1 用户装好后仍弹更新的根因）。
  *
- * 2026-09-03 修复：正式包真机返回 0（在线 latest=103、本机 current=0 被判"已最新"假阳）。
- * 原实现 getPackageInfo(pkgName, 0) flags=0 在部分 Android 版本拿不到 versionCode，
- * 且未 importClass。现改用 importClass + invoke 调用链，并优先尝试 longVersionCode（Android 9+）。
- * 读取过程写入 updateDiag.versionCodeDetail 便于真机定位失败点。
+ * 2026-09-03 修复演进：
+ * - 初版 getPackageInfo(pkgName, 0) 正式包真机返回 0。
+ * - 尝试 importClass 后取 PACKAGE_MATCH_ALL flage（不可靠，静态常量可能取到 guest 对象），
+ *   且 try 未抛异常但返回 null 时被我误判为成功而未走 flags=0 fallback → 仍 0。
+ * - 现重写为：flags 固定传 0（最可靠），校验返回值非空，读字段用 getAttribute，全程写诊断。
  */
 function getCurrentVersionCode(): number {
   // #ifdef APP-PLUS
@@ -96,44 +97,31 @@ function getCurrentVersionCode(): number {
     const pm = plus.android.invoke(main, 'getPackageManager')
     detail.push('pm=ok')
 
-    // importClass 确保能力级类可被后续 invoke/属性读取正确识别
-    const PackageManager = plus.android.importClass('android.content.pm.PackageManager') as unknown as {
-      PACKAGE_MATCH_ALL: number
-    }
-    detail.push('importPM=ok')
-
-    // 尝试 flags=PACKAGE_MATCH_ALL 而非 0，规避部分系统拿不到 versionCode
+    // flags 固定用 0；flags 为非零常量时（尤其从 importClass 取）不可靠，可能返回 null
     let pkgInfo: any = null
     try {
-      pkgInfo = plus.android.invoke(pm, 'getPackageInfo', [pkgName, PackageManager.PACKAGE_MATCH_ALL])
-      detail.push('getPkg(matchAll)=ok')
+      pkgInfo = plus.android.invoke(pm, 'getPackageInfo', [pkgName, 0])
+      detail.push('getPkg(0)=' + (pkgInfo ? 'nonNull' : 'null'))
     } catch (e) {
-      detail.push('getPkg(matchAll)ERR=' + String((e && (e as Error).message) || e))
-      try {
-        pkgInfo = plus.android.invoke(pm, 'getPackageInfo', [pkgName, 0])
-        detail.push('getPkg(0)=ok')
-      } catch (e2) {
-        detail.push('getPkg(0)ERR=' + String((e2 && (e2 as Error).message) || e2))
-      }
+      detail.push('getPkg(0)ERR=' + String((e && (e as Error).message) || e))
     }
     if (!pkgInfo) {
       updateDiag.versionCodeDetail = detail.join(' | ')
       return 0
     }
-    detail.push('pkgInfo=ok')
 
-    // Android 9+ versionCode 为 long，用 longVersionCode 读取兼兼容旧字段 versionCode
+    // Android 9+ versionCode 为 long：优先 longVersionCode，兼容旧字段 versionCode
     let versionCode = 0
     try {
-      const longVersionCode = plus.android.invoke(pkgInfo, 'get', 'longVersionCode')
-      versionCode = Number(longVersionCode)
-      detail.push('longVersionCode=' + versionCode)
+      const longV = Number(plus.android.getAttribute(pkgInfo, 'longVersionCode'))
+      if (Number.isFinite(longV) && longV > 0) versionCode = longV
+      detail.push('longVersionCode=' + (versionCode || longV))
     } catch (e) {
-      detail.push('longERR=' + String(((e) && (e as Error).message) || e))
+      detail.push('longERR=' + String((e && (e as Error).message) || e))
     }
     if (!Number.isFinite(versionCode) || versionCode <= 0) {
       try {
-        versionCode = Number(plus.android.invoke(pkgInfo, 'get', 'versionCode'))
+        versionCode = Number(plus.android.getAttribute(pkgInfo, 'versionCode'))
         detail.push('versionCode=' + versionCode)
       } catch (e) {
         detail.push('versionCodeERR=' + String((e && (e as Error).message) || e))
