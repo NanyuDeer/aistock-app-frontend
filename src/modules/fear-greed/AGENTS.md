@@ -19,6 +19,7 @@
 ## API
 
 - `GET /api/fear-greed/dashboard?index=jq`：主面板数据（指数 + 历史）。
+- `GET /api/fear-greed/sectors`：当日板块行情榜（topGainers/topInflows/topLosers/topOutflows，camel），供建议引擎 `utils/fgAdvice.ts` 选取配置方向；availability=false 时回退静态档位。
 - 前端封装位于 `shared/api/modules/fear-greed.ts`，页面中禁止直接发起 HTTP 请求。
 - 开发代理：`/api/fear-greed` → `http://127.0.0.1:8001`（见 `vite.config.ts`）。
 - 悬浮温度计在 `onMounted` 时同样拉取该接口展示真实指数（失败保留默认值，不阻塞首页）。
