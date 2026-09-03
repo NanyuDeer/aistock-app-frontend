@@ -54,21 +54,30 @@ const props = withDefaults(defineProps<{
 
 /**
  * 卡标题 = 一句话研判（与大盘溯源"现象一句话"同构，均取 LLM 生成句，不拼行情）：
- * 1. prediction.attribution_summary（预判综述一句话，agent 30~40 字产出）优先；
- * 2. 回退 trace.summary（仅溯源无预判时，标题即溯源主句，避免下方重复）；
- * 3. 兜底板块名（罕见旧数据仅有分支无综述）。
+ * 1. prediction.attribution_summary（预判综述一句话）优先，但跳过合规下架占位句
+ *    （"（点位表述已按合规要求移除）"——该句被红线下架整体替换，无研判信息）；
+ * 2. 回退 trace.summary（仅溯源无预判时标题即溯源主句，避免下方重复）；
+ * 3. 回退首档基准走势生成"短/中/长期预计 {label}"（如 短期预计窄幅整理）；
+ * 4. 兜底板块名。
  */
-const hasAttributionSummary = computed<boolean>(() =>
-  Boolean(props.candidate?.prediction?.attribution_summary?.trim())
-)
+const REDACT_PLACEHOLDER_RE = /（点位表述已按合规要求移除）/
+
+const hasAttributionSummary = computed<boolean>(() => {
+  const a = props.candidate?.prediction?.attribution_summary?.trim() ?? ''
+  return a.length > 0 && !REDACT_PLACEHOLDER_RE.test(a)
+})
 
 const cardTitle = computed(() => {
   const c = props.candidate
   if (!c) return ''
   const conclusion = c.prediction?.attribution_summary?.trim()
-  if (conclusion) return conclusion
+  if (conclusion && !REDACT_PLACEHOLDER_RE.test(conclusion)) return conclusion
   const traceSum = c.trace?.summary?.trim()
   if (traceSum) return traceSum
+  // 首档基准走势兜底（label 4~6 字，如 高位震荡/窄幅整理 → "短期预计高位震荡"）
+  const first = structured.value?.horizons?.[0]
+  const horizonCn = { short: '短期', mid: '中期', long: '长期' }[first?.horizon ?? 'short'] ?? '短期'
+  if (first?.label) return `${horizonCn}预计${first.label}`
   return c.name
 })
 
