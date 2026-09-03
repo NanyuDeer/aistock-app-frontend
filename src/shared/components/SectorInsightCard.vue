@@ -52,20 +52,32 @@ const props = withDefaults(defineProps<{
   date: ''
 })
 
-/** 卡标题：板块名 + 当日涨跌（如 "存储板块 -4.2%"） */
+/**
+ * 卡标题 = 一句话研判（与大盘溯源"现象一句话"同构，均取 LLM 生成句，不拼行情）：
+ * 1. prediction.attribution_summary（预判综述一句话，agent 30~40 字产出）优先；
+ * 2. 回退 trace.summary（仅溯源无预判时，标题即溯源主句，避免下方重复）；
+ * 3. 兜底板块名（罕见旧数据仅有分支无综述）。
+ */
+const hasAttributionSummary = computed<boolean>(() =>
+  Boolean(props.candidate?.prediction?.attribution_summary?.trim())
+)
+
 const cardTitle = computed(() => {
   const c = props.candidate
   if (!c) return ''
-  const pct = c.quote?.pct_change
-  const pctText =
-    typeof pct === 'number' && Number.isFinite(pct)
-      ? (pct > 0 ? `+${pct}%` : `${pct}%`)
-      : ''
-  return `${c.name}${pctText ? ` ${pctText}` : ''}`
+  const conclusion = c.prediction?.attribution_summary?.trim()
+  if (conclusion) return conclusion
+  const traceSum = c.trace?.summary?.trim()
+  if (traceSum) return traceSum
+  return c.name
 })
 
-/** 溯源行文案（wind_leader-only 来源无溯源 → 空则隐藏该行） */
-const traceText = computed(() => props.candidate?.trace?.summary ?? '')
+/** 溯源行文案：标题已用溯源主句时不再重复展示（仅无 attribution_summary 回退场景） */
+const traceText = computed(() => {
+  const c = props.candidate
+  if (!c || !hasAttributionSummary.value) return ''
+  return c.trace?.summary ?? ''
+})
 
 const timeLabel = computed(() => {
   const d = props.date || ''
@@ -77,10 +89,11 @@ const timeLabel = computed(() => {
 /** InsightCard 条件化预判结构化数据（映射自聚合接口 horizons/conditions/met；与 sector-loop 共用映射工具） */
 const structured = computed(() => sectorPredictionToStructured(props.candidate?.prediction))
 
-/** 是否有实际洞察内容（溯源结论或预判分支任一存在）；无 → 走占位而非空壳标题卡 */
+/** 是否有实际洞察内容（溯源主句或预判分支任一存在）；无 → 走占位而非空壳标题卡 */
 const hasContent = computed<boolean>(() => {
+  const c = props.candidate
   const s = structured.value
-  return Boolean(traceText.value || s?.horizons?.length || s?.conditions?.length)
+  return Boolean(c?.trace?.summary?.trim() || s?.horizons?.length || s?.conditions?.length)
 })
 </script>
 

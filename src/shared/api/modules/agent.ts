@@ -585,6 +585,8 @@ export interface SectorInsightPrediction {
   status?: 'pending' | 'verified' | 'skipped'
   dueLabel?: string | null
   verification?: 'pending' | 'hit' | 'miss'
+  /** 一句话研判结论（LLM 30~40 字；洞见卡标题用；旧记录无） */
+  attribution_summary?: string | null
   /** 概览方向/置信（取首档有值者），detail 在 horizons */
   direction?: SectorDirection
   confidence?: SectorConfidence

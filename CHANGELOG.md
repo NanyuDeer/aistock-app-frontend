@@ -2,6 +2,17 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-03 — 板块洞见卡标题改用 LLM 一句话研判（去板块名+涨跌幅）
+
+**开发者**: Aria
+
+### 改进
+- `shared/components/SectorInsightCard.vue`：洞见卡"一句话"标题不再用"板块名+涨跌幅"（行情由页面统计卡展示，洞见标题应与大盘溯源"现象一句话"同构取 LLM 生成句）：
+  - 优先 `prediction.attribution_summary`（板块预判综述一句话，agent 30~40 字产出，app-api 已透传）；
+  - 回退 `trace.summary`（仅溯源无预判时标题即溯源主句，溯源行不再重复展示）；
+  - 兜底板块名
+- `shared/api/modules/agent.ts`：`SectorInsightPrediction` 补可选 `attribution_summary`
+
 ## [master] 2026-09-03 — 板块详情洞见卡空壳修复（无溯源/预判不再只渲染行情标题）
 
 **开发者**: Aria
