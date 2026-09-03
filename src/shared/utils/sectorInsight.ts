@@ -9,6 +9,8 @@ export interface SectorStructuredForecast {
   horizons?: Array<{
     horizon: 'short' | 'mid' | 'long'
     remaining?: string
+    /** 基准走势短语（4~6 字） */
+    label?: string
     direction?: 'bullish' | 'bearish' | 'neutral'
     confidence?: 'high' | 'medium' | 'low'
   }>
@@ -16,6 +18,8 @@ export interface SectorStructuredForecast {
     horizon: 'short' | 'mid' | 'long'
     direction?: 'bullish' | 'bearish' | 'neutral'
     condition: string
+    /** 路径短语名（两段式“状态 · 走势”） */
+    label?: string
     scenario: string
     /** 简洁展示关键词（新数据携带） */
     keywords?: string[]
@@ -36,6 +40,7 @@ export function sectorPredictionToStructured(p: SectorInsightPrediction | null |
       p.horizons?.map((h) => ({
         horizon: h.horizon,
         remaining: h.remaining,
+        label: h.label ?? undefined,
         direction: h.direction,
         confidence: h.confidence
       })) ?? [],
@@ -44,6 +49,7 @@ export function sectorPredictionToStructured(p: SectorInsightPrediction | null |
         horizon: c.horizon,
         direction: c.direction,
         condition: c.condition,
+        label: c.label ?? undefined,
         scenario: c.scenario,
         keywords: c.keywords ?? [],
         met: c.met ?? undefined

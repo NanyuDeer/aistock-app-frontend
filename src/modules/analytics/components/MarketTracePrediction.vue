@@ -127,6 +127,7 @@ const condStructured = computed(() => {
     horizons: p.horizons.map((h) => ({
       horizon: h.horizon,
       remaining: h.remainingEstimate || undefined,
+      label: h.label || undefined,
       direction: h.direction,
       confidence: h.confidence
     })),
@@ -136,6 +137,7 @@ const condStructured = computed(() => {
         horizon: toHorizonKey(c.anchor?.horizon) ?? 'short',
         direction: toDirectionKey(c.anchor?.direction),
         condition: c.condition,
+        label: c.label || undefined,
         scenario: c.scenario,
         anchor: c.anchor && (c.anchor.threshold || c.anchor.metric)
           ? { metric: c.anchor.metric || undefined, threshold: c.anchor.threshold || undefined }

@@ -3,10 +3,12 @@
     <!-- 加载中 -->
     <LoadingState v-if="loading" size="sm" text="研判生成中..." layout="horizontal" />
 
-    <!-- 严格占位（D4）：当日/近 7 天无该板块溯源/预判 -->
-    <view v-else-if="!candidate" class="as-sector-insight__empty">
+    <!-- 占位：未命中候选，或命中但无溯源/预判内容（避免仅渲染"板块+涨跌幅"空壳标题卡） -->
+    <view v-else-if="!candidate || !hasContent" class="as-sector-insight__empty">
       <text class="as-sector-insight__empty-title">暂无板块研判</text>
-      <text class="as-sector-insight__empty-desc">该板块近期无溯源/预判记录</text>
+      <text class="as-sector-insight__empty-desc">
+        {{ candidate ? '该板块今日无溯源/预判记录，暂无洞察内容' : '该板块近期无溯源/预判记录' }}
+      </text>
     </view>
 
     <!-- 板块洞见卡（InsightCard 条件化形态） -->
@@ -50,20 +52,41 @@ const props = withDefaults(defineProps<{
   date: ''
 })
 
-/** 卡标题：板块名 + 当日涨跌（如 "存储板块 -4.2%"） */
+/**
+ * 卡标题 = 一句话研判（与大盘溯源"现象一句话"同构，均取 LLM 生成句，不拼行情）：
+ * 1. prediction.attribution_summary（预判综述一句话）优先，但跳过合规下架占位句
+ *    （"（点位表述已按合规要求移除）"——该句被红线下架整体替换，无研判信息）；
+ * 2. 回退 trace.summary（仅溯源无预判时标题即溯源主句，避免下方重复）；
+ * 3. 回退首档基准走势生成"短/中/长期预计 {label}"（如 短期预计窄幅整理）；
+ * 4. 兜底板块名。
+ */
+const REDACT_PLACEHOLDER_RE = /（点位表述已按合规要求移除）/
+
+const hasAttributionSummary = computed<boolean>(() => {
+  const a = props.candidate?.prediction?.attribution_summary?.trim() ?? ''
+  return a.length > 0 && !REDACT_PLACEHOLDER_RE.test(a)
+})
+
 const cardTitle = computed(() => {
   const c = props.candidate
   if (!c) return ''
-  const pct = c.quote?.pct_change
-  const pctText =
-    typeof pct === 'number' && Number.isFinite(pct)
-      ? (pct > 0 ? `+${pct}%` : `${pct}%`)
-      : ''
-  return `${c.name}${pctText ? ` ${pctText}` : ''}`
+  const conclusion = c.prediction?.attribution_summary?.trim()
+  if (conclusion && !REDACT_PLACEHOLDER_RE.test(conclusion)) return conclusion
+  const traceSum = c.trace?.summary?.trim()
+  if (traceSum) return traceSum
+  // 首档基准走势兜底（label 4~6 字，如 高位震荡/窄幅整理 → "短期预计高位震荡"）
+  const first = structured.value?.horizons?.[0]
+  const horizonCn = { short: '短期', mid: '中期', long: '长期' }[first?.horizon ?? 'short'] ?? '短期'
+  if (first?.label) return `${horizonCn}预计${first.label}`
+  return c.name
 })
 
-/** 溯源行文案（wind_leader-only 来源无溯源 → 空则隐藏该行） */
-const traceText = computed(() => props.candidate?.trace?.summary ?? '')
+/** 溯源行文案：标题已用溯源主句时不再重复展示（仅无 attribution_summary 回退场景） */
+const traceText = computed(() => {
+  const c = props.candidate
+  if (!c || !hasAttributionSummary.value) return ''
+  return c.trace?.summary ?? ''
+})
 
 const timeLabel = computed(() => {
   const d = props.date || ''
@@ -74,6 +97,13 @@ const timeLabel = computed(() => {
 
 /** InsightCard 条件化预判结构化数据（映射自聚合接口 horizons/conditions/met；与 sector-loop 共用映射工具） */
 const structured = computed(() => sectorPredictionToStructured(props.candidate?.prediction))
+
+/** 是否有实际洞察内容（溯源主句或预判分支任一存在）；无 → 走占位而非空壳标题卡 */
+const hasContent = computed<boolean>(() => {
+  const c = props.candidate
+  const s = structured.value
+  return Boolean(c?.trace?.summary?.trim() || s?.horizons?.length || s?.conditions?.length)
+})
 </script>
 
 <style lang="scss" scoped>
