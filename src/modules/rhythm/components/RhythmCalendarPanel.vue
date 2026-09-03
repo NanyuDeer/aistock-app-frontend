@@ -138,20 +138,32 @@ type GridCell = RhythmCalendarDay | null
 const gridRows = computed<GridCell[][]>(() => {
   const rows: GridCell[][] = []
   let row: GridCell[] = []
-  let cursor = 0 // 上一格已占列 +1
+  let rowMonday = '' // 当前行首格所在周的周一（YYYY-MM-DD），跨周断行依据
+  let rowHasDay = false
+  const p = (n: number) => String(n).padStart(2, '0')
+  /** 该日期所在自然周的周一（本地年月日算术，避开 DST/UTC 偏差） */
+  const mondayOf = (date: string): string => {
+    const [y, m, dd] = date.split('-').map(Number)
+    const dow = (new Date(y, m - 1, dd).getDay() + 6) % 7 // 周一=0
+    const mon = new Date(y, m - 1, dd - dow)
+    return `${mon.getFullYear()}-${p(mon.getMonth() + 1)}-${p(mon.getDate())}`
+  }
   const pushRow = () => {
     if (!row.length) return
     while (row.length < 7) row.push(null) // 每行恒 7 列：周末/空列留空，跨行周一对齐
     rows.push(row)
     row = []
+    rowHasDay = false
   }
   for (const d of ascending.value) {
+    const monday = mondayOf(d.date)
+    // 新的一周（含长假跨周：节后首交易日列号 ≥ 游标也另起一行）→ 按周一锚点断行
+    if (rowHasDay && monday !== rowMonday) pushRow()
     const col = WEEK_COL[new Date(`${d.date}T00:00:00`).getDay()]
-    // 新的一周（本日列号小于当前游标）→ 换行，回到周一列起排
-    if (cursor > 0 && col < cursor) { pushRow(); cursor = 0 }
-    while (cursor < col) { row.push(null); cursor++ }
+    while (row.length < col) row.push(null) // 周首缺日前置空列（周一=0 不补）
+    if (!rowHasDay) rowMonday = monday
     row.push(d)
-    cursor = col + 1
+    rowHasDay = true
   }
   pushRow()
   return rows
