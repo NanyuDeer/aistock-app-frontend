@@ -25,10 +25,108 @@
           </view>
           <view class="audio-info">
             <text class="audio-status">{{ audioStatusText }}</text>
-            <text class="audio-meta">{{ audioLabelText }} · 播报详情 ›</text>
+            <text class="audio-meta">{{ audioMetaText }}</text>
           </view>
           <text class="audio-arrow">›</text>
         </view>
+
+        <!-- 午间报专属精简卡片：盘中报仅展示精简结论（summary + 风险提示），完整报告跳转 agent-report（与晨/晚报"播报器+洞见卡"的精简结构一致） -->
+        <template v-if="broadcastType === 'midday' && middayReport">
+          <view class="midday-card">
+            <view class="midday-label">
+              <text class="midday-star">★</text>
+              <text class="midday-label-text">盘中研判</text>
+            </view>
+            <text
+              v-if="middayReport.content.display_report.summary"
+              class="midday-summary"
+            >{{ middayReport.content.display_report.summary }}</text>
+            <text v-else class="midday-summary">今日盘中报已生成</text>
+            <view class="midday-view-entry" @tap="openMiddayFullReport">
+              <text class="midday-view-entry-text">查看完整报告</text>
+              <SvgIcon name="arrow-right-s-line" size="30rpx" color="#0b5fff" />
+            </view>
+          </view>
+
+          <!-- 午后前瞻 · 机会/风险对位（schema 2.1：带 opportunities 键（可空）即渲染对位卡；两栏均空时整块不渲染；风险栏取 display_report.risks 短词） -->
+          <view v-if="afternoonSection && (afternoonSection.opportunities?.length || middayRisks.length)" class="midday-section-card">
+            <view class="midday-section-head">
+              <view class="midday-badge" :class="sectionBadgeClass(afternoonSection.title)">{{ sectionBadgeText(afternoonSection.title) }}</view>
+              <view class="midday-section-body">
+                <text class="midday-section-title">{{ afternoonSection.title }}</text>
+              </view>
+            </view>
+            <view class="midday-dual-col">
+              <view v-if="afternoonSection.opportunities?.length" class="midday-col">
+                <view class="midday-col-label">
+                  <view class="midday-dot midday-dot--up" />
+                  <text class="midday-col-label-text midday-col-label-text--up">机会提示</text>
+                </view>
+                <view class="midday-pills">
+                  <text
+                    v-for="(kw, kwIndex) in afternoonSection.opportunities"
+                    :key="`op-${kwIndex}`"
+                    class="midday-pill midday-pill--up"
+                  >{{ kw }}</text>
+                </view>
+              </view>
+              <view v-if="middayRisks.length" class="midday-col">
+                <view class="midday-col-label">
+                  <view class="midday-dot midday-dot--down" />
+                  <text class="midday-col-label-text midday-col-label-text--down">风险提示</text>
+                </view>
+                <view class="midday-pills">
+                  <text
+                    v-for="(risk, riskIndex) in middayRisks"
+                    :key="`risk-${riskIndex}`"
+                    class="midday-pill midday-pill--down"
+                  >{{ risk }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+
+          <!-- 多分段摘要：与晨/晚报 Agent 洞见卡一致的多个精简要点，每张卡片标题前带圆角方标 -->
+          <template v-if="displaySections.length">
+            <view class="section-label">
+              <text class="section-label-text">Agent 洞见</text>
+              <view class="section-line" />
+            </view>
+            <view
+              v-for="(sec, index) in displaySections"
+              :key="index"
+              class="midday-section-card"
+            >
+              <!-- 洞见卡同款布局：左侧方标 + 右侧标题/结论（结论随 body 缩进） -->
+              <view v-if="sec.title" class="midday-section-head">
+                <view class="midday-badge" :class="sectionBadgeClass(sec.title)">{{ sectionBadgeText(sec.title) }}</view>
+                <view class="midday-section-body">
+                  <text class="midday-section-title">{{ sec.title }}</text>
+                  <text class="midday-section-conclusion">{{ sec.conclusion }}</text>
+                </view>
+              </view>
+              <text v-else class="midday-section-conclusion">{{ sec.conclusion }}</text>
+            </view>
+          </template>
+
+          <!-- 风险提示（单卡片 + 编号列表）：仅老格式（无机会/风险对位区）展示，避免与对位区重复 -->
+          <template v-if="showStandaloneRiskCard">
+            <view class="midday-risk-card">
+              <view class="midday-label">
+                <view class="midday-badge midday-badge--risk">警</view>
+                <text class="midday-label-text midday-risk-label-text">风险提示</text>
+              </view>
+              <view
+                v-for="(risk, index) in middayRisks"
+                :key="index"
+                class="midday-risk-item"
+              >
+                <text class="midday-risk-index">{{ index + 1 }}</text>
+                <text class="midday-risk">{{ risk }}</text>
+              </view>
+            </view>
+          </template>
+        </template>
 
         <!-- 大盘洞见卡片（原市场异象）：参考早报「今日头条」卡片设计，紧跟音频播报下方（仅晚报展示，有异象时显示） -->
         <template v-if="broadcastType === 'evening' && eveningViewModel">
@@ -39,7 +137,7 @@
         </template>
 
         <!-- 头条卡片：今日最重要研判（仅晨报展示） -->
-        <view v-if="headlineItem && broadcastType !== 'evening'" class="headline-card">
+        <view v-if="headlineItem && broadcastType !== 'evening' && broadcastType !== 'midday'" class="headline-card">
           <view class="headline-label">
             <text class="headline-star">★</text>
             <text class="headline-label-text">今日头条</text>
@@ -138,10 +236,10 @@
         </view>
 
         <!-- 无报告 -->
-        <view v-if="!audioPath && !items.length" class="empty-state">
+        <view v-if="!hasAnyContent" class="empty-state">
           <SvgIcon name="file-line" size="80rpx" color="#9ca3af" />
-          <text class="empty-text">今日播报尚未生成</text>
-          <text class="empty-hint">请在 9:10 后查看</text>
+          <text class="empty-text">{{ emptyText }}</text>
+          <text class="empty-hint">{{ emptyHint }}</text>
         </view>
 
         <!-- 日期切换 -->
@@ -152,6 +250,12 @@
               @tap="switchType('morning')"
             >
               <text class="type-btn-text">晨报</text>
+            </view>
+            <view
+              :class="['type-btn', broadcastType === 'midday' ? 'active' : '']"
+              @tap="switchType('midday')"
+            >
+              <text class="type-btn-text">午间报</text>
             </view>
             <view
               :class="['type-btn', broadcastType === 'evening' ? 'active' : '']"
@@ -179,7 +283,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { agentApi, type BriefType, type BriefV1, type BroadcastV1, type MarketTraceReviewRecord } from '@/shared/api/modules/agent'
+import { agentApi, type BriefV1, type BroadcastV1, type MarketTraceReviewRecord } from '@/shared/api/modules/agent'
 import {
   SOURCE_LABELS,
   SOURCE_ICONS,
@@ -191,7 +295,8 @@ import {
 import { parseBriefingItemsFromBrief } from '@/shared/utils/briefingAdapter'
 import { parseBriefingReport } from '@/shared/utils/briefingReport'
 import { parseBroadcastReport } from '@/shared/utils/broadcastReport'
-import { buildBriefingDetailUrl, normalizeBriefingType } from '@/shared/utils/briefingDetail'
+import { parseMiddayReport, type MiddayReport } from '@/shared/utils/middayReport'
+import { buildBriefingDetailUrl, normalizeBriefingType, type BriefingTabType } from '@/shared/utils/briefingDetail'
 import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
@@ -206,10 +311,41 @@ import {
 } from '@/shared/utils/eveningBriefCards'
 
 const currentDate = ref('')
-const broadcastType = ref<BriefType>('morning')
+const broadcastType = ref<BriefingTabType>('morning')
 const loading = ref(true)
 const report = ref<BroadcastV1 | null>(null)
 const items = ref<BriefingItem[]>([])
+/** 午间报报告（方案 A：audio_path 回填在 content 内，可能无音频） */
+const middayReport = ref<MiddayReport | null>(null)
+
+/** 午间报：午后前瞻分段（schema 2.1 带 opportunities 键即视为对位数据，键可空）；老数据无 opportunities 键时为 null（回退段落流）。 */
+const afternoonSection = computed(() => {
+  if (broadcastType.value !== 'midday') return null
+  const sections = middayReport.value?.content.display_report.sections ?? []
+  return sections.find((sec) => sec.opportunities !== undefined) ?? null
+})
+
+/** Agent 洞见列表：排除已由机会/风险对位区渲染的午后前瞻分段（老数据无 opportunities 时保留段落卡）。 */
+const displaySections = computed(() => {
+  if (broadcastType.value !== 'midday') return []
+  const sections = middayReport.value?.content.display_report.sections ?? []
+  if (!afternoonSection.value) return sections
+  return sections.filter((sec) => sec !== afternoonSection.value)
+})
+
+/** 午间报风险短词（对位区风险栏数据源，与完整报告/老格式共用 display_report.risks）。 */
+const middayRisks = computed(() => {
+  return broadcastType.value === 'midday'
+    ? (middayReport.value?.content.display_report.risks ?? [])
+    : []
+})
+
+/** 是否展示底部独立「风险提示」卡：新格式已并入对位区 → false；老格式无对位区 → 维持原条件。 */
+const showStandaloneRiskCard = computed(() => {
+  if (broadcastType.value !== 'midday') return false
+  return middayRisks.value.length > 0 && !afternoonSection.value
+})
+
 /** 播放状态来自悬浮窗 store（FloatingPodcast AudioPlayer 事件同步），页面内按钮与悬浮球状态一致 */
 const isPlaying = computed(() => podcastStore.playing)
 /** 悬浮播报 store：音频统一由全局悬浮窗承载，跨页切换状态不丢 */
@@ -223,9 +359,13 @@ const isFallback = ref(false)
 const requestedDate = ref('')
 /** 晚报卡片 ViewModel（仅晚报分支使用） */
 const eveningViewModel = ref<EveningCardViewModel | null>(null)
+/** 加载序号：类型/日期切换时递增，用于丢弃过期请求的迟到结果（防竞态覆盖） */
+let loadSeq = 0
 
 const subtitleText = computed(() => {
-  const typeLabel = broadcastType.value === 'morning' ? '晨报' : '晚报'
+  const typeLabel = broadcastType.value === 'morning'
+    ? '晨报'
+    : broadcastType.value === 'midday' ? '午间报' : '晚报'
   if (currentDate.value) {
     return `${currentDate.value} · ${typeLabel} · AI 生成内容，仅供参考`
   }
@@ -233,17 +373,44 @@ const subtitleText = computed(() => {
 })
 
 const audioPath = computed(() => {
+  // 午间报音频回填在 content.audio_path（方案 A），晨/晚报在 BroadcastV1 顶层 audio_path
+  if (broadcastType.value === 'midday') {
+    return middayReport.value?.content.audio_path || null
+  }
   return report.value?.audio_path || null
 })
 
-/** 音频入口文案：根据播报类型动态展示"AI 早报音频"或"AI 晚报音频" */
+/** 音频入口文案：根据播报类型动态展示"AI 早报音频"/"AI 午间报音频"/"AI 晚报音频" */
 const audioLabelText = computed(() => {
-  return broadcastType.value === 'morning' ? 'AI 早报音频' : 'AI 晚报音频'
+  if (broadcastType.value === 'morning') return 'AI 早报音频'
+  if (broadcastType.value === 'midday') return 'AI 午间报音频'
+  return 'AI 晚报音频'
+})
+
+/** 音频条副文案：午间报无独立播报详情页，仅标注类型，不引导跳转详情 */
+const audioMetaText = computed(() => {
+  return broadcastType.value === 'midday'
+    ? audioLabelText.value
+    : `${audioLabelText.value} · 播报详情 ›`
 })
 
 const audioStatusText = computed(() => {
   if (!audioPath.value) return '语音生成中...'
   return isPlaying.value ? '播放中' : '点击播放'
+})
+
+/** 是否有可展示内容：午间报看报告本体（可能无音频），晨/晚报看音频或洞见条目 */
+const hasAnyContent = computed(() => {
+  if (broadcastType.value === 'midday') return !!middayReport.value
+  return !!(audioPath.value || items.value.length)
+})
+
+const emptyText = computed(() => {
+  return broadcastType.value === 'midday' ? '今日午间报尚未生成' : '今日播报尚未生成'
+})
+
+const emptyHint = computed(() => {
+  return broadcastType.value === 'midday' ? '请在 12:05 后查看' : '请在 9:10 后查看'
 })
 
 /** 头条条目（isHeadline=true） */
@@ -308,6 +475,22 @@ function sentimentClass(sentiment: Sentiment): string {
   return `sentiment-${sentiment}`
 }
 
+/** 盘中要点分段标识（圆角方标文字）：按标题关键词区分，避免清一色"点" */
+function sectionBadgeText(title: string): string {
+  if (/盘面|回顾/.test(title)) return '盘'
+  if (/前瞻|午后|展望/.test(title)) return '瞻'
+  if (/资金|情绪/.test(title)) return '金'
+  return '点'
+}
+
+/** 盘中要点分段标识配色：盘面回顾→蓝、午后前瞻→紫、资金情绪→橙 */
+function sectionBadgeClass(title: string): string {
+  if (/盘面|回顾/.test(title)) return 'midday-badge--blue'
+  if (/前瞻|午后|展望/.test(title)) return 'midday-badge--purple'
+  if (/资金|情绪/.test(title)) return 'midday-badge--orange'
+  return 'midday-badge--blue'
+}
+
 /** 将早点听摘要与事件库标题做最小匹配，命中后直达对应 AI 事件分析。 */
 function eventMatchScore(target: string, candidate: string): number {
   const normalizedTarget = target.replace(/[^\u4e00-\u9fffA-Za-z0-9]/g, '')
@@ -343,8 +526,17 @@ async function goEventAnalysis(event: BriefingItem) {
 
 /** 点击音频卡片进入双人播报详情页，查看主持人/分析师对话。 */
 function goDetail() {
+  // 午间报无独立播报详情页（方案 A 只回填 audio_path，不产独立广播报告），点击仅播放
+  if (broadcastType.value === 'midday') return
   uni.navigateTo({
     url: buildBriefingDetailUrl(currentDate.value, broadcastType.value),
+  })
+}
+
+/** 午间报完整报告跳转 agent-report（intent=midday）展示 details 全文；页面本身只保留精简结论。 */
+function openMiddayFullReport() {
+  uni.navigateTo({
+    url: `/modules/chat/pages/agent-report?intent=midday&date=${currentDate.value}`,
   })
 }
 
@@ -368,7 +560,9 @@ function togglePlay() {
     podcastStore.resume()
     return
   }
-  const label = broadcastType.value === 'morning' ? 'AI 早报' : 'AI 晚报'
+  const label = broadcastType.value === 'morning'
+    ? 'AI 早报'
+    : broadcastType.value === 'midday' ? 'AI 午间报' : 'AI 晚报'
   // 传相对路径：FloatingPodcast 按 API 前缀（/api）拼接完整地址，与 generatePodcast 返回格式一致
   podcastStore.playDirect(`/api/agent/audio/${filename}`, key, label, 0)
 }
@@ -389,20 +583,60 @@ async function changeDate(delta: number) {
   loadReport()
 }
 
-/** 切换晨报/晚报，重新加载当日对应类型的报告 */
-function switchType(type: BriefType) {
+/** 切换晨报/午间报/晚报：状态切换 + 重载当前类型报告。
+ *  不重建页面（uni.redirectTo 同路由重建/复用在 H5 下不确定，会导致加载竞态、内容丢失）；
+ *  类型间数据残留由 fetchReportFor 各分支清空兜底。H5 端用 replaceState 同步地址栏类型参数。 */
+function switchType(type: BriefingTabType) {
   if (broadcastType.value === type) return
   broadcastType.value = type
   loadReport()
+  // #ifdef H5
+  syncUrlType(type)
+  // #endif
 }
+
+// #ifdef H5
+/** H5 端同步 URL 类型参数：仅更新地址栏（replaceState 不触发路由导航，页面不重建） */
+function syncUrlType(type: BriefingTabType) {
+  try {
+    const url = new URL(window.location.href)
+    url.searchParams.set('type', type)
+    url.searchParams.set('date', currentDate.value)
+    history.replaceState(null, '', url.toString())
+  } catch {
+    /* 忽略：地址栏同步失败不影响功能 */
+  }
+}
+// #endif
 
 /**
  * 拉取指定日期的广播与简报并写入展示状态，返回是否找到可用内容。
  * 仅消费通过严格校验的 Broadcast v1 / Brief v1（解析器强制绑定同日同类型，
  * 不会把跨日期或旧结构数据混入）。
+ * seq 为发起时的加载序号：await 期间类型/日期可能被再次切换（loadSeq 递增），
+ * 迟到结果必须丢弃，否则旧请求会覆盖新状态（如晨报请求晚到执行
+ * middayReport=null 清空刚加载好的午间报 → 盘中要点卡片消失）。
  */
-async function fetchReportFor(date: string): Promise<boolean> {
+async function fetchReportFor(date: string, seq: number): Promise<boolean> {
+  /** 本请求是否已过期（期间发生过新的加载） */
+  const stale = () => seq !== loadSeq
   try {
+    // 午间报分支：走通用报告端点（方案 A，audio_path 回填在 content 内），不消费 broadcast/brief。
+    // 必须先清空晨/晚报的广播与洞见条目（items/report/eveningViewModel）——
+    // 否则从晨报切回午间报时，晨报的 Agent 洞见会残留并渲染在午间报下方。
+    if (broadcastType.value === 'midday') {
+      items.value = []
+      report.value = null
+      eveningViewModel.value = null
+      const res: unknown = await agentApi.getReport('midday', date)
+      if (stale()) return false
+      middayReport.value = parseMiddayReport(res, date)
+      return middayReport.value !== null
+    }
+    // 午间报报告不适用于晨/晚报展示，切换类型时清空
+    if (stale()) return false
+    middayReport.value = null
+
     // 晚报分支：并行加载 broadcast + brief + review
     // 晨报分支：保持原逻辑（broadcast + brief），不加载 review
     const requests: Promise<unknown>[] = [
@@ -414,6 +648,7 @@ async function fetchReportFor(date: string): Promise<boolean> {
     }
 
     const [broadcastRes, briefRes, reviewRes] = await Promise.allSettled(requests)
+    if (stale()) return false
 
     // 仅消费通过严格校验的 Broadcast v1，避免跨日期或旧结构数据混入。
     if (broadcastRes.status === 'fulfilled') {
@@ -452,8 +687,11 @@ async function fetchReportFor(date: string): Promise<boolean> {
 
     return report.value !== null || items.value.length > 0
   } catch {
+    // 过期请求的异常不落状态（新请求会自行初始化）
+    if (stale()) return false
     report.value = null
     items.value = []
+    middayReport.value = null
     eveningViewModel.value = null
     return false
   }
@@ -461,6 +699,8 @@ async function fetchReportFor(date: string): Promise<boolean> {
 
 async function loadReport() {
   if (!currentDate.value) return
+  // 每次加载递增序号：使仍在进行中的旧请求过期，丢弃其迟到结果（防竞态覆盖）
+  const seq = ++loadSeq
   loading.value = true
   // 切换日期/类型：暂停悬浮窗播放（避免旧报告音频继续，用户可手动续播）
   podcastStore.pause()
@@ -474,7 +714,8 @@ async function loadReport() {
     let found = false
     for (let offset = 0; offset <= MAX_FALLBACK_DAYS; offset++) {
       const date = offset === 0 ? requested : addCalendarDays(requested, -offset)
-      if (await fetchReportFor(date)) {
+      if (await fetchReportFor(date, seq)) {
+        if (seq !== loadSeq) return // 已切换到新加载，丢弃本轮回退结果
         if (offset > 0) {
           currentDate.value = date
           isFallback.value = true
@@ -484,12 +725,13 @@ async function loadReport() {
         break
       }
     }
+    if (seq !== loadSeq) return
     if (!found) {
       // 回退窗口内无任何报告：保持请求日期，展示空状态。
       currentDate.value = requested
     }
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
@@ -628,6 +870,234 @@ onLoad((options) => {
   color: $primary;
   border: 1rpx solid rgba(77, 124, 254, 0.20);
   font-weight: 500;
+}
+
+/* 午间报卡片（盘中报，样式参考晨报头条卡片） */
+.midday-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid rgba(77, 124, 254, 0.20);
+  border-left: 8rpx solid $primary;
+}
+
+.midday-label {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+/* 盘中研判标题星标：与早报「今日头条」★ 一致 */
+.midday-star {
+  font-size: 24rpx;
+  color: $primary;
+}
+
+/* 卡片标题前的圆角正方形标识（中间文字），与晨/晚报洞见卡图标（64rpx 圆角方标）风格一致 */
+.midday-badge {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
+  background: $primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+/* 盘中要点分段标识配色：盘面回顾→蓝、午后前瞻→紫、资金情绪→橙 */
+.midday-badge--blue { background: $primary; }
+.midday-badge--purple { background: #7c3aed; }
+.midday-badge--orange { background: #d97706; }
+
+/* 风险提示卡片：红色方标 */
+.midday-badge--risk {
+  background: #e04545;
+}
+
+.midday-label-text {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: $primary;
+  letter-spacing: 2rpx;
+}
+
+.midday-risk-label-text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #e04545;
+}
+
+.midday-summary {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: $ink;
+  line-height: 1.4;
+  display: block;
+  margin-bottom: 20rpx;
+}
+
+.midday-view-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  background: rgba(11, 95, 255, 0.06);
+  border-radius: 999rpx;
+  padding: 12rpx 24rpx;
+}
+
+.midday-view-entry-text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: $primary;
+}
+
+/* 午间报多分段摘要卡片（对齐洞见行卡片样式） */
+.midday-section-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 16rpx;
+  border: 1rpx solid $line;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
+}
+
+/* 午间报分段卡片：洞见卡同款布局（左侧方标 + 右侧标题/结论，结论随 body 缩进） */
+.midday-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.midday-section-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.midday-section-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: $ink;
+  line-height: 1.4;
+  margin-bottom: 6rpx;
+}
+
+.midday-section-conclusion {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-size: 24rpx;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+/* 午后前瞻 · 机会/风险双栏对位（schema 2.1） */
+.midday-dual-col {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+  margin-top: 20rpx;
+}
+
+.midday-col {
+  flex: 1 1 240rpx;
+  min-width: 0;
+}
+
+.midday-col-label {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 12rpx;
+}
+
+.midday-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 4rpx;
+}
+
+.midday-dot--up { background: #0b5fff; }
+.midday-dot--down { background: #e04545; }
+
+.midday-col-label-text {
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.midday-col-label-text--up { color: #0b5fff; }
+.midday-col-label-text--down { color: #e04545; }
+
+.midday-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.midday-pill {
+  font-size: 24rpx;
+  line-height: 1;
+  padding: 12rpx 20rpx;
+  border-radius: 999rpx;
+}
+
+.midday-pill--up {
+  color: #0b5fff;
+  background: rgba(11, 95, 255, 0.08);
+}
+
+.midday-pill--down {
+  color: #e04545;
+  background: rgba(224, 69, 69, 0.08);
+}
+
+/* 午间报风险提示：单卡片容器（标题方标 + 编号列表） */
+.midday-risk-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 28rpx 32rpx;
+  margin-bottom: 16rpx;
+  border: 1rpx solid $line;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.03);
+}
+
+.midday-risk-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  margin-top: 18rpx;
+  /* 与标题/方标区形成层级缩进 */
+  padding-left: 20rpx;
+}
+
+/* 风险编号（圆角小方块） */
+.midday-risk-index {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 10rpx;
+  background: rgba(224, 69, 69, 0.10);
+  color: #e04545;
+  font-size: 22rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2rpx;
+}
+
+.midday-risk {
+  font-size: 24rpx;
+  color: #4b5563;
+  line-height: 1.5;
+  flex: 1;
 }
 
 /* 分区标签 */

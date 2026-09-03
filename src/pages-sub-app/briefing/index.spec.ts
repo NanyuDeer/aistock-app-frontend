@@ -26,3 +26,41 @@ test('非交易日无当日报告时自动回退最近可用报告并标注日�
   assert.match(source, /当前显示最近可用报告/)
   assert.match(source, /isFallback\.value = true/)
 })
+
+test('午间报 Tab 独立分支：走 getReport(midday) + 严格解析器渲染 display_report', () => {
+  assert.match(source, /switchType\('midday'\)/)
+  assert.match(source, /agentApi\.getReport\('midday', date\)/)
+  assert.match(source, /parseMiddayReport\(/)
+  assert.match(source, /content\.display_report/)
+  assert.match(source, /午间报/)
+})
+
+test('午间报不消费广播型字段：无 broadcast_midday、音频仅经 content.audio_path', () => {
+  assert.doesNotMatch(source, /broadcast_midday/)
+  assert.doesNotMatch(source, /getBroadcast\('midday'/)
+  assert.match(source, /content\.audio_path/)
+})
+
+test('午间报无音频时隐藏音频条只展示文字（空态用 hasAnyContent 守卫）', () => {
+  assert.match(source, /hasAnyContent/)
+  assert.match(source, /empty-state/)
+})
+
+test('午间报：午后前瞻渲染机会/风险双栏对位（opportunities），底部独立风险卡让位于对位区', () => {
+  assert.match(source, /afternoonSection/)
+  assert.match(source, /midday-dual-col/)
+  assert.match(source, /机会提示/)
+  assert.match(source, /风险提示/)
+  assert.match(source, /showStandaloneRiskCard/)
+})
+
+test('午间报：仅午后前瞻带 opportunities 的分段进入对位区，其余分段段落流保留（老数据回退）', () => {
+  assert.match(source, /displaySections/)
+  assert.match(source, /sections\.filter\(/)
+})
+
+test('午间报：午后前瞻对位区改由 opportunities 键存在性接管（空数组也保留卡，双空才整块隐藏）', () => {
+  assert.match(source, /sec\.opportunities !== undefined/)
+  assert.match(source, /afternoonSection && \(afternoonSection\.opportunities\?\.length \|\| middayRisks\.length\)/)
+  assert.match(source, /v-if="afternoonSection\.opportunities\?\.length"/)
+})

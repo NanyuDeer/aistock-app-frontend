@@ -80,6 +80,7 @@ export interface ChatMessage {
   reasoningSteps?: ReasoningStep[]   // NEW: AI 思考链
   cards?: ChatCard[]                 // P11: DONE 下发的结构化卡片（HTTP 降级/旧协议缺失）
   tokenUsage?: TokenUsage            // P11: DONE 下发的本轮 token 用量（会话本地累加用）
+  questions?: string[]               // 追问面板（2026-08-26）：DONE 下发 2-4 条建议追问，缺失=无建议
   timestamp: number
   /** Phase 4-2 Task 3：本地赞/踩反馈（v1 纯前端本地、按 message_id 持久化，不落库；同消息可改选/取消） */
   feedback?: 'up' | 'down'
@@ -198,10 +199,29 @@ export interface MarketTracePredictionStep {
   text: string
 }
 
+/** 条件锚点（Spec A：验证锚点，direction 自挂，不依赖 horizons[].direction） */
+export interface MarketTracePredictionAnchor {
+  horizon: 'short' | 'mid' | 'long'
+  threshold?: string
+  metric?: string
+  direction?: 'bullish' | 'bearish' | 'neutral'
+}
+
+/** 条件化预判单条（Spec A：condition + scenario + anchor） */
+export interface MarketTracePredictionCondition {
+  condition: string
+  scenario: string
+  anchor?: MarketTracePredictionAnchor
+  /** 简洁展示用关键词（2026-09-02 起新数据携带：1~2 个，单条 ≤10 字）；旧记录无 */
+  keywords?: string[]
+}
+
 export interface MarketTracePrediction {
   schema_version?: string
   prediction_status: 'confirmed' | 'hypothesis' | 'insufficient'
   horizons?: MarketTracePredictionHorizon[]
+  /** 条件化预判（Spec A §3.1；2.0 旧记录缺失） */
+  conditions?: MarketTracePredictionCondition[]
   evolution_narrative?: string
   /** 结构化演化步骤（前端时间轴渲染）；旧记录可能缺失 */
   evolution_steps?: MarketTracePredictionStep[]
@@ -351,6 +371,33 @@ export interface ChatAnalysisReport {
 }
 
 export type BriefType = 'morning' | 'evening'
+
+/** 午间报报告 DB 记录（GET /api/agent/report/midday/:date 返回；方案 A 契约） */
+export interface MiddayReportRecord {
+  id?: string | number
+  report_type: string
+  report_date: string
+  status?: string
+  data_source?: string | null
+  created_at?: string
+  content: {
+    display_report?: {
+      summary?: string
+      details?: string
+      stocks?: string[]
+      risks?: string[]
+      sections?: Array<{
+        title?: string
+        conclusion?: string
+        opportunities?: string[]
+      }>
+    }
+    podcast_brief?: string
+    schema_version?: string
+    /** 方案 A：音频回填到同一份 midday 报告的 content.audio_path；未生成音频时缺失/null */
+    audio_path?: string | null
+  }
+}
 export const PUBLIC_REPORT_INTENTS = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review'] as const
 export type PublicReportIntent = typeof PUBLIC_REPORT_INTENTS[number]
 
@@ -413,6 +460,148 @@ export interface BroadcastV1 {
   missing_sources: string[]
   dialogue: BroadcastDialogueLine[]
   audio_path: string | null
+}
+
+/** 节奏大师（report_type=rhythm_master，契约 #6：顶层 target_date/basis_date/refresh_slot） */
+export interface RhythmEvent {
+  date: string
+  type: 'delivery' | 'earnings' | 'seed' | 'macro'
+  title: string
+  importance: 'high' | 'medium' | 'low'
+  source: 'L1' | 'L2' | 'L3' | 'L4'
+  event_time?: string | null
+  result?: string | null
+}
+export interface RhythmBranch {
+  condition: {
+    kind: 'interval' | 'enum'
+    indicator: string
+    lo?: number | null
+    hi?: number | null
+    unit?: string
+    label?: string
+    value?: string
+  }
+  conclusion: { direction: 'bullish' | 'bearish' | 'neutral'; range?: string; validity: number; note?: string }
+  event_ref?: { event_date: string; title: string }
+}
+export interface RhythmCard {
+  score?: number | null
+  level?: string | null
+  position_band: { min?: number | null; max?: number | null; text: string }
+  phase?: string | null
+  phase_evidence?: Record<string, unknown>
+  temperature_series: { date: string; score: number }[]
+  event_window: RhythmEvent[]
+  event_source_missing?: boolean
+  event_high_hint?: string
+  next_event_anchor?: { title: string; event_date: string; days_until: number; note: string } | null
+  conflict: boolean
+  conflict_detail?: string
+  branches: RhythmBranch[]
+  data_missing?: string[]
+}
+export interface RhythmMasterContent {
+  display_report?: { summary?: string; details?: string; risks?: string[] }
+  schema_version?: string
+  target_date?: string
+  basis_date?: string
+  refresh_slot?: 'after_close' | 'morning' | 'midday'
+  rhythm_card?: RhythmCard
+}
+export interface RhythmMasterReport {
+  report_type: string
+  report_date: string
+  created_at?: string
+  content?: RhythmMasterContent
+}
+
+/** 每日收盘基准建议仓位（rhythm_card.position_band 透传；缺失/无仓位语义 = null，前端如实展示） */
+export interface RhythmPositionBand {
+  min?: number | null
+  max?: number | null
+  text?: string
+}
+
+/** 节奏日历热力图行（契约 #7）：恒取 after_close 收盘基准；level 可空 = 灰格（行缺失/沿用前值） */
+export interface RhythmCalendarDay {
+  date: string
+  refresh_slot: 'after_close'
+  level: string | null
+  score: number | null
+  basis_date: string | null
+  position_band: RhythmPositionBand | null
+}
+
+export interface RhythmCalendarResponse {
+  days: RhythmCalendarDay[]
+}
+
+/** 板块四环聚合（/api/agent/sector-insight/:date，2026-09-02）：单板块候选 */
+export interface SectorInsightQuote {
+  pct_change: number | null
+  amount: number | null
+  lead_stock: string | null
+}
+
+export interface SectorInsightTrace {
+  present: boolean
+  status?: 'completed' | 'insufficient'
+  summary: string | null
+  sectors: string[]
+}
+
+export type SectorDirection = 'bullish' | 'bearish' | 'neutral'
+export type SectorConfidence = 'high' | 'medium' | 'low'
+
+export interface SectorInsightHorizon {
+  horizon: 'short' | 'mid' | 'long'
+  remaining?: string
+  direction?: SectorDirection
+  confidence?: SectorConfidence
+}
+
+export interface SectorInsightCondition {
+  horizon: 'short' | 'mid' | 'long'
+  direction?: SectorDirection
+  condition: string
+  scenario: string
+  /** 简洁展示用关键词（2026-09-02 起新数据携带：1~2 个，单条 ≤10 字）；旧记录无 */
+  keywords?: string[]
+  /** 该条件是否已触发（验证回填），缺省 null=待观察 */
+  met?: boolean | null
+}
+
+export interface SectorInsightPrediction {
+  present: boolean
+  status?: 'pending' | 'verified' | 'skipped'
+  dueLabel?: string | null
+  verification?: 'pending' | 'hit' | 'miss'
+  /** 概览方向/置信（取首档有值者），detail 在 horizons */
+  direction?: SectorDirection
+  confidence?: SectorConfidence
+  horizons?: SectorInsightHorizon[]
+  conditions?: SectorInsightCondition[]
+}
+
+export interface SectorInsightCandidate {
+  ts_code: string
+  name: string
+  category: 'industry' | 'concept'
+  source: 'wind_leader' | 'review_primary' | 'both'
+  cycle?: 'long' | 'short' | 'both' | null
+  quote: SectorInsightQuote | null
+  /** 仅 review_primary/both（读当日 sector_trace 报告）；wind_leader-only 恒 null */
+  trace: SectorInsightTrace | null
+  prediction: SectorInsightPrediction | null
+}
+
+export interface SectorInsightResponse {
+  date: string
+  hasData: boolean
+  candidates: SectorInsightCandidate[]
+  /** 归一失败板块（可选，便于排查） */
+  unresolved?: Array<{ name: string; source: string }>
 }
 
 export const agentApi = {
@@ -566,6 +755,23 @@ export const agentApi = {
   /** 读取大盘复盘报告。 */
   getMarketTraceReview(date: string) {
     return request.get<MarketTraceReviewRecord | null>(`/agent/report/review/${date}`)
+  },
+
+  /** 板块四环聚合（板块溯源+预判+验证 一览）：当日板块候选与各环节摘要。 */
+  getSectorInsight(date: string) {
+    return request.get<SectorInsightResponse>(`/agent/sector-insight/${date}`)
+  },
+
+  /** 节奏大师三时点版本读取（契约 #4）：返回 { date, versions: [{refresh_slot, created_at, content}] } */
+  getRhythmMaster(date: string) {
+    return request.get(`/agent/rhythm-master/${date}`)
+  },
+
+  /** 节奏日历热力图聚合（契约 #7）：最近 N 个交易日 after_close 收盘基准档位。
+   *  返回 { days: [{date, refresh_slot, level, score, basis_date, position_band}] }，
+   *  level 可空（灰格）；position_band 为空 = 该日无仓位语义（如实展示，不伪造）。 */
+  getRhythmMasterCalendar(days = 60) {
+    return request.get<RhythmCalendarResponse>('/agent/rhythm-master/calendar', { params: { days } })
   },
 
   /**

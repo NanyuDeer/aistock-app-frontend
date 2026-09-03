@@ -2,6 +2,426 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-09-03 — 午间报「午后前瞻 → 机会/风险对位」（schema 2.1）
+
+**开发者**: 37588
+
+### 新增
+- 早点听午间报卡「午后前瞻」由长段落改为**机会提示/风险提示左右双栏**（`briefing/index.vue`）：机会 = `午后前瞻.opportunities`（4-5 个 ≤8 字 pill，蓝），风险 = `display_report.risks`（短词 pill，红）；LLM 无明确机会（空数组）时卡保留、仅渲染风险栏全宽；opportunities 与 risks 双空整卡隐藏；老数据（无 opportunities 键）回退段落流 + 底部独立风险卡
+
+### 改进
+- `shared/utils/middayReport.ts`：`MiddaySection.opportunities?` 可选字段；`normalizeSections` 保留条件放宽（opportunities 键存在即对位，空数组兼容）；`normalizeKeywords` 防御归一（trim/去空/最多 5 个/每项 ≤8 字截断）；risks 不做内容截断（老数据长句原样保留）
+- `shared/api/modules/agent.ts`：`MiddayReportRecord.content.display_report` 补可选 `sections[{ title?, conclusion?, opportunities? }]`
+
+### 测试
+- 新增 `shared/utils/middayReport.spec.ts`：新结构保留 / 空 opportunities 兼容 / 防御归一 / 老数据兼容（opportunities undefined）/ risks 不截断
+- `pages-sub-app/briefing/index.spec.ts`：追加双栏对位 / displaySections 过滤 / 空机会守卫 source 断言
+- `vue-tsc --noEmit` 零错误
+
+### 文档
+- 根 `AGENTS.md`：分包表「早点听」行与 §6.2 `agent.ts` 行补充 schema 2.1 对位契约（`content.display_report.sections[].opportunities` 可选）
+
+## [changer] 2026-09-02 — 节奏大师页通用子页化 + 顶部日期条 + 首页近5日摘要卡
+
+**开发者**: changer-collab
+
+### 改进
+- 节奏详情页 `rhythm/pages/index.vue` 与日历页 `pages/calendar.vue` 由自绘 nav + `.page{height:100%}` 迁移到通用子页容器 `SubPageCard2`（fixed 布局 + 原生滚动 + 白底导航），根治 H5 固定 9:16 视口下页面"翻不动"；底部随容器恢复全局 AI 对话栏 GlobalChatBar（报告|AI 对话胶囊|自选 + 免责声明）
+- 节奏详情页内容区顶部新增**近 7 交易日紧凑日期条**（收盘基准档位色 + 短码 + 建议仓位文本，点格切换目标日并重拉三时点版本）；右上 header-right 新增"日历"入口（此前 60 日总览页无任何入口）
+- 首页节奏大师卡由"仅最近 1 天摘要"改为**近 5 交易日摘要行**（MM-DD + 档位色 chip + 建议仓位，点行进该日详情），一次 `getRhythmMasterCalendar(5)` 取数，不再逐日 `getRhythmMaster`（避免放大首页 onShow 刷新成本）
+- `agent.ts`：新增 `RhythmCalendarDay`/`RhythmPositionBand`/`RhythmCalendarResponse` 类型，`getRhythmMasterCalendar` 类型化（含 `position_band`）
+- 修复 `chat/event/components/EventHeadlineCard.vue` `sourceInfo: () => undefined` 冗余默认值导致的 TS2322（基线遗留，挡 vue-tsc）
+
+### 测试
+- `MorningContent.spec.ts`：节奏卡近 5 日摘要相关用例更新（getRhythmMasterCalendar / goRhythmDate / 失败兜底 / onShow 接入）；`rhythm/pages/index.spec.ts`、`RhythmCard.spec.ts` 保持通过；`vue-tsc --noEmit` 零错误
+
+### 文档
+- `src/modules/rhythm/AGENTS.md`：页面容器变更、顶部日期条、首页近 5 日摘要、`position_band` 契约
+
+## [changer] 2026-09-02 — 节奏大师下一重大事件锚点 + 洞察详情引用修复
+
+**开发者**: changer-collab
+
+### 新增
+- `RhythmCard` 事件日历区块新增「下一重大事件」锚点条：渲染 `rhythm_card.next_event_anchor`（首条 high 事件 + 距运行日 N 天），`v-if` 控制无锚点整块不渲染（`components/RhythmCard.vue`）
+- `RhythmCard` 类型加可选字段 `next_event_anchor?: { title, event_date, days_until, note } | null`（旧报告零破坏）（`shared/api/modules/agent.ts`）
+
+### 修复
+- `insight-detail-move.vue`：删除残留 `suggestedActions` 引用（建议跟踪 2026-08-25 已移除，定义删除时漏删引用），修复 TS2304
+
+### 测试
+- `RhythmCard.spec.ts`：P1 锚点渲染源码断言（next_event_anchor / v-if / 下一重大事件 / rc-anchor）
+
+### 文档
+- `src/modules/rhythm/AGENTS.md`：渲染契约表追加 next_event_anchor 字段行
+
+## [master] 2026-09-01 — 条件化预判改造前端（Spec A，三端全量收尾）
+
+**开发者**: Aria
+
+### 新增
+- `src/shared/api/modules/agent.ts` + `prediction.ts`：新增 `MarketTracePredictionAnchor`/`MarketTracePredictionCondition`/`PredictionCondition`/`PredictionConditionAnchor`；`MarketTracePrediction` 增加可选 `conditions`，`PredictionVerificationEntry` 扩展 `condition_index/condition_met/threshold/target_type`
+- `marketTraceReview.ts`：`PredictionPresentation` 增加 `conditions`，`toPredictionPresentation` 映射后端 conditions
+- `predictionHistory.ts`：新增 `ConditionStage` 与 `conditionStage(record, index)` 按 `c{i}` key 读取条件验证（独立于 horizon）
+- `MarketTracePrediction.vue`：新增条件化预判块（condition+scenario+anchor 芯片），2.0 旧记录 conditions 空不渲染
+- `PredictionVerification.vue`：新增条件化预判验证渲染（按 c{i}），融合 A1 early_exit 失效信号，horizon 验证保持兼容
+
+### 测试
+- `predictionHistory.spec.ts` 新增 `conditionStage` 用例；`marketTraceReview.spec.ts` 新增 conditions 映射与空兜底；`marketInsightBrief.spec.ts` 补 `conditions` 字段；node:test 28 通过，Spec A 相关 `vue-tsc --noEmit` 通过
+
+---
+
+## [master] 2026-08-31 — 登录页恢复「手机号验证码登录」入口（阿里云短信认证）
+
+**开发者**: Aria
+
+### 新增
+- `login.vue`：登录方式增加「手机号验证码登录」入口按钮（`phone-line` 图标）；新增手机号表单（phone + smsCode，`handleSendSms`/`handlePhoneLogin`，手机号格式校验 `^1[3-9]\d{9}$`，60s 倒计时），与邮箱表单共享 `smsCode`/`countdown`
+- `user.ts` store：新增 `smsLogin(phone, code)`（复用 `authApi.smsLogin`，存 token/userInfo 后 `fetchUserInfo`）并导出
+
+### 说明
+- 仅 App 端（aistock-app-frontend）；Web 端登录方式不变。`vue-tsc --noEmit` 通过
+
+---
+
+## [master] 2026-08-31 — 洞见卡标签统一 + VIP 弹窗/会员页优化 + 登录验证码可读性修复
+
+**开发者**: Aria
+
+### 修复
+- `AiEventReport.vue` + `insight-detail.vue` + `insight-detail-move.vue`：移除三处自定义洞见标签（动因/展望、依据/展望、依据/跟踪），统一使用 InsightCard 默认「溯源/预判」，与全局洞见卡契约一致
+- `login.vue` + `account-security.vue`：验证码按钮禁用态整体 opacity 导致白字变浅灰看不清，改为取消整体透明度、背景手动淡化 + 文字固定纯白
+- `MarketInsightCard.vue`：通过 `:deep()` 覆盖子组件 section padding 为 0，并移除"溯源"外层白卡包装，使现象/溯源/预判卡外边界与洞见卡对齐（消除卡中卡）
+
+### 改进
+- `vip.vue`：会员身份卡由纵向居中改为横向布局——皇冠标识左对齐（渐变金色圆底），权益勾选标识加浅绿圆底，提升页面质感
+- `agent-report.vue` + `ConfirmModal.vue`：非会员引导开通弹窗统一为 ConfirmModal（560rpx + 等宽 secondary/primary 双按钮）；ConfirmModal 新增 `maskClosable` prop 透传（VIP 弹窗点遮罩不可关闭）
+
+---
+
+## [junliang] 2026-08-28 — 修复异动详情页渲染崩溃（suggestedActions 残留引用）
+
+**开发者**: Aria
+
+### 修复
+- `src/modules/favorites/pages/insight-detail-move.vue`：洞见卡 computed 中 `forecast` 引用已删除的 `suggestedActions`（2026-08-25 移除"建议跟踪"时漏删）→ `ReferenceError` 导致详情页渲染崩溃白屏。修复为 `forecast` 恒为空（与移除建议跟踪的决策一致），并同步注释
+
+## [changer] 2026-08-30 — 节奏大师语义修正 + 日历热力图总览（design-debate）
+
+**开发者**: changer-collab
+
+### 新增
+- 节奏日历热力图总览页 `pages/calendar.vue`：近 60 交易日网格（7 列按周），独立五档色板 + 图例，灰格=无报告/沿用前值，点格跳详情（带 date），H5 直开兜底
+- `agentApi.getRhythmMasterCalendar(days)` API（契约 #7）
+
+### 修复
+- `RhythmCard.vue` 分支语义：拆分"触发条件 / 目标参考区间"标签、点位来源脚注、`conflict=true` 隐藏仓位建议（G2 背离纪律）、空区间"结果待公布"占位
+- 详情页返回按钮 H5 直接 URL 打开时 `reLaunch` 回首页兜底
+- `vite.config.ts` 新增 `/api/agent/trading-calendar` 显式代理规则（修复本地 H5 节奏大师 fallbackDate 500）
+
+### 文档
+- `src/modules/rhythm/AGENTS.md` 更新（日历页/接口/分支语义/契约 #7）
+
+---
+
+## [master] 2026-08-28 — 洞见卡片体系统一：横幅卡配色 + 板块洞见蓝卡 + 修复市场洞见预判
+
+**开发者**: Aria
+
+### 新增
+- 全局 SCSS mixin `insight-banner`（洞见 key+text 卡片化：顶部小字关键词 + 底部正文，底色由 `--banner-bg` 指定）与 `insight-line`（左 key 右 text 统一排版），一处调整全站生效
+- 趋势洞见独立紫色 token（`$insight-trend` 系列）与 `InsightCard`/`InsightTag` 的 `trend` 类型，与市场蓝脱色区隔
+
+### 改进
+- 洞见 key+text 全部升级为彩色横幅卡（同「归因结论」样式）：溯源=实底蓝、预判=浅金柔底（`$gold-soft-bg` #fff4de + 深金字 + 细描边）、优势=绿、风险=红；覆盖 `InsightCard`、个股综合决策（重点/机会/风险）、板块洞见等
+- 板块洞见：持续原因/传递方向/传递判断 合入**同一蓝色卡片**（分隔线分开、行距优化），风险提示独立红色横幅；AI 分析卡上移至板块 K 线上方
+- 全站接入统一洞见卡片（事件页/情报页/异动页/业绩洞见/趋势详情），溯源/预判 与 lines（优势/风险/建议）字段契约稳定
+- 洞见解 line 统一排版抽离（key=22rpx/600/$primary，text=26rpx/$ink-soft/400），个股详情与板块页同步生效
+
+### 修复
+- 市场洞见页预判恒显示"暂无预判"：预测记录改为按**报告真实日期**关联（后端 review 查询会回退返回最近可用报告），回退场景也能命中预测；日期标签同步显示真实报告日期
+- `InsightCard` 的 `trace`/`forecast` 声明为可选，修复 report-detail 传 `lines` 时的类型报错
+
+### 文档
+- AGENTS / README / LLM prompt 改造建议（字段契约、横幅卡语义色、板块洞见关键词）同步
+
+---
+
+## [changer] 2026-08-28 — 市场洞见展开详情渲染修复
+
+**开发者**: 37588
+
+### 重构
+- 展开详情现象块复用 MarketTracePhenomenon 完整卡片（严重度标签 + 指数表现/领涨领跌网格），移除手写现象块与领涨领跌代码，清理 detail computed / sectorNames 等无引用代码与样式
+- 溯源块删除冗余「主因」标题，结构收敛为「溯源 → 归因结论」；预判去掉外层「预判」标题，三块统一单层标题（核心现象 / 溯源 / 影响持续性预判）
+
+---
+
+## [changer] 2026-08-27 — 市场洞见页改造：完整归因报告改为简短洞察卡
+
+**开发者**: 37588
+
+### 改进
+- 市场洞见页（原大盘溯源报告页）由完整归因报告改版为「简短洞察卡 + 展开详情」：卡片完整呈现现象/溯源/预判与置信度（不截断省略），展开后按现象/溯源/预判三块展示详情
+- 移除备选链、被拒候选、待确认风险与「完整报告（原始）」折叠区块，信息更聚焦
+- 无预判记录时不再显示"预判生成中/今日暂无预判"空态占位，改为卡片内兜底提示
+
+### 文档
+- README/AGENTS/分析模块说明同步（简短洞察卡改版）
+
+---
+
+## [master] 2026-08-27 — 午间报切换修复 + 盘中要点从 details 解析 + 卡片样式统一
+
+**开发者**: Aria
+
+### 修复
+- 晨/晚报切换后路由不更新（URL 停在进入时类型）→ `switchType` 状态切换 + H5 `history.replaceState` 同步 URL 类型参数（不重建页面）
+- 切回午间报后残留晨报 Agent 洞见 → `fetchReportFor` 午间报分支先清空 items/report/eveningViewModel，杜绝类型间数据串扰
+- 晚报切回午间报盘中要点卡片消失 → 根因：后端 `display_report` 只返回 `details`（markdown），不返回结构化 `sections` 字段，前端只消费 `sections`（恒空）→ 盘中要点从未渲染。修复：`middayReport.ts` 新增 `parseSectionsFromDetails` 从 details「## 第N部分：标题」解析分段摘要（标题去前缀、结论为要点合并），`parseMiddayReport` 在 sections 为空时兜底；结论加 `-webkit-line-clamp: 3` 截断；保留 loadSeq 竞态守卫
+
+### 改进
+- 盘中研判标题方标「盘」→ 早报同款 ★ 星标；盘中要点分段卡片改洞见卡同款布局（左侧方标 + 右侧标题/结论随 body 缩进）；风险提示标题字号/字重统一 28rpx/600（红色保留）；风险编号列表项加 20rpx 左缩进
+
+### 验证
+- `npx tsc --noEmit` 通过；`parseSectionsFromDetails` 用真实后端 details 解析出「上午盘面回顾/午后前瞻」2 个分段
+
+---
+
+## [xusiyun] 2026-08-27 — 修复事件原文详情页顶部状态栏遮挡
+
+**开发者**: xusiyun
+
+### 修复
+- `src/pages-sub-app/event-article/index.vue`：页面配置 `navigationStyle: custom` 后自绘导航栏从屏幕最顶渲染，返回按钮与「原文详情」标题被系统状态栏/摄像头/刘海遮挡。修复：页面根容器增加 `paddingTop: statusBarHeight`（`uni.getSystemInfoSync().statusBarHeight`，APP 端除以 zoom 1.2 补偿，与 SubPageCard2 同款方案），兼容 iOS 刘海 / Android 状态栏 / 普通设备 / H5（H5 statusBarHeight=0，无额外顶部空白）。
+- 验证：`npm run type-check` 通过；`npm run build:app` 构建通过且产物含修复；H5 实测 statusBarHeight=0、导航栏紧贴视口顶端、正文正常从导航栏下方开始；真机待验证。
+
+## [changer] 2026-08-26 — AI 投顾追问面板（回答后底部建议追问 + 输入框）
+
+**开发者**: 37588
+
+### 新增
+- 追问面板：回答打字机完成后底部弹出建议追问胶囊 + 输入框；点胶囊发送追问 → 面板收起、输入栏恢复；无 questions（deep 降级/闸门/澄清）不弹面板；× 收起恢复 quick-skills 行，消息 footer「查看追问」弱入口可恢复；上滑（followPaused）不自动弹、弱入口可恢复
+- ChatMessage 增加 `questions?: string[]`（WS/HTTP 容缺消费，`[]` 与 `undefined` 均视为无建议）；FollowupSuggestChips 组件自组件库复制接入；面板状态机 + 打字机完成信号触发（typingMsgKey → null 才展示，F2 守卫）
+
+### 改进
+- 新发送轮/发送追问收起面板；立即展示路径保留 pending（× 收起后 footer 弱入口可恢复）；删除气泡胶囊与 parseFollowupQuestions 解析器（单一追问面板范式）
+
+### 验证
+- vitest useChatStream 48/48 + node:test chat/index 49/49 + tsc/vue-tsc 0 错误
+
+---
+
+## [master] 2026-08-26 — 悬浮播报 App 端面板定位修复
+
+**开发者**: Aria
+
+### 修复
+- `FloatingPodcast.vue`：展开面板右缘出屏 + 面板头部最右侧「关闭」按钮落在屏外点不到（用户反馈"× 叉不掉"、"右偏移到屏幕外"）。根因：App 内核整页缩放时 `right` 定位推算右缘溢出屏外（与既有注释记载的 App rpx 基准不一致问题一致）。修复：App/小程序分支静止/吸附/展开统一改为 `left` px 计算定位并 clamp（右缘恒为 winW - margin），面板与悬浮球完全落在屏内，关闭按钮回到可点击区域。
+- 验证：`FloatingPodcast.spec.ts` 2 个用例通过；`npx tsc --noEmit` 通过。
+
+---
+
+## [master] 2026-08-26 — 文档：部署 Web 前端流程补充
+
+**开发者**: Aria
+
+### 文档
+- `docs/app-update-release-process.md`：补充「部署 Web 前端」章节警告（`npm run build -- --dest` 无效，`scripts/build.js` 忽略 `--dest`，须用 rm+cp 方案）并新增常见问题条目「部署后网页没更新」（2026-08-26，0.1.2 重发时实测踩坑）
+
+---
+
+## [master] 2026-08-26 — 我的页 UI 完善 + 统一确认弹窗 + Modal 隐形拦截修复 + 多端适配
+
+**开发者**: Aria
+
+### 新增
+- 统一确认弹窗 `src/shared/components/ConfirmModal.vue`：基于 Modal 组件（白色圆角卡片 + 标题 + 关闭叉号 + 内容区 + footer 等宽按钮），样式与版本更新弹窗（UpdateModal）一致；支持 `v-model:visible`、title/content、confirmText/cancelText、showCancel（信息弹窗）、danger（删除等危险操作红字确认）；替换原生 `uni.showModal`（H5 浏览器原生样式不统一）：
+  - `profile.vue`：确认退出、确认删除（danger）、确认重置、关于洞见（单按钮）
+  - `favorites.vue`：删除自选股（单个/批量，danger）
+- 多端适配（方案 B 中等自适应，平板/折叠屏/横屏大屏）：
+  - `src/pages.json` globalStyle 配置 rpx 收敛参数（`rpxCalcMaxDeviceWidth: 1024` 等，平板/折叠屏展开时 rpx 放大不再失控）
+  - 新增 `src/shared/utils/useAdaptiveScreen.ts`：宽屏判断（阈值 700px）+ `uni.onWindowResize` 监听窗口变化（折叠屏展开/收起、平板旋转实时响应）
+  - `src/shared/utils/h5-scale.ts` 支持画布模式切换（手机 390×693 / 平板竖屏 860×900 / 平板横屏 1194×834 / 大屏 1024×768）：切换时同步 html font-size（rpx 基准）与 #app 尺寸，仅 H5 开发环境显示右下角切换按钮（localStorage 持久化）
+  - 宽屏布局：MainTabs/SubPageCard/SubPageCard2 宽屏内容限宽 1200px 居中；首页 feature-grid 宽屏 3 列
+
+### 修复
+- Modal.vue 隐藏态隐形拦截：`.as-modal:not(.is-visible) .as-modal__dialog { pointer-events: none }`——弹窗隐藏时（opacity:0）dialog 不再占据 DOM 捕获指针事件，修复首页「机构推荐热门股」整卡点不开（CDP 实证：居中的不可见版本更新弹窗恰好盖住屏幕中央卡片）；一并解决所有使用 Modal/UpdateModal 页面屏幕中央区域被隐形拦截的同类问题
+- 账号与安全页双顶栏：`src/pages.json` 为 `account-security`/`vip` 页补 `"navigationStyle": "custom"`（此前原生导航栏与 SubPageCard2 自带白色导航栏同时渲染）
+- ListCell 可点击列表项 H5 光标：`.as-list-cell.is-clickable` 补 `cursor: pointer; user-select: none`（与 Card 组件一致）
+- 首页白色卡片与提醒模块卡片按压动效：MorningContent.vue（feature-card/track-card）与 AlertContent.vue（module-card）复用 briefing-card 点击动效（`:active { transform: scale(0.98); box-shadow: $shadow-sm }`），与「今日专属」卡片一致
+
+### 改进
+- 账号与安全页改用 SubPageCard2（v2 白色导航栏，与 vip/insight/monitor 等新子页面视觉统一）：`account-security.vue` 由 SubPageCard v1 迁移，`noChatBar` → `no-chat-bar`，内容区顶部加 32rpx 间距
+- profile.vue「对话引导」重置先弹确认窗：确认后才清除 `chat_empty_guide_closed` 标记并提示，取消无操作
+- profile.vue「关于」入口修正：由仅弹 toast（版本号过期 v2.1）改为弹关于对话框（洞见 v0.1.2 + 简介 + 免责声明），菜单项移到「版本更新」下方；最终菜单顺序：自选股 → 账号与安全 → 对话引导 → 版本更新 → 关于
+- 文档：`src/modules/user/AGENTS.md` 补充 account-security/vip 页面登记，注明 SubPageCard2 容器使用情况
+
+### 验证
+- CDP 实证：Modal 隐形拦截根因（`document.elementFromPoint` 命中 um-footer）+ 修复后真实鼠标点击卡片跳转成功；多端画布切换（尺寸/rpx 基准/缩放）、首页 is-wide 类、宽屏 3 列均正常
+- 多端适配经 5 轮验收修正收敛（平板按宽缩放/完整显示、画布模式 4 个、宽屏限宽 1200px、平板竖屏 860×900 等）
+
+---
+
+## [master] 2026-08-26 — 午间报展示与播报 + 邮箱登录 App 联调 + 请求 scheme 修复
+
+**开发者**: Aria
+
+### 新增
+- 首页「今日专属」报卡补充午间报：`src/modules/home/components/MorningContent.vue` 按时间自动切换晨报/午间报/晚报（12:00–15:30 显示午间报，摘要+短关键词标签与晨/晚报样式统一）；`src/shared/utils/useBriefingCard.ts` 扩展支持 `midday` 类型（走 `/agent/report/midday/:date` 的 display_report 结构，晨/晚报仍走 `/agent/brief/:type/:date`）；`briefingTypeAtShanghaiTime` 时段划分：15:30+ 晚报 / 12:00–15:30 午间报 / 早间晨报
+- agent-report 概览加入「午间报」入口：`src/modules/chat/pages/agent-report.vue` 概览卡片在「收盘复盘」正上方新增午间报卡片（`OVERVIEW_ORDER` 增加 `midday`），走统一 `/agent/report/:intent/:date` 读取，点击 `selectAgent('midday')` 原地加载详情；`AGENT_META`/`titleMap` 新增 midday 配置
+- `src/shared/utils/middayReport.ts`：新增 `MiddaySection` 接口与 `normalizeSections` 归一化多分段摘要（仅保留含非空 conclusion 的项，容忍 LLM 字段缺漏/顺序变化）
+- `src/shared/utils/briefingNavigation.ts`：`buildBriefingUrl` 类型扩展支持 `midday`
+- 邮箱登录 App 前端联调打通：`Input.vue` 修复输入框高度塌缩为 0px 无法点击（`.as-input__inner` 固定 `height: 88rpx; box-sizing: border-box`）与 v-model 失效（`handleInput` 优先读 uni-app 标准 `event.detail.value`，保留 `target.value` 兜底）；邮箱登录表单验证码发送、60s 倒计时与登录落盘正常
+
+### 修复
+- App 调试请求 scheme 错误导致首页无数据：`src/shared/utils/constants.ts` 新增 `isExternalUrl()`（仅接受绝对且非回环地址），`API_BASE_URL`/`WS_BASE_URL`/`AGENT_WS_BASE_URL` 在 APP-PLUS 下仅接受外部绝对地址、否则兜底线上，不再被 dev 注入的相对 `/api` 或 `localhost` 覆盖（真机/基座调试不再报 `request:fail Expected URL scheme 'http' or 'https'`）；`src/shared/api/request.ts` baseURL 直接复用 constants 的 `API_BASE_URL`，删除重复的 `|| /api` 判定
+- 早点听午间报格式对齐晨/晚报（精简）：`src/pages-sub-app/briefing/index.vue` 午间报页由「完整长报告」改为与晨/晚报一致的精简结构——播报器 + 「盘中研判」结论卡 + 风险提示洞见卡，移除 `details` 全文渲染，新增「查看完整报告」入口 `openMiddayFullReport()` 跳转 agent-report 查看完整 Markdown
+- 邮箱绑定报错透传 + 空壳账户自动接管：`src/shared/api/request.ts` 非 2xx 错误归一化时把原始响应体挂到 `error.data`；`src/modules/user/pages/account-security.vue` `handleBind` 失败 toast 优先取 `e.data.message`，绑定被空账户占用的邮箱时自动释放旧账户并绑定成功
+- `src/shared/components/MainTabs.vue`：移除 `touch-action: none`（H5 端预览 App 会禁用浏览器原生触摸滚动与点击识别，导致「划很多次才动」、卡片点击无反应）
+
+### 验证
+- `vue-tsc --noEmit` 退出码 0；`node --import tsx --test` 相关用例全过（含午间报入口/格式新增用例）
+
+---
+
+## [master] 2026-08-25 — App 手机号短信验证码登录 + 账号与安全绑定
+
+**开发者**: Aria
+
+### 变更
+- `src/shared/api/modules/auth.ts`：新增 `sendSmsCode` / `smsLogin` / `bindPhone` / `bindWechat` 接口
+- `src/shared/store/modules/user.ts`：新增短信登录、手机/微信绑定 actions，维护 `phoneBound` / `wechatBound` 绑定态
+- `src/modules/user/pages/login.vue`：登录页新增「手机号验证码登录」入口与表单（手机号/验证码输入、60s 倒计时、dev 固定测试码 123456），可切回微信登录
+- `src/modules/user/pages/account-security.vue`（新增）：账号与安全页——展示并绑定/解绑手机号与微信，归属冲突 409 时展示引导文案
+- `src/modules/user/pages/profile.vue`：新增「账号与安全」入口
+- `src/pages.json`：注册 `modules/user/pages/account-security` 路由
+
+### 说明
+- 微信老用户数据保留：手机号登录后可在账号与安全页绑回原微信；微信用户也可绑定手机号，两渠道数据归属同一账户
+
+---
+
+## [master] 2026-08-25 — AI 报告详情改 VIP 会员专属 + 移除导出（renderjs 导出实现一并清理）
+
+**开发者**: Aria
+
+### 背景
+- 手机端导出 PDF 体验差、renderjs 视图层生成不稳定（预生成/导出超时），且在手机上阅读/截图即可满足需求 → 移除「导出报告」，报告改为 App 内纯阅读；同时报告详情设为 VIP 会员专属，非会员进入详情前弹窗引导开通
+
+### 变更
+- `src/modules/chat/pages/agent-report.vue`：移除导出入口（右上角「导出报告」按钮）与全部导出实现（renderjs `pdfExporter` 模块、预生成缓存、`savePdfAndShare`、`onPdfBase64/onPdfError` 等）；新增 VIP 门禁 `vipModalVisible` 弹窗，概览→详情与深层链接两条路径均校验 `userInfo.isVip`，非会员回退展示概览并引导跳转 VIP 页
+- `src/modules/user/pages/vip.vue`（新增）：会员中心占位页（SubPageCard2 容器，含「开通会员」底栏与开发中提示；`isVip` 时切换为已开通态）
+- `src/pages.json`：注册 `modules/user/pages/vip` 路由
+- `src/shared/components/FloatingPodcast.vue`：连续播放开关改用 uni-app 原生 `<switch>`（消除「Failed to resolve component: Switch」构建警告）
+
+### 说明
+- VIP 判定沿用 `userInfo.isVip`（后端 `/users/me` 的 `is_vip` 归一化）；未登录按非会员处理
+
+## [junliang] 2026-08-27 — 统一午尾盘异动与涨停雷达详情展示逻辑 + 候选归因板块调整
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/favorites/pages/insight-detail.vue`（涨停雷达详情）：归因明细（次要因素行）改为候选归因卡片列表，与午尾盘异动详情页同款 cand-card——统一两端展示逻辑；"主因判定"标签改为"支持性主因"；`.section-title` 与价格异动页样式对齐
+- `src/modules/favorites/pages/insight-detail-move.vue`（午尾盘异动详情）：板块名称调整——"主因"→"支持性主因"、原"支持性主因"区→"候选归因"；候选归因过滤由仅 supported 扩为 supported+weak（证据不足/反向排除不展示）；移除"建议跟踪"区块（2026-08-25 决策）
+
+---
+
+## [master] 2026-08-25 — 发布流程文档补全 + 修复「已装 0.1.1 仍反复弹更新」
+
+**开发者**: Aria
+
+### 修复
+- `src/shared/utils/useAppUpdate.ts`：本机 versionCode 读取改走 `plus.android.invoke(pkgInfo,'get','versionCode')`（不可直接 `pkgInfo.versionCode` 属性访问，否则读不到返回 0 被误判比线上旧而反复弹更新）；`current<=0`（读取失败）保守视为已最新，避免反复误弹
+
+### 文档
+- `docs/app-update-release-process.md`：补全第 0 节「前置条件与权限」（HBuilderX 开发版 / DCloud 云打包权限 / 正式签名证书 / SSH / 仓库访问）、第 2.0 节「打包前 git pull 最新主干」、第 3 节正式证书注意事项、第 5 节 `export PATH` 前置、自检清单与 10 步流程速览、FAQ 补充
+
+---
+
+## [master] 2026-08-25 — 首页简报卡片：大盘无归因时改用市场异象关键词标签
+
+**开发者**: 协作
+
+### 修复
+- `src/modules/home/components/MorningContent.vue`：`summaryTags` 当头条为「归因结论」且结论命中降级文案（`证据不足|未确认主因|暂无明确主因`）时，改从市场异象条目（收盘复盘/市场快照）取结论切标签；新增 `isDowngradedAttribution` / `marketAnomalyText` 辅助函数
+- `src/modules/home/components/MorningContent.spec.ts`：新增静态断言校验降级判定与市场异象回退逻辑
+
+---
+
+## [changer] 2026-08-25 — AI 投顾对话页长按菜单优化（滑动误触 + 原位浮动菜单 + 圈选复制）
+
+**开发者**: 37588
+
+### 改进
+- 修复消息列表滑动时仍计算长按导致误弹出菜单的问题：改为手动触摸判定（按住 350ms 触发 + 位移超过 10px 取消），滚动过程不弹出。
+- 底部 ActionSheet 替换为长按原位浮动菜单，无遮罩、无模糊、不跳页，贴视口边缘自动内收。
+
+### 新增
+- 长按菜单新增「选中文字」，点击后启用系统原生拖拽手柄圈选，浮出「复制已选」按钮，复制优先取选中片段、未圈选则整条复制；仅 App 生效。
+
+---
+
+## [changer] 2026-08-24 — 早点听新增午间报（盘中报）展示与播报
+
+**开发者**: 37588
+
+### 新增
+- 早点听由晨报/晚报两个入口扩展为晨报/午间报/晚报三个入口，新增午间报（盘中报）入口。
+- 午间报展示盘中摘要、详细解读与风险提示；当日未生成时自动回退最近可用报告并标注日期。
+- 午间报音频就绪时支持播报播放，音频未生成时仅展示文字内容。
+
+## [junliang] 2026-08-24 — 洞察页异动按最近触发时间排序 + 详情只展示支撑性主因
+
+**开发者**: Aria
+
+### 改进
+- `src/modules/favorites/pages/insight.vue`：异动列表排序由首次触发时间改为最近触发时间（`window_end_at` 兜底 `triggered_at`），长窗口事件不再沉底
+- `src/modules/favorites/pages/insight-detail-move.vue`：异动详情页候选只展示支撑性主因（supported），隐藏证据不足/偏弱候选，标题改"支撑性主因"
+- `src/shared/api/modules/stockTrace.ts`：`StockTraceEvent` 新增 `window_end_at` 字段（最近触发/窗口更新时间）
+
+## [master] 2026-08-24 — 0.1.1 发版：修复 APP 启动白屏 + 版本号保持 0.1.1（修复开发版 bug）
+
+**开发者**: Aria
+
+### 修复
+- App 启动白屏（部分老旧 Android WebView 缺少 `TextEncoder`，PDF 导出链 fast-png 在模块顶层 `new TextEncoder()` 抛 ReferenceError）：
+  - `vite.config.ts`：新增 `prependGlobalPolyfill` 插件，在发行打包时把 TextEncoder/TextDecoder polyfill 字面前插到 bundle 开头，先于 fast-png 执行。
+  - `src/shared/utils/global-polyfills.ts`（新增）：TextEncoder/TextDecoder 兜底实现，作为 `main.ts` 首条 import，保障 dev（HBuilder 运行）场景按 import 顺序先定义。
+  - `src/main.ts`：首行导入 `global-polyfills`。
+- 循环依赖导致的分块执行顺序损坏：
+  - `src/shared/components/KLineChart.vue`：`EmptyState` 从 barrel `index.ts` 改为直接导入 `./EmptyState.vue`，切断 `KLineChart → index.ts → KLineChart` 回环。
+- App 端 `performance-now` 被当外部依赖导致 `require$$0$1 is not defined`：
+  - `package.json`/`pnpm-lock.yaml`：显式新增 `performance-now ^2.1.0`（raf 的运行依赖），让 Rollup 能解析并打包。
+
+### 变更
+- `src/manifest.json`：`versionName` 保持 0.1.1，`versionCode` 保持 101（修复开发版 bug，正式版仍为 0.1.1）。
+- `public/download/version.json`（Web 端）：`versionName` 0.1.1/`versionCode` 101，`downloadUrl` 指向 `aistock-0.1.1.apk`，文案由 APP 介绍改为本次更新内容。
+
+---
+
+## [master] 2026-08-24 — 0.1.1 发版：修复 HBuilder/App 打包失败 + 应用内更新弹窗 + 版本号升至 0.1.1
+
+**开发者**: Aria
+
+### 修复
+- HBuilder/App 打包失败（`Rollup failed to resolve import "@babel/runtime/helpers/typeof"` 与 `iife ... not supported for code-splitting`）：
+  - `src/modules/chat/pages/agent-report.vue`：PDF 导出 `html2canvas`/`jspdf` 改为文件顶部静态 import，移除函数内动态 `import()`（动态导入触发 code-splitting，与 App 的 iife 输出冲突）。
+  - `vite.config.ts`：App(app-plus) 平台将 `jspdf` alias 到自包含的 UMD 构建（`jspdf/dist/jspdf.umd.min.js`，无动态 import）；删除与 uni `manualChunks` 冲突的 `forceInlineDynamicImports` 插件。
+  - `package.json`/`pnpm-lock.yaml`：补齐 `@babel/runtime`、`fflate`、`fast-png`、`dompurify`、`canvg`、`core-js`、`stackblur-canvas`、`svg-pathdata`、`text-segmentation`、`raf`、`rgbcolor`、`iobuffer`、`pako` 到顶层依赖。
+
+### 新增
+- 应用内版本更新弹窗（更新操作入口 + 永久关闭版本标记）：
+  - `src/shared/utils/useAppUpdate.ts`：启动检查移除 24h 节流，写入全局 `updatePromptState`；新增「永久关闭」标记（`app_update_never_v{versionCode}`）与 `neverUpdateStorageKey`/`isNeverUpdate`/`downloadAndInstall`。
+  - `src/shared/components/UpdateModal.vue`：复用 `Modal`+`Button` 的更新弹窗，「立即更新」/「永久关闭」/仅叉掉下次仍提示。
+  - `src/shared/components/MainTabs.vue`、`src/modules/user/pages/profile.vue`、`src/shared/components/index.ts`：挂载 `<UpdateModal />`。
+
+### 变更
+- `src/manifest.json`：`versionName` 0.1.0→0.1.1，`versionCode` 100→101（触发存量用户自动更新）。
+
+---
+
 ## [master] 2026-08-24 — 恐贪指数悬浮温度计改为首页晨报头部入口按钮
 
 **开发者**: 林晓研

@@ -92,8 +92,8 @@ test('Phase 4-2 语音输入：麦克风按钮仅支持平台显示（speechInpu
 })
 
 test('Phase 4-2 语音输入：识别文本回填 inputText（可编辑），不自动发送', () => {
-  // tap 切换：isListening 时结束识别，否则开始识别并回填
-  assert.match(pageSource, /@tap="handleMicTap"/)
+  // tap 切换：isListening 时结束识别，否则开始识别并回填（.stop 阻止冒泡，避免误触输入区其他处理）
+  assert.match(pageSource, /@tap(\.stop)?="handleMicTap"/)
   assert.match(pageSource, /stopSpeechRecognition\(\)/)
   assert.match(pageSource, /inputText\.value = result\.text/)
   // 回填后必须走用户手动发送（handleSend 只被发送按钮/确认键触发），识别回调内禁止直接 chatStream.send
@@ -173,19 +173,6 @@ test('改进18：示例问题覆盖六大类（大盘/个股/资金/对比/新�
   assert.match(pageSource, /市盈率是什么/)
 })
 
-// ─── 改进 20（批次 1，2026-08-13）：引导追问按钮化 ───
-
-test('改进20：引导追问按钮化（parseFollowupQuestions 接入 + 按钮点击即发）', () => {
-  assert.match(pageSource, /parseFollowupQuestions/)
-  assert.match(pageSource, /followup-questions/)
-  assert.match(pageSource, /@tap="quickAsk\(q\)"/)
-})
-
-test('改进20：解析失败回退纯文本（followupOf 返回 null 时走既有 msg.content 渲染）', () => {
-  assert.match(pageSource, /function followupOf\(msg: ChatMessage\)/)
-  assert.match(pageSource, /v-else-if="msg\.content"/)
-})
-
 // ─── 改进 16（批次 1，2026-08-13）：对话滚动交互（豆包式） ───
 
 test('改进16：scroll-view 上滑检测接入（@scroll + measureProximity 三态判定）', () => {
@@ -201,8 +188,8 @@ test('5B：resetFollow 纯复位（无滚底/无定时器——硬约束 #3）',
   assert.doesNotMatch(pageSource, /function resetFollow\(\)[\s\S]{0,200}followTimer/)
 })
 
-test('5B：useChatStream 接线 onBeforeStream → resetFollow', () => {
-  assert.match(pageSource, /useChatStream\(\{ onBeforeStream: \(\) => resetFollow\(\) \}\)/)
+test('5B：useChatStream 接线 onBeforeStream → resetFollow + 轮次锚点更新（FIX-2 全发送路径覆盖）', () => {
+  assert.match(pageSource, /useChatStream\(\{ onBeforeStream: \(\) => \{ resetFollow\(\); roundAnchor\.value = Date\.now\(\) \} \}\)/)
 })
 
 test('5B：四处显式滚底已删除，watch(isStreaming) v=true 唯一收口（spy===1）', () => {
@@ -293,29 +280,89 @@ test('G6：goSessions 不置位 pendingRestore（仅 D 出口接线，会话列�
   assert.doesNotMatch(pageSource, /goSessions[\s\S]{0,150}pendingRestore/)
 })
 
-// ─── 批次 4（2026）：消息长按操作 + 引导胶囊升级 ───
+// ─── 批次 4（2026）：消息长按操作 ───
 
-test('批次4：消息项长按接入（message-item @longpress → 打开操作菜单）', () => {
-  assert.match(pageSource, /@longpress="openMessageActions\(msg\)"/)
-  assert.match(pageSource, /function openMessageActions\(msg: ChatMessage\)/)
+test('批次4：消息项长按接入（message-item @touchstart → 打开操作菜单）', () => {
+  assert.match(pageSource, /@touchstart="onMsgTouchStart\(\$event, msg\)"/)
+  assert.match(pageSource, /function openMessageActions\(msg: ChatMessage, clientX = 0, clientY = 0\)/)
 })
 
-test('批次4：长按菜单含复制/删除/重发（ActionSheet 接入 + 危险项删除）', () => {
-  assert.match(pageSource, /<ActionSheet/)
+test('批次4：长按菜单含复制/选中文字/删除/重发（MessageActionMenu 接入 + 危险项删除）', () => {
+  assert.match(pageSource, /<MessageActionMenu/)
   assert.match(pageSource, /\{ label: '复制', value: 'copy' \}/)
+  assert.match(pageSource, /\{ label: '选中文字', value: 'select-text' \}/)
   assert.match(pageSource, /\{ label: '重发', value: 'resend' \}/)
   assert.match(pageSource, /\{ label: '删除', value: 'delete', danger: true \}/)
+})
+
+test('批次4：选中文字态（原生手柄圈选复制片段，仅 App）', () => {
+  assert.match(pageSource, /user-select: text/)
+  assert.match(pageSource, /copy-selection-bar/)
+  assert.match(pageSource, /function handleSelectText\(msg: ChatMessage\)/)
+  assert.match(pageSource, /case 'select-text':/)
 })
 
 test('批次4：复制走剪贴板 / 重发回填输入框可编辑 / 删除调用 store.removeMessage', () => {
   assert.match(pageSource, /uni\.setClipboardData\(\{ data: msg\.content \}\)/)
   assert.match(pageSource, /inputText\.value = msg\.content/)
-  assert.match(pageSource, /function handleMessageAction\(item: \{ label: string; value: string \}\)/)
+  assert.match(pageSource, /function handleMessageAction\(item: MenuItem\)/)
   assert.match(pageSource, /chatStore\.removeMessage\(msg\.timestamp\)/)
   assert.match(pageSource, /isStreaming\.value\) return \/\/ 流式中禁长按/)
 })
 
-test('批次4：引导提问升级为浅色胶囊按钮（999rpx 圆角 + active 反馈，对齐豆包）', () => {
-  assert.match(pageSource, /\.followup-question \{[\s\S]{0,160}border-radius: 999rpx/)
-  assert.match(pageSource, /\.followup-question:active \{ opacity: 0\.7; \}/)
+// ─── 追问面板（2026-08-26，Task 8）：panelState 状态机 + 替换 quick-skills + 打字机完成信号 ───
+
+test('Task8：追问面板状态机已接入（panelState 类型 + 状态函数 + 纯函数判定）', () => {
+  assert.match(pageSource, /const panelState = ref<\{ visible: boolean; messageId: number \| null; pending: boolean \}>\(/)
+  assert.match(pageSource, /function onAnswerSettled\(msg: ChatMessage\)/)
+  assert.match(pageSource, /function clearPanel\(\)/)
+  assert.match(pageSource, /function dismissPanel\(\)/)
+  assert.match(pageSource, /function restorePanel\(\)/)
+  assert.match(pageSource, /function shouldShowPanel\(hasQuestions: boolean, typingActive: boolean, followPaused: boolean\)/)
+})
+
+test('Task8：display-messages 收口 watch（最后一条 assistant 且 questions 非空才处理；打字机完成 + 未暂停才立即展示）', () => {
+  assert.match(pageSource, /displayMessages\.value\[displayMessages\.value\.length - 1\]\?\.timestamp/)
+  assert.match(pageSource, /if \(ts === prev\) return/)
+  assert.match(pageSource, /last\.role !== 'assistant' \|\| !hasQuestions/)
+  assert.match(pageSource, /onAnswerSettled\(last\)/)
+  assert.match(pageSource, /shouldShowPanel\(hasQuestions, typingMsgKey\.value !== null, followPaused\.value\)/)
+})
+
+test('Task8：display-messages 收口 watch 定义于 watch(isStreaming) 之后（结构性事实）', () => {
+  // final review 修正：Vue 3.5 的 watch 回调按依赖变更入队顺序执行（非创建顺序），
+  // 旧名「同 flush 先启动打字机」的机制表述已过时；真正守卫是展示判定 nextTick 延后一帧。
+  // 本测试仅保留可验证的结构性事实：display 收口 watch 在源码中定义于 watch(isStreaming) 之后。
+  const isStreamingIdx = pageSource.search(/watch\(isStreaming,/)
+  const displayWatchIdx = pageSource.search(/displayMessages\.value\[displayMessages\.value\.length - 1\]\?\.timestamp/)
+  assert.ok(isStreamingIdx !== -1 && displayWatchIdx !== -1)
+  assert.ok(isStreamingIdx < displayWatchIdx)
+})
+
+test('Task8：typingMsgKey→null 完成信号展示面板（pending 且未暂停跟随）', () => {
+  assert.match(pageSource, /watch\(typingMsgKey, \(k\) => \{/)
+  assert.match(pageSource, /if \(k !== null \|\| !panelState\.value\.pending\) return/)
+  assert.match(pageSource, /if \(!followPaused\.value\) panelState\.value\.visible = true/)
+})
+
+test('Task8：quick-skills 行被面板替换（v-if/v-else + FollowupSuggestChips + × 收起）', () => {
+  assert.match(pageSource, /<view v-if="!panelState\.visible" class="quick-skills">/)
+  assert.match(pageSource, /<FollowupSuggestChips :items="panelQuestions" @select="onPanelSelect" \/>/)
+  assert.match(pageSource, /@tap="dismissPanel"/)
+  assert.match(pageSource, /import FollowupSuggestChips from '@\/shared\/components\/FollowupSuggestChips\.vue'/)
+})
+
+test('Task8：footer「查看追问」弱入口（pending && !visible && 消息归属）→ restorePanel；建议点击 → clearPanel + quickAsk', () => {
+  assert.match(pageSource, /panelState\.pending && !panelState\.visible && msg\.timestamp === panelState\.messageId/)
+  assert.match(pageSource, /@tap="restorePanel"/)
+  assert.match(pageSource, /function onPanelSelect\(q: string\)/)
+  assert.match(pageSource, /clearPanel\(\)[\s\S]{0,80}quickAsk\(q\)/)
+})
+
+test('Task8：新发送轮收起面板（watch(isStreaming) v=true 先清 pending 防 typingMsgKey 复活旧建议）', () => {
+  assert.match(pageSource, /if \(v\) \{[\s\S]{0,200}clearPanel\(\)/)
+})
+
+test('Task8：quickAsk 发送入口清面板', () => {
+  assert.match(pageSource, /function quickAsk\(text: string\)[\s\S]{0,120}clearPanel\(\)/)
 })

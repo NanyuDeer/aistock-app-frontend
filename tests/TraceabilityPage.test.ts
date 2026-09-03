@@ -15,14 +15,28 @@ vi.mock('@dcloudio/uni-app', () => ({
   onShow: (callback: () => void) => {
     lifecycle.onShow = callback
   },
+  onHide: () => {},
+  onUnload: () => {},
 }))
 
 vi.mock('@/shared/api/modules/agent', () => ({
   agentApi: api,
 }))
 
+vi.mock('@/shared/api/modules/prediction', () => ({
+  predictionApi: {
+    list: vi.fn().mockResolvedValue({ items: [] }),
+  },
+}))
+
 vi.mock('@/shared/utils/tradingTime', () => ({
   shanghaiDateString: () => '2026-07-31',
+  addCalendarDays: (date: string, delta: number) => {
+    // mock ：直接天数计算，兼容 traceDateCandidates 生成候选列表
+    const d = new Date(date)
+    d.setDate(d.getDate() + delta)
+    return d.toISOString().slice(0, 10)
+  },
 }))
 
 vi.mock('@/shared/components/SubPageCard.vue', () => ({
@@ -33,7 +47,7 @@ vi.mock('@/shared/components/SvgIcon.vue', () => ({
   default: { template: '<i />' },
 }))
 
-vi.mock('@/shared/components', () => {
+vi.mock('@/shared/components', async () => {
   const slotStub = { template: '<section><slot /></section>' }
   const buttonStub = {
     emits: ['click'],
@@ -43,6 +57,10 @@ vi.mock('@/shared/components', () => {
     props: ['title', 'description', 'text'],
     template: '<section>{{ title || text }}{{ description }}<slot /></section>',
   }
+  // 仅引入真实 InsightCard/InsightTag（市场洞见卡需渲染真实品牌角标/标题），
+  // 不整体 importActual barrel，避免连带编译含 lang 冲突的 KLineChart 等无关组件
+  const InsightCard = (await vi.importActual('@/shared/components/InsightCard.vue')).default
+  const InsightTag = (await vi.importActual('@/shared/components/InsightTag.vue')).default
   return {
     Button: buttonStub,
     Card: slotStub,
@@ -50,6 +68,8 @@ vi.mock('@/shared/components', () => {
     LoadingState: slotStub,
     Badge: slotStub,
     Tag: slotStub,
+    InsightCard,
+    InsightTag,
   }
 })
 
@@ -115,7 +135,8 @@ describe('大盘溯源页面', () => {
     const wrapper = mount(TraceabilityPage, {
       global: {
         stubs: {
-          SubPageCard: slotStub,
+          // header-right 插槽渲染"当前展示日期"标签，用于断言页面显示的日期
+          SubPageCard: { template: '<section><slot name="header-right" /><slot /></section>' },
           Card: slotStub,
           Badge: slotStub,
           Tag: slotStub,
@@ -123,7 +144,6 @@ describe('大盘溯源页面', () => {
           EmptyState: slotStub,
           LoadingState: slotStub,
           SvgIcon: { template: '<i />' },
-          'rich-text': { props: ['nodes'], template: '<div v-html="nodes" />' },
         },
       },
     })
@@ -134,14 +154,16 @@ describe('大盘溯源页面', () => {
     expect(api.getMarketTraceReview).toHaveBeenCalledWith('2026-07-31')
     expect(wrapper.text()).toContain('真实市场摘要')
     expect(wrapper.text()).toContain('2026-07-31')
-    expect(wrapper.text()).toContain('2026-08-01 03:25')
-    expect(wrapper.text()).toContain('半导体')
+    expect(wrapper.text()).toContain('INSIGHT')
     expect(wrapper.text()).not.toContain('北向资金大幅流入半导体板块')
 
-    // 展开折叠的 markdown 兜底区域，验证原始报告渲染
-    await wrapper.get('.markdown-section .section-title').trigger('tap')
+    // 展开详情后展示 现象 / 溯源 / 预判 三块结构化内容
+    await wrapper.get('.detail-toggle').trigger('tap')
     await flushPromises()
-    expect(wrapper.html()).toContain('<h1 class="md-h1">报告标题</h1>')
+    expect(wrapper.text()).toContain('现象')
+    expect(wrapper.text()).toContain('溯源')
+    expect(wrapper.text()).toContain('预判')
+    expect(wrapper.text()).toContain('半导体')
 
     wrapper.unmount()
   })

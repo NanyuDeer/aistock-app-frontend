@@ -15,7 +15,7 @@
       <!-- 关键变量节点 -->
       <view class="graph-node var-node">
         <text class="node-type-label">关键变量</text>
-        <view v-for="(v, vi) in data.variables.slice(0, 2)" :key="vi" class="var-item">
+        <view v-for="(v, vi) in data.variables" :key="vi" class="var-item">
           <text class="var-item-name">{{ v.name }}</text>
           <text class="var-item-dir" :class="'dir-' + v.direction">
             {{ v.direction === 'bullish' ? '↑' : v.direction === 'bearish' ? '↓' : '→' }}

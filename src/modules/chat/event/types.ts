@@ -293,22 +293,6 @@ export interface NewsArticle {
   relatedEventId: string
 }
 
-// ==================== 原文详情 ====================
-
-/** 事件原文详情（后端 /api/agent/event/:eventId/article） */
-export interface EventArticle {
-  /** 原文标题 */
-  title: string
-  /** 来源名称 */
-  source: string
-  /** 发布时间 */
-  publishTime: string
-  /** 正文内容（财联社详情页抓取，由后端做字符截断） */
-  content: string
-  /** 原始来源链接 */
-  sourceUrl: string
-}
-
 // ==================== Agent 未来输出结构（预留） ====================
 
 /** AI分析步骤（Agent流式输出格式） */
@@ -374,4 +358,9 @@ export interface FocusEventViewModel {
   industries: string[]
   /** 影响行业完整对象（含涨跌方向，供顶部卡片箭头/颜色展示） */
   affectedIndustries?: AffectedIndustry[]
+  /** 来源信息（含原文 URL，供标题跳转原文） */
+  sourceInfo?: {
+    name: string
+    url?: string
+  }
 }

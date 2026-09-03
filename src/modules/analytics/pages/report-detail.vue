@@ -41,8 +41,18 @@
       </view>
     </view>
 
-    <!-- ===== 模块3：四维分析评分（仅数据完整可评分时显示，无法评分的删去该模块） ===== -->
-    <view v-if="aiScoreData?.dataStatus === 'complete'" class="section">
+    <!-- ===== 洞见卡：业绩一句话 + 优势/风险/建议 ===== -->
+    <InsightCard
+      v-if="reportInsight.content"
+      type="fund"
+      :title="reportInsight.content"
+      :lines="reportInsight.lines"
+      theme="light"
+      class="report-insight-card"
+    />
+
+    <!-- ===== 模块3：四维分析评分（数据不足/不完整/完整均展示，由 AiAnalysis 组件内部区分状态） ===== -->
+    <view v-if="aiScoreData?.dataStatus" class="section">
       <AiAnalysis :loading="scoreLoading" :data="aiScoreData" />
     </view>
 
@@ -101,6 +111,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { Tag, Button } from '@/shared/components'
 import LoadingState from '@/shared/components/LoadingState.vue'
+import InsightCard from '@/shared/components/InsightCard.vue'
 import AiAnalysis from '@/modules/analytics/components/ai-analysis.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 
@@ -191,6 +202,31 @@ const displayColumns = computed(() => displayPeriods.value)
 const scoreLoading = ref(false)
 const aiScoreData = ref<any>(null)
 
+/**
+ * 业绩洞见卡数据。
+ * title=结论一句话；lines=优势/风险/建议 多行（risk 用金色高亮）。
+ * 风险按评分生成：`risks` 非空才显示「风险」行，无则整行隐藏（不做占位兜底）。
+ */
+const reportInsight = computed(() => {
+  const ai = aiScoreData.value
+  if (!ai || ai.conclusion == null) return { content: '', lines: [] }
+  const period = stock.value?.period ? `（${stock.value.period}）` : ''
+  const lines: Array<{ key: string; text: string; tone?: 'default' | 'positive' | 'risk' }> = []
+  if (Array.isArray(ai.strengths) && ai.strengths.length) {
+    lines.push({ key: '优势', text: ai.strengths.join('；'), tone: 'positive' })
+  }
+  if (Array.isArray(ai.risks) && ai.risks.length) {
+    lines.push({ key: '风险', text: ai.risks.join('；'), tone: 'risk' })
+  }
+  if (ai.advice) {
+    lines.push({ key: '建议', text: ai.advice })
+  }
+  return {
+    content: ai.conclusion ? `${ai.conclusion}${period}` : '',
+    lines,
+  }
+})
+
 // ===== 表格数据 =====
 /** PeriodData 中数值型字段（排除 key/label 等字符串字段） */
 type NumericField = 'revenue' | 'revenueYoy' | 'netProfit' | 'netProfitYoy' | 'deductProfit' | 'grossMargin' | 'netMargin' | 'roe' | 'cashFlow' | 'debtRatio'
@@ -271,12 +307,26 @@ function scoreLevelOf(score: number | null | undefined): 'red' | 'blue' | 'green
   return 'green'
 }
 
-/** 页面光晕：标签与分数双红→红光，双绿→绿光，其余情况（双蓝/不同色/无分数）→蓝光 */
+/**
+ * 页面光晕：与正式报告一致的配色逻辑
+ * 标签与分数双红→红光，双绿→绿光；标签无等级（快报"预告"兜底）时退化为按评分着色；
+ * 无评分（数据不完整）时按头部标签等级着色，避免与页面标签语义矛盾。
+ */
 const glowClass = computed(() => {
   const tagLevel = tagLevelOf(stock.value.tag)
   const scoreLevel = scoreLevelOf(aiScoreData.value?.score)
   if (tagLevel === 'red' && scoreLevel === 'red') return 'glow-red'
   if (tagLevel === 'green' && scoreLevel === 'green') return 'glow-green'
+  // 标签无等级（快报"预告"等）时：按评分等级着色，保证红/蓝/绿三色齐全
+  if (tagLevel == null && scoreLevel) {
+    if (scoreLevel === 'red') return 'glow-red'
+    if (scoreLevel === 'green') return 'glow-green'
+    return 'glow-blue'
+  }
+  // 无评分（数据不完整）时：按头部标签等级着色，与页面 Tag 语义一致
+  if (scoreLevel == null && (tagLevel === 'red' || tagLevel === 'green')) {
+    return tagLevel === 'red' ? 'glow-red' : 'glow-green'
+  }
   return 'glow-blue'
 })
 
@@ -340,7 +390,10 @@ async function fetchAnalysisData(sym: string) {
   loading.value = true
   error.value = false
   try {
-    const res: any = await stockApi.getReportAnalysis({ symbol: sym })
+    const res: any = await stockApi.getReportAnalysis({
+      symbol: sym,
+      endDate: options?.endDate || undefined,
+    })
     if (!res) throw new Error('API 返回为空')
     const data = (res.data as Record<string, unknown>) || res
     const reportPeriod = String(data['报告期'] || '')
@@ -406,6 +459,10 @@ onLoad((opts?: Record<string, string>) => {
 <style lang="scss" scoped>
 /* ===== 页面底色层：标签+分数双红→浅红底，双绿→浅绿底，其余→浅蓝底 =====
    作为全屏底层背景（z-index 0），SubPageCard 背景透明，白色卡片浮于浅色底之上 */
+
+.report-insight-card {
+  margin: 0 24rpx 24rpx;
+}
 .glow-overlay {
   position: fixed;
   top: 0;

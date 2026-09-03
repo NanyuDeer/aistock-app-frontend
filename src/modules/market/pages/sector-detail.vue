@@ -28,27 +28,6 @@
           <StatGrid :items="sectorStatItems" :columns="3" />
         </Card>
 
-        <!-- 板块K线（近120日，同花顺板块指数日线）；加载失败(数据为null)时整卡隐藏 -->
-        <Card v-if="sector.code && (klineLoading || boardKline)" class="kline-card">
-          <text class="section-title">板块K线 · 近120日</text>
-          <LoadingState v-if="klineLoading" size="sm" text="正在加载K线数据..." />
-          <KLineChart v-else-if="boardKline" :title="sector.name" :data="boardKline" />
-        </Card>
-
-        <!-- 涨跌家数 -->
-        <view v-if="sector.up_count || sector.down_count" class="count-bar">
-          <view class="count-section up">
-            <text class="count-arrow">↑</text>
-            <text class="count-num">{{ sector.up_count || 0 }}</text>
-            <text class="count-label">上涨</text>
-          </view>
-          <view class="count-section down">
-            <text class="count-arrow">↓</text>
-            <text class="count-num">{{ sector.down_count || 0 }}</text>
-            <text class="count-label">下跌</text>
-          </view>
-        </view>
-
         <!-- 改动2+5: AI 分析 + 层级流向图 SVG -->
         <view v-if="analysisRows.length || flowChartData" class="ai-card">
           <text class="section-title">AI 分析</text>
@@ -78,6 +57,32 @@
               <text class="ai-label">{{ row.label }}</text>
               <text :class="['ai-value', row.risk ? 'risk' : '']">{{ row.value }}</text>
             </view>
+          </view>
+        </view>
+
+        <!-- 板块研判（板块四环聚合命中当前板块 → 洞见卡；加载中/无数据 → 占位） -->
+        <view class="sector-insight-box">
+          <SectorInsightCard :candidate="sectorInsight" :loading="insightLoading" :date="insightDate" />
+        </view>
+
+        <!-- 板块K线（近120日，同花顺板块指数日线）；加载失败(数据为null)时整卡隐藏 -->
+        <Card v-if="sector.code && (klineLoading || boardKline)" class="kline-card">
+          <text class="section-title">板块K线 · 近120日</text>
+          <LoadingState v-if="klineLoading" size="sm" text="正在加载K线数据..." />
+          <KLineChart v-else-if="boardKline" :title="sector.name" :data="boardKline" />
+        </Card>
+
+        <!-- 涨跌家数 -->
+        <view v-if="sector.up_count || sector.down_count" class="count-bar">
+          <view class="count-section up">
+            <text class="count-arrow">↑</text>
+            <text class="count-num">{{ sector.up_count || 0 }}</text>
+            <text class="count-label">上涨</text>
+          </view>
+          <view class="count-section down">
+            <text class="count-arrow">↓</text>
+            <text class="count-num">{{ sector.down_count || 0 }}</text>
+            <text class="count-label">下跌</text>
           </view>
         </view>
 
@@ -263,12 +268,16 @@
 // @ts-nocheck -- uni-app renderjs module (flowView) 在正常 vue-tsc 上下文之外编译；首行声明以抑制整 SFC 交叉诊断。
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
+import { agentApi } from '@/shared/api/modules/agent'
+import type { SectorInsightCandidate } from '@/shared/api/modules/agent'
 import { stockApi } from '@/shared/api/modules/stock'
 import type { WindLeaderSector, WindLeaderAiAnalysis, WindLeaderFlowData, WindLeaderStock } from '@/shared/api/modules/stock'
 import type { TrendKLineData } from '@/shared/api/modules/trend-score'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import SectorInsightCard from '@/shared/components/SectorInsightCard.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, StatGrid, Modal, KLineChart } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
+import { findSectorCandidate, todayDateStr } from '@/shared/utils/sectorInsight'
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -278,6 +287,11 @@ const sectorName = ref('')
 /** 板块 K 线（近120日） */
 const boardKline = ref<TrendKLineData | null>(null)
 const klineLoading = ref(false)
+
+/** 板块研判：sector-insight 聚合命中当前板块的候选（无命中/加载失败 → null 占位） */
+const sectorInsight = ref<SectorInsightCandidate | null>(null)
+const insightLoading = ref(false)
+const insightDate = ref('')
 
 function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
@@ -600,6 +614,26 @@ function openStockModal(stock: WindLeaderStock) {
   modalVisible.value = true
 }
 
+/** 板块研判：取最近交易日的 sector-insight 聚合，匹配当前板块候选；失败/无数据置 null（不阻断主流程） */
+async function loadSectorInsight() {
+  const cur = sector.value
+  if (!cur?.name) return
+  insightLoading.value = true
+  try {
+    // 交易日历取最近交易日（count=1，末位即目标），避免周末/节假日空数据
+    const days = await agentApi.getRecentTradingDays(todayDateStr(), 1)
+    const tradeDate = days?.length ? days[days.length - 1] : todayDateStr()
+    insightDate.value = tradeDate
+    const res = await agentApi.getSectorInsight(tradeDate)
+    sectorInsight.value = findSectorCandidate(res?.candidates ?? [], { name: cur.name, code: cur.code })
+  } catch (error) {
+    console.error('板块研判加载失败:', error)
+    sectorInsight.value = null
+  } finally {
+    insightLoading.value = false
+  }
+}
+
 async function loadData() {
   if (!sectorName.value) {
     errorMessage.value = '缺少板块名称参数'
@@ -623,6 +657,10 @@ async function loadData() {
         boardKline.value = data
         klineLoading.value = false
       })
+    }
+    // 板块研判（板块四环聚合，命中当前板块后异步拉取；失败不阻断主流程）
+    if (found) {
+      void loadSectorInsight()
     }
     if (!found) {
       errorMessage.value = '未找到该板块数据'
@@ -889,6 +927,11 @@ export default {
     border-radius: 4rpx;
     display: inline-block;
   }
+}
+
+/* ===== 板块研判（SectorInsightCard 承载，白卡自带圆角，仅留外边距） ===== */
+.sector-insight-box {
+  margin-bottom: 20rpx;
 }
 
 /* ===== 个股列表（Card 提供 bg/border/shadow，仅保留间距） ===== */

@@ -19,33 +19,124 @@
     <!-- 登录方式区域（统一模板：H5 / APP-PLUS / MP-WEIXIN 共用二维码 + 错误状态） -->
     <view class="login-body">
       <!-- 初始状态：登录方式选择 -->
-      <view v-if="!qrCodeUrl && !loginLoading && !errorMsg" class="login-methods">
+      <view v-if="!qrCodeUrl && !loginLoading && !errorMsg && !showEmailForm && !showSmsForm" class="login-methods">
         <!-- #ifdef MP-WEIXIN -->
         <button @tap="handleWxLogin" class="btn-wx-login">
-          <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
+          <SvgIcon name="wechat" size="36rpx" color="#ffffff" />
           <text class="btn-text">微信一键登录</text>
         </button>
         <!-- #endif -->
 
         <!-- #ifdef H5 -->
         <button @click="startScanLogin" class="btn-wx-login">
-          <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
+          <SvgIcon name="wechat" size="36rpx" color="#ffffff" />
           <text class="btn-text">微信扫码登录</text>
         </button>
         <!-- #endif -->
 
         <!-- #ifdef APP-PLUS -->
-        <button @tap="handleWxLogin" class="btn-wx-login">
-          <image class="btn-wx-icon" src="/static/icons/wechat.svg" mode="aspectFit" />
-          <text class="btn-text">微信登录</text>
+        <!-- 测试号 AppID 无法走微信原生登录(uni.login code 为空)，统一用扫码登录 -->
+        <button @tap="startScanLogin" class="btn-wx-login">
+          <SvgIcon name="wechat" size="36rpx" color="#ffffff" />
+          <text class="btn-text">微信扫码登录</text>
         </button>
         <!-- #endif -->
+
+        <!-- 邮箱验证码登录入口（全平台） -->
+        <button @click="showEmailForm = true" class="btn-email-login">
+          <SvgIcon name="mail-line" size="36rpx" color="#0b5fff" />
+          <text class="btn-text">邮箱验证码登录</text>
+        </button>
+
+        <!-- 手机号验证码登录入口（全平台） -->
+        <button @click="showSmsForm = true" class="btn-email-login">
+          <SvgIcon name="phone-line" size="36rpx" color="#0b5fff" />
+          <text class="btn-text">手机号验证码登录</text>
+        </button>
 
         <view class="login-tip">
           <text class="tip-text">登录后可同步自选股、接收异动提醒</text>
         </view>
         <view class="skip-wrap">
           <Button type="ghost" size="sm" @click="goHome">暂不登录，先看看</Button>
+        </view>
+      </view>
+
+      <!-- 邮箱验证码登录表单（全平台） -->
+      <view v-else-if="showEmailForm" class="email-form">
+        <text class="form-title">邮箱验证码登录</text>
+        <view class="form-row">
+          <SvgIcon name="mail-line" size="36rpx" color="#9ca3af" />
+          <Input
+            v-model="email"
+            placeholder="请输入邮箱"
+            class="form-input"
+          />
+        </view>
+        <view class="form-row">
+          <SvgIcon name="lock-line" size="36rpx" color="#9ca3af" />
+          <Input
+            v-model="smsCode"
+            type="number"
+            :maxlength="6"
+            placeholder="请输入验证码"
+            class="form-input"
+          />
+          <Button
+            class="form-code-btn"
+            :disabled="countdown > 0 || !isValidEmail"
+            size="sm"
+            @click="handleSendEmail"
+          >
+            {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
+          </Button>
+        </view>
+        <view class="form-submit">
+          <Button block :loading="loginLoading" @click="handleEmailLogin">登录</Button>
+        </view>
+        <view class="form-back" @click="showEmailForm = false">
+          <SvgIcon name="arrow-left-line" size="28rpx" color="#4b5a7a" />
+          <text class="form-back-text">返回微信登录</text>
+        </view>
+      </view>
+
+      <!-- 手机号验证码登录表单（全平台） -->
+      <view v-else-if="showSmsForm" class="email-form">
+        <text class="form-title">手机号验证码登录</text>
+        <view class="form-row">
+          <SvgIcon name="phone-line" size="36rpx" color="#9ca3af" />
+          <Input
+            v-model="phone"
+            type="number"
+            :maxlength="11"
+            placeholder="请输入手机号"
+            class="form-input"
+          />
+        </view>
+        <view class="form-row">
+          <SvgIcon name="lock-line" size="36rpx" color="#9ca3af" />
+          <Input
+            v-model="smsCode"
+            type="number"
+            :maxlength="6"
+            placeholder="请输入验证码"
+            class="form-input"
+          />
+          <Button
+            class="form-code-btn"
+            :disabled="countdown > 0 || !isValidPhone"
+            size="sm"
+            @click="handleSendSms"
+          >
+            {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
+          </Button>
+        </view>
+        <view class="form-submit">
+          <Button block :loading="loginLoading" @click="handlePhoneLogin">登录</Button>
+        </view>
+        <view class="form-back" @click="showSmsForm = false">
+          <SvgIcon name="arrow-left-line" size="28rpx" color="#4b5a7a" />
+          <text class="form-back-text">返回微信登录</text>
         </view>
       </view>
 
@@ -93,11 +184,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useUserStore } from '@/shared/store/modules/user'
 import { authApi } from '@/shared/api/modules/auth'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import Input from '@/shared/components/Input.vue'
 import { LoadingState, Card, EmptyState, Button } from '@/shared/components'
 
 const userStore = useUserStore()
@@ -110,6 +202,19 @@ const scanState = ref('')
 const scanStatus = ref<'waiting' | 'scanned' | 'confirmed' | 'expired'>('waiting')
 const loginLoading = ref(false)
 const errorMsg = ref('')
+
+// 邮箱验证码登录状态
+const showEmailForm = ref(false)
+const email = ref('')
+const smsCode = ref('')
+const countdown = ref(0)
+const isValidEmail = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value))
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+
+// 手机号验证码登录状态
+const showSmsForm = ref(false)
+const phone = ref('')
+const isValidPhone = computed(() => /^1[3-9]\d{9}$/.test(phone.value))
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollCount = 0
@@ -124,6 +229,7 @@ onLoad(() => {
 
 onUnmounted(() => {
   stopPolling()
+  stopCountdown()
 })
 
 /** 启动扫码登录 */
@@ -191,6 +297,100 @@ function cancelScanLogin() {
   qrCodeUrl.value = ''
   scanStatus.value = 'waiting'
   errorMsg.value = ''
+}
+
+/** 停止验证码倒计时 */
+function stopCountdown() {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+}
+
+/** 发送手机号验证码（60s 倒计时；阿里云短信认证真实下发） */
+async function handleSendSms() {
+  if (!isValidPhone.value) {
+    uni.showToast({ title: '请输入正确的手机号', icon: 'none' })
+    return
+  }
+  try {
+    await authApi.sendSmsCode(phone.value)
+    uni.showToast({ title: '验证码已发送，请查收短信', icon: 'none' })
+    countdown.value = 60
+    stopCountdown()
+    countdownTimer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) stopCountdown()
+    }, 1000)
+  } catch (e: any) {
+    uni.showToast({ title: e?.data?.message || '发送失败，请稍后再试', icon: 'none' })
+  }
+}
+
+/** 手机号 + 验证码登录 */
+async function handlePhoneLogin() {
+  if (!isValidPhone.value) {
+    uni.showToast({ title: '请输入正确的手机号', icon: 'none' })
+    return
+  }
+  if (!smsCode.value) {
+    uni.showToast({ title: '请输入验证码', icon: 'none' })
+    return
+  }
+  loginLoading.value = true
+  try {
+    await userStore.smsLogin(phone.value, smsCode.value)
+    loginLoading.value = false
+    stopCountdown()
+    uni.showToast({ title: '登录成功', icon: 'success' })
+    setTimeout(() => goHome(), 500)
+  } catch (e: any) {
+    loginLoading.value = false
+    uni.showToast({ title: e?.data?.message || '登录失败，请重试', icon: 'none' })
+  }
+}
+
+/** 发送邮箱验证码（60s 倒计时） */
+async function handleSendEmail() {
+  if (!isValidEmail.value) {
+    uni.showToast({ title: '请输入正确的邮箱', icon: 'none' })
+    return
+  }
+  try {
+    await authApi.sendEmailCode(email.value)
+    uni.showToast({ title: '验证码已发送，请查收邮箱', icon: 'none' })
+    countdown.value = 60
+    stopCountdown()
+    countdownTimer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) stopCountdown()
+    }, 1000)
+  } catch (e: any) {
+    uni.showToast({ title: e?.data?.message || '发送失败，请稍后再试', icon: 'none' })
+  }
+}
+
+/** 邮箱 + 验证码登录 */
+async function handleEmailLogin() {
+  if (!isValidEmail.value) {
+    uni.showToast({ title: '请输入正确的邮箱', icon: 'none' })
+    return
+  }
+  if (!smsCode.value) {
+    uni.showToast({ title: '请输入验证码', icon: 'none' })
+    return
+  }
+  loginLoading.value = true
+  try {
+    await userStore.emailLogin(email.value, smsCode.value)
+    loginLoading.value = false
+    stopCountdown()
+    uni.showToast({ title: '登录成功', icon: 'success' })
+    setTimeout(() => goHome(), 500)
+  } catch (e: any) {
+    loginLoading.value = false
+    uni.showToast({ title: e?.data?.message || '登录失败，请重试', icon: 'none' })
+  }
 }
 
 /** 扫码登录成功处理 */
@@ -366,12 +566,6 @@ function goBack() {
   border: none;
   line-height: 1.2;
 
-  .btn-wx-icon {
-    width: 36rpx;
-    height: 36rpx;
-    flex-shrink: 0;
-  }
-
   .btn-text {
     font-size: 30rpx;
     color: #ffffff;
@@ -386,6 +580,87 @@ function goBack() {
   .tip-text {
     font-size: 24rpx;
     color: #9ca3af;
+  }
+}
+
+/* 邮箱验证码登录入口（描边按钮） */
+.btn-email-login {
+  width: 100%;
+  margin-top: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: #ffffff;
+  border: 2rpx solid $line;
+  border-radius: 48rpx;
+  padding: 18rpx 0;
+  line-height: 1.2;
+
+  .btn-text {
+    font-size: 30rpx;
+    color: $primary;
+    font-weight: 600;
+  }
+}
+
+/* ===== 邮箱验证码登录表单 ===== */
+.email-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: 16rpx;
+}
+
+.form-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: $ink;
+  margin-bottom: 40rpx;
+  text-align: center;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.form-input {
+  flex: 1;
+}
+
+.form-code-btn {
+  flex-shrink: 0;
+  min-width: 180rpx;
+}
+
+/* 验证码倒计时禁用态：整体 opacity 会让白字变浅灰看不清，
+   改为背景手动淡化（保持"按钮颜色变淡"）＋文字固定纯白保证可读 */
+.form-code-btn.is-disabled {
+  opacity: 1;
+  background: rgba(11, 95, 255, 0.4);
+  box-shadow: none;
+}
+.form-code-btn.is-disabled :deep(.as-btn__text) {
+  color: #ffffff;
+}
+
+.form-submit {
+  margin-top: 16rpx;
+}
+
+.form-back {
+  margin-top: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+
+  .form-back-text {
+    font-size: 28rpx;
+    color: #4b5a7a;
   }
 }
 

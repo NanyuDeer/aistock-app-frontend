@@ -1,18 +1,11 @@
 <template>
   <SubPageCard2 :title="pageTitle" :subtitle="pageSubtitle">
-    <!-- 右上角：详情模式下显示导出按钮（播报按钮保留自身条件），避免深层链接无 podcast_brief 时导出按钮被隐藏 -->
-    <template v-if="isDetail || podcastBriefForFloating" #header-right>
+    <!-- 右上角：仅播报按钮（导出功能已移除，报告改为 App 内阅读） -->
+    <template v-if="podcastBriefForFloating" #header-right>
       <view class="header-right-actions">
-        <view v-if="podcastBriefForFloating" class="header-podcast-btn" @tap="openFloatingPodcast">
+        <view class="header-podcast-btn" @tap="openFloatingPodcast">
           <SvgIcon name="broadcast-line" size="30rpx" color="#0b5fff" />
         </view>
-        <Button
-          v-if="isDetail"
-          type="primary"
-          size="sm"
-          :loading="exporting"
-          @click="handleExportPdf"
-        >导出 PDF</Button>
       </view>
     </template>
 
@@ -422,6 +415,17 @@
         </view>
       </view>
     </template>
+
+    <!-- VIP 会员弹窗：非会员进入报告详情前阻断并引导开通（样式对齐版本更新弹窗） -->
+    <ConfirmModal
+      v-model:visible="vipModalVisible"
+      title="会员专属内容"
+      content="AI 深度报告为会员专属内容，开通会员后即可查看全部报告详情。"
+      confirm-text="去开通"
+      cancel-text="取消"
+      :mask-closable="false"
+      @confirm="goVip"
+    />
   </SubPageCard2>
 </template>
 
@@ -436,7 +440,7 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
 import { useUserStore } from '@/shared/store/modules/user'
-import { LoadingState, EmptyState, Card, Tag, Button } from '@/shared/components'
+import { LoadingState, EmptyState, Card, Tag, ConfirmModal } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 // ===== Markdown 分区解析工具（参考 hot-burst-report 模式）=====
@@ -550,18 +554,24 @@ interface AgentMeta {
 
 const AGENT_META: Record<string, AgentMeta> = {
   morning: { title: '今日晨报', icon: 'sun-line', color: '#f0a020', bgColor: '#f0a020', desc: '每日开盘前市场概览' },
+  midday: { title: '午间报', icon: 'sun-cloudy-line', color: '#ff8f1f', bgColor: '#ff8f1f', desc: '午间市场快评与异动解读' },
   wind_leader: { title: '风口龙头', icon: 'windy-line', color: '#0b5fff', bgColor: '#0b5fff', desc: '长短线风口与龙头股追踪' },
   hot_burst: { title: '机构调研', icon: 'eye-line', color: '#00b8ff', bgColor: '#00b8ff', desc: '机构推荐热门股分析' },
   trend_score: { title: '趋势股评分', icon: 'line-chart-line', color: '#18a058', bgColor: '#18a058', desc: '趋势形态评分排名' },
   review: { title: '收盘复盘', icon: 'moon-line', color: '#7c5cff', bgColor: '#7c5cff', desc: '收盘后大盘归因分析' },
   broadcast: { title: '双人播报', icon: 'broadcast-line', color: '#0b5fff', bgColor: '#0b5fff', desc: 'AI 双人对话播报' },
+  rhythm_master: { title: '节奏大师', icon: 'rhythm-line', color: '#0b5fff', bgColor: '#0b5fff', desc: '目标交易日节奏状态卡' },
 }
 
 /** 概览模式下的 Agent 顺序（不含 broadcast，用户不需要在概览中看到双人播报） */
-const OVERVIEW_ORDER = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'review']
+const OVERVIEW_ORDER = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'midday', 'review', 'rhythm_master']
+
+/** 节奏大师概览入口标识：走 getRhythmMaster 特判（不走 getReport），点击直达节奏详情页 */
+const OVERVIEW_RHYTHM = 'rhythm_master'
 
 const titleMap: Record<string, string> = {
   morning: '今日晨报',
+  midday: '午间报',
   wind_leader: '风口龙头分析',
   hot_burst: '机构调研分析',
   trend_score: '趋势股评分分析',
@@ -601,67 +611,16 @@ const isOverview = computed(() => !selectedIntent.value && !intent.value)
 /** 是否可以返回概览（从概览进入详情时） */
 const canBackToOverview = computed(() => !intent.value && !!selectedIntent.value)
 
-/** 当前是否为详情模式（概览 → 显示单个报告） */
-const isDetail = computed(() => !isOverview.value)
-
-/** 用户信息 store（导出 PDF 会员门禁） */
+/** 用户信息 store（VIP 会员内容门禁） */
 const userStore = useUserStore()
 
-/** 导出 PDF 进行中标记 */
-const exporting = ref(false)
+/** VIP 会员弹窗：非会员进入报告详情前阻断 */
+const vipModalVisible = ref(false)
 
-/** 会员导出当前报告为多页 A4 PDF；非会员提示开通 */
-async function handleExportPdf() {
-  if (exporting.value) return
-  const vip = userStore.userInfo?.isVip
-  if (!vip) {
-    uni.showToast({ title: '开通会员后可导出 PDF', icon: 'none' })
-    return
-  }
-  // 非 H5/无 DOM 环境不可导出（document 访问移入容错）
-  if (typeof document === 'undefined') {
-    uni.showToast({ title: '报告内容未就绪', icon: 'none' })
-    return
-  }
-  exporting.value = true
-  uni.showLoading({ title: '正在生成 PDF...', mask: true })
-  try {
-    const target = document.querySelector('.report-body') as HTMLElement | null
-    if (!target) {
-      uni.showToast({ title: '报告内容未就绪', icon: 'none' })
-      return
-    }
-    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-      import('html2canvas'),
-      import('jspdf'),
-    ])
-    const canvas = await html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
-    const pdf = new jsPDF('p', 'mm', 'a4')
-    const pageW = pdf.internal.pageSize.getWidth()
-    const pageH = pdf.internal.pageSize.getHeight()
-    const imgW = pageW
-    const imgH = (canvas.height * imgW) / canvas.width
-    // 整幅图只编码一次，供所有分页复用（避免每页重复 toDataURL）
-    const imgData = canvas.toDataURL('image/jpeg', 0.95)
-    pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH)
-    let heightLeft = imgH - pageH
-    let position = -pageH
-    while (heightLeft > 0) {
-      pdf.addPage()
-      pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH)
-      heightLeft -= pageH
-      position -= pageH
-    }
-    const fname = `报告-${effectiveIntent.value || date.value}-${date.value}.pdf`
-    pdf.save(fname)
-    uni.showToast({ title: '报告已导出', icon: 'success' })
-  } catch (e) {
-    console.error('[agent-report] 导出 PDF 失败', e)
-    uni.showToast({ title: '导出失败，请重试', icon: 'none' })
-  } finally {
-    exporting.value = false
-    uni.hideLoading()
-  }
+/** 非会员点击"去开通"：跳转 VIP 开通页 */
+function goVip() {
+  vipModalVisible.value = false
+  uni.navigateTo({ url: '/modules/user/pages/vip' })
 }
 
 /** 当前生效的 intent */
@@ -853,8 +812,22 @@ async function loadAllReports() {
   loading.value = true
   loadingText.value = '正在加载今日分析...'
 
+  // midday 与其余 Agent 一致走 /agent/report/:intent/:date（Node DB analysis_reports），
+  // 由 report_date 匹配判断"已更新/待生成"并展示摘要；
+  // rhythm_master 走 getRhythmMaster（三时点版本，契约 #4），有版本即视为已生成
   const results = await Promise.allSettled(
-    OVERVIEW_ORDER.map((agentIntent) => agentApi.getReport(agentIntent, date.value))
+    OVERVIEW_ORDER.map(async (agentIntent) => {
+      if (agentIntent === OVERVIEW_RHYTHM) {
+        try {
+          const res: unknown = await agentApi.getRhythmMaster(date.value)
+          // 响应拦截器（request.ts）已解包 {code,data} 信封：code===0 时直接 return data，
+          // 故 getRhythmMaster 解析值即 {date, versions}，没有 .data 字段，这里直接取 .versions
+          const versions = (res as { versions?: { content?: unknown }[] }).versions ?? []
+          return { intent: agentIntent, report: versions?.length ? ({ content: versions[0].content, report_date: date.value }) : null }
+        } catch { return { intent: agentIntent, report: null } }
+      }
+      return { intent: agentIntent, report: await agentApi.getReport(agentIntent, date.value) }
+    })
   )
 
   const briefs: AgentBrief[] = OVERVIEW_ORDER.map((agentIntent, idx) => {
@@ -865,7 +838,8 @@ async function loadAllReports() {
     let available = false
 
     if (result.status === 'fulfilled' && result.value) {
-      const data = result.value as AgentReport
+      // 并发映射统一返回 { intent, report } 形状（rhythm_master 特判打包，其余透传 getReport 结果）
+      const data = (result.value as { report?: AgentReport | null }).report ?? null
       // 检查 report_date 是否与请求日期匹配：后端在指定日期无报告时会降级返回最近一份报告，
       // 不匹配时视为当日无报告（显示"待生成"而非"已更新"）
       if (data?.content && data.report_date === date.value) {
@@ -919,8 +893,17 @@ async function loadReport() {
   }
 }
 
-/** 点击简报卡片，进入详情 */
+/** 点击简报卡片，进入详情（非会员阻断并引导开通） */
 function selectAgent(agentIntent: string) {
+  // 节奏大师走独立详情页（F2），不经 VIP 门禁与报告详情
+  if (agentIntent === OVERVIEW_RHYTHM) {
+    uni.navigateTo({ url: '/modules/rhythm/pages/index' })
+    return
+  }
+  if (!userStore.userInfo?.isVip) {
+    vipModalVisible.value = true
+    return
+  }
   selectedIntent.value = agentIntent
   report.value = null
   loadReport()
@@ -957,9 +940,17 @@ async function changeDate(delta: number) {
 
 onLoad((options) => {
   const requestedIntent = options?.intent || ''
-  intent.value = isPublicReportIntent(requestedIntent) ? requestedIntent : ''
+  const urlIntent = isPublicReportIntent(requestedIntent) ? requestedIntent : ''
   date.value = options?.date || shanghaiDateString()
 
+  if (urlIntent && !userStore.userInfo?.isVip) {
+    // 深层链接直达报告详情：非会员不得进入详情，回退展示概览并在入页时弹会员开通提示
+    vipModalVisible.value = true
+    loadAllReports()
+    return
+  }
+
+  intent.value = urlIntent
   if (intent.value) {
     // 从 URL 参数直接进入详情
     loadReport()
@@ -980,7 +971,7 @@ onBackPress(() => {
 </script>
 
 <style lang="scss" scoped>
-/* 标题栏右侧：播报按钮 + 概览按钮 */
+/* 标题栏右侧：播报按钮 */
 .header-right-actions {
   display: flex;
   align-items: center;

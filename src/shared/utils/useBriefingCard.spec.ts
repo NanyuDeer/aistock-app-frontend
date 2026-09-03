@@ -12,7 +12,7 @@ test('Brief 卡片使用上海时段和上海日期', () => {
   assert.match(source, /fixedDate \?\? shanghaiDateString\(\)/)
 })
 
-test('Brief 卡片在上海 15:29/15:30 边界切换类型', async () => {
+test('Brief 卡片在上海早间/午间/晚报时段自动切换类型', async () => {
   const server = await createServer({
     root: process.cwd(),
     configFile: false,
@@ -23,7 +23,12 @@ test('Brief 卡片在上海 15:29/15:30 边界切换类型', async () => {
 
   try {
     const module = await server.ssrLoadModule('/src/shared/utils/useBriefingCard.ts')
-    assert.equal(module.briefingTypeAtShanghaiTime(new Date('2026-07-24T07:29:00Z')), 'morning')
+    // 10:00 → 晨报
+    assert.equal(module.briefingTypeAtShanghaiTime(new Date('2026-07-24T02:00:00Z')), 'morning')
+    // 12:00 → 午间报
+    assert.equal(module.briefingTypeAtShanghaiTime(new Date('2026-07-24T04:00:00Z')), 'midday')
+    // 15:29 → 午间报；15:30 → 晚报
+    assert.equal(module.briefingTypeAtShanghaiTime(new Date('2026-07-24T07:29:00Z')), 'midday')
     assert.equal(module.briefingTypeAtShanghaiTime(new Date('2026-07-24T07:30:00Z')), 'evening')
   } finally {
     await server.close()

@@ -9,7 +9,18 @@
     <view v-if="open" class="notification-panel">
       <view class="notification-panel__header">
         <text class="notification-panel__title">自选消息</text>
-        <text v-if="loggedIn" class="notification-panel__count">{{ unreadCount ? `${unreadCount} 条未读` : '已读' }}</text>
+        <view v-if="loggedIn" class="notification-filter">
+          <view :class="['notification-filter__option', !unreadOnly ? 'is-active' : '']" @tap="setUnreadOnly(false)">全部</view>
+          <view :class="['notification-filter__option', unreadOnly ? 'is-active' : '']" @tap="setUnreadOnly(true)">未读{{ unreadCount ? ` ${unreadCount}` : '' }}</view>
+        </view>
+        <view
+          v-if="loggedIn && unreadCount"
+          class="notification-panel__read-all"
+          @tap="markAllRead"
+        >
+          <text>全标已读</text>
+          <SvgIcon name="checkbox-circle-line" size="30rpx" color="#a8afbd" />
+        </view>
       </view>
       <view v-if="!loggedIn" class="notification-panel__state">登录后查看自选消息</view>
       <view v-else-if="loading" class="notification-panel__loading">
@@ -17,8 +28,8 @@
       </view>
       <scroll-view v-else class="notification-panel__list" scroll-y @scrolltolower="loadMore">
         <view v-if="unavailable" class="notification-panel__state">消息暂不可用</view>
-        <view v-else-if="!items.length" class="notification-panel__state">暂无自选消息</view>
-        <view v-for="item in items" :key="item.id" class="notification-item" @tap="openItem(item)">
+        <view v-else-if="!displayItems.length" class="notification-panel__state">{{ unreadOnly ? '暂无未读消息' : '暂无自选消息' }}</view>
+        <view v-for="item in displayItems" :key="item.id" class="notification-item" @tap="openItem(item)">
           <view class="notification-item__main">
             <text class="notification-item__title">{{ item.title }}</text>
             <text class="notification-item__summary">{{ item.summary }}</text>
@@ -27,9 +38,14 @@
           <view v-if="!item.readAt" class="notification-item__dot" />
         </view>
         <view v-if="loadingMore" class="notification-panel__footer">加载中...</view>
-        <view v-else-if="!nextCursor && items.length" class="notification-panel__footer">没有更多消息</view>
+        <view v-else-if="!nextCursor && displayItems.length" class="notification-panel__footer">没有更多消息</view>
       </scroll-view>
     </view>
+    <NotificationInsightModal
+      :visible="detailOpen"
+      :notification="selectedNotification"
+      @close="closeDetail"
+    />
   </view>
 </template>
 
@@ -37,10 +53,11 @@
 import { computed, ref, watch, onActivated, onMounted } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
+import NotificationInsightModal from '@/shared/components/NotificationInsightModal.vue'
 import { notificationApi, type UserNotification } from '@/shared/api/modules/notifications'
 import { useNotificationSocket } from '@/shared/utils/useNotificationSocket'
 import { useUserStore } from '@/shared/store/modules/user'
-import { formatShanghaiClock } from '@/shared/utils/datetime'
+import { formatShanghaiDateTime } from '@/shared/utils/datetime'
 
 const userStore = useUserStore()
 const open = ref(false)
@@ -50,11 +67,15 @@ const unavailable = ref(false)
 const items = ref<UserNotification[]>([])
 const unreadCount = ref(0)
 const nextCursor = ref<string | null>(null)
+const detailOpen = ref(false)
+const selectedNotification = ref<UserNotification | null>(null)
+const unreadOnly = ref(false)
 const loggedIn = computed(() => userStore.isLoggedIn())
+const displayItems = computed(() => items.value)
 let latestLoadRequest = 0
 let notificationRevision = 0
 
-function formatTime(value: string) { return formatShanghaiClock(value) }
+function formatTime(value: string) { return formatShanghaiDateTime(value) }
 
 function mergeItem(notification: UserNotification) {
   notificationRevision += 1
@@ -84,7 +105,7 @@ async function load(reset = true) {
     loadingMore.value = true
   }
   try {
-    const page = await notificationApi.list({ limit: 20, cursor: reset ? undefined : nextCursor.value || undefined })
+    const page = await notificationApi.list({ limit: 20, cursor: reset ? undefined : nextCursor.value || undefined, unread: unreadOnly.value || undefined })
     if (requestId !== latestLoadRequest) return
     // 请求期间若已经收到 WS 新消息，不能让这次可能过期的 HTTP 响应覆盖实时状态。
     if (revisionAtRequest !== notificationRevision) {
@@ -113,6 +134,26 @@ async function load(reset = true) {
   }
 }
 
+function setUnreadOnly(next: boolean) {
+  if (unreadOnly.value === next) return
+  unreadOnly.value = next
+  nextCursor.value = null
+  void load()
+}
+
+async function markAllRead() {
+  if (!unreadCount.value) return
+  try {
+    await notificationApi.markAllRead()
+  } catch {
+    return
+  }
+  const readAt = new Date().toISOString()
+  items.value = unreadOnly.value ? [] : items.value.map(item => item.readAt ? item : { ...item, readAt })
+  unreadCount.value = 0
+  nextCursor.value = null
+}
+
 async function markRead(item: UserNotification) {
   if (item.readAt) return
   try {
@@ -130,6 +171,7 @@ async function markRead(item: UserNotification) {
     return { ...current, readAt }
   })
   if (becameRead) unreadCount.value = Math.max(0, unreadCount.value - 1)
+  if (unreadOnly.value && becameRead) items.value = items.value.filter(current => current.id !== item.id)
 }
 
 async function toggle() {
@@ -149,12 +191,17 @@ function loadMore() {
 
 async function openItem(item: UserNotification) {
   await markRead(item)
-  close()
-  if (item.targetPath) uni.navigateTo({ url: item.targetPath })
+  selectedNotification.value = item
+  detailOpen.value = true
 }
 
 function close() {
   open.value = false
+}
+
+function closeDetail() {
+  detailOpen.value = false
+  selectedNotification.value = null
 }
 
 watch(() => [userStore.token, userStore.userInfo?.openid] as const, ([token, openid]) => {
@@ -193,9 +240,13 @@ onActivated(() => {
 .bell-badge { position: absolute; top: -6rpx; right: -10rpx; min-width: 28rpx; height: 28rpx; padding: 0 4rpx; border-radius: 14rpx; background: $up; color: #fff; font-size: 18rpx; line-height: 28rpx; text-align: center; }
 .notification-backdrop { position: fixed; z-index: $z-modal; inset: 0; background: $overlay-base; }
 .notification-panel { position: fixed; z-index: $z-modal + 1; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 560rpx; max-width: 88vw; height: 640rpx; max-height: 70vh; display: flex; flex-direction: column; overflow: hidden; border: 2rpx solid $line; border-radius: $r-lg; background: $bg-card; box-shadow: $shadow-card; }
-.notification-panel__header { display: flex; align-items: center; justify-content: space-between; padding: $s-3; border-bottom: 2rpx solid $line-soft; }
+.notification-panel__header { position: relative; display: flex; align-items: center; gap: 12rpx; min-height: 84rpx; padding: $s-3; border-bottom: 2rpx solid $line-soft; }
 .notification-panel__title { font-size: $font-size-base; font-weight: 600; color: $ink; }
-.notification-panel__count, .notification-panel__footer { font-size: $font-size-xs; color: $ink-mute; }
+.notification-panel__footer { font-size: $font-size-xs; color: $ink-mute; }
+.notification-panel__read-all { display: inline-flex; flex: none; align-items: center; gap: 6rpx; margin-left: auto; padding: 8rpx 0 8rpx 8rpx; color: #a8afbd; font-size: $font-size-sm; font-weight: 400; line-height: 1.2; white-space: nowrap; }
+.notification-filter { display: inline-flex; flex: none; align-items: center; gap: 4rpx; padding: 4rpx; border-radius: $r-full; background: $bg-soft; }
+.notification-filter__option { min-width: 56rpx; padding: 8rpx 10rpx; border-radius: $r-full; color: $ink-mute; font-size: $font-size-xs; line-height: 1.2; text-align: center; white-space: nowrap; }
+.notification-filter__option.is-active { background: $bg-card; box-shadow: $shadow-sm; color: $primary; font-weight: 600; }
 .notification-panel__list { flex: 1; height: 0; min-height: 0; }
 .notification-panel__state, .notification-panel__footer { padding: $s-4; text-align: center; }
 .notification-panel__loading { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 30vh; }

@@ -35,6 +35,48 @@
       </view>
     </template>
 
+    <!-- 数据不完整（partial）：部分字段缺失，展示原始研判标签与已确认亮点 -->
+    <template v-else-if="data.dataStatus === 'partial'">
+      <!-- 原始研判标签 -->
+      <view v-if="data.originalTag" class="partial-tag-bar">
+        <text
+          class="partial-tag-text"
+          :style="{ color: data.originalTagColor, background: (data.originalTagColor || '#378ADD') + '1A' }"
+        >AI研判：{{ data.originalTag }}</text>
+      </view>
+
+      <!-- 已确认亮点 -->
+      <view v-if="data.availableHighlights?.length" class="partial-highlights">
+        <text class="partial-block-title">已确认亮点</text>
+        <view
+          v-for="(h, i) in data.availableHighlights"
+          :key="i"
+          class="partial-highlight-item"
+        >
+          <SvgIcon :name="highlightIcon(h.icon)" size="30rpx" :color="h.color" />
+          <view class="hl-texts">
+            <text class="hl-label" :style="{ color: h.color }">{{ h.label }}</text>
+            <text class="hl-detail">{{ h.detail }}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 数据不完整提示 -->
+      <view class="partial-card">
+        <SvgIcon name="alert-line" size="44rpx" :color="warningColor" />
+        <view class="partial-card-texts">
+          <text class="partial-title">AI研判数据不完整</text>
+          <text class="partial-desc">因{{ missingFieldsText }}等数据缺失，暂无法生成完整四维评分</text>
+        </view>
+      </view>
+
+      <!-- 待补全提示条 -->
+      <view v-if="data.prompt" class="advice-bar">
+        <SvgIcon name="lightbulb-line" size="28rpx" :color="warningColor" class="advice-icon" />
+        <text class="advice-text">{{ data.prompt }}</text>
+      </view>
+    </template>
+
     <!-- 完整数据 -->
     <template v-else-if="data.dataStatus === 'complete' && data.score != null">
       <!-- 评分区 -->
@@ -86,36 +128,6 @@
           </view>
         </view>
       </view>
-
-      <!-- 优势与风险 -->
-      <view class="strength-risk">
-        <view class="strength-col">
-          <text class="col-title strength-title">核心优势</text>
-          <view v-if="data.strengths.length === 0" class="no-risk">
-            <view class="placeholder-row" />
-          </view>
-          <view v-for="(s, i) in data.strengths" :key="'s' + i" class="list-item">
-            <view class="dot strength-dot" />
-            <text class="item-text">{{ s }}</text>
-          </view>
-        </view>
-        <view class="risk-col">
-          <text class="col-title risk-title">潜在风险</text>
-          <view v-if="data.risks.length === 0" class="no-risk">
-            <text class="no-risk-text">暂无明显风险</text>
-          </view>
-          <view v-for="(r, i) in data.risks" :key="'r' + i" class="list-item">
-            <view class="dot risk-dot" />
-            <text class="item-text">{{ r }}</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 洞见条 -->
-      <view class="advice-bar" v-if="data.advice">
-        <text class="advice-title">洞见：</text>
-        <text class="advice-text">{{ data.advice }}</text>
-      </view>
     </template>
   </view>
 </template>
@@ -135,6 +147,24 @@ const props = defineProps<{
 const dataPeriod = computed(() => {
   return props.data?.dataPeriod || ''
 })
+
+/** 缺失字段文案（如"毛利率、经营现金流"） */
+const missingFieldsText = computed(() => {
+  const labels = props.data?.missingFieldLabels || []
+  return labels.length ? labels.join('、') : '部分指标'
+})
+
+/** 后端亮点图标名 → remix 图标名（后端用下划线命名，前端图标为连字符命名） */
+function highlightIcon(icon: string): string {
+  const map: Record<string, string> = {
+    trend_up: 'arrow-up-line',
+    trend_down: 'arrow-down-line',
+    cash: 'wallet-line',
+    warning: 'alert-line',
+    shield: 'shield-line',
+  }
+  return map[icon] || 'line-chart-line'
+}
 
 /** 分数颜色：70-100 红 / 36-69 蓝 / 0-35 绿 */
 const scoreColorClass = computed(() => {
@@ -338,73 +368,6 @@ function formatMetricKey(key: string): string {
   }
 }
 
-// 优势与风险
-.strength-risk {
-  display: flex;
-  gap: 12px;
-  padding: 4px 0;
-
-  .strength-col,
-  .risk-col {
-    flex: 1;
-  }
-
-  .col-title {
-    font-size: 12px;
-    font-weight: 600;
-    margin-bottom: 4px;
-    display: block;
-  }
-
-  .strength-title {
-    color: $down;
-  }
-
-  .risk-title {
-    color: $warning;
-  }
-
-  .list-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    margin-bottom: 2px;
-  }
-
-  .dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    margin-top: 8px;
-  }
-
-  .strength-dot {
-    background: $down;
-  }
-
-  .risk-dot {
-    background: $warning;
-  }
-
-  .item-text {
-    font-size: 12px;
-    color: $ink-soft;
-    line-height: 1.8;
-  }
-
-  .no-risk {
-    .no-risk-text {
-      font-size: 12px;
-      color: $ink-mute;
-    }
-  }
-
-  .placeholder-row {
-    height: 18px;
-  }
-}
-
 // 建议条
 .advice-bar {
   background: $warning-bg;
@@ -466,6 +429,89 @@ function formatMetricKey(key: string): string {
     text-align: center;
     margin-top: 4px;
     line-height: 1.5;
+  }
+}
+
+// 数据不完整（partial）
+.partial-tag-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+
+  .partial-tag-text {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 3px 12px;
+    border-radius: 11px;
+    line-height: 1.6;
+  }
+}
+
+.partial-highlights {
+  background: $bg-soft;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  .partial-block-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: $ink;
+  }
+
+  .partial-highlight-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+
+    .hl-texts {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .hl-label {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .hl-detail {
+      font-size: 12px;
+      color: $ink-soft;
+      line-height: 1.6;
+    }
+  }
+}
+
+.partial-card {
+  background: $warning-bg;
+  border-radius: 12px;
+  padding: 18px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  .partial-card-texts {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .partial-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: $warning;
+  }
+
+  .partial-desc {
+    font-size: 12px;
+    color: $ink-soft;
+    line-height: 1.6;
   }
 }
 

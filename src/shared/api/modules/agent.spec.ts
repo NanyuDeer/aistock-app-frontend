@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import path from 'node:path'
 import { createServer } from 'vite'
@@ -267,4 +268,16 @@ test('getChatAnalysisReport 解包拦截器返回体（正常态 body / 空态 n
   } finally {
     await server.close()
   }
+})
+
+// ── 节奏大师（契约 #4/#6）：源码断言（对齐 MorningContent.spec.ts 先例） ──
+
+const source = readFileSync(new URL('./agent.ts', import.meta.url), 'utf8')
+
+test('agent.ts 提供节奏大师类型与读取方法（契约 #4/#6）', () => {
+  assert.match(source, /getRhythmMaster/)
+  assert.match(source, /\/agent\/rhythm-master\/\$\{/)
+  assert.match(source, /refresh_slot/)
+  assert.match(source, /rhythm_card/)
+  assert.match(source, /after_close.*morning.*midday/)
 })

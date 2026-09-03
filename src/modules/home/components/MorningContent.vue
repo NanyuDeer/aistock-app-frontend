@@ -1,27 +1,42 @@
 <template>
   <view class="morning-content">
     <view class="content-wrap">
-      <!-- 今日专属晨报卡片 -->
+      <!-- 今日专属播报卡片（晨报/午间报/晚报按时间自动切换） -->
       <view class="briefing-card" @tap="goBriefingDetail">
         <view class="briefing-left">
           <view class="briefing-top">
             <text class="briefing-title">今日专属 · {{ briefingTypeLabel }}</text>
             <text v-if="report?.degraded" class="briefing-degraded">证据不完整</text>
           </view>
-          <!-- 有数据时：显示线索数量和简洁摘要 -->
+          <!-- 有数据时：午间报摘要+关键词，晨/晚报线索数量和简洁摘要；关键词样式统一为短标签 -->
           <template v-if="briefingStatus === 'ready'">
-            <view v-if="briefingClueCount > 0" class="briefing-clue">
-              <text class="clue-text">{{ briefingClueCount }}条关键线索需关注</text>
-            </view>
-            <view v-if="briefingClueCount > 0" class="briefing-tags">
-              <view v-for="(tag, idx) in summaryTags" :key="idx" class="summary-tag">
-                <text class="tag-text">{{ tag }}</text>
+            <!-- 午间报：摘要一行 + 短关键词标签（与晨/晚报一致的紧凑样式） -->
+            <template v-if="briefingType === 'midday' && middayReport">
+              <view class="briefing-clue">
+                <text class="clue-text">{{ middayReport.content.display_report.summary }}</text>
               </view>
-              <text class="tags-arrow">›</text>
-            </view>
-            <view v-else class="briefing-clue">
-              <text class="clue-text">暂无关键线索</text>
-            </view>
+              <view v-if="summaryTags.length" class="briefing-tags">
+                <view v-for="(tag, idx) in summaryTags" :key="idx" class="summary-tag">
+                  <text class="tag-text">{{ tag }}</text>
+                </view>
+                <text class="tags-arrow">›</text>
+              </view>
+            </template>
+            <!-- 晨/晚报：保留原有"线索数量 + 短标签"展示 -->
+            <template v-else>
+              <view v-if="briefingClueCount > 0" class="briefing-clue">
+                <text class="clue-text">{{ briefingClueCount }}条关键线索需关注</text>
+              </view>
+              <view v-if="briefingClueCount > 0" class="briefing-tags">
+                <view v-for="(tag, idx) in summaryTags" :key="idx" class="summary-tag">
+                  <text class="tag-text">{{ tag }}</text>
+                </view>
+                <text class="tags-arrow">›</text>
+              </view>
+              <view v-else class="briefing-clue">
+                <text class="clue-text">暂无关键线索</text>
+              </view>
+            </template>
           </template>
           <!-- 空状态/错误/加载时：显示提示 -->
           <view v-else class="briefing-clue">
@@ -48,7 +63,7 @@
 
       <!-- 功能入口 2x2 网格 -->
       <view class="feature-grid">
-        <Card class="feature-card" clickable @click="goSectors">
+        <Card class="feature-card" clickable @tap="goSectors">
           <view class="feature-header">
             <text class="feature-title">风口龙头</text>
             <text class="feature-more">›</text>
@@ -56,7 +71,12 @@
           <text class="feature-sub">排行前三板块</text>
           <view class="feature-list">
             <template v-if="leaderSectors.length">
-              <view v-for="(item, idx) in leaderSectors.slice(0, 3)" :key="idx" class="feature-item">
+              <view
+                v-for="(item, idx) in leaderSectors.slice(0, 3)"
+                :key="idx"
+                class="feature-item"
+                @tap.stop="goSectorDetail(item.name)"
+              >
                 <text class="item-name">No.{{ idx + 1 }} {{ item.name }}</text>
                 <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
               </view>
@@ -67,21 +87,26 @@
           </view>
         </Card>
 
-        <Card class="feature-card" clickable @click="goEventChain">
+        <Card class="feature-card" clickable @tap="goEventChain">
           <view class="feature-header">
             <text class="feature-title">事件传导</text>
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">产业链追踪</text>
           <view class="feature-list">
-            <view v-for="(item, idx) in chainEvents.slice(0, 3)" :key="idx" class="feature-item">
+            <view
+              v-for="(item, idx) in chainEvents.slice(0, 3)"
+              :key="idx"
+              class="feature-item"
+              @tap.stop="goEventDetail(item.eventId)"
+            >
               <text class="item-name">{{ item.name }}</text>
               <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
             </view>
           </view>
         </Card>
 
-        <Card class="feature-card" clickable @click="goTraceability">
+        <Card class="feature-card" clickable @tap="goTraceability">
           <view class="feature-header">
             <text class="feature-title">市场洞见</text>
             <text class="feature-more">›</text>
@@ -95,23 +120,31 @@
           </view>
         </Card>
 
-        <Card class="feature-card" clickable @click="goAgentReport">
+        <Card class="feature-card" clickable @tap="goRhythm">
           <view class="feature-header">
-            <text class="feature-title">今日分析概览</text>
+            <text class="feature-title">节奏大师</text>
             <text class="feature-more">›</text>
           </view>
-          <text class="feature-sub">Agent报告更新状态</text>
-          <view class="feature-list">
-            <view v-for="(item, idx) in aiReports.slice(0, 3)" :key="idx" class="feature-item">
-              <text class="item-name">{{ item.name }}</text>
-              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
+          <text class="feature-sub">近 {{ HOME_RHYTHM_DAYS }} 个交易日 · 收盘基准</text>
+          <!-- 近几日结论：每行 = 建议仓位 + 档位色块（最右，与其它功能卡"名称+Tag"同构）；点行进该日详情（stop 防触整卡跳转） -->
+          <view class="feature-list" v-if="rhythmRows.length">
+            <view
+              v-for="r in rhythmRows"
+              :key="r.date"
+              class="feature-item rhythm-row"
+              @tap.stop="goRhythmDate(r.date)"
+            >
+              <text class="feature-value rhythm-band">{{ r.band || (r.basis_date ? '沿用前值' : '无报告') }}</text>
+              <view class="rhythm-chip" :style="{ background: rhythmChipColor(r) }">
+                <text class="rhythm-chip-text">{{ rhythmLevelShort(r) }}</text>
+              </view>
             </view>
           </view>
         </Card>
       </view>
 
       <!-- 重磅事件跟踪 -->
-      <Card class="track-card" clickable @click="goTrackDetail">
+      <Card class="track-card" clickable @tap="goTrackDetail">
         <view class="track-header">
           <text class="track-title">重磅事件跟踪</text>
           <text class="track-more">›</text>
@@ -153,13 +186,41 @@ const {
   report,
   status: briefingStatus,
   loading: briefingLoading,
+  middayReport,
   refresh: briefingRefresh,
 } = useBriefingCard()
 
+/** 大盘归因降级文案判定：后端在归因结论无归因时返回"今日证据不足，未确认主因" */
+function isDowngradedAttribution(text: string): boolean {
+  return /证据不足|未确认主因|暂无明确主因/.test(text)
+}
+
+/**
+ * 大盘（归因结论）无归因时，改取市场异象条目结论作为标签来源。
+ * 晚报 items：[归因结论 / 市场快照(板块) / 收盘复盘(现象摘要)]，
+ * 优先"收盘复盘"（现象摘要，如"今日概念板块集中异动…"）的市场异象关键词，
+ * 其次"市场快照"（板块行情），均无则回退首个非归因条目。
+ */
+function marketAnomalyText(items: readonly { title?: string; conclusion?: string }[]): string {
+  for (const title of ['收盘复盘', '市场快照']) {
+    const hit = items.find(it => it?.title === title)
+    if (hit?.conclusion) return hit.conclusion
+  }
+  const fallback = items.find(it => it?.title !== '归因结论')
+  return fallback?.conclusion ?? ''
+}
+
 /** 摘要拆分为标签：按标点切割，过滤过长片段（整句），最多3个，每个限12字 */
 const summaryTags = computed(() => {
-  const text = briefingSummary.value || ''
-  return text
+  const items = report.value?.items ?? []
+  const head = items[0]
+  const headText = head?.conclusion ?? ''
+  // 大盘无归因（头条为归因结论且降级）时，改用市场异象关键词，不展示降级文案
+  const sourceText =
+    head?.title === '归因结论' && isDowngradedAttribution(headText)
+      ? marketAnomalyText(items)
+      : briefingSummary.value
+  return sourceText
     .split(/[，,、+。！!？?]/)
     .map(s => s.trim())
     .filter(s => s.length > 0 && s.length <= 15)
@@ -176,7 +237,8 @@ const briefingClueCount = computed(() => {
 function getBriefingDesc(): string {
   switch (briefingStatus.value) {
     case 'empty':
-      return briefingTypeLabel.value === '晨报'
+      if (briefingType.value === 'midday') return '午间报生成中，12:05后查看'
+      return briefingType.value === 'morning'
         ? '晨报生成中，9:00后查看'
         : '晚报生成中，收盘后查看'
     case 'error':
@@ -188,10 +250,9 @@ function getBriefingDesc(): string {
   }
 }
 
-// 卡片点击：进入早点听页面（音频播报 + 条目列表）
+// 卡片点击：进入早点听页面（音频播报 + 条目列表），保留当前报告类型
 function goBriefingDetail() {
-  const type = briefingTypeLabel.value === '晨报' ? 'morning' : 'review'
-  uni.navigateTo({ url: `/pages-sub-app/briefing/index?type=${type}` })
+  uni.navigateTo({ url: `/pages-sub-app/briefing/index?type=${briefingType.value}` })
 }
 
 // 长线风口：从后端 API 获取风口板块数据，提取排行前3的板块在首页预览
@@ -199,6 +260,8 @@ interface LeaderStockPreview {
   name: string
   tag: string
   tagType: 'buy' | 'sell' | 'wash' | 'up' | 'down' | 'date'
+  /** 预览行额外携带的跳转标识：事件传导行 → 事件 ID，跳转 AI 事件分析页用 */
+  eventId?: string
 }
 
 const leaderSectors = ref<LeaderStockPreview[]>([])
@@ -256,9 +319,11 @@ async function loadChainEvents() {
 
     // 事件传导卡片：取最新3条事件
     chainEvents.value = events.slice(0, 3).map(e => {
-      // 标签：优先用 publishTime 的日期，否则标"新"
-      const tag = e.publishTime ? e.publishTime.slice(5, 10) : '新'
-      return { name: e.title, tag, tagType: 'date' as const }
+      // 标签：优先用 publishTime 的时间(HH:MM)，无时间则回退日期，否则标"新"
+      const tag = e.publishTime
+        ? (e.publishTime.length >= 16 ? e.publishTime.slice(11, 16) : e.publishTime.slice(5, 10))
+        : '新'
+      return { name: e.title, tag, tagType: 'date' as const, eventId: e.eventId }
     })
 
     // 重磅事件跟踪：取第1条事件
@@ -274,8 +339,6 @@ async function loadChainEvents() {
     // 失败时保持空状态，不显示假数据
   }
 }
-
-const aiReports = ref<LeaderStockPreview[]>([])
 
 const traceReports = ref<LeaderStockPreview[]>([])
 
@@ -314,61 +377,82 @@ async function loadTraceReports() {
   })
 }
 
-/** Agent 报告状态预览：检查 4 个 agent（晨报/风口龙头/机构调研/趋势股评分），最多显示3个已更新，不足则补"待更新" */
-const AGENT_REPORT_LABELS: Array<{ intent: string; name: string }> = [
-  { intent: 'morning', name: '晨报' },
-  { intent: 'wind_leader', name: '风口龙头' },
-  { intent: 'hot_burst', name: '机构调研' },
-  { intent: 'trend_score', name: '趋势股评分' },
-]
+/** 首页节奏大师卡：近几日摘要（收盘基准档位 + 建议仓位），每行点入该日详情 */
+const HOME_RHYTHM_DAYS = 3
+interface RhythmHistoryRow {
+  date: string
+  level: string | null
+  score: number | null
+  basis_date: string | null
+  band: string
+}
+const rhythmRows = ref<RhythmHistoryRow[]>([])
 
-async function loadAiReports() {
-  const today = shanghaiDateString()
-  const results = await Promise.allSettled(
-    AGENT_REPORT_LABELS.map(item => agentApi.getReport(item.intent, today))
-  )
+// 档位短码/色板（与节奏模块日历同源：ice 紫灰 / low 青 / normal 主蓝 / active 橙 / euphoria 红）
+const RHYTHM_LEVEL_SHORT: Record<string, string> = { ice: '冰', low: '低', normal: '常', active: '活', euphoria: '亢' }
+const RHYTHM_LEVEL_COLOR: Record<string, string> = {
+  ice: '#8a6fae',
+  low: '#2f9e9e',
+  normal: '#4d7cfe',
+  active: '#f59e0b',
+  euphoria: '#ef4444',
+}
+const RHYTHM_GREY = '#eceef1' // 无档位（行缺失/沿用前值）
 
-  const updated: LeaderStockPreview[] = []
-  AGENT_REPORT_LABELS.forEach((item, idx) => {
-    const r = results[idx]
-    const hasReport = r.status === 'fulfilled' && r.value &&
-      !!(r.value as { content?: unknown })?.content
-    if (hasReport) {
-      updated.push({ name: item.name, tag: '已更新', tagType: 'buy' })
-    }
-  })
-
-  // 最多显示3个：已更新优先，不足补"待更新"
-  const display: LeaderStockPreview[] = updated.slice(0, 3)
-  for (const item of AGENT_REPORT_LABELS) {
-    if (display.length >= 3) break
-    if (!updated.some(u => u.name === item.name)) {
-      display.push({ name: item.name, tag: '待更新', tagType: 'wash' })
-    }
+async function loadRhythmHistory() {
+  try {
+    // 一次日历接口取数即可获得多日 level/score/position_band（契约 #7），避免逐日 getRhythmMaster 放大首页刷新成本
+    const res = await agentApi.getRhythmMasterCalendar(HOME_RHYTHM_DAYS)
+    const days = res?.days ?? []
+    // 接口"最近在前"（降序）→ 卡片顶部为最新日期
+    rhythmRows.value = days.map((d) => ({
+      date: d.date,
+      level: d.level,
+      score: d.score,
+      basis_date: d.basis_date,
+      band: d.position_band?.text ?? '',
+    }))
+  } catch {
+    rhythmRows.value = []
   }
+}
 
-  aiReports.value = display
+function rhythmChipColor(r: RhythmHistoryRow): string {
+  return (r.level && RHYTHM_LEVEL_COLOR[r.level]) || RHYTHM_GREY
+}
+function rhythmLevelShort(r: RhythmHistoryRow): string {
+  if (r.level) return RHYTHM_LEVEL_SHORT[r.level] ?? r.level.slice(0, 1)
+  return '沿'
+}
+
+function goRhythm() {
+  uni.navigateTo({ url: '/modules/rhythm/pages/index' })
+}
+/** 点节奏卡某日摘要行：直达该交易日详情（无报告日由详情页回退链兜底） */
+function goRhythmDate(date: string) {
+  uni.navigateTo({ url: `/modules/rhythm/pages/index?date=${date}` })
 }
 
 /**
  * 业务 tagType → 组件库 Tag type 映射
- * up→up(红)，down/date/sell→down(绿)，wash→warning(橙)，buy→neutral(蓝)
+ * up→up(红)，down/sell→down(绿)，date→neutral(静尘蓝)，
+ * buy/已更新→warning(暖杏橙)，wash/待更新→gray(中性灰)
  */
-function itemTagType(tagType: LeaderStockPreview['tagType']): 'up' | 'down' | 'neutral' | 'warning' {
+function itemTagType(tagType: LeaderStockPreview['tagType']): 'up' | 'down' | 'neutral' | 'warning' | 'gray' {
   switch (tagType) {
     case 'up': return 'up'
     case 'down': return 'down'
-    case 'date': return 'down'
+    case 'date': return 'neutral'
     case 'sell': return 'down'
-    case 'wash': return 'warning'
-    case 'buy': return 'neutral'
+    case 'wash': return 'gray'
+    case 'buy': return 'warning'
   }
 }
 
 onShow(() => {
   briefingRefresh()
   loadLeaderSectors()
-  loadAiReports()
+  loadRhythmHistory()
   loadChainEvents()
   loadTraceReports()
 })
@@ -389,12 +473,23 @@ function goEventChain() {
   uni.navigateTo({ url: '/modules/chat/pages/event/list' })
 }
 
-function goTraceability() {
-  uni.navigateTo({ url: '/modules/analytics/pages/traceability' })
+/** 风口龙头卡片的预览板块行 → 板块/风口详情页（按板块名定位） */
+function goSectorDetail(name: string) {
+  if (!name) return
+  uni.navigateTo({ url: `/modules/market/pages/sector-detail?name=${encodeURIComponent(name)}` })
 }
 
-function goAgentReport() {
-  uni.navigateTo({ url: '/modules/chat/pages/agent-report' })
+/** 事件传导卡片的预览事件行 → AI 事件分析页（按事件 ID）；无 ID 回退事件列表 */
+function goEventDetail(eventId?: string) {
+  if (!eventId) {
+    goEventChain()
+    return
+  }
+  uni.navigateTo({ url: `/modules/chat/pages/event/detail?id=${eventId}` })
+}
+
+function goTraceability() {
+  uni.navigateTo({ url: '/modules/analytics/pages/traceability' })
 }
 
 function goTrackDetail() {
@@ -655,6 +750,17 @@ function goLogin() {
   padding: $s-2;
 }
 
+/* 首页白色卡片：与今日专属卡片一致的按压动效（覆盖 Card 默认 scale(0.995)，加阴影变化） */
+.feature-card.as-card,
+.track-card.as-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: $shadow-sm;
+  }
+}
+
 .feature-header {
   display: flex;
   justify-content: space-between;
@@ -710,6 +816,33 @@ function goLogin() {
 
 .item-name.placeholder {
   color: $ink-mute;
+}
+
+/* 节奏大师卡片：近几日结论摘要行（建议仓位 + 档位色块最右，与其它功能卡"名称+Tag"同构） */
+.rhythm-chip {
+  flex: none;
+  width: 40rpx;
+  height: 34rpx;
+  border-radius: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rhythm-chip-text {
+  color: #fff;
+  font-size: 18rpx;
+  line-height: 1;
+}
+/* 仓位文案作为"行主体"占满剩余宽度，色块借 feature-item 的 space-between 贴右 */
+.rhythm-band {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: $font-size-xs;
+  color: $ink-soft;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* ===== 重磅事件跟踪 ===== */
