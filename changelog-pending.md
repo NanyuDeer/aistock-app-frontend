@@ -1,5 +1,8 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-03 App 更新"已是最新"假阳真机排障日志
+- `src/shared/utils/useAppUpdate.ts`：`checkAppUpdate` 比对处增加 `[appUpdate-diag]` 诊断日志，打印线上 `latest`/本机 `current`/`isNever`/`manual`。真机打包含本行的包，点「版本更新」后读 console 即可锁定根因（线上已 0.1.3/103 时 current<=0 或 latest<=current 仍判已最新）。**确认根因后移除本日志**。
+
 ## 2026-09-03 修复 0.1.3 更新不弹窗（version.json 缓存命中旧版本号）
 - `src/shared/api/modules/appUpdate.ts`：`fetchLatestVersion` 请求 URL 追加 `?t=${Date.now()}` cache-busting——version.json 带 Etag/Last-Modified，无绕过会命中 HTTP/App 层缓存旧的 `versionCode`（如 102），即使线上已是 103 也会被 `latest<=current` 误判为"已最新"而不弹更新。本修复随下一个包生效；存量包可用「个人中心」手动检查**暂时无果**（同一旧包拉取代码仍无时间戳），需重装含本修复的新包。
 

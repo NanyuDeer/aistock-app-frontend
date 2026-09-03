@@ -101,6 +101,8 @@ export async function checkAppUpdate(opts: { manual?: boolean } = {}): Promise<A
   // 比对版本号
   const latest = Number(info.versionCode) || 0
   const current = getCurrentVersionCode()
+  // 诊断日志（真机「已是最新」假阳排查用，确认后移除）：打印线上与本机 versionCode 及判断走向
+  console.warn('[appUpdate-diag] latest =', latest, '| current =', current, '| isNever =', isNeverUpdate(latest), '| manual =', opts.manual)
   // current<=0 表示本机版本号读取失败（无法判定本机版本），保守视为已最新，避免反复误弹
   if (!latest || current <= 0 || latest <= current) return 'latest'
 
