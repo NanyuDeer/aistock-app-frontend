@@ -2,17 +2,18 @@
 
 ## 模块职责
 
-节奏大师状态卡详情页 + 60 交易日热力图日历总览：展示"节奏大师"报告（`report_type=rhythm_master`）的三时点版本（收盘后 / 早盘 / 午盘），渲染状态卡（`rhythm_card`）与对应分时点结论；日历页按交易日展示每日收盘基准档位（冷→热热力图）。前端只读消费，不产生修改动作。
+节奏大师详情页：展示"节奏大师"报告（`report_type=rhythm_master`）的三时点版本（收盘后 / 早盘 / 午盘），顶部为可折叠双模式节奏日历面板（仓位/事件，60 日热力网格内嵌于此），下方渲染节奏洞见摘要卡（InsightCard）与瘦身状态卡（`rhythm_card`）。前端只读消费，不产生修改动作。
 
-**页面容器（2026-09-02 起）**：详情页与日历页均已迁移到通用子页容器 `SubPageCard2`（白底导航 + 原生滚动 + 内置 GlobalChatBar 全局 AI 对话栏 + 自动返回兜底）。自绘 nav + `.page{height:100%}` 滚动方案已废弃——H5 固定 9:16 视口下非 fixed 布局滚动区高度链不可靠，易"翻不动"。
+**页面容器（2026-09-02 起）**：详情页已迁移到通用子页容器 `SubPageCard2`（白底导航 + 原生滚动 + 内置 GlobalChatBar 全局 AI 对话栏 + 自动返回兜底）。自绘 nav + `.page{height:100%}` 滚动方案已废弃——H5 固定 9:16 视口下非 fixed 布局滚动区高度链不可靠，易"翻不动"。
 
 ## 页面 / 组件清单
 
 | 文件                          | 说明                                                                                                                                 |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `pages/index.vue`           | 节奏大师详情页（SubPageCard2 容器；内容区顶部**近 7 交易日紧凑日期条**：格 = 收盘基准档位色 + 短码 + 建议仓位，点格切日重拉三时点版本；下方三时点 pill + 状态卡；右上 header-right **"日历"入口**进总览页） |
-| `pages/calendar.vue`        | 节奏日历热力图总览（SubPageCard2 容器，近 60 交易日，点格跳详情）                                                                                          |
-| `components/RhythmCard.vue` | 状态卡组件（主档位 / 情绪周期 / 分支 / 事件日历 / 数据缺失）                                                                                               |
+| `pages/index.vue`           | 节奏大师详情页（SubPageCard2 容器；内容流 = 顶部 **RhythmCalendarPanel**（折叠近 7 日紧凑条 / 展开 60 交易日周网格，仓位/事件 Segmented；事件模式 = macro 角标 + 选中日事件行）+ 三时点 pill / 沿用前值 fallback + **节奏洞见卡**（InsightCard 摘要：仓位/档位/interval 分支上移）→ RhythmCard（明细已去重瘦身）+ EmptyState 兜底）                          |
+| `components/RhythmCalendarPanel.vue` | 顶部可折叠双模式日历面板（2026-09-03）：折叠 = 近 7 交易日紧凑条（左旧右新，点格切日）；展开 = 60 交易日自然周网格（默认展开，`rhythm.calendar.expanded` storage 记忆）；仓位/事件 Segmented 仅展开态；事件模式 = macro 角标（high 红点计数 / medium-low 灰点）+ 选中日事件行；点格以 `pick` 事件上抛切日（不导航） |
+| `components/RhythmCard.vue` | 状态卡组件（瘦身后保留：score + 五档色带 / 情绪周期 chip / 温度曲线 / 事件日历 / conflict / data_missing；仓位长句、档位 chip、证据行、关键节点分支已上移洞见卡——**同屏去重**）                                                                                               |
+| `utils/rhythmInsight.ts`    | 洞见卡映射（2026-09-03）：`toRhythmInsight(card, slot, date)` → `RhythmInsightCard`（结构化子集对齐 ConditionalForecastBlock/InsightCard 入参；不可拼装返回 null → 整卡不渲染）                                                                                    |
 
 ## 首页节奏卡（modules/home/components/MorningContent.vue）
 
@@ -24,7 +25,9 @@
 
 - `agentApi.getRhythmMaster(date)`（`src/shared/api/modules/agent.ts`）：GET `/agent/rhythm-master/:date`，返回 `{ date, versions: [{ refresh_slot, created_at, content }] }`
 
-- `agentApi.getRhythmMasterCalendar(days)`：GET `/agent/rhythm-master/calendar?days=N`（N 默认 60，≤60 交易日），返回 `{ days: [{ date, refresh_slot, level, score, basis_date, position_band }] }`，恒取 after\_close 收盘基准行（三时点 level 恒等）。**`position_band`（2026-09-02 扩展）：该日收盘基准建议仓位** **`{min?, max?, text?}`，行缺失/null = 无仓位语义（如实展示）**，供详情页顶部日期条与首页近 5 日摘要使用
+- `agentApi.getRhythmMasterCalendar(days)`：GET `/agent/rhythm-master/calendar?days=N`（N 默认 60，≤60 交易日），返回 `{ days: [{ date, refresh_slot, level, score, basis_date, position_band, events? }] }`，恒取 after\_close 收盘基准行（三时点 level 恒等）。**`position_band`（2026-09-02 扩展）：该日收盘基准建议仓位** **`{min?, max?, text?}`，行缺失/null = 无仓位语义（如实展示）**，供日历面板/详情页与首页近 5 日摘要使用。**`events`（2026-09-03 扩展）：该日 macro 事件行**（CN + US 隔夜按对外契约顺延；类型标可选 `events?` 以兼容缺省/降级响应——**后端恒下发，无事件 = `[]`**）
+
+- **洞见卡映射与去重（2026-09-03）**：详情页 RhythmCard 前插入统一摘要洞见卡（InsightCard，type=market / tag-text=节奏洞见）；洞见卡映射规则（owner 表 + structured 规则）与 RhythmCard 去重清单指向 spec §10（docs/superpowers/specs/2026-09-03-rhythm-calendar-inline-panel-design.md）
 
 - 三时点标识 `refresh_slot`：`'after_close' | 'morning' | 'midday'`
 
@@ -56,15 +59,19 @@
 
 - 事件分支（enum）公布前 range 为空 → 显示"结果待公布"占位
 
-## 日历页契约（契约 #7）
+## 日历面板网格契约（契约 #7，2026-09-03 起内嵌详情页）
 
-- 网格按交易日（服务端展开，前端不依赖交易日历），默认近 60 交易日
+- 独立日历总览页已废弃（`pages/calendar.vue` 删除）；60 日热力网格内嵌为详情页顶部 `RhythmCalendarPanel`，一次 `getRhythmMasterCalendar(60)` 取全量（含 events），折叠态渲染最近 7 日、展开态渲染 60 日，不再逐日请求
+
+- 网格按交易日（服务端展开，前端不依赖交易日历），展开态为自然周网格：周一列开头、周末列留空
 
 - 独立五档色板（不复用卡片 chip 色）：ice 紫灰 `#8a6fae` / low 青 `#2f9e9e` / normal 主蓝 / active 橙 / euphoria 红；灰格 `#eceef1`（行缺失或 level=null）
 
 - `level=null` = 灰格（行缺失 / 沿用前值），如实展示不伪造
 
-- 点格 `navigateTo` 详情页带 `date` 参数；H5 直开兜底（`getCurrentPages()` 深度=1 → `reLaunch` 首页）
+- 展开态默认展开（`rhythm.calendar.expanded` storage 记忆）；仓位/事件 Segmented 仅展开态展示；事件模式 = macro 角标（high 红点+计数 / medium-low 灰点）+ 选中日事件行（影响度·时间·标题 / result 尾注 / US 隔夜角标），空日显示「当日无宏观事件」，不标点不填充
+
+- 点格切日 = 面板 `pick` 事件上抛，详情页原地重拉该日三时点版本（无页面跳转）
 
 ## 约束
 
