@@ -20,3 +20,13 @@ test('getRhythmMasterCalendar 支持自然日模式（naturalDays 参数）', ()
   const api = readFileSync(new URL('../../../shared/api/modules/agent.ts', import.meta.url), 'utf8')
   assert.match(api, /naturalDays/)
 })
+
+test('折叠近 7 交易日紧凑条走交易日数据源（dayList），展开网格走自然日数据源（dayListRaw）', () => {
+  // dayList = 交易日数据源（getRhythmMasterCalendar(60) 单参数 days=60，不含周末）
+  assert.match(source, /getRhythmMasterCalendar\(60\)\.then/)
+  // dayListRaw = 自然日数据源（getRhythmMasterCalendar(60, 60) naturalDays=60，含周末）
+  assert.match(source, /getRhythmMasterCalendar\(60, 60\)\.then/)
+  // 两条数据源各自独立持久化（dayList 不再复用 dayListRaw，否则周末会混入折叠紧凑条）
+  assert.match(source, /const dayList = ref<RhythmCalendarDay\[\]>\(\[\]\)/)
+  assert.match(source, /const dayListRaw = ref<RhythmCalendarDay\[\]>\(\[\]\)/)
+})

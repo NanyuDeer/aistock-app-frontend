@@ -94,8 +94,8 @@ const expanded = ref(true)
 try { expanded.value = uni.getStorageSync(STORAGE_KEY) !== '' ? uni.getStorageSync(STORAGE_KEY) === true || uni.getStorageSync(STORAGE_KEY) === 'true' : true } catch { /* 忽略 */ }
 
 const mode = ref<'position' | 'event'>('position')
-const dayListRaw = ref<RhythmCalendarDay[]>([]) // naturalDays=60 原序（降序：最近在前，含周末自然日）
-const dayList = computed<RhythmCalendarDay[]>(() => dayListRaw.value) // 供 stripDays/selectedEvents（语义经 ascending 转升序）
+const dayListRaw = ref<RhythmCalendarDay[]>([]) // naturalDays=60 原序（降序：最近在前，含周末自然日）—— 展开月度网格专用
+const dayList = ref<RhythmCalendarDay[]>([]) // days=60 交易日原序（降序：仅交易日）—— 折叠紧凑条/selectedEvents 专用（近 7 交易日不含周末）
 
 const LEVEL_SHORT: Record<string, string> = { ice: '冰', low: '低', normal: '常', active: '活', euphoria: '亢' }
 const LEVEL_COLOR: Record<string, string> = {
@@ -203,7 +203,9 @@ function toggle() {
 }
 function pick(d: RhythmCalendarDay) { emit('pick', d.date) }
 
+// 两条数据源：展开月度网格用自然日（naturalDays=60，含周末）；折叠紧凑条/事件面板用交易日（days=60，仅交易日，避免周末/节假日混入近 7 交易日）
 agentApi.getRhythmMasterCalendar(60, 60).then((res) => { dayListRaw.value = res?.days ?? [] }).catch(() => { dayListRaw.value = [] })
+agentApi.getRhythmMasterCalendar(60).then((res) => { dayList.value = res?.days ?? [] }).catch(() => { dayList.value = [] })
 </script>
 
 <style lang="scss" scoped>

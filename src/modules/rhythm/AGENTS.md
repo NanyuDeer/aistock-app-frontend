@@ -61,7 +61,7 @@
 
 ## 日历面板网格契约（契约 #7，2026-09-03 起内嵌详情页）
 
-- 独立日历总览页已废弃（`pages/calendar.vue` 删除）；60 日热力网格内嵌为详情页顶部 `RhythmCalendarPanel`，一次 `getRhythmMasterCalendar(60)` 取全量（含 events），折叠态渲染最近 7 日、展开态渲染 60 日，不再逐日请求
+- 独立日历总览页已废弃（`pages/calendar.vue` 删除）；60 日热力网格内嵌为详情页顶部 `RhythmCalendarPanel`，**两条数据源分别取数**：折叠态近 7 交易日紧凑条走交易日数据源 `getRhythmMasterCalendar(60)`（days=60，仅交易日，不含周末/节假日）、展开态 60 日自然月网格走自然日数据源 `getRhythmMasterCalendar(60, 60)`（naturalDays=60，含周末），不再逐日请求
 
 - 网格按交易日（服务端展开，前端不依赖交易日历），展开态为自然周网格：周一列开头、周末列留空
 
