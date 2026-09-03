@@ -795,8 +795,10 @@ export const agentApi = {
   /** 节奏日历热力图聚合（契约 #7）：最近 N 个交易日 after_close 收盘基准档位。
    *  返回 { days: [{date, refresh_slot, level, score, basis_date, position_band}] }，
    *  level 可空（灰格）；position_band 为空 = 该日无仓位语义（如实展示，不伪造）。 */
-  getRhythmMasterCalendar(days = 60) {
-    return request.get<RhythmCalendarResponse>('/agent/rhythm-master/calendar', { params: { days } })
+  getRhythmMasterCalendar(days = 60, naturalDays = 0) {
+    return request.get<RhythmCalendarResponse>('/agent/rhythm-master/calendar', {
+      params: naturalDays > 0 ? { naturalDays } : { days },
+    })
   },
 
   /**

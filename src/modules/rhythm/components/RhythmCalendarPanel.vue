@@ -29,12 +29,18 @@
       </view>
     </view>
 
-    <!-- 展开态：60 交易日自然周网格（周一列开头，周末留空；今日高亮；事件模式标点） -->
+    <!-- 展开态：自然月网格（含周末 cell 灰格如实展示；今日高亮；事件模式标点；月翻页） -->
     <view v-else>
+      <view class="month-nav">
+        <text class="month-nav-btn" @tap="prevMonth">‹</text>
+        <text class="month-nav-title">{{ currentMonthTitle }}</text>
+        <text class="month-nav-btn" @tap="nextMonth">›</text>
+        <text class="month-nav-today" @tap="goToday">今天</text>
+      </view>
       <view class="week-head">
         <text v-for="w in ['一', '二', '三', '四', '五', '六', '日']" :key="w" class="week-head-cell">{{ w }}</text>
       </view>
-      <view v-for="(row, ri) in gridRows" :key="ri" class="cal-row">
+      <view v-for="(row, ri) in currentMonthGrid" :key="ri" class="cal-row">
         <view
           v-for="(cell, ci) in row"
           :key="ci"
@@ -47,7 +53,7 @@
             :style="{ background: dayCellBg(cell) }"
             @tap="pick(cell)"
           >
-            <text class="cal-date">{{ cell.date.slice(8) }}</text>
+            <text class="cal-date" :class="{ dim: !cell.level }">{{ cell.date.slice(8) }}</text>
             <text class="cal-lev" v-if="cell.level">{{ LEVEL_SHORT[cell.level] ?? cell.level.slice(0, 1) }}</text>
             <view v-if="mode === 'event' && eventsOf(cell).length" class="ev-badge" :class="{ hasHigh: highCount(cell) > 0 }">
               <text v-if="highCount(cell) > 0" class="ev-badge-num">{{ highCount(cell) }}</text>
@@ -88,7 +94,8 @@ const expanded = ref(true)
 try { expanded.value = uni.getStorageSync(STORAGE_KEY) !== '' ? uni.getStorageSync(STORAGE_KEY) === true || uni.getStorageSync(STORAGE_KEY) === 'true' : true } catch { /* 忽略 */ }
 
 const mode = ref<'position' | 'event'>('position')
-const dayList = ref<RhythmCalendarDay[]>([]) // API 原序（降序：最近在前）
+const dayListRaw = ref<RhythmCalendarDay[]>([]) // naturalDays=60 原序（降序：最近在前，含周末自然日）
+const dayList = computed<RhythmCalendarDay[]>(() => dayListRaw.value) // 供 stripDays/selectedEvents（语义经 ascending 转升序）
 
 const LEVEL_SHORT: Record<string, string> = { ice: '冰', low: '低', normal: '常', active: '活', euphoria: '亢' }
 const LEVEL_COLOR: Record<string, string> = {
@@ -132,42 +139,62 @@ const selectedEvents = computed<RhythmEvent[]>(() => {
   return day ? eventsOf(day) : []
 })
 
-// —— 展开网格：自然周对齐（周一列开头；相邻交易日之间的周末/假日列留空；跨周换行）——
+// —— 展开网格：自然月铺满（周一列开头；含周末/节假日 cell=灰格 level=null；每行恒 7 列）——
 const WEEK_COL: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 } // jsDay(0=周日) → col(0=周一)
 type GridCell = RhythmCalendarDay | null
-const gridRows = computed<GridCell[][]>(() => {
+const p = (n: number) => String(n).padStart(2, '0')
+
+/** 当前展示月份（YYYY-MM，默认当前自然月） */
+function defaultMonth(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}`
+}
+const currentMonth = ref(defaultMonth())
+
+/** 按 YYYY-MM 构造该自然月的完整网格：上/下个月前导后置空列置 null；月中每一天都渲染（含周末） ->
+ *  命中 dayListRaw 带真实档位/事件；否则 level=null 灰格如实展示，但仍可 pick（看当日 macro 事件）。 */
+function buildMonthGrid(month: string): GridCell[][] {
+  const [year, monthIdx] = month.split('-').map(Number) // monthIdx 1-based(1~12)
+  const daysInMonth = new Date(year, monthIdx, 0).getDate() // 当月总天数
+  const firstDow = new Date(year, monthIdx - 1, 1).getDay() // 当月 1 号的 jsDay(0=周日)
+  const lead = WEEK_COL[firstDow] // 首日列偏移（周一=0，不补）
   const rows: GridCell[][] = []
-  let row: GridCell[] = []
-  let rowMonday = '' // 当前行首格所在周的周一（YYYY-MM-DD），跨周断行依据
-  let rowHasDay = false
-  const p = (n: number) => String(n).padStart(2, '0')
-  /** 该日期所在自然周的周一（本地年月日算术，避开 DST/UTC 偏差） */
-  const mondayOf = (date: string): string => {
-    const [y, m, dd] = date.split('-').map(Number)
-    const dow = (new Date(y, m - 1, dd).getDay() + 6) % 7 // 周一=0
-    const mon = new Date(y, m - 1, dd - dow)
-    return `${mon.getFullYear()}-${p(mon.getMonth() + 1)}-${p(mon.getDate())}`
+  let row: GridCell[] = new Array<GridCell>(lead).fill(null)
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = `${year}-${p(monthIdx)}-${p(d)}`
+    const found = dayListRaw.value.find((x) => x.date === date)
+    const cell: GridCell = found ?? { date, level: null, score: null, basis_date: null, position_band: null, events: [] }
+    row.push(cell)
+    if (row.length === 7) {
+      rows.push(row)
+      row = []
+    }
   }
-  const pushRow = () => {
-    if (!row.length) return
-    while (row.length < 7) row.push(null) // 每行恒 7 列：周末/空列留空，跨行周一对齐
+  if (row.length) {
+    while (row.length < 7) row.push(null) // 月尾补空列到整行
     rows.push(row)
-    row = []
-    rowHasDay = false
   }
-  for (const d of ascending.value) {
-    const monday = mondayOf(d.date)
-    // 新的一周（含长假跨周：节后首交易日列号 ≥ 游标也另起一行）→ 按周一锚点断行
-    if (rowHasDay && monday !== rowMonday) pushRow()
-    const col = WEEK_COL[new Date(`${d.date}T00:00:00`).getDay()]
-    while (row.length < col) row.push(null) // 周首缺日前置空列（周一=0 不补）
-    if (!rowHasDay) rowMonday = monday
-    row.push(d)
-    rowHasDay = true
-  }
-  pushRow()
   return rows
+}
+const currentMonthGrid = computed<GridCell[][]>(() => buildMonthGrid(currentMonth.value))
+
+const currentMonthTitle = computed(() => {
+  const [y, m] = currentMonth.value.split('-').map(Number)
+  return `${y}年${m}月`
 })
+function prevMonth() {
+  const [y, m] = currentMonth.value.split('-').map(Number)
+  const d = new Date(y, m - 2, 1) // 上一月：1-based m → 0-based 索引 m-2
+  currentMonth.value = `${d.getFullYear()}-${p(d.getMonth() + 1)}`
+}
+function nextMonth() {
+  const [y, m] = currentMonth.value.split('-').map(Number)
+  const d = new Date(y, m, 1) // 下一月：1-based m → 0-based 索引 m
+  currentMonth.value = `${d.getFullYear()}-${p(d.getMonth() + 1)}`
+}
+function goToday() {
+  currentMonth.value = defaultMonth()
+}
 
 function onModeChange(v: string | number) { mode.value = v as 'position' | 'event' }
 function toggle() {
@@ -176,7 +203,7 @@ function toggle() {
 }
 function pick(d: RhythmCalendarDay) { emit('pick', d.date) }
 
-agentApi.getRhythmMasterCalendar(60).then((res) => { dayList.value = res?.days ?? [] }).catch(() => { dayList.value = [] })
+agentApi.getRhythmMasterCalendar(60, 60).then((res) => { dayListRaw.value = res?.days ?? [] }).catch(() => { dayListRaw.value = [] })
 </script>
 
 <style lang="scss" scoped>
@@ -217,7 +244,13 @@ agentApi.getRhythmMasterCalendar(60).then((res) => { dayList.value = res?.days ?
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* —— 展开态：自然周网格（行=周，列=一~日；空位留白）—— */
+/* —— 展开态月份翻页条 —— */
+.month-nav { display: flex; align-items: center; gap: 16rpx; margin-bottom: 12rpx; }
+.month-nav-btn { font-size: 32rpx; color: $primary; width: 48rpx; height: 48rpx; text-align: center; line-height: 48rpx; }
+.month-nav-title { flex: 1; text-align: center; font-size: 28rpx; font-weight: 600; color: $ink; }
+.month-nav-today { font-size: 24rpx; color: $primary; padding: 4rpx 0 4rpx 8rpx; }
+
+/* —— 展开态：自然月网格（行=周，列=一~日；空位留白；周末灰格）—— */
 .week-head { display: flex; gap: 10rpx; margin-bottom: 6rpx; }
 .week-head-cell {
   flex: 0 0 calc((100% - 60rpx) / 7);
