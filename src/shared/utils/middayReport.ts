@@ -14,6 +14,8 @@
 export interface MiddaySection {
   title: string
   conclusion: string
+  /** schema 2.1：午后前瞻的机会提示短词（4-5 个、每个 ≤8 字）；老数据无此字段 */
+  opportunities?: string[]
 }
 
 export interface MiddayDisplayReport {
@@ -43,7 +45,20 @@ function isStringList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
-/** 归一化多分段摘要 sections：仅保留含非空 conclusion 的项（容忍 LLM 字段缺漏/顺序变化）。 */
+/** LLM 输出防御：trim、去空、最多取前 5 个、单项 ≤8 字截断（schema 2.1 opportunities）。 */
+function normalizeKeywords(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const result: string[] = []
+  for (const item of value) {
+    if (result.length >= 5) break
+    const text = typeof item === 'string' ? item.trim() : ''
+    if (!text) continue
+    result.push(text.slice(0, 8))
+  }
+  return result
+}
+
+/** 归一化多分段摘要 sections：仅保留含非空 conclusion 或非空 opportunities 的项（容忍 LLM 字段缺漏/顺序变化）。 */
 function normalizeSections(value: unknown): MiddaySection[] {
   if (!Array.isArray(value)) return []
   const result: MiddaySection[] = []
@@ -51,9 +66,14 @@ function normalizeSections(value: unknown): MiddaySection[] {
     if (!item || typeof item !== 'object') continue
     const body = item as Record<string, unknown>
     const conclusion = typeof body.conclusion === 'string' ? body.conclusion.trim() : ''
-    if (!conclusion) continue
+    const opportunities = normalizeKeywords(body.opportunities)
+    if (!conclusion && opportunities.length === 0) continue
     const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim() : ''
-    result.push({ title, conclusion })
+    result.push({
+      title,
+      conclusion,
+      ...(opportunities.length ? { opportunities } : {}),
+    })
   }
   return result
 }
