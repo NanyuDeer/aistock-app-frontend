@@ -476,6 +476,16 @@ export interface RhythmEvent {
   event_time?: string | null
   result?: string | null
 }
+export interface RhythmPositionAction {
+  direction: 'add' | 'reduce' | 'hold'
+  change: string
+  band?: RhythmPositionBand | null
+}
+export interface RhythmAnchor {
+  metric: 'index_close' | 'close' | 'high' | 'low'
+  threshold: string
+  direction: 'bullish' | 'bearish' | 'neutral'
+}
 export interface RhythmBranch {
   condition: {
     kind: 'interval' | 'enum'
@@ -486,6 +496,9 @@ export interface RhythmBranch {
     label?: string
     value?: string
   }
+  position_action?: RhythmPositionAction
+  anchor?: RhythmAnchor
+  touch_strength?: number | null
   conclusion: { direction: 'bullish' | 'bearish' | 'neutral'; range?: string; validity: number; note?: string }
   event_ref?: { event_date: string; title: string }
 }
