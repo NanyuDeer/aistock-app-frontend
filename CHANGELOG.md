@@ -2,6 +2,17 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-03 — 预测历史页只显示大盘 + 板块预判 label 展示链路就绪
+
+**开发者**: Aria
+
+### 改进
+- `modules/analytics/pages/prediction-history.vue`（大盘溯源预测历史 B2.1）：调用 `predictionApi.list` 显式传 `source_type: 'market_trace'`——板块预判记录（sector_prediction）不再混入大盘历史页（板块预判在板块四环聚合页查看）
+- `shared/api/modules/prediction.ts`：`list` 参数补可选 `source_type`（market_trace | sector_prediction），与后端 `/api/predictions` 白名单过滤对齐
+
+### 备注
+- 板块四环预判卡 label/互斥路径展示所需字段已由后端 sector-insight 透传（app-api d34ee17），前端类型/映射此前已就绪
+
 ## [master] 2026-09-03 — 洞见卡去金重构同步：溯源/预判同构双子卡 + label 字段链路
 
 **开发者**: Aria

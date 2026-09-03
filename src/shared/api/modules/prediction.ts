@@ -98,6 +98,8 @@ export const predictionApi = {
   list(params: {
     status?: 'all' | 'pending' | 'verified'
     source_id?: string
+    /** 记录类型过滤：大盘溯源预测（market_trace）/ 板块预判（sector_prediction）；大盘历史页传 market_trace */
+    source_type?: 'market_trace' | 'sector_prediction'
     page?: number
     pageSize?: number
   } = {}) {
