@@ -169,7 +169,7 @@
               <text class="fg-sectors__label">配置方向<text class="fg-sectors__hint">（点击查看解释）</text></text>
               <view class="fg-sectors__tags">
                 <view
-                  v-for="s in zone.sectors"
+                  v-for="s in adviceCards.sectorTags"
                   :key="s.name"
                   class="fg-tag"
                   :style="{ borderColor: zone.color, color: zone.color }"
@@ -181,7 +181,7 @@
             <view class="fg-actions">
               <text class="fg-actions__label">操作要点</text>
               <view
-                v-for="(a, i) in zone.actions"
+                v-for="(a, i) in adviceCards.actions"
                 :key="i"
                 class="fg-actions__item"
               >
@@ -189,7 +189,7 @@
                 <text class="fg-actions__text">{{ a }}</text>
               </view>
             </view>
-            <text class="fg-advice">{{ zone.advice }}</text>
+            <text class="fg-advice">{{ adviceCards.advice }}</text>
           </view>
         </view>
       </template>
@@ -210,7 +210,8 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
-import { fearGreedApi, type FearGreedDashboard } from '@/shared/api/modules/fear-greed'
+import { fearGreedApi, type FearGreedDashboard, type FgSectorBoard } from '@/shared/api/modules/fear-greed'
+import { buildSectorTags, buildActions, buildAdvice, buildDriversSentence } from '../utils/fgAdvice'
 
 /**
  * 情绪分档（沸点/冰点生活化表述，去专业术语）。
@@ -318,6 +319,8 @@ const ZONES: ZoneDef[] = [
 const loading = ref(true)
 const errorMsg = ref('')
 const dashboard = ref<FearGreedDashboard | null>(null)
+/** 当日板块行情（建议引擎输入；失败静默置 null 走 fallback） */
+const sectorBoard = ref<FgSectorBoard | null>(null)
 /** 当前点击的配置方向弹窗（null = 关闭） */
 const activeSector = ref<{ name: string; desc: string } | null>(null)
 
@@ -325,6 +328,22 @@ const activeSector = ref<{ name: string; desc: string } | null>(null)
 const zone = computed<ZoneDef>(() => {
   const v = dashboard.value?.currentIndex ?? 50
   return ZONES.find((z) => v >= z.min && v < z.max) ?? ZONES[ZONES.length - 1]
+})
+
+/**
+ * 动态建议（情绪结构 × 真实板块行情；板块不可用时回退 ZONES 静态档位内容）。
+ * 温度档静态内容（ZONES）仅作 fallback 与 UI 元数据（色/标签/仓位锚点）。
+ */
+const fallbackSectors = computed(() => zone.value.sectors.map((s) => ({ name: s.name, desc: s.desc })))
+const adviceCards = computed(() => {
+  const c = dashboard.value?.currentIndex ?? 50
+  const indicators = dashboard.value?.indicators ?? []
+  const ctx = { composite: c, indicators, board: sectorBoard.value ?? undefined }
+  return {
+    sectorTags: buildSectorTags(ctx, fallbackSectors.value),
+    actions: buildActions(ctx),
+    advice: buildAdvice(ctx),
+  }
 })
 
 /**
@@ -571,8 +590,9 @@ const aiInsight = computed(() => {
   const ma = movingAverages.value
   const ice = icePointStats.value
 
-  // —— 为什么：市场情绪总结 + 数据依据 ——
-  const whyParts: string[] = [`当前市场情绪${z.label}（恐贪指数 ${cur.toFixed(0)}%），${z.summary}`]
+  // —— 为什么：今日主因（指标驱动）+ 档位总览 ——
+  const driversSentence = buildDriversSentence({ composite: cur, indicators: dashboard.value?.indicators ?? [] })
+  const whyParts: string[] = [`${driversSentence}，当前市场情绪${z.label}（恐贪指数 ${cur.toFixed(0)}%）`]
   if (ma?.ma5 != null && ma?.ma20 != null) {
     if (ma.ma5 > ma.ma20) {
       whyParts.push(`5日均线 ${ma.ma5.toFixed(0)}% 高于20日均线 ${ma.ma20.toFixed(0)}%，短期情绪正在回暖`)
@@ -725,6 +745,8 @@ async function load() {
   errorMsg.value = ''
   try {
     dashboard.value = await fearGreedApi.getDashboard('jq')
+    // 板块行情独立拉取：失败不影响主数据（引擎侧回退静态档位内容）
+    fearGreedApi.getSectors().then((b) => { sectorBoard.value = b }).catch(() => { sectorBoard.value = null })
   } catch (e: unknown) {
     errorMsg.value = (e as { message?: string })?.message || '请稍后重试'
   } finally {
