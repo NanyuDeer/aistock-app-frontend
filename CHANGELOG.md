@@ -2,6 +2,23 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-09-02 — 节奏大师页通用子页化 + 顶部日期条 + 首页近5日摘要卡
+
+**开发者**: changer-collab
+
+### 改进
+- 节奏详情页 `rhythm/pages/index.vue` 与日历页 `pages/calendar.vue` 由自绘 nav + `.page{height:100%}` 迁移到通用子页容器 `SubPageCard2`（fixed 布局 + 原生滚动 + 白底导航），根治 H5 固定 9:16 视口下页面"翻不动"；底部随容器恢复全局 AI 对话栏 GlobalChatBar（报告|AI 对话胶囊|自选 + 免责声明）
+- 节奏详情页内容区顶部新增**近 7 交易日紧凑日期条**（收盘基准档位色 + 短码 + 建议仓位文本，点格切换目标日并重拉三时点版本）；右上 header-right 新增"日历"入口（此前 60 日总览页无任何入口）
+- 首页节奏大师卡由"仅最近 1 天摘要"改为**近 5 交易日摘要行**（MM-DD + 档位色 chip + 建议仓位，点行进该日详情），一次 `getRhythmMasterCalendar(5)` 取数，不再逐日 `getRhythmMaster`（避免放大首页 onShow 刷新成本）
+- `agent.ts`：新增 `RhythmCalendarDay`/`RhythmPositionBand`/`RhythmCalendarResponse` 类型，`getRhythmMasterCalendar` 类型化（含 `position_band`）
+- 修复 `chat/event/components/EventHeadlineCard.vue` `sourceInfo: () => undefined` 冗余默认值导致的 TS2322（基线遗留，挡 vue-tsc）
+
+### 测试
+- `MorningContent.spec.ts`：节奏卡近 5 日摘要相关用例更新（getRhythmMasterCalendar / goRhythmDate / 失败兜底 / onShow 接入）；`rhythm/pages/index.spec.ts`、`RhythmCard.spec.ts` 保持通过；`vue-tsc --noEmit` 零错误
+
+### 文档
+- `src/modules/rhythm/AGENTS.md`：页面容器变更、顶部日期条、首页近 5 日摘要、`position_band` 契约
+
 ## [changer] 2026-09-02 — 节奏大师下一重大事件锚点 + 洞察详情引用修复
 
 **开发者**: changer-collab

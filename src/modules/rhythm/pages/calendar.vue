@@ -1,11 +1,6 @@
 <template>
-  <view class="page">
-    <view class="nav">
-      <text class="back" @tap="goBack">‹</text>
-      <text class="nav-title">节奏日历</text>
-      <text class="nav-sub">近 {{ days }} 个交易日 · 收盘基准</text>
-    </view>
-    <scroll-view scroll-y class="content">
+  <SubPageCard2 title="节奏日历" subtitle="近 60 个交易日 · 收盘基准" back-url="/modules/home/pages/index">
+    <view class="body">
       <!-- 图例：五档冷→热 + 灰格 -->
       <view class="legend">
         <view v-for="l in LEGEND" :key="l.label" class="legend-item">
@@ -34,25 +29,19 @@
       <view class="tip dim">
         <text>数据自部署起前向积累，早期日可能缺失（灰格）——如实展示，不伪造。</text>
       </view>
-    </scroll-view>
-  </view>
+    </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { agentApi } from '@/shared/api/modules/agent'
-
-interface RhythmDay {
-  date: string
-  refresh_slot?: string
-  level: string | null
-  score: number | null
-  basis_date: string | null
-}
+import type { RhythmCalendarDay } from '@/shared/api/modules/agent'
 
 const days = ref(60)
-const dayList = ref<RhythmDay[]>([])
+const dayList = ref<RhythmCalendarDay[]>([])
 
 // 独立五档色板（design-debate A6/R8：不复用卡片 chip 色——low/normal 同蓝系、ice 灰蓝撞灰格）
 const LEVEL_COLOR: Record<string, string> = {
@@ -75,7 +64,7 @@ const LEGEND = [
 function levelShort(level: string): string {
   return LEVEL_SHORT[level] ?? level.slice(0, 1)
 }
-function cellColor(d: RhythmDay): string {
+function cellColor(d: RhythmCalendarDay): string {
   return (d.level && LEVEL_COLOR[d.level]) || GREY
 }
 // 接口返回"最近在前"（降序），网格按日期升序（左→右时间前进）
@@ -83,9 +72,7 @@ const orderedDays = computed(() => [...dayList.value].reverse())
 
 onLoad(async () => {
   try {
-    const res = (await agentApi.getRhythmMasterCalendar(days.value)) as {
-      days?: RhythmDay[]
-    }
+    const res = await agentApi.getRhythmMasterCalendar(days.value)
     dayList.value = res?.days ?? []
   } catch {
     // 网络/服务错误保持空态，不抛 unhandled rejection
@@ -93,28 +80,14 @@ onLoad(async () => {
   }
 })
 
-function goDetail(d: RhythmDay) {
+function goDetail(d: RhythmCalendarDay) {
   uni.navigateTo({ url: `/modules/rhythm/pages/index?date=${d.date}` })
-}
-
-function goBack() {
-  // H5 直接以 URL 打开时无上级页面栈（深度=1），navigateBack 会静默失败（对齐详情页兜底）
-  if (getCurrentPages().length > 1) {
-    uni.navigateBack()
-  } else {
-    uni.reLaunch({ url: '/modules/home/pages/index' })
-  }
 }
 </script>
 
 <style lang="scss" scoped>
 @import '@/shared/styles/variables.scss';
-.page { display: flex; flex-direction: column; height: 100%; background: $bg-page; }
-.nav { display: flex; align-items: baseline; gap: 16rpx; padding: 24rpx 32rpx; background: $bg-card; }
-.back { font-size: 40rpx; color: $ink; padding-right: 8rpx; }
-.nav-title { font-size: 34rpx; font-weight: 600; color: $ink; }
-.nav-sub { font-size: 22rpx; color: $ink-soft; }
-.content { flex: 1; padding: 24rpx 32rpx; }
+.body { padding: 24rpx 32rpx; }
 
 .legend { display: flex; align-items: center; gap: 18rpx; flex-wrap: wrap; margin-bottom: 20rpx; }
 .legend-item { display: flex; align-items: center; gap: 8rpx; }
