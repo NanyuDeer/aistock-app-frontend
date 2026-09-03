@@ -139,7 +139,12 @@ const gridRows = computed<GridCell[][]>(() => {
   const rows: GridCell[][] = []
   let row: GridCell[] = []
   let cursor = 0 // 上一格已占列 +1
-  const pushRow = () => { if (row.length) { rows.push(row); row = [] } }
+  const pushRow = () => {
+    if (!row.length) return
+    while (row.length < 7) row.push(null) // 每行恒 7 列：周末/空列留空，跨行周一对齐
+    rows.push(row)
+    row = []
+  }
   for (const d of ascending.value) {
     const col = WEEK_COL[new Date(`${d.date}T00:00:00`).getDay()]
     // 新的一周（本日列号小于当前游标）→ 换行，回到周一列起排
@@ -148,7 +153,6 @@ const gridRows = computed<GridCell[][]>(() => {
     row.push(d)
     cursor = col + 1
   }
-  while (cursor < 7) { row.push(null); cursor++ }
   pushRow()
   return rows
 })
