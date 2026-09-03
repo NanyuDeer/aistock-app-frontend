@@ -46,12 +46,12 @@ export function neverUpdateStorageKey(versionCode: number): string {
  * 便于在不读 console 的情况下确认线上与本机 versionCode 的判定走向。
  */
 export const updateDiag = {
-  /** 线上 versionCode（0 表示未能取到） */
-  latest: 0 as number,
-  /** 本机 versionCode（0 表示原生读取失败） */
-  current: 0 as number,
+  /** 线上 versionName（如 "0.1.3"） */
+  latest: '' as string,
+  /** 本机 versionName（如 "0.1.2"；空表示读取失败） */
+  current: '' as string,
   lastResult: '' as string,
-  /** 读取本机 versionCode 的详细过程/异常信息（定位根因） */
+  /** 读取本机版本号的详细过程/异常信息（定位根因） */
   versionCodeDetail: '' as string,
 }
 
@@ -76,67 +76,49 @@ function isAndroidApp(): boolean {
 
 /**
  * 读取本机已安装版本号（Android 原生 versionCode）。
- * 注意：plus.android 返回的是 Java 对象句柄，读字段必须走 plus.android.getAttribute（或 invoke(obj,'get','field')），
- * 不可直接 pkgInfo.versionCode 属性访问——否则会读不到值返回 0，
- * 被误判为「比线上旧」而反复弹出更新（0.1.1 用户装好后仍弹更新的根因）。
  *
- * 2026-09-03 修复演进：
- * - 初版 getPackageInfo(pkgName, 0) 正式包真机返回 0。
- * - 尝试 importClass 后取 PACKAGE_MATCH_ALL flage（不可靠，静态常量可能取到 guest 对象），
- *   且 try 未抛异常但返回 null 时被我误判为成功而未走 flags=0 fallback → 仍 0。
- * - 现重写为：flags 固定传 0（最可靠），校验返回值非空，读字段用 getAttribute，全程写诊断。
+ * 2026-09-03 根因定论：plus.android 反射（getPackageInfo）在本环境正式包真机返回 null，
+ * 无论 flags=0 / PACKAGE_MATCH_ALL / getAttribute / longVersionCode 均无法读出，
+ * 导致 current=0 被判"已最新"假阳。此项在 plus 运行时不可靠，弃用原生反射，
+ * 改由 getCurrentVersionName() 用 plus.runtime.version（官方 API，返回版本号字符串）读取并做版本号比较。
  */
-function getCurrentVersionCode(): number {
+function getCurrentVersionName(): string {
   // #ifdef APP-PLUS
-  const detail: string[] = []
   try {
-    const main = plus.android.runtimeMainActivity()
-    detail.push('main=ok')
-    const pkgName = plus.android.invoke(main, 'getPackageName')
-    detail.push('pkgName=' + pkgName)
-    const pm = plus.android.invoke(main, 'getPackageManager')
-    detail.push('pm=ok')
-
-    // flags 固定用 0；flags 为非零常量时（尤其从 importClass 取）不可靠，可能返回 null
-    let pkgInfo: any = null
-    try {
-      pkgInfo = plus.android.invoke(pm, 'getPackageInfo', [pkgName, 0])
-      detail.push('getPkg(0)=' + (pkgInfo ? 'nonNull' : 'null'))
-    } catch (e) {
-      detail.push('getPkg(0)ERR=' + String((e && (e as Error).message) || e))
-    }
-    if (!pkgInfo) {
-      updateDiag.versionCodeDetail = detail.join(' | ')
-      return 0
-    }
-
-    // Android 9+ versionCode 为 long：优先 longVersionCode，兼容旧字段 versionCode
-    let versionCode = 0
-    try {
-      const longV = Number(plus.android.getAttribute(pkgInfo, 'longVersionCode'))
-      if (Number.isFinite(longV) && longV > 0) versionCode = longV
-      detail.push('longVersionCode=' + (versionCode || longV))
-    } catch (e) {
-      detail.push('longERR=' + String((e && (e as Error).message) || e))
-    }
-    if (!Number.isFinite(versionCode) || versionCode <= 0) {
-      try {
-        versionCode = Number(plus.android.getAttribute(pkgInfo, 'versionCode'))
-        detail.push('versionCode=' + versionCode)
-      } catch (e) {
-        detail.push('versionCodeERR=' + String((e && (e as Error).message) || e))
-      }
-    }
-    updateDiag.versionCodeDetail = detail.join(' | ')
-    return Number.isFinite(versionCode) && versionCode > 0 ? versionCode : 0
+    const v = String(plus.runtime.version)
+    return v && v.trim() ? v.trim() : ''
   } catch (e) {
-    detail.push('TOP_ERR=' + String((e && (e as Error).message) || e))
-    updateDiag.versionCodeDetail = detail.join(' | ')
     console.warn('[useAppUpdate] 读取本机版本号失败:', e)
-    return 0
+    return ''
   }
   // #endif
-  updateDiag.versionCodeDetail = 'not-app-plus'
+  return ''
+}
+
+/** 解析 "0.1.3" → [0,1,3]，供版本号逐段比较；无法解析时返回 [] */
+function parseVersion(str: string): number[] {
+  return String(str || '')
+    .split('.')
+    .map((s) => Number(s))
+    .filter((n) => Number.isFinite(n))
+}
+
+/**
+ * 比较两个版本号字符串（如 "0.1.3" vs "0.1.2"）。
+ * 返回 >0 表示 a 比 b 新；<0 表示 a 比 b 旧；=0 表示相同。
+ * 任意一方无法解析时：能解析的一方判定为更新（避免误判"已最新"）；都无法解析视为相等 → 视为已最新。
+ */
+function compareVersion(a: string, b: string): number {
+  const pa = parseVersion(a)
+  const pb = parseVersion(b)
+  if (pa.length === 0 && pb.length === 0) return 0
+  if (pa.length === 0) return -1
+  if (pb.length === 0) return 1
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0)
+    if (diff !== 0) return diff
+  }
   return 0
 }
 
@@ -156,20 +138,20 @@ export async function checkAppUpdate(opts: { manual?: boolean } = {}): Promise<A
   const info = await fetchLatestVersion()
   if (!info) return 'error'
 
-  // 比对版本号
-  const latest = Number(info.versionCode) || 0
-  const current = getCurrentVersionCode()
-  // 诊断（真机「已是最新」假阳排查用，确认后移除）：写入快照供 UI 展示 + console 打印
-  const result = !latest || current <= 0 || latest <= current ? 'latest' : opts.manual && isNeverUpdate(latest) ? 'never-closed' : 'would-prompt'
+  // 比对版本号：用 versionName 字符串比较（线上下发 versionName 与 App 打包 versionName 一致）
+  const latest = String(info.versionName || '')
+  const current = getCurrentVersionName()
+  const isNewer = compareVersion(latest, current) > 0
+  // 诊断（真机排查用，确认后移除）：写入快照供 UI 展示 + console 打印
   updateDiag.latest = latest
   updateDiag.current = current
-  updateDiag.lastResult = result
-  console.warn('[appUpdate-diag] latest =', latest, '| current =', current, '| isNever =', isNeverUpdate(latest), '| manual =', opts.manual, '| predict =', result)
-  // current<=0 表示本机版本号读取失败（无法判定本机版本），保守视为已最新，避免反复误弹
-  if (!latest || current <= 0 || latest <= current) return 'latest'
+  updateDiag.lastResult = isNewer ? 'would-prompt' : 'latest'
+  console.warn('[appUpdate-diag] latest =', latest, '| current =', current, '| manual =', opts.manual, '| would-prompt =', isNewer)
+  // 本机版本无法读取（current 为空）时保守视为已最新，避免反复误弹
+  if (!latest || !current || !isNewer) return 'latest'
 
   // 用户已对该版本选择「永久关闭」→ 直接跳过，不再提示
-  if (isNeverUpdate(latest)) return 'latest'
+  if (isNeverUpdate(info.versionCode)) return 'latest'
 
   // 有新版 → 写入全局弹窗状态（真正弹窗由 UpdateModal 渲染）
   updatePromptState.info = info

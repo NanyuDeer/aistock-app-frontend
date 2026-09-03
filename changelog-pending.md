@@ -1,5 +1,11 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-03 修复正式包读取版本号=0（更新"已最新"假阳真根因，最终方案）
+- 真机诊断 `getPkg(0)=null`（plus.android 反射 getPackageManager().getPackageInfo 返回 null，flags=0/matchAll/getAttribute/longVersionCode 全无法读出）→ 弃用原生反射。
+- 改用官方 `plus.runtime.version` 读 versionName 字符串 + `compareVersion` 逐段比较：`getCurrentVersionName()`、`parseVersion`、`compareVersion`；checkAppUpdate 从 `versionCode<=` 数值比较改为 `versionName` 字符串比较；`isNeverUpdate` 仍用 `info.versionCode` 做存储 key。
+- updateDiag.latest/current 改为 string（versionName）。
+- **待确认修复有效后移除诊断代码**（updateDiag、profile 弹窗、console 日志）。
+
 ## 2026-09-03 修复正式包读取 versionCode=0（更新"已最新"假阳真根因，第 3 轮）
 - 真机诊断明细 `getPkg(matchAll)=ok` 后停止 + `current=0` → 上一版从 `importClass` 取 `PACKAGE_MATCH_ALL` 常量不可靠且 `try` 未抛异常但返回 null 时被误判为成功，未走 `flags=0` fallback。
 - 重写 [getCurrentVersionCode](`src/shared/utils/useAppUpdate.ts`)：flags 固定 0、校验返回值非空、读字段用 `plus.android.getAttribute`（longVersionCode→versionCode 回退），全程写 `updateDiag.versionCodeDetail`。
