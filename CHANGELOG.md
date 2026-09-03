@@ -2,6 +2,82 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-03 — 板块洞见卡标题改用 LLM 一句话研判（去板块名+涨跌幅）
+
+**开发者**: Aria
+
+### 改进
+- `shared/components/SectorInsightCard.vue`：洞见卡"一句话"标题不再用"板块名+涨跌幅"（行情由页面统计卡展示，洞见标题应与大盘溯源"现象一句话"同构取 LLM 生成句）：
+  - 优先 `prediction.attribution_summary`（板块预判综述一句话，agent 30~40 字产出，app-api 已透传）；
+  - 回退 `trace.summary`（仅溯源无预判时标题即溯源主句，溯源行不再重复展示）；
+  - 回退首档基准走势生成"短/中/长期预计 {label}"；
+  - 兜底板块名
+- 增加合规占位句守卫：`attribution_summary` 为"（点位表述已按合规要求移除）"（红线下架整句替换、无研判信息）时跳过，走后续回退
+- `shared/api/modules/agent.ts`：`SectorInsightPrediction` 补可选 `attribution_summary`
+
+## [master] 2026-09-03 — 板块详情洞见卡空壳修复（无溯源/预判不再只渲染行情标题）
+
+**开发者**: Aria
+
+### 修复
+- `shared/components/SectorInsightCard.vue`：候选命中但既无溯源结论、也无预判分支（今日未产预判的风口板块）时，此前只渲染"板块名+涨跌幅"标题的空壳洞见卡 → 改为展示"暂无板块研判 · 该板块今日无溯源/预判记录"占位，避免把行情误当洞察内容
+
+## [master] 2026-09-03 — 预判卡情景行换行优化（灰幅度段与黑字粘连）
+
+**开发者**: Aria
+
+### 改进
+- `shared/components/ConditionalForecastBlock.vue`：情景正文由 flex-chip 拆分改**整句内联文本流**——灰色幅度段（+3%~+5% 等）不再以独立 chip 强拆导致前后黑字频繁孤立换行；幅度段首尾插入零宽连字符 U+2060 与前后文字粘连，行内自然换行
+- 幅度识别正则补 `±`（如 `波幅小于±1%` 此前只灰化 `1%`、`±` 残留黑色）
+
+## [master] 2026-09-03 — 预测历史页只显示大盘 + 板块预判 label 展示链路就绪
+
+**开发者**: Aria
+
+### 改进
+- `modules/analytics/pages/prediction-history.vue`（大盘溯源预测历史 B2.1）：调用 `predictionApi.list` 显式传 `source_type: 'market_trace'`——板块预判记录（sector_prediction）不再混入大盘历史页（板块预判在板块四环聚合页查看）
+- `shared/api/modules/prediction.ts`：`list` 参数补可选 `source_type`（market_trace | sector_prediction），与后端 `/api/predictions` 白名单过滤对齐
+
+### 备注
+- 板块四环预判卡 label/互斥路径展示所需字段已由后端 sector-insight 透传（app-api d34ee17），前端类型/映射此前已就绪
+
+## [master] 2026-09-03 — 洞见卡去金重构同步：溯源/预判同构双子卡 + label 字段链路
+
+**开发者**: Aria
+
+### 改进
+- 镜像同步组件库洞见卡重构：`shared/components/InsightCard.vue`、`ConditionalForecastBlock.vue`（同构双子卡、互斥路径“或”分隔、命中“条件成立”徽、label 缺失回退长句）
+
+### 字段链路
+- `shared/api/modules/agent.ts`：`SectorInsight`/`MarketTrace` 的 Horizon/Condition 类型补可选 `label?: string` 注解
+- `shared/utils/sectorInsight.ts`：`sectorPredictionToStructured` 透传 `horizons[].label` 与 `conditions[].label`（旧数据缺省回退）
+- `shared/utils/conditionalForecast.ts`：对冲分支对象清理时 label 一并置 `undefined`，防主支 label 泄漏
+- `modules/analytics/utils/marketTraceReview.ts` + `MarketTracePrediction.vue`：大盘预判映射透传 label
+
+### 测试
+- `vue-tsc --noEmit` 零错误
+
+## \[changer] 2026-09-03 — 节奏大师详情页内嵌可折叠双模式日历面板 + 洞见摘要卡
+
+**开发者**: 37588
+
+### 新增
+- 节奏详情页 `rhythm/pages/index.vue`：移除独立日历页与顶部 7 日条，改为内嵌可折叠双模式日历面板 `RhythmCalendarPanel.vue`（折叠 7 日条 / 展开 60 日网格，仓位/事件双模式切换，点击选日联动三时点版本）
+- 新增节奏洞见摘要卡：`utils/rhythmInsight.ts` 将 `rhythm_card` 映射为统一 `InsightCard` 结构（level/建议仓位/title/trace/分支 structured），详情页顶部展示
+- `agent.ts`：`RhythmCalendarDay` 补可选 `events`（macro 事件子集，后端每行恒下发，无事件为空数组）
+
+### 修复
+- `RhythmCalendarPanel.vue`：网格按周一锚点断行（长假跨周不并入同一视觉行）；事件角标仅在当日有 macro 事件时渲染（无事件日无灰点）
+- `ConditionalForecastBlock.vue`：单段（只有一个 horizon）隐藏 Tab 栏并正确初始化唯一档
+
+### 重构
+- `RhythmCard.vue`：洞见卡承载后去掉重复内容（仓位文本/分支明细），卡片瘦身去重
+
+### 文档
+- `modules/rhythm/AGENTS.md`：新增日历面板/洞见卡/去重清单说明
+
+---
+
 ## \[changer] 2026-09-03 — 午间报「午后前瞻 → 机会/风险对位」（schema 2.1）
 
 **开发者**: 37588

@@ -62,6 +62,8 @@ interface StructuredHorizon {
   horizon: HorizonKey
   /** 档位时长描述，如 "1-5 交易日"（缺省只显示 短/中/长） */
   remaining?: string
+  /** 基准走势短语（4~6 字；基准行“基准 · {label}”展示） */
+  label?: string
   /** 该期基准方向 */
   direction?: Direction
   /** 该期基准置信度 */
@@ -73,12 +75,16 @@ interface StructuredCondition {
   horizon: HorizonKey
   /** 情景方向（自挂，可与同档基准方向相反） */
   direction?: Direction
+  /** 路径短语名，两段式“状态 · 走势”（路径首行加粗展示） */
+  label?: string
   /** 触发条件（可量化的市场事实描述） */
   condition: string
   /** 条件满足后的走势预判（含幅度/目标位等，展示原文） */
   scenario: string
   /** 验证锚点（可选透传） */
   anchor?: { metric?: string; threshold?: string }
+  /** 简洁展示用关键词（1~2 个，单条 ≤10 字；仅新数据携带，旧记录无 → 走长句兜底） */
+  keywords?: string[]
   /** 该条件是否已触发（验证回填）：true=已触发（分支点亮）/ false=未触发（置灰）/ 缺省=待观察常态 */
   met?: boolean | null
 }
@@ -187,27 +193,65 @@ const handleClick = () => {
   margin: $s-1 0;
 }
 
-/* ===== Lines（彩色横幅卡，同"归因结论"样式） ===== */
-/* 语义色：溯源=蓝 / 预判=金 */
+/* ===== 双子卡（同构：key 标题行 + 内容，仅底色区分；去金全中性 2026-09-03） ===== */
+.as-insight-card {
+  /* 溯源=冷雾蓝 / 预判(文本形态)=浅中性；dark 深蓝研报卡内转深面板 */
+  --ins-trace-bg: #f4f8fe;
+  --ins-trace-bd: #dce7f8;
+  --ins-trace-key: #4a6fbf;
+  --ins-fc-bg: #f7f8fb;
+  --ins-fc-bd: #e3e6ec;
+  --ins-fc-key: #181b22;
+  --ins-card-tx: #5e6673;
+}
+
+.as-insight-card--dark {
+  --ins-trace-bg: rgba(11, 95, 255, 0.10);
+  --ins-trace-bd: rgba(11, 95, 255, 0.30);
+  --ins-trace-key: #9db6e8;
+  --ins-fc-bg: rgba(255, 255, 255, 0.06);
+  --ins-fc-bd: rgba(255, 255, 255, 0.12);
+  --ins-fc-key: #cfd8ff;
+  --ins-card-tx: rgba(255, 255, 255, 0.74);
+}
+
+.as-insight-card__line {
+  border-radius: $r-md;
+  padding: 16rpx 20rpx;
+}
+
+.as-insight-card__line .as-insight-card__key {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  margin-bottom: 8rpx;
+}
+
+.as-insight-card__line .as-insight-card__text {
+  display: block;
+  font-size: $font-size-sm;
+  line-height: $lh-base;
+  color: var(--ins-card-tx);
+}
+
+/* 溯源子卡：冷雾蓝 */
 .as-insight-card__line--trace {
-  --banner-bg: #{$insight-market};
-  --banner-glow: rgba(11, 95, 255, 0.18);
+  background: var(--ins-trace-bg);
+  border: 1rpx solid var(--ins-trace-bd);
+
+  .as-insight-card__key {
+    color: var(--ins-trace-key);
+  }
 }
 
+/* 预判（文本形态）子卡：浅中性（structured 形态由 ConditionalForecastBlock 同款呈现） */
 .as-insight-card__line--forecast {
-  --banner-bg: #{$gold-soft-bg};
-  --banner-glow: rgba(138, 100, 17, 0.12);
-}
+  background: var(--ins-fc-bg);
+  border: 1rpx solid var(--ins-fc-bd);
 
-@include insight-banner('.as-insight-card__line', '.as-insight-card__key', '.as-insight-card__text');
-
-/* 预判：浅金柔底（需在 mixin 之后覆盖白字） */
-.as-insight-card__line--forecast {
-  border: 1rpx solid $gold-soft-border;
-
-  .as-insight-card__key,
-  .as-insight-card__text {
-    color: $gold-deep;
+  .as-insight-card__key {
+    color: var(--ins-fc-key);
   }
 }
 
