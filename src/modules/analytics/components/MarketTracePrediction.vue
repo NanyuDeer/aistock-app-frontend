@@ -14,24 +14,14 @@
         <text class="summary-text">{{ prediction.attributionSummary }}</text>
       </view>
 
-      <!-- 条件化预判（Spec A §4.3：condition + scenario + anchor；2.0 旧记录为空数组不渲染） -->
-      <view v-if="prediction.conditions.length > 0" class="conditions-block">
-        <text class="conditions-label">条件化预判</text>
-        <view v-for="(cond, idx) in prediction.conditions" :key="`c-${idx}`" class="condition-item">
-          <view class="condition-row">
-            <view class="condition-index">{{ idx + 1 }}</view>
-            <view class="condition-body">
-              <text class="condition-text">{{ cond.condition }}</text>
-              <text class="scenario-text">{{ cond.scenario }}</text>
-              <view v-if="cond.anchor" class="anchor-meta">
-                <text class="anchor-chip">{{ horizonLabel(cond.anchor.horizon) }}</text>
-                <text v-if="cond.anchor.threshold" class="anchor-chip">{{ cond.anchor.threshold }}</text>
-                <text class="anchor-chip" :class="anchorDirectionClass(cond.anchor.direction)">{{ directionText(cond.anchor.direction) }}</text>
-              </view>
-            </view>
-          </view>
-        </view>
-      </view>
+      <!-- 条件化预判：大盘/板块/个股一切有条件化预判统一用 ConditionalForecastBlock
+           （2026-09-02 从 InsightCard structured 抽取的通用预判块；2.0 旧记录为空数组不渲染）
+           prediction-detail 需长句原文 → 强制 sentence 模式（tags 模式供洞见/列表等简洁场景） -->
+      <ConditionalForecastBlock
+        v-if="prediction.conditions.length > 0"
+        :structured="condStructured"
+        condition-display="sentence"
+      />
 
       <view v-for="(h, idx) in prediction.horizons" :key="`h-${idx}`" class="horizon-item">
         <view class="horizon-head">
@@ -77,6 +67,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Card from '@/shared/components/Card.vue'
+import ConditionalForecastBlock from '@/shared/components/ConditionalForecastBlock.vue'
+import { expandConditionalBranches } from '@/shared/utils/conditionalForecast'
 import type { PredictionPresentation } from '../utils/marketTraceReview'
 
 const props = defineProps<{
@@ -114,6 +106,48 @@ const timelineSteps = computed<Array<{ label: string; text: string }>>(() => {
     .map(s => ({ label: '', text: s }))
 })
 
+/** 条件化预判结构化数据（映射为通用预判块 ConditionalForecastBlock 输入，与板块/个股同构） */
+const HORIZON_KEYS = ['short', 'mid', 'long'] as const
+type HorizonKey = typeof HORIZON_KEYS[number]
+const DIRECTION_KEYS = ['bullish', 'bearish', 'neutral'] as const
+type DirectionKey = typeof DIRECTION_KEYS[number]
+
+function toHorizonKey(v: string | undefined): HorizonKey | undefined {
+  return v && (HORIZON_KEYS as readonly string[]).includes(v) ? (v as HorizonKey) : undefined
+}
+
+function toDirectionKey(v: string | undefined): DirectionKey | undefined {
+  return v && (DIRECTION_KEYS as readonly string[]).includes(v) ? (v as DirectionKey) : undefined
+}
+
+const condStructured = computed(() => {
+  const p = props.prediction
+  if (!p) return null
+  return {
+    horizons: p.horizons.map((h) => ({
+      horizon: h.horizon,
+      remaining: h.remainingEstimate || undefined,
+      direction: h.direction,
+      confidence: h.confidence
+    })),
+    conditions: p.conditions.flatMap((c) => {
+      // anchor.horizon 缺失时默认挂 short（沿用旧分组语义）；anchor 阈值/指标缺失则不渲染 chip
+      const built = {
+        horizon: toHorizonKey(c.anchor?.horizon) ?? 'short',
+        direction: toDirectionKey(c.anchor?.direction),
+        condition: c.condition,
+        scenario: c.scenario,
+        anchor: c.anchor && (c.anchor.threshold || c.anchor.metric)
+          ? { metric: c.anchor.metric || undefined, threshold: c.anchor.threshold || undefined }
+          : undefined,
+        met: undefined
+      }
+      // scenario 内嵌“；若X则Y”的对冲情形拆成独立分支卡（方向/锚点随主条件保留给主卡）
+      return expandConditionalBranches(built)
+    })
+  }
+})
+
 function horizonLabel(horizon: string): string {
   const map: Record<string, string> = {
     short: '短线(1-5交易日)',
@@ -146,13 +180,6 @@ function directionClass(direction: string): string {
   if (direction === 'bullish') return 'direction-bullish'
   if (direction === 'bearish') return 'direction-bearish'
   return 'direction-neutral'
-}
-
-/** 条件锚点方向（chip 只染字体色，不复用 directionClass 的底色） */
-function anchorDirectionClass(direction: string): string {
-  if (direction === 'bullish') return 'anchor-chip-bullish'
-  if (direction === 'bearish') return 'anchor-chip-bearish'
-  return 'anchor-chip-neutral'
 }
 
 function confidenceClass(confidence: string): string {
@@ -221,50 +248,6 @@ function confidenceText(confidence: string): string {
   font-size: 28rpx;
   color: $text-color-title;
 }
-
-/* 条件化预判（Spec A §4.3） */
-.conditions-block {
-  margin-bottom: $spacing-sm;
-  border-top: 2rpx solid $line;
-  border-left: 6rpx solid $primary;
-  padding: $spacing-sm 0 $spacing-sm $spacing-base;
-  background: $primary-50;
-  border-radius: 0 $r-sm $r-sm 0;
-}
-
-.conditions-label {
-  display: block;
-  font-size: 28rpx;
-  font-weight: 600;
-  color: $text-color-title;
-  margin-bottom: $spacing-xs;
-}
-
-.condition-item { margin-bottom: $spacing-sm; }
-.condition-item:last-child { margin-bottom: 0; }
-
-.condition-row { display: flex; gap: $spacing-sm; }
-
-.condition-index {
-  width: 32rpx; height: 32rpx; border-radius: $r-full;
-  background: $primary; color: $white;
-  font-size: 22rpx; font-weight: 600;
-  display: flex; align-items: center; justify-content: center;
-  margin-top: 2rpx; flex-shrink: 0;
-}
-
-.condition-body { flex: 1; display: flex; flex-direction: column; gap: 4rpx; }
-.condition-text { font-size: 26rpx; font-weight: 500; color: $text-color-title; }
-.scenario-text { font-size: 26rpx; color: $text-color-secondary; }
-
-.anchor-meta { display: flex; gap: $spacing-xs; flex-wrap: wrap; margin-top: 4rpx; }
-.anchor-chip {
-  padding: 2rpx 14rpx; border-radius: $r-md; background: $white;
-  font-size: 22rpx; color: $text-color-tertiary; border: 1rpx solid $line-soft;
-}
-.anchor-chip-bullish { color: $up; border-color: rgba(229, 77, 94, 0.25); }
-.anchor-chip-bearish { color: $down; border-color: rgba(24, 160, 88, 0.25); }
-.anchor-chip-neutral { color: $primary; border-color: $primary-100; }
 
 .horizon-item {
   padding: $spacing-sm 0;

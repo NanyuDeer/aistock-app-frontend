@@ -35,6 +35,20 @@
 
       <view v-else class="report-content">
         <MarketInsightCard :presentation="presentation" />
+
+        <!-- 主因板块 · 板块研判：仅当日存在大盘主因候选（review_primary/both）时渲染；
+             拉取失败静默置空 → 整块不渲染，不阻断主内容 -->
+        <view v-if="primarySectorCandidates.length" class="primary-sector-block">
+          <view class="primary-sector-head">
+            <text class="primary-sector-title">主因板块 · 板块研判</text>
+            <view class="primary-sector-more" @tap="goSectorLoop">
+              <text class="primary-sector-more-text">全部板块 ›</text>
+            </view>
+          </view>
+          <view v-for="c in primarySectorCandidates" :key="c.ts_code" class="primary-sector-card">
+            <SectorInsightCard :candidate="c" :date="displayedDate" />
+          </view>
+        </view>
       </view>
 
       <!-- 日期切换（放在 footer 插槽，固定在底部不依赖 scroll-view 滚动） -->
@@ -55,11 +69,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import SectorInsightCard from '@/shared/components/SectorInsightCard.vue'
 import { LoadingState, EmptyState, Button, Card } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
+import type { SectorInsightCandidate } from '@/shared/api/modules/agent'
 import { predictionApi } from '@/shared/api/modules/prediction'
 import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import { traceDateCandidates } from '@/shared/utils/traceDate'
@@ -160,6 +176,36 @@ function goPredictionHistory() {
   uni.navigateTo({ url: '/modules/analytics/pages/prediction-history' })
 }
 
+/* ===== 主因板块 · 板块研判（板块四环聚合，2026-09-02） ===== */
+
+/** 当日大盘复盘主因板块的聚合候选（source 含 review_primary）；空 → 整块不渲染 */
+const primarySectorCandidates = ref<SectorInsightCandidate[]>([])
+
+/** 拉取主因板块研判：失败静默置空，不阻断原有报告内容 */
+async function loadPrimarySectorInsight(d: string) {
+  if (!d) return
+  try {
+    const res = await agentApi.getSectorInsight(d)
+    primarySectorCandidates.value = (res?.candidates ?? []).filter(
+      (c) => c.source === 'review_primary' || c.source === 'both'
+    )
+  } catch (err) {
+    console.error('主因板块研判加载失败:', err)
+    primarySectorCandidates.value = []
+  }
+}
+
+// 复盘报告实际展示日期确定后（成功展示/切日），追加拉取主因板块研判
+watch(displayedDate, (d) => {
+  if (d) void loadPrimarySectorInsight(d)
+})
+
+/** 全部板块入口：跳板块四环页并定位到当前展示日期（traceability 当日为交易日、接口按交易日落库） */
+function goSectorLoop() {
+  const q = displayedDate.value ? `?date=${encodeURIComponent(displayedDate.value)}` : ''
+  uni.navigateTo({ url: `/modules/market/pages/sector-loop${q}` })
+}
+
 /** 跨 20:30 / 15:30 切日自动刷新定时器句柄 */
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
@@ -242,6 +288,43 @@ onUnload(stopRefreshTimer)
 
 .date-btn-text {
   font-size: 26rpx;
+  color: $primary;
+  font-weight: 500;
+}
+
+/* ===== 主因板块 · 板块研判（卡外小标题 + SectorInsightCard，水平内边距与 MarketInsightCard 对齐） ===== */
+.primary-sector-block {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  padding: $spacing-xs $spacing-base $spacing-base;
+}
+
+.primary-sector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: $spacing-sm 0 $spacing-xs;
+}
+
+.primary-sector-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: $text-color-title;
+}
+
+.primary-sector-more {
+  padding: 6rpx 16rpx;
+  background: $primary-50;
+  border-radius: $r-xs;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.primary-sector-more-text {
+  font-size: $font-size-sm;
   color: $primary;
   font-weight: 500;
 }

@@ -8,7 +8,8 @@
 - `pages/alert-analysis.vue` - AI 异动解读
 - `pages/hot-burst.vue` - 机构调研热门股
 - `pages/leaders.vue` - 长线风口（概览入口页：泡泡图 + 板块入口卡片列表，点击板块跳转详情；长线/短线两档切换，龙头股行分档展示——长线档取 `long_leader`（趋势龙头，trend_scores 评分最高）、短线档取 `leading_stock_info`（短线领涨），跨板块去重）
-- `pages/sector-detail.vue` - 板块详情子页面（板块统计、龙头股、AI 分析、主线/上游/下游个股列表）；板块详情页含近120日板块K线图（KLineChart + getBoardKline）；AI 分析区"层级流向图" App + H5 走 renderjs 视图层 DOM 注入 SVG（v-html 在 App webview 不渲染切题注入的 svg）
+- `pages/sector-detail.vue` - 板块详情子页面（板块统计、龙头股、AI 分析、主线/上游/下游个股列表）；板块详情页含近120日板块K线图（KLineChart + getBoardKline）；AI 分析区"层级流向图" App + H5 走 renderjs 视图层 DOM 注入 SVG（v-html 在 App webview 不渲染切题注入的 svg）；AI 分析卡之后嵌入**板块洞见卡**（SectorInsightCard，2026-09-02：按最近交易日拉 agentApi.getSectorInsight 匹配当前板块渲染 InsightCard 条件化预判，无记录严格占位）
+- `pages/sector-loop.vue` - 板块四环页（2026-09-02：近 7 交易日回看的白卡列表——当日被溯源/预判板块的 来源tag/溯源短句/行情/预判概要；大盘归因链条；wind_leader/both 行跳板块详情、review_primary-only 行跳大盘溯源页；入口：leaders「板块预判 · 今日」+ traceability「全部板块」）
 - `pages/push-history.vue` - 历史推送
 
 ## 组件
