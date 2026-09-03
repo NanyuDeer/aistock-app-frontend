@@ -67,13 +67,14 @@
               >{{ k }}</text>
             </view>
 
-            <!-- 情景正文（幅度/目标位段弱化） -->
+            <!-- 情景正文（幅度/目标位段弱化；整句内联流，幅度段与前后文字粘连不孤立换行） -->
             <view class="as-insight-card__sc-then">
-              <template v-for="(part, i) in splitScenario(cond.scenario)" :key="i">
+              <template v-for="(part, i) in scenarioParts(cond.scenario)" :key="i">
                 <text
-                  class="as-insight-card__sc-scenario"
-                  :class="{ 'as-insight-card__sc-amp': part.kind === 'amp' }"
+                  v-if="part.kind === 'amp'"
+                  class="as-insight-card__sc-amp"
                 >{{ part.t }}</text>
+                <text v-else class="as-insight-card__sc-scenario">{{ part.t }}</text>
               </template>
             </view>
 
@@ -247,11 +248,13 @@ const setActiveHorizon = (seg: HorizonKey) => {
 }
 
 /**
- * 拆解 scenario 文本：幅度/目标位段（如 -3% ~ -5%、+3%、75 元）置灰弱化，
+ * 拆解 scenario 文本：幅度/目标位段（如 -3% ~ -5%、+3%、±1%、75 元）置灰弱化，
  * 其余正文保持主色。仅按带符号数字+%的形态拆分，不解析语义。
+ * 幅度段首尾插入零宽连字符（U+2060）：段与前后文字不可在边界断开——避免
+ * "+3%" 孤立到行首/行尾导致黑字换行（洞见卡换行优化 2026-09-03）。
  */
 function splitScenario(text: string): Array<{ t: string; kind: 'text' | 'amp' }> {
-  const ampRe = /[+-]?\d+(?:\.\d+)?%?(?:\s*[~～至到]\s*[+-]?\d+(?:\.\d+)?%?)?/g
+  const ampRe = /[±+\-]?\d+(?:\.\d+)?%?(?:\s*[~～至到]\s*[±+\-]?\d+(?:\.\d+)?%?)?/g
   const parts: Array<{ t: string; kind: 'text' | 'amp' }> = []
   let last = 0
   let m: RegExpExecArray | null
@@ -263,6 +266,13 @@ function splitScenario(text: string): Array<{ t: string; kind: 'text' | 'amp' }>
   if (last < text.length) parts.push({ t: text.slice(last), kind: 'text' })
   if (!parts.length) parts.push({ t: text, kind: 'text' })
   return parts
+}
+
+/** 供模板渲染：与 splitScenario 同构，但幅度段首尾带 U+2060 防断行 */
+function scenarioParts(text: string): Array<{ t: string; kind: 'text' | 'amp' }> {
+  return splitScenario(text).map((p) =>
+    p.kind === 'amp' ? { t: `\u2060${p.t}\u2060`, kind: 'amp' } : p,
+  )
 }
 
 /**
@@ -551,12 +561,11 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   line-height: $lh-tight;
 }
 
+/* 情景正文：整句内联文本流（黑/灰同句排版，非 chip 拆分）——
+   灰色幅度段以 U+2060 与前后文字粘连，行内自然换行不再孤立断句（2026-09-03） */
 .as-insight-card__sc-then {
-  display: flex;
-  align-items: baseline;
-  gap: $s-1;
-  flex-wrap: wrap;
-  font-size: $font-size-xs;
+  display: block;
+  font-size: 24rpx;
   color: $ink;
   line-height: $lh-tight;
 }
