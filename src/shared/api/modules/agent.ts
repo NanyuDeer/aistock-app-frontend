@@ -180,6 +180,8 @@ export interface MarketTracePredictionValidation {
 
 export interface MarketTracePredictionHorizon {
   horizon: 'short' | 'mid' | 'long'
+  /** 基准走势短语（4~6 字，如 恐慌出清为主；2026-09-03 起新数据携带） */
+  label?: string
   remaining_estimate: string
   phase: 'building' | 'peaking' | 'decaying' | 'returning'
   direction: 'bullish' | 'bearish' | 'neutral'
@@ -210,6 +212,8 @@ export interface MarketTracePredictionAnchor {
 /** 条件化预判单条（Spec A：condition + scenario + anchor） */
 export interface MarketTracePredictionCondition {
   condition: string
+  /** 路径短语名（两段式“状态 · 走势”，2026-09-03 起新数据携带）；旧记录无 */
+  label?: string
   scenario: string
   anchor?: MarketTracePredictionAnchor
   /** 简洁展示用关键词（2026-09-02 起新数据携带：1~2 个，单条 ≤10 字）；旧记录无 */
@@ -557,6 +561,8 @@ export type SectorConfidence = 'high' | 'medium' | 'low'
 export interface SectorInsightHorizon {
   horizon: 'short' | 'mid' | 'long'
   remaining?: string
+  /** 基准走势短语（4~6 字，2026-09-03 起新数据携带） */
+  label?: string
   direction?: SectorDirection
   confidence?: SectorConfidence
 }
@@ -565,6 +571,8 @@ export interface SectorInsightCondition {
   horizon: 'short' | 'mid' | 'long'
   direction?: SectorDirection
   condition: string
+  /** 路径短语名（两段式“状态 · 走势”，2026-09-03 起新数据携带）；旧记录无 */
+  label?: string
   scenario: string
   /** 简洁展示用关键词（2026-09-02 起新数据携带：1~2 个，单条 ≤10 字）；旧记录无 */
   keywords?: string[]

@@ -2,6 +2,22 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-03 — 洞见卡去金重构同步：溯源/预判同构双子卡 + label 字段链路
+
+**开发者**: Aria
+
+### 改进
+- 镜像同步组件库洞见卡重构：`shared/components/InsightCard.vue`、`ConditionalForecastBlock.vue`（同构双子卡、互斥路径“或”分隔、命中“条件成立”徽、label 缺失回退长句）
+
+### 字段链路
+- `shared/api/modules/agent.ts`：`SectorInsight`/`MarketTrace` 的 Horizon/Condition 类型补可选 `label?: string` 注解
+- `shared/utils/sectorInsight.ts`：`sectorPredictionToStructured` 透传 `horizons[].label` 与 `conditions[].label`（旧数据缺省回退）
+- `shared/utils/conditionalForecast.ts`：对冲分支对象清理时 label 一并置 `undefined`，防主支 label 泄漏
+- `modules/analytics/utils/marketTraceReview.ts` + `MarketTracePrediction.vue`：大盘预判映射透传 label
+
+### 测试
+- `vue-tsc --noEmit` 零错误
+
 ## [changer] 2026-09-03 — 午间报「午后前瞻 → 机会/风险对位」（schema 2.1）
 
 **开发者**: 37588
