@@ -23,6 +23,8 @@ export interface SectorStructuredForecast {
     scenario: string
     /** 简洁展示关键词（新数据携带） */
     keywords?: string[]
+    /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度） */
+    scenario_keywords?: string[]
     met?: boolean | null
   }>
   dueLabel?: string
@@ -52,6 +54,7 @@ export function sectorPredictionToStructured(p: SectorInsightPrediction | null |
         label: c.label ?? undefined,
         scenario: c.scenario,
         keywords: c.keywords ?? [],
+        scenario_keywords: c.scenario_keywords ?? [],
         met: c.met ?? undefined
       })) ?? [],
     dueLabel: p.dueLabel ?? undefined,

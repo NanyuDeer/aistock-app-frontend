@@ -82,6 +82,11 @@
               <view class="fg-chart__legend-dot" />
               <text class="fg-chart__legend-text">冰点日</text>
             </view>
+            <!-- 沸点日图例常显（红点），出现 >=80 数据时图中自动标红 -->
+            <view class="fg-chart__legend-item">
+              <view class="fg-chart__legend-dot fg-chart__legend-dot--hot" />
+              <text class="fg-chart__legend-text">沸点日</text>
+            </view>
           </view>
           <!-- 均线数值 -->
           <view v-if="movingAverages" class="fg-chart__ma">
@@ -164,7 +169,7 @@
               <text class="fg-sectors__label">配置方向<text class="fg-sectors__hint">（点击查看解释）</text></text>
               <view class="fg-sectors__tags">
                 <view
-                  v-for="s in zone.sectors"
+                  v-for="s in adviceCards.sectorTags"
                   :key="s.name"
                   class="fg-tag"
                   :style="{ borderColor: zone.color, color: zone.color }"
@@ -176,7 +181,7 @@
             <view class="fg-actions">
               <text class="fg-actions__label">操作要点</text>
               <view
-                v-for="(a, i) in zone.actions"
+                v-for="(a, i) in adviceCards.actions"
                 :key="i"
                 class="fg-actions__item"
               >
@@ -184,7 +189,7 @@
                 <text class="fg-actions__text">{{ a }}</text>
               </view>
             </view>
-            <text class="fg-advice">{{ zone.advice }}</text>
+            <text class="fg-advice">{{ adviceCards.advice }}</text>
           </view>
         </view>
       </template>
@@ -205,7 +210,8 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
-import { fearGreedApi, type FearGreedDashboard } from '@/shared/api/modules/fear-greed'
+import { fearGreedApi, type FearGreedDashboard, type FgSectorBoard } from '@/shared/api/modules/fear-greed'
+import { buildSectorTags, buildActions, buildAdvice, buildDriversSentence } from '../utils/fgAdvice'
 
 /**
  * 情绪分档（沸点/冰点生活化表述，去专业术语）。
@@ -244,8 +250,8 @@ interface ZoneDef {
 
 const ZONES: ZoneDef[] = [
   {
-    min: 0, max: 25, label: '冰点', subLabel: '极度恐惧', color: '#FF3B30',
-    start: '#FF3B30', end: '#FF6B60', pulseColor: 'rgba(255, 59, 48, 0.5)', isExtreme: true,
+    min: 0, max: 20, label: '冰点', subLabel: '极度恐惧', color: '#00C853',
+    start: '#00C853', end: '#5AFF8F', pulseColor: 'rgba(0, 200, 83, 0.5)', isExtreme: true,
     advice: '市场恐慌情绪降至冰点，优质资产或被错杀。建议保持耐心，可分批关注超跌的优质标的，等待企稳信号后再加大仓位。',
     summary: '市场情绪处于冰点，恐慌性抛售主导盘面，避险情绪浓厚',
     positionMin: 20, positionMax: 35,
@@ -257,7 +263,7 @@ const ZONES: ZoneDef[] = [
     actions: ['分批建仓，控制节奏', '设好止损，严守纪律', '等待放量企稳信号'],
   },
   {
-    min: 25, max: 45, label: '寒冷', subLabel: '恐惧', color: '#FF9500',
+    min: 20, max: 45, label: '寒冷', subLabel: '恐惧', color: '#FF9500',
     start: '#FF9500', end: '#FFB84D', pulseColor: 'rgba(255, 149, 0, 0)', isExtreme: false,
     advice: '市场情绪偏谨慎，建议控制仓位，优先配置业绩确定性高的防御性板块，耐心等待情绪修复。',
     summary: '市场情绪偏谨慎，投资者信心不足、交易活跃度偏低',
@@ -296,8 +302,8 @@ const ZONES: ZoneDef[] = [
     actions: ['分批止盈，锁定收益', '注意追高风险', '警惕高位放量滞涨信号'],
   },
   {
-    min: 80, max: 100, label: '沸点', subLabel: '极度贪婪', color: '#00C853',
-    start: '#00C853', end: '#5AFF8F', pulseColor: 'rgba(0, 200, 83, 0.5)', isExtreme: true,
+    min: 80, max: 100, label: '沸点', subLabel: '极度贪婪', color: '#FF3B30',
+    start: '#FF3B30', end: '#FF6B60', pulseColor: 'rgba(255, 59, 48, 0.5)', isExtreme: true,
     advice: '市场情绪已至沸点，追涨情绪浓烈，风险收益比显著下降。建议降低仓位、落袋为安，避免盲目追高。',
     summary: '市场情绪过热，非理性追涨主导，追高风险加大',
     positionMin: 20, positionMax: 40,
@@ -313,6 +319,8 @@ const ZONES: ZoneDef[] = [
 const loading = ref(true)
 const errorMsg = ref('')
 const dashboard = ref<FearGreedDashboard | null>(null)
+/** 当日板块行情（建议引擎输入；失败静默置 null 走 fallback） */
+const sectorBoard = ref<FgSectorBoard | null>(null)
 /** 当前点击的配置方向弹窗（null = 关闭） */
 const activeSector = ref<{ name: string; desc: string } | null>(null)
 
@@ -323,25 +331,37 @@ const zone = computed<ZoneDef>(() => {
 })
 
 /**
+ * 动态建议（情绪结构 × 真实板块行情；板块不可用时回退 ZONES 静态档位内容）。
+ * 温度档静态内容（ZONES）仅作 fallback 与 UI 元数据（色/标签/仓位锚点）。
+ */
+const fallbackSectors = computed(() => zone.value.sectors.map((s) => ({ name: s.name, desc: s.desc })))
+const adviceCards = computed(() => {
+  const c = dashboard.value?.currentIndex ?? 50
+  const indicators = dashboard.value?.indicators ?? []
+  const ctx = { composite: c, indicators, board: sectorBoard.value ?? undefined }
+  return {
+    sectorTags: buildSectorTags(ctx, fallbackSectors.value),
+    actions: buildActions(ctx),
+    advice: buildAdvice(ctx),
+  }
+})
+
+/**
  * 历史走势图共享数据（图表 + 交互热区 + tooltip 共用）
- * 取最近 60 天；每日一个数据点（当天恐贪指数）：
- * - DB 快照的每日 composite 均值优先（当日多次快照的日均值）
- * - 无 DB 数据时回退到 history.scores 日级序列
+ * 取最近 60 个交易日（约 3 个月）；每日一个数据点（当天恐贪指数）：
+ * - 优先使用 calculator 计算的 history.scores（有 ~500 天历史，覆盖 3 个月）
+ * - historySnapshots 仅用于 intraday 粒度（当前图表为日级，不需要）
  */
 const chartData = computed(() => {
-  const snaps = dashboard.value?.historySnapshots
-  const dailyDates = snaps?.dates ?? []
-  const dailyComposite = snaps?.composite ?? []
-
-  const hasSnaps = dailyComposite.length >= 2
   const allScores = dashboard.value?.history?.scores ?? []
   const allDates = dashboard.value?.history?.dates ?? []
 
-  if (!hasSnaps && allScores.length < 2) return null
+  if (allScores.length < 2) return null
 
-  const nDays = hasSnaps ? dailyComposite.length : Math.min(60, allScores.length)
-  const dates = hasSnaps ? dailyDates.slice(-nDays) : allDates.slice(0, nDays).reverse()
-  const composite = hasSnaps ? dailyComposite.slice(-nDays) : allScores.slice(0, nDays).reverse()
+  // history.scores 是倒序（[0]=最新），取最近 60 天并反转为升序
+  const nDays = Math.min(60, allScores.length)
+  const dates = allDates.slice(0, nDays).reverse()
+  const composite = allScores.slice(0, nDays).reverse()
 
   // SVG 坐标常量（与 historyChartSrc 一致）
   const W = 340, H = 190
@@ -410,8 +430,8 @@ function selectDay(idx: number) {
 /**
  * 历史走势图 SVG（近 3 个月，每日单点折线）
  * - 主线（蓝）：连接每日恐贪指数（当天数据，一个点/日）
- * - 五色色带 + 冰点标记（composite < 25）
- * 数据源：DB 快照日均值优先，回退 history.scores 日级序列
+ * - 冰点日（恐贪<20）绿点、沸点日（恐贪>=80）红点
+ * 数据源：history.scores（calculator 日级序列，倒序 [0]=最新，取最近 60 交易日）
  */
 const historyChartSrc = computed(() => {
   const cd = chartData.value
@@ -422,25 +442,16 @@ const historyChartSrc = computed(() => {
   const yScale = (v: number) => padT + (1 - v / 100) * plotH
   const xDay = (i: number) => padL + i * dayW + dayW / 2
 
-  // 五色色带背景
-  const zones = [
-    { min: 0, max: 25, color: 'rgba(255,59,48,0.10)' },
-    { min: 25, max: 45, color: 'rgba(255,149,0,0.10)' },
-    { min: 45, max: 55, color: 'rgba(255,204,0,0.10)' },
-    { min: 55, max: 80, color: 'rgba(52,199,89,0.10)' },
-    { min: 80, max: 100, color: 'rgba(0,200,83,0.10)' },
-  ]
-  const bandRects = zones
-    .map((z) => `<rect x="${padL}" y="${yScale(z.max).toFixed(1)}" width="${plotW}" height="${(yScale(z.min) - yScale(z.max)).toFixed(1)}" fill="${z.color}"/>`)
+  // 20/80 分割线（虚线，区分冰点/沸点区域）
+  const thresholdLines = [20, 80]
+    .map((v) => `<line x1="${padL}" y1="${yScale(v).toFixed(1)}" x2="${W - padR}" y2="${yScale(v).toFixed(1)}" stroke="rgba(11,95,255,0.15)" stroke-width="0.6" stroke-dasharray="3 2"/>`)
     .join('')
 
-  // 网格线（25/50/75）
-  const gridLines = [25, 50, 75]
-    .map((v) => `<line x1="${padL}" y1="${yScale(v).toFixed(1)}" x2="${W - padR}" y2="${yScale(v).toFixed(1)}" stroke="rgba(11,95,255,0.06)" stroke-width="0.5" stroke-dasharray="2 2"/>`)
-    .join('')
+  // 中线（50，更淡）
+  const midLine = `<line x1="${padL}" y1="${yScale(50).toFixed(1)}" x2="${W - padR}" y2="${yScale(50).toFixed(1)}" stroke="rgba(11,95,255,0.06)" stroke-width="0.5" stroke-dasharray="2 2"/>`
 
-  // Y 轴标签
-  const yLabels = [0, 25, 50, 75, 100]
+  // Y 轴标签（0/20/50/80/100）
+  const yLabels = [0, 20, 50, 80, 100]
     .map((v) => `<text x="${padL - 3}" y="${(yScale(v) + 3).toFixed(1)}" text-anchor="end" font-size="7" fill="rgba(11,95,255,0.35)">${v}</text>`)
     .join('')
 
@@ -458,10 +469,17 @@ const historyChartSrc = computed(() => {
     ? `<line x1="${xDay(activeIdx).toFixed(1)}" y1="${padT}" x2="${xDay(activeIdx).toFixed(1)}" y2="${H - padB}" stroke="rgba(11,95,255,0.3)" stroke-width="0.8" stroke-dasharray="2 2"/><circle cx="${xDay(activeIdx).toFixed(1)}" cy="${yScale(composite[activeIdx] ?? 50).toFixed(1)}" r="3" fill="#0b5fff" stroke="#fff" stroke-width="1"/>`
     : ''
 
-  // 冰点标记：日 composite < 25，红色圆点贴在当日 composite 位置
+  // 冰点/沸点标记：冰点日（恐贪<20，超卖机会区）绿点，沸点日（恐贪>=80，超买风险区）红点
+  // （A股习惯绿=低吸机会/红=过热风险，与均线 maColor 档位一致）
   const iceDots = composite
     .map((s, i) => {
-      if (s >= 25) return ''
+      if (s >= 20) return ''
+      return `<circle cx="${xDay(i).toFixed(1)}" cy="${yScale(s).toFixed(1)}" r="2.5" fill="#00C853" stroke="#fff" stroke-width="0.8"/>`
+    })
+    .join('')
+  const boilDots = composite
+    .map((s, i) => {
+      if (s < 80) return ''
       return `<circle cx="${xDay(i).toFixed(1)}" cy="${yScale(s).toFixed(1)}" r="2.5" fill="#FF3B30" stroke="#fff" stroke-width="0.8"/>`
     })
     .join('')
@@ -482,22 +500,20 @@ const historyChartSrc = computed(() => {
     .join('')
 
   // 影线在底层，主线在上层，十字线最上层
-  const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${bandRects}${gridLines}${yLabels}<path d="${mainPath}" fill="none" stroke="#0b5fff" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>${iceDots}${cursor}${xLabels}</svg>`
+  const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${thresholdLines}${midLine}${yLabels}<path d="${mainPath}" fill="none" stroke="#0b5fff" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>${iceDots}${boilDots}${cursor}${xLabels}</svg>`
 
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
 })
 
 /**
  * 均线数值（5日/20日/60日）
- * 优先使用 historySnapshots.composite（DB 日级均值，与图表口径一致），
- * 回退到 history.scores（calculator 计算的日级 composite）
+ * 使用 history.scores（calculator 计算的日级 composite，倒序：[0]=最新）
  */
 const movingAverages = computed(() => {
-  const snaps = dashboard.value?.historySnapshots
-  const compositeArr = snaps?.composite ?? dashboard.value?.history?.scores ?? []
+  const compositeArr = dashboard.value?.history?.scores ?? []
   if (compositeArr.length < 2) return null
-  // compositeArr 升序（DB）或倒序（history.scores），统一转倒序：[0]=最新
-  const recentDesc = snaps?.composite ? [...compositeArr].reverse() : compositeArr
+  // compositeArr 倒序：[0]=最新
+  const recentDesc = compositeArr
   const calc = (period: number) => {
     if (recentDesc.length < period) return null
     let sum = 0
@@ -511,14 +527,14 @@ const movingAverages = computed(() => {
   }
 })
 
-/** 均线值对应的颜色（红<25 / 橙<45 / 黄<55 / 绿<80 / 深绿≥80） */
+/** 均线值对应的颜色（绿<20冰点 / 橙<45 / 黄<55 / 绿<80 / 红≥80沸点） */
 function maColor(v: number | null): string {
   if (v == null) return '#999'
-  if (v < 25) return '#FF3B30'
+  if (v < 20) return '#00C853'
   if (v < 45) return '#FF9500'
   if (v < 55) return '#FFCC00'
   if (v < 80) return '#34C759'
-  return '#00C853'
+  return '#FF3B30'
 }
 
 /**
@@ -526,11 +542,10 @@ function maColor(v: number | null): string {
  * 数据源优先 historySnapshots.composite（与图表口径一致），回退 history.scores
  */
 const icePointStats = computed(() => {
-  const snaps = dashboard.value?.historySnapshots
-  // compositeArr 统一转倒序：[0]=最新
-  const compositeArr = snaps?.composite ?? dashboard.value?.history?.scores ?? []
+  const compositeArr = dashboard.value?.history?.scores ?? []
   if (compositeArr.length < 2) return null
-  const recentDesc = snaps?.composite ? [...compositeArr].reverse() : compositeArr
+  // compositeArr 倒序：[0]=最新
+  const recentDesc = compositeArr
 
   // 取近 3 个月（recentDesc[0]=最新）
   const n = Math.min(60, recentDesc.length)
@@ -542,7 +557,7 @@ const icePointStats = computed(() => {
 
   // recent[i]=i天前的冰点，recent[i-1]=(i-1)天前=次日
   for (let i = 1; i < recent.length; i++) {
-    if (recent[i] < 25) {
+    if (recent[i] < 20) {
       iceCount++
       const nextDay = recent[i - 1]
       const diff = nextDay - recent[i]
@@ -575,8 +590,9 @@ const aiInsight = computed(() => {
   const ma = movingAverages.value
   const ice = icePointStats.value
 
-  // —— 为什么：市场情绪总结 + 数据依据 ——
-  const whyParts: string[] = [`当前市场情绪${z.label}（恐贪指数 ${cur.toFixed(0)}%），${z.summary}`]
+  // —— 为什么：今日主因（指标驱动）+ 档位总览 ——
+  const driversSentence = buildDriversSentence({ composite: cur, indicators: dashboard.value?.indicators ?? [] })
+  const whyParts: string[] = [`${driversSentence}，当前市场情绪${z.label}（恐贪指数 ${cur.toFixed(0)}%）`]
   if (ma?.ma5 != null && ma?.ma20 != null) {
     if (ma.ma5 > ma.ma20) {
       whyParts.push(`5日均线 ${ma.ma5.toFixed(0)}% 高于20日均线 ${ma.ma20.toFixed(0)}%，短期情绪正在回暖`)
@@ -614,7 +630,7 @@ const aiInsight = computed(() => {
 /** 冰点反弹洞见文字 */
 const icePointInsight = computed(() => {
   const s = icePointStats.value
-  if (!s) return '近 3 个月未出现冰点区域（恐贪<25），市场情绪整体处于非极端水平。'
+  if (!s) return '近 3 个月未出现冰点区域（恐贪<20），市场情绪整体处于非极端水平。'
   if (s.reboundRate >= 70) {
     return `历史数据显示，冰点后次日反弹概率高达 ${s.reboundRate}%，平均反弹 ${s.avgRebound} 点。冰点区域往往是中长期布局窗口，但需结合基本面确认非趋势性下跌。`
   }
@@ -629,7 +645,7 @@ const icePointInsight = computed(() => {
  * 1) 基准曲线：按当前恐贪指数在「各温度档锚点」间线性插值（锚点 = 各档预设区间中心）
  *    指数越接近中性(50)仓位越高，两端（冰点/沸点）防守低仓，随指数连续变化、无跳档
  * 2) 动态修正：
- *    - 冰点区域(<25) 且历史冰点次日反弹概率 ≥70% → 加 8%（超跌布局机会）
+ *    - 冰点区域(<20) 且历史冰点次日反弹概率 ≥70% → 加 8%（超跌布局机会）
  *    - 短期趋势：5日均线 > 20日均线（回暖）+3，反之 -3
  * 3) 钳制：区间下限 ≥10、上限 ≤90
  */
@@ -664,7 +680,7 @@ const positionRange = computed(() => {
 
   // 动态修正
   let adj = 0
-  if (v < 25) {
+  if (v < 20) {
     const ice = icePointStats.value
     if (ice && ice.iceCount > 0 && ice.reboundRate >= 70) adj += 8
   }
@@ -710,7 +726,7 @@ const gaugeImgSrc = computed(() => {
     }
   }
 
-  const svg = `<svg viewBox="0 0 220 150" xmlns="http://www.w3.org/2000/svg"><path d="M 25 110 A 85 85 0 0 1 195 110" fill="none" stroke="rgba(11,95,255,0.06)" stroke-width="14" stroke-linecap="round"/><path d="M 25 110 A 85 85 0 0 1 195 110" fill="none" stroke="${z.color}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${dashLen} ${arcLen}"/>${ticksArr.join('')}<g transform="rotate(${angle} 110 110)"><line x1="110" y1="110" x2="110" y2="40" stroke="${z.color}" stroke-width="3" stroke-linecap="round"/><circle cx="110" cy="40" r="5" fill="${z.color}"/></g><circle cx="110" cy="110" r="9" fill="#ffffff" stroke="${z.color}" stroke-width="3"/><circle cx="110" cy="110" r="4" fill="${z.color}"/><text x="25" y="142" text-anchor="middle" font-size="10" font-weight="700" fill="#FF3B30">冰点</text><text x="110" y="142" text-anchor="middle" font-size="9" fill="rgba(11,95,255,0.4)">常温</text><text x="195" y="142" text-anchor="middle" font-size="10" font-weight="700" fill="#00C853">沸点</text></svg>`
+  const svg = `<svg viewBox="0 0 220 150" xmlns="http://www.w3.org/2000/svg"><path d="M 25 110 A 85 85 0 0 1 195 110" fill="none" stroke="rgba(11,95,255,0.06)" stroke-width="14" stroke-linecap="round"/><path d="M 25 110 A 85 85 0 0 1 195 110" fill="none" stroke="${z.color}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${dashLen} ${arcLen}"/>${ticksArr.join('')}<g transform="rotate(${angle} 110 110)"><line x1="110" y1="110" x2="110" y2="40" stroke="${z.color}" stroke-width="3" stroke-linecap="round"/><circle cx="110" cy="40" r="5" fill="${z.color}"/></g><circle cx="110" cy="110" r="9" fill="#ffffff" stroke="${z.color}" stroke-width="3"/><circle cx="110" cy="110" r="4" fill="${z.color}"/><text x="25" y="142" text-anchor="middle" font-size="10" font-weight="700" fill="#00C853">冰点</text><text x="110" y="142" text-anchor="middle" font-size="9" fill="rgba(11,95,255,0.4)">常温</text><text x="195" y="142" text-anchor="middle" font-size="10" font-weight="700" fill="#FF3B30">沸点</text></svg>`
 
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
 })
@@ -729,6 +745,8 @@ async function load() {
   errorMsg.value = ''
   try {
     dashboard.value = await fearGreedApi.getDashboard('jq')
+    // 板块行情独立拉取：失败不影响主数据（引擎侧回退静态档位内容）
+    fearGreedApi.getSectors().then((b) => { sectorBoard.value = b }).catch(() => { sectorBoard.value = null })
   } catch (e: unknown) {
     errorMsg.value = (e as { message?: string })?.message || '请稍后重试'
   } finally {
@@ -977,8 +995,14 @@ onShow(() => {
   width: 14rpx;
   height: 14rpx;
   border-radius: 50%;
-  background: #FF3B30;
+  background: #00C853;
   border: 2rpx solid #fff;
+  box-shadow: 0 0 0 1rpx rgba(0, 200, 83, 0.3);
+}
+
+/* 沸点日：过热风险区，红色圆点（与图内沸点标记同色） */
+.fg-chart__legend-dot--hot {
+  background: #FF3B30;
   box-shadow: 0 0 0 1rpx rgba(255, 59, 48, 0.3);
 }
 
@@ -1165,7 +1189,7 @@ onShow(() => {
   margin-top: $s-2;
   padding: $s-2;
   border-radius: $r-md;
-  background: rgba(255, 59, 48, 0.04);
+  background: rgba(0, 200, 83, 0.04);
 }
 
 .fg-rebound__header {
@@ -1202,7 +1226,7 @@ onShow(() => {
 .fg-rebound__num {
   font-size: 40rpx;
   font-weight: 800;
-  color: #FF3B30;
+  color: #00C853;
   line-height: 1.1;
 }
 

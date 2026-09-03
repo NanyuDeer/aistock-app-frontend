@@ -172,6 +172,10 @@ export interface PredictionConditionPresentation {
   /** 路径短语名（两段式“状态 · 走势”；2026-09-03 起新数据携带，旧记录无） */
   label?: string
   scenario: string
+  /** 触发条件关键词（1~2 个；2026-09-02 起新数据携带，旧记录无） */
+  keywords?: string[]
+  /** 预判关键词（scenario 摘要，侧重方向+幅度；2026-09-03 起新数据携带，旧记录无） */
+  scenario_keywords?: string[]
   anchor: PredictionAnchorPresentation | null
 }
 
@@ -313,6 +317,8 @@ export function toPredictionPresentation(raw: MarketTracePrediction | null | und
         .map(c => ({
           condition: asString(c.condition),
           label: asString((c as { label?: unknown }).label) || undefined,
+          keywords: asStringList((c as { keywords?: unknown }).keywords),
+          scenario_keywords: asStringList((c as { scenario_keywords?: unknown }).scenario_keywords),
           scenario: asString(c.scenario),
           anchor: c.anchor && typeof c.anchor === 'object'
             ? {

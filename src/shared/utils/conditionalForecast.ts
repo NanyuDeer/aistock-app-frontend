@@ -21,6 +21,8 @@ export interface BranchLike {
   label?: string
   /** 简洁展示关键词（新数据携带）；对冲拆分分支无 → 置空 */
   keywords?: string[]
+  /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度）；对冲拆分分支无 → 置空 */
+  scenario_keywords?: string[]
 }
 
 /** 以“；若”/“;若”切分 scenario 为多段（保留各段文本，前导分隔符去除） */
@@ -74,6 +76,7 @@ export function expandConditionalBranches<T extends BranchLike>(cond: T): T[] {
       anchor: undefined,
       label: undefined,
       keywords: undefined,
+      scenario_keywords: undefined,
     }
     return extra as T
   })
