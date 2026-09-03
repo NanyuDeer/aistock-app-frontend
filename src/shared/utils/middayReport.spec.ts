@@ -54,6 +54,22 @@ describe('parseMiddayReport schema 2.1：午后前瞻 opportunities', () => {
     ])
   })
 
+  it('新格式 opportunities 键存在但为空数组（LLM 无明确机会）时：午后前瞻分段仍保留且透出空数组', () => {
+    const content = buildContent(
+      [
+        { title: '上午盘面回顾', conclusion: '回顾段落' },
+        { title: '午后前瞻', opportunities: [] },
+      ],
+      ['高位股回调'],
+    )
+    const parsed = parseMiddayReport(content, DATE)!
+    const sections = parsed.content.display_report.sections
+    expect(sections).toHaveLength(2)
+    const afternoon = sections.find((sec) => sec.title === '午后前瞻')!
+    expect(afternoon.conclusion).toBe('')
+    expect(afternoon.opportunities).toEqual([])
+  })
+
   it('老数据（无 opportunities，schema 2.0 段落流）兼容：conclusion 保留、无 opportunities 字段', () => {
     const content = buildContent([
       { title: '上午盘面回顾', conclusion: '回顾段落' },

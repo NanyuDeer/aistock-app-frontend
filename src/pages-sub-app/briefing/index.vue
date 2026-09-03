@@ -48,8 +48,8 @@
             </view>
           </view>
 
-          <!-- 午后前瞻 · 机会/风险对位（schema 2.1：仅带 opportunities 时渲染；风险栏取 display_report.risks 短词） -->
-          <view v-if="afternoonSection" class="midday-section-card">
+          <!-- 午后前瞻 · 机会/风险对位（schema 2.1：带 opportunities 键（可空）即渲染对位卡；两栏均空时整块不渲染；风险栏取 display_report.risks 短词） -->
+          <view v-if="afternoonSection && (afternoonSection.opportunities?.length || middayRisks.length)" class="midday-section-card">
             <view class="midday-section-head">
               <view class="midday-badge" :class="sectionBadgeClass(afternoonSection.title)">{{ sectionBadgeText(afternoonSection.title) }}</view>
               <view class="midday-section-body">
@@ -57,7 +57,7 @@
               </view>
             </view>
             <view class="midday-dual-col">
-              <view class="midday-col">
+              <view v-if="afternoonSection.opportunities?.length" class="midday-col">
                 <view class="midday-col-label">
                   <view class="midday-dot midday-dot--up" />
                   <text class="midday-col-label-text midday-col-label-text--up">机会提示</text>
@@ -318,11 +318,11 @@ const items = ref<BriefingItem[]>([])
 /** 午间报报告（方案 A：audio_path 回填在 content 内，可能无音频） */
 const middayReport = ref<MiddayReport | null>(null)
 
-/** 午间报：午后前瞻分段（schema 2.1 带 opportunities）；老数据无 opportunities 时为 null（回退段落流）。 */
+/** 午间报：午后前瞻分段（schema 2.1 带 opportunities 键即视为对位数据，键可空）；老数据无 opportunities 键时为 null（回退段落流）。 */
 const afternoonSection = computed(() => {
   if (broadcastType.value !== 'midday') return null
   const sections = middayReport.value?.content.display_report.sections ?? []
-  return sections.find((sec) => sec.opportunities && sec.opportunities.length > 0) ?? null
+  return sections.find((sec) => sec.opportunities !== undefined) ?? null
 })
 
 /** Agent 洞见列表：排除已由机会/风险对位区渲染的午后前瞻分段（老数据无 opportunities 时保留段落卡）。 */
