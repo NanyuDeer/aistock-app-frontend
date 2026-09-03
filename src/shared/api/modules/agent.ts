@@ -527,7 +527,8 @@ export interface RhythmPositionBand {
   text?: string
 }
 
-/** 节奏日历热力图行（契约 #7）：恒取 after_close 收盘基准；level 可空 = 灰格（行缺失/沿用前值） */
+/** 节奏日历热力图行（契约 #7）：恒取 after_close 收盘基准；level 可空 = 灰格（行缺失/沿用前值）；
+ *  events（2026-09-03 扩展）：该交易日 macro 事件（对外契约子集，后端恒下发，无事件 = []；前端可选以兼容旧缓存/降级） */
 export interface RhythmCalendarDay {
   date: string
   refresh_slot: 'after_close'
@@ -535,6 +536,7 @@ export interface RhythmCalendarDay {
   score: number | null
   basis_date: string | null
   position_band: RhythmPositionBand | null
+  events?: RhythmEvent[]
 }
 
 export interface RhythmCalendarResponse {
