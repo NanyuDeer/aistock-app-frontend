@@ -6,8 +6,8 @@
       <text v-if="verifyText" class="as-insight-card__verify" :class="verifyClass">{{ verifyText }}</text>
     </view>
 
-    <!-- 期段切换 -->
-    <view class="as-insight-card__seg">
+    <!-- 期段切换（单档数据隐藏 Tab 栏，仅多档才需切换） -->
+    <view v-if="horizonSegments.length > 1" class="as-insight-card__seg">
       <view
         v-for="seg in horizonSegments"
         :key="seg"
@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 
 /**
  * ConditionalForecastBlock 条件化预判块（洞见卡系通用块，2026-09-02 抽取）
@@ -182,6 +182,14 @@ const activeConditions = computed<StructuredCondition[]>(() => {
   const data = props.structured
   if (!data) return []
   return (data.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
+})
+
+/** 单档守卫：只有一档数据时把当前期初始化为该档（避免默认 'short' 落空导致"该期暂无细分情景"） */
+watchEffect(() => {
+  const segs = horizonSegments.value
+  if (segs.length && !segs.includes(activeHorizon.value)) {
+    activeHorizon.value = segs[segs.length - 1]
+  }
 })
 
 const verifyText = computed(() => {
