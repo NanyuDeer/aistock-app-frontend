@@ -1,7 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { toRhythmInsight } from './rhythmInsight'
 import type { RhythmCard, RhythmBranch } from '@/shared/api/modules/agent'
+
+const source = readFileSync(new URL('./rhythmInsight.ts', import.meta.url), 'utf8')
 
 function branch(p: Partial<RhythmBranch>): RhythmBranch {
   return {
@@ -42,4 +45,18 @@ test('conflict 不阻断 structured；无分支则不产 structured；card 为�
   const noBranches = { level: 'active', position_band: { text: 'x' }, conflict: false, branches: [] } as unknown as RhythmCard
   assert.equal(toRhythmInsight(noBranches, 'after_close', '2026-09-02')?.structured, undefined)
   assert.equal(toRhythmInsight(null, 'after_close', '2026-09-02'), null)
+})
+
+test('toCondition 透传 direction / positionAction / anchor（结构化仓位动作 + 验证锚点）', () => {
+  // toCondition 应产出 { horizon, condition, scenario, direction, positionAction, anchor }
+  const toCondition = source.match(/function toCondition[\s\S]*?\n\}/)?.[0] ?? ''
+  assert.match(toCondition, /direction:\s*b\.conclusion\.direction/)
+  assert.match(toCondition, /positionAction:\s*b\.position_action/)
+  assert.match(toCondition, /anchor:\s*b\.anchor\s*\?/)
+})
+
+test('RhythmInsightCondition 接口含 direction / positionAction / anchor 字段', () => {
+  assert.match(source, /direction\?: ['"]bullish['"] \| ['"]bearish['"] \| ['"]neutral['"]/)
+  assert.match(source, /positionAction\?:/)
+  assert.match(source, /anchor\?:/)
 })

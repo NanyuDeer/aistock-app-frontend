@@ -78,6 +78,11 @@
               </template>
             </view>
 
+            <!-- 结构化仓位动作徽标（add/reduce/hold + 成数，如 加仓 +2 成；后端 position_action 透传） -->
+            <view v-if="cond.positionAction" class="as-insight-card__sc-action" :class="actionClass(cond.positionAction.direction)">
+              <text class="as-insight-card__sc-action-tx">{{ actionText(cond.positionAction) }}</text>
+            </view>
+
             <!-- 验证锚点（大盘等粒度 anchor.threshold/metric 透传，板块暂无则不渲染） -->
             <view v-if="hasAnchor(cond)" class="as-insight-card__sc-anchors">
               <text v-if="cond.anchor?.threshold" class="as-insight-card__anchor-chip">{{ cond.anchor.threshold }}</text>
@@ -135,6 +140,8 @@ interface StructuredCondition {
   scenario: string
   /** 简洁展示用关键词（1~2 个，单条 ≤10 字；仅新数据携带，旧记录无 → 走长句兜底） */
   keywords?: string[]
+  /** 结构化仓位动作（add/reduce/hold + 成数，如 "+2 成"；后端 position_action 透传，纯 UI 展示） */
+  positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string }
   /** 验证锚点（可选透传：threshold/metric 以 chip 展示） */
   anchor?: { metric?: string; threshold?: string }
   /** 该条件是否已触发（验证回填）：true=已触发（分支点亮）/ false=未触发（置灰）/ 缺省=待观察常态 */
@@ -224,6 +231,17 @@ const verifyClass = computed(() => {
 /** 是否有可展示的验证锚点 chip */
 function hasAnchor(cond: StructuredCondition): boolean {
   return Boolean(cond.anchor && (cond.anchor.metric || cond.anchor.threshold))
+}
+
+/** 仓位动作徽标 class（加仓=红 / 减仓=绿 / 观望=灰，对齐方向色语义） */
+function actionClass(d: 'add' | 'reduce' | 'hold'): string {
+  return d === 'add' ? 'is-add' : d === 'reduce' ? 'is-reduce' : 'is-hold'
+}
+
+/** 仓位动作文案：加仓/减仓/观望 + 成数（如 加仓 +2 成；change 由后端下发原文） */
+function actionText(a: NonNullable<StructuredCondition['positionAction']>): string {
+  const verb = a.direction === 'add' ? '加仓' : a.direction === 'reduce' ? '减仓' : '观望'
+  return `${verb} ${a.change}`
 }
 
 // ===== 文案与样式映射 =====
@@ -596,6 +614,39 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 
 .as-insight-card__sc--dn.as-insight-card__sc--live .as-insight-card__sc-amp {
   color: $down;
+}
+
+/* 结构化仓位动作徽标（加仓=红 / 减仓=绿 / 观望=灰，对齐方向色语义；后端 position_action 透传） */
+.as-insight-card__sc-action {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  border-radius: $r-full;
+  padding: 2rpx 14rpx;
+}
+
+.as-insight-card__sc-action-tx {
+  font-size: 22rpx;
+  font-weight: 600;
+  line-height: $lh-tight;
+}
+
+.as-insight-card__sc-action.is-add {
+  color: $up;
+  background: $up-soft;
+  border: 1rpx solid rgba(229, 77, 94, 0.35);
+}
+
+.as-insight-card__sc-action.is-reduce {
+  color: $down;
+  background: $down-soft;
+  border: 1rpx solid rgba(24, 160, 88, 0.35);
+}
+
+.as-insight-card__sc-action.is-hold {
+  color: $flat;
+  background: $bg-soft;
+  border: 1rpx solid $line;
 }
 
 /* 验证锚点 chip（threshold/metric；大盘等粒度传入时展示） */
