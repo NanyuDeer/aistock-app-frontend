@@ -38,6 +38,7 @@
 ### 改进
 - `src/modules/fear-greed/pages/index.vue` 历史走势图：冰点日（恐贪<20，超卖机会区）圆点由红改**绿**（#00C853，A股习惯绿=低吸机会）；新增**沸点日**（恐贪>=80，超买风险区）**红**点（#FF3B30）标记
 - 图例区新增"沸点日"条目（红点，样式 `fg-chart__legend-dot--hot`），**常显**作为图例说明；出现 >=80 数据时图中自动标红点（标记为数据驱动，图例为常显）；"冰点日"图例保持原有条件显示
+- 同时将图表曲线 / 5/20/60 均线 / 冰点反弹统计的数据源由「DB `historySnapshots` 日均值优先、回退 `history.scores`」统一为仅用 `history.scores`（calculator 日级序列，覆盖近 3 个月）——因 `historySnapshots` 为日内粒度、DB 仅当天数据时图表曾只显示当日；`historySnapshots` 字段保留给其他日内消费方，不再被本页图表引用
 
 ---
 
