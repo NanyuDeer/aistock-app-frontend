@@ -126,7 +126,7 @@
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">近 {{ HOME_RHYTHM_DAYS }} 个交易日 · 收盘基准</text>
-          <!-- 近几日结论：每行 = 日期 + 档位 chip + 建议仓位；点行进该日详情（stop 防触整卡跳转） -->
+          <!-- 近几日结论：每行 = 建议仓位 + 档位色块（最右，与其它功能卡"名称+Tag"同构）；点行进该日详情（stop 防触整卡跳转） -->
           <view class="feature-list" v-if="rhythmRows.length">
             <view
               v-for="r in rhythmRows"
@@ -134,11 +134,10 @@
               class="feature-item rhythm-row"
               @tap.stop="goRhythmDate(r.date)"
             >
-              <text class="feature-label rhythm-date">{{ r.date.slice(5) }}</text>
+              <text class="feature-value rhythm-band">{{ r.band || (r.basis_date ? '沿用前值' : '无报告') }}</text>
               <view class="rhythm-chip" :style="{ background: rhythmChipColor(r) }">
                 <text class="rhythm-chip-text">{{ rhythmLevelShort(r) }}</text>
               </view>
-              <text class="feature-value rhythm-band">{{ r.band || (r.basis_date ? '沿用前值' : '无报告') }}</text>
             </view>
           </view>
         </Card>
@@ -379,7 +378,7 @@ async function loadTraceReports() {
 }
 
 /** 首页节奏大师卡：近几日摘要（收盘基准档位 + 建议仓位），每行点入该日详情 */
-const HOME_RHYTHM_DAYS = 5
+const HOME_RHYTHM_DAYS = 3
 interface RhythmHistoryRow {
   date: string
   level: string | null
@@ -405,8 +404,8 @@ async function loadRhythmHistory() {
     // 一次日历接口取数即可获得多日 level/score/position_band（契约 #7），避免逐日 getRhythmMaster 放大首页刷新成本
     const res = await agentApi.getRhythmMasterCalendar(HOME_RHYTHM_DAYS)
     const days = res?.days ?? []
-    // 接口"最近在前"（降序），卡片按时间正序展示（旧→新，最底=最新）
-    rhythmRows.value = [...days].reverse().map((d) => ({
+    // 接口"最近在前"（降序）→ 卡片顶部为最新日期
+    rhythmRows.value = days.map((d) => ({
       date: d.date,
       level: d.level,
       score: d.score,
@@ -819,17 +818,7 @@ function goLogin() {
   color: $ink-mute;
 }
 
-/* 节奏大师卡片：近几日结论摘要行（日期 + 档位 chip + 建议仓位） */
-.rhythm-row {
-  justify-content: flex-start;
-}
-.rhythm-date {
-  flex: none;
-  width: 84rpx;
-  font-size: $font-size-xs;
-  color: $ink;
-  font-weight: 500;
-}
+/* 节奏大师卡片：近几日结论摘要行（建议仓位 + 档位色块最右，与其它功能卡"名称+Tag"同构） */
 .rhythm-chip {
   flex: none;
   width: 40rpx;
@@ -844,14 +833,13 @@ function goLogin() {
   font-size: 18rpx;
   line-height: 1;
 }
+/* 仓位文案作为"行主体"占满剩余宽度，色块借 feature-item 的 space-between 贴右 */
 .rhythm-band {
   flex: 1;
   min-width: 0;
-  margin-left: 8rpx;
-  text-align: right;
+  text-align: left;
   font-size: $font-size-xs;
-  color: $primary;
-  font-weight: 500;
+  color: $ink-soft;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
