@@ -32,8 +32,6 @@ export function zoneLabel(composite: number): string {
   return '沸点'
 }
 
-const DECENT = 3 // 涨停/净流入数字格式化位数
-
 function fmtPct(v: number): string {
   return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`
 }
@@ -53,7 +51,9 @@ function pickFrom(list: FgSectorFact[], opts: { maxPct?: number; netPositive?: b
 
 function tagOf(f: FgSectorFact, kind: SectorTag['kind'], reason: string): SectorTag {
   const lead = f.leadStock ? `，领涨 ${f.leadStock}` : ''
-  return { name: f.name, kind, desc: `${f.name} 今日 ${fmtPct(f.pctChange)}，主力净流入 ${fmtYuan(f.netAmount)}${lead}，${reason}` }
+  // 净流入/净流出按净额符号区分，负净额展示绝对值，杜绝"净流入 -X亿"与流出原因同现的矛盾
+  const direction = f.netAmount >= 0 ? '净流入' : '净流出'
+  return { name: f.name, kind, desc: `${f.name} 今日 ${fmtPct(f.pctChange)}，主力${direction} ${fmtYuan(Math.abs(f.netAmount))}${lead}，${reason}` }
 }
 
 export function buildSectorTags(ctx: FgContext, fallback: { name: string; desc: string }[]): SectorTag[] {
@@ -86,8 +86,11 @@ export function buildSectorTags(ctx: FgContext, fallback: { name: string; desc: 
     }
   } else if (c < 80) {
     addInflow(2)
-    const warn = topOutflows.find((f) => f.pctChange >= 3) ?? topGainers.find((f) => f.pctChange >= 5)
-    if (warn) tags.push(tagOf(warn, 'warning', '高位放量资金流出，追高风险大，建议兑现不宜加仓'))
+    const outflow = topOutflows.find((f) => f.pctChange >= 3)
+    const gainer = topGainers.find((f) => f.pctChange >= 5)
+    if (outflow) tags.push(tagOf(outflow, 'warning', '高位放量资金流出，追高风险大，建议兑现不宜加仓'))
+    // 净流出榜无高位股时回退涨幅榜：用与净流入不冲突的"涨幅已高"表述，避免"净流入+资金流出"矛盾句
+    else if (gainer) tags.push(tagOf(gainer, 'warning', '当日涨幅已高、偏离成本区，追高风险大'))
     else addInflow(3)
   } else {
     addInflow(2)
@@ -125,22 +128,17 @@ function actionFor(key: string, score: number, raw: number): string | null {
 }
 
 export function buildActions(ctx: FgContext): string[] {
+  const zone = zoneLabel(ctx.composite)
   const hits: string[] = []
+  if (zone === '沸点') hits.push('不追高，分批兑现浮盈')
+  if (zone === '冰点' || zone === '寒冷') hits.push('控制仓位，分批布局，等待企稳信号')
   for (const ind of ctx.indicators) {
     const hit = actionFor(ind.key, ind.score, ind.raw)
     if (hit) hits.push(hit)
   }
-  // 命中要点是否已含“仓位”类建议：用于决定是否补风控纪律。
-  // 档位前缀（unshift 的“控制仓位…”）不计入，否则两端档会吞掉独立的止损纪律条目。
-  const hitHasPosCtrl = hits.some((s) => s.includes('仓位'))
-  const zone = zoneLabel(ctx.composite)
-  if (zone === '沸点') hits.unshift('不追高，分批兑现浮盈')
-  if (zone === '冰点' || zone === '寒冷') hits.unshift('控制仓位，分批布局，等待企稳信号')
-  const uniq = [...new Set(hits)]
-  const base: string[] = []
-  if (!hitHasPosCtrl) base.push('控制仓位，严格执行止损纪律')
-  if (uniq.length === 0) base.unshift('多看少动，等待情绪方向明朗')
-  return [...uniq, ...base].slice(0, 3)
+  // 通用要点池：命中（含档位前缀）去重后不足 3 条时按序补足，保证任何输入恒 3 条且全文互不重复
+  const pool = ['严格执行止损纪律', '关注量能与换手变化', '等待方向明朗再出手']
+  return [...new Set([...hits, ...pool])].slice(0, 3)
 }
 
 /** 情绪两端驱动指标（score 最低的恐惧驱动、最高的贪婪驱动各取一个） */
@@ -164,9 +162,6 @@ export function buildDriversSentence(ctx: FgContext): string {
 export function buildAdvice(ctx: FgContext): string {
   const zone = zoneLabel(ctx.composite)
   const d = buildDriversSentence(ctx)
-  const tagNames = buildSectorTags(ctx, []).length ? '' : ''
-  // tagNames 仅用于保持函数签名用途；真正的配置方向由调用方渲染
-  void tagNames
   if (zone === '冰点' || zone === '寒冷') {
     return `${d}。市场情绪${zone}，建议控制仓位、分批布局超跌优质资产，优先资金逆势流入的防御方向，等待放量企稳。`
   }
