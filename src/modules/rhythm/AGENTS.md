@@ -73,6 +73,20 @@
 
 - 点格切日 = 面板 `pick` 事件上抛，详情页原地重拉该日三时点版本（无页面跳转）
 
+## 预判分支契约（RhythmBranch v2，2026-09-03）
+
+- `branch` 结构新增 **`position_action`（结构化仓位动作，需求方核心）**：`{ direction: 'add'|'reduce'|'hold', change: string, band?: RhythmPositionBand|null }`——`change` 为成数文案（如 `"+2 成"`/`"-1 成"`/`"持仓不变"`），由后端确定性算法算，前端不臆断；`add`→加仓、`reduce`→减仓、`hold`→观望。
+- 新增 **`anchor`（可验证锚点）**：`{ metric: 'index_close'|'close'|'high'|'low', threshold: string, direction: 'bullish'|'bearish'|'neutral' }`——供验证器机械判 hit/miss。
+- 新增 **`touch_strength`（历史触碰强度）**：`number|null`，**非命中概率**，与 `validity`（有效天数）语义分离。
+- `conclusion.range` 降级为辅助（scenario 参考），不再当主输出。
+- `position_action` / `anchor` 为可选（`?`），旧报告无则回退展示。
+
+## 日历面板数据源（2026-09-03）
+
+- 展开态（iOS 日历样式）：`getRhythmMasterCalendar(60, 60)` 走 **`naturalDays=60`** 拉近 60 自然日（**含周末/节假日**），渲染完整自然月网格 + 翻页（上月/下月/今天）；周末/节假日格 `level=null` 灰格如实展示但**可 pick**（看该日 macro 事件）。
+- 折叠态（近 7 交易日紧凑条）：`getRhythmMasterCalendar(60)` 走 **`days=60`（交易日）**，**只展示交易日**（周末不混入）——两数据源独立。
+- 事件角标/模式（high 红点 / medium-low 灰点）语义不变。
+
 ## 约束
 
 - 所有字段缺失按可选处理，页面必须容忍 `rhythm_card` 缺失（报告可能处于降级态）。
