@@ -2,6 +2,20 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-03 — 预判句关键词化（scenario_keywords 生成链路 + 若·则展示）
+
+**开发者**: Aria
+
+### 新增字段链路
+- `shared/api/modules/agent.ts`：`SectorInsightCondition` 补 `scenario_keywords`（2026-09-03 起新数据携带）
+- `shared/utils/sectorInsight.ts` / `conditionalForecast.ts`：结构化映射透传 `scenario_keywords`；对冲拆分分支置空（对齐 label/keywords 清理）
+- `modules/analytics/utils/marketTraceReview.ts`：`PredictionConditionPresentation` 补 `keywords`/`scenario_keywords` 并透传（大盘记录，sentence 模式暂未消费）
+
+### UI（ConditionalForecastBlock，与组件库同步）
+- 每支条件默认两行：行1 `方向徽 + 路径名`（右侧纯文字"详情 ▾"右对齐）；行2 `若[触发条件关键词] 则[预判标签]`——预判标签优先 LLM `scenario_keywords`，旧记录回退从 scenario 提取幅度段
+- 点行1"详情"→ 行3 展开完整预判句（浅块、幅度灰），再点收起；命中态右上角"条件成立"徽时行1让出右侧空间
+- 兜底：sentence 模式 / 无 label / 无预判标签 → 整句原文直显不失真
+
 ## [master] 2026-09-03 — 风口榜排序统一为"上榜次数 → 持续时间"
 
 **开发者**: Aria

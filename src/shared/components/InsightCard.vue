@@ -4,9 +4,14 @@
     :class="[`as-insight-card--${theme}`]"
     @tap="handleClick"
   >
-    <!-- 头部：瞳孔 + 类型标签 + 时间 -->
+    <!-- 头部：洞见字标标签（字标 + 灰点 + 彩色类型词）+ 时间 -->
     <view class="as-insight-card__head">
-      <InsightTag :type="type" size="sm">{{ tagText || typeLabel }}</InsightTag>
+      <view class="wm-tag" :class="`wm-tag--${type}`">
+        <!-- "洞见"字标 PNG：浅色卡深色版 / 深蓝研报卡反白版（预览环境 image 标签不可用，走内联背景图） -->
+        <view class="wm-img" :style="wmStyle" />
+        <text class="wm-dot">·</text>
+        <text class="wm-label">{{ typeWord }}</text>
+      </view>
       <text v-if="time" class="as-insight-card__time">{{ time }}</text>
     </view>
 
@@ -41,12 +46,18 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import InsightTag from './InsightTag.vue'
 import ConditionalForecastBlock from './ConditionalForecastBlock.vue'
+import wordmarkPng from './insight-wordmark.png'
+import wordmarkLightPng from './insight-wordmark-light.png'
+
+/** 洞见字标（"洞见"PNG：浅底用深色版 / 深蓝研报卡用反白版） */
+const wmStyle = computed(() => ({
+  backgroundImage: `url(${props.theme === 'dark' ? wordmarkLightPng : wordmarkPng})`
+}))
 
 /**
  * InsightCard 洞见卡片（全站洞见统一容器）
- * - 文本形态（兼容旧用法）：瞳孔标签 → 结论一句话 → 溯源 → 预判（两句话上限）。
+ * - 文本形态（兼容旧用法）：洞见字标标签（洞见字标 · 类型词）→ 结论一句话 → 溯源 → 预判（两句话上限）。
  * - 条件化形态（structured 传入）：溯源 → 通用条件化预判块（ConditionalForecastBlock，
  *   2026-09-02 抽取：大盘/板块/个股等一切有条件化预判的粒度共用同款分支 UI）。
  * 组件保持纯 UI：方向/置信/期段/条件全部经 props 结构化传入，不引业务。
@@ -85,6 +96,8 @@ interface StructuredCondition {
   anchor?: { metric?: string; threshold?: string }
   /** 简洁展示用关键词（1~2 个，单条 ≤10 字；仅新数据携带，旧记录无 → 走长句兜底） */
   keywords?: string[]
+  /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度） */
+  scenario_keywords?: string[]
   /** 该条件是否已触发（验证回填）：true=已触发（分支点亮）/ false=未触发（置灰）/ 缺省=待观察常态 */
   met?: boolean | null
 }
@@ -108,7 +121,7 @@ const props = withDefaults(defineProps<{
   trace?: string
   /** 预判：后续走向（文本形态，structured 传入时忽略） */
   forecast?: string
-  /** 标签文字覆盖（如板块洞见卡传 tag-text="板块洞见"）；缺省按 type 映射 */
+  /** 标签词覆盖（如板块卡传 tag-text="板块洞见"，剥"洞见"后缀后显示"板块"）；缺省按 type 取短词 */
   tagText?: string
   /** 条件化预判结构化数据（传入则渲染期段切换的预判块） */
   structured?: InsightStructuredForecast | null
@@ -137,14 +150,18 @@ const emit = defineEmits<{
 }>()
 
 const typeLabelMap: Record<InsightType, string> = {
-  emotion: '情绪洞见',
-  fund: '资金洞见',
-  event: '事件洞见',
-  market: '市场洞见',
-  trend: '趋势洞见'
+  emotion: '情绪',
+  fund: '资金',
+  event: '事件',
+  market: '市场',
+  trend: '趋势'
 }
 
-const typeLabel = computed(() => typeLabelMap[props.type])
+/** 类型词：字标已含"洞见"二字，词仅显示类型；tagText 自定义时剥掉重复的"洞见"后缀 */
+const typeWord = computed(() => {
+  const t = props.tagText?.trim()
+  return t ? t.replace(/洞见$/, '') : typeLabelMap[props.type]
+})
 
 const handleClick = () => {
   emit('click')
@@ -177,6 +194,46 @@ const handleClick = () => {
   font-size: $font-size-xs;
   color: $ink-mute;
 }
+
+/* ===== 洞见字标标签（字标 PNG + 灰点 + 彩色类型词；2026-09-03 由瞳孔标签 InsightTag 换为洞见字标） ===== */
+.wm-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  line-height: 1;
+}
+
+/* "洞见"字标 PNG（内联背景图 + 右下远距阴影 drop-shadow 按图片 alpha 成形；若 PNG 自带投影可去掉） */
+.wm-img {
+  width: 58rpx;
+  height: 40rpx;
+  flex: 0 0 auto;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  filter: drop-shadow(3rpx 5rpx 8rpx rgba(10, 46, 111, 0.25));
+}
+
+/* 间隔号：灰色缓冲，弱化字标与类型词的连接 */
+.wm-dot {
+  font-size: 26rpx;
+  color: $ink-mute;
+  line-height: 1;
+}
+
+.wm-label {
+  font-size: $font-size-base;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--wm-color, $primary);
+}
+
+/* 类型词彩色（沿用 5 类型色）：event 主色 #00b8ff 在白卡偏浅，取中调保证可读 */
+.wm-tag--emotion { --wm-color: #{$insight-emotion}; }
+.wm-tag--fund    { --wm-color: #{$insight-fund}; }
+.wm-tag--event   { --wm-color: #00a8d8; }
+.wm-tag--market  { --wm-color: #{$insight-market}; }
+.wm-tag--trend   { --wm-color: #{$insight-trend}; }
 
 /* ===== Title ===== */
 .as-insight-card__title {
@@ -300,5 +357,18 @@ const handleClick = () => {
   .as-insight-card__brand {
     color: rgba($white, 0.55);
   }
+
+  /* 字标标签：类型词提亮为 light 色，间隔号淡化；反白字标在深底上无需投影 */
+  .wm-img {
+    filter: none;
+  }
+  .wm-dot {
+    color: rgba($white, 0.45);
+  }
+  .wm-tag--emotion { --wm-color: #{$insight-emotion-light}; }
+  .wm-tag--fund    { --wm-color: #{$insight-fund-light}; }
+  .wm-tag--event   { --wm-color: #{$insight-event-light}; }
+  .wm-tag--market  { --wm-color: #{$insight-market-light}; }
+  .wm-tag--trend   { --wm-color: #{$insight-trend-light}; }
 }
 </style>

@@ -578,6 +578,8 @@ export interface SectorInsightCondition {
   scenario: string
   /** 简洁展示用关键词（2026-09-02 起新数据携带：1~2 个，单条 ≤10 字）；旧记录无 */
   keywords?: string[]
+  /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度，如 上探+3%~+5%）；旧记录无 */
+  scenario_keywords?: string[]
   /** 该条件是否已触发（验证回填），缺省 null=待观察 */
   met?: boolean | null
 }
