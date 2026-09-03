@@ -386,6 +386,11 @@ export interface MiddayReportRecord {
       details?: string
       stocks?: string[]
       risks?: string[]
+      sections?: Array<{
+        title?: string
+        conclusion?: string
+        opportunities?: string[]
+      }>
     }
     podcast_brief?: string
     schema_version?: string

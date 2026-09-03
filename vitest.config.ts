@@ -61,6 +61,7 @@ export default defineConfig({
       'src/shared/components/FloatingPodcast.spec.ts',
       'src/shared/components/NotificationDropdown.spec.ts',
       'src/shared/utils/floatingEngine.spec.ts',
+      'src/shared/utils/middayReport.spec.ts',
       'src/modules/favorites/components/InsightDetailLayout.spec.ts',
       'src/modules/favorites/pages/monitor.spec.ts',
       'src/modules/favorites/pages/insight-detail.spec.ts',
