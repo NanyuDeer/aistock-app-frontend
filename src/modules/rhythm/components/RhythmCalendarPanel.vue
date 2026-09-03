@@ -135,7 +135,9 @@ function isOvernight(ev: RhythmEvent): boolean {
 }
 
 const selectedEvents = computed<RhythmEvent[]>(() => {
+  // 交易日数据源优先；周末/节假日命中不到交易日时回退自然日数据源，保证展开网格的事件角标与事件面板一致
   const day = ascending.value.find((d) => d.date === props.targetDate)
+    ?? dayListRaw.value.find((d) => d.date === props.targetDate)
   return day ? eventsOf(day) : []
 })
 

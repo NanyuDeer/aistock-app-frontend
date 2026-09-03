@@ -30,3 +30,10 @@ test('折叠近 7 交易日紧凑条走交易日数据源（dayList），展开�
   assert.match(source, /const dayList = ref<RhythmCalendarDay\[\]>\(\[\]\)/)
   assert.match(source, /const dayListRaw = ref<RhythmCalendarDay\[\]>\(\[\]\)/)
 })
+
+test('selectedEvents 在交易日数据源未命中时回退自然日数据源（周末/节假日 cell 仍可看当日 macro 事件）', () => {
+  // 事件面板查找需同时覆盖交易日（dayList/ascending）与自然日（dayListRaw）两条来源，
+  // 保证展开网格周末/节假日格显示的事件角标在选中后仍能在事件面板列出，而非"当日无宏观事件"。
+  assert.match(source, /ascending\.value\.find\(\(d\) => d\.date === props\.targetDate\)/)
+  assert.match(source, /dayListRaw\.value\.find\(\(d\) => d\.date === props\.targetDate\)/)
+})
