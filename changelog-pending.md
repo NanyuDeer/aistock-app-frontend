@@ -1,5 +1,11 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-03 App 更新"已是最新"假阳真机排障
+- 初版只在 `checkAppUpdate` 打 `[appUpdate-diag]` console 日志，但正式包无法读 console，故改为 **UI 弹窗诊断**：
+  - `src/shared/utils/useAppUpdate.ts`：新增导出 `updateDiag` 快照对象（latest/current/lastResult），比对处写入；保留 console 日志便于 logcat 侧看。
+  - `src/modules/user/pages/profile.vue`：`checkUpdate()` 手动检查后 `showModal` 弹出「版本检测诊断」（online latest / current / 判定 / 结果），正式包真机点「版本更新」即可看到，无需读 console。
+  - **确认根因后移除**：`updateDiag` 快照、profile 里的诊断弹窗、useAppUpdate 比对处的 console 诊断日志。
+
 ## 2026-09-03 App 更新"已是最新"假阳真机排障日志
 - `src/shared/utils/useAppUpdate.ts`：`checkAppUpdate` 比对处增加 `[appUpdate-diag]` 诊断日志，打印线上 `latest`/本机 `current`/`isNever`/`manual`。真机打包含本行的包，点「版本更新」后读 console 即可锁定根因（线上已 0.1.3/103 时 current<=0 或 latest<=current 仍判已最新）。**确认根因后移除本日志**。
 

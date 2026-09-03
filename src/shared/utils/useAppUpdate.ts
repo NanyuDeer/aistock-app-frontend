@@ -40,6 +40,19 @@ export function neverUpdateStorageKey(versionCode: number): string {
   return `app_update_never_v${versionCode}`
 }
 
+/**
+ * 更新检查诊断快照：真机正式包排查「已是最新」假阳用（确认后移除）。
+ * checkAppUpdate 每次比对后写入，profile 手动检查时用 showModal 展示，
+ * 便于在不读 console 的情况下确认线上与本机 versionCode 的判定走向。
+ */
+export const updateDiag = {
+  /** 线上 versionCode（0 表示未能取到） */
+  latest: 0 as number,
+  /** 本机 versionCode（0 表示原生读取失败） */
+  current: 0 as number,
+  lastResult: '' as string,
+}
+
 /** 是否已对该版本选择「永久关闭」（不再提示） */
 export function isNeverUpdate(versionCode: number): boolean {
   return !!uni.getStorageSync(neverUpdateStorageKey(versionCode))
@@ -101,8 +114,12 @@ export async function checkAppUpdate(opts: { manual?: boolean } = {}): Promise<A
   // 比对版本号
   const latest = Number(info.versionCode) || 0
   const current = getCurrentVersionCode()
-  // 诊断日志（真机「已是最新」假阳排查用，确认后移除）：打印线上与本机 versionCode 及判断走向
-  console.warn('[appUpdate-diag] latest =', latest, '| current =', current, '| isNever =', isNeverUpdate(latest), '| manual =', opts.manual)
+  // 诊断（真机「已是最新」假阳排查用，确认后移除）：写入快照供 UI 展示 + console 打印
+  const result = !latest || current <= 0 || latest <= current ? 'latest' : opts.manual && isNeverUpdate(latest) ? 'never-closed' : 'would-prompt'
+  updateDiag.latest = latest
+  updateDiag.current = current
+  updateDiag.lastResult = result
+  console.warn('[appUpdate-diag] latest =', latest, '| current =', current, '| isNever =', isNeverUpdate(latest), '| manual =', opts.manual, '| predict =', result)
   // current<=0 表示本机版本号读取失败（无法判定本机版本），保守视为已最新，避免反复误弹
   if (!latest || current <= 0 || latest <= current) return 'latest'
 
