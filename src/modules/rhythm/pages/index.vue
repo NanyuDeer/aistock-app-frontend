@@ -16,6 +16,16 @@
         </view>
       </view>
       <view class="fallback" v-if="isFallback">非交易日/当日无报告，沿用前值（{{ basisLabel }}）</view>
+      <view class="insight-wrap" v-if="insightCard">
+        <InsightCard
+          type="market"
+          tag-text="节奏洞见"
+          :title="insightCard.title"
+          :trace="insightCard.trace ?? ''"
+          :structured="insightCard.structured ?? null"
+          :time="insightCard.time"
+        />
+      </view>
       <RhythmCard
         v-if="content"
         :card="content.rhythm_card!"
@@ -33,10 +43,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { EmptyState } from '@/shared/components'
+import { EmptyState, InsightCard } from '@/shared/components'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import RhythmCard from '../components/RhythmCard.vue'
 import RhythmCalendarPanel from '../components/RhythmCalendarPanel.vue'
+import { toRhythmInsight } from '../utils/rhythmInsight'
+import type { RhythmInsightCard } from '../utils/rhythmInsight'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { RhythmMasterContent } from '@/shared/api/modules/agent'
 
@@ -59,6 +71,11 @@ const content = computed<RhythmMasterContent | undefined>(() => {
   const v = versions.value.find((x) => x.refresh_slot === activeSlot.value)
   return v?.content
 })
+
+/** 摘要洞见卡入参：仓位/档位/interval 分支上移，mapper 不可拼装时整卡不渲染（去重：RhythmCard 不再重复这些单元） */
+const insightCard = computed<RhythmInsightCard | null>(() =>
+  content.value ? toRhythmInsight(content.value.rhythm_card, activeSlot.value, targetDate.value) : null,
+)
 
 const pageTitle = computed(() => {
   const s = activeSlot.value
@@ -144,6 +161,7 @@ function switchSlot(s: string) { activeSlot.value = s }
 <style lang="scss" scoped>
 @import '@/shared/styles/variables.scss';
 .body { padding: 24rpx 32rpx; }
+.insight-wrap { margin-bottom: 20rpx; }
 
 /* 三时点分段切换（设计稿：surface 底 + 边框 + pill，active 主色填充） */
 .slots { display: flex; gap: 8rpx; background: $bg-card; border: 1rpx solid $line; border-radius: 999rpx; padding: 6rpx; margin-bottom: 24rpx; }
