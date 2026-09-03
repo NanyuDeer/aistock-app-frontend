@@ -3,10 +3,12 @@
     <!-- 加载中 -->
     <LoadingState v-if="loading" size="sm" text="研判生成中..." layout="horizontal" />
 
-    <!-- 严格占位（D4）：当日/近 7 天无该板块溯源/预判 -->
-    <view v-else-if="!candidate" class="as-sector-insight__empty">
+    <!-- 占位：未命中候选，或命中但无溯源/预判内容（避免仅渲染"板块+涨跌幅"空壳标题卡） -->
+    <view v-else-if="!candidate || !hasContent" class="as-sector-insight__empty">
       <text class="as-sector-insight__empty-title">暂无板块研判</text>
-      <text class="as-sector-insight__empty-desc">该板块近期无溯源/预判记录</text>
+      <text class="as-sector-insight__empty-desc">
+        {{ candidate ? '该板块今日无溯源/预判记录，暂无洞察内容' : '该板块近期无溯源/预判记录' }}
+      </text>
     </view>
 
     <!-- 板块洞见卡（InsightCard 条件化形态） -->
@@ -74,6 +76,12 @@ const timeLabel = computed(() => {
 
 /** InsightCard 条件化预判结构化数据（映射自聚合接口 horizons/conditions/met；与 sector-loop 共用映射工具） */
 const structured = computed(() => sectorPredictionToStructured(props.candidate?.prediction))
+
+/** 是否有实际洞察内容（溯源结论或预判分支任一存在）；无 → 走占位而非空壳标题卡 */
+const hasContent = computed<boolean>(() => {
+  const s = structured.value
+  return Boolean(traceText.value || s?.horizons?.length || s?.conditions?.length)
+})
 </script>
 
 <style lang="scss" scoped>
