@@ -1,5 +1,8 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-03 修复 0.1.3 更新不弹窗（version.json 缓存命中旧版本号）
+- `src/shared/api/modules/appUpdate.ts`：`fetchLatestVersion` 请求 URL 追加 `?t=${Date.now()}` cache-busting——version.json 带 Etag/Last-Modified，无绕过会命中 HTTP/App 层缓存旧的 `versionCode`（如 102），即使线上已是 103 也会被 `latest<=current` 误判为"已最新"而不弹更新。本修复随下一个包生效；存量包可用「个人中心」手动检查**暂时无果**（同一旧包拉取代码仍无时间戳），需重装含本修复的新包。
+
 ## 2026-09-03 发布 0.1.3（versionCode 103）版本号升级
 - `src/manifest.json`：`versionName` 0.1.2 → 0.1.3，`versionCode` 102 → 103（打包依据）
 - 配套 aistock-frontend `public/download/version.json`：0.1.3 / 103 / `aistock-0.1.3.apk` / 更新文案与 releaseDate 2026-09-03（fileSize 待打包后按实际产物修正）
