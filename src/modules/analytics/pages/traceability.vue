@@ -88,7 +88,7 @@ import { traceDateCandidates } from '@/shared/utils/traceDate'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { toMarketTracePresentation, type MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 import MarketInsightCard from '@/modules/analytics/components/MarketInsightCard.vue'
-import AttributionChainView from '@/modules/market/components/AttributionChainView.vue'
+import AttributionChainView from '@/shared/components/AttributionChainView.vue'
 
 const loading = ref(false)
 const error = ref(false)

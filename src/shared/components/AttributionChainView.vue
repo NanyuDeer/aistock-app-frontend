@@ -43,12 +43,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import {
   fetchAttributionChain,
   type AttributionChain,
   type AttributionChainChild
-} from '../api/attributionChain'
+} from '@/shared/api/modules/attributionChain'
 
 const props = withDefaults(defineProps<{ date: string; mock?: boolean }>(), { mock: false })
 
@@ -57,40 +57,52 @@ const displayDate = computed(() => props.date)
 
 /**
  * 内置演示数据（mock=true 时渲染，供无链日/后端未生成时向老师演示）。
+ * 按当前展示日期动态构造：date 切换（watch 重拉）时 date 字段同步更新，不残留旧日。
  * 语义与后端组装契约一致：大盘根一句话 + 多主驱动板块分支（relation/pct/trace_summary）。
  */
-const MOCK_CHAIN: AttributionChain = {
-  date: displayDate.value,
-  root: {
-    type: 'market',
-    date: displayDate.value,
-    summary: '半导体材料与券商走弱拖累大盘',
-    index_pct: -1.2
-  },
-  children: [
-    { sector: '半导体材料', relation: 'self_driven', pct: -3, trace_summary: '美对华设备出口限制落地，产业链避险' },
-    { sector: '券商', relation: 'market_follow', pct: -0.8, trace_summary: '大盘情绪拖累，资金观望' }
-  ]
+function buildMockChain(date: string): AttributionChain {
+  return {
+    date,
+    root: {
+      type: 'market',
+      date,
+      summary: '半导体材料与券商走弱拖累大盘',
+      index_pct: -1.2
+    },
+    children: [
+      { sector: '半导体材料', relation: 'self_driven', pct: -3, trace_summary: '美对华设备出口限制落地，产业链避险' },
+      { sector: '券商', relation: 'market_follow', pct: -0.8, trace_summary: '大盘情绪拖累，资金观望' }
+    ]
+  }
 }
 
 const chain = ref<AttributionChain | null>(null)
 const loading = ref(false)
 
-onMounted(async () => {
+/** 按日期加载：mock → 内置演示数据；真实 → fetchAttributionChain（内部已 catch → null，此处兜底异常与 loading 结算） */
+async function load(date: string) {
   if (props.mock) {
-    chain.value = MOCK_CHAIN
+    chain.value = buildMockChain(date)
     return
   }
   loading.value = true
   try {
-    // fetchAttributionChain 内部已 catch → null，此处仅兜底异常与 loading 结算
-    chain.value = await fetchAttributionChain(displayDate.value)
+    chain.value = await fetchAttributionChain(date)
   } catch (e) {
     console.error('[AttributionChainView] load failed:', e)
     chain.value = null
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  void load(displayDate.value)
+})
+
+// date 变化（父页切日/回退报告日变化，组件实例复用不重建）时重拉，避免依赖父级卸载/重建机制
+watch(() => props.date, (d) => {
+  if (d) void load(d)
 })
 
 /** relation 徽文案：自驱动 / 跟随大盘 / 关系未知 */
@@ -100,16 +112,21 @@ function relText(relation: AttributionChainChild['relation']): string {
   return '关系未知'
 }
 
-/** 带符号百分号：+3.0% / -1.2% / 0.0% */
+/**
+ * 带符号百分号：+3.0% / -1.2% / 0.0%。
+ * 负零边界：toFixed(1) 对 -0.0/微小负值可能产出 '-0.0' → |n| < 0.05 统一归零显示
+ * （与 pctCls 判平同口径，避免「显示 -0.0% 却判跌」的不一致）。
+ */
 function fmtPct(n: number): string {
+  if (Math.abs(n) < 0.05) return '0.0%'
   return `${n > 0 ? '+' : ''}${n.toFixed(1)}%`
 }
 
-/** 涨跌 class（A 股红涨绿跌；0 平灰） */
+/** 涨跌 class（A 股红涨绿跌；舍入后为 0 判平灰——与 fmtPct 归零口径一致） */
 function pctCls(n: number): string {
+  if (Math.abs(n) < 0.05) return 'acv-flat'
   if (n > 0) return 'acv-up'
-  if (n < 0) return 'acv-down'
-  return 'acv-flat'
+  return 'acv-down'
 }
 
 /** 板块分支展示序：按 |pct| 降序稳定排序；pct 为 null 的分支排末尾（保持原相对顺序） */
@@ -123,7 +140,7 @@ const sortedChildren = computed(() => {
 </script>
 
 <style lang="scss" scoped>
-/* 外卡：白底描边圆角（与 modules/market 既有卡面一致：sl-row / SectorInsightCard） */
+/* 外卡：白底描边圆角（与既有 shared/market 卡面一致：sl-row / SectorInsightCard） */
 .acv {
   padding: $spacing-base;
   background: $bg-card;

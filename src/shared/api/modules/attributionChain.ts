@@ -1,10 +1,11 @@
 /**
- * 大盘归因链 API（行情/市场模块私有封装，P1 chain-attribution）
- * 对接 Node 代理域 GET /api/agent/attribution-chain/:date（baseURL 已含 /api，路径写 /agent/...，
- * 与 shared/api/modules/agent.ts 同模式）。
+ * 大盘归因链 API（agent 代理域共享封装，P1 chain-attribution）
+ * 2026-09-04 自 modules/market/api 提升至 shared/api/modules（消除 analytics → market 跨模块依赖），
+ * 与同目录 agent.ts 同模式：request.get<T> + baseURL 已含 /api，路径写 /agent/...。
+ * 对接 Node 代理域 GET /api/agent/attribution-chain/:date。
  * 后端返回 { date, chain | null }；无链日/接口异常 → null，由组件空态承接（不抛出）。
  */
-import request from '@/shared/api/request'
+import request from '../request'
 
 /** 归因链板块分支（relation：self_driven=自驱动 / market_follow=跟随大盘 / unknown=未入链语义） */
 export interface AttributionChainChild {

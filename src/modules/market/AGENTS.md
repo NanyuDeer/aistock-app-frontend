@@ -17,10 +17,6 @@
 - `components/NewsSlider.vue` - 资讯快讯滚动
 - `components/EventCard.vue` - 事件卡片
 - `components/EventChainGraph.vue` - 事件传导图
-- `components/AttributionChainView.vue` - 大盘归因链视图（2026-09-03 P1 chain-attribution：大盘根 → 主驱动板块分支，relation 徽（自驱动/跟随大盘/关系未知）+ 板块一句话溯源驱动卡；props `{ date, mock? }`，mock=true 渲染内置演示数据，无链/失败组件内空态承接；消费下方模块私有 API，展示页为 analytics/traceability（大盘溯源页））
-
-## API（模块私有）
-- `api/attributionChain.ts` - 大盘归因链 API（2026-09-03 P1；`fetchAttributionChain(date)` → `GET /api/agent/attribution-chain/:date`，返回 `{date, chain|null}`；无链/请求失败返回 null，不抛出；类型 `AttributionChain`/`AttributionChainChild` 同文件导出，供 components/AttributionChainView 与 pages/sector-detail「大盘联动」消费）
 
 ## Hooks
 （暂无模块专属 hooks）
@@ -29,6 +25,7 @@
 - 其他模块通过 navigateTo 跳转到异动捕手或长线风口页面
 
 ## 依赖的 shared/ 中的类型
+- `@/shared/api/modules/attributionChain` - 大盘归因链 API（2026-09-04 提升至共享层；`fetchAttributionChain(date)` → `GET /api/agent/attribution-chain/:date`，返回 `{date, chain|null}`；无链/失败返回 null；类型 `AttributionChain`/`AttributionChainChild` 同文件导出；消费方：analytics/traceability 经共享组件 AttributionChainView，sector-detail「大盘联动」待接入）
 - `@/shared/api/modules/stock` - 股票 API（含 getTrendEvents、getFavoritesNews、getWindLeaders）
 - `@/shared/utils/stock` - 股票格式化工具
 - `@/shared/utils/datetime` - 日期时间格式化
