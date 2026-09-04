@@ -501,6 +501,7 @@ export interface RhythmBranch {
   touch_strength?: number | null
   conclusion: { direction: 'bullish' | 'bearish' | 'neutral'; range?: string; validity: number; note?: string }
   event_ref?: { event_date: string; title: string }
+  met?: boolean | null
 }
 export interface RhythmCard {
   score?: number | null
