@@ -2,6 +2,7 @@
  * 板块研判（sector-insight 聚合）辅助工具：候选匹配 + 本地日期。
  */
 import type { SectorInsightCandidate, SectorInsightPrediction } from '@/shared/api/modules/agent'
+import type { AttributionChain, AttributionChainChild } from '@/shared/api/modules/attributionChain'
 import { expandConditionalBranches } from '@/shared/utils/conditionalForecast'
 
 /** 条件化预判块（ConditionalForecastBlock）的输入形态（与 InsightCard.structured 结构性一致） */
@@ -101,4 +102,45 @@ export function todayDateStr(): string {
   const mo = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
   return `${d.getFullYear()}-${mo}-${dd}`
+}
+
+/**
+ * 板块「大盘联动」（P1 chain-attribution，2026-09-04）：
+ * 当前板块在当日大盘归因链中的角色数据，供板块洞见卡溯源行（InsightCard traceStructured）使用。
+ */
+export interface SectorMarketLink {
+  /** 大盘一句话（chain.root.summary，如归因综述） */
+  summary: string
+  /** 大盘指数涨跌幅（chain.root.index_pct） */
+  index_pct: number | null
+  /** 本板块在链上的关系；null = 当日未入链（大盘主因中无本板块） */
+  relation: 'self_driven' | 'market_follow' | null
+  /** 本板块驱动一句话（入链时 = child.trace_summary） */
+  driver: string
+}
+
+/** 关系徽文案：自驱动 / 跟随大盘；未入链/unknown → 空（不渲染徽） */
+export function relationLabel(relation: AttributionChainChild['relation'] | null | undefined): string {
+  if (relation === 'self_driven') return '自驱动'
+  if (relation === 'market_follow') return '跟随大盘'
+  return ''
+}
+
+/**
+ * 由大盘归因链构建当前板块的「大盘联动」数据：
+ * - 无链 → null（洞见卡溯源行回退板块四环文本形态）；
+ * - 链存在 → 按板块名匹配 children（unknown/未命中 → relation=null 未入链语义）。
+ */
+export function buildMarketLink(
+  chain: AttributionChain | null | undefined,
+  sectorName: string
+): SectorMarketLink | null {
+  if (!chain) return null
+  const node = (chain.children ?? []).find((c) => c.sector === sectorName)
+  return {
+    summary: chain.root?.summary?.trim() || '',
+    index_pct: chain.root?.index_pct ?? null,
+    relation: node?.relation && node.relation !== 'unknown' ? node.relation : null,
+    driver: node?.trace_summary?.trim() || ''
+  }
 }

@@ -21,8 +21,39 @@
     <!-- 分隔线 -->
     <view class="as-insight-card__divider" />
 
-    <!-- 溯源（横幅卡：蓝） -->
-    <view v-if="trace" class="as-insight-card__line as-insight-card__line--trace">
+    <!-- 多要点行（优势/风险/建议等）：key 固定宽 + 正文，tone 语义底色 -->
+    <view v-if="lines.length" class="as-insight-card__lines">
+      <view
+        v-for="(l, i) in lines"
+        :key="i"
+        :class="['as-insight-card__line', 'as-insight-card__line--point', l.tone ? `is-${l.tone}` : 'is-default']"
+      >
+        <text class="as-insight-card__key">{{ l.key }}</text>
+        <text class="as-insight-card__text">{{ l.text }}</text>
+      </view>
+    </view>
+
+    <!-- 溯源：结构化大盘联动形态（溯源蓝卡双行：大盘一句话行 + 角色徽驱动行；traceStructured 传入优先于文本 trace） -->
+    <view v-if="traceStructured" class="as-insight-card__line as-insight-card__line--trace">
+      <text class="as-insight-card__key">溯源</text>
+      <view class="as-insight-card__tlk">
+        <text class="as-insight-card__tlk-sum">{{ traceStructured.summary }}</text>
+        <text
+          v-if="traceStructured.index_pct != null"
+          class="as-insight-card__tlk-pct"
+          :class="pctDirClass(traceStructured.index_pct)"
+        >
+          {{ fmtSignedPct(traceStructured.index_pct) }}
+        </text>
+      </view>
+      <view v-if="traceStructured.badge" class="as-insight-card__tlk-drv">
+        <text class="as-insight-card__tlk-badge">{{ traceStructured.badge }}</text>
+        <text class="as-insight-card__tlk-drv-text">{{ traceStructured.detail }}</text>
+      </view>
+    </view>
+
+    <!-- 溯源（横幅卡：蓝，文本形态兼容旧用法） -->
+    <view v-else-if="trace" class="as-insight-card__line as-insight-card__line--trace">
       <text class="as-insight-card__key">溯源</text>
       <text class="as-insight-card__text">{{ trace }}</text>
     </view>
@@ -35,6 +66,9 @@
       <text class="as-insight-card__key">预判</text>
       <text class="as-insight-card__text">{{ forecast }}</text>
     </view>
+
+    <!-- 自定义尾部内容（默认 slot：用于承载量化统计块等卡片底部补充，如恐贪页冰点反弹统计） -->
+    <slot />
 
     <!-- 底部 meta -->
     <view v-if="showMeta" class="as-insight-card__foot">
@@ -112,19 +146,48 @@ interface InsightStructuredForecast {
   verification?: Verification | null
 }
 
+/** 多要点行（如财报 优势/风险/建议）；tone 决定行底色语义 */
+interface InsightLine {
+  /** 要点名，如 "优势" / "风险" / "建议" */
+  key: string
+  text: string
+  /** 语义底色：positive=机会(红涨) / risk=风险(金) / 缺省=中性 */
+  tone?: 'positive' | 'risk' | 'default'
+}
+
+/**
+ * 溯源行结构化形态（V2 大盘联动，2026-09-04）：
+ * 溯源蓝卡内双行展示 —— ①大盘一句话 + 指数涨跌右对齐；②板块角色徽（自驱动/跟随大盘）+ 驱动一句话。
+ * 未入链（badge 缺省）时只渲染大盘行。传入优先于文本形态 trace；组件保持纯 UI。
+ */
+interface InsightTraceStructured {
+  /** 首行：大盘一句话（如当日归因综述） */
+  summary: string
+  /** 大盘指数涨跌幅（右对齐；null 不显示） */
+  index_pct?: number | null
+  /** 板块角色徽文案（"自驱动"/"跟随大盘"；缺省 → 仅大盘行，未入链语义） */
+  badge?: string
+  /** 角色徽后驱动一句话（入链时） */
+  detail?: string
+}
+
 const props = withDefaults(defineProps<{
   /** 洞见类型 */
   type?: InsightType
   /** 结论标题（一句话说清现象） */
   title: string
-  /** 溯源：原因说明 */
+  /** 溯源：原因说明（文本形态；traceStructured 传入时忽略） */
   trace?: string
+  /** 溯源行结构化形态（大盘联动双行；传入优先于 trace 文本行） */
+  traceStructured?: InsightTraceStructured | null
   /** 预判：后续走向（文本形态，structured 传入时忽略） */
   forecast?: string
   /** 标签词覆盖（如板块卡传 tag-text="板块洞见"，剥"洞见"后缀后显示"板块"）；缺省按 type 取短词 */
   tagText?: string
   /** 条件化预判结构化数据（传入则渲染期段切换的预判块） */
   structured?: InsightStructuredForecast | null
+  /** 多要点行（优势/风险/建议等，渲染于分隔线后、溯源前；不依赖 trace/forecast/structured） */
+  lines?: InsightLine[]
   /** 时间，如 '08-21 · 09:10' */
   time?: string
   /** 主题：light 亮色列表卡 / dark 深蓝研报卡 */
@@ -136,9 +199,11 @@ const props = withDefaults(defineProps<{
 }>(), {
   type: 'emotion',
   trace: '',
+  traceStructured: null,
   forecast: '',
   tagText: '',
   structured: null,
+  lines: () => [],
   time: '',
   theme: 'light',
   showMeta: false,
@@ -162,6 +227,21 @@ const typeWord = computed(() => {
   const t = props.tagText?.trim()
   return t ? t.replace(/洞见$/, '') : typeLabelMap[props.type]
 })
+
+/**
+ * 带符号百分号：+1.2% / -1.2% / 0.0%。
+ * 负零边界：|n| < 0.05 统一归零显示（与 pctDirClass 判平同口径）。
+ */
+function fmtSignedPct(n: number): string {
+  if (Math.abs(n) < 0.05) return '0.0%'
+  return `${n > 0 ? '+' : ''}${n.toFixed(1)}%`
+}
+
+/** 涨跌 class（A 股红涨绿跌；舍入为 0 判平） */
+function pctDirClass(n: number): string {
+  if (Math.abs(n) < 0.05) return 'is-flat'
+  return n > 0 ? 'is-up' : 'is-down'
+}
 
 const handleClick = () => {
   emit('click')
@@ -260,6 +340,9 @@ const handleClick = () => {
   --ins-fc-bd: #e3e6ec;
   --ins-fc-key: #181b22;
   --ins-card-tx: #5e6673;
+  /* 结构化溯源涨跌（A 股红涨绿跌，随主题切换明暗） */
+  --ins-up: #e03e3e;
+  --ins-down: #0e9f5f;
 }
 
 .as-insight-card--dark {
@@ -270,6 +353,8 @@ const handleClick = () => {
   --ins-fc-bd: rgba(255, 255, 255, 0.12);
   --ins-fc-key: #cfd8ff;
   --ins-card-tx: rgba(255, 255, 255, 0.74);
+  --ins-up: #f87171;
+  --ins-down: #34d399;
 }
 
 .as-insight-card__line {
@@ -302,6 +387,57 @@ const handleClick = () => {
   }
 }
 
+/* ===== 溯源行结构化（V2 大盘联动：大盘一句话行 + 角色徽驱动行） ===== */
+.as-insight-card__tlk {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+}
+
+.as-insight-card__tlk-sum {
+  flex: 1;
+  min-width: 0;
+  font-size: $font-size-sm;
+  line-height: $lh-base;
+  color: var(--ins-trace-key);
+}
+
+.as-insight-card__tlk-pct {
+  flex-shrink: 0;
+  font-size: $font-size-sm;
+  font-weight: 700;
+
+  &.is-up { color: var(--ins-up); }
+  &.is-down { color: var(--ins-down); }
+  &.is-flat { color: var(--ins-card-tx); }
+}
+
+.as-insight-card__tlk-drv {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+  margin-top: $s-1;
+}
+
+/* 角色徽：描边文字徽（沿 AttributionChainView 关系徽同款，中性描边、key 色文字） */
+.as-insight-card__tlk-badge {
+  flex-shrink: 0;
+  padding: 2rpx 12rpx;
+  border: 1rpx solid var(--ins-trace-bd);
+  border-radius: $r-md;
+  font-size: $font-size-xs;
+  font-weight: 700;
+  color: var(--ins-trace-key);
+}
+
+.as-insight-card__tlk-drv-text {
+  flex: 1;
+  min-width: 0;
+  font-size: $font-size-xs;
+  line-height: 1.6;
+  color: var(--ins-card-tx);
+}
+
 /* 预判（文本形态）子卡：浅中性（structured 形态由 ConditionalForecastBlock 同款呈现） */
 .as-insight-card__line--forecast {
   background: var(--ins-fc-bg);
@@ -309,6 +445,54 @@ const handleClick = () => {
 
   .as-insight-card__key {
     color: var(--ins-fc-key);
+  }
+}
+
+/* 多要点行（优势/风险/建议）：key 固定宽横排 + 语义底色（财报洞见等用，2026-09-03 补充） */
+.as-insight-card__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.as-insight-card__line--point {
+  display: flex;
+  align-items: flex-start;
+  gap: $s-2;
+  padding: 12rpx 16rpx;
+  border-radius: $r-sm;
+  background: $bg-soft;
+
+  .as-insight-card__key {
+    display: block;
+    flex: 0 0 72rpx;
+    font-size: $font-size-xs;
+    color: $ink;
+    margin-bottom: 0;
+  }
+
+  .as-insight-card__text {
+    flex: 1;
+    min-width: 0;
+    font-size: $font-size-xs;
+    line-height: 1.6;
+    color: $ink-soft;
+  }
+}
+
+.as-insight-card__line--point.is-positive {
+  background: $up-soft;
+
+  .as-insight-card__key {
+    color: $up;
+  }
+}
+
+.as-insight-card__line--point.is-risk {
+  background: $warning-soft;
+
+  .as-insight-card__key {
+    color: $warning;
   }
 }
 
@@ -370,5 +554,14 @@ const handleClick = () => {
   .wm-tag--event   { --wm-color: #{$insight-event-light}; }
   .wm-tag--market  { --wm-color: #{$insight-market-light}; }
   .wm-tag--trend   { --wm-color: #{$insight-trend-light}; }
+
+  /* 多要点行（dark 下统一半透明底，tone 仅 key 强调） */
+  .as-insight-card__line--point,
+  .as-insight-card__line--point.is-positive,
+  .as-insight-card__line--point.is-risk {
+    background: rgba($white, 0.06);
+  }
+  .as-insight-card__line--point .as-insight-card__key { color: $white; }
+  .as-insight-card__line--point .as-insight-card__text { color: rgba($white, 0.74); }
 }
 </style>

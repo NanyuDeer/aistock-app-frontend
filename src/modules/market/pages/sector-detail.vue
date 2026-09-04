@@ -28,6 +28,17 @@
           <StatGrid :items="sectorStatItems" :columns="3" />
         </Card>
 
+        <!-- 板块研判（板块四环聚合命中当前板块 → 洞见卡；无命中但有归因链入链 → 大盘联动溯源行）置于 AI 分析上方 -->
+        <view class="sector-insight-box">
+          <SectorInsightCard
+            :candidate="sectorInsight"
+            :loading="insightLoading"
+            :date="insightDate"
+            :market-link="marketLink"
+            :sector-name="sector.name"
+          />
+        </view>
+
         <!-- 改动2+5: AI 分析 + 层级流向图 SVG -->
         <view v-if="analysisRows.length || flowChartData" class="ai-card">
           <text class="section-title">AI 分析</text>
@@ -58,11 +69,6 @@
               <text :class="['ai-value', row.risk ? 'risk' : '']">{{ row.value }}</text>
             </view>
           </view>
-        </view>
-
-        <!-- 板块研判（板块四环聚合命中当前板块 → 洞见卡；加载中/无数据 → 占位） -->
-        <view class="sector-insight-box">
-          <SectorInsightCard :candidate="sectorInsight" :loading="insightLoading" :date="insightDate" />
         </view>
 
         <!-- 板块K线（近120日，同花顺板块指数日线）；加载失败(数据为null)时整卡隐藏 -->
@@ -277,7 +283,9 @@ import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SectorInsightCard from '@/shared/components/SectorInsightCard.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, StatGrid, Modal, KLineChart } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
-import { findSectorCandidate, todayDateStr } from '@/shared/utils/sectorInsight'
+import { findSectorCandidate, todayDateStr, buildMarketLink } from '@/shared/utils/sectorInsight'
+import type { SectorMarketLink } from '@/shared/utils/sectorInsight'
+import { fetchAttributionChain } from '@/shared/api/modules/attributionChain'
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -292,6 +300,9 @@ const klineLoading = ref(false)
 const sectorInsight = ref<SectorInsightCandidate | null>(null)
 const insightLoading = ref(false)
 const insightDate = ref('')
+
+/** 大盘联动（板块在大盘归因链中的角色；无链 → null，洞见卡溯源行回退四环文本） */
+const marketLink = ref<SectorMarketLink | null>(null)
 
 function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
@@ -614,7 +625,7 @@ function openStockModal(stock: WindLeaderStock) {
   modalVisible.value = true
 }
 
-/** 板块研判：取最近交易日的 sector-insight 聚合，匹配当前板块候选；失败/无数据置 null（不阻断主流程） */
+/** 板块研判：取最近交易日的 sector-insight 聚合匹配当前板块候选；同日拉大盘归因链算「大盘联动」角色（P1 chain-attribution） */
 async function loadSectorInsight() {
   const cur = sector.value
   if (!cur?.name) return
@@ -624,11 +635,21 @@ async function loadSectorInsight() {
     const days = await agentApi.getRecentTradingDays(todayDateStr(), 1)
     const tradeDate = days?.length ? days[days.length - 1] : todayDateStr()
     insightDate.value = tradeDate
-    const res = await agentApi.getSectorInsight(tradeDate)
+    // 板块研判聚合与大盘归因链并行（fetchAttributionChain 内部已兜底 → null；研判失败置 null 不阻断链）
+    const [res, chain] = await Promise.all([
+      agentApi.getSectorInsight(tradeDate).catch((e) => {
+        console.error('板块研判加载失败:', e)
+        return null
+      }),
+      fetchAttributionChain(tradeDate)
+    ])
     sectorInsight.value = findSectorCandidate(res?.candidates ?? [], { name: cur.name, code: cur.code })
+    // 大盘联动：同日归因链命中当前板块 → 溯源行升级为「大盘一句话 + 角色徽 + 驱动句」；无链 → null 回退
+    marketLink.value = buildMarketLink(chain, cur.name)
   } catch (error) {
     console.error('板块研判加载失败:', error)
     sectorInsight.value = null
+    marketLink.value = null
   } finally {
     insightLoading.value = false
   }
