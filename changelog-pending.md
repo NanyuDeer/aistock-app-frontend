@@ -1,5 +1,9 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-03 insight-detail-move 接入真实 forecast（Task4）
+- `src/modules/favorites/pages/insight-detail-move.vue`：新增 `forecastSlot` computed（从 `detail.forecast` 取 `close ?? midday` 解析为 `ForecastSlotPayload`）；洞见卡预判字段改为取真实 summary（不再恒空）；新增"预判区"区块渲染完整 conditions 列表（condition/scenario/anchor）；底部显示 slot 标识（基于收盘/午盘预判）。引入 `ForecastSlotPayload` 类型（来自 insightCards.ts）。
+- 文档：`src/modules/favorites/AGENTS.md` 新增预判区说明。`InsightDetailLayout.spec.ts` / `insight-detail.spec.ts` 无 forecast 相关断言，无需更新。
+
 ## 2026-09-02 板块四环弱溯源还原 + 条件卡内文本拆分（全粒度）
 - `src/modules/market/pages/sector-loop.vue`：还原弱溯源原文（不再替换为短标签），改用**溯源横幅样式**（浅蓝底 + “溯源” key，对齐洞见卡）展示在预判块上方；头行第 2 行只保留来源 tag + 右侧日期/验证文案。
 - `src/shared/utils/conditionalForecast.ts`（新增）：`expandConditionalBranches`——把 scenario 内嵌“；若X则Y”的对冲/后续情形拆成独立条件条目（方向/锚点置空随主卡），解决一张条件卡里多段文本“杂糅”。
@@ -36,3 +40,5 @@
 
 ## 2026-09-02 大盘条件化预判前端展示升级（MarketTracePrediction）
 - `src/modules/analytics/components/MarketTracePrediction.vue`：条件化预判区由"蓝缘平铺列表"升级为**按期段（短/中/长，按 anchor.horizon 分组）的分支卡**——每组含档位标题 + 该档基准方向 pill（取 horizons 同期 direction）+ 互斥分支（序号 + 若[条件] → 方向 pill + scenario + anchor 阈值/指标 chips）；不再用洞见组件（prediction-detail/市场洞见展开两页面共用本组件，大盘条件化预判 now 后即自动展示分组分支）。注释定位"大盘/板块/个股有条件化预判同构展示"。
+
+- 2026-09-03: 自选股洞察阶段3+4 — AlertContent 自选股洞察块升级为按股票聚合卡（Segmented 全部/预判/溯源 + 溯源区/预判区/情报折叠/AI解读，复用 insightCards.ts buildInsightCards/cardInTab/parseForecastSlot）；详情页 insight-detail-move 接入真实 forecast（close??midday，洞见卡预判字段不再恒空 + conditions 预判区，独立于归因完成守卫）；insight.vue 列表加 forecast 摘要行；app-api 公开情报接口透出 stock_info_judgements.forecast（monitor/service + crawler queryJudgements 等 SELECT/类型/映射）；涨停文案改用 is_limit_up（删 9.5% 启发式）；重大判定改用 ai_impact

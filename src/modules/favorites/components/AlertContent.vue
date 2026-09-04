@@ -1,7 +1,7 @@
 <template>
   <view class="alert-content">
     <view class="content-wrap">
-      <!-- 自选股洞察模块：预览自选股涨停雷达事件的归因结果，点击进入异动监控/洞察详情 -->
+      <!-- 自选股洞察模块：预览自选股价格异动的归因结果，点击进入异动监控/洞察详情 -->
       <view class="alert-module">
         <view class="module-card">
           <view class="module-decor"></view>
@@ -83,6 +83,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { useUserStore } from '@/shared/store/modules/user'
+import { isUnattributableMovement } from './insightCards'
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -151,8 +152,9 @@ function fromMovement(m: StockTraceEvent): CaptureItem {
 async function loadCaptureList() {
   // 2026-08-30 链路合并：涨停雷达事件已并入 stock-trace（movements），列表只消费 movements
   try {
-    const page = await stockTraceApi.list(3).catch(() => ({ items: [] as StockTraceEvent[] }))
-    captureList.value = page.items.map(fromMovement).sort((a, b) => b.sortTime - a.sortTime)
+    const page = await stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] }))
+    const attributable = (page.items ?? []).filter((m) => !isUnattributableMovement(m))
+    captureList.value = attributable.map(fromMovement).sort((a, b) => b.sortTime - a.sortTime)
   } catch {
     captureList.value = []
   }
@@ -226,10 +228,10 @@ const intelRows = computed<Array<IntelItem | null>>(() => {
 })
 
 /**
- * 异动捕手列表固定渲染 4 行：数据不足时空行占位，
+ * 异动捕手列表固定渲染 6 行：数据不足时空行占位，
  * 卡片纵向长度不随数据量变化（避免只有 1 条资讯时卡片变矮）
  */
-const CAPTURE_ROW_COUNT = 4
+const CAPTURE_ROW_COUNT = 6
 const captureRows = computed<Array<CaptureItem | null>>(() => {
   const rows: Array<CaptureItem | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
   while (rows.length < CAPTURE_ROW_COUNT) rows.push(null)

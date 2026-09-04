@@ -45,7 +45,7 @@
     {
       "path": "modules/favorites/pages/monitor",
       "style": {
-        "navigationBarTitleText": "异动监控",
+        "navigationBarTitleText": "自选股异动",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }

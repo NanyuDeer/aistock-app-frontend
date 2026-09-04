@@ -91,7 +91,7 @@ vi.mock('@dcloudio/uni-app', () => ({
 
 import monitor from './monitor.vue'
 
-describe('monitor.vue 异动监控页', () => {
+describe('monitor.vue 自选股异动页', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     insightApiMock.getInsights.mockReset()
