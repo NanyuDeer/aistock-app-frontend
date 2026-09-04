@@ -36,6 +36,12 @@
       <view v-else class="report-content">
         <MarketInsightCard :presentation="presentation" />
 
+        <!-- 大盘归因链（P1 chain-attribution）：大盘根 → 主驱动板块分支（relation 徽 + 一句话驱动卡）；
+             链空/接口失败由组件内空态承接（无链日不报错，不阻断报告内容） -->
+        <view class="chain-view-block">
+          <AttributionChainView :date="displayedDate" />
+        </view>
+
         <!-- 主因板块 · 板块研判：仅当日存在大盘主因候选（review_primary/both）时渲染；
              拉取失败静默置空 → 整块不渲染，不阻断主内容 -->
         <view v-if="primarySectorCandidates.length" class="primary-sector-block">
@@ -82,6 +88,7 @@ import { traceDateCandidates } from '@/shared/utils/traceDate'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { toMarketTracePresentation, type MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 import MarketInsightCard from '@/modules/analytics/components/MarketInsightCard.vue'
+import AttributionChainView from '@/modules/market/components/AttributionChainView.vue'
 
 const loading = ref(false)
 const error = ref(false)
@@ -290,6 +297,11 @@ onUnload(stopRefreshTimer)
   font-size: 26rpx;
   color: $primary;
   font-weight: 500;
+}
+
+/* ===== 大盘归因链（水平内边距与 MarketInsightCard/主因板块对齐） ===== */
+.chain-view-block {
+  padding: $spacing-xs $spacing-base 0;
 }
 
 /* ===== 主因板块 · 板块研判（卡外小标题 + SectorInsightCard，水平内边距与 MarketInsightCard 对齐） ===== */
