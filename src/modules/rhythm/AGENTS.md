@@ -8,12 +8,12 @@
 
 ## 页面 / 组件清单
 
-| 文件                          | 说明                                                                                                                                 |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `pages/index.vue`           | 节奏大师详情页（SubPageCard2 容器；内容流 = 顶部 **RhythmCalendarPanel**（折叠近 7 日紧凑条 / 展开 60 交易日周网格，仓位/事件 Segmented；事件模式 = macro 角标 + 选中日事件行）+ 三时点 pill / 沿用前值 fallback + **节奏洞见卡**（InsightCard 摘要：仓位/档位/interval 分支上移）→ RhythmCard（明细已去重瘦身）+ EmptyState 兜底）                          |
-| `components/RhythmCalendarPanel.vue` | 顶部可折叠双模式日历面板（2026-09-03）：折叠 = 近 7 交易日紧凑条（左旧右新，点格切日）；展开 = 60 交易日自然周网格（默认展开，`rhythm.calendar.expanded` storage 记忆）；仓位/事件 Segmented 仅展开态；事件模式 = macro 角标（high 红点计数 / medium-low 灰点）+ 选中日事件行；点格以 `pick` 事件上抛切日（不导航） |
-| `components/RhythmCard.vue` | 状态卡组件（瘦身后保留：score + 五档色带 / 情绪周期 chip / 温度曲线 / 事件日历 / conflict / data_missing；仓位长句、档位 chip、证据行、关键节点分支已上移洞见卡——**同屏去重**）                                                                                               |
-| `utils/rhythmInsight.ts`    | 洞见卡映射（2026-09-03）：`toRhythmInsight(card, slot, date)` → `RhythmInsightCard`（结构化子集对齐 ConditionalForecastBlock/InsightCard 入参；不可拼装返回 null → 整卡不渲染）                                                                                    |
+| 文件                                   | 说明                                                                                                                                                                                                                                          |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pages/index.vue`                    | 节奏大师详情页（SubPageCard2 容器；内容流 = 顶部 **RhythmCalendarPanel**（折叠近 7 日紧凑条 / 展开 60 交易日周网格，仓位/事件 Segmented；事件模式 = macro 角标 + 选中日事件行）+ 三时点 pill / 沿用前值 fallback + **节奏洞见卡**（InsightCard 摘要：仓位/档位/interval 分支上移）→ RhythmCard（明细已去重瘦身）+ EmptyState 兜底） |
+| `components/RhythmCalendarPanel.vue` | 顶部可折叠双模式日历面板（2026-09-03）：折叠 = 近 7 交易日紧凑条（左旧右新，点格切日）；展开 = 60 交易日自然周网格（默认展开，`rhythm.calendar.expanded` storage 记忆）；仓位/事件 Segmented 仅展开态；事件模式 = macro 角标（high 红点计数 / medium-low 灰点）+ 选中日事件行；点格以 `pick` 事件上抛切日（不导航）                             |
+| `components/RhythmCard.vue`          | 状态卡组件（瘦身后保留：score + 五档色带 / 情绪周期 chip / 温度曲线 / 事件日历 / conflict / data\_missing；仓位长句、档位 chip、证据行、关键节点分支已上移洞见卡——**同屏去重**）                                                                                                                      |
+| `utils/rhythmInsight.ts`             | 洞见卡映射（2026-09-03）：`toRhythmInsight(card, slot, date)` → `RhythmInsightCard`（结构化子集对齐 ConditionalForecastBlock/InsightCard 入参；不可拼装返回 null → 整卡不渲染）                                                                                            |
 
 ## 首页节奏卡（modules/home/components/MorningContent.vue）
 
@@ -25,9 +25,9 @@
 
 - `agentApi.getRhythmMaster(date)`（`src/shared/api/modules/agent.ts`）：GET `/agent/rhythm-master/:date`，返回 `{ date, versions: [{ refresh_slot, created_at, content }] }`
 
-- `agentApi.getRhythmMasterCalendar(days)`：GET `/agent/rhythm-master/calendar?days=N`（N 默认 60，≤60 交易日），返回 `{ days: [{ date, refresh_slot, level, score, basis_date, position_band, events? }] }`，恒取 after\_close 收盘基准行（三时点 level 恒等）。**`position_band`（2026-09-02 扩展）：该日收盘基准建议仓位** **`{min?, max?, text?}`，行缺失/null = 无仓位语义（如实展示）**，供日历面板/详情页与首页近 5 日摘要使用。**`events`（2026-09-03 扩展）：该日 macro 事件行**（CN + US 隔夜按对外契约顺延；类型标可选 `events?` 以兼容缺省/降级响应——**后端恒下发，无事件 = `[]`**）
+- `agentApi.getRhythmMasterCalendar(days)`：GET `/agent/rhythm-master/calendar?days=N`（N 默认 60，≤60 交易日），返回 `{ days: [{ date, refresh_slot, level, score, basis_date, position_band, events? }] }`，恒取 after\_close 收盘基准行（三时点 level 恒等）。**`position_band`（2026-09-02 扩展）：该日收盘基准建议仓位** **`{min?, max?, text?}`，行缺失/null = 无仓位语义（如实展示）**，供日历面板/详情页与首页近 5 日摘要使用。**`events`（2026-09-03 扩展）：该日 macro 事件行**（CN + US 隔夜按对外契约顺延；类型标可选 `events?` 以兼容缺省/降级响应——**后端恒下发，无事件 =** **`[]`**）
 
-- **洞见卡映射与去重（2026-09-03）**：详情页 RhythmCard 前插入统一摘要洞见卡（InsightCard，type=market / tag-text=节奏洞见）；洞见卡映射规则（owner 表 + structured 规则）与 RhythmCard 去重清单见实施计划 docs/superpowers/plans/2026-09-03-rhythm-calendar-inline-panel.md（Task 4/6）与 `utils/rhythmInsight.ts`（toRhythmInsight）
+- **洞见卡映射与去重（2026-09-03）**：详情页 RhythmCard 前插入统一摘要洞见卡（InsightCard，type=market / tag-text=节奏洞见）；洞见卡映射规则（owner 表 + structured 规则）与 RhythmCard 去重清单见实施计划 docs/superpowers/plans/2026-09-03-rhythm-calendar-inline-panel.md（Task 4/6）与 `utils/rhythmInsight.ts`（toRhythmInsight）。**2026-09-04 扩展**：事件分支（`kind='enum'`）已纳入 structured——`condition = indicator + value`（如 `CPI 数据公布预期差超预期`，取 `value` 防 label 错位），`met` 透传用于点亮/置灰。
 
 - 三时点标识 `refresh_slot`：`'after_close' | 'morning' | 'midday'`
 
@@ -76,15 +76,23 @@
 ## 预判分支契约（RhythmBranch v2，2026-09-03）
 
 - `branch` 结构新增 **`position_action`（结构化仓位动作，需求方核心）**：`{ direction: 'add'|'reduce'|'hold', change: string, band?: RhythmPositionBand|null }`——`change` 为成数文案（如 `"+2 成"`/`"-1 成"`/`"持仓不变"`），由后端确定性算法算，前端不臆断；`add`→加仓、`reduce`→减仓、`hold`→观望。
+
 - 新增 **`anchor`（可验证锚点）**：`{ metric: 'index_close'|'close'|'high'|'low', threshold: string, direction: 'bullish'|'bearish'|'neutral' }`——供验证器机械判 hit/miss。
+
 - 新增 **`touch_strength`（历史触碰强度）**：`number|null`，**非命中概率**，与 `validity`（有效天数）语义分离。
+
 - `conclusion.range` 降级为辅助（scenario 参考），不再当主输出。
+
 - `position_action` / `anchor` 为可选（`?`），旧报告无则回退展示。
+
+- 新增 **`met`（事件分支公布后标记）**：`boolean|null`——公布后已实现 `true`（点亮）、未实现 `false`（置灰）、未公布 `null`（待观察）。事件分支（`kind='enum'`）公布前 `range=""`、`note="结果待公布，公布后按预期差落档"`、`met=null`；公布后命中预期差的分支 `met=true` 并回填 `range`（engine 确定性取），其余同事件分支 `met=false`。
 
 ## 日历面板数据源（2026-09-03）
 
 - 展开态（iOS 日历样式）：`getRhythmMasterCalendar(60, 60)` 走 **`naturalDays=60`** 拉近 60 自然日（**含周末/节假日**），渲染完整自然月网格 + 翻页（上月/下月/今天）；周末/节假日格 `level=null` 灰格如实展示但**可 pick**（看该日 macro 事件）。
+
 - 折叠态（近 7 交易日紧凑条）：`getRhythmMasterCalendar(60)` 走 **`days=60`（交易日）**，**只展示交易日**（周末不混入）——两数据源独立。
+
 - 事件角标/模式（high 红点 / medium-low 灰点）语义不变。
 
 ## 约束
