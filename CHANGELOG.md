@@ -2,6 +2,24 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [changer] 2026-09-04 — 节奏大师预判结论结构化 + 日历改 iOS 样式（含周末）
+
+**开发者**: 37588
+
+### 新增
+- `shared/api/modules/agent.ts`：`RhythmBranch` 契约新增 `position_action`（direction=add/reduce/hold + change 成数 + band）、`anchor`（metric/threshold/direction）、`touch_strength`；新增 `RhythmPositionAction`/`RhythmAnchor` 接口（均可选，向后兼容）
+- `shared/components/ConditionalForecastBlock.vue`：`StructuredCondition` 补 `positionAction`/`anchor`，渲染结构化仓位动作徽标（加仓/减仓/观望 + 成数）与验证锚点 chip
+- `modules/rhythm/utils/rhythmInsight.ts`：`RhythmInsightCondition` 补 `direction`/`positionAction`/`anchor`；`toCondition` 透传后端 `position_action`/`anchor`
+
+### 改进
+- `modules/rhythm/components/RhythmCalendarPanel.vue`：展开态从"60 交易日自然周网格"改为 **iOS 日历样式**（按月铺满全部自然日含周末/节假日，可翻页上月/下月/今天，标题"YYYY年M月"）；周末/节假日格 `level=null` 灰格如实展示但仍可选中查看该日 macro 事件；折叠态近 7 交易日紧凑条保持交易日数据源（周末不混入）；`selectedEvents` 对周末格回退到自然日源查找事件
+- `shared/api/modules/agent.ts`：`getRhythmMasterCalendar(days, naturalDays)` 支持 `naturalDays` 参数（展开态走自然日模式、折叠态走交易日模式，两数据源独立）
+
+### 文档
+- `modules/rhythm/AGENTS.md`：补充 RhythmBranch v2 预判分支契约与日历面板双数据源说明
+
+---
+
 ## [master] 2026-09-03 — 预判句关键词化（scenario_keywords 生成链路 + 若·则展示）
 
 **开发者**: Aria
@@ -64,6 +82,7 @@
 - 同时将图表曲线 / 5/20/60 均线 / 冰点反弹统计的数据源由「DB `historySnapshots` 日均值优先、回退 `history.scores`」统一为仅用 `history.scores`（calculator 日级序列，覆盖近 3 个月）——因 `historySnapshots` 为日内粒度、DB 仅当天数据时图表曾只显示当日；`historySnapshots` 字段保留给其他日内消费方，不再被本页图表引用
 
 ---
+
 ## [master] 2026-09-03 — 板块洞见卡标题改用 LLM 一句话研判（去板块名+涨跌幅）
 
 **开发者**: Aria

@@ -5,6 +5,11 @@ export interface RhythmInsightCondition {
   horizon: 'short'
   condition: string
   scenario: string
+  /** 情景方向（自挂，可与同档基准方向相反） */
+  direction?: 'bullish' | 'bearish' | 'neutral'
+  /** 结构化仓位动作（add/reduce/hold + 成数，如 "+2 成"；后端 position_action 透传） */
+  positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string; band?: { min?: number | null; max?: number | null; text?: string } | null }
+  /** 验证锚点（阈值/指标；括号兜底或后端 anchor 透传） */
   anchor?: { threshold?: string; metric?: string }
 }
 export interface RhythmInsightStructured {
@@ -37,8 +42,11 @@ function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
     horizon: 'short',
     condition: main,
     scenario: [note, range].filter(Boolean).join(' '),
+    direction: b.conclusion.direction,
+    positionAction: b.position_action,
+    anchor: b.anchor ? { threshold: b.anchor.threshold, metric: b.anchor.metric } : undefined,
   }
-  if (paren) condition.anchor = { threshold: paren }
+  if (paren && !condition.anchor) condition.anchor = { threshold: paren }
   return condition
 }
 

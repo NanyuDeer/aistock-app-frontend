@@ -61,7 +61,7 @@
 
 ## 日历面板网格契约（契约 #7，2026-09-03 起内嵌详情页）
 
-- 独立日历总览页已废弃（`pages/calendar.vue` 删除）；60 日热力网格内嵌为详情页顶部 `RhythmCalendarPanel`，一次 `getRhythmMasterCalendar(60)` 取全量（含 events），折叠态渲染最近 7 日、展开态渲染 60 日，不再逐日请求
+- 独立日历总览页已废弃（`pages/calendar.vue` 删除）；60 日热力网格内嵌为详情页顶部 `RhythmCalendarPanel`，**两条数据源分别取数**：折叠态近 7 交易日紧凑条走交易日数据源 `getRhythmMasterCalendar(60)`（days=60，仅交易日，不含周末/节假日）、展开态 60 日自然月网格走自然日数据源 `getRhythmMasterCalendar(60, 60)`（naturalDays=60，含周末），不再逐日请求
 
 - 网格按交易日（服务端展开，前端不依赖交易日历），展开态为自然周网格：周一列开头、周末列留空
 
@@ -72,6 +72,20 @@
 - 展开态默认展开（`rhythm.calendar.expanded` storage 记忆）；仓位/事件 Segmented 仅展开态展示；事件模式 = macro 角标（high 红点+计数 / medium-low 灰点）+ 选中日事件行（影响度·时间·标题 / result 尾注 / US 隔夜角标），空日显示「当日无宏观事件」，不标点不填充
 
 - 点格切日 = 面板 `pick` 事件上抛，详情页原地重拉该日三时点版本（无页面跳转）
+
+## 预判分支契约（RhythmBranch v2，2026-09-03）
+
+- `branch` 结构新增 **`position_action`（结构化仓位动作，需求方核心）**：`{ direction: 'add'|'reduce'|'hold', change: string, band?: RhythmPositionBand|null }`——`change` 为成数文案（如 `"+2 成"`/`"-1 成"`/`"持仓不变"`），由后端确定性算法算，前端不臆断；`add`→加仓、`reduce`→减仓、`hold`→观望。
+- 新增 **`anchor`（可验证锚点）**：`{ metric: 'index_close'|'close'|'high'|'low', threshold: string, direction: 'bullish'|'bearish'|'neutral' }`——供验证器机械判 hit/miss。
+- 新增 **`touch_strength`（历史触碰强度）**：`number|null`，**非命中概率**，与 `validity`（有效天数）语义分离。
+- `conclusion.range` 降级为辅助（scenario 参考），不再当主输出。
+- `position_action` / `anchor` 为可选（`?`），旧报告无则回退展示。
+
+## 日历面板数据源（2026-09-03）
+
+- 展开态（iOS 日历样式）：`getRhythmMasterCalendar(60, 60)` 走 **`naturalDays=60`** 拉近 60 自然日（**含周末/节假日**），渲染完整自然月网格 + 翻页（上月/下月/今天）；周末/节假日格 `level=null` 灰格如实展示但**可 pick**（看该日 macro 事件）。
+- 折叠态（近 7 交易日紧凑条）：`getRhythmMasterCalendar(60)` 走 **`days=60`（交易日）**，**只展示交易日**（周末不混入）——两数据源独立。
+- 事件角标/模式（high 红点 / medium-low 灰点）语义不变。
 
 ## 约束
 
