@@ -35,9 +35,16 @@ function splitParen(text: string): [string, string] {
 }
 
 function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
-  if (b.condition.kind !== 'interval') return null // enum（事件待公布）分支不进 structured
-  const label = b.condition.label || b.condition.value || b.condition.indicator || ''
-  const [main, paren] = splitParen(label)
+  if (b.condition.kind !== 'interval' && b.condition.kind !== 'enum') return null
+  let main = ''
+  let paren = ''
+  if (b.condition.kind === 'enum') {
+    // 事件分支：条件 = 事件标题预期差 + 档（value 优先，防 label 错位）
+    main = `${b.condition.indicator || ''}${b.condition.value || ''}`
+  } else {
+    const label = b.condition.label || b.condition.value || b.condition.indicator || ''
+    ;[main, paren] = splitParen(label)
+  }
   const note = b.conclusion.note || ''
   const range = b.conclusion.range || ''
   const condition: RhythmInsightCondition = {
@@ -47,6 +54,7 @@ function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
     direction: b.conclusion.direction,
     positionAction: b.position_action,
     anchor: b.anchor ? { threshold: b.anchor.threshold, metric: b.anchor.metric } : undefined,
+    met: b.met,
   }
   if (paren && !condition.anchor) condition.anchor = { threshold: paren }
   return condition
