@@ -28,7 +28,7 @@
           <StatGrid :items="sectorStatItems" :columns="3" />
         </Card>
 
-        <!-- 板块研判（板块四环聚合命中当前板块 → 洞见卡；无命中但有归因链入链 → 大盘联动溯源行）置于 AI 分析上方 -->
+        <!-- 板块研判（板块四环聚合命中当前板块 → 洞见卡；?mock=1 演示 → 大盘联动溯源 + 事件驱动预判剧本）置于 AI 分析上方 -->
         <view class="sector-insight-box">
           <SectorInsightCard
             :candidate="sectorInsight"
@@ -36,7 +36,12 @@
             :date="insightDate"
             :market-link="marketLink"
             :sector-name="sector.name"
+            :forecast-override="demoForecast"
           />
+          <!-- 演示模式提示：示意数据仅在 ?mock=1 下注入，18:30 收盘后自动接入真实归因 -->
+          <view v-if="demoMode" class="demo-hint">
+            <text class="demo-hint-text">演示模式：大盘归因与板块预判为示意数据，18:30 收盘后接入真实生成结果</text>
+          </view>
         </view>
 
         <!-- 改动2+5: AI 分析 + 层级流向图 SVG -->
@@ -283,8 +288,8 @@ import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SectorInsightCard from '@/shared/components/SectorInsightCard.vue'
 import { LoadingState, EmptyState, Tag, Badge, Button, Card, StatGrid, Modal, KLineChart } from '@/shared/components'
 import type { StatGridItem } from '@/shared/components'
-import { findSectorCandidate, todayDateStr, buildMarketLink } from '@/shared/utils/sectorInsight'
-import type { SectorMarketLink } from '@/shared/utils/sectorInsight'
+import { findSectorCandidate, todayDateStr, buildMarketLink, buildDemoAttributionChain, buildDemoEventForecast } from '@/shared/utils/sectorInsight'
+import type { SectorMarketLink, SectorStructuredForecast } from '@/shared/utils/sectorInsight'
 import { fetchAttributionChain } from '@/shared/api/modules/attributionChain'
 
 const loading = ref(false)
@@ -303,6 +308,11 @@ const insightDate = ref('')
 
 /** 大盘联动（板块在大盘归因链中的角色；无链 → null，洞见卡溯源行回退四环文本） */
 const marketLink = ref<SectorMarketLink | null>(null)
+
+/** 演示模式（?mock=1）：18:30 收盘前真实大盘归因/事件预判未生成时注入示意数据供展示 */
+const demoMode = ref(false)
+/** 演示用事件驱动板块预判（洞见卡预判侧覆盖，静态剧本） */
+const demoForecast = ref<SectorStructuredForecast | null>(null)
 
 function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
@@ -644,12 +654,17 @@ async function loadSectorInsight() {
       fetchAttributionChain(tradeDate)
     ])
     sectorInsight.value = findSectorCandidate(res?.candidates ?? [], { name: cur.name, code: cur.code })
+    // 演示模式：真实归因链未生成（未到 18:30）时注入 9-4 示意归因链（页面 mock 提示会显示）
+    const chainForLink = chain || (demoMode.value ? buildDemoAttributionChain(tradeDate, cur.name) : null)
     // 大盘联动：同日归因链命中当前板块 → 溯源行升级为「大盘一句话 + 角色徽 + 驱动句」；无链 → null 回退
-    marketLink.value = buildMarketLink(chain, cur.name)
+    marketLink.value = buildMarketLink(chainForLink, cur.name)
+    // 演示模式：洞见卡预判侧注入「事件驱动板块预判」静态剧本（P2 新模型示意，取代四环 CFB）
+    demoForecast.value = demoMode.value ? buildDemoEventForecast(cur.name) : null
   } catch (error) {
     console.error('板块研判加载失败:', error)
     sectorInsight.value = null
     marketLink.value = null
+    demoForecast.value = null
   } finally {
     insightLoading.value = false
   }
@@ -697,6 +712,8 @@ async function loadData() {
 onLoad((options) => {
   const name = options?.name || options?.sector || ''
   sectorName.value = decodeURIComponent(name)
+  // 演示模式：18:30 前展示大盘联动 + 事件驱动预判示意数据（?mock=1）
+  demoMode.value = options?.mock === '1' || options?.mock === 'true'
   loadData()
 })
 </script>
@@ -953,6 +970,20 @@ export default {
 /* ===== 板块研判（SectorInsightCard 承载，白卡自带圆角，仅留外边距） ===== */
 .sector-insight-box {
   margin-bottom: 20rpx;
+}
+
+/* 演示模式提示（?mock=1 时显示，示意数据免责说明） */
+.demo-hint {
+  display: flex;
+  justify-content: center;
+  padding: 12rpx 16rpx 0;
+}
+
+.demo-hint-text {
+  font-size: 20rpx;
+  color: $ink-mute;
+  text-align: center;
+  line-height: 1.5;
 }
 
 /* ===== 个股列表（Card 提供 bg/border/shadow，仅保留间距） ===== */

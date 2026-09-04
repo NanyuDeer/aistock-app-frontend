@@ -144,3 +144,86 @@ export function buildMarketLink(
     driver: node?.trace_summary?.trim() || ''
   }
 }
+
+/** 演示用跟随分支候选（大盘联动 mock；避开当前板块防重名） */
+const DEMO_PARTNER_SECTORS = ['券商', '白酒', '银行', '新能源']
+
+/**
+ * 演示用大盘归因链（2026-09-04，P1 演示）：真实大盘归因 18:30 收盘后才生成，演示前经
+ * 板块详情 `?mock=1` 注入示意数据：聚焦板块（focusSector）为自驱动主因 + 一个跟随分支。
+ * 仅用于前端演示，勿当真实数据（页面 mock 模式下会显示"演示模式"提示）。
+ */
+export function buildDemoAttributionChain(date: string, focusSector?: string): AttributionChain {
+  const focus = focusSector?.trim()
+  const partner = DEMO_PARTNER_SECTORS.find((s) => s !== focus) ?? '券商'
+  const children: AttributionChain['children'] = []
+  if (focus) {
+    children.push({
+      sector: focus,
+      relation: 'self_driven',
+      pct: -3.2,
+      trace_summary: `${focus}突发利空事件落地，资金避险离场`
+    })
+  }
+  children.push({
+    sector: partner,
+    relation: 'market_follow',
+    pct: -0.6,
+    trace_summary: '大盘情绪拖累，观望为主'
+  })
+  return {
+    date,
+    root: {
+      type: 'market',
+      date,
+      summary: focus ? `大盘低开承压，${focus}事件异动拖累情绪` : '大盘低开承压，板块结构性分化',
+      index_pct: -0.9
+    },
+    children
+  }
+}
+
+/**
+ * 演示用事件驱动板块预判（P2 新模型静态剧本，2026-09-04）：
+ * 事件确认 → 预判在途（档位基准）→ 条件触发点亮（met:true）/ 未触发置灰（met:false）；
+ * 验证不设固定日（dueLabel 提示），事件驱动、可提前兑现。
+ * 经板块详情 `?mock=1` 注入洞见卡预判侧；仅用于前端演示，勿当真实数据。
+ */
+export function buildDemoEventForecast(focusSector?: string): SectorStructuredForecast {
+  const focus = focusSector?.trim() || '该板块'
+  return {
+    horizons: [
+      {
+        horizon: 'short',
+        remaining: '事件后 1-5 个交易日',
+        label: '事件驱动走弱',
+        direction: 'bearish',
+        confidence: 'medium'
+      }
+    ],
+    conditions: [
+      {
+        horizon: 'short',
+        direction: 'bearish',
+        label: '事件确认 · 承压',
+        condition: '核心事件确认落地（演示数据）',
+        keywords: ['事件确认'],
+        scenario: `${focus}受核心事件驱动下探，短期承压（演示数据）`,
+        scenario_keywords: ['承压'],
+        met: true
+      },
+      {
+        horizon: 'short',
+        direction: 'bearish',
+        label: '事件扩散 · 加码',
+        condition: '事件沿产业链扩散（演示数据）',
+        keywords: ['事件扩散'],
+        scenario: `${focus}随事件沿产业链扩散，跌幅扩大（演示数据）`,
+        scenario_keywords: ['跌幅扩大'],
+        met: false
+      }
+    ],
+    dueLabel: '无固定验证日',
+    verification: 'pending'
+  }
+}
