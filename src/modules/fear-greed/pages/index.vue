@@ -114,38 +114,44 @@
           </view>
         </view>
 
-        <!-- AI 情绪洞见 -->
-        <view class="fg-card">
-          <text class="fg-card__title">AI 情绪洞见</text>
-          <!-- AI 洞见：为什么 + 后续预判（基于历史走势图数据） -->
-          <text v-if="aiInsight" class="fg-insight">{{ aiInsight }}</text>
-          <!-- 冰点反弹统计 -->
-          <view v-if="icePointStats" class="fg-rebound">
-            <view class="fg-rebound__header">
-              <text class="fg-rebound__title">冰点反弹统计</text>
-              <text class="fg-rebound__period">近 3 个月</text>
+        <!-- AI 情绪洞见：洞见卡（字标·情绪 + 一句话结论 + 溯源 + 预判），底部 slot 承载冰点反弹统计 -->
+        <view v-if="insightTexts.why || insightTexts.forecast" class="fg-insight-box">
+          <InsightCard
+            type="emotion"
+            tagText="情绪洞见"
+            :title="zone.summary"
+            :trace="insightTexts.why"
+            :forecast="insightTexts.forecast"
+            theme="light"
+          >
+            <!-- 冰点反弹统计（三列数字，保留原有量化补充） -->
+            <view v-if="icePointStats" class="fg-rebound">
+              <view class="fg-rebound__header">
+                <text class="fg-rebound__title">冰点反弹统计</text>
+                <text class="fg-rebound__period">近 3 个月</text>
+              </view>
+              <view class="fg-rebound__stats">
+                <view class="fg-rebound__stat">
+                  <text class="fg-rebound__num">{{ icePointStats.iceCount }}</text>
+                  <text class="fg-rebound__label">冰点次数</text>
+                </view>
+                <view class="fg-rebound__divider" />
+                <view class="fg-rebound__stat">
+                  <text
+                    class="fg-rebound__num"
+                    :style="{ color: icePointStats.reboundRate >= 60 ? '#18a058' : '#FF9500' }"
+                  >{{ icePointStats.reboundRate }}%</text>
+                  <text class="fg-rebound__label">次日反弹概率</text>
+                </view>
+                <view class="fg-rebound__divider" />
+                <view class="fg-rebound__stat">
+                  <text class="fg-rebound__num">+{{ icePointStats.avgRebound }}</text>
+                  <text class="fg-rebound__label">平均反弹幅度</text>
+                </view>
+              </view>
+              <text class="fg-rebound__desc">{{ icePointInsight }}</text>
             </view>
-            <view class="fg-rebound__stats">
-              <view class="fg-rebound__stat">
-                <text class="fg-rebound__num">{{ icePointStats.iceCount }}</text>
-                <text class="fg-rebound__label">冰点次数</text>
-              </view>
-              <view class="fg-rebound__divider" />
-              <view class="fg-rebound__stat">
-                <text
-                  class="fg-rebound__num"
-                  :style="{ color: icePointStats.reboundRate >= 60 ? '#18a058' : '#FF9500' }"
-                >{{ icePointStats.reboundRate }}%</text>
-                <text class="fg-rebound__label">次日反弹概率</text>
-              </view>
-              <view class="fg-rebound__divider" />
-              <view class="fg-rebound__stat">
-                <text class="fg-rebound__num">+{{ icePointStats.avgRebound }}</text>
-                <text class="fg-rebound__label">平均反弹幅度</text>
-              </view>
-            </view>
-            <text class="fg-rebound__desc">{{ icePointInsight }}</text>
-          </view>
+          </InsightCard>
         </view>
 
         <!-- 投资建议 -->
@@ -210,6 +216,7 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
+import { InsightCard } from '@/shared/components'
 import { fearGreedApi, type FearGreedDashboard, type FgSectorBoard } from '@/shared/api/modules/fear-greed'
 import { buildSectorTags, buildActions, buildAdvice, buildDriversSentence } from '../utils/fgAdvice'
 
@@ -579,13 +586,13 @@ const icePointStats = computed(() => {
 })
 
 /**
- * AI 情绪洞见：一句话/两句话格式 —— 为什么 + 后续预判
+ * AI 情绪洞见：拆分「溯源(为什么) + 预判(后续)」两段，供洞见卡 trace/forecast 使用
  * - 为什么：市场情绪总结（档位 + summary）+ 数据依据（5/20日均线关系）
  * - 后续预判：基于历史走势图数据（冰点反弹概率优先，其次均线排列）的趋势判断
  */
-const aiInsight = computed(() => {
+const insightTexts = computed<{ why: string; forecast: string }>(() => {
   const cur = dashboard.value?.currentIndex
-  if (cur == null) return ''
+  if (cur == null) return { why: '', forecast: '' }
   const z = zone.value
   const ma = movingAverages.value
   const ice = icePointStats.value
@@ -623,8 +630,8 @@ const aiInsight = computed(() => {
     forecast = '建议维持当前节奏，等待方向进一步明朗'
   }
 
-  // 两句话拼接（不写"为什么/后续预判"字样，仅按此结构输出）
-  return `${whyParts.join('，')}。${forecast}。`
+  // 结构化返回：溯源（为什么）+ 预判（后续）
+  return { why: whyParts.join('，'), forecast }
 })
 
 /** 冰点反弹洞见文字 */
@@ -1177,11 +1184,9 @@ onShow(() => {
 }
 
 /* ===== AI 情绪洞见 ===== */
-/* 洞见正文：与卡片正文（投资建议等段落）同字号同色，保持页面协调 */
-.fg-insight {
-  font-size: $font-size-sm;
-  line-height: 1.7;
-  color: $ink-soft;
+/* 洞见卡容器：与上方卡片拉开间距 */
+.fg-insight-box {
+  margin-top: $s-2;
 }
 
 /* ===== 冰点反弹统计 ===== */

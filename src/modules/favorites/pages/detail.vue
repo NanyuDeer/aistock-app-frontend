@@ -53,53 +53,36 @@
         </view>
       </view>
 
-      <view class="decision-card">
-        <view class="decision-head">
-          <InsightTag type="market" size="sm">综合洞见</InsightTag>
-          <view class="decision-verdict">
-            <text :class="['decision-status', overallDecision.verdictClass]">{{ overallDecision.verdict }}</text>
-            <text :class="['decision-status', 'is-sub', overallDecision.periodDominanceClass]">{{ overallDecision.periodDominance }}</text>
-          </view>
-        </view>
-        <text class="decision-summary">{{ overallDecision.summary }}</text>
-        <view class="decision-divider" />
-        <view class="decision-next">
-          <text class="next-label">重点</text>
-          <text class="next-text">{{ overallDecision.nextStep }}</text>
-        </view>
-        <view class="decision-points">
-          <view v-if="overallDecision.opportunity" class="decision-point decision-point--opportunity" @tap="toggleDecisionPoint('opportunity')">
-            <text class="point-label">机会</text>
-            <text :class="['point-text', { expanded: expandedDecisionPoint === 'opportunity' }]">{{ expandedDecisionPoint === 'opportunity' ? overallDecision.opportunityFull : overallDecision.opportunity }}</text>
-            <text class="point-more">{{ expandedDecisionPoint === 'opportunity' ? '收起' : '展开' }}</text>
-          </view>
-          <view v-if="overallDecision.risk" class="decision-point decision-point--risk" @tap="toggleDecisionPoint('risk')">
-            <text class="point-label">风险</text>
-            <text :class="['point-text', { expanded: expandedDecisionPoint === 'risk' }]">{{ expandedDecisionPoint === 'risk' ? overallDecision.riskFull : overallDecision.risk }}</text>
-            <text class="point-more">{{ expandedDecisionPoint === 'risk' ? '收起' : '展开' }}</text>
-          </view>
-        </view>
-      </view>
+      <!-- 综合洞见：容器化为洞见卡（洞见字标·综合 + 一句话结论 + 重点/机会/风险 多要点行） -->
+      <InsightCard
+        v-if="decisionInsight.lines.length"
+        type="market"
+        tag-text="综合洞见"
+        :title="decisionInsight.title"
+        :lines="decisionInsight.lines"
+        theme="light"
+      />
 
       <view id="detail-anchor-stock-info">
-      <view v-if="isFavorite" class="major-event-alert">
-        <view class="major-event-head">
-          <text class="decision-kicker">最新重大异动</text>
-          <text v-if="latestMajorEvent" :class="['major-impact', majorEventImpactClass]">
-            {{ latestMajorEvent.ai_impact || latestMajorEvent.level || latestMajorEvent.change_type_name }}
-          </text>
-        </view>
+      <!-- 最新重大异动：双平面「重大机会/重大风险」样式（对齐事件传导焦点卡 EventHeadlineCard：语义渐变顶 + 白正文） -->
+      <view
+        v-if="isFavorite"
+        :class="['major-event-alert', 'major-event-alert--' + majorEventDirection, { 'is-muted': !latestMajorEvent }]"
+      >
         <template v-if="latestMajorEvent">
-          <text class="major-event-title">{{ latestMajorEvent.summary || latestMajorEvent.title || latestMajorEvent.change_type_name }}</text>
-          <view class="major-event-meta">
-            <text>{{ latestMajorEvent.ai_horizon || latestMajorEvent.cycle || '周期待判' }}</text>
-            <text>{{ latestMajorEvent.change_type_name || latestMajorEvent.info_type || '资讯研判' }}</text>
-            <text>{{ latestMajorEvent.event_time_display || formatEventTime(latestMajorEvent.event_time) }}</text>
+          <view class="me-top">
+            <text class="me-title">{{ majorEventTitle }}</text>
+          </view>
+          <view class="me-body">
+            <text class="major-event-title">{{ latestMajorEvent.summary || latestMajorEvent.title || latestMajorEvent.change_type_name }}</text>
+            <view class="major-event-meta">
+              <text>{{ latestMajorEvent.ai_horizon || latestMajorEvent.cycle || '周期待判' }}</text>
+              <text>{{ latestMajorEvent.change_type_name || latestMajorEvent.info_type || '资讯研判' }}</text>
+              <text>{{ latestMajorEvent.event_time_display || formatEventTime(latestMajorEvent.event_time) }}</text>
+            </view>
           </view>
         </template>
-        <template v-else>
-          <text class="major-event-title">暂无数据</text>
-        </template>
+        <text v-else class="major-event-title major-event-empty">暂无数据</text>
       </view>
       </view>
 
@@ -901,7 +884,7 @@ import { stockApi } from '@/shared/api/modules/stock'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import InsightTag from '@/shared/components/InsightTag.vue'
+import InsightCard from '@/shared/components/InsightCard.vue'
 import KLineChart from '@/modules/favorites/components/KLineChart.vue'
 import ForecastProfitChart from '@/modules/favorites/components/ForecastProfitChart.vue'
 import CapitalFlowCharts from '@/modules/favorites/components/CapitalFlowCharts.vue'
@@ -959,7 +942,6 @@ const viewTabs: { key: ViewKey; label: string; desc: string }[] = [
   { key: 'mid', label: '中线', desc: '月/季' },
   { key: 'long', label: '长线', desc: '年' }
 ]
-const expandedDecisionPoint = ref<'opportunity' | 'risk' | null>(null)
 const policyExpanded = ref(false)
 
 function selectActiveView(key: ViewKey) {
@@ -1296,6 +1278,18 @@ const majorEventImpactClass = computed(() => {
   return 'is-neutral'
 })
 
+/** 双平面语义方向（对齐事件传导焦点卡）：利好→positive(红) / 利空→negative(绿) / 其余→mixed(中性) */
+const majorEventDirection = computed(() => {
+  const c = majorEventImpactClass.value
+  return c === 'is-positive' ? 'positive' : c === 'is-negative' ? 'negative' : 'mixed'
+})
+
+/** 顶部色块标题：利好「重大机会」/ 利空「重大风险」/ 其余「重大异动」 */
+const majorEventTitle = computed(() => {
+  const d = majorEventDirection.value
+  return d === 'positive' ? '重大机会' : d === 'negative' ? '重大风险' : '重大异动'
+})
+
 const legacyOverallDecision = computed(() => {
   const conclusion = String(aiAnalysis.value?.conclusion || '').trim()
   const changePercent = toDecisionNumber(quote.value?.changePercent)
@@ -1629,9 +1623,20 @@ const overallDecision = computed(() => {
   }
 })
 
-function toggleDecisionPoint(type: 'opportunity' | 'risk') {
-  expandedDecisionPoint.value = expandedDecisionPoint.value === type ? null : type
-}
+/** 综合洞见（容器化 InsightCard 数据）：title=一句话结论；lines=重点/机会/风险（机会红·风险金·重点中性） */
+const decisionInsight = computed(() => {
+  const d = overallDecision.value
+  const lines: Array<{ key: string; text: string; tone?: 'positive' | 'risk' | 'default' }> = []
+  if (d.nextStep) lines.push({ key: '重点', text: d.nextStep })
+  if (d.opportunity) {
+    // 原展开全文不再折叠展示，取全文避免截断丢信息
+    lines.push({ key: '机会', text: d.opportunityFull || d.opportunity, tone: 'positive' })
+  }
+  if (d.risk) {
+    lines.push({ key: '风险', text: d.riskFull || d.risk, tone: 'risk' })
+  }
+  return { title: d.summary, lines }
+})
 
 function getEventIdentity(event: any): string {
   if (!event) return ''
@@ -2527,217 +2532,70 @@ function goChat() {
   font-size: 24rpx;
 }
 
-/* 综合决策 */
-.decision-card,
+/* 最新重大异动：双平面「重大机会/风险/异动」（对齐事件传导焦点卡：语义渐变顶 + 白正文） */
 .major-event-alert {
   background: $bg-card;
-  border: 2rpx solid $line;
+  border: none;
+  border-left: 6rpx solid $ink-soft;
   border-radius: $r-md;
-  padding: 24rpx 28rpx;
-  margin-bottom: 16rpx;
-}
-
-.decision-card {
-  display: flex;
-  flex-direction: column;
-  gap: $s-2;
-  border-radius: $r-lg;
-  box-shadow: $shadow-xs;
-}
-
-/* 洞见卡风格：结论前的渐变分隔线，替代原先顶部主题色条 */
-.decision-divider {
-  height: 2rpx;
-  margin: $s-1 0;
-  background: linear-gradient(90deg, $primary-100, rgba($primary-100, 0));
-}
-
-.decision-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16rpx;
-}
-
-.decision-kicker {
-  display: block;
-  font-size: 28rpx;
-  line-height: 1.3;
-  font-weight: 800;
-  color: $ink;
-}
-
-.decision-summary {
-  display: block;
-  font-size: $font-size-lg;
-  line-height: $lh-tight;
-  font-weight: 600;
-  color: $ink;
-}
-
-/* 重点：横幅卡（蓝），与机会/风险(point-) 同卡片化结构 */
-.decision-next {
-  --banner-bg: #{$insight-market};
-  --banner-glow: rgba(11, 95, 255, 0.18);
-}
-
-/* 重点行横幅卡排版统一走全局 insight-banner mixin */
-@include insight-banner('.decision-next', '.next-label', '.next-text');
-
-.decision-verdict {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.decision-status {
-  padding: 6rpx 14rpx;
-  border-radius: 10rpx;
-  background: $primary-50;
-  font-size: 24rpx;
-  line-height: 1.35;
-  font-weight: 800;
-
-  &.is-positive {
-    color: $up;
-    background: $up-soft;
-  }
-
-  &.is-neutral {
-    color: $primary;
-    background: $primary-50;
-  }
-
-  &.is-risk {
-    color: $down;
-    background: $down-soft;
-  }
-}
-
-.decision-status.is-sub {
-  background: $bg-deep;
-  color: $ink-soft;
-
-  &.is-positive {
-    color: $up;
-    background: $up-soft;
-  }
-
-  &.is-risk {
-    color: $down;
-    background: $down-soft;
-  }
-}
-
-.decision-period {
-  padding: 6rpx 12rpx;
-  border-radius: 10rpx;
-  background: $bg-deep;
-  color: $ink-soft;
-  font-size: 22rpx;
-  line-height: 1.35;
-  font-weight: 700;
-}
-
-/* 机会/风险：横幅卡（机会绿/风险红），保留展开交互 */
-.decision-points {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-
-.decision-point {
-  --banner-bg: #{$down};
-  --banner-glow: rgba(24, 160, 88, 0.18);
-
-  &.decision-point--risk {
-    --banner-bg: #{$up};
-    --banner-glow: rgba(229, 77, 94, 0.18);
-  }
-}
-
-/* 机会/风险：走洞见解横幅卡全局排版，保留展开交互 */
-@include insight-banner('.decision-point', '.point-label', '.point-text');
-
-.point-more {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 20rpx;
-  font-weight: 600;
-  text-align: right;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.point-text {
-  display: -webkit-box;
+  padding: 0;
+  margin: 24rpx 0 16rpx; /* 与上方综合洞见卡拉开间距 */
   overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-
-  &.expanded {
-    display: block;
-    overflow: visible;
-    -webkit-line-clamp: unset;
-  }
+  box-shadow: $shadow-card;
 }
 
-.major-event-alert {
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-  padding-top: 18rpx;
-  padding-bottom: 18rpx;
-  border-left: 6rpx solid $primary;
+.major-event-alert--positive { border-left-color: #d81f1f; }
+.major-event-alert--negative { border-left-color: #0d9e43; }
 
-  &.is-muted {
-    background: $bg-soft;
-    border-left-color: $line-strong;
-  }
+.major-event-alert.is-muted {
+  background: $bg-soft;
+  border-left-color: $line-strong;
+  box-shadow: none;
 }
 
-.major-event-head {
+/* 上层语义渐变（上浅下深，模拟顶面受光压重） */
+.me-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
+  height: 52rpx;
+  padding: 0 16rpx;
+  box-shadow: inset 0 -2rpx 0 rgba(0, 0, 0, 0.06);
 }
 
-.major-impact {
-  flex-shrink: 0;
-  padding: 4rpx 14rpx;
-  border: 1rpx solid;
-  border-radius: 8rpx;
-  font-size: 22rpx;
-  line-height: 1.4;
-  font-weight: 800;
+.major-event-alert--positive .me-top { background: linear-gradient(180deg, #e22c2c, #d81f1f); }
+.major-event-alert--negative .me-top { background: linear-gradient(180deg, #0faa4a, #0d9e43); }
+.major-event-alert--mixed .me-top { background: linear-gradient(180deg, $ink-soft, $ink); }
+.major-event-alert.is-muted .me-top { display: none; }
 
-  &.is-positive {
-    color: $up;
-    border-color: #fecaca;
-    background: $up-soft;
-  }
+.me-title {
+  font-size: $font-size-md;
+  font-weight: bold;
+  color: #f8f8f8;
+  letter-spacing: 1rpx;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-  &.is-negative {
-    color: $down;
-    border-color: #bbf7d0;
-    background: $down-soft;
-  }
-
-  &.is-neutral {
-    color: $ink-mute;
-    border-color: $line-strong;
-    background: $bg-soft;
-  }
+/* 下层白正文区 */
+.me-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  padding: 14rpx 22rpx 16rpx;
 }
 
 .major-event-title {
   display: block;
-  font-size: 26rpx;
-  line-height: 1.5;
+  font-size: $font-size-md;
+  line-height: 1.4;
   font-weight: 600;
-  color: $ink-soft;
+  color: $ink;
+}
+
+.major-event-empty {
+  padding: 14rpx 22rpx 16rpx;
 }
 
 .major-event-meta {

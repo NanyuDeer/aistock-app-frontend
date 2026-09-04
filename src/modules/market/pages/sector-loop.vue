@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard title="板块四环">
+  <SubPageCard title="板块预判">
     <view class="sl-content">
       <!-- 日期回看：近三个交易日按钮（准确日期）；更多→下拉选更早交易日 -->
       <view class="sl-datewrap">
@@ -50,12 +50,12 @@
 
       <!-- 加载中（首载 / 切日） -->
       <view v-if="loading" class="sl-state">
-        <LoadingState text="正在加载板块四环数据..." />
+        <LoadingState text="正在加载板块预判数据..." />
       </view>
 
       <!-- 加载失败：可重试 -->
       <Card v-else-if="error" class="sl-state-card">
-        <EmptyState title="板块四环加载失败" description="请检查网络连接后重新加载">
+        <EmptyState title="板块预判加载失败" description="请检查网络连接后重新加载">
           <Button size="sm" @click="retry">重新加载</Button>
         </EmptyState>
       </Card>

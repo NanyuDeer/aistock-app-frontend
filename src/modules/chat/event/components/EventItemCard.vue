@@ -41,7 +41,8 @@
     <!-- AI 摘要 + 操作按钮 -->
     <view class="card-bottom">
       <view class="card-ai-summary" v-if="event.aiSummary">
-        <InsightTag type="event" size="sm" class="ai-badge">洞见</InsightTag>
+        <!-- AI 洞见徽标：洞见字标 PNG（与洞见卡头部字标同源，无背景小图） -->
+        <view class="ai-badge-wm" :style="wmBg" />
         <text class="ai-text">{{ event.aiSummary }}</text>
       </view>
       <view class="card-actions">
@@ -76,8 +77,12 @@
 import { computed } from 'vue'
 import type { EventItem } from '../types'
 import { formatDateTime } from '@/shared/utils/datetime'
-import { Card, Button, Tag, InsightTag } from '@/shared/components'
+import { Card, Button, Tag } from '@/shared/components'
 import Rate from '@/shared/components/Rate.vue'
+import wordmarkPng from '@/shared/components/insight-wordmark.png'
+
+/** AI 洞见徽标底图（洞见字标 PNG） */
+const wmBg = { backgroundImage: `url(${wordmarkPng})` }
 
 // ========== Props ==========
 
@@ -212,17 +217,14 @@ const top5Industries = computed(() => {
   margin-bottom: 12rpx;
 }
 
-/* AI 洞见徽标：复用 InsightTag，缩小胶囊与瞳孔，保持与一句话水平对齐 */
-.card-ai-summary .ai-badge {
+/* AI 洞见徽标：洞见字标 PNG 小图，与一句话水平对齐 */
+.card-ai-summary .ai-badge-wm {
   flex-shrink: 0;
-  padding: 2rpx 10rpx;
-  font-size: 20rpx;
-  line-height: 1;
-}
-
-.card-ai-summary .ai-badge :deep(.as-insight-tag__eye) {
-  width: 18rpx;
-  height: 18rpx;
+  width: 34rpx;
+  height: 24rpx;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
 }
 
 .ai-text {
