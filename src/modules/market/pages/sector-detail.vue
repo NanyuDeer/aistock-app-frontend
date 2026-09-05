@@ -694,20 +694,11 @@ async function loadData() {
         klineLoading.value = false
       })
     }
+    // 板块研判（板块四环聚合，命中当前板块后异步拉取；失败不阻断主流程）
     if (found) {
-      // 板块研判（板块四环聚合，命中当前板块后异步拉取；失败不阻断主流程）
       void loadSectorInsight()
-    } else if (demoMode.value) {
-      // 演示模式：实时风口榜单（top40）可能不含演示板块（18:30 收盘前）→ 用板块名 + 示意行情占位，
-      // 行情区显示示意涨跌，洞见卡正常渲染「大盘联动 + 事件驱动预判」演示
-      sector.value = {
-        name: sectorName.value,
-        today_change: -3.2,
-        avg_change: -2.1,
-        amount: 25800000000
-      } as WindLeaderSector
-      void loadSectorInsight()
-    } else {
+    }
+    if (!found) {
       errorMessage.value = '未找到该板块数据'
     }
   } catch (error) {
@@ -720,7 +711,7 @@ async function loadData() {
 
 onLoad((options) => {
   const name = options?.name || options?.sector || ''
-  sectorName.value = decodeURIComponent(name).trim()
+  sectorName.value = decodeURIComponent(name)
   // 演示模式：18:30 前展示大盘联动 + 事件驱动预判示意数据（?mock=1）
   demoMode.value = options?.mock === '1' || options?.mock === 'true'
   loadData()
