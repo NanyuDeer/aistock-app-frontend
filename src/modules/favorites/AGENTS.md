@@ -9,10 +9,12 @@
 - `pages/favorites-grid.vue` - 多股同列（2 列宫格卡片，每格含迷你 K 线 + 名称/最新价/涨跌幅/涨跌额，顶部周期切换）
 - `pages/detail.vue` - 个股详情页
 - `pages/search.vue` - 股票搜索
-- `pages/monitor.vue` - 异动监控
-- `pages/insight.vue` - 自选股洞察（涨停雷达 + 价格异动融合列表）
-- `pages/insight-detail.vue` - 洞察详情（涨停雷达）
-- `pages/insight-detail-move.vue` - 洞察详情（价格异动，数据源为 stocktrace movements API）
+- `pages/monitor.vue` - 自选股异动
+- `pages/insight.vue` - 自选股洞察（2026-08-30 起统一为 stock-trace movements 列表，涨停雷达事件已并入该链路）
+- `pages/insight-detail.vue` - 洞察详情（涨停雷达，**停用**——涨停雷达事件并入 stock-trace 后列表不再产生该类型，文件保留兼容历史直达链接）
+- `pages/insight-detail-move.vue` - 洞察详情（价格异动/涨停雷达统一入口，数据源为 stocktrace movements API）
+
+> **2026-08-30 链路合并**：涨停雷达命中不再建 watchlist_insight_events（存量保留不展示）；`AlertContent.vue`（首页特别提醒）与 `pages/insight.vue`（自选股洞察列表）均只消费 `stockTraceApi.list`（movements），`watchlistInsightApi.getInsights` 不再被列表页调用（monitor.vue 等存量入口保留历史引用）。
 
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。
@@ -25,6 +27,7 @@
 - 归因候选：直接取 `artifactJson.candidates` 展示全部五层候选（含偏弱/证据不足/排除判定），主候选排第一（按 `primary_chain_id` → 链的 candidateId 定位）。不依赖 `movementView.alternatives`（其仅含 supported 候选，证据不足时为空）。
 - 六阶段链：仅渲染主因链（`artifactJson.chains` 中 `role=primary`）。备选链统一不展示——其信息已由归因候选全量覆盖，且证据不足时 LLM 仅生成主因链，避免时有时无。
 - 证据清单：`artifactJson.evidence_index` 中过滤掉系统生成的 trigger_fact/quote_fact 条目（"触发时刻行情"/"价格触发事件"不展示）；market_fact/sector_fact 的英文模板摘要由 `evidenceExcerpt` 转中文展示（"涨跌幅 -X%"、"板块最新日涨跌幅 -X%（MM-DD）"）。
+- 预判区（2026-09-03 新增）：`detail.forecast` 取 `close ?? midday` slot，解析为 `ForecastSlotPayload`（summary + conditions[]）。洞见卡预判字段展示 summary 文本；另在页面底部渲染完整 conditions 列表（condition/scenario/anchor）。无 forecast 时整块不渲染（不再恒空兜底）。
 
 ## 组件
 - `components/StockCard.vue` - 股票卡片
@@ -59,3 +62,11 @@
 - 分时/五日走分钟级 K 线（klt=1），`getKLine` 会自动带 `startDate`（分时近 3 自然日、五日近 9 自然日）避免拉全量历史分钟数据
 - 特别提醒页面使用堆叠卡片手势交互
 - **子页面滚动容器（2026-08-19）**：H5 预览包装固定 `#app` 高度并 `overflow: hidden`，页面原生滚动被禁用。`insight.vue` / `insight-detail.vue` / `insight-detail-move.vue` 必须用 `SubPageCard2`（自带白色导航栏 + scroll-view）包裹（对应 pages.json `navigationStyle: "custom"`），否则长内容被裁剪、底部不可达。新增/改造子页面沿用此模式。
+
+## 首页 AlertContent 自选股洞察（2026-09-04 还原为旧预览 ListCell 形态）
+- `AlertContent.vue` 自选股洞察块还原为旧预览 ListCell 形态：`module-header`（标题"自选股洞察"+箭头，点跳 `/modules/favorites/pages/monitor` 自选股异动页）+ `ListCell` 列表（`CAPTURE_ROW_COUNT=6`）。行字段：`title=stock_name`、前缀 `Tag` 用方向（up/down, 红绿, 文案"涨/跌"）、`description=主因或状态 · MM-DD 时间`。点击行进 `insight-detail-move?event_id=`。
+- 数据源：`stockTraceApi.list(20)` → `.filter(m => !isUnattributableMovement(m))`（保留无法归因不展示）→ 取前 6 条（含空行占位至 6）。
+- 主因三段式兜底：`primary_cause` → `movement_view.primaryCandidate.verdict` → `analysis_status`（completed→归因完成 / processing→归因中 / 其他→待归因）。
+- 移除：Segmented[全部|预判|溯源]、buildInsightCards 聚合卡渲染、情报折叠、卡片级"预判区/溯源区/AI解读"按钮、intel 并行拉取（该数据仅个股情报块需要，个股情报块自身加载不动）。洞察块只拉 movements。
+- `isUnattributableMovement` 仍从 `insightCards.ts` 导入复用，`insightCards.ts`/`insight.vue`/`monitor.vue`/详情页不动。
+- 个股情报块（intel module-card）保持阶段3改造不动（Segmented[全部|利好|利空] + ListCell 预览 + AI解读跳 alert-analysis）。

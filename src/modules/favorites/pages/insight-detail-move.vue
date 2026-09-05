@@ -56,7 +56,7 @@
         </view>
       </view>
 
-      <!-- ===== 洞见卡：主因结论作一句话 + 主链作溯源 + 建议跟踪作预判 ===== -->
+      <!-- ===== 洞见卡：主因结论作一句话 + 主链作溯源 + forecast summary 作预判 ===== -->
       <InsightCard
         v-if="insightData.content"
         type="event"
@@ -170,6 +170,36 @@
         </view>
       </template>
 
+      <!-- ===== 预判区（独立于归因状态，forecastSlot 存在即渲染）：完整 conditions 列表 ===== -->
+      <view v-if="forecastSlot" class="section forecast-area">
+        <text class="section-title">预判条件</text>
+        <view v-for="(cond, i) in forecastSlot.conditions" :key="i" class="forecast-item">
+          <view class="forecast-header">
+            <text class="forecast-index">条件 {{ i + 1 }}</text>
+          </view>
+          <view class="forecast-body">
+            <view class="forecast-row">
+              <text class="forecast-label">条件</text>
+              <text class="forecast-value">{{ cond.condition }}</text>
+            </view>
+            <view class="forecast-row">
+              <text class="forecast-label">预判</text>
+              <text class="forecast-value">{{ cond.scenario }}</text>
+            </view>
+            <view v-if="cond.anchor" class="forecast-row">
+              <text class="forecast-label">锚点</text>
+              <text class="forecast-value">
+                {{ [cond.anchor.metric, cond.anchor.threshold, cond.anchor.direction].filter(Boolean).join(' · ') }}
+              </text>
+            </view>
+          </view>
+        </view>
+        <!-- 预判 slot 标识：展示当前预判来源（close 收盘 / midday 午盘） -->
+        <text class="forecast-slot-label">
+          {{ slotLabel }}
+        </text>
+      </view>
+
       <!-- 归因完成但结果不可用 -->
       <view
         v-else-if="analysis?.processing_status === 'completed' && !artifact"
@@ -189,6 +219,8 @@ import { onLoad } from '@dcloudio/uni-app'
 import { stockTraceApi, type StockTraceEvent, type StockTraceAnalysisResponse, type TraceChain, type TraceEvidence } from '@/shared/api/modules/stockTrace'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import InsightCard from '@/shared/components/InsightCard.vue'
+import type { ForecastSlotPayload } from '@/modules/favorites/components/insightCards'
+import { parseForecastSlot } from '@/modules/favorites/components/insightCards'
 
 const detail = ref<StockTraceEvent | null>(null)
 const analysis = ref<StockTraceAnalysisResponse | null>(null)
@@ -272,9 +304,27 @@ const candidateCards = computed(() => allCandidates.value.slice(1))
 const unresolvedQuestions = computed<string[]>(() => artifact.value?.artifactJson.unresolved_questions ?? [])
 
 /**
+ * 预判 slot（close??midday）：从详情事件 forecast 字段解析为结构化 payload，
+ * 供洞见卡预判 summary 与预判区 conditions 列表渲染。
+ * 复用 insightCards 导出的 parseForecastSlot。
+ * 无 forecast 或解析失败返回 null，对应区块不渲染。
+ */
+const forecastSlot = computed<ForecastSlotPayload | null>(() => {
+  return parseForecastSlot(detail.value?.forecast)
+})
+
+/** 当前展示的预判 slot 名（close 收盘 / midday 午盘），用于预判区底部标识 */
+const slotLabel = computed(() => {
+  const slot = forecastSlot.value?.slot
+  if (slot === 'close') return '基于收盘预判'
+  if (slot === 'midday') return '基于午盘预判'
+  return ''
+})
+
+/**
  * 洞见卡数据：主因结论作一句话标题、主链声明作「溯源」。
- * 预判（forecast）字段随建议跟踪一并移除（2026-08-25 决策），暂留空串；
- * 后续由 stock_trace agent 的 LLM 直接产出溯源/预判全文。
+ * 预判 summary 取真实 forecast slot 的 summary（close??midday），不再恒空兜底。
+ * InsightCard 对空 forecast 不渲染该行，有值则展示一行金底横幅。
  */
 const insightData = computed(() => {
   const cause = primaryCause.value
@@ -284,8 +334,7 @@ const insightData = computed(() => {
   return {
     content: cause.verdict,
     trace,
-    // 建议跟踪已移除、无数据源，空串兜底（InsightCard 对空 forecast 不渲染该行）
-    forecast: '',
+    forecast: forecastSlot.value?.summary ?? '',
     time: detail.value?.triggered_at ? fmtTime(detail.value.triggered_at).slice(5) : '',
   }
 })
@@ -688,6 +737,72 @@ onLoad(async (query) => {
 .suggest-label { display: block; font-size: $font-size-xs; color: $ink-soft; margin-bottom: $s-1; }
 .suggest-chips { display: flex; flex-wrap: wrap; gap: $s-1; }
 .suggest-chip { font-size: $font-size-xs; color: $primary; background: $white; padding: 4rpx 16rpx; border-radius: $r-full; }
+
+/* ===== 预判区：conditions 卡片列表 ===== */
+.forecast-area {
+  background: $gold-soft-bg;
+  border: 2rpx solid $gold-soft-border;
+}
+
+.forecast-item {
+  margin-bottom: $s-2;
+  padding: $s-2 $s-3;
+  background: $bg-card;
+  border-radius: $r-md;
+  border: 2rpx solid $line-soft;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.forecast-header {
+  margin-bottom: $s-1;
+}
+
+.forecast-index {
+  font-size: $font-size-xs;
+  font-weight: 600;
+  color: $ink-mute;
+}
+
+.forecast-body {
+  display: flex;
+  flex-direction: column;
+  gap: $s-1;
+}
+
+.forecast-row {
+  display: flex;
+  align-items: flex-start;
+  gap: $s-2;
+}
+
+.forecast-label {
+  flex-shrink: 0;
+  font-size: $font-size-xs;
+  font-weight: 500;
+  color: $ink-soft;
+  min-width: 8rpx;
+  &::after {
+    content: '：';
+  }
+}
+
+.forecast-value {
+  flex: 1;
+  font-size: $font-size-sm;
+  color: $ink;
+  line-height: 1.5;
+}
+
+.forecast-slot-label {
+  display: block;
+  margin-top: $s-2;
+  text-align: right;
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
 
 /* ===== 证据清单（默认收起，点击标题展开） ===== */
 .section-title.row {

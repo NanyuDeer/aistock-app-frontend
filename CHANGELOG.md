@@ -159,6 +159,98 @@
 
 ---
 
+## [master] 2026-08-31 — 登录页恢复「手机号验证码登录」入口（阿里云短信认证）
+
+**开发者**: Aria
+
+### 新增
+- `login.vue`：登录方式增加「手机号验证码登录」入口按钮（`phone-line` 图标）；新增手机号表单（phone + smsCode，`handleSendSms`/`handlePhoneLogin`，手机号格式校验 `^1[3-9]\d{9}$`，60s 倒计时），与邮箱表单共享 `smsCode`/`countdown`
+- `user.ts` store：新增 `smsLogin(phone, code)`（复用 `authApi.smsLogin`，存 token/userInfo 后 `fetchUserInfo`）并导出
+
+### 说明
+- 仅 App 端（aistock-app-frontend）；Web 端登录方式不变。`vue-tsc --noEmit` 通过
+
+---
+
+## [master] 2026-08-31 — 洞见卡标签统一 + VIP 弹窗/会员页优化 + 登录验证码可读性修复
+
+**开发者**: Aria
+
+### 修复
+- `AiEventReport.vue` + `insight-detail.vue` + `insight-detail-move.vue`：移除三处自定义洞见标签（动因/展望、依据/展望、依据/跟踪），统一使用 InsightCard 默认「溯源/预判」，与全局洞见卡契约一致
+- `login.vue` + `account-security.vue`：验证码按钮禁用态整体 opacity 导致白字变浅灰看不清，改为取消整体透明度、背景手动淡化 + 文字固定纯白
+- `MarketInsightCard.vue`：通过 `:deep()` 覆盖子组件 section padding 为 0，并移除"溯源"外层白卡包装，使现象/溯源/预判卡外边界与洞见卡对齐（消除卡中卡）
+
+### 改进
+- `vip.vue`：会员身份卡由纵向居中改为横向布局——皇冠标识左对齐（渐变金色圆底），权益勾选标识加浅绿圆底，提升页面质感
+- `agent-report.vue` + `ConfirmModal.vue`：非会员引导开通弹窗统一为 ConfirmModal（560rpx + 等宽 secondary/primary 双按钮）；ConfirmModal 新增 `maskClosable` prop 透传（VIP 弹窗点遮罩不可关闭）
+
+---
+
+## [junliang] 2026-08-30 — 涨停雷达并入 stock-trace：洞察列表统一 movements
+
+**开发者**: Aria
+
+### 变更
+- 涨停雷达事件并入 stock-trace 链路后，自选股洞察卡片/列表统一只消费 `stockTraceApi.list`（movements）：
+  - `AlertContent.vue`（首页特别提醒）：移除并行拉取 `watchlistInsightApi.getInsights()` 与 `fromInsight`，`goTrace` 统一跳 `insight-detail-move`。
+  - `pages/insight.vue`（自选股洞察列表）：移除 `limit_up_radar` 卡片渲染与 insight-detail 跳转，统一 price 展示。
+- `insight-detail.vue`（涨停雷达详情）停用为入口，文件保留兼容历史链接；watchlist_insight_events 存量保留在库、不再展示。
+
+---
+
+## [junliang] 2026-08-28 — 修复异动详情页渲染崩溃（suggestedActions 残留引用）
+
+**开发者**: Aria
+
+### 修复
+- `src/modules/favorites/pages/insight-detail-move.vue`：洞见卡 computed 中 `forecast` 引用已删除的 `suggestedActions`（2026-08-25 移除"建议跟踪"时漏删）→ `ReferenceError` 导致详情页渲染崩溃白屏。修复为 `forecast` 恒为空（与移除建议跟踪的决策一致），并同步注释
+
+## [changer] 2026-08-30 — 节奏大师语义修正 + 日历热力图总览（design-debate）
+
+**开发者**: changer-collab
+
+### 新增
+- 节奏日历热力图总览页 `pages/calendar.vue`：近 60 交易日网格（7 列按周），独立五档色板 + 图例，灰格=无报告/沿用前值，点格跳详情（带 date），H5 直开兜底
+- `agentApi.getRhythmMasterCalendar(days)` API（契约 #7）
+
+### 修复
+- `RhythmCard.vue` 分支语义：拆分"触发条件 / 目标参考区间"标签、点位来源脚注、`conflict=true` 隐藏仓位建议（G2 背离纪律）、空区间"结果待公布"占位
+- 详情页返回按钮 H5 直接 URL 打开时 `reLaunch` 回首页兜底
+- `vite.config.ts` 新增 `/api/agent/trading-calendar` 显式代理规则（修复本地 H5 节奏大师 fallbackDate 500）
+
+### 文档
+- `src/modules/rhythm/AGENTS.md` 更新（日历页/接口/分支语义/契约 #7）
+
+---
+
+## [master] 2026-08-28 — 洞见卡片体系统一：横幅卡配色 + 板块洞见蓝卡 + 修复市场洞见预判
+
+**开发者**: Aria
+
+### 新增
+- 全局 SCSS mixin `insight-banner`（洞见 key+text 卡片化：顶部小字关键词 + 底部正文，底色由 `--banner-bg` 指定）与 `insight-line`（左 key 右 text 统一排版），一处调整全站生效
+- 趋势洞见独立紫色 token（`$insight-trend` 系列）与 `InsightCard`/`InsightTag` 的 `trend` 类型，与市场蓝脱色区隔
+
+### 改进
+- 洞见 key+text 全部升级为彩色横幅卡（同「归因结论」样式）：溯源=实底蓝、预判=浅金柔底（`$gold-soft-bg` #fff4de + 深金字 + 细描边）、优势=绿、风险=红；覆盖 `InsightCard`、个股综合决策（重点/机会/风险）、板块洞见等
+- 板块洞见：持续原因/传递方向/传递判断 合入**同一蓝色卡片**（分隔线分开、行距优化），风险提示独立红色横幅；AI 分析卡上移至板块 K 线上方
+- 全站接入统一洞见卡片（事件页/情报页/异动页/业绩洞见/趋势详情），溯源/预判 与 lines（优势/风险/建议）字段契约稳定
+- 洞见解 line 统一排版抽离（key=22rpx/600/$primary，text=26rpx/$ink-soft/400），个股详情与板块页同步生效
+
+### 修复
+- 市场洞见页预判恒显示"暂无预判"：预测记录改为按**报告真实日期**关联（后端 review 查询会回退返回最近可用报告），回退场景也能命中预测；日期标签同步显示真实报告日期
+- `InsightCard` 的 `trace`/`forecast` 声明为可选，修复 report-detail 传 `lines` 时的类型报错
+
+### 文档
+- AGENTS / README / LLM prompt 改造建议（字段契约、横幅卡语义色、板块洞见关键词）同步
+
+---
+
+## [changer] 2026-08-28 — 市场洞见展开详情渲染修复
+
+---
+
 ## \[changer] 2026-09-03 — 午间报「午后前瞻 → 机会/风险对位」（schema 2.1）
 
 **开发者**: 37588
