@@ -31,7 +31,7 @@ import InsightCard from './InsightCard.vue'
 import { LoadingState } from '@/shared/components'
 import { sectorPredictionToStructured, relationLabel } from '@/shared/utils/sectorInsight'
 import type { SectorInsightCandidate } from '@/shared/api/modules/agent'
-import type { SectorMarketLink, SectorStructuredForecast } from '@/shared/utils/sectorInsight'
+import type { SectorMarketLink } from '@/shared/utils/sectorInsight'
 
 /**
  * SectorInsightCard 板块洞见卡（shared wrapper，板块四环前端 spec 2026-09-02）
@@ -56,14 +56,11 @@ const props = withDefaults(defineProps<{
   marketLink?: SectorMarketLink | null
   /** 板块名（入链但四环无内容时标题兜底用） */
   sectorName?: string
-  /** 预判结构化覆盖（演示/事件驱动剧本用；正常模式 null → 走 candidate.prediction 映射） */
-  forecastOverride?: SectorStructuredForecast | null
 }>(), {
   loading: false,
   date: '',
   marketLink: null,
-  sectorName: '',
-  forecastOverride: null
+  sectorName: ''
 })
 
 /**
@@ -118,11 +115,8 @@ const timeLabel = computed(() => {
   return `${Number(m[2])}/${Number(m[3])}`
 })
 
-/**
- * InsightCard 条件化预判结构化数据：演示/事件驱动剧本覆盖优先（forecastOverride），
- * 否则映射自聚合接口 horizons/conditions/met（与 sector-loop 共用映射工具）。
- */
-const structured = computed(() => props.forecastOverride ?? sectorPredictionToStructured(props.candidate?.prediction))
+/** InsightCard 条件化预判结构化数据（映射自聚合接口 horizons/conditions/met；与 sector-loop 共用映射工具） */
+const structured = computed(() => sectorPredictionToStructured(props.candidate?.prediction))
 
 /**
  * 溯源行结构化数据（V2 大盘联动）：marketLink 传入 → InsightCard 结构化溯源

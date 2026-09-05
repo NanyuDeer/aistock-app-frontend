@@ -1,13 +1,5 @@
 # changelog-pending.md（待提交修改记录）
 
-## 2026-09-04 板块详情 ?mock=1 演示数据（T6 配套：大盘联动 mock + 事件驱动预判静态剧本）
-
-- 背景：18:30 收盘后才有真实大盘归因链；演示前经板块详情 `?mock=1` 注入示意数据（页面显示"演示模式"提示，18:30 后自动接入真实结果）。
-- **utils/sectorInsight.ts**：`buildDemoAttributionChain(date, focusSector)`（focusSector 自驱动 -3.2% + 跟随分支 -0.6%，大盘 index -0.9%）与 `buildDemoEventForecast(focusSector)`（P2 事件驱动静态剧本：事件确认→在途→条件触发点亮 met:true / 未触发置灰 met:false；dueLabel「无固定验证日」）。
-- **SectorInsightCard**：新增可选 prop `forecastOverride`（预判结构化覆盖，演示剧本用；正常 null 走 candidate.prediction 映射）。
-- **sector-detail.vue**：解析 `?mock=1`；真实归因链为空时注入演示链 → 洞见卡溯源行展示大盘联动；预判侧注入事件驱动剧本取代四环 CFB；洞见卡下方加演示模式提示行。
-- 类型检查：`npx vue-tsc --noEmit` 0 新增错误（仅存量 RhythmCalendarPanel）。
-
 ## 2026-09-04 板块洞见卡溯源行接大盘归因链（P1 Task 6，V2 结构化角色卡；连同并行蓝色卡改动一并提交）
 
 - 用户拍板：板块详情「大盘联动」不落独立区块，并入洞见卡溯源行（InsightCard 双子卡语义：溯源 = 大盘联动角色；板块四环内容源将被事件驱动/链式模型替换）。
