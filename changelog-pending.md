@@ -1,5 +1,9 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-05
+- 合并 PR #127（自选股洞察前端整线：movement/洞察页演进 + 详情统一 + 轻量预判展示，43 commits）至 master 并 push（commit 1e4ec99）。
+  - 冲突解决：`CHANGELOG.md`/`changelog-pending.md` 双端条目全保留、按时间倒序重组（HEAD 09-03 节奏大师条目 + pr-127 08-28~08-31 条目 + HEAD 后续条目）。
+
 ## 2026-09-04 板块洞见卡溯源行接大盘归因链（P1 Task 6，V2 结构化角色卡；连同并行蓝色卡改动一并提交）
 - 用户拍板：板块详情「大盘联动」不落独立区块，并入洞见卡溯源行（InsightCard 双子卡语义：溯源 = 大盘联动角色；板块四环内容源将被事件驱动/链式模型替换）。
 - **InsightCard 结构化溯源 prop（shared，已同步 aistock-component-lib）**：新增可选 `traceStructured`，溯源蓝卡双行 —— ①大盘一句话 + 指数涨跌右对齐（A 股红涨绿跌，`--ins-up/--ins-down` 明暗随主题）②角色徽（自驱动/跟随大盘 中性描边徽）+ 驱动一句话；badge 缺省 → 仅大盘行（未入链语义）。传入优先于文本形态 `trace`，组件保持纯 UI。
