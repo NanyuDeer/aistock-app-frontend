@@ -490,7 +490,8 @@ export const stockApi = {
     const qParams: Record<string, unknown> = { symbol, klt, fqt: 1, limit: params?.count || defaultCount }
     if (startDate) qParams.startDate = startDate
     return request.get<Record<string, unknown>>('/cn/stock/quotes/kline', {
-      params: qParams
+      params: qParams,
+      timeout: 60000,
     }).then((res: Record<string, unknown>) => {
       const data = (res.data as Record<string, unknown>) || res
       const payload = (data.data as Record<string, unknown>) || data
@@ -519,7 +520,7 @@ export const stockApi = {
 
   /** 获取资金流向（已归一化） */
   getCapitalFlow(symbol: string) {
-    return request.get(`/cn/stocks/${symbol}/capital-flow`).then((res: Record<string, unknown>) => res || null)
+    return request.get(`/cn/stocks/${symbol}/capital-flow`, { timeout: 30000 }).then((res: Record<string, unknown>) => res || null)
   },
 
   /** 获取个股新闻 */
@@ -534,7 +535,7 @@ export const stockApi = {
 
   /** 获取趋势股评分（四维：技术面/行业赛道景气/消息面催化/基本面，含一票否决检查） */
   getTrendScore(symbol: string) {
-    return request.get(`/cn/stocks/${symbol}/trend-score`).then((res: Record<string, unknown>) => normalizeTrendScore(res))
+    return request.get(`/cn/stocks/${symbol}/trend-score`, { timeout: 90000 }).then((res: Record<string, unknown>) => normalizeTrendScore(res))
   },
 
   /** 获取行业景气指数（基于板块成分股近7个月涨跌幅） */
@@ -636,32 +637,32 @@ export const stockApi = {
 
   /** 获取半年报关键财务数据 */
   getSemiAnnualReport(symbol: string) {
-    return request.get(`/cn/stocks/${symbol}/semi-annual-report`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+    return request.get(`/cn/stocks/${symbol}/semi-annual-report`, { timeout: 60000 }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 获取个股 AI 资讯分析 */
   getStockAnalysis(symbol: string) {
-    return request.get(`/cn/stocks/${symbol}/analysis`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+    return request.get(`/cn/stocks/${symbol}/analysis`, { timeout: 90000 }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 创建个股 AI 资讯分析（触发后端生成） */
   createStockAnalysis(symbol: string) {
-    return request.post(`/cn/stocks/${symbol}/analysis`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+    return request.post(`/cn/stocks/${symbol}/analysis`, {}, { timeout: 120000 }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 获取个股 AI 分析历史 */
   getStockAnalysisHistory(symbol: string, params?: { page?: number; pageSize?: number }) {
-    return request.get(`/cn/stocks/${symbol}/analysis/history`, { params }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+    return request.get(`/cn/stocks/${symbol}/analysis/history`, { params, timeout: 60000 }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 获取中/长线 AI 洞见（从缓存读取） */
   getMidLongAnalysis(symbol: string, timeframe: 'mid' | 'long') {
-    return request.get(`/cn/stocks/${symbol}/mid-long/${timeframe}`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+    return request.get(`/cn/stocks/${symbol}/mid-long/${timeframe}`, { timeout: 60000 }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 创建中/长线 AI 洞见（触发后端 LLM 生成） */
   createMidLongAnalysis(symbol: string, timeframe: 'mid' | 'long') {
-    return request.post(`/cn/stocks/${symbol}/mid-long/${timeframe}`).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+    return request.post(`/cn/stocks/${symbol}/mid-long/${timeframe}`, {}, { timeout: 120000 }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 获取股票基础信息（行业、地域板块、上市时间、股本、市值等） */
@@ -690,17 +691,17 @@ export const stockApi = {
 
   /** 获取业绩预测（GET 只读） */
   getForecast(symbol: string) {
-    return request.get(`/cn/stock/${symbol}/profit-forecast`).then((res: Record<string, unknown>) => normalizeForecast(res))
+    return request.get(`/cn/stock/${symbol}/profit-forecast`, { timeout: 60000 }).then((res: Record<string, unknown>) => normalizeForecast(res))
   },
 
   /** 触发更新业绩预测 */
   createForecast(symbol: string) {
-    return request.post(`/cn/stock/${symbol}/profit-forecast`).then((res: Record<string, unknown>) => normalizeForecast(res))
+    return request.post(`/cn/stock/${symbol}/profit-forecast`, {}, { timeout: 120000 }).then((res: Record<string, unknown>) => normalizeForecast(res))
   },
 
   /** 强制刷新趋势股评分 */
   refreshTrendScore(symbol: string) {
-    return request.post(`/cn/stocks/${symbol}/trend-score/refresh`).then((res: Record<string, unknown>) => normalizeTrendScore(res))
+    return request.post(`/cn/stocks/${symbol}/trend-score/refresh`, {}, { timeout: 120000 }).then((res: Record<string, unknown>) => normalizeTrendScore(res))
   },
 
   /** 获取个股异动事件（趋势风口） */

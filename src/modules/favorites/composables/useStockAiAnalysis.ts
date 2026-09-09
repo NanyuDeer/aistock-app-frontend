@@ -60,7 +60,7 @@ function formatMultiple(value: any): string {
 
 function formatAmountYi(value: any): string {
   const num = toFiniteNumber(value)
-  if (num === null) return '--'
+  if (num === null || num === 0) return '--'
   const yi = Math.abs(num) >= 100000000 ? num / 100000000 : num
   return `${yi.toFixed(2)}亿`
 }
