@@ -1173,28 +1173,37 @@ const forecastChartItems = computed(() => {
 })
 
 const forecastYearRows = computed(() => {
-  const rows = Array.isArray(forecastData.value?.predictions) ? forecastData.value.predictions : []
-  if (!rows.length) return []
-  const parsed = rows
-    .slice(0, 3)
+  // 与图表同源：优先预测明细，缺净利润值时回退到详表净利润行
+  const source = buildForecastChartSource()
+  if (!source.length) return []
+  const detailRows = Array.isArray(forecastData.value?.detailIndicators) ? forecastData.value.detailIndicators : []
+  const growthRow = detailRows.find((r: any) => String(r['预测指标'] || r.indicator || '').includes('净利润增长率'))
+  const getGrowth = (year: string): number | string => {
+    if (!growthRow) return '--'
+    const raw = growthRow[`预测${year}-平均`] || growthRow[`预测${year}`] || growthRow[`${year}-实际值`] || '--'
+    const num = parseFloat(String(raw).replace('%', '').replace(/,/g, ''))
+    return Number.isNaN(num) ? '--' : num
+  }
+  const parsed = source
     .map((item: any) => {
       const value = parseForecastProfit(item.netProfit)
+      const growth = item.growth != null ? item.growth : getGrowth(String(item.year || ''))
       return {
         year: String(item.year || ''),
         netProfit: item.netProfit || '--',
-        growth: item.growth,
+        growth,
         value: value ?? 0,
-        kindClass: item.growth === '--' || item.growth == null ? 'is-forecast' : item.growth >= 0 ? 'is-actual' : 'is-forecast',
-        kindText: item.growth === '--' || item.growth == null ? '预测' : item.growth >= 0 ? '改善' : '承压',
-        growthText: item.growth === '--' || item.growth == null ? '--' : `${item.growth >= 0 ? '+' : ''}${item.growth}%`,
-        growthClass: item.growth === '--' || item.growth == null ? '' : item.growth >= 0 ? 'up' : 'down',
+        kindClass: growth === '--' || growth == null ? 'is-forecast' : growth >= 0 ? 'is-actual' : 'is-forecast',
+        kindText: growth === '--' || growth == null ? '预测' : growth >= 0 ? '改善' : '承压',
+        growthText: growth === '--' || growth == null ? '--' : `${growth >= 0 ? '+' : ''}${growth}%`,
+        growthClass: growth === '--' || growth == null ? '' : `${growth >= 0 ? 'up' : 'down'}`,
       }
     })
   const max = Math.max(...parsed.map((item: any) => Math.abs(item.value)), 0.01)
   return parsed.map((item: any) => ({
     ...item,
     progress: Math.max(18, Math.round((Math.abs(item.value) / max) * 100)),
-  }))
+  })).filter((item: any) => item.year)
 })
 
 const forecastYearKeys = computed(() => {
@@ -1214,14 +1223,27 @@ const forecastYearKeys = computed(() => {
 })
 
 function buildForecastChartSource(): Array<{ year: string; netProfit: any; kind?: 'actual' | 'forecast' }> {
+  const details = forecastData.value?.detailIndicators
+  const detailRows = Array.isArray(details) ? details : []
+  // 净利润行：匹配"净利润"，排除"净利润增长率"等衍生指标
+  const profitRow = detailRows.find((row: any) => {
+    const name = String(row['预测指标'] || row.indicator || '')
+    return name.includes('净利润') && !name.includes('增长率')
+  })
+
   const predictions = forecastData.value?.predictions
   if (Array.isArray(predictions) && predictions.length > 0) {
-    return predictions.map((item: any) => ({ year: String(item.year || ''), netProfit: item.netProfit }))
+    // 优先用预测明细；个别年份净利率缺失时，用详表净利润行兜底
+    return predictions.map((item: any) => {
+      const year = String(item.year || '')
+      let netProfit = item.netProfit
+      if ((netProfit == null || netProfit === '--') && profitRow) {
+        netProfit = profitRow[`预测${year}-平均`] || profitRow[year + '-实际值'] || profitRow[`预测${year}`] || netProfit
+      }
+      return { year, netProfit, kind: item.kind }
+    })
   }
 
-  const details = forecastData.value?.detailIndicators
-  if (!Array.isArray(details) || details.length === 0) return []
-  const profitRow = details.find((row: any) => String(row['预测指标'] || row.indicator || '').includes('净利润'))
   if (!profitRow) return []
   return forecastYearKeys.value.map(item => ({
     year: item.year,
