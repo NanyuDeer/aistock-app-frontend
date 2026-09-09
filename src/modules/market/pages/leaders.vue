@@ -14,6 +14,15 @@
       <!-- 引导卡片：点击查看今日分析报告 -->
       <GuideCard title="点击查看今日分析报告" icon-name="file-line" theme="brand" @click="goAgentReport" />
 
+      <!-- 板块四环入口：板块溯源+预判+验证一览（跳板块四环页） -->
+      <view class="sector-pred-entry" @tap="goSectorLoop">
+        <view class="spe-left">
+          <text class="spe-title">板块预判</text>
+          <text class="spe-tag">今日</text>
+        </view>
+        <text class="spe-arrow">›</text>
+      </view>
+
       <!-- 长线/短线风口两档切换 -->
       <view v-if="sectors.length" class="cycle-tabs">
         <view
@@ -180,24 +189,22 @@ const CYCLE_OPTIONS = [
 
 const activeCycle = ref<'long' | 'short'>('long')
 
-/** 当前档位展示的板块：短线榜按上榜次数（近10日 freq20）→ 热度（short_heat）降序、长线榜按 long_term_days 降序，各取 top8。
+/** 当前档位展示的板块：统一先按上榜次数降序、再按该档位持续时间（影响天数）降序，各取 top8。
+ * 长线上榜次数=近120日 frequency、短线=近20日 freq20；持续时间=长线 long_term_days / 短线 short_term_days。
  * 先过滤掉该档位天数为 0 的板块（另一链被裁剪或长短线均不成立的板块），
- * 宁少勿滥，避免短线档塞满 0 天补位板块。
- * 短线排序与后端 applyDualRankings 口径一致（上榜次数-热度），不依赖后端返回顺序。 */
+ * 宁少勿滥，避免短线档塞满 0 天补位板块。 */
 const displaySectors = computed(() =>
   [...sectors.value]
     .filter(s => getSectorDays(s, activeCycle.value) > 0)
     .sort((a, b) => {
-      if (activeCycle.value === 'short') {
-        // 短线榜：上榜次数（近10日 freq20）降序，相同按短线热度（short_heat）降序
-        const freqDiff = Number(b.freq20 ?? 0) - Number(a.freq20 ?? 0)
-        if (freqDiff !== 0) return freqDiff
-        return getSectorStrength(b, 'short') - getSectorStrength(a, 'short')
-      }
-      // 长线榜：长线影响天数降序，同天数按近120日上榜次数 frequency 降序
-      const daysDiff = getSectorDays(b, 'long') - getSectorDays(a, 'long')
-      if (daysDiff !== 0) return daysDiff
-      return Number(b.frequency ?? 0) - Number(a.frequency ?? 0)
+      // 上榜次数（长线 frequency / 短线 freq20）降序优先
+      const freqDiff =
+        activeCycle.value === 'short'
+          ? Number(b.freq20 ?? 0) - Number(a.freq20 ?? 0)
+          : Number(b.frequency ?? 0) - Number(a.frequency ?? 0)
+      if (freqDiff !== 0) return freqDiff
+      // 上榜次数相同时按该档持续时间（影响天数）降序
+      return getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value)
     })
     .slice(0, 8)
 )
@@ -653,6 +660,11 @@ function goPushHistory() {
   uni.navigateTo({ url: '/modules/market/pages/push-history' })
 }
 
+// 跳转到板块四环页（板块溯源/预判/验证一览）
+function goSectorLoop() {
+  uni.navigateTo({ url: '/modules/market/pages/sector-loop' })
+}
+
 // 跳转到板块详情子页面，传递板块名称用于数据筛选
 function goSectorDetail(sector: WindLeaderSector) {
   if (!sector?.name) return
@@ -677,6 +689,51 @@ onShow(() => {
 .leaders-content > :first-child {
   margin-bottom: 20rpx;
 }
+
+/* ===== 板块四环入口行（白卡，跟随 GuideCard 之后） ===== */
+.sector-pred-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 28rpx;
+  margin-bottom: 20rpx;
+  background: $bg-card;
+  border: 2rpx solid $line;
+  border-radius: $r-lg;
+  box-shadow: $shadow-sm;
+  transition: transform 0.15s ease;
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.spe-left {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.spe-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: $ink;
+}
+
+.spe-tag {
+  font-size: 20rpx;
+  color: $primary;
+  background: rgba(11, 95, 255, 0.08);
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  font-weight: 500;
+}
+
+.spe-arrow {
+  font-size: 36rpx;
+  color: #9ca3af;
+}
+
 
 .state-section {
   margin-bottom: 24rpx;

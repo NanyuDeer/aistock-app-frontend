@@ -36,8 +36,6 @@
         v-if="insightCard.content"
         type="event"
         :title="insightCard.content"
-        trace-label="动因"
-        forecast-label="展望"
         :trace="insightCard.trace"
         :forecast="insightCard.forecast"
         :time="insightCard.time"
@@ -173,12 +171,19 @@ onMounted(() => {
   startAnalysis()
 })
 
-/** 打开来源 → 进入 APP 原文详情页（统一走 event-article，不依赖 WebView/剪贴板） */
+/** 打开来源原文 → 跨端跳转：H5 新标签打开，APP 内 web-view 打开；无链接友好提示 */
 function openArticle(): void {
-  if (!props.detail?.event?.eventId) return
-  uni.navigateTo({
-    url: `/pages-sub-app/event-article/index?eventId=${props.detail.event.eventId}`,
-  })
+  const url = props.detail?.event?.sourceInfo?.url
+  if (!url) {
+    uni.showToast({ title: '暂无原文链接', icon: 'none' })
+    return
+  }
+  // #ifdef H5
+  window.open(url, '_blank')
+  // #endif
+  // #ifndef H5
+  uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
+  // #endif
 }
 
 /** Step 1: AI投资机会 */

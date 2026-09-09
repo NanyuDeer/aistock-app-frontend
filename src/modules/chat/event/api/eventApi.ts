@@ -5,7 +5,7 @@
  * 通过 eventAdapter 处理数据映射和降级逻辑。
  */
 
-import type { EventListResponse, EventListParams, EventDetailResponse, EventGraph, NewsArticle, EventArticle } from '../types'
+import type { EventListResponse, EventListParams, EventDetailResponse, EventGraph, NewsArticle } from '../types'
 import type { BackendEventListData, BackendEventDetailData } from './eventAdapter'
 import { adaptEventList, adaptEventDetail } from './eventAdapter'
 import request from '@/shared/api/request'
@@ -90,16 +90,6 @@ export async function unfollowEvent(eventId: string): Promise<void> {
 export async function watchEvent(eventId: string): Promise<void> {
   // TODO: 需要后端新增盯盘接口
   console.warn('[eventApi] watchEvent 功能暂未实现:', eventId)
-}
-
-/**
- * 获取事件原文详情（APP 内展示财联社正文）
- *
- * @param eventId - 事件ID
- */
-export async function getEventArticle(eventId: string): Promise<EventArticle> {
-  const response = await request.get<EventArticle>(`/agent/event/${eventId}/article`)
-  return response
 }
 
 /**

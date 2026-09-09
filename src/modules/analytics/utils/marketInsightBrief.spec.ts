@@ -27,7 +27,7 @@ function makePresentation(overrides: Partial<MarketTracePresentation> = {}): Mar
     alternatives: [], rejected: [],
     sectorRanking: { topGainers: [], topLosers: [] },
     predictionValidation: null,
-    prediction: { status: 'confirmed', horizons: [], evolutionSteps: [], evolutionNarrative: '', risks: [], attributionSummary: '短线情绪延续，中线关注政策落地' },
+    prediction: { status: 'confirmed', horizons: [], evolutionSteps: [], evolutionNarrative: '', risks: [], conditions: [], attributionSummary: '短线情绪延续，中线关注政策落地' },
     markdownDetails: '详情',
     ...overrides,
   }

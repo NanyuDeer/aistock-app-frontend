@@ -50,6 +50,25 @@ export const useUserStore = defineStore('user', () => {
     await fetchUserInfo()
   }
 
+  /** 手机号 + 短信验证码登录（无账户自动创建；dev 验证码 123456） */
+  async function smsLogin(phone: string, code: string) {
+    const result: any = await authApi.smsLogin(phone, code)
+    token.value = result.token
+    storage.set(STORAGE_KEYS.TOKEN, result.token)
+    if (result.userInfo) {
+      userInfo.value = {
+        id: result.userInfo.id,
+        openid: result.userInfo.openid || '',
+        phone: result.userInfo.phone || '',
+        nickname: result.userInfo.nickname || '',
+        avatar: result.userInfo.avatar || result.userInfo.avatar_url || '',
+      }
+      storage.set(STORAGE_KEYS.USER_INFO, userInfo.value)
+    }
+    await fetchUserInfo()
+    return userInfo.value
+  }
+
   /** 邮箱 + 验证码登录（无账户自动创建；dev 验证码 123456） */
   async function emailLogin(email: string, code: string) {
     const result: any = await authApi.emailLogin(email, code)
@@ -141,6 +160,7 @@ export const useUserStore = defineStore('user', () => {
     isLoggedIn,
     login,
     wxLogin,
+    smsLogin,
     emailLogin,
     handleScanLoginSuccess,
     fetchUserInfo,

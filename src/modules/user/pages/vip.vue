@@ -7,19 +7,25 @@
         <view class="vip-hero-icon">
           <SvgIcon :name="isVip ? 'vip-crown-fill' : 'vip-crown-line'" size="52rpx" :color="isVip ? '#f0a020' : '#b8c0d0'" />
         </view>
-        <text class="vip-hero-title">{{ isVip ? 'VIP 会员' : '开通会员' }}</text>
-        <text class="vip-hero-sub">{{ isVip ? '已解锁全部 AI 深度报告' : '解锁 AI 深度报告全部内容' }}</text>
+        <view class="vip-hero-text">
+          <text class="vip-hero-title">{{ isVip ? 'VIP 会员' : '开通会员' }}</text>
+          <text class="vip-hero-sub">{{ isVip ? '已解锁全部 AI 深度报告' : '解锁 AI 深度报告全部内容' }}</text>
+        </view>
       </Card>
 
       <!-- 会员权益 -->
       <Card class="vip-benefit">
         <text class="vip-section-title">会员权益</text>
         <view class="vip-benefit-item">
-          <SvgIcon name="check-line" size="28rpx" color="#18a058" />
+          <view class="vip-benefit-icon">
+            <SvgIcon name="check-line" size="24rpx" color="#18a058" />
+          </view>
           <text class="vip-benefit-text">查看全部 AI 深度报告详情（晨报 / 风口龙头 / 机构调研 / 趋势股评分 / 收盘复盘）</text>
         </view>
         <view class="vip-benefit-item">
-          <SvgIcon name="check-line" size="28rpx" color="#18a058" />
+          <view class="vip-benefit-icon">
+            <SvgIcon name="check-line" size="24rpx" color="#18a058" />
+          </view>
           <text class="vip-benefit-text">优先体验更多会员功能</text>
         </view>
       </Card>
@@ -68,15 +74,30 @@ function handleOpen() {
 
 .vip-hero {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  padding: 48rpx 32rpx;
+  gap: 24rpx;
+  padding: 40rpx 32rpx;
   background: linear-gradient(135deg, rgba(240, 160, 32, 0.08), rgba(240, 160, 32, 0.03));
   border-left: 6rpx solid #f0a020;
 }
 
+/* 皇冠标识左对齐，加渐变圆底增强质感 */
 .vip-hero-icon {
-  margin-bottom: 16rpx;
+  flex-shrink: 0;
+  width: 96rpx;
+  height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $r-full;
+  background: linear-gradient(135deg, rgba(240, 160, 32, 0.16), rgba(240, 160, 32, 0.06));
+}
+
+.vip-hero-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .vip-hero-title {
@@ -106,7 +127,20 @@ function handleOpen() {
 .vip-benefit-item {
   display: flex;
   align-items: flex-start;
-  gap: 12rpx;
+  gap: 16rpx;
+}
+
+/* 权益勾选标识：浅绿圆底 */
+.vip-benefit-icon {
+  flex-shrink: 0;
+  width: 44rpx;
+  height: 44rpx;
+  margin-top: 2rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $r-full;
+  background: rgba(24, 160, 88, 0.08);
 }
 
 .vip-benefit-text {

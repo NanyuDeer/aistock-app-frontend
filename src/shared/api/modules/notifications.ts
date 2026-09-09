@@ -23,10 +23,13 @@ export interface NotificationPage {
 }
 
 export const notificationApi = {
-  list(params: { limit?: number; cursor?: string } = {}) {
+  list(params: { limit?: number; cursor?: string; unread?: boolean } = {}) {
     return request.get<NotificationPage>('/users/me/notifications', { params })
   },
   markRead(ids: string[]) {
     return request.post<{ ids: string[] }>('/users/me/notifications/read', { ids })
+  },
+  markAllRead() {
+    return request.post<{ updated: number }>('/users/me/notifications/read-all')
   }
 }

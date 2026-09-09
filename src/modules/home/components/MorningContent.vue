@@ -120,16 +120,24 @@
           </view>
         </Card>
 
-        <Card class="feature-card" clickable @tap="goAgentReport">
+        <Card class="feature-card" clickable @tap="goRhythm">
           <view class="feature-header">
-            <text class="feature-title">今日分析概览</text>
+            <text class="feature-title">节奏大师</text>
             <text class="feature-more">›</text>
           </view>
-          <text class="feature-sub">Agent报告更新状态</text>
-          <view class="feature-list">
-            <view v-for="(item, idx) in aiReports.slice(0, 3)" :key="idx" class="feature-item">
-              <text class="item-name">{{ item.name }}</text>
-              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
+          <text class="feature-sub">近 {{ HOME_RHYTHM_DAYS }} 个交易日 · 收盘基准</text>
+          <!-- 近几日结论：每行 = 建议仓位 + 档位色块（最右，与其它功能卡"名称+Tag"同构）；点行进该日详情（stop 防触整卡跳转） -->
+          <view class="feature-list" v-if="rhythmRows.length">
+            <view
+              v-for="r in rhythmRows"
+              :key="r.date"
+              class="feature-item rhythm-row"
+              @tap.stop="goRhythmDate(r.date)"
+            >
+              <text class="feature-value rhythm-band">{{ r.band || (r.basis_date ? '沿用前值' : '无报告') }}</text>
+              <view class="rhythm-chip" :style="{ background: rhythmChipColor(r) }">
+                <text class="rhythm-chip-text">{{ rhythmLevelShort(r) }}</text>
+              </view>
             </view>
           </view>
         </Card>
@@ -332,8 +340,6 @@ async function loadChainEvents() {
   }
 }
 
-const aiReports = ref<LeaderStockPreview[]>([])
-
 const traceReports = ref<LeaderStockPreview[]>([])
 
 /**
@@ -371,40 +377,60 @@ async function loadTraceReports() {
   })
 }
 
-/** Agent 报告状态预览：检查 4 个 agent（晨报/风口龙头/机构调研/趋势股评分），最多显示3个已更新，不足则补"待更新" */
-const AGENT_REPORT_LABELS: Array<{ intent: string; name: string }> = [
-  { intent: 'morning', name: '晨报' },
-  { intent: 'wind_leader', name: '风口龙头' },
-  { intent: 'hot_burst', name: '机构调研' },
-  { intent: 'trend_score', name: '趋势股评分' },
-]
+/** 首页节奏大师卡：近几日摘要（收盘基准档位 + 建议仓位），每行点入该日详情 */
+const HOME_RHYTHM_DAYS = 3
+interface RhythmHistoryRow {
+  date: string
+  level: string | null
+  score: number | null
+  basis_date: string | null
+  band: string
+}
+const rhythmRows = ref<RhythmHistoryRow[]>([])
 
-async function loadAiReports() {
-  const today = shanghaiDateString()
-  const results = await Promise.allSettled(
-    AGENT_REPORT_LABELS.map(item => agentApi.getReport(item.intent, today))
-  )
+// 档位短码/色板（与节奏模块日历同源：ice 紫灰 / low 青 / normal 主蓝 / active 橙 / euphoria 红）
+const RHYTHM_LEVEL_SHORT: Record<string, string> = { ice: '冰', low: '低', normal: '常', active: '活', euphoria: '亢' }
+const RHYTHM_LEVEL_COLOR: Record<string, string> = {
+  ice: '#8a6fae',
+  low: '#2f9e9e',
+  normal: '#4d7cfe',
+  active: '#f59e0b',
+  euphoria: '#ef4444',
+}
+const RHYTHM_GREY = '#eceef1' // 无档位（行缺失/沿用前值）
 
-  const updated: LeaderStockPreview[] = []
-  AGENT_REPORT_LABELS.forEach((item, idx) => {
-    const r = results[idx]
-    const hasReport = r.status === 'fulfilled' && r.value &&
-      !!(r.value as { content?: unknown })?.content
-    if (hasReport) {
-      updated.push({ name: item.name, tag: '已更新', tagType: 'buy' })
-    }
-  })
-
-  // 最多显示3个：已更新优先，不足补"待更新"
-  const display: LeaderStockPreview[] = updated.slice(0, 3)
-  for (const item of AGENT_REPORT_LABELS) {
-    if (display.length >= 3) break
-    if (!updated.some(u => u.name === item.name)) {
-      display.push({ name: item.name, tag: '待更新', tagType: 'wash' })
-    }
+async function loadRhythmHistory() {
+  try {
+    // 一次日历接口取数即可获得多日 level/score/position_band（契约 #7），避免逐日 getRhythmMaster 放大首页刷新成本
+    const res = await agentApi.getRhythmMasterCalendar(HOME_RHYTHM_DAYS)
+    const days = res?.days ?? []
+    // 接口"最近在前"（降序）→ 卡片顶部为最新日期
+    rhythmRows.value = days.map((d) => ({
+      date: d.date,
+      level: d.level,
+      score: d.score,
+      basis_date: d.basis_date,
+      band: d.position_band?.text ?? '',
+    }))
+  } catch {
+    rhythmRows.value = []
   }
+}
 
-  aiReports.value = display
+function rhythmChipColor(r: RhythmHistoryRow): string {
+  return (r.level && RHYTHM_LEVEL_COLOR[r.level]) || RHYTHM_GREY
+}
+function rhythmLevelShort(r: RhythmHistoryRow): string {
+  if (r.level) return RHYTHM_LEVEL_SHORT[r.level] ?? r.level.slice(0, 1)
+  return '沿'
+}
+
+function goRhythm() {
+  uni.navigateTo({ url: '/modules/rhythm/pages/index' })
+}
+/** 点节奏卡某日摘要行：直达该交易日详情（无报告日由详情页回退链兜底） */
+function goRhythmDate(date: string) {
+  uni.navigateTo({ url: `/modules/rhythm/pages/index?date=${date}` })
 }
 
 /**
@@ -426,7 +452,7 @@ function itemTagType(tagType: LeaderStockPreview['tagType']): 'up' | 'down' | 'n
 onShow(() => {
   briefingRefresh()
   loadLeaderSectors()
-  loadAiReports()
+  loadRhythmHistory()
   loadChainEvents()
   loadTraceReports()
 })
@@ -464,10 +490,6 @@ function goEventDetail(eventId?: string) {
 
 function goTraceability() {
   uni.navigateTo({ url: '/modules/analytics/pages/traceability' })
-}
-
-function goAgentReport() {
-  uni.navigateTo({ url: '/modules/chat/pages/agent-report' })
 }
 
 function goTrackDetail() {
@@ -794,6 +816,33 @@ function goLogin() {
 
 .item-name.placeholder {
   color: $ink-mute;
+}
+
+/* 节奏大师卡片：近几日结论摘要行（建议仓位 + 档位色块最右，与其它功能卡"名称+Tag"同构） */
+.rhythm-chip {
+  flex: none;
+  width: 40rpx;
+  height: 34rpx;
+  border-radius: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rhythm-chip-text {
+  color: #fff;
+  font-size: 18rpx;
+  line-height: 1;
+}
+/* 仓位文案作为"行主体"占满剩余宽度，色块借 feature-item 的 space-between 贴右 */
+.rhythm-band {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: $font-size-xs;
+  color: $ink-soft;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* ===== 重磅事件跟踪 ===== */

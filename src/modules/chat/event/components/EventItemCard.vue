@@ -3,10 +3,10 @@
     <!-- 第一行：事件类型 + 来源 + 时间 + 重要程度 -->
     <view class="card-header">
       <view class="header-left">
-        <text class="card-type" :style="{ color: typeColor.text, background: typeColor.bg }">
+        <Tag v-if="event.eventType" type="gray" size="sm" class="card-type-tag">
           {{ event.eventType }}
-        </text>
-        <Tag size="sm" :type="sourceTagType">
+        </Tag>
+        <Tag size="sm" :type="sourceTagType" :class="sourceTagType === 'gray' ? 'source-tag-muted' : ''">
           {{ sourceLabel }}
         </Tag>
         <text class="card-time">{{ formatDateTime(event.publishTime) }}</text>
@@ -24,40 +24,36 @@
            横向滚动必须由内层容器承载 flex 行布局（外层直接 flex 无效） -->
       <view class="card-top5-inner">
         <text v-if="top5Industries.length === 0" class="top5-empty">暂无明确行业影响</text>
-        <text
+        <Tag
           v-for="ind in top5Industries"
           :key="ind.name"
-          class="top5-item"
-          :class="'t5-' + ind.sentiment"
+          type="gray"
+          class="t5-tag"
         >
-          {{ ind.name }}<text class="t5-arrow">{{ ind.sentiment === 'bullish' ? '↑' : ind.sentiment === 'bearish' ? '↓' : '→' }}</text>
-        </text>
+          <text>{{ ind.name }}</text>
+          <text class="t5-arrow" :class="'t5-arrow--' + ind.sentiment">
+            {{ ind.sentiment === 'bullish' ? '↑' : ind.sentiment === 'bearish' ? '↓' : '→' }}
+          </text>
+        </Tag>
       </view>
     </scroll-view>
 
     <!-- AI 摘要 + 操作按钮 -->
     <view class="card-bottom">
       <view class="card-ai-summary" v-if="event.aiSummary">
-        <Badge type="primary" :dot="false" size="sm" class="ai-badge">洞见</Badge>
+        <!-- AI 洞见徽标：洞见字标 PNG（与洞见卡头部字标同源，无背景小图） -->
+        <view class="ai-badge-wm" :style="wmBg" />
         <text class="ai-text">{{ event.aiSummary }}</text>
       </view>
       <view class="card-actions">
         <Button
-          type="ghost"
+          type="secondary"
           size="sm"
           class="follow-btn"
           :class="{ followed: event.isFollowed }"
           @click.stop="$emit('toggle-follow', event)"
         >
           {{ event.isFollowed ? '已关注' : '关注' }}
-        </Button>
-        <Button
-          type="primary"
-          size="sm"
-          class="detail-btn"
-          @click.stop="$emit('view-detail', event)"
-        >
-          洞见
         </Button>
       </view>
     </view>
@@ -80,10 +76,13 @@
  */
 import { computed } from 'vue'
 import type { EventItem } from '../types'
-import { EVENT_TYPE_COLORS } from '../constants'
 import { formatDateTime } from '@/shared/utils/datetime'
-import { Card, Button, Tag, Badge } from '@/shared/components'
+import { Card, Button, Tag } from '@/shared/components'
 import Rate from '@/shared/components/Rate.vue'
+import wordmarkPng from '@/shared/components/insight-wordmark.png'
+
+/** AI 洞见徽标底图（洞见字标 PNG） */
+const wmBg = { backgroundImage: `url(${wordmarkPng})` }
 
 // ========== Props ==========
 
@@ -101,25 +100,16 @@ defineEmits<{
   'view-news': [event: EventItem]
 }>()
 
-// ========== 设计令牌（避免硬编码颜色） ==========
-
-// typeColor 兜底色用于内联 style，无法使用 SCSS 变量
-
 // ========== 计算属性 ==========
-
-/** 事件类型颜色（按类型映射） */
-const typeColor = computed(() => {
-  return EVENT_TYPE_COLORS[props.event.eventType] || { bg: '#f0f2f5', text: '#4b5a7a' }
-})
 
 /** 来源标签文案 */
 const sourceLabel = computed(() => {
   return props.event.sourceInfo?.name || props.event.source || '来源暂不可验证'
 })
 
-/** 来源是否可验证：无可验证来源时用 warning 色提示，否则用 neutral */
-const sourceTagType = computed<'neutral' | 'warning'>(() => {
-  return props.event.sourceInfo?.name || props.event.source ? 'neutral' : 'warning'
+/** 来源是否可验证：无可验证来源时用 warning 色提示，否则用中性灰 gray */
+const sourceTagType = computed<'gray' | 'warning'>(() => {
+  return props.event.sourceInfo?.name || props.event.source ? 'gray' : 'warning'
 })
 
 /** 按 impactLevel 降序取前5个行业 */
@@ -161,17 +151,37 @@ const top5Industries = computed(() => {
   gap: 12rpx;
 }
 
-.card-type {
-  font-size: 20rpx;
-  font-weight: 600;
-  padding: 4rpx 14rpx;
-  border-radius: $r-xs;
-  letter-spacing: 0.5rpx;
+/* 事件类型：复用 <Tag type="gray"> 中性标签，不再按事件类型渲染多色 */
+.card-type-tag {
+  flex-shrink: 0;
+}
+
+/* 事件类型 / 可验证来源 / 行业 标签统一白底，与卡片底色一致（覆盖 Tag gray 的 $bg-soft 浅灰） */
+.card-type-tag,
+.source-tag-muted,
+.t5-tag {
+  background: $bg-card !important;
+}
+
+/* 事件类型文字：class 合并到 Tag 根节点，需命中内部的 .as-tag__text（后代）才生效；
+   统一为 $ink-mute(22rpx/400)，覆盖 Tag 默认更深的 $ink-soft 与 sm 的 20rpx/600 */
+.card-type-tag :deep(.as-tag__text) {
+  font-size: $font-size-xs;
+  font-weight: 400;
+  color: $ink-mute;
+}
+
+/* 来源标签：同样命中内部的 .as-tag__text，统一为 $ink-mute(22rpx/400) */
+.source-tag-muted :deep(.as-tag__text) {
+  font-size: $font-size-xs;
+  font-weight: 400;
+  color: $ink-mute;
 }
 
 .card-time {
-  font-size: 20rpx;
-  color: $ink-mute;
+  font-size: $font-size-xs; /* 22rpx，与事件类型/来源同一字号 */
+  font-weight: 400;
+  color: $ink-mute; /* 与来源/事件类型/洞见摘要同一灰阶 */
 }
 
 /* ========== 标题（最多2行，超出省略） ========== */
@@ -197,26 +207,30 @@ const top5Industries = computed(() => {
 .card-ai-summary {
   flex: 1;
   display: flex;
-  align-items: flex-start;
+  align-items: center; /* 洞见之眼 logo 与右侧一句话横向居中对齐 */
   gap: 8rpx;
   min-width: 0;
   padding: 10rpx 14rpx;
-  background: linear-gradient(135deg, $primary-50, rgba($primary, 0.05));
+  background: $bg-card; /* 与事件卡片一致的白底，去掉浅蓝底 */
   border-radius: $r-sm;
   border-left: 4rpx solid $primary;
   margin-bottom: 12rpx;
 }
 
-/* AI 徽标：外观由 Badge 组件管理，此处仅保留定位 */
-.ai-badge {
+/* AI 洞见徽标：洞见字标 PNG 小图，与一句话水平对齐 */
+.card-ai-summary .ai-badge-wm {
   flex-shrink: 0;
-  margin-top: 2rpx;
+  width: 34rpx;
+  height: 24rpx;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
 }
 
 .ai-text {
   flex: 1;
   font-size: $font-size-xs;
-  color: $ink-soft;
+  color: $ink-mute; /* 洞见一句话总结与事件类型/来源/时间同一灰阶 */
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -246,41 +260,22 @@ const top5Industries = computed(() => {
   white-space: nowrap;
 }
 
-.top5-item {
-  display: inline-flex;
-  align-items: center;
+/* 行业标签：复用 <Tag type="gray"> 中性容器（浅底灰黑字），不按涨跌染色 */
+.t5-tag {
   flex-shrink: 0;
-  font-size: 22rpx;
-  font-weight: 600;
-  line-height: 1.5;
-  padding: 4rpx 12rpx;
-  border-radius: $r-xs;
   white-space: nowrap;
 }
 
+/* 方向箭头：位于行业名右侧；保留小面积语义色（涨红 / 跌绿 / 中性灰），行业名保持中性 */
 .t5-arrow {
-  margin-left: 2rpx;
+  margin-left: 4rpx;
   font-weight: 700;
   font-size: 18rpx;
 }
 
-.t5-bullish {
-  background: $up-soft;
-  border: 1px solid rgba($up, 0.15);
-  color: $up;
-}
-
-.t5-bearish {
-  background: $down-soft;
-  border: 1px solid rgba($down, 0.15);
-  color: $down;
-}
-
-.t5-neutral {
-  background: $bg-deep;
-  border: 1px solid rgba($ink-faint, 0.1);
-  color: $ink-mute;
-}
+.t5-arrow--bullish { color: $up; }
+.t5-arrow--bearish { color: $down; }
+.t5-arrow--neutral { color: $ink-mute; }
 
 /* ========== 底部：AI 摘要 + 操作按钮 ========== */
 .card-bottom {
@@ -291,29 +286,23 @@ const top5Industries = computed(() => {
   border-top: 1px solid $line;
 }
 
-/* 按钮组 */
+/* 按钮组：靠右对齐（洞见摘要缺省时也贴右缘） */
 .card-actions {
   display: flex;
   gap: 8rpx;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
-/* 关注按钮：ghost 类型，followed 时切换为 warning 配色 */
+/* 关注按钮：secondary 类型（组件库灰色字 + 灰色细边框圆角），followed 时切 warning 配色 */
 .follow-btn.as-btn {
   height: auto;
   padding: 8rpx 16rpx;
   border-radius: $r-full;
 }
 
-.follow-btn.as-btn--ghost.followed {
+.follow-btn.as-btn--secondary.followed {
   background: $warning-soft;
   color: $warning;
-}
-
-/* 查看详情按钮：primary 类型，覆写为紧凑圆角胶囊 */
-.detail-btn.as-btn {
-  height: auto;
-  padding: 8rpx 18rpx;
-  border-radius: $r-full;
 }
 </style>

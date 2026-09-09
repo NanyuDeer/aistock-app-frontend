@@ -19,14 +19,15 @@
 ## API
 
 - `GET /api/fear-greed/dashboard?index=jq`：主面板数据（指数 + 历史）。
+- `GET /api/fear-greed/sectors`：当日板块行情榜（topGainers/topInflows/topLosers/topOutflows，camel），供建议引擎 `utils/fgAdvice.ts` 选取配置方向；availability=false 时回退静态档位。
 - 前端封装位于 `shared/api/modules/fear-greed.ts`，页面中禁止直接发起 HTTP 请求。
 - 开发代理：`/api/fear-greed` → `http://127.0.0.1:8001`（见 `vite.config.ts`）。
 - 悬浮温度计在 `onMounted` 时同样拉取该接口展示真实指数（失败保留默认值，不阻塞首页）。
 
 ## 开发注意事项
 
-- 恐贪指数统一为 0-100；情绪分档用沸点/冰点生活化表述（冰点 0-25 / 寒冷 25-45 / 常温 45-55 / 温热 55-80 / 沸点 80-100），避免专业术语。
+- 恐贪指数统一为 0-100；情绪分档用沸点/冰点生活化表述（冰点 0-20 / 寒冷 20-45 / 常温 45-55 / 温热 55-80 / 沸点 80-100），避免专业术语。
 - 分档定义与文案（投资建议/情绪洞见）在 `pages/index.vue` 内常量维护；悬浮温度计分档定义在 `FearGreedIndex.vue` 内常量维护，改动需同步。
 - 温度计为纯 CSS 垂直圆柱体（含刻度、水银柱、半圆汞柱头），不引入 ECharts。
-- 情绪配色：冰点偏红、沸点偏绿（A 股红涨绿跌之外的恐贪国际标准色）。
+- 情绪配色：冰点绿 `#00C853`（低吸机会）、沸点红 `#FF3B30`（过热风险），遵循 A 股"绿=机会/红=风险"直觉，勿用国际"冰红沸绿"。
 - 页面必须兼容 H5 预览；后端未启动时页面展示加载/错误态。

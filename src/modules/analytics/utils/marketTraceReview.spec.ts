@@ -343,3 +343,50 @@ test('prediction 提取：predictionRecord.prediction 非法 shape（horizons �
   assert.ok(presentation, 'presentation 不应为 null')
   assert.equal(presentation!.prediction, null)
 })
+
+test('prediction 提取：conditions（条件化预判）映射到 PredictionPresentation', () => {
+  const predictionRecord = makePredictionRecord({
+    prediction_status: 'confirmed',
+    horizons: [
+      { horizon: 'short', remaining_estimate: '1-3 日', phase: 'decaying', direction: 'bearish', target: '上证指数', metric_projection: '短期弱震荡', confidence: 'high' },
+    ],
+    conditions: [
+      { condition: '若上证放量站上前高', scenario: '则趋势延续', anchor: { horizon: 'short', threshold: '+5%', metric: 'close', direction: 'bullish' } },
+      { condition: '若缩量跌破5日线', scenario: '则短期转弱', anchor: { horizon: 'short', threshold: '-3%', metric: 'close', direction: 'bearish' } },
+    ],
+    evolution_narrative: '短线已兑现大半，中线延续，长线回归',
+    risks: [],
+    evidence_ids: ['SEARCH_007'],
+  })
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+    predictionRecord,
+  )
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.ok(presentation!.prediction, 'prediction 不应为 null')
+  assert.equal(presentation!.prediction!.conditions.length, 2)
+  const first = presentation!.prediction!.conditions[0]!
+  assert.equal(first.condition, '若上证放量站上前高')
+  assert.equal(first.scenario, '则趋势延续')
+  assert.equal(first.anchor!.horizon, 'short')
+  assert.equal(first.anchor!.threshold, '+5%')
+  assert.equal(first.anchor!.direction, 'bullish')
+})
+
+test('prediction 提取：conditions 缺失（2.0 旧记录）→ 空数组兜底', () => {
+  const predictionRecord = makePredictionRecord({
+    prediction_status: 'confirmed',
+    horizons: [
+      { horizon: 'short', remaining_estimate: '1-3 日', phase: 'decaying', direction: 'bearish', target: '上证指数', metric_projection: '短期弱震荡', confidence: 'high' },
+    ],
+  })
+  const presentation = toMarketTracePresentation(
+    record0723 as unknown as MarketTraceReviewRecord,
+    '2026-07-23',
+    predictionRecord,
+  )
+  assert.ok(presentation, 'presentation 不应为 null')
+  assert.ok(presentation!.prediction, 'prediction 不应为 null')
+  assert.deepEqual(presentation!.prediction!.conditions, [])
+})

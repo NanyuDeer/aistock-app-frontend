@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 title="异动监控" subtitle="AI 实时盯盘 · 自选股异动推送">
+  <SubPageCard2 title="自选股异动" subtitle="AI 实时盯盘 · 盘中异动推送">
     <view class="page-monitor">
 
     <!-- 订阅状态 -->
@@ -80,6 +80,7 @@ import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockT
 import { WS_BASE_URL } from '@/shared/utils/constants'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
+import { isUnattributableMovement } from '@/modules/favorites/components/insightCards'
 
 interface AlertItem {
   eventId: string
@@ -175,7 +176,8 @@ async function fetchAlerts() {
       stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] })),
     ])
     // 融合后按事件时间倒序：最新异动（含今日价格异动）优先展示
-    const items = [...list.map(toAlertItem), ...page.items.map(movementToAlertItem)]
+    // 无法归因的异动（unavailable/证据不足）不展示（与自选股洞察一致）
+    const items = [...list.map(toAlertItem), ...page.items.filter((m) => !isUnattributableMovement(m)).map(movementToAlertItem)]
     alerts.value = items
       .sort((a, b) => (new Date(b.time).getTime() || 0) - (new Date(a.time).getTime() || 0))
   } catch {

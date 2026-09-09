@@ -51,8 +51,6 @@
           v-if="insightData.content"
           type="event"
           :title="insightData.content"
-          trace-label="依据"
-          forecast-label="展望"
           :trace="insightData.trace"
           :forecast="insightData.forecast"
           :time="insightData.time"

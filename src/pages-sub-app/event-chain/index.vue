@@ -174,10 +174,10 @@ onMounted(() => {
 
 // ========== 事件处理 ==========
 
-/** 重大事件卡片点击 → 进入 APP 原文详情页（与列表标题跳转一致，不依赖 WebView） */
+/** 重大事件卡片点击 → 跳转到事件详情页（与事件传导列表页重大卡片行为一致） */
 function handleHeadlineClick(eventId: string) {
   uni.navigateTo({
-    url: `/pages-sub-app/event-article/index?eventId=${eventId}`
+    url: `/modules/chat/pages/event/detail?id=${eventId}`
   })
 }
 
@@ -193,11 +193,19 @@ function goToDetail(event: EventItem) {
   })
 }
 
-/** 点击事件标题 → 进入 APP 原文详情页（不跳外部网页，不依赖 WebView） */
+/** 点击事件标题 → 跨端跳转原文：H5 新标签打开，APP 内 web-view 打开；无链接友好提示 */
 function goToNews(event: EventItem) {
-  uni.navigateTo({
-    url: `/pages-sub-app/event-article/index?eventId=${event.eventId}`,
-  })
+  const url = event.sourceInfo?.url
+  if (!url) {
+    uni.showToast({ title: '暂无原文链接', icon: 'none' })
+    return
+  }
+  // #ifdef H5
+  window.open(url, '_blank')
+  // #endif
+  // #ifndef H5
+  uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
+  // #endif
 }
 
 /** 关注/取消关注 */
@@ -220,11 +228,19 @@ async function handleFollow(event: EventItem) {
 .tab-scroll {
   width: 100%;
   white-space: nowrap;
-  padding: 16rpx 0 8rpx;
+  padding: 16rpx 12rpx 8rpx;
+  background: $bg-deep; /* 浅蓝背景横贯整行，覆盖全部事件类型标签（含右侧需滚动到的「监管变化/公司公告」） */
+  border-radius: 16rpx;
 }
 
 .tab-scroll :deep(.as-segmented) {
   display: inline-flex;
+  background: transparent; /* 背景移交 .tab-scroll，避免只包内容宽度 */
+}
+
+/* 事件类型筛选：选中态文字由主题蓝 $primary 改为行业标签灰 $ink-soft */
+.tab-scroll :deep(.as-segmented__item.is-active) {
+  color: $ink-soft;
 }
 
 // ========== AI 关注焦点区域 ==========

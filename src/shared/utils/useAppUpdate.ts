@@ -61,24 +61,49 @@ function isAndroidApp(): boolean {
 
 /**
  * 读取本机已安装版本号（Android 原生 versionCode）。
- * 注意：plus.android 返回的是 Java 对象句柄，读字段必须走 plus.android.invoke(obj,'get','field')，
- * 不可直接 pkgInfo.versionCode 属性访问——否则会读不到值返回 0，
- * 被误判为「比线上旧」而反复弹出更新（0.1.1 用户装好后仍弹更新的根因）。
+ *
+ * 2026-09-03 根因定论：plus.android 反射（getPackageInfo）在本环境正式包真机返回 null，
+ * 无论 flags=0 / PACKAGE_MATCH_ALL / getAttribute / longVersionCode 均无法读出，
+ * 导致 current=0 被判"已最新"假阳。此项在 plus 运行时不可靠，弃用原生反射，
+ * 改由 getCurrentVersionName() 用 plus.runtime.version（官方 API，返回版本号字符串）读取并做版本号比较。
  */
-function getCurrentVersionCode(): number {
+function getCurrentVersionName(): string {
   // #ifdef APP-PLUS
   try {
-    const main = plus.android.runtimeMainActivity()
-    const pkgName = plus.android.invoke(main, 'getPackageName')
-    const pm = plus.android.invoke(main, 'getPackageManager')
-    const pkgInfo = plus.android.invoke(pm, 'getPackageInfo', [pkgName, 0])
-    const versionCode = Number(plus.android.invoke(pkgInfo, 'get', 'versionCode'))
-    return Number.isFinite(versionCode) && versionCode > 0 ? versionCode : 0
+    const v = String(plus.runtime.version)
+    return v && v.trim() ? v.trim() : ''
   } catch (e) {
     console.warn('[useAppUpdate] 读取本机版本号失败:', e)
-    return 0
+    return ''
   }
   // #endif
+  return ''
+}
+
+/** 解析 "0.1.3" → [0,1,3]，供版本号逐段比较；无法解析时返回 [] */
+function parseVersion(str: string): number[] {
+  return String(str || '')
+    .split('.')
+    .map((s) => Number(s))
+    .filter((n) => Number.isFinite(n))
+}
+
+/**
+ * 比较两个版本号字符串（如 "0.1.3" vs "0.1.2"）。
+ * 返回 >0 表示 a 比 b 新；<0 表示 a 比 b 旧；=0 表示相同。
+ * 任意一方无法解析时：能解析的一方判定为更新（避免误判"已最新"）；都无法解析视为相等 → 视为已最新。
+ */
+function compareVersion(a: string, b: string): number {
+  const pa = parseVersion(a)
+  const pb = parseVersion(b)
+  if (pa.length === 0 && pb.length === 0) return 0
+  if (pa.length === 0) return -1
+  if (pb.length === 0) return 1
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0)
+    if (diff !== 0) return diff
+  }
   return 0
 }
 
@@ -98,14 +123,15 @@ export async function checkAppUpdate(opts: { manual?: boolean } = {}): Promise<A
   const info = await fetchLatestVersion()
   if (!info) return 'error'
 
-  // 比对版本号
-  const latest = Number(info.versionCode) || 0
-  const current = getCurrentVersionCode()
-  // current<=0 表示本机版本号读取失败（无法判定本机版本），保守视为已最新，避免反复误弹
-  if (!latest || current <= 0 || latest <= current) return 'latest'
+  // 比对版本号：用 versionName 字符串比较（线上下发 versionName 与 App 打包 versionName 一致）
+  const latest = String(info.versionName || '')
+  const current = getCurrentVersionName()
+  const isNewer = compareVersion(latest, current) > 0
+  // 本机版本无法读取（current 为空）时保守视为已最新，避免反复误弹
+  if (!latest || !current || !isNewer) return 'latest'
 
   // 用户已对该版本选择「永久关闭」→ 直接跳过，不再提示
-  if (isNeverUpdate(latest)) return 'latest'
+  if (isNeverUpdate(info.versionCode)) return 'latest'
 
   // 有新版 → 写入全局弹窗状态（真正弹窗由 UpdateModal 渲染）
   updatePromptState.info = info

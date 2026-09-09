@@ -4,6 +4,7 @@
     :title="title"
     width="560rpx"
     closeable
+    :mask-closable="maskClosable"
     @close="handleCancel"
     @update:visible="handleVisible"
   >
@@ -47,6 +48,8 @@ const props = withDefaults(defineProps<{
   showCancel?: boolean
   /** 确认按钮是否用 danger 类型（删除等危险操作） */
   danger?: boolean
+  /** 点击遮罩是否可关闭（默认 true；会员开通等需明确选择的场景设 false） */
+  maskClosable?: boolean
 }>(), {
   title: '',
   content: '',
@@ -54,6 +57,7 @@ const props = withDefaults(defineProps<{
   cancelText: '取消',
   showCancel: true,
   danger: false,
+  maskClosable: true,
 })
 
 const emit = defineEmits<{

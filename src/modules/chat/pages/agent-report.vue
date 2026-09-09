@@ -416,16 +416,16 @@
       </view>
     </template>
 
-    <!-- VIP 会员弹窗：非会员进入报告详情前阻断并引导开通 -->
-    <Modal v-model:visible="vipModalVisible" title="会员专属内容" :mask-closable="false">
-      <text class="vip-modal-desc">AI 深度报告为会员专属内容，开通会员后即可查看全部报告详情。</text>
-      <template #footer>
-        <view class="vip-modal-actions">
-          <Button size="sm" plain @click="vipModalVisible = false">取消</Button>
-          <Button size="sm" type="primary" @click="goVip">去开通</Button>
-        </view>
-      </template>
-    </Modal>
+    <!-- VIP 会员弹窗：非会员进入报告详情前阻断并引导开通（样式对齐版本更新弹窗） -->
+    <ConfirmModal
+      v-model:visible="vipModalVisible"
+      title="会员专属内容"
+      content="AI 深度报告为会员专属内容，开通会员后即可查看全部报告详情。"
+      confirm-text="去开通"
+      cancel-text="取消"
+      :mask-closable="false"
+      @confirm="goVip"
+    />
   </SubPageCard2>
 </template>
 
@@ -440,7 +440,7 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
 import { useUserStore } from '@/shared/store/modules/user'
-import { LoadingState, EmptyState, Card, Tag, Button, Modal } from '@/shared/components'
+import { LoadingState, EmptyState, Card, Tag, ConfirmModal } from '@/shared/components'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 
 // ===== Markdown 分区解析工具（参考 hot-burst-report 模式）=====
@@ -560,10 +560,14 @@ const AGENT_META: Record<string, AgentMeta> = {
   trend_score: { title: '趋势股评分', icon: 'line-chart-line', color: '#18a058', bgColor: '#18a058', desc: '趋势形态评分排名' },
   review: { title: '收盘复盘', icon: 'moon-line', color: '#7c5cff', bgColor: '#7c5cff', desc: '收盘后大盘归因分析' },
   broadcast: { title: '双人播报', icon: 'broadcast-line', color: '#0b5fff', bgColor: '#0b5fff', desc: 'AI 双人对话播报' },
+  rhythm_master: { title: '节奏大师', icon: 'rhythm-line', color: '#0b5fff', bgColor: '#0b5fff', desc: '目标交易日节奏状态卡' },
 }
 
 /** 概览模式下的 Agent 顺序（不含 broadcast，用户不需要在概览中看到双人播报） */
-const OVERVIEW_ORDER = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'midday', 'review']
+const OVERVIEW_ORDER = ['morning', 'wind_leader', 'hot_burst', 'trend_score', 'midday', 'review', 'rhythm_master']
+
+/** 节奏大师概览入口标识：走 getRhythmMaster 特判（不走 getReport），点击直达节奏详情页 */
+const OVERVIEW_RHYTHM = 'rhythm_master'
 
 const titleMap: Record<string, string> = {
   morning: '今日晨报',
@@ -809,9 +813,21 @@ async function loadAllReports() {
   loadingText.value = '正在加载今日分析...'
 
   // midday 与其余 Agent 一致走 /agent/report/:intent/:date（Node DB analysis_reports），
-  // 由 report_date 匹配判断"已更新/待生成"并展示摘要
+  // 由 report_date 匹配判断"已更新/待生成"并展示摘要；
+  // rhythm_master 走 getRhythmMaster（三时点版本，契约 #4），有版本即视为已生成
   const results = await Promise.allSettled(
-    OVERVIEW_ORDER.map((agentIntent) => agentApi.getReport(agentIntent, date.value))
+    OVERVIEW_ORDER.map(async (agentIntent) => {
+      if (agentIntent === OVERVIEW_RHYTHM) {
+        try {
+          const res: unknown = await agentApi.getRhythmMaster(date.value)
+          // 响应拦截器（request.ts）已解包 {code,data} 信封：code===0 时直接 return data，
+          // 故 getRhythmMaster 解析值即 {date, versions}，没有 .data 字段，这里直接取 .versions
+          const versions = (res as { versions?: { content?: unknown }[] }).versions ?? []
+          return { intent: agentIntent, report: versions?.length ? ({ content: versions[0].content, report_date: date.value }) : null }
+        } catch { return { intent: agentIntent, report: null } }
+      }
+      return { intent: agentIntent, report: await agentApi.getReport(agentIntent, date.value) }
+    })
   )
 
   const briefs: AgentBrief[] = OVERVIEW_ORDER.map((agentIntent, idx) => {
@@ -822,7 +838,8 @@ async function loadAllReports() {
     let available = false
 
     if (result.status === 'fulfilled' && result.value) {
-      const data = result.value as AgentReport
+      // 并发映射统一返回 { intent, report } 形状（rhythm_master 特判打包，其余透传 getReport 结果）
+      const data = (result.value as { report?: AgentReport | null }).report ?? null
       // 检查 report_date 是否与请求日期匹配：后端在指定日期无报告时会降级返回最近一份报告，
       // 不匹配时视为当日无报告（显示"待生成"而非"已更新"）
       if (data?.content && data.report_date === date.value) {
@@ -878,6 +895,11 @@ async function loadReport() {
 
 /** 点击简报卡片，进入详情（非会员阻断并引导开通） */
 function selectAgent(agentIntent: string) {
+  // 节奏大师走独立详情页（F2），不经 VIP 门禁与报告详情
+  if (agentIntent === OVERVIEW_RHYTHM) {
+    uni.navigateTo({ url: '/modules/rhythm/pages/index' })
+    return
+  }
   if (!userStore.userInfo?.isVip) {
     vipModalVisible.value = true
     return
@@ -1453,19 +1475,5 @@ onBackPress(() => {
 .date-btn-text {
   font-size: 24rpx;
   color: $primary;
-}
-
-/* VIP 会员弹窗 */
-.vip-modal-desc {
-  display: block;
-  font-size: 28rpx;
-  line-height: 1.7;
-  color: $ink-soft;
-}
-
-.vip-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 20rpx;
 }
 </style>

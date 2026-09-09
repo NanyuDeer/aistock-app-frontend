@@ -1,7 +1,8 @@
 <template>
   <view class="webview-page">
-    <!-- 自绘返回导航栏：置于 web-view 上方（web-view 高度让位），保证返回按钮不被原生 web-view 遮挡 -->
-    <view class="nav-bar">
+    <!-- 自绘返回导航栏：置于 web-view 上方（web-view 高度让位），保证返回按钮不被原生 web-view 遮挡；
+         状态栏预留同 SubPageCard2 方案：custom 导航下页面从屏幕最顶渲染，需为刘海/状态栏让位 -->
+    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="nav-back" hover-class="nav-back--hover" @click="goBack">
         <text class="nav-back-arrow">‹</text>
         <text class="nav-back-text">返回</text>
@@ -47,6 +48,21 @@ import { onLoad } from '@dcloudio/uni-app'
 const targetUrl = ref('')
 const pageTitle = ref('网页')
 const loadFailed = ref(false)
+
+/** 状态栏高度（px）：与 SubPageCard2 同款方案，APP 端需除以 zoom(1.2) 补偿 */
+const statusBarHeight = ref(0)
+try {
+  const sysInfo = uni.getSystemInfoSync()
+  const raw = sysInfo.statusBarHeight || 0
+  // #ifdef APP-PLUS
+  statusBarHeight.value = raw / 1.2
+  // #endif
+  // #ifndef APP-PLUS
+  statusBarHeight.value = raw
+  // #endif
+} catch {
+  statusBarHeight.value = 0
+}
 
 function goBack() {
   // 返回来源页（事件列表 / 详情页）；无法返回时兜底回首页

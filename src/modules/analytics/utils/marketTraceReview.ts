@@ -138,6 +138,8 @@ export interface PredictionValidationPresentation {
 
 export interface PredictionHorizonPresentation {
   horizon: 'short' | 'mid' | 'long'
+  /** 基准走势短语（4~6 字；2026-09-03 起新数据携带，旧记录无） */
+  label?: string
   remainingEstimate: string
   phase: 'building' | 'peaking' | 'decaying' | 'returning'
   direction: 'bullish' | 'bearish' | 'neutral'
@@ -156,9 +158,32 @@ export interface PredictionStepPresentation {
   text: string
 }
 
+/** 条件化预判锚点展示（Spec A §4.3） */
+export interface PredictionAnchorPresentation {
+  horizon: string
+  threshold: string
+  metric: string
+  direction: string
+}
+
+/** 条件化预判单条展示（Spec A §4.3） */
+export interface PredictionConditionPresentation {
+  condition: string
+  /** 路径短语名（两段式“状态 · 走势”；2026-09-03 起新数据携带，旧记录无） */
+  label?: string
+  scenario: string
+  /** 触发条件关键词（1~2 个；2026-09-02 起新数据携带，旧记录无） */
+  keywords?: string[]
+  /** 预判关键词（scenario 摘要，侧重方向+幅度；2026-09-03 起新数据携带，旧记录无） */
+  scenario_keywords?: string[]
+  anchor: PredictionAnchorPresentation | null
+}
+
 export interface PredictionPresentation {
   status: 'confirmed' | 'hypothesis' | 'insufficient'
   horizons: PredictionHorizonPresentation[]
+  /** 条件化预判（Spec A；2.0 旧记录为空数组） */
+  conditions: PredictionConditionPresentation[]
   /** 结构化演化步骤（后端 B2 输出）；旧记录为空数组，组件回退 narrative 拆分 */
   evolutionSteps: PredictionStepPresentation[]
   evolutionNarrative: string
@@ -270,6 +295,7 @@ export function toPredictionPresentation(raw: MarketTracePrediction | null | und
           && CONFIDENCE_KEYS.has(h.confidence))
         .map(h => ({
           horizon: h.horizon,
+          label: asString((h as { label?: unknown }).label) || undefined,
           remainingEstimate: asString(h.remaining_estimate),
           phase: h.phase,
           direction: h.direction,
@@ -284,6 +310,26 @@ export function toPredictionPresentation(raw: MarketTracePrediction | null | und
         .filter(r => Boolean(r) && typeof r === 'object' && typeof r.factor === 'string' && typeof r.invalidation === 'string')
         .map(r => ({ factor: asString(r.factor), invalidation: asString(r.invalidation) }))
     : []
+  // Spec A §4.3：条件化预判映射（2.0 旧记录无 conditions → 空数组兜底）
+  const conditions = Array.isArray(raw.conditions)
+    ? raw.conditions
+        .filter(c => Boolean(c) && typeof c === 'object' && typeof c.condition === 'string' && typeof c.scenario === 'string')
+        .map(c => ({
+          condition: asString(c.condition),
+          label: asString((c as { label?: unknown }).label) || undefined,
+          keywords: asStringList((c as { keywords?: unknown }).keywords),
+          scenario_keywords: asStringList((c as { scenario_keywords?: unknown }).scenario_keywords),
+          scenario: asString(c.scenario),
+          anchor: c.anchor && typeof c.anchor === 'object'
+            ? {
+                horizon: asString((c.anchor as { horizon?: unknown }).horizon),
+                threshold: asString((c.anchor as { threshold?: unknown }).threshold),
+                metric: asString((c.anchor as { metric?: unknown }).metric) || 'close',
+                direction: asString((c.anchor as { direction?: unknown }).direction) || 'neutral',
+              }
+            : null,
+        }))
+    : []
   const evolutionSteps = Array.isArray(raw.evolution_steps)
     ? raw.evolution_steps
         .filter(s => Boolean(s) && typeof s === 'object' && typeof s.label === 'string' && typeof s.text === 'string')
@@ -292,6 +338,7 @@ export function toPredictionPresentation(raw: MarketTracePrediction | null | und
   return {
     status: raw.prediction_status,
     horizons,
+    conditions,
     evolutionSteps,
     evolutionNarrative: asString(raw.evolution_narrative),
     risks,

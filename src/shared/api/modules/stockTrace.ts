@@ -19,6 +19,10 @@ export interface StockTraceEvent {
   analysis_status: 'pending' | 'processing' | 'completed' | 'unavailable'
   /** 简短主因短语（LLM 生成），列表/卡片展示用；无归因结果为 null */
   primary_cause?: string | null
+  /** 涨停文章命中标记（强时效来源） */
+  is_limit_up?: boolean
+  /** 轻量预判 slot 分存：{midday?: ..., close?: ...}，各含 summary + conditions */
+  forecast?: Record<string, unknown> | null
   read_at?: string | null
   movement_view?: MovementViewV2 | null
   unavailable?: TraceUnavailableView
