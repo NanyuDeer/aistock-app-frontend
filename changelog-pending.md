@@ -1,5 +1,7 @@
 # changelog-pending.md（待提交修改记录）
 
+（暂无待提交的修改）
+
 ## 2026-09-05
 - 合并 PR #127（自选股洞察前端整线：movement/洞察页演进 + 详情统一 + 轻量预判展示，43 commits）至 master 并 push（commit 1e4ec99）。
   - 冲突解决：`CHANGELOG.md`/`changelog-pending.md` 双端条目全保留、按时间倒序重组（HEAD 09-03 节奏大师条目 + pr-127 08-28~08-31 条目 + HEAD 后续条目）。

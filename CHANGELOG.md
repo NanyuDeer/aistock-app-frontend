@@ -2,6 +2,18 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-10 — 首页卡片微调 + 组件库版本号对齐 0.1.3
+
+**开发者**: Aria
+
+### 改进
+- `modules/favorites/components/AlertContent.vue`：自选股洞察列表行数 6 → 4（`CAPTURE_ROW_COUNT`），与个股情报 4 行对齐，卡片整体收窄变矮。
+- `modules/favorites/components/AlertContent.vue`：个股情报侧「全部/利好/利空」切换整体收窄（`.intel-tabs` scale 0.85 → 0.75，右对齐缩放），不挤压模块标题。
+- `modules/home/components/MorningContent.vue`：节奏大师副标题「近 3 个交易日 · 收盘基准」→「近 3 日 · 收盘基准」，精简文案。
+- `modules/user/pages/profile.vue`：「关于洞见」弹窗版本号 v0.1.2 → v0.1.3，与 `src/manifest.json`（versionName 0.1.3 / versionCode 103）对齐。
+
+---
+
 ## [changer] 2026-09-04 — 节奏大师预判结论结构化 + 日历改 iOS 样式（含周末）
 
 **开发者**: 37588

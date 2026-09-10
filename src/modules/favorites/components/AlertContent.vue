@@ -228,10 +228,10 @@ const intelRows = computed<Array<IntelItem | null>>(() => {
 })
 
 /**
- * 异动捕手列表固定渲染 6 行：数据不足时空行占位，
+ * 异动捕手列表固定渲染 4 行：数据不足时空行占位，
  * 卡片纵向长度不随数据量变化（避免只有 1 条资讯时卡片变矮）
  */
-const CAPTURE_ROW_COUNT = 6
+const CAPTURE_ROW_COUNT = 4
 const captureRows = computed<Array<CaptureItem | null>>(() => {
   const rows: Array<CaptureItem | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
   while (rows.length < CAPTURE_ROW_COUNT) rows.push(null)
@@ -435,7 +435,8 @@ watch(
 
 .intel-tabs {
   display: flex;
-  transform: scale(0.85);
+  /* 收窄切换宽度：右对齐缩放，文字大小不变但整组占宽更小 */
+  transform: scale(0.75);
   transform-origin: right center;
 }
 </style>

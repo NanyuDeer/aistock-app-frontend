@@ -125,7 +125,7 @@
             <text class="feature-title">节奏大师</text>
             <text class="feature-more">›</text>
           </view>
-          <text class="feature-sub">近 {{ HOME_RHYTHM_DAYS }} 个交易日 · 收盘基准</text>
+          <text class="feature-sub">近 {{ HOME_RHYTHM_DAYS }} 日 · 收盘基准</text>
           <!-- 近几日结论：每行 = 建议仓位 + 档位色块（最右，与其它功能卡"名称+Tag"同构）；点行进该日详情（stop 防触整卡跳转） -->
           <view class="feature-list" v-if="rhythmRows.length">
             <view
