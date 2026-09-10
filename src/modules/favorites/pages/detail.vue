@@ -224,7 +224,13 @@
         </view>
         <view v-else class="section-card">
           <text class="section-title">资金流向</text>
-          <view class="ai-empty">
+          <view class="ai-loading" v-if="capitalFlowLoading">
+            <text class="ai-loading-text">加载中...</text>
+          </view>
+          <view v-else-if="capitalFlowError" class="ai-empty" @tap="retryLoadCapitalFlow">
+            <text class="ai-empty-text">资金流向加载失败，点击重试</text>
+          </view>
+          <view class="ai-empty" v-else>
             <text class="ai-empty-text">暂无资金流数据</text>
           </view>
         </view>
@@ -462,7 +468,7 @@
               <view class="semi-row">
                 <text class="semi-cell semi-cell-label">研发费用</text>
                 <text class="semi-cell semi-cell-value">{{ formatSemiAmount(semiAnnualReport.reports[0]?.rd_exp) }}</text>
-                <text class="semi-cell semi-cell-value">--</text>
+                <text class="semi-cell semi-cell-value">未单列</text>
               </view>
             </view>
             <view v-if="disclosureUrl" class="semi-footer">
@@ -479,7 +485,7 @@
         </view>
 
         <!-- 业绩预测 -->
-        <view v-if="forecastLoading || hasForecastCardData" id="detail-anchor-forecast" class="section-card">
+        <view v-if="forecastLoading || hasForecastCardData || !forecastData" id="detail-anchor-forecast" class="section-card">
           <view class="section-header">
             <text class="section-title">业绩预测</text>
             <view v-if="!forecastLoading" class="ai-refresh-btn" @tap="loadForecast(true)">
@@ -488,6 +494,9 @@
           </view>
           <view v-if="forecastLoading" class="ai-loading">
             <text class="ai-loading-text">加载中...</text>
+          </view>
+          <view v-else-if="!hasForecastCardData" class="ai-empty">
+            <text class="ai-empty-text">暂无业绩预测数据，可点击刷新尝试获取</text>
           </view>
           <view v-else class="forecast-content">
             <view v-if="forecastData.updateTime" class="forecast-update-time">
@@ -894,6 +903,8 @@ const loading = ref(true)
 const quote = ref<any>(null)
 const stockInfo = ref<any>(null)
 const capitalFlow = ref<any>(null)
+const capitalFlowLoading = ref(false)
+const capitalFlowError = ref(false)
 const semiAnnualReport = ref<any>(null)
 const disclosureUrl = ref('')
 const symbol = ref('')
@@ -1144,28 +1155,37 @@ const forecastChartItems = computed(() => {
 })
 
 const forecastYearRows = computed(() => {
-  const rows = Array.isArray(forecastData.value?.predictions) ? forecastData.value.predictions : []
-  if (!rows.length) return []
-  const parsed = rows
-    .slice(0, 3)
+  // 与图表同源：优先预测明细，缺净利润值时回退到详表净利润行
+  const source = buildForecastChartSource()
+  if (!source.length) return []
+  const detailRows = Array.isArray(forecastData.value?.detailIndicators) ? forecastData.value.detailIndicators : []
+  const growthRow = detailRows.find((r: any) => String(r['预测指标'] || r.indicator || '').includes('净利润增长率'))
+  const getGrowth = (year: string): number | string => {
+    if (!growthRow) return '--'
+    const raw = growthRow[`预测${year}-平均`] || growthRow[`预测${year}`] || growthRow[`${year}-实际值`] || '--'
+    const num = parseFloat(String(raw).replace('%', '').replace(/,/g, ''))
+    return Number.isNaN(num) ? '--' : num
+  }
+  const parsed = source
     .map((item: any) => {
       const value = parseForecastProfit(item.netProfit)
+      const growth = item.growth != null ? item.growth : getGrowth(String(item.year || ''))
       return {
         year: String(item.year || ''),
         netProfit: item.netProfit || '--',
-        growth: item.growth,
+        growth,
         value: value ?? 0,
-        kindClass: item.growth === '--' || item.growth == null ? 'is-forecast' : item.growth >= 0 ? 'is-actual' : 'is-forecast',
-        kindText: item.growth === '--' || item.growth == null ? '预测' : item.growth >= 0 ? '改善' : '承压',
-        growthText: item.growth === '--' || item.growth == null ? '--' : `${item.growth >= 0 ? '+' : ''}${item.growth}%`,
-        growthClass: item.growth === '--' || item.growth == null ? '' : item.growth >= 0 ? 'up' : 'down',
+        kindClass: growth === '--' || growth == null ? 'is-forecast' : growth >= 0 ? 'is-actual' : 'is-forecast',
+        kindText: growth === '--' || growth == null ? '预测' : growth >= 0 ? '改善' : '承压',
+        growthText: growth === '--' || growth == null ? '--' : `${growth >= 0 ? '+' : ''}${growth}%`,
+        growthClass: growth === '--' || growth == null ? '' : `${growth >= 0 ? 'up' : 'down'}`,
       }
     })
   const max = Math.max(...parsed.map((item: any) => Math.abs(item.value)), 0.01)
   return parsed.map((item: any) => ({
     ...item,
     progress: Math.max(18, Math.round((Math.abs(item.value) / max) * 100)),
-  }))
+  })).filter((item: any) => item.year)
 })
 
 const forecastYearKeys = computed(() => {
@@ -1185,14 +1205,27 @@ const forecastYearKeys = computed(() => {
 })
 
 function buildForecastChartSource(): Array<{ year: string; netProfit: any; kind?: 'actual' | 'forecast' }> {
+  const details = forecastData.value?.detailIndicators
+  const detailRows = Array.isArray(details) ? details : []
+  // 净利润行：匹配"净利润"，排除"净利润增长率"等衍生指标
+  const profitRow = detailRows.find((row: any) => {
+    const name = String(row['预测指标'] || row.indicator || '')
+    return name.includes('净利润') && !name.includes('增长率')
+  })
+
   const predictions = forecastData.value?.predictions
   if (Array.isArray(predictions) && predictions.length > 0) {
-    return predictions.map((item: any) => ({ year: String(item.year || ''), netProfit: item.netProfit }))
+    // 优先用预测明细；个别年份净利率缺失时，用详表净利润行兜底
+    return predictions.map((item: any) => {
+      const year = String(item.year || '')
+      let netProfit = item.netProfit
+      if ((netProfit == null || netProfit === '--') && profitRow) {
+        netProfit = profitRow[`预测${year}-平均`] || profitRow[year + '-实际值'] || profitRow[`预测${year}`] || netProfit
+      }
+      return { year, netProfit, kind: item.kind }
+    })
   }
 
-  const details = forecastData.value?.detailIndicators
-  if (!Array.isArray(details) || details.length === 0) return []
-  const profitRow = details.find((row: any) => String(row['预测指标'] || row.indicator || '').includes('净利润'))
   if (!profitRow) return []
   return forecastYearKeys.value.map(item => ({
     year: item.year,
@@ -1849,68 +1882,102 @@ onLoad((options: any) => {
 async function loadData() {
   loading.value = true
   try {
-    const [quoteData, flowData, semiData, newsData, infoData, eventsData, klineRes] = await Promise.allSettled([
+    // 快速请求：行情、新闻、基础信息、事件（通常 <500ms）
+    const fastTask = Promise.allSettled([
       stockApi.getQuote(symbol.value),
-      stockApi.getCapitalFlow(symbol.value),
-      stockApi.getSemiAnnualReport(symbol.value),
       stockApi.getStockNews(symbol.value, { size: 10 }),
       stockApi.getStockInfos(symbol.value),
       stockApi.getStockEvents(symbol.value, { cycle: 'all', limit: 20 }),
+    ]).then(([quoteData, newsData, infoData, eventsData]) => {
+      if (quoteData.status === 'fulfilled') {
+        quote.value = quoteData.value
+      }
+      if (newsData.status === 'fulfilled') {
+        const news = newsData.value as any
+        const rawList = Array.isArray(news) ? news : (news?.['个股新闻'] || news?.data?.['个股新闻'] || news?.data || news?.news || [])
+        newsExpanded.value = false
+        newsList.value = rawList.map((n: any) => ({
+          id: n['ID'] || n.id || '',
+          title: n['标题'] || n.title || '',
+          summary: n['内容'] || n.content || n.summary || '',
+          content: n['内容'] || n.content || '',
+          url: n['链接'] || n.url || '',
+          source: n['来源'] || n.source || '财联社',
+          publishTime: n['时间'] || n.publish_time || n.time || '',
+        }))
+      }
+      if (infoData.status === 'fulfilled' && infoData.value) {
+        stockInfo.value = infoData.value
+      }
+      if (eventsData.status === 'fulfilled') {
+        stockEvents.value = Array.isArray(eventsData.value) ? eventsData.value : []
+      }
+    })
+
+    // 慢速请求：资金流向（可能触发AI分析）、半年报（Tushare）、K线
+    capitalFlowLoading.value = true
+    const slowTask = Promise.allSettled([
+      stockApi.getCapitalFlow(symbol.value),
+      stockApi.getSemiAnnualReport(symbol.value),
       stockApi.getKLine(symbol.value, { period: klinePeriod.value, count: getKLineCount(klinePeriod.value) }),
-    ])
-    if (quoteData.status === 'fulfilled') {
-      quote.value = quoteData.value
-    }
-    if (flowData.status === 'fulfilled') {
-      const flow = flowData.value as any
-      capitalFlow.value = flow?.data || flow
-    }
-    if (semiData.status === 'fulfilled') {
-      const semi = semiData.value as any
-      semiAnnualReport.value = semi?.data || semi
-      disclosureUrl.value = semiAnnualReport.value?.disclosure_url || ''
-    }
-    if (newsData.status === 'fulfilled') {
-      const news = newsData.value as any
-      const rawList = Array.isArray(news) ? news : (news?.['个股新闻'] || news?.data?.['个股新闻'] || news?.data || news?.news || [])
-      newsExpanded.value = false
-      // 归一化中文键名为英文
-      newsList.value = rawList.map((n: any) => ({
-        id: n['ID'] || n.id || '',
-        title: n['标题'] || n.title || '',
-        summary: n['内容'] || n.content || n.summary || '',
-        content: n['内容'] || n.content || '',
-        url: n['链接'] || n.url || '',
-        source: n['来源'] || n.source || '财联社',
-        publishTime: n['时间'] || n.publish_time || n.time || '',
-      }))
-    }
-    if (infoData.status === 'fulfilled' && infoData.value) {
-      stockInfo.value = infoData.value
-    }
-    if (eventsData.status === 'fulfilled') {
-      stockEvents.value = Array.isArray(eventsData.value) ? eventsData.value : []
-    }
-    if (klineRes.status === 'fulfilled') {
-      klineData.value = Array.isArray(klineRes.value) ? klineRes.value : []
-    }
-    applyLiveQuoteToKline()
-// 中线卡片上方的异步内容会改变锚点位置，完成后再执行锚定。
+    ]).then(([flowData, semiData, klineRes]) => {
+      if (flowData.status === 'fulfilled') {
+        const flow = flowData.value as any
+        capitalFlow.value = flow?.data || flow
+        capitalFlowError.value = false
+      } else {
+        capitalFlowError.value = true
+      }
+      capitalFlowLoading.value = false
+      if (semiData.status === 'fulfilled') {
+        const semi = semiData.value as any
+        semiAnnualReport.value = semi?.data || semi
+        disclosureUrl.value = semiAnnualReport.value?.disclosure_url || ''
+      }
+      if (klineRes.status === 'fulfilled') {
+        klineData.value = Array.isArray(klineRes.value) ? klineRes.value : []
+      }
+      applyLiveQuoteToKline()
+    })
+
+    // 快速请求完成后立即启动后续异步任务（不等慢速请求）
+    await fastTask
     const aiTask = loadAiAnalysis()
     const forecastTask = loadForecast(false)
     const trendTask = loadTrendScore()
     const industryTask = loadIndustryHealth()
     loadMidLongAnalysis()
+
+    // 只在需要锚定到特定区域时等待对应任务完成
     if (detailAnchor.value === 'forecast') {
-      await Promise.all([aiTask, forecastTask, trendTask, industryTask])
+      await Promise.all([slowTask, aiTask, forecastTask, trendTask, industryTask])
     } else if (detailAnchor.value === 'performance-report') {
-      await Promise.all([aiTask, trendTask, industryTask])
+      await Promise.all([slowTask, aiTask, trendTask, industryTask])
+    } else {
+      // 不等待慢速请求，让 loading 先结束
+      slowTask.catch(() => {})
     }
   } catch (err) {
     console.error('[StockDetail] load error:', err)
   } finally {
     if (detailAnchor.value) await scrollToDetailAnchor()
     loading.value = false
+  }
+}
+
+async function retryLoadCapitalFlow() {
+  if (!symbol.value) return
+  capitalFlowLoading.value = true
+  capitalFlowError.value = false
+  try {
+    const res = await stockApi.getCapitalFlow(symbol.value)
+    const flow = (res as any)?.data || res
+    capitalFlow.value = flow
+    capitalFlowError.value = false
+  } catch {
+    capitalFlowError.value = true
+  } finally {
+    capitalFlowLoading.value = false
   }
 }
 
@@ -2322,7 +2389,7 @@ function formatMarketValue(value: any): string {
 }
 
 function formatSemiAmount(amt: number): string {
-  if (!amt) return '--'
+  if (!amt || amt === 0) return '--'
   const yi = Math.abs(amt) / 100000000
   if (yi >= 1) return yi.toFixed(2) + '亿'
   const wan = Math.abs(amt) / 10000
