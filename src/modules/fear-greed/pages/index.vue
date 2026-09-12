@@ -78,14 +78,9 @@
               <view class="fg-chart__line-short" />
               <text class="fg-chart__legend-text">恐贪指数</text>
             </view>
-            <view v-if="icePointStats" class="fg-chart__legend-item">
-              <view class="fg-chart__legend-dot" />
-              <text class="fg-chart__legend-text">冰点日</text>
-            </view>
-            <!-- 沸点日图例常显（红点），出现 >=80 数据时图中自动标红 -->
             <view class="fg-chart__legend-item">
-              <view class="fg-chart__legend-dot fg-chart__legend-dot--hot" />
-              <text class="fg-chart__legend-text">沸点日</text>
+              <view class="fg-chart__threshold-mark" />
+              <text class="fg-chart__legend-text">20 / 80 分割线</text>
             </view>
           </view>
           <!-- 均线数值 -->
@@ -121,10 +116,9 @@
             tagText="情绪洞见"
             :title="zone.summary"
             :trace="insightTexts.why"
-            :forecast="insightTexts.forecast"
             theme="light"
           >
-            <!-- 冰点反弹统计（三列数字，保留原有量化补充） -->
+            <!-- 冰点反弹统计（三列数字 + 卡片框，保留原有量化补充） -->
             <view v-if="icePointStats" class="fg-rebound">
               <view class="fg-rebound__header">
                 <text class="fg-rebound__title">冰点反弹统计</text>
@@ -132,20 +126,20 @@
               </view>
               <view class="fg-rebound__stats">
                 <view class="fg-rebound__stat">
-                  <text class="fg-rebound__num">{{ icePointStats.iceCount }}</text>
+                  <text class="fg-rebound__num fg-rebound__num--neutral">{{ icePointStats.iceCount }}</text>
                   <text class="fg-rebound__label">冰点次数</text>
+                </view>
+                <view class="fg-rebound__divider" />
+                <view class="fg-rebound__stat">
+                  <text class="fg-rebound__num fg-rebound__num--neutral">{{ icePointStats.reboundRate }}%</text>
+                  <text class="fg-rebound__label">次日反弹概率</text>
                 </view>
                 <view class="fg-rebound__divider" />
                 <view class="fg-rebound__stat">
                   <text
                     class="fg-rebound__num"
-                    :style="{ color: icePointStats.reboundRate >= 60 ? '#18a058' : '#FF9500' }"
-                  >{{ icePointStats.reboundRate }}%</text>
-                  <text class="fg-rebound__label">次日反弹概率</text>
-                </view>
-                <view class="fg-rebound__divider" />
-                <view class="fg-rebound__stat">
-                  <text class="fg-rebound__num">+{{ icePointStats.avgRebound }}</text>
+                    :style="{ color: icePointStats.avgRebound > 0 ? '#FF3B30' : '#18a058' }"
+                  >+{{ icePointStats.avgRebound }}</text>
                   <text class="fg-rebound__label">平均反弹幅度</text>
                 </view>
               </view>
@@ -191,7 +185,7 @@
                 :key="i"
                 class="fg-actions__item"
               >
-                <view class="fg-actions__dot" :style="{ background: zone.color }" />
+                <view class="fg-actions__dot" />
                 <text class="fg-actions__text">{{ a }}</text>
               </view>
             </view>
@@ -204,7 +198,7 @@
     <!-- 配置方向弹窗 -->
     <view v-if="activeSector" class="fg-overlay" @tap="activeSector = null">
       <view class="fg-popup" @tap.stop>
-        <text class="fg-popup__title" :style="{ color: zone.color }">{{ activeSector.name }}</text>
+        <text class="fg-popup__title">{{ activeSector.name }}</text>
         <text class="fg-popup__desc">{{ activeSector.desc }}</text>
         <view class="fg-popup__close" @tap="activeSector = null">知道了</view>
       </view>
@@ -449,9 +443,9 @@ const historyChartSrc = computed(() => {
   const yScale = (v: number) => padT + (1 - v / 100) * plotH
   const xDay = (i: number) => padL + i * dayW + dayW / 2
 
-  // 20/80 分割线（虚线，区分冰点/沸点区域）
+  // 20/80 分割线（实线 + 标签，清晰区分冰点/沸点区域）
   const thresholdLines = [20, 80]
-    .map((v) => `<line x1="${padL}" y1="${yScale(v).toFixed(1)}" x2="${W - padR}" y2="${yScale(v).toFixed(1)}" stroke="rgba(11,95,255,0.15)" stroke-width="0.6" stroke-dasharray="3 2"/>`)
+    .map((v) => `<line x1="${padL}" y1="${yScale(v).toFixed(1)}" x2="${W - padR}" y2="${yScale(v).toFixed(1)}" stroke="rgba(11,95,255,0.4)" stroke-width="1" stroke-dasharray="5 3"/><text x="${W - padR}" y="${(yScale(v) - 3).toFixed(1)}" text-anchor="end" font-size="7" font-weight="600" fill="rgba(11,95,255,0.5)">${v}</text>`)
     .join('')
 
   // 中线（50，更淡）
@@ -476,20 +470,7 @@ const historyChartSrc = computed(() => {
     ? `<line x1="${xDay(activeIdx).toFixed(1)}" y1="${padT}" x2="${xDay(activeIdx).toFixed(1)}" y2="${H - padB}" stroke="rgba(11,95,255,0.3)" stroke-width="0.8" stroke-dasharray="2 2"/><circle cx="${xDay(activeIdx).toFixed(1)}" cy="${yScale(composite[activeIdx] ?? 50).toFixed(1)}" r="3" fill="#0b5fff" stroke="#fff" stroke-width="1"/>`
     : ''
 
-  // 冰点/沸点标记：冰点日（恐贪<20，超卖机会区）绿点，沸点日（恐贪>=80，超买风险区）红点
-  // （A股习惯绿=低吸机会/红=过热风险，与均线 maColor 档位一致）
-  const iceDots = composite
-    .map((s, i) => {
-      if (s >= 20) return ''
-      return `<circle cx="${xDay(i).toFixed(1)}" cy="${yScale(s).toFixed(1)}" r="2.5" fill="#00C853" stroke="#fff" stroke-width="0.8"/>`
-    })
-    .join('')
-  const boilDots = composite
-    .map((s, i) => {
-      if (s < 80) return ''
-      return `<circle cx="${xDay(i).toFixed(1)}" cy="${yScale(s).toFixed(1)}" r="2.5" fill="#FF3B30" stroke="#fff" stroke-width="0.8"/>`
-    })
-    .join('')
+
 
   // X 轴日期标签（首/中/尾）
   const dateLabel = (idx: number) => {
@@ -507,7 +488,7 @@ const historyChartSrc = computed(() => {
     .join('')
 
   // 影线在底层，主线在上层，十字线最上层
-  const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${thresholdLines}${midLine}${yLabels}<path d="${mainPath}" fill="none" stroke="#0b5fff" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>${iceDots}${boilDots}${cursor}${xLabels}</svg>`
+  const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${thresholdLines}${midLine}${yLabels}<path d="${mainPath}" fill="none" stroke="#0b5fff" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>${cursor}${xLabels}</svg>`
 
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
 })
@@ -702,13 +683,13 @@ const positionRange = computed(() => {
   return { min, max }
 })
 
-/** 仓位条样式：动态建议仓位区间在 0-100% 条上的位置 */
+/** 仓位条样式：动态建议仓位区间在 0-100% 条上的位置（中性配色） */
 const positionBarStyle = computed(() => {
   const { min, max } = positionRange.value
   return {
     left: min + '%',
     width: (max - min) + '%',
-    background: `linear-gradient(to right, ${zone.value.start}, ${zone.value.end})`,
+    background: `linear-gradient(to right, rgba(11,95,255,0.3), rgba(11,95,255,0.5))`,
   }
 })
 
@@ -998,19 +979,10 @@ onShow(() => {
   gap: 8rpx;
 }
 
-.fg-chart__legend-dot {
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-  background: #00C853;
-  border: 2rpx solid #fff;
-  box-shadow: 0 0 0 1rpx rgba(0, 200, 83, 0.3);
-}
-
-/* 沸点日：过热风险区，红色圆点（与图内沸点标记同色） */
-.fg-chart__legend-dot--hot {
-  background: #FF3B30;
-  box-shadow: 0 0 0 1rpx rgba(255, 59, 48, 0.3);
+.fg-chart__threshold-mark {
+  width: 24rpx;
+  height: 0;
+  border-top: 3rpx dashed rgba(11, 95, 255, 0.4);
 }
 
 .fg-chart__legend-text {
@@ -1139,10 +1111,11 @@ onShow(() => {
 
 .fg-tag {
   padding: 6rpx 20rpx;
-  border: 2rpx solid;
+  border: 2rpx solid rgba(11, 95, 255, 0.25);
   border-radius: $r-full;
   font-size: $font-size-xs;
   font-weight: 600;
+  color: $ink-soft;
 }
 
 /* 操作要点 */
@@ -1169,6 +1142,7 @@ onShow(() => {
   height: 12rpx;
   margin-top: 10rpx;
   border-radius: 50%;
+  background: rgba(11, 95, 255, 0.3);
 }
 
 .fg-actions__text {
@@ -1192,9 +1166,10 @@ onShow(() => {
 /* ===== 冰点反弹统计 ===== */
 .fg-rebound {
   margin-top: $s-2;
-  padding: $s-2;
+  padding: $s-3;
   border-radius: $r-md;
-  background: rgba(0, 200, 83, 0.04);
+  background: rgba(0, 0, 0, 0.02);
+  border: 2rpx solid rgba(0, 0, 0, 0.06);
 }
 
 .fg-rebound__header {
@@ -1231,8 +1206,12 @@ onShow(() => {
 .fg-rebound__num {
   font-size: 40rpx;
   font-weight: 800;
-  color: #00C853;
+  color: $ink;
   line-height: 1.1;
+}
+
+.fg-rebound__num--neutral {
+  color: $ink;
 }
 
 .fg-rebound__label {
@@ -1282,6 +1261,7 @@ onShow(() => {
 .fg-popup__title {
   font-size: 36rpx;
   font-weight: 800;
+  color: $ink;
 }
 
 .fg-popup__desc {
