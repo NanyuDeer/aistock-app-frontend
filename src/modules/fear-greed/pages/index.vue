@@ -1,6 +1,23 @@
 <template>
   <SubPageCard title="恐贪指数" :no-chat-bar="true">
     <view class="fg-page">
+      <!-- 波段操作节奏入口卡（常驻：脱离三分支链，loading/error 态仍显示纯导航；摘要失败静默降级） -->
+      <view class="fg-rhythm" @tap="goRhythmEntry">
+        <view class="fg-rhythm__head">
+          <text class="fg-rhythm__title">波段操作节奏</text>
+          <text class="fg-rhythm__sub">节奏大师</text>
+        </view>
+        <view v-if="rhythmSummary" class="fg-rhythm__row">
+          <text class="fg-rhythm__label">节奏档位</text>
+          <view v-if="rhythmSummary.level" class="fg-rhythm__chip" :style="{ background: rhythmSummary.levelColor }">
+            <text class="fg-rhythm__chip-text">{{ rhythmSummary.levelShort }}</text>
+          </view>
+          <text v-if="rhythmSummary.bandText" class="fg-rhythm__band">{{ rhythmSummary.bandText }}</text>
+          <text class="fg-rhythm__date">{{ rhythmSummary.dateLabel }}</text>
+        </view>
+        <text class="fg-rhythm__note">短线实时 / 波段昨收：周期不同，请独立判断，勿混用</text>
+      </view>
+
       <!-- 加载 / 错误态 -->
       <view v-if="loading" class="fg-state">
         <text class="fg-state__text">加载中...</text>
@@ -193,6 +210,9 @@
           </view>
         </view>
       </template>
+
+      <!-- 免责声明（硬约束 9） -->
+      <text class="fg-disclaimer">本页内容仅供参考，不构成投资建议；短线与波段为不同周期观测，请独立判断。</text>
     </view>
 
     <!-- 配置方向弹窗 -->
@@ -213,6 +233,9 @@ import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { InsightCard } from '@/shared/components'
 import { fearGreedApi, type FearGreedDashboard, type FgSectorBoard } from '@/shared/api/modules/fear-greed'
 import { buildSectorTags, buildActions, buildAdvice, buildDriversSentence } from '../utils/fgAdvice'
+import { agentApi } from '@/shared/api/modules/agent'
+import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
+import { formatRhythmSummary, getRhythmUrl, type RhythmSummary } from '../utils/fgRhythmSummary'
 
 /**
  * 情绪分档（沸点/冰点生活化表述，去专业术语）。
@@ -324,6 +347,34 @@ const dashboard = ref<FearGreedDashboard | null>(null)
 const sectorBoard = ref<FgSectorBoard | null>(null)
 /** 当前点击的配置方向弹窗（null = 关闭） */
 const activeSector = ref<{ name: string; desc: string } | null>(null)
+
+const rhythmSummary = ref<RhythmSummary | null>(null)
+
+/** 本地自然日 YYYY-MM-DD（交易日周末不前进，故跨日判断不得用 basis_date） */
+function todayStr(): string {
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+/** 摘要跨日门控：存储拉取日 ≠ 本地今日 → 需刷新（失败不写存储 → 同日 onShow 隐式重试） */
+function isRhythmNewDay(): boolean {
+  return storage.get<string>(STORAGE_KEYS.FG_RHYTHM_SUMMARY_DATE) !== todayStr()
+}
+
+async function loadRhythmSummary() {
+  try {
+    const res = await agentApi.getRhythmMasterCalendar(2)
+    rhythmSummary.value = formatRhythmSummary(res?.days ?? [])
+    storage.set(STORAGE_KEYS.FG_RHYTHM_SUMMARY_DATE, todayStr())
+  } catch {
+    rhythmSummary.value = null
+  }
+}
+
+function goRhythmEntry() {
+  uni.navigateTo({ url: getRhythmUrl(rhythmSummary.value?.urlDate ?? null) })
+}
 
 /** 当前分档（颜色 / 标签 / 建议 / 情绪总结 / 是否极端） */
 const zone = computed<ZoneDef>(() => {
@@ -736,14 +787,20 @@ async function load() {
     // 板块行情独立拉取：失败不影响主数据（引擎侧回退静态档位内容）
     fearGreedApi.getSectors().then((b) => { sectorBoard.value = b }).catch(() => { sectorBoard.value = null })
   } catch (e: unknown) {
-    errorMsg.value = (e as { message?: string })?.message || '请稍后重试'
+    // 策略冻结（spec 实现注意事项 3）：有缓存时不置 errorMsg，避免错误页覆盖昨日数据
+    if (!dashboard.value) {
+      errorMsg.value = (e as { message?: string })?.message || '请稍后重试'
+    }
   } finally {
     loading.value = false
   }
+  // 摘要独立于 dashboard 拉取：失败静默降级为纯导航卡，不影响主面板
+  loadRhythmSummary()
 }
 
 onShow(() => {
-  if (!dashboard.value) load()
+  // 跨日门控：dashboard 为空或摘要跨日 → 刷新
+  if (!dashboard.value || isRhythmNewDay()) load()
 })
 </script>
 
@@ -1279,5 +1336,77 @@ onShow(() => {
   color: #fff;
   font-size: $font-size-sm;
   font-weight: 600;
+}
+
+/* ===== 波段操作节奏入口卡 ===== */
+.fg-rhythm {
+  padding: $s-3;
+  border-radius: $r-lg;
+  background: $bg-card;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.fg-rhythm__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+}
+
+.fg-rhythm__title {
+  font-size: $font-size-md;
+  font-weight: 700;
+}
+
+.fg-rhythm__sub {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
+
+.fg-rhythm__row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.fg-rhythm__label {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
+
+.fg-rhythm__chip {
+  padding: 2rpx 16rpx;
+  border-radius: $r-full;
+  background: $ink-mute;
+  color: #fff;
+  font-size: $font-size-xs;
+  line-height: 1.6;
+}
+
+.fg-rhythm__chip-text {
+  color: #fff;
+}
+
+.fg-rhythm__band {
+  font-size: $font-size-xs;
+  font-weight: 600;
+}
+
+.fg-rhythm__date {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
+
+.fg-rhythm__note {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
+
+.fg-disclaimer {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+  text-align: center;
+  padding: 8rpx 24rpx 16rpx;
 }
 </style>
