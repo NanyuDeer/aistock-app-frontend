@@ -17,7 +17,7 @@
 
 ## 首页节奏卡（modules/home/components/MorningContent.vue）
 
-- 首页"节奏大师"卡展示**近 5 个交易日摘要行**（`getRhythmMasterCalendar(5)` 一次取数）：每行 = MM-DD + 档位色 chip + 建议仓位文本；点行进该日详情（带 `?date=`），整卡点击仍进默认（最近交易日）详情。
+- 首页"节奏大师"卡展示**近 3 个交易日摘要行**（`getRhythmMasterCalendar(HOME_RHYTHM_DAYS)`，`HOME_RHYTHM_DAYS = 3`）：每行 = MM-DD + 档位色 chip + 建议仓位文本；点行进该日详情（带 `?date=`），整卡点击仍进默认（最近交易日）详情。
 
 - 摘要数据统一走日历聚合接口（含 `position_band`），**不**逐日 `getRhythmMaster`（避免放大首页 onShow 刷新成本）。
 
@@ -25,7 +25,7 @@
 
 - 恐贪指数页顶部常驻「波段操作节奏」入口卡（消费方在 `modules/fear-greed`，跳转目标为本模块详情页），取数 `getRhythmMasterCalendar(2)`（**2 个交易日**，一次取数，不逐日 `getRhythmMaster`）。
 
-- 摘要格式化走纯函数 `modules/fear-greed/utils/fgRhythmSummary.ts`（`formatRhythmSummary(days)` / `getRhythmUrl(basisDate)` / `RhythmSummary`，由 `fgRhythmSummary.spec.ts` 覆盖）；档位色/短码**引用 `src/shared/utils/rhythmColors.ts` 唯一副本**，不得内联第二份。
+- 摘要格式化走纯函数 `modules/fear-greed/utils/fgRhythmSummary.ts`（`formatRhythmSummary(days)` / `getRhythmUrl(date)` / `RhythmSummary`，由 `fgRhythmSummary.spec.ts` 覆盖）；档位色/短码**引用 `src/shared/utils/rhythmColors.ts` 唯一副本**，不得内联第二份。**注意**：`getRhythmUrl` 的入参是**该行 `date`**（详情页 `report_date`/`target_date` 键），**不是 `basis_date`**；`basis_date` = 证据日 = `date − 1 个交易日`，误用会落到前一张卡。
 
 - 跳转本模块详情页 `modules/rhythm/pages/index`，**恒带 `?date=`**（取该行 `date`，即详情页 `report_date`/`target_date` 键；无有效行才不带参），不依赖详情页 fallback 链。**勿改用 `basis_date`**（= 证据日 = `date − 1 个交易日`，会落到前一张卡）。
 

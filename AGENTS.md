@@ -35,7 +35,8 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 | 业绩分析 | `modules/analytics` | 业绩预测、业绩报告列表、财报详情 | — |
 | 用户 | `modules/user` | 个人中心、登录设置、更新日志 | [user/AGENTS.md](./src/modules/user/AGENTS.md) |
 | 资讯 | `modules/news` | 公告、新闻详情 | [news/AGENTS.md](./src/modules/news/AGENTS.md) |
-| 节奏大师 | `modules/rhythm` | 节奏状态卡详情页 + 首页入口卡片 + 归档入口 | [rhythm/AGENTS.md](./src/modules/rhythm/AGENTS.md) |
+| 节奏大师 | `modules/rhythm` | 节奏状态卡详情页 + 首页入口卡片 | [rhythm/AGENTS.md](./src/modules/rhythm/AGENTS.md) |
+| 恐贪指数 | `modules/fear-greed` | 情绪温度面板（半圆仪表盘 + 历史走势）+ 波段操作节奏入口卡 | [fear-greed/AGENTS.md](./src/modules/fear-greed/AGENTS.md) |
 
 ### App 专属分包（pages-sub-app/）
 
@@ -120,7 +121,8 @@ src/
 │   ├── market/          # 行情
 │   ├── user/            # 用户
 │   ├── news/            # 资讯
-│   └── rhythm/          # 节奏大师（节奏状态卡详情页 + 首页入口卡片 + 归档入口）
+│   ├── fear-greed/      # 恐贪指数（情绪温度面板 + 波段操作节奏入口卡）
+│   ├── rhythm/          # 节奏大师（节奏状态卡详情页 + 首页入口卡片）
 ├── pages-sub-app/       # App 专属分包
 ├── pages-sub-mp/        # 小程序专属分包
 ├── assets/icons/        # SVG 图标库（大量预置图标）

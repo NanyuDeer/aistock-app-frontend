@@ -53,7 +53,7 @@ export function formatRhythmSummary(days: RhythmCalendarDay[]): RhythmSummary | 
 }
 
 /** 节奏大师详情页跳转 URL：恒带 ?date=，缺失才不带参（不依赖详情页 fallback 链） */
-export function getRhythmUrl(basisDate: string | null): string {
+export function getRhythmUrl(date: string | null): string {
   const base = '/modules/rhythm/pages/index'
-  return basisDate ? `${base}?date=${basisDate}` : base
+  return date ? `${base}?date=${date}` : base
 }
