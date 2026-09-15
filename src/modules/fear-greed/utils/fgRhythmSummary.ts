@@ -12,9 +12,9 @@ export interface RhythmSummary {
   levelColor: string
   /** position_band.text 去「建议仓位」前缀；空串 = 无仓位语义 */
   bandText: string
-  /** 「数据截至 MM-DD」/「沿用最近有效档位 MM-DD」（均 basis_date 优先回退行 date，与 urlDate 同源）/「暂无档位」 */
+  /** 「数据截至 MM-DD」/「沿用最近有效档位 MM-DD」（均 basis_date 优先回退行 date）/「暂无档位」 */
   dateLabel: string
-  /** 跳转 ?date= 值（basis_date 优先，缺失回退行 date）；无有效行 → null（跳转不带参） */
+  /** 跳转 ?date= 值：恒取该行 date（详情页以 report_date/target_date 为键）；无有效行 → null（跳转不带参） */
   urlDate: string | null
 }
 
@@ -35,7 +35,7 @@ export function formatRhythmSummary(days: RhythmCalendarDay[]): RhythmSummary | 
       levelColor: RHYTHM_GREY,
       bandText: '',
       dateLabel: '暂无档位',
-      urlDate: fallbackRow ? (fallbackRow.basis_date ?? fallbackRow.date) : null,
+      urlDate: fallbackRow ? fallbackRow.date : null,
     }
   }
 
@@ -46,9 +46,9 @@ export function formatRhythmSummary(days: RhythmCalendarDay[]): RhythmSummary | 
     levelShort: RHYTHM_LEVEL_SHORT[level] ?? level.slice(0, 1),
     levelColor: COLORS[level] ?? RHYTHM_GREY,
     bandText: (row.position_band?.text?.trim() ?? '').replace(/^建议仓位\s*/, ''),
-    // 标签与 urlDate 同源（basis_date 优先回退行 date），保证卡面与详情页落地日一致
+    // 跳转恒取该行 date（= 详情页 report_date/target_date 键，落同一张卡）；dateLabel 仍用证据日 basis_date
     dateLabel: usingFallback ? `沿用最近有效档位 ${MM(row.basis_date ?? row.date)}` : `数据截至 ${MM(row.basis_date ?? row.date)}`,
-    urlDate: row.basis_date ?? row.date,
+    urlDate: row.date,
   }
 }
 

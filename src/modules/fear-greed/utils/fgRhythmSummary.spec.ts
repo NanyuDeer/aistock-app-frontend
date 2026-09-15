@@ -10,7 +10,7 @@ describe('formatRhythmSummary', () => {
   it('无数据行 → null（纯导航卡）', () => {
     expect(formatRhythmSummary([])).toBeNull()
   })
-  it('首行有档位：取首行，数据截至 basis_date，urlDate=basis_date', () => {
+  it('首行有档位：取首行，数据截至 basis_date，urlDate 为该行 date', () => {
     const s = formatRhythmSummary([day({ date: '2026-09-14', level: 'active', basis_date: '2026-09-14', position_band: { text: '建议仓位 5 成' } })])
     expect(s).not.toBeNull()
     expect(s!.level).toBe('active')
@@ -20,7 +20,7 @@ describe('formatRhythmSummary', () => {
     expect(s!.dateLabel).toBe('数据截至 09-14')
     expect(s!.urlDate).toBe('2026-09-14')
   })
-  it('首行无档位、第二行有：沿用最近有效档位，urlDate 取第二行 basis_date', () => {
+  it('首行无档位、第二行有：沿用最近有效档位，urlDate 取该行 date', () => {
     const s = formatRhythmSummary([
       day({ date: '2026-09-14', basis_date: '2026-09-14' }),
       day({ date: '2026-09-11', level: 'normal', basis_date: '2026-09-11', position_band: { text: '建议仓位 3 成' } }),
@@ -30,29 +30,29 @@ describe('formatRhythmSummary', () => {
     expect(s!.urlDate).toBe('2026-09-11')
     expect(s!.bandText).toBe('3 成')
   })
-  it('沿用行 basis_date≠date 时：标签与 URL 一致取 basis_date（卡面与详情页不脱节）', () => {
+  it('沿用行 basis_date≠date 时：标签取 basis_date、urlDate 取该行 date（落详情页 target_date）', () => {
     const s = formatRhythmSummary([
       day({ date: '2026-09-14', basis_date: '2026-09-14' }),
       day({ date: '2026-09-12', level: 'low', basis_date: '2026-09-11' }),
     ])
     expect(s!.dateLabel).toBe('沿用最近有效档位 09-11')
-    expect(s!.urlDate).toBe('2026-09-11')
+    expect(s!.urlDate).toBe('2026-09-12')
   })
-  it('两行均无档位：暂无档位，urlDate 用首行 basis_date', () => {
+  it('两行均无档位：暂无档位，urlDate 用首行 date', () => {
     const s = formatRhythmSummary([
       day({ date: '2026-09-14', basis_date: '2026-09-12' }),
       day({ date: '2026-09-11', basis_date: '2026-09-11' }),
     ])
     expect(s!.level).toBeNull()
     expect(s!.dateLabel).toBe('暂无档位')
-    expect(s!.urlDate).toBe('2026-09-12')
+    expect(s!.urlDate).toBe('2026-09-14')
   })
-  it('basis_date 缺失回退行 date', () => {
+  it('basis_date 缺失时 dateLabel 回退行 date（urlDate 恒为该行 date）', () => {
     const s = formatRhythmSummary([day({ date: '2026-09-14', level: 'ice' })])
     expect(s!.dateLabel).toBe('数据截至 09-14')
     expect(s!.urlDate).toBe('2026-09-14')
   })
-  it('仅一行且无档位：暂无档位且 urlDate 回退该行 date', () => {
+  it('仅一行且无档位：暂无档位且 urlDate 为该行 date', () => {
     const s = formatRhythmSummary([day({ date: '2026-09-14' })])
     expect(s!.level).toBeNull()
     expect(s!.dateLabel).toBe('暂无档位')

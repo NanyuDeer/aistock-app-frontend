@@ -18,7 +18,7 @@
 - 拉取失败**静默降级**为纯导航卡（`rhythmSummary = null`，不置错误态）；两行均无档位时如实展示「暂无档位」，不伪造。
 - 跨日门控：storage 键 `STORAGE_KEYS.FG_RHYTHM_SUMMARY_DATE`（`fg_rhythm_summary_date`，**本地自然日** `YYYY-MM-DD`）；失败不写存储 → 同日 `onShow` 隐式重试。
 - `errorMsg` 策略：跨日刷新失败且 `dashboard` 已有缓存时**保留缓存、不置错误态**（`catch` 中仅 `!dashboard.value` 才写 `errorMsg`）。
-- 跳转 `modules/rhythm/pages/index` **恒带 `?date=`**（`basis_date` 优先、缺失才不带参，不依赖详情页 fallback 链）。
+- 跳转 `modules/rhythm/pages/index` **恒带 `?date=`**（取该行 `date`，即详情页 `report_date`/`target_date` 键；无有效行才不带参，不依赖详情页 fallback 链）。**勿改用 `basis_date`**：`basis_date` = 证据日 = `date − 1 个交易日`，会落到前一张卡。
 - 口径文案「短线实时 / 波段昨收：周期不同，请独立判断，勿混用」；页面底部另有免责声明行。
 
 ## 入口

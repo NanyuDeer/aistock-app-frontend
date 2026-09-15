@@ -780,7 +780,8 @@ const badgeStyle = computed(() => {
 const scaleMarks = [0, 25, 50, 75, 100]
 
 async function load() {
-  loading.value = true
+  // 仅无缓存时才显示整屏加载态：跨日刷新（onShow 门控）不得用「加载中」覆盖昨日看板
+  if (!dashboard.value) loading.value = true
   errorMsg.value = ''
   try {
     dashboard.value = await fearGreedApi.getDashboard('jq')

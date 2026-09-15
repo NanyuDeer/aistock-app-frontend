@@ -27,7 +27,7 @@
 
 - 摘要格式化走纯函数 `modules/fear-greed/utils/fgRhythmSummary.ts`（`formatRhythmSummary(days)` / `getRhythmUrl(basisDate)` / `RhythmSummary`，由 `fgRhythmSummary.spec.ts` 覆盖）；档位色/短码**引用 `src/shared/utils/rhythmColors.ts` 唯一副本**，不得内联第二份。
 
-- 跳转本模块详情页 `modules/rhythm/pages/index`，**恒带 `?date=`**（`basis_date` 优先、缺失回退行 `date`；无有效行才不带参），不依赖详情页 fallback 链。
+- 跳转本模块详情页 `modules/rhythm/pages/index`，**恒带 `?date=`**（取该行 `date`，即详情页 `report_date`/`target_date` 键；无有效行才不带参），不依赖详情页 fallback 链。**勿改用 `basis_date`**（= 证据日 = `date − 1 个交易日`，会落到前一张卡）。
 
 - `RhythmCard.vue` 的五段 scale 是**刻意不同的主题变量色系**（`$primary` / `$warning` / `$up`，仅 `seg-low` 的 `#4d7cfe` 与唯一副本的 `normal` 同值），**明确豁免不迁移**，勿误判为漏迁移。
 
