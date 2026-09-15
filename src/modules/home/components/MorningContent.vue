@@ -177,6 +177,7 @@ import { getEventList } from '@/modules/chat/event/api/eventApi'
 import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import { toMarketTraceViewModel } from '@/modules/analytics/utils/marketTraceReview'
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
+import { RHYTHM_LEVEL_SHORT, RHYTHM_LEVEL_COLORS, RHYTHM_GREY, type RhythmLevelKey } from '@/shared/utils/rhythmColors'
 
 const {
   type: briefingType,
@@ -388,16 +389,7 @@ interface RhythmHistoryRow {
 }
 const rhythmRows = ref<RhythmHistoryRow[]>([])
 
-// 档位短码/色板（与节奏模块日历同源：ice 紫灰 / low 青 / normal 主蓝 / active 橙 / euphoria 红）
-const RHYTHM_LEVEL_SHORT: Record<string, string> = { ice: '冰', low: '低', normal: '常', active: '活', euphoria: '亢' }
-const RHYTHM_LEVEL_COLOR: Record<string, string> = {
-  ice: '#8a6fae',
-  low: '#2f9e9e',
-  normal: '#4d7cfe',
-  active: '#f59e0b',
-  euphoria: '#ef4444',
-}
-const RHYTHM_GREY = '#eceef1' // 无档位（行缺失/沿用前值）
+// 档位色板/短码唯一副本见 shared/utils/rhythmColors.ts
 
 async function loadRhythmHistory() {
   try {
@@ -418,7 +410,7 @@ async function loadRhythmHistory() {
 }
 
 function rhythmChipColor(r: RhythmHistoryRow): string {
-  return (r.level && RHYTHM_LEVEL_COLOR[r.level]) || RHYTHM_GREY
+  return (r.level && RHYTHM_LEVEL_COLORS[r.level as RhythmLevelKey]) || RHYTHM_GREY
 }
 function rhythmLevelShort(r: RhythmHistoryRow): string {
   if (r.level) return RHYTHM_LEVEL_SHORT[r.level] ?? r.level.slice(0, 1)

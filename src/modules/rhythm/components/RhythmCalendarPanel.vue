@@ -23,7 +23,7 @@
         @tap="pick(d)"
       >
         <text class="day-date">{{ d.date.slice(5) }}</text>
-        <text class="day-lev" v-if="d.level">{{ LEVEL_SHORT[d.level] ?? d.level.slice(0, 1) }}</text>
+        <text class="day-lev" v-if="d.level">{{ RHYTHM_LEVEL_SHORT[d.level] ?? d.level.slice(0, 1) }}</text>
         <text class="day-pos" v-else>沿用</text>
         <text class="day-pos" v-if="d.level && bandShort(d)">{{ bandShort(d) }}</text>
       </view>
@@ -54,7 +54,7 @@
             @tap="pick(cell)"
           >
             <text class="cal-date" :class="{ dim: !cell.level }">{{ cell.date.slice(8) }}</text>
-            <text class="cal-lev" v-if="cell.level">{{ LEVEL_SHORT[cell.level] ?? cell.level.slice(0, 1) }}</text>
+            <text class="cal-lev" v-if="cell.level">{{ RHYTHM_LEVEL_SHORT[cell.level] ?? cell.level.slice(0, 1) }}</text>
             <view v-if="mode === 'event' && eventsOf(cell).length" class="ev-badge" :class="{ hasHigh: highCount(cell) > 0 }">
               <text v-if="highCount(cell) > 0" class="ev-badge-num">{{ highCount(cell) }}</text>
             </view>
@@ -85,6 +85,7 @@ import { computed, ref } from 'vue'
 import { Segmented } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { RhythmCalendarDay, RhythmEvent } from '@/shared/api/modules/agent'
+import { RHYTHM_LEVEL_SHORT, RHYTHM_LEVEL_COLORS, RHYTHM_GREY, type RhythmLevelKey } from '@/shared/utils/rhythmColors'
 
 const props = withDefaults(defineProps<{ targetDate?: string }>(), { targetDate: '' })
 const emit = defineEmits<{ pick: [date: string] }>()
@@ -97,18 +98,12 @@ const mode = ref<'position' | 'event'>('position')
 const dayListRaw = ref<RhythmCalendarDay[]>([]) // naturalDays=60 原序（降序：最近在前，含周末自然日）—— 展开月度网格专用
 const dayList = ref<RhythmCalendarDay[]>([]) // days=60 交易日原序（降序：仅交易日）—— 折叠紧凑条/selectedEvents 专用（近 7 交易日不含周末）
 
-const LEVEL_SHORT: Record<string, string> = { ice: '冰', low: '低', normal: '常', active: '活', euphoria: '亢' }
-const LEVEL_COLOR: Record<string, string> = {
-  ice: '#8a6fae', low: '#2f9e9e', normal: '#4d7cfe', active: '#f59e0b', euphoria: '#ef4444',
-}
-const GREY = '#eceef1'
-
 // 折叠态最近 7 日（升序展示：左旧右新）
 const ascending = computed(() => [...dayList.value].reverse())
 const stripDays = computed(() => ascending.value.slice(-7))
 
 function dayCellBg(d: RhythmCalendarDay): string {
-  return (d.level && LEVEL_COLOR[d.level]) || GREY
+  return (d.level && RHYTHM_LEVEL_COLORS[d.level as RhythmLevelKey]) || RHYTHM_GREY
 }
 function bandShort(d: RhythmCalendarDay): string {
   return (d.position_band?.text?.trim() ?? '').replace(/^建议仓位\s*/, '')
