@@ -73,6 +73,7 @@ export default defineConfig({
       'src/modules/chat/pages/chat-report-detail.spec.ts',
       'src/modules/fear-greed/utils/fgAdvice.spec.ts',
       'src/shared/utils/rhythmColors.spec.ts',
+      'src/modules/fear-greed/utils/fgRhythmSummary.spec.ts',
     ],
   },
 })
