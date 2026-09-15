@@ -27,7 +27,7 @@
         <view class="fg-retry" @tap="load">重试</view>
       </view>
 
-      <!-- 主面板：只展示恐贪指数一个页面，无六指标/无折线图 -->
+      <!-- 主面板：只展示恐贪指数一个页面，无六指标 -->
       <!-- v-else-if="dashboard" 显式收窄 dashboard 非空，满足 TS 类型检查 -->
       <template v-else-if="dashboard">
         <!-- 当前情绪 + 更新时间 -->
@@ -236,6 +236,7 @@ import { buildSectorTags, buildActions, buildAdvice, buildDriversSentence } from
 import { agentApi } from '@/shared/api/modules/agent'
 import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 import { formatRhythmSummary, getRhythmUrl, type RhythmSummary } from '../utils/fgRhythmSummary'
+import { localDayKey, decideRhythmRefresh, shouldSetErrorMsg } from '../utils/fgRhythmGate'
 
 /**
  * 情绪分档（沸点/冰点生活化表述，去专业术语）。
@@ -343,6 +344,8 @@ const ZONES: ZoneDef[] = [
 const loading = ref(true)
 const errorMsg = ref('')
 const dashboard = ref<FearGreedDashboard | null>(null)
+/** 主面板内存缓存的拉取日（与 dashboard 缓存同生命周期；空串 = 从未成功拉取） */
+const dashboardLoadedDay = ref('')
 /** 当日板块行情（建议引擎输入；失败静默置 null 走 fallback） */
 const sectorBoard = ref<FgSectorBoard | null>(null)
 /** 当前点击的配置方向弹窗（null = 关闭） */
@@ -350,23 +353,11 @@ const activeSector = ref<{ name: string; desc: string } | null>(null)
 
 const rhythmSummary = ref<RhythmSummary | null>(null)
 
-/** 本地自然日 YYYY-MM-DD（交易日周末不前进，故跨日判断不得用 basis_date） */
-function todayStr(): string {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-
-/** 摘要跨日门控：存储拉取日 ≠ 本地今日 → 需刷新（失败不写存储 → 同日 onShow 隐式重试） */
-function isRhythmNewDay(): boolean {
-  return storage.get<string>(STORAGE_KEYS.FG_RHYTHM_SUMMARY_DATE) !== todayStr()
-}
-
 async function loadRhythmSummary() {
   try {
     const res = await agentApi.getRhythmMasterCalendar(2)
     rhythmSummary.value = formatRhythmSummary(res?.days ?? [])
-    storage.set(STORAGE_KEYS.FG_RHYTHM_SUMMARY_DATE, todayStr())
+    storage.set(STORAGE_KEYS.FG_RHYTHM_SUMMARY_DATE, localDayKey())
   } catch {
     rhythmSummary.value = null
   }
@@ -785,11 +776,12 @@ async function load() {
   errorMsg.value = ''
   try {
     dashboard.value = await fearGreedApi.getDashboard('jq')
+    dashboardLoadedDay.value = localDayKey()
     // 板块行情独立拉取：失败不影响主数据（引擎侧回退静态档位内容）
     fearGreedApi.getSectors().then((b) => { sectorBoard.value = b }).catch(() => { sectorBoard.value = null })
   } catch (e: unknown) {
     // 策略冻结（spec 实现注意事项 3）：有缓存时不置 errorMsg，避免错误页覆盖昨日数据
-    if (!dashboard.value) {
+    if (shouldSetErrorMsg(dashboard.value !== null)) {
       errorMsg.value = (e as { message?: string })?.message || '请稍后重试'
     }
   } finally {
@@ -800,8 +792,16 @@ async function load() {
 }
 
 onShow(() => {
-  // 跨日门控：dashboard 为空或摘要跨日 → 刷新
-  if (!dashboard.value || isRhythmNewDay()) load()
+  // 门控：主面板缺失/跨日 → 整体重拉；否则仅摘要跨日时只补拉摘要
+  // （摘要接口失败不写存储 → 单请求隐式重试，不连带重拉 dashboard/sectors）
+  const action = decideRhythmRefresh({
+    hasDashboard: dashboard.value !== null,
+    dashboardLoadedDay: dashboardLoadedDay.value,
+    storedSummaryDay: storage.get<string>(STORAGE_KEYS.FG_RHYTHM_SUMMARY_DATE),
+    today: localDayKey(),
+  })
+  if (action === 'load') load()
+  else if (action === 'summary') loadRhythmSummary()
 })
 </script>
 
