@@ -11,6 +11,16 @@
   水银柱随指数升降、冰点/沸点极端时呼吸灯）、投资建议卡片、AI 情绪洞见卡片。
   **不包含**六指标导航、折线图、饼图、柱状图等复杂图表（简化版需求）。
 
+## 波段操作节奏入口卡（2026-09-15）
+
+- 页面顶部常驻「波段操作节奏」入口卡：外壳挂在 `.fg-page` 顶层，与 loading / error / dashboard 三分支链**并列**（不参与该 `v-if` 链），三态均显示。
+- 摘要取数走 `agentApi.getRhythmMasterCalendar(2)`（2 个交易日），格式化走纯函数 `utils/fgRhythmSummary.ts`（`formatRhythmSummary` / `getRhythmUrl`，单测 `fgRhythmSummary.spec.ts`）；档位色/短码引用 `src/shared/utils/rhythmColors.ts` 唯一副本。
+- 拉取失败**静默降级**为纯导航卡（`rhythmSummary = null`，不置错误态）；两行均无档位时如实展示「暂无档位」，不伪造。
+- 跨日门控：storage 键 `STORAGE_KEYS.FG_RHYTHM_SUMMARY_DATE`（`fg_rhythm_summary_date`，**本地自然日** `YYYY-MM-DD`）；失败不写存储 → 同日 `onShow` 隐式重试。
+- `errorMsg` 策略：跨日刷新失败且 `dashboard` 已有缓存时**保留缓存、不置错误态**（`catch` 中仅 `!dashboard.value` 才写 `errorMsg`）。
+- 跳转 `modules/rhythm/pages/index` **恒带 `?date=`**（`basis_date` 优先、缺失才不带参，不依赖详情页 fallback 链）。
+- 口径文案「短线实时 / 波段昨收：周期不同，请独立判断，勿混用」；页面底部另有免责声明行。
+
 ## 入口
 
 - 首页悬浮温度计（`shared/components/FearGreedIndex.vue`）点击跳转至本模块。

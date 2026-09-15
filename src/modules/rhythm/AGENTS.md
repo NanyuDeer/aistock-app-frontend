@@ -21,6 +21,16 @@
 
 - 摘要数据统一走日历聚合接口（含 `position_band`），**不**逐日 `getRhythmMaster`（避免放大首页 onShow 刷新成本）。
 
+## 恐贪页入口卡（modules/fear-greed/pages/index.vue，2026-09-15）
+
+- 恐贪指数页顶部常驻「波段操作节奏」入口卡（消费方在 `modules/fear-greed`，跳转目标为本模块详情页），取数 `getRhythmMasterCalendar(2)`（**2 个交易日**，一次取数，不逐日 `getRhythmMaster`）。
+
+- 摘要格式化走纯函数 `modules/fear-greed/utils/fgRhythmSummary.ts`（`formatRhythmSummary(days)` / `getRhythmUrl(basisDate)` / `RhythmSummary`，由 `fgRhythmSummary.spec.ts` 覆盖）；档位色/短码**引用 `src/shared/utils/rhythmColors.ts` 唯一副本**，不得内联第二份。
+
+- 跳转本模块详情页 `modules/rhythm/pages/index`，**恒带 `?date=`**（`basis_date` 优先、缺失回退行 `date`；无有效行才不带参），不依赖详情页 fallback 链。
+
+- `RhythmCard.vue` 的五段 scale 是**刻意不同的主题变量色系**（`$primary` / `$warning` / `$up`，仅 `seg-low` 的 `#4d7cfe` 与唯一副本的 `normal` 同值），**明确豁免不迁移**，勿误判为漏迁移。
+
 ## 数据源
 
 - `agentApi.getRhythmMaster(date)`（`src/shared/api/modules/agent.ts`）：GET `/agent/rhythm-master/:date`，返回 `{ date, versions: [{ refresh_slot, created_at, content }] }`
@@ -65,7 +75,7 @@
 
 - 网格按交易日（服务端展开，前端不依赖交易日历），展开态为自然周网格：周一列开头、周末列留空
 
-- 独立五档色板（不复用卡片 chip 色）：ice 紫灰 `#8a6fae` / low 青 `#2f9e9e` / normal 主蓝 / active 橙 / euphoria 红；灰格 `#eceef1`（行缺失或 level=null）
+- 档位色板/短码唯一副本见 `src/shared/utils/rhythmColors.ts`（ice 紫灰 `#8a6fae` / low 青 `#2f9e9e` / normal 主蓝 `#4d7cfe` / active 橙 `#f59e0b` / euphoria 红 `#ef4444`；灰格 `#eceef1`），禁止组件内第二份副本
 
 - `level=null` = 灰格（行缺失 / 沿用前值），如实展示不伪造
 
