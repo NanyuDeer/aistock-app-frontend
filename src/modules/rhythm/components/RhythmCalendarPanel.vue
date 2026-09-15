@@ -165,7 +165,7 @@ function buildMonthGrid(month: string): GridCell[][] {
   for (let d = 1; d <= daysInMonth; d++) {
     const date = `${year}-${p(monthIdx)}-${p(d)}`
     const found = dayListRaw.value.find((x) => x.date === date)
-    const cell: GridCell = found ?? { date, level: null, score: null, basis_date: null, position_band: null, events: [] }
+    const cell: GridCell = found ?? { date, refresh_slot: 'after_close', level: null, score: null, basis_date: null, position_band: null, events: [] }
     row.push(cell)
     if (row.length === 7) {
       rows.push(row)
