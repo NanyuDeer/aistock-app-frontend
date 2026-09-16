@@ -64,7 +64,7 @@ function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
 export function toRhythmInsight(card: RhythmCard | null | undefined, slot: string, targetDate: string): RhythmInsightCard | null {
   if (!card) return null
   const level = LEVEL_LABEL[card.level ?? ''] ?? ''
-  const band = (card.position_band?.text ?? '').trim().replace(/^建议仓位\s*/, '')
+  const band = (card.position_band?.text ?? '').trim().replace(/^建议仓位[：:]*\s*/, '')
   const title = card.conflict
     ? '信号背离 · 仅区间与提示'
     : [level, band].filter(Boolean).join(' · ')

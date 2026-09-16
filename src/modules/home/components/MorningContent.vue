@@ -177,7 +177,7 @@ import { getEventList } from '@/modules/chat/event/api/eventApi'
 import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import { toMarketTraceViewModel } from '@/modules/analytics/utils/marketTraceReview'
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
-import { RHYTHM_LEVEL_SHORT, RHYTHM_LEVEL_COLORS, RHYTHM_GREY, type RhythmLevelKey } from '@/shared/utils/rhythmColors'
+import { RHYTHM_LEVEL_COLORS, RHYTHM_GREY, levelShort, type RhythmLevelKey } from '@/shared/utils/rhythmColors'
 
 const {
   type: briefingType,
@@ -413,7 +413,7 @@ function rhythmChipColor(r: RhythmHistoryRow): string {
   return (r.level && RHYTHM_LEVEL_COLORS[r.level as RhythmLevelKey]) || RHYTHM_GREY
 }
 function rhythmLevelShort(r: RhythmHistoryRow): string {
-  if (r.level) return RHYTHM_LEVEL_SHORT[r.level] ?? r.level.slice(0, 1)
+  if (r.level) return levelShort(r.level)
   return '沿'
 }
 

@@ -15,8 +15,8 @@ function branch(p: Partial<RhythmBranch>): RhythmBranch {
 }
 
 test('title：非 conflict 拼接档位中文与仓位句；conflict 用背离文案', () => {
-  const card = { level: 'active', position_band: { text: '建议仓位 60%-80%' }, conflict: false, branches: [] } as unknown as RhythmCard
-  assert.equal(toRhythmInsight(card, 'after_close', '2026-09-02')?.title, '活跃 · 60%-80%')
+  const card = { level: 'active', position_band: { text: '建议仓位：七成~八成' }, conflict: false, branches: [] } as unknown as RhythmCard
+  assert.equal(toRhythmInsight(card, 'after_close', '2026-09-02')?.title, '活跃 · 七成~八成')
   const conflict = { ...card, conflict: true, conflict_detail: '多空背离' } as unknown as RhythmCard
   assert.equal(toRhythmInsight(conflict, 'after_close', '2026-09-02')?.title, '信号背离 · 仅区间与提示')
 })
@@ -29,7 +29,7 @@ test('预判 structured 同时收 interval 与 enum（事件）分支；enum 用
     event_ref: { event_date: '2026-09-03', title: 'CPI 数据公布' },
     met: true,
   })
-  const card = { level: 'normal', position_band: { text: '建议仓位 30%-50%' }, conflict: false, branches: [interval, eventBranch] } as unknown as RhythmCard
+  const card = { level: 'normal', position_band: { text: '建议仓位：五成~六成' }, conflict: false, branches: [interval, eventBranch] } as unknown as RhythmCard
   const out = toRhythmInsight(card, 'morning', '2026-09-02')
   assert.equal(out?.structured?.conditions.length, 2)
   assert.equal(out?.structured?.conditions[0].condition, '收盘站上 4050 压力位')
@@ -41,7 +41,7 @@ test('预判 structured 同时收 interval 与 enum（事件）分支；enum 用
 
 test('括号阈值（放量（>xxx亿））→ anchor.threshold，主干保留', () => {
   const amt = branch({ condition: { kind: 'interval', indicator: '成交额', label: '放量（>120亿）', lo: 120, hi: null }, conclusion: { direction: 'bullish', range: '4050-4200', validity: 5, note: '放量突破压力位' } })
-  const card = { level: 'active', position_band: { text: '建议仓位 60%-80%' }, conflict: false, branches: [amt] } as unknown as RhythmCard
+  const card = { level: 'active', position_band: { text: '建议仓位：七成~八成' }, conflict: false, branches: [amt] } as unknown as RhythmCard
   const out = toRhythmInsight(card, 'after_close', '2026-09-02')
   assert.equal(out?.structured?.conditions[0].condition, '放量')
   assert.equal(out?.structured?.conditions[0].anchor?.threshold, '>120亿')

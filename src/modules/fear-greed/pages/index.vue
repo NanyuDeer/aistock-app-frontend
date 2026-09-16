@@ -767,9 +767,6 @@ const badgeStyle = computed(() => {
   return { background: `${c}1a`, color: c }
 })
 
-/** 温度计刻度 */
-const scaleMarks = [0, 25, 50, 75, 100]
-
 async function load() {
   // 仅无缓存时才显示整屏加载态：跨日刷新（onShow 门控）不得用「加载中」覆盖昨日看板
   if (!dashboard.value) loading.value = true
@@ -1379,7 +1376,6 @@ onShow(() => {
 .fg-rhythm__chip {
   padding: 2rpx 16rpx;
   border-radius: $r-full;
-  background: $ink-mute;
   color: #fff;
   font-size: $font-size-xs;
   line-height: 1.6;

@@ -23,7 +23,7 @@
         @tap="pick(d)"
       >
         <text class="day-date">{{ d.date.slice(5) }}</text>
-        <text class="day-lev" v-if="d.level">{{ RHYTHM_LEVEL_SHORT[d.level] ?? d.level.slice(0, 1) }}</text>
+        <text class="day-lev" v-if="d.level">{{ levelShort(d.level) }}</text>
         <text class="day-pos" v-else>沿用</text>
         <text class="day-pos" v-if="d.level && bandShort(d)">{{ bandShort(d) }}</text>
       </view>
@@ -54,7 +54,7 @@
             @tap="pick(cell)"
           >
             <text class="cal-date" :class="{ dim: !cell.level }">{{ cell.date.slice(8) }}</text>
-            <text class="cal-lev" v-if="cell.level">{{ RHYTHM_LEVEL_SHORT[cell.level] ?? cell.level.slice(0, 1) }}</text>
+            <text class="cal-lev" v-if="cell.level">{{ levelShort(cell.level) }}</text>
             <view v-if="mode === 'event' && eventsOf(cell).length" class="ev-badge" :class="{ hasHigh: highCount(cell) > 0 }">
               <text v-if="highCount(cell) > 0" class="ev-badge-num">{{ highCount(cell) }}</text>
             </view>
@@ -85,7 +85,7 @@ import { computed, ref } from 'vue'
 import { Segmented } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { RhythmCalendarDay, RhythmEvent } from '@/shared/api/modules/agent'
-import { RHYTHM_LEVEL_SHORT, RHYTHM_LEVEL_COLORS, RHYTHM_GREY, type RhythmLevelKey } from '@/shared/utils/rhythmColors'
+import { RHYTHM_LEVEL_COLORS, RHYTHM_GREY, isRhythmLevelKey, levelShort } from '@/shared/utils/rhythmColors'
 
 const props = withDefaults(defineProps<{ targetDate?: string }>(), { targetDate: '' })
 const emit = defineEmits<{ pick: [date: string] }>()
@@ -103,10 +103,10 @@ const ascending = computed(() => [...dayList.value].reverse())
 const stripDays = computed(() => ascending.value.slice(-7))
 
 function dayCellBg(d: RhythmCalendarDay): string {
-  return (d.level && RHYTHM_LEVEL_COLORS[d.level as RhythmLevelKey]) || RHYTHM_GREY
+  return isRhythmLevelKey(d.level) ? RHYTHM_LEVEL_COLORS[d.level] : RHYTHM_GREY
 }
 function bandShort(d: RhythmCalendarDay): string {
-  return (d.position_band?.text?.trim() ?? '').replace(/^建议仓位\s*/, '')
+  return (d.position_band?.text?.trim() ?? '').replace(/^建议仓位[：:]*\s*/, '')
 }
 
 // 今日高亮：模板以 todayStr() 调用取当日 YYYY-MM-DD 串（brief 样例漏了括号——函数引用恒不等于字符串，今日格永不亮，此处修正）
@@ -141,6 +141,11 @@ const WEEK_COL: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6
 type GridCell = RhythmCalendarDay | null
 const p = (n: number) => String(n).padStart(2, '0')
 
+/** 自然月网格的空缺日占位灰格：无档位/无事件，仍可 pick；refresh_slot 仅为满足 RhythmCalendarDay 必填类型，无业务语义 */
+function greyCell(date: string): GridCell {
+  return { date, refresh_slot: 'after_close', level: null, score: null, basis_date: null, position_band: null, events: [] }
+}
+
 /** 当前展示月份（YYYY-MM，默认当前自然月） */
 function defaultMonth(): string {
   const d = new Date()
@@ -160,7 +165,7 @@ function buildMonthGrid(month: string): GridCell[][] {
   for (let d = 1; d <= daysInMonth; d++) {
     const date = `${year}-${p(monthIdx)}-${p(d)}`
     const found = dayListRaw.value.find((x) => x.date === date)
-    const cell: GridCell = found ?? { date, refresh_slot: 'after_close', level: null, score: null, basis_date: null, position_band: null, events: [] }
+    const cell: GridCell = found ?? greyCell(date)
     row.push(cell)
     if (row.length === 7) {
       rows.push(row)
