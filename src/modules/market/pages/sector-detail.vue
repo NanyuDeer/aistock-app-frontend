@@ -36,6 +36,7 @@
             :date="insightDate"
             :market-link="marketLink"
             :sector-name="sector.name"
+            display-mode="conclusion"
           />
         </view>
 

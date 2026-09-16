@@ -52,7 +52,7 @@
             </view>
           </view>
           <view v-for="c in primarySectorCandidates" :key="c.ts_code" class="primary-sector-card">
-            <SectorInsightCard :candidate="c" :date="displayedDate" />
+            <SectorInsightCard :candidate="c" :date="displayedDate" display-mode="conclusion" />
           </view>
         </view>
       </view>

@@ -124,7 +124,7 @@
 
               <!-- 预判详情区：复用组件库条件化预判格式（分支/期段/点亮），行样式白卡 -->
               <view v-if="row.structured" class="sl-row__fc" @tap.stop>
-                <ConditionalForecastBlock :structured="row.structured" />
+                <ConditionalForecastBlock :structured="row.structured" display-mode="conclusion" />
               </view>
             </view>
           </template>
