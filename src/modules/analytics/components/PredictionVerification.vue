@@ -137,6 +137,8 @@ function condBadgeText(idx: number): string {
     const map: Record<string, string> = { hit: '命中', miss: '未命中', insufficient: '无法验证' }
     return map[stage.result] || '已验证'
   }
+  // 两段判定第①段：条件已点亮（condition_met），尚未到期验证——不得显示「已验证」
+  if (stage.kind === 'condition_met') return '条件已成立 · 待验证'
   return '待验证'
 }
 

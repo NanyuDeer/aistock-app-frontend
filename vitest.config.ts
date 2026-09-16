@@ -76,6 +76,7 @@ export default defineConfig({
       'src/modules/fear-greed/utils/fgRhythmSummary.spec.ts',
       'src/modules/fear-greed/utils/fgRhythmGate.spec.ts',
       'src/modules/fear-greed/pages/index.spec.ts',
+      'src/modules/analytics/components/PredictionVerification.spec.ts',
     ],
   },
 })

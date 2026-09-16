@@ -23,8 +23,10 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *  2026-09-16：ConditionalForecastBlock 单档守卫 + activeHorizon watchEffect 已实现，既有 2 条失败转绿，残余失败清零。
  *  2026-09-16：结论模式落地新增 6 条（conditionalForecast.spec.ts 5 条 + CFB spec __seg 容器断言 1 条）。
  *  2026-09-16：无 met 数据降级全量渲染新增 3 条（conditionalForecast.spec.ts 的 resolveDisplayMode 三态）。
+ *  2026-09-16：condition_met 两段判定（条件点亮中间态不再误标「已验证」）新增 2 条
+ *    （predictionHistory.spec.ts 的 conditionStage 中间态/到期后）。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '246/246/0'
+const EXPECTED_BASELINE = '248/248/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {

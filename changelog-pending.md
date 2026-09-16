@@ -16,3 +16,13 @@
   - **Web 端**（`aistock-frontend`）：零等价组件（仅 `modules/event/components/AiEventReport.vue` 内联手写文本洞见卡）→ 跨端属新增工作。
 - 验收（Task 8 全量回归）：App `npx vue-tsc --noEmit` **0 错误**（exit 0）；`npm run test:node` `246/246/0`（exit 0）；`npx vitest run` 4 failed / 406 passed——5 个失败文件经 A/B 回退到本计划前基线复核**全部为存量基线红**（KLineChart.vue renderjs 双 script 编译错 ×2 suite、reports.vue 布局断言、favorites AlertContent/insight-detail 断言），本次零引入；CFB 两副本差异仅 helper 定义块、InsightCard 两副本无差异。
 - 终审收口（2026-09-16 全分支终审 I/L 项）：`resolvedDisplayMode` 改为按**当前期段**判定降级（新增 `inHorizonConditions` computed，`activeConditions` 改由它过滤）——消除跨档假空态：某档有布尔 `met`、另一档全为 `null/undefined` 时，切到后者不再误显「条件未成立 · 暂无已验证结论」并隐藏该档全部分支（I1）；spec 追加 2 条锚定断言（过滤必须取 `resolvedDisplayMode`；App 侧必须 import shared util，防「库→App 整文件复制」把内联灌回使 utils 变死代码）（I3/L2）；SectorInsightCard `traceDetailText` 补「与卡标题同句 → 空」，与既有「与溯源行同句 → 空」并列（L1）。验证：`npx vue-tsc --noEmit` 0 错误（exit 0）；`npm run test:node` `246/246/0`（exit 0，断言加在既有用例内，基线不变）。
+
+## 2026-09-16 condition_met 两段判定：条件点亮中间态不再误标「已验证」（终审阻塞项 #1）
+
+- 问题：后端两段判定第①段（到期前点亮）只写 `verification[c{i}].condition_met = true`、**不写 `result`**；`conditionStage` 旧口径「entry 存在即 verified」把中间态判成 `result: undefined`，`condBadgeText` 落到 `map[undefined] || '已验证'` → 详情页误显「已验证」+「实际 --」。
+- 修复：`src/modules/analytics/utils/predictionHistory.ts` 新增 `ConditionStage` 分支 `{ kind: 'condition_met' }`（判定：entry 存在、`result == null`、`condition_met === true`），置于「有 result → verified」之前；`verified` 分支返回形状不变（向后兼容）。
+- 组件：`src/modules/analytics/components/PredictionVerification.vue` 的 `condBadgeText` 对新 kind 输出「条件已成立 · 待验证」，颜色沿用既有 `badge-pending`（`condBadgeClass` 未改，fallthrough 即 pending）；「实际 X」仍只在 `kind === 'verified'` 渲染，中间态不再出现「实际 --」。
+- 测试（先红后绿）：`predictionHistory.spec.ts` 新增 2 条（中间态 → `condition_met`；到期后 `condition_met` 保留 + 有 `result` → `verified`）；新增 vitest 挂载 spec `src/modules/analytics/components/PredictionVerification.spec.ts`（3 条：中间态文案+pending 色且不含「已验证」/「实际」、到期后「命中」+「实际 +5.2%」、无 c{i} 仍「待验证」），并登记进 `vitest.config.ts` 的 `test.include` 白名单（否则 vitest 静默跳过）。
+- 基线同步：`tests/run-node-specs.mjs` `EXPECTED_BASELINE` `246/246/0` → `248/248/0`。
+- 验收：`npx vitest run src/modules/analytics` 3/3 passed（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`npx vue-tsc --noEmit` 0 错误（exit 0）；`npx vitest run` 全量为存量红（4 failed / 409 passed + 2 失败 suite，A/B 回退取证与本次改动前逐条一致）。
+- 未改：`PredictionVerification` 其他状态文案/样式、后端契约、`overallStatus`（c{i} entry 本就不参与 `status=verified`）。
