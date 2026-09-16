@@ -6,8 +6,8 @@
       <text v-if="verifyText" class="as-insight-card__verify" :class="verifyClass">{{ verifyText }}</text>
     </view>
 
-    <!-- 期段切换 -->
-    <view class="as-insight-card__seg">
+    <!-- 期段切换（仅多档时展示：单档不显孤 Tab） -->
+    <view v-if="horizonSegments.length > 1" class="as-insight-card__seg">
       <view
         v-for="seg in horizonSegments"
         :key="seg"
@@ -140,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 
 /**
  * ConditionalForecastBlock 条件化预判块（洞见卡系通用块，2026-09-02 抽取）
@@ -278,6 +278,14 @@ const horizonSegments = computed<HorizonKey[]>(() => {
   for (const c of data.conditions ?? []) keys.add(c.horizon)
   if (!keys.size) return []
   return HORIZON_ORDER.filter((k) => keys.has(k))
+})
+
+/** 档位切换后校正：data 不含当前档（或首次拿到数据）时回到首个可见档 */
+watchEffect(() => {
+  const segs = horizonSegments.value
+  if (segs.length > 0 && !segs.includes(activeHorizon.value)) {
+    activeHorizon.value = segs[0]
+  }
 })
 
 /** 当前期内的基准方向（horizons 匹配当期） */
