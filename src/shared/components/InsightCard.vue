@@ -50,16 +50,46 @@
         <text class="as-insight-card__tlk-badge">{{ traceStructured.badge }}</text>
         <text class="as-insight-card__tlk-drv-text">{{ traceStructured.detail }}</text>
       </view>
+
+      <!-- 依据详情（本地展开：展示溯源全文 + 板块链阶段 stages；无内容不渲染入口） -->
+      <template v-if="traceDetailText || traceStages.length">
+        <view class="as-insight-card__more" @tap.stop="traceExpanded = !traceExpanded">
+          <text class="as-insight-card__more-tx">{{ traceExpanded ? '收起' : '依据详情' }}</text>
+          <view class="as-insight-card__more-chev" :class="{ 'as-insight-card__more-chev--open': traceExpanded }" />
+        </view>
+        <view v-if="traceExpanded" class="as-insight-card__detail">
+          <view v-for="(st, i) in traceStages" :key="i" class="as-insight-card__detail-st">
+            <text class="as-insight-card__detail-k">{{ st.name }}</text>
+            <text class="as-insight-card__detail-v">{{ st.text }}</text>
+          </view>
+          <text v-if="traceDetailText" class="as-insight-card__detail-tx">{{ traceDetailText }}</text>
+        </view>
+      </template>
     </view>
 
     <!-- 溯源（横幅卡：蓝，文本形态兼容旧用法） -->
     <view v-else-if="trace" class="as-insight-card__line as-insight-card__line--trace">
       <text class="as-insight-card__key">溯源</text>
       <text class="as-insight-card__text">{{ trace }}</text>
+
+      <!-- 依据详情（本地展开：展示溯源全文 + 板块链阶段 stages；无内容不渲染入口） -->
+      <template v-if="traceDetailText || traceStages.length">
+        <view class="as-insight-card__more" @tap.stop="traceExpanded = !traceExpanded">
+          <text class="as-insight-card__more-tx">{{ traceExpanded ? '收起' : '依据详情' }}</text>
+          <view class="as-insight-card__more-chev" :class="{ 'as-insight-card__more-chev--open': traceExpanded }" />
+        </view>
+        <view v-if="traceExpanded" class="as-insight-card__detail">
+          <view v-for="(st, i) in traceStages" :key="i" class="as-insight-card__detail-st">
+            <text class="as-insight-card__detail-k">{{ st.name }}</text>
+            <text class="as-insight-card__detail-v">{{ st.text }}</text>
+          </view>
+          <text v-if="traceDetailText" class="as-insight-card__detail-tx">{{ traceDetailText }}</text>
+        </view>
+      </template>
     </view>
 
     <!-- 预判：条件化结构化块（structured 传入时；渲染通用 ConditionalForecastBlock，全粒度共用） -->
-    <ConditionalForecastBlock v-if="structured" :structured="structured" />
+    <ConditionalForecastBlock v-if="structured" :structured="structured" :display-mode="displayMode" />
 
     <!-- 预判（横幅卡：金，文本形态，兼容旧用法） -->
     <view v-else-if="forecast" class="as-insight-card__line as-insight-card__line--forecast">
@@ -79,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import ConditionalForecastBlock from './ConditionalForecastBlock.vue'
 import wordmarkPng from './insight-wordmark.png'
 import wordmarkLightPng from './insight-wordmark-light.png'
@@ -169,6 +199,10 @@ interface InsightTraceStructured {
   badge?: string
   /** 角色徽后驱动一句话（入链时） */
   detail?: string
+  /** 板块自身链阶段（链式溯源 P3' 产出：现象 → 触发 → 传导 → 定价；本期仅预留渲染，无数据不渲染） */
+  stages?: Array<{ name: string; text: string }>
+  /** 依据详情正文（缺省回退 InsightCard 的 traceDetail） */
+  more?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -180,6 +214,10 @@ const props = withDefaults(defineProps<{
   trace?: string
   /** 溯源行结构化形态（大盘联动双行；传入优先于 trace 文本行） */
   traceStructured?: InsightTraceStructured | null
+  /** 溯源「依据详情」正文（可选；有值时溯源区显示「依据详情 ▾」入口并在卡片内展开） */
+  traceDetail?: string
+  /** 预判展示模式：full=全量分支（现状）；conclusion=只显示已成立分支（透传 CFB，spec §7） */
+  displayMode?: 'full' | 'conclusion'
   /** 预判：后续走向（文本形态，structured 传入时忽略） */
   forecast?: string
   /** 标签词覆盖（如板块卡传 tag-text="板块洞见"，剥"洞见"后缀后显示"板块"）；缺省按 type 取短词 */
@@ -200,6 +238,8 @@ const props = withDefaults(defineProps<{
   type: 'emotion',
   trace: '',
   traceStructured: null,
+  traceDetail: '',
+  displayMode: 'full',
   forecast: '',
   tagText: '',
   structured: null,
@@ -227,6 +267,15 @@ const typeWord = computed(() => {
   const t = props.tagText?.trim()
   return t ? t.replace(/洞见$/, '') : typeLabelMap[props.type]
 })
+
+/** 溯源「依据详情」展开态（本地交互；不新增接口） */
+const traceExpanded = ref(false)
+
+/** 依据详情正文：结构化 more 优先，其次 traceDetail prop */
+const traceDetailText = computed(() => props.traceStructured?.more?.trim() || props.traceDetail?.trim() || '')
+
+/** 板块链阶段（链式溯源 P3' 产出；无数据 → 不渲染阶段区） */
+const traceStages = computed(() => props.traceStructured?.stages ?? [])
 
 /**
  * 带符号百分号：+1.2% / -1.2% / 0.0%。
@@ -434,6 +483,70 @@ const handleClick = () => {
   flex: 1;
   min-width: 0;
   font-size: $font-size-xs;
+  line-height: 1.6;
+  color: var(--ins-card-tx);
+}
+
+/* ===== 溯源「依据详情」入口与展开体（2026-09-16 结论模式配套） ===== */
+.as-insight-card__more {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+  margin-top: 8rpx;
+}
+
+.as-insight-card__more-tx {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--ins-trace-key);
+}
+
+.as-insight-card__more-chev {
+  width: 0;
+  height: 0;
+  border-left: 8rpx solid transparent;
+  border-right: 8rpx solid transparent;
+  border-top: 10rpx solid var(--ins-trace-key);
+  transition: transform 0.15s ease;
+}
+
+.as-insight-card__more-chev--open {
+  transform: rotate(180deg);
+}
+
+.as-insight-card__detail {
+  margin-top: 10rpx;
+  padding-top: 10rpx;
+  border-top: 1rpx dashed var(--ins-trace-bd);
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.as-insight-card__detail-st {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.as-insight-card__detail-k {
+  flex: 0 0 72rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--ins-trace-key);
+}
+
+.as-insight-card__detail-v {
+  flex: 1;
+  min-width: 0;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: var(--ins-card-tx);
+}
+
+.as-insight-card__detail-tx {
+  font-size: 22rpx;
   line-height: 1.6;
   color: var(--ins-card-tx);
 }

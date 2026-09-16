@@ -19,8 +19,10 @@
       :title="cardTitle"
       :trace="traceText"
       :trace-structured="traceStructured"
+      :trace-detail="traceDetailText"
       :time="timeLabel"
       :structured="structured"
+      :display-mode="displayMode"
     />
   </view>
 </template>
@@ -56,11 +58,17 @@ const props = withDefaults(defineProps<{
   marketLink?: SectorMarketLink | null
   /** 板块名（入链但四环无内容时标题兜底用） */
   sectorName?: string
+  /** 预判展示模式（spec §7）：full=全量分支；conclusion=只显示已成立分支 */
+  displayMode?: 'full' | 'conclusion'
+  /** 溯源「依据详情」正文（缺省取 candidate.trace.summary） */
+  traceDetail?: string
 }>(), {
   loading: false,
   date: '',
   marketLink: null,
-  sectorName: ''
+  sectorName: '',
+  displayMode: 'full',
+  traceDetail: ''
 })
 
 /**
@@ -133,6 +141,9 @@ const traceStructured = computed(() => {
     detail: m.driver
   }
 })
+
+/** 依据详情正文：显式传入优先，否则回退板块溯源结论句 */
+const traceDetailText = computed(() => props.traceDetail?.trim() || props.candidate?.trace?.summary?.trim() || '')
 
 /** 四环聚合本身是否有实际洞察内容（溯源主句或预判分支任一存在） */
 const hasContent = computed<boolean>(() => {
