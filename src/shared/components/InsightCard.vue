@@ -1,7 +1,7 @@
 <template>
   <view
     class="as-insight-card"
-    :class="[`as-insight-card--${theme}`]"
+    :class="[`as-insight-card--${theme}`, lineStyle === 'plain' ? 'as-insight-card--plain-lines' : '']"
     @tap="handleClick"
   >
     <!-- 头部：瞳孔 + 类型标签 + 时间 -->
@@ -61,6 +61,8 @@ import InsightTag from './InsightTag.vue'
  */
 type InsightType = 'emotion' | 'fund' | 'event' | 'market' | 'trend'
 type InsightTheme = 'light' | 'dark'
+/** 行样式：banner 彩色实底（默认）/ plain 白底 + 语义色文字 */
+type InsightLineStyle = 'banner' | 'plain'
 
 interface InsightLine {
   /** 行关键词（如「核心优势」「潜在风险」「建议」） */
@@ -89,6 +91,8 @@ const props = withDefaults(defineProps<{
   time?: string
   /** 主题：light 亮色列表卡 / dark 深蓝研报卡 */
   theme?: InsightTheme
+  /** 行样式：banner 彩色实底（默认）/ plain 白底 + 语义色文字（无大面积重色底） */
+  lineStyle?: InsightLineStyle
   /** 是否显示底部 meta（置信度 + INSIGHT 角标） */
   showMeta?: boolean
   /** 数据置信度，如 '0.82' */
@@ -102,6 +106,7 @@ const props = withDefaults(defineProps<{
   lines: () => [],
   time: '',
   theme: 'light',
+  lineStyle: 'banner',
   showMeta: false,
   confidence: ''
 })
@@ -256,6 +261,54 @@ const handleClick = () => {
   .as-insight-card__meta,
   .as-insight-card__brand {
     color: rgba($white, 0.55);
+  }
+}
+
+/* ===== 行样式：plain（白底 + 语义色关键词 + 中性灰蓝正文，去掉大面积重色底） ===== */
+/* 语义色只落在关键词上：优势=红（涨）/ 风险=绿（跌）/ 建议=蓝（主色）/ 预判=金 */
+.as-insight-card--plain-lines {
+  .as-insight-card__line {
+    background: $bg-card;
+    border: 1rpx solid $line;
+    box-shadow: none;
+
+    /* 关键词与正文互换字号：关键词 26rpx，正文 24rpx（比关键词小一号） */
+    .as-insight-card__key {
+      font-size: 26rpx;
+    }
+
+    /* 正文统一中性灰蓝（与四维分析评分模块描述文字同色），常规字重不加粗 */
+    .as-insight-card__text {
+      font-size: 24rpx;
+      font-weight: 400;
+      color: $ink-mute;
+    }
+  }
+
+  .as-insight-card__line--positive {
+    .as-insight-card__key {
+      color: $up;
+    }
+  }
+
+  .as-insight-card__line--risk {
+    .as-insight-card__key {
+      color: $down;
+    }
+  }
+
+  .as-insight-card__line--trace {
+    .as-insight-card__key {
+      color: $primary;
+    }
+  }
+
+  .as-insight-card__line--forecast {
+    border-color: $gold-soft-border;
+
+    .as-insight-card__key {
+      color: $gold-deep;
+    }
   }
 }
 </style>

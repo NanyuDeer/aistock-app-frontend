@@ -192,9 +192,9 @@ const emptyText = computed(() => {
   return favoritesOnly.value ? '自选股中暂无业绩预测数据' : '暂无业绩预测数据'
 })
 
-// 排序字段按钮配置（均匀分布展示，更新时间放自选股后第一位）
+// 排序字段按钮配置（均匀分布展示，最新放自选股后第一位）
 const sortFields = [
-  { key: 'update_time', label: '更新时间' },
+  { key: 'update_time', label: '最新' },
   { key: 'net_profit_forecast', label: '净利润预测' },
   { key: 'eps_forecast', label: 'EPS预测' },
   { key: 'net_profit_growth', label: '净利润增长' },
@@ -449,7 +449,8 @@ onShow(() => {
 
 /* 未选中：flex:1 均匀分布；选中：flex-grow 放大，带动其他项滑动缩小 */
 .sort-field-item {
-  flex: 1 1 0%;
+  /* 基准宽度按文字内容（auto），剩余空间再按 flex-grow 分配，避免短文案占宽过多 */
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -459,7 +460,7 @@ onShow(() => {
   transition: flex-grow 0.3s ease;
 
   &.active {
-    flex-grow: 1.6;
+    flex-grow: 1.2;
   }
 }
 
@@ -488,28 +489,47 @@ onShow(() => {
   flex-shrink: 0;
 }
 
+/* 上下三角：容器提供点击热区，伪元素绘制超小三角并向中间贴紧（保持紧凑间距） */
 .sort-arrow-up,
 .sort-arrow-down {
+  position: relative;
+  width: 36rpx;
+  height: 18rpx;
+  display: flex;
+  justify-content: center;
+}
+
+.sort-arrow-up {
+  align-items: flex-end;
+}
+
+.sort-arrow-down {
+  align-items: flex-start;
+}
+
+.sort-arrow-up::after,
+.sort-arrow-down::after {
+  content: '';
   width: 0;
   height: 0;
   border-left: 5rpx solid transparent;
   border-right: 5rpx solid transparent;
 }
 
-.sort-arrow-up {
+.sort-arrow-up::after {
   border-bottom: 6rpx solid #9ca3af;
-
-  &.active {
-    border-bottom-color: $primary;
-  }
 }
 
-.sort-arrow-down {
+.sort-arrow-down::after {
   border-top: 6rpx solid #9ca3af;
+}
 
-  &.active {
-    border-top-color: $primary;
-  }
+.sort-arrow-up.active::after {
+  border-bottom-color: $primary;
+}
+
+.sort-arrow-down.active::after {
+  border-top-color: $primary;
 }
 
 /* 加载/空/失败状态 */
