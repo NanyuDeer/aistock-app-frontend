@@ -1,5 +1,14 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-16 无 met 数据时降级为全量渲染（Task 5b，用户裁决）
+
+- 背景：后端 `condition_met` 当前恒为 `null`（`prediction_validator.py:370,391`）→ 板块路由派生的 `conditions[].met` 为 `null` → 板块页结论模式会**全部落空态**（错误观感）。裁决：**无 met 数据时降级为全量渲染**，只有整块确实含布尔 `met` 数据时才严格只显已成立分支。
+- `src/shared/utils/conditionalForecast.ts`：新增 `resolveDisplayMode(conditions, mode)`——`conclusion` 仅在含布尔 `met` 时生效，否则返回 `full`；`conditionalForecast.spec.ts` 新增 3 条 node:test 用例（full 恒 full / conclusion 含 met 生效 / 全无 met 降级 full）。
+- `src/shared/components/ConditionalForecastBlock.vue`：新增 `resolvedDisplayMode` computed 驱动 ①分支过滤 ②结论空态门控（`resolvedDisplayMode === 'conclusion' && !activeConditions.length`）；无 met 数据时保持全量渲染与既有 full 空态文案。
+- `src/shared/components/ConditionalForecastBlock.spec.ts`：源码断言同步为 `resolvedDisplayMode === 'conclusion'`（门控变量改名所致，无新增用例）。
+- 基线同步：`tests/run-node-specs.mjs` `EXPECTED_BASELINE` `243/243/0` → `246/246/0`（实测 246/246/0，exit 0）。
+- 验收：App `npx vue-tsc --noEmit` 0 错误；CFB 两副本差异仍**仅** helper 定义块（App import / 库内联），InsightCard 两副本无差异。
+
 ## 2026-09-16 结论模式接入大盘粒度：取证为「无 met 数据」→ 保持 full 渲染（Task 5）
 
 - 结论模式覆盖缺口：大盘粒度（MarketTracePrediction）分支级 `met` 恒为 `undefined`（2026-09-16 取证），故本期待后端补齐 `conditions[].met` 后再接入 `display-mode="conclusion"`，当前保持 full 渲染。

@@ -132,8 +132,8 @@
         </template>
       </view>
 
-      <!-- 结论模式：无已成立分支（不看有无基准行）→ 固定空态文案 -->
-      <view v-if="displayMode === 'conclusion' && !activeConditions.length" class="as-insight-card__sc-empty">
+      <!-- 结论模式（实际生效：整块含布尔 met 数据）：无已成立分支（不看有无基准行）→ 固定空态文案 -->
+      <view v-if="resolvedDisplayMode === 'conclusion' && !activeConditions.length" class="as-insight-card__sc-empty">
         <text>条件未成立 · 暂无已验证结论</text>
       </view>
       <!-- full 模式：沿用既有空态（无基准行且无分支） -->
@@ -147,7 +147,7 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
 
-import { selectVisibleConditions } from '@/shared/utils/conditionalForecast'
+import { resolveDisplayMode, selectVisibleConditions } from '@/shared/utils/conditionalForecast'
 
 /**
  * ConditionalForecastBlock 条件化预判块（洞见卡系通用块，2026-09-02 抽取）
@@ -305,12 +305,17 @@ const activeBase = computed<StructuredHorizon | undefined>(() => {
   return (data.horizons ?? []).find((h) => h.horizon === activeHorizon.value)
 })
 
-/** 当前期内的条件情景（conditions 按 horizon 归组；conclusion 模式只留已成立分支） */
+/** 当前期的实际展示模式：整块无布尔 met 数据（后端未回填 condition_met）时 conclusion 降级 full，避免全空态 */
+const resolvedDisplayMode = computed<'full' | 'conclusion'>(() =>
+  resolveDisplayMode(props.structured?.conditions ?? [], props.displayMode)
+)
+
+/** 当前期内的条件情景（conditions 按 horizon 归组；结论模式只留已成立分支） */
 const activeConditions = computed<StructuredCondition[]>(() => {
   const data = props.structured
   if (!data) return []
   const inHorizon = (data.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
-  return selectVisibleConditions(inHorizon, props.displayMode)
+  return selectVisibleConditions(inHorizon, resolvedDisplayMode.value)
 })
 
 const verifyText = computed(() => {

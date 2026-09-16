@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { hasMetData, selectVisibleConditions } from './conditionalForecast'
+import { hasMetData, resolveDisplayMode, selectVisibleConditions } from './conditionalForecast'
 
 const conds = [
   { label: 'a', met: true },
@@ -28,4 +28,16 @@ test('hasMetData：任一分支有布尔 met 即为 true', () => {
 
 test('hasMetData：全部 met 缺省/null 时为 false（无从判断已成立）', () => {
   assert.equal(hasMetData([{}, { met: null }]), false)
+})
+
+test('resolveDisplayMode：full 入参恒返回 full', () => {
+  assert.equal(resolveDisplayMode([{ met: true }], 'full'), 'full')
+})
+
+test('resolveDisplayMode：conclusion 且含布尔 met → conclusion', () => {
+  assert.equal(resolveDisplayMode([{ met: null }, { met: false }], 'conclusion'), 'conclusion')
+})
+
+test('resolveDisplayMode：conclusion 但全无布尔 met → 降级 full（防全空态）', () => {
+  assert.equal(resolveDisplayMode([{}, { met: null }], 'conclusion'), 'full')
 })

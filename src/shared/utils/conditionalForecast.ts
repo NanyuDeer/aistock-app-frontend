@@ -101,3 +101,12 @@ export function selectVisibleConditions<T extends { met?: boolean | null }>(
 export function hasMetData(conditions: Array<{ met?: boolean | null }>): boolean {
   return conditions.some((c) => typeof c.met === 'boolean')
 }
+
+/** 解析实际展示模式：conclusion 仅在整块含布尔 met 数据时生效，否则降级 full（防后端未回填 met 造成全空态） */
+export function resolveDisplayMode(
+  conditions: Array<{ met?: boolean | null }>,
+  mode: 'full' | 'conclusion'
+): 'full' | 'conclusion' {
+  if (mode !== 'conclusion') return 'full'
+  return hasMetData(conditions) ? 'conclusion' : 'full'
+}
