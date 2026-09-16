@@ -494,6 +494,7 @@ const handleClick = () => {
   justify-content: flex-end;
   gap: 8rpx;
   margin-top: 8rpx;
+  padding: 6rpx 0;
 }
 
 .as-insight-card__more-tx {

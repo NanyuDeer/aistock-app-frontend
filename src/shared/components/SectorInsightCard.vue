@@ -142,8 +142,14 @@ const traceStructured = computed(() => {
   }
 })
 
-/** 依据详情正文：显式传入优先，否则回退板块溯源结论句 */
-const traceDetailText = computed(() => props.traceDetail?.trim() || props.candidate?.trace?.summary?.trim() || '')
+/** 依据详情正文：显式传入优先；文本溯源形态下若与溯源行同句则不重复展示（返回空 → 入口不渲染） */
+const traceDetailText = computed(() => {
+  const explicit = props.traceDetail?.trim()
+  if (explicit) return explicit
+  const sum = props.candidate?.trace?.summary?.trim() || ''
+  if (!traceStructured.value && sum && sum === traceText.value.trim()) return ''
+  return sum
+})
 
 /** 四环聚合本身是否有实际洞察内容（溯源主句或预判分支任一存在） */
 const hasContent = computed<boolean>(() => {
