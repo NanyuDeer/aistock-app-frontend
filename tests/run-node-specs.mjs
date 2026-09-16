@@ -19,9 +19,10 @@ import { fileURLToPath } from 'node:url'
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SRC = join(REPO, 'src')
 const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
-/** 采集器跑通后的干净基线（tests/pass/fail）；残余 2 条为 ConditionalForecastBlock「单档守卫」既有真实失败。
- *  修改此常量须同步 `project_memory.md` 的「节奏档位色板唯一副本（2026-09-15）」条目与 README 快速开始。 */
-const EXPECTED_BASELINE = '237/235/2'
+/** 采集器跑通后的干净基线（tests/pass/fail）；与实测一致 = 无回归，不一致 = 基线漂移（exit 2）。
+ *  2026-09-16：ConditionalForecastBlock 单档守卫 + activeHorizon watchEffect 已实现，既有 2 条失败转绿，残余失败清零。
+ *  修改此常量须同步 `project_memory.md` 与 README 快速开始。 */
+const EXPECTED_BASELINE = '237/237/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {
@@ -104,12 +105,12 @@ console.log(
 )
 
 // 机器判定：基线漂移（含"残余失败数变化"）必须显式报错，不能只靠人眼比对文本。
-// 注意退出码语义：1 = 基线一致（子进程仍因 2 条已知真实失败返回 1，属预期）；2 = 基线漂移。
+// 注意退出码语义：1 = 子进程自身退出码（基线一致时透传，非漂移）；2 = 基线漂移。
 const actualBaseline = `${metric('tests')}/${metric('pass')}/${metric('fail')}`
 if (actualBaseline !== EXPECTED_BASELINE) {
   console.error(
     `\n[node-specs] ✖ 基线漂移：期望 ${EXPECTED_BASELINE}，实际 ${actualBaseline}。` +
-      `\n  （残余失败必须恰为 ConditionalForecastBlock.spec.ts 的「单档守卫」2 条；新增失败 = 回归，请先定位）\n`,
+      `\n  （fail 大于基线值 0 = 新增回归，请先定位；新增/删除 spec 导致计数变化须同步本常量与注释）\n`,
   )
   process.exit(2)
 }
