@@ -148,6 +148,7 @@ const traceDetailText = computed(() => {
   if (explicit) return explicit
   const sum = props.candidate?.trace?.summary?.trim() || ''
   if (!traceStructured.value && sum && sum === traceText.value.trim()) return ''
+  if (sum && sum === cardTitle.value.trim()) return ''
   return sum
 })
 

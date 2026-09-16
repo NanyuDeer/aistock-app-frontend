@@ -305,18 +305,20 @@ const activeBase = computed<StructuredHorizon | undefined>(() => {
   return (data.horizons ?? []).find((h) => h.horizon === activeHorizon.value)
 })
 
-/** 当前期的实际展示模式：整块无布尔 met 数据（后端未回填 condition_met）时 conclusion 降级 full，避免全空态 */
-const resolvedDisplayMode = computed<'full' | 'conclusion'>(() =>
-  resolveDisplayMode(props.structured?.conditions ?? [], props.displayMode)
+/** 当前档内的条件（按 horizon 归组） */
+const inHorizonConditions = computed(() =>
+  (props.structured?.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
 )
 
-/** 当前期内的条件情景（conditions 按 horizon 归组；结论模式只留已成立分支） */
-const activeConditions = computed<StructuredCondition[]>(() => {
-  const data = props.structured
-  if (!data) return []
-  const inHorizon = (data.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
-  return selectVisibleConditions(inHorizon, resolvedDisplayMode.value)
-})
+/** 实际展示模式：conclusion 仅在**当前档**含布尔 met 时生效，否则降级 full（防按档假空态） */
+const resolvedDisplayMode = computed(() =>
+  resolveDisplayMode(inHorizonConditions.value, props.displayMode)
+)
+
+/** 当前期内的条件情景（conclusion 模式只留已成立分支） */
+const activeConditions = computed(() =>
+  selectVisibleConditions(inHorizonConditions.value, resolvedDisplayMode.value)
+)
 
 const verifyText = computed(() => {
   const v = props.structured?.verification
