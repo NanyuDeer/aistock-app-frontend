@@ -30,15 +30,15 @@ export default defineConfig({
     // src/**/*.spec.ts 是为 Node.js 内置 node:test 运行器编写的源码正则测试，
     // 与 Vitest 不兼容（依赖 import.meta.url + readFileSync 加载 .vue 源码），
     // 由 package.json 的 "test:node" 脚本单独运行，不在 vitest 采集范围内。
-    // 例外：以下两个 vitest 风格（import from 'vitest'）spec 显式纳入，
-    // 供 Task 2 (P3-fix) 的 useChatStream / ReasoningPanel 单测使用。
+    // 例外：以下 vitest 风格（import from 'vitest'）spec 为**显式白名单**，必须逐条注册，
+    // 否则 `npm test` 静默跳过；tests/run-node-specs.mjs 据本清单反向排除，
+    // 避免 node:test 侧出现「Vitest 被 CommonJS require」的同因假失败。
     include: [
       'tests/**/*.test.ts',
       'src/shared/utils/useChatStream.spec.ts',
       'src/shared/utils/useChatStream.http.spec.ts',
       'src/shared/utils/chatSuggestions.spec.ts',
       'src/shared/utils/parseMarkdownSections.spec.ts',
-      'src/shared/utils/parseFollowupQuestions.spec.ts',
       'src/shared/utils/scrollFollow.spec.ts',
       'src/shared/utils/sessionUsageMerge.spec.ts',
       'src/shared/utils/eveningBriefCards.spec.ts',
@@ -72,6 +72,10 @@ export default defineConfig({
       'src/pages-sub-app/chat/index.scroll.spec.ts',
       'src/modules/chat/pages/chat-report-detail.spec.ts',
       'src/modules/fear-greed/utils/fgAdvice.spec.ts',
+      'src/shared/utils/rhythmColors.spec.ts',
+      'src/modules/fear-greed/utils/fgRhythmSummary.spec.ts',
+      'src/modules/fear-greed/utils/fgRhythmGate.spec.ts',
+      'src/modules/fear-greed/pages/index.spec.ts',
     ],
   },
 })

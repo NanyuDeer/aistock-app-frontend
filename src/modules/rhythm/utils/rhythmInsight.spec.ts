@@ -15,24 +15,33 @@ function branch(p: Partial<RhythmBranch>): RhythmBranch {
 }
 
 test('title：非 conflict 拼接档位中文与仓位句；conflict 用背离文案', () => {
-  const card = { level: 'active', position_band: { text: '建议仓位 60%-80%' }, conflict: false, branches: [] } as unknown as RhythmCard
-  assert.equal(toRhythmInsight(card, 'after_close', '2026-09-02')?.title, '活跃 · 60%-80%')
+  const card = { level: 'active', position_band: { text: '建议仓位：七成~八成' }, conflict: false, branches: [] } as unknown as RhythmCard
+  assert.equal(toRhythmInsight(card, 'after_close', '2026-09-02')?.title, '活跃 · 七成~八成')
   const conflict = { ...card, conflict: true, conflict_detail: '多空背离' } as unknown as RhythmCard
   assert.equal(toRhythmInsight(conflict, 'after_close', '2026-09-02')?.title, '信号背离 · 仅区间与提示')
 })
 
-test('预判 structured 仅收 interval 分支；enum 分支被过滤', () => {
+test('预判 structured 同时收 interval 与 enum（事件）分支；enum 用 indicator+value，透传 met', () => {
   const interval = branch({})
-  const enumBranch = branch({ condition: { kind: 'enum', indicator: '事件', label: 'CPI 数据公布', value: '待公布' }, conclusion: { direction: 'neutral', validity: 1, note: '结果待公布' } })
-  const card = { level: 'normal', position_band: { text: '建议仓位 30%-50%' }, conflict: false, branches: [interval, enumBranch] } as unknown as RhythmCard
+  const eventBranch = branch({
+    condition: { kind: 'enum', indicator: 'CPI 数据公布预期差', value: '超预期', label: '超预期' },
+    conclusion: { direction: 'bullish', validity: 1, note: '结果待公布' },
+    event_ref: { event_date: '2026-09-03', title: 'CPI 数据公布' },
+    met: true,
+  })
+  const card = { level: 'normal', position_band: { text: '建议仓位：五成~六成' }, conflict: false, branches: [interval, eventBranch] } as unknown as RhythmCard
   const out = toRhythmInsight(card, 'morning', '2026-09-02')
-  assert.equal(out?.structured?.conditions.length, 1)
+  assert.equal(out?.structured?.conditions.length, 2)
   assert.equal(out?.structured?.conditions[0].condition, '收盘站上 4050 压力位')
+  const ev = out?.structured?.conditions[1]
+  assert.equal(ev?.condition, 'CPI 数据公布预期差超预期')
+  assert.equal(ev?.direction, 'bullish')
+  assert.equal(ev?.met, true)
 })
 
 test('括号阈值（放量（>xxx亿））→ anchor.threshold，主干保留', () => {
   const amt = branch({ condition: { kind: 'interval', indicator: '成交额', label: '放量（>120亿）', lo: 120, hi: null }, conclusion: { direction: 'bullish', range: '4050-4200', validity: 5, note: '放量突破压力位' } })
-  const card = { level: 'active', position_band: { text: '建议仓位 60%-80%' }, conflict: false, branches: [amt] } as unknown as RhythmCard
+  const card = { level: 'active', position_band: { text: '建议仓位：七成~八成' }, conflict: false, branches: [amt] } as unknown as RhythmCard
   const out = toRhythmInsight(card, 'after_close', '2026-09-02')
   assert.equal(out?.structured?.conditions[0].condition, '放量')
   assert.equal(out?.structured?.conditions[0].anchor?.threshold, '>120亿')
@@ -59,4 +68,8 @@ test('RhythmInsightCondition 接口含 direction / positionAction / anchor 字�
   assert.match(source, /direction\?: ['"]bullish['"] \| ['"]bearish['"] \| ['"]neutral['"]/)
   assert.match(source, /positionAction\?:/)
   assert.match(source, /anchor\?:/)
+})
+
+test('RhythmInsightCondition 含 met 字段', () => {
+  assert.match(source, /met\?: boolean \| null/)
 })

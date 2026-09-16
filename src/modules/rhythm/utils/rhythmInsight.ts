@@ -11,6 +11,8 @@ export interface RhythmInsightCondition {
   positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string; band?: { min?: number | null; max?: number | null; text?: string } | null }
   /** 验证锚点（阈值/指标；括号兜底或后端 anchor 透传） */
   anchor?: { threshold?: string; metric?: string }
+  /** 公布后已实现/未实现（true 点亮 / false 置灰 / null 待观察）；事件分支透传 */
+  met?: boolean | null
 }
 export interface RhythmInsightStructured {
   conditions: RhythmInsightCondition[]
@@ -33,9 +35,16 @@ function splitParen(text: string): [string, string] {
 }
 
 function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
-  if (b.condition.kind !== 'interval') return null // enum（事件待公布）分支不进 structured
-  const label = b.condition.label || b.condition.value || b.condition.indicator || ''
-  const [main, paren] = splitParen(label)
+  if (b.condition.kind !== 'interval' && b.condition.kind !== 'enum') return null
+  let main = ''
+  let paren = ''
+  if (b.condition.kind === 'enum') {
+    // 事件分支：条件 = 事件标题预期差 + 档（value 优先，防 label 错位）
+    main = `${b.condition.indicator || ''}${b.condition.value || ''}`
+  } else {
+    const label = b.condition.label || b.condition.value || b.condition.indicator || ''
+    ;[main, paren] = splitParen(label)
+  }
   const note = b.conclusion.note || ''
   const range = b.conclusion.range || ''
   const condition: RhythmInsightCondition = {
@@ -45,6 +54,7 @@ function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
     direction: b.conclusion.direction,
     positionAction: b.position_action,
     anchor: b.anchor ? { threshold: b.anchor.threshold, metric: b.anchor.metric } : undefined,
+    met: b.met,
   }
   if (paren && !condition.anchor) condition.anchor = { threshold: paren }
   return condition
@@ -54,7 +64,7 @@ function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
 export function toRhythmInsight(card: RhythmCard | null | undefined, slot: string, targetDate: string): RhythmInsightCard | null {
   if (!card) return null
   const level = LEVEL_LABEL[card.level ?? ''] ?? ''
-  const band = (card.position_band?.text ?? '').trim().replace(/^建议仓位\s*/, '')
+  const band = (card.position_band?.text ?? '').trim().replace(/^建议仓位[：:]*\s*/, '')
   const title = card.conflict
     ? '信号背离 · 仅区间与提示'
     : [level, band].filter(Boolean).join(' · ')
