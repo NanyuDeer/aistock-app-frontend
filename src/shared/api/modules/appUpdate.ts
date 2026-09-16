@@ -24,7 +24,9 @@ export interface AppVersionInfo {
 export function fetchLatestVersion(): Promise<AppVersionInfo | null> {
   return new Promise((resolve) => {
     uni.request({
-      url: `${DOWNLOAD_BASE_URL}/version.json`,
+      // 追加毫秒时间戳做 cache-busting：version.json 带 Etag/Last-Modified，
+      // 不绕过会命中 HTTP/App 层缓存旧版本号（本机 0.1.2 拉到旧 102 被误判"已最新"）。
+      url: `${DOWNLOAD_BASE_URL}/version.json?t=${Date.now()}`,
       method: 'GET',
       timeout: 10000,
       success: (res) => {

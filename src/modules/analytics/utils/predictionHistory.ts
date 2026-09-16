@@ -29,6 +29,17 @@ export function horizonStage(
   return { kind: 'not_due' }
 }
 
+export type ConditionStage =
+  | { kind: 'verified'; result: 'hit' | 'miss' | 'insufficient'; entry: PredictionVerificationEntry }
+  | { kind: 'pending' } // 尚未验证 / 条件未触发
+
+/** 条件状态（Spec A §4.2/§4.3）：condition 验证按 c{i} key 读取，独立于 horizon key */
+export function conditionStage(record: PredictionRecord, index: number): ConditionStage {
+  const entry = record.verification?.[`c${index}`]
+  if (entry) return { kind: 'verified', result: entry.result, entry }
+  return { kind: 'pending' }
+}
+
 /** 整体状态：全部已登记档位已验证 → verified，否则 pending（以 verification 实况计算，与后端 status 双保险） */
 export function overallStatus(record: PredictionRecord, today: string): 'pending' | 'verified' {
   const registered = HORIZON_ORDER.filter((h) => Boolean(record.due_dates?.[h]))

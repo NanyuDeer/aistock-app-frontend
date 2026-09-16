@@ -53,53 +53,36 @@
         </view>
       </view>
 
-      <view class="decision-card">
-        <view class="decision-head">
-          <InsightTag type="market" size="sm">综合洞见</InsightTag>
-          <view class="decision-verdict">
-            <text :class="['decision-status', overallDecision.verdictClass]">{{ overallDecision.verdict }}</text>
-            <text :class="['decision-status', 'is-sub', overallDecision.periodDominanceClass]">{{ overallDecision.periodDominance }}</text>
-          </view>
-        </view>
-        <text class="decision-summary">{{ overallDecision.summary }}</text>
-        <view class="decision-divider" />
-        <view class="decision-next">
-          <text class="next-label">重点</text>
-          <text class="next-text">{{ overallDecision.nextStep }}</text>
-        </view>
-        <view class="decision-points">
-          <view v-if="overallDecision.opportunity" class="decision-point decision-point--opportunity" @tap="toggleDecisionPoint('opportunity')">
-            <text class="point-label">机会</text>
-            <text :class="['point-text', { expanded: expandedDecisionPoint === 'opportunity' }]">{{ expandedDecisionPoint === 'opportunity' ? overallDecision.opportunityFull : overallDecision.opportunity }}</text>
-            <text class="point-more">{{ expandedDecisionPoint === 'opportunity' ? '收起' : '展开' }}</text>
-          </view>
-          <view v-if="overallDecision.risk" class="decision-point decision-point--risk" @tap="toggleDecisionPoint('risk')">
-            <text class="point-label">风险</text>
-            <text :class="['point-text', { expanded: expandedDecisionPoint === 'risk' }]">{{ expandedDecisionPoint === 'risk' ? overallDecision.riskFull : overallDecision.risk }}</text>
-            <text class="point-more">{{ expandedDecisionPoint === 'risk' ? '收起' : '展开' }}</text>
-          </view>
-        </view>
-      </view>
+      <!-- 综合洞见：容器化为洞见卡（洞见字标·综合 + 一句话结论 + 重点/机会/风险 多要点行） -->
+      <InsightCard
+        v-if="decisionInsight.lines.length"
+        type="market"
+        tag-text="综合洞见"
+        :title="decisionInsight.title"
+        :lines="decisionInsight.lines"
+        theme="light"
+      />
 
       <view id="detail-anchor-stock-info">
-      <view v-if="isFavorite" class="major-event-alert">
-        <view class="major-event-head">
-          <text class="decision-kicker">最新重大异动</text>
-          <text v-if="latestMajorEvent" :class="['major-impact', majorEventImpactClass]">
-            {{ latestMajorEvent.ai_impact || latestMajorEvent.level || latestMajorEvent.change_type_name }}
-          </text>
-        </view>
+      <!-- 最新重大异动：双平面「重大机会/重大风险」样式（对齐事件传导焦点卡 EventHeadlineCard：语义渐变顶 + 白正文） -->
+      <view
+        v-if="isFavorite"
+        :class="['major-event-alert', 'major-event-alert--' + majorEventDirection, { 'is-muted': !latestMajorEvent }]"
+      >
         <template v-if="latestMajorEvent">
-          <text class="major-event-title">{{ latestMajorEvent.summary || latestMajorEvent.title || latestMajorEvent.change_type_name }}</text>
-          <view class="major-event-meta">
-            <text>{{ latestMajorEvent.ai_horizon || latestMajorEvent.cycle || '周期待判' }}</text>
-            <text>{{ latestMajorEvent.change_type_name || latestMajorEvent.info_type || '资讯研判' }}</text>
-            <text>{{ latestMajorEvent.event_time_display || formatEventTime(latestMajorEvent.event_time) }}</text>
+          <view class="me-top">
+            <text class="me-title">{{ majorEventTitle }}</text>
+          </view>
+          <view class="me-body">
+            <text class="major-event-title">{{ latestMajorEvent.summary || latestMajorEvent.title || latestMajorEvent.change_type_name }}</text>
+            <view class="major-event-meta">
+              <text>{{ latestMajorEvent.ai_horizon || latestMajorEvent.cycle || '周期待判' }}</text>
+              <text>{{ latestMajorEvent.change_type_name || latestMajorEvent.info_type || '资讯研判' }}</text>
+              <text>{{ latestMajorEvent.event_time_display || formatEventTime(latestMajorEvent.event_time) }}</text>
+            </view>
           </view>
         </template>
-        <template v-else>
-          <text class="major-event-title">暂无数据</text>
-        </template>
+        <text v-else class="major-event-title major-event-empty">暂无数据</text>
       </view>
       </view>
 
@@ -140,10 +123,11 @@
           <view class="card-header">
             <text class="card-title">AI 资讯洞见</text>
             <view class="card-header-actions">
+              <text v-if="aiAnalysis.analysisDate && !isAiDateToday(aiAnalysis.analysisDate)" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
               <view class="ai-history-btn" @tap="openHistoryDialog">
                 <text class="history-icon">历史</text>
               </view>
-              <view v-if="!aiLoading" class="ai-refresh-btn" @tap="refreshAiAnalysis">
+              <view v-if="!aiLoading && !isAiDateToday(aiAnalysis.analysisDate)" class="ai-refresh-btn" @tap="refreshAiAnalysis">
                 <text class="refresh-icon">↻</text>
               </view>
             </view>
@@ -155,7 +139,6 @@
             <template v-else-if="aiAnalysis && aiAnalysis.conclusion">
               <view class="ai-conclusion">
                 <text :class="['conclusion-badge', aiConclusionClass]">{{ aiAnalysis.conclusion }}</text>
-                <text v-if="aiAnalysis.analysisDate" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
               </view>
               <view v-if="logicTags.length" class="ai-section">
                 <text class="ai-section-title">研判依据</text>
@@ -241,7 +224,13 @@
         </view>
         <view v-else class="section-card">
           <text class="section-title">资金流向</text>
-          <view class="ai-empty">
+          <view class="ai-loading" v-if="capitalFlowLoading">
+            <text class="ai-loading-text">加载中...</text>
+          </view>
+          <view v-else-if="capitalFlowError" class="ai-empty" @tap="retryLoadCapitalFlow">
+            <text class="ai-empty-text">资金流向加载失败，点击重试</text>
+          </view>
+          <view class="ai-empty" v-else>
             <text class="ai-empty-text">暂无资金流数据</text>
           </view>
         </view>
@@ -368,8 +357,18 @@
         <view class="ai-analysis-card">
           <view class="card-header">
             <text class="card-title">中线AI洞见</text>
+            <view class="card-header-actions">
+              <text v-if="midAnalysisDate && !isAiDateToday(midAnalysisDate)" class="analysis-date">{{ formatAiDate(midAnalysisDate) }}</text>
+              <view v-if="!midAnalysisLoading && !isAiDateToday(midAnalysisDate)" class="ai-refresh-btn" @tap="refreshMidAnalysis">
+                <text class="refresh-icon">↻</text>
+              </view>
+            </view>
           </view>
           <view class="card-body">
+            <view v-if="midAnalysisLoading" class="ai-loading">
+              <text class="ai-loading-text">正在生成AI分析...</text>
+            </view>
+            <template v-else>
             <view class="ai-conclusion">
               <text :class="['conclusion-badge', midAiAnalysis.badgeClass]">{{ midAiAnalysis.conclusion }}</text>
             </view>
@@ -421,6 +420,7 @@
                 <text class="tag-detail-text">{{ midRiskTags[expandedTagIdx]?.full }}</text>
               </view>
             </view>
+            </template>
           </view>
         </view>
 
@@ -468,7 +468,7 @@
               <view class="semi-row">
                 <text class="semi-cell semi-cell-label">研发费用</text>
                 <text class="semi-cell semi-cell-value">{{ formatSemiAmount(semiAnnualReport.reports[0]?.rd_exp) }}</text>
-                <text class="semi-cell semi-cell-value">--</text>
+                <text class="semi-cell semi-cell-value">未单列</text>
               </view>
             </view>
             <view v-if="disclosureUrl" class="semi-footer">
@@ -485,7 +485,7 @@
         </view>
 
         <!-- 业绩预测 -->
-        <view v-if="forecastLoading || hasForecastCardData" id="detail-anchor-forecast" class="section-card">
+        <view v-if="forecastLoading || hasForecastCardData || !forecastData" id="detail-anchor-forecast" class="section-card">
           <view class="section-header">
             <text class="section-title">业绩预测</text>
             <view v-if="!forecastLoading" class="ai-refresh-btn" @tap="loadForecast(true)">
@@ -494,6 +494,9 @@
           </view>
           <view v-if="forecastLoading" class="ai-loading">
             <text class="ai-loading-text">加载中...</text>
+          </view>
+          <view v-else-if="!hasForecastCardData" class="ai-empty">
+            <text class="ai-empty-text">暂无业绩预测数据，可点击刷新尝试获取</text>
           </view>
           <view v-else class="forecast-content">
             <view v-if="forecastData.updateTime" class="forecast-update-time">
@@ -584,8 +587,18 @@
         <view class="ai-analysis-card">
           <view class="card-header">
             <text class="card-title">长线AI洞见</text>
+            <view class="card-header-actions">
+              <text v-if="longAnalysisDate && !isAiDateToday(longAnalysisDate)" class="analysis-date">{{ formatAiDate(longAnalysisDate) }}</text>
+              <view v-if="!longAnalysisLoading && !isAiDateToday(longAnalysisDate)" class="ai-refresh-btn" @tap="refreshLongAnalysis">
+                <text class="refresh-icon">↻</text>
+              </view>
+            </view>
           </view>
           <view class="card-body">
+            <view v-if="longAnalysisLoading" class="ai-loading">
+              <text class="ai-loading-text">正在生成AI分析...</text>
+            </view>
+            <template v-else>
             <view class="ai-conclusion">
               <text :class="['conclusion-badge', longAiAnalysis.badgeClass]">{{ longAiAnalysis.conclusion }}</text>
             </view>
@@ -637,6 +650,7 @@
                 <text class="tag-detail-text">{{ longRiskTags[expandedTagIdx]?.full }}</text>
               </view>
             </view>
+            </template>
           </view>
         </view>
 
@@ -879,7 +893,7 @@ import { stockApi } from '@/shared/api/modules/stock'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import InsightTag from '@/shared/components/InsightTag.vue'
+import InsightCard from '@/shared/components/InsightCard.vue'
 import KLineChart from '@/modules/favorites/components/KLineChart.vue'
 import ForecastProfitChart from '@/modules/favorites/components/ForecastProfitChart.vue'
 import CapitalFlowCharts from '@/modules/favorites/components/CapitalFlowCharts.vue'
@@ -889,6 +903,8 @@ const loading = ref(true)
 const quote = ref<any>(null)
 const stockInfo = ref<any>(null)
 const capitalFlow = ref<any>(null)
+const capitalFlowLoading = ref(false)
+const capitalFlowError = ref(false)
 const semiAnnualReport = ref<any>(null)
 const disclosureUrl = ref('')
 const symbol = ref('')
@@ -910,6 +926,10 @@ const klineLoading = ref(false)
 const trendScoreData = ref<any>(null)
 const midAnalysisData = ref<any>(null)
 const longAnalysisData = ref<any>(null)
+const midAnalysisLoading = ref(false)
+const longAnalysisLoading = ref(false)
+const midAnalysisDate = computed(() => midAnalysisData.value?.分析时间 || midAnalysisData.value?.analysis_time || '')
+const longAnalysisDate = computed(() => longAnalysisData.value?.分析时间 || longAnalysisData.value?.analysis_time || '')
 const trendLoading = ref(false)
 const industryHealthData = ref<any>(null)
 // 历史 AI 评价
@@ -933,7 +953,6 @@ const viewTabs: { key: ViewKey; label: string; desc: string }[] = [
   { key: 'mid', label: '中线', desc: '月/季' },
   { key: 'long', label: '长线', desc: '年' }
 ]
-const expandedDecisionPoint = ref<'opportunity' | 'risk' | null>(null)
 const policyExpanded = ref(false)
 
 function selectActiveView(key: ViewKey) {
@@ -1136,28 +1155,37 @@ const forecastChartItems = computed(() => {
 })
 
 const forecastYearRows = computed(() => {
-  const rows = Array.isArray(forecastData.value?.predictions) ? forecastData.value.predictions : []
-  if (!rows.length) return []
-  const parsed = rows
-    .slice(0, 3)
+  // 与图表同源：优先预测明细，缺净利润值时回退到详表净利润行
+  const source = buildForecastChartSource()
+  if (!source.length) return []
+  const detailRows = Array.isArray(forecastData.value?.detailIndicators) ? forecastData.value.detailIndicators : []
+  const growthRow = detailRows.find((r: any) => String(r['预测指标'] || r.indicator || '').includes('净利润增长率'))
+  const getGrowth = (year: string): number | string => {
+    if (!growthRow) return '--'
+    const raw = growthRow[`预测${year}-平均`] || growthRow[`预测${year}`] || growthRow[`${year}-实际值`] || '--'
+    const num = parseFloat(String(raw).replace('%', '').replace(/,/g, ''))
+    return Number.isNaN(num) ? '--' : num
+  }
+  const parsed = source
     .map((item: any) => {
       const value = parseForecastProfit(item.netProfit)
+      const growth = item.growth != null ? item.growth : getGrowth(String(item.year || ''))
       return {
         year: String(item.year || ''),
         netProfit: item.netProfit || '--',
-        growth: item.growth,
+        growth,
         value: value ?? 0,
-        kindClass: item.growth === '--' || item.growth == null ? 'is-forecast' : item.growth >= 0 ? 'is-actual' : 'is-forecast',
-        kindText: item.growth === '--' || item.growth == null ? '预测' : item.growth >= 0 ? '改善' : '承压',
-        growthText: item.growth === '--' || item.growth == null ? '--' : `${item.growth >= 0 ? '+' : ''}${item.growth}%`,
-        growthClass: item.growth === '--' || item.growth == null ? '' : item.growth >= 0 ? 'up' : 'down',
+        kindClass: growth === '--' || growth == null ? 'is-forecast' : growth >= 0 ? 'is-actual' : 'is-forecast',
+        kindText: growth === '--' || growth == null ? '预测' : growth >= 0 ? '改善' : '承压',
+        growthText: growth === '--' || growth == null ? '--' : `${growth >= 0 ? '+' : ''}${growth}%`,
+        growthClass: growth === '--' || growth == null ? '' : `${growth >= 0 ? 'up' : 'down'}`,
       }
     })
   const max = Math.max(...parsed.map((item: any) => Math.abs(item.value)), 0.01)
   return parsed.map((item: any) => ({
     ...item,
     progress: Math.max(18, Math.round((Math.abs(item.value) / max) * 100)),
-  }))
+  })).filter((item: any) => item.year)
 })
 
 const forecastYearKeys = computed(() => {
@@ -1177,14 +1205,27 @@ const forecastYearKeys = computed(() => {
 })
 
 function buildForecastChartSource(): Array<{ year: string; netProfit: any; kind?: 'actual' | 'forecast' }> {
+  const details = forecastData.value?.detailIndicators
+  const detailRows = Array.isArray(details) ? details : []
+  // 净利润行：匹配"净利润"，排除"净利润增长率"等衍生指标
+  const profitRow = detailRows.find((row: any) => {
+    const name = String(row['预测指标'] || row.indicator || '')
+    return name.includes('净利润') && !name.includes('增长率')
+  })
+
   const predictions = forecastData.value?.predictions
   if (Array.isArray(predictions) && predictions.length > 0) {
-    return predictions.map((item: any) => ({ year: String(item.year || ''), netProfit: item.netProfit }))
+    // 优先用预测明细；个别年份净利率缺失时，用详表净利润行兜底
+    return predictions.map((item: any) => {
+      const year = String(item.year || '')
+      let netProfit = item.netProfit
+      if ((netProfit == null || netProfit === '--') && profitRow) {
+        netProfit = profitRow[`预测${year}-平均`] || profitRow[year + '-实际值'] || profitRow[`预测${year}`] || netProfit
+      }
+      return { year, netProfit, kind: item.kind }
+    })
   }
 
-  const details = forecastData.value?.detailIndicators
-  if (!Array.isArray(details) || details.length === 0) return []
-  const profitRow = details.find((row: any) => String(row['预测指标'] || row.indicator || '').includes('净利润'))
   if (!profitRow) return []
   return forecastYearKeys.value.map(item => ({
     year: item.year,
@@ -1268,6 +1309,18 @@ const majorEventImpactClass = computed(() => {
   if (impact.includes('利好')) return 'is-positive'
   if (impact.includes('利空')) return 'is-negative'
   return 'is-neutral'
+})
+
+/** 双平面语义方向（对齐事件传导焦点卡）：利好→positive(红) / 利空→negative(绿) / 其余→mixed(中性) */
+const majorEventDirection = computed(() => {
+  const c = majorEventImpactClass.value
+  return c === 'is-positive' ? 'positive' : c === 'is-negative' ? 'negative' : 'mixed'
+})
+
+/** 顶部色块标题：利好「重大机会」/ 利空「重大风险」/ 其余「重大异动」 */
+const majorEventTitle = computed(() => {
+  const d = majorEventDirection.value
+  return d === 'positive' ? '重大机会' : d === 'negative' ? '重大风险' : '重大异动'
 })
 
 const legacyOverallDecision = computed(() => {
@@ -1603,9 +1656,20 @@ const overallDecision = computed(() => {
   }
 })
 
-function toggleDecisionPoint(type: 'opportunity' | 'risk') {
-  expandedDecisionPoint.value = expandedDecisionPoint.value === type ? null : type
-}
+/** 综合洞见（容器化 InsightCard 数据）：title=一句话结论；lines=重点/机会/风险（机会红·风险金·重点中性） */
+const decisionInsight = computed(() => {
+  const d = overallDecision.value
+  const lines: Array<{ key: string; text: string; tone?: 'positive' | 'risk' | 'default' }> = []
+  if (d.nextStep) lines.push({ key: '重点', text: d.nextStep })
+  if (d.opportunity) {
+    // 原展开全文不再折叠展示，取全文避免截断丢信息
+    lines.push({ key: '机会', text: d.opportunityFull || d.opportunity, tone: 'positive' })
+  }
+  if (d.risk) {
+    lines.push({ key: '风险', text: d.riskFull || d.risk, tone: 'risk' })
+  }
+  return { title: d.summary, lines }
+})
 
 function getEventIdentity(event: any): string {
   if (!event) return ''
@@ -1818,68 +1882,102 @@ onLoad((options: any) => {
 async function loadData() {
   loading.value = true
   try {
-    const [quoteData, flowData, semiData, newsData, infoData, eventsData, klineRes] = await Promise.allSettled([
+    // 快速请求：行情、新闻、基础信息、事件（通常 <500ms）
+    const fastTask = Promise.allSettled([
       stockApi.getQuote(symbol.value),
-      stockApi.getCapitalFlow(symbol.value),
-      stockApi.getSemiAnnualReport(symbol.value),
       stockApi.getStockNews(symbol.value, { size: 10 }),
       stockApi.getStockInfos(symbol.value),
       stockApi.getStockEvents(symbol.value, { cycle: 'all', limit: 20 }),
+    ]).then(([quoteData, newsData, infoData, eventsData]) => {
+      if (quoteData.status === 'fulfilled') {
+        quote.value = quoteData.value
+      }
+      if (newsData.status === 'fulfilled') {
+        const news = newsData.value as any
+        const rawList = Array.isArray(news) ? news : (news?.['个股新闻'] || news?.data?.['个股新闻'] || news?.data || news?.news || [])
+        newsExpanded.value = false
+        newsList.value = rawList.map((n: any) => ({
+          id: n['ID'] || n.id || '',
+          title: n['标题'] || n.title || '',
+          summary: n['内容'] || n.content || n.summary || '',
+          content: n['内容'] || n.content || '',
+          url: n['链接'] || n.url || '',
+          source: n['来源'] || n.source || '财联社',
+          publishTime: n['时间'] || n.publish_time || n.time || '',
+        }))
+      }
+      if (infoData.status === 'fulfilled' && infoData.value) {
+        stockInfo.value = infoData.value
+      }
+      if (eventsData.status === 'fulfilled') {
+        stockEvents.value = Array.isArray(eventsData.value) ? eventsData.value : []
+      }
+    })
+
+    // 慢速请求：资金流向（可能触发AI分析）、半年报（Tushare）、K线
+    capitalFlowLoading.value = true
+    const slowTask = Promise.allSettled([
+      stockApi.getCapitalFlow(symbol.value),
+      stockApi.getSemiAnnualReport(symbol.value),
       stockApi.getKLine(symbol.value, { period: klinePeriod.value, count: getKLineCount(klinePeriod.value) }),
-    ])
-    if (quoteData.status === 'fulfilled') {
-      quote.value = quoteData.value
-    }
-    if (flowData.status === 'fulfilled') {
-      const flow = flowData.value as any
-      capitalFlow.value = flow?.data || flow
-    }
-    if (semiData.status === 'fulfilled') {
-      const semi = semiData.value as any
-      semiAnnualReport.value = semi?.data || semi
-      disclosureUrl.value = semiAnnualReport.value?.disclosure_url || ''
-    }
-    if (newsData.status === 'fulfilled') {
-      const news = newsData.value as any
-      const rawList = Array.isArray(news) ? news : (news?.['个股新闻'] || news?.data?.['个股新闻'] || news?.data || news?.news || [])
-      newsExpanded.value = false
-      // 归一化中文键名为英文
-      newsList.value = rawList.map((n: any) => ({
-        id: n['ID'] || n.id || '',
-        title: n['标题'] || n.title || '',
-        summary: n['内容'] || n.content || n.summary || '',
-        content: n['内容'] || n.content || '',
-        url: n['链接'] || n.url || '',
-        source: n['来源'] || n.source || '财联社',
-        publishTime: n['时间'] || n.publish_time || n.time || '',
-      }))
-    }
-    if (infoData.status === 'fulfilled' && infoData.value) {
-      stockInfo.value = infoData.value
-    }
-    if (eventsData.status === 'fulfilled') {
-      stockEvents.value = Array.isArray(eventsData.value) ? eventsData.value : []
-    }
-    if (klineRes.status === 'fulfilled') {
-      klineData.value = Array.isArray(klineRes.value) ? klineRes.value : []
-    }
-    applyLiveQuoteToKline()
-// 中线卡片上方的异步内容会改变锚点位置，完成后再执行锚定。
+    ]).then(([flowData, semiData, klineRes]) => {
+      if (flowData.status === 'fulfilled') {
+        const flow = flowData.value as any
+        capitalFlow.value = flow?.data || flow
+        capitalFlowError.value = false
+      } else {
+        capitalFlowError.value = true
+      }
+      capitalFlowLoading.value = false
+      if (semiData.status === 'fulfilled') {
+        const semi = semiData.value as any
+        semiAnnualReport.value = semi?.data || semi
+        disclosureUrl.value = semiAnnualReport.value?.disclosure_url || ''
+      }
+      if (klineRes.status === 'fulfilled') {
+        klineData.value = Array.isArray(klineRes.value) ? klineRes.value : []
+      }
+      applyLiveQuoteToKline()
+    })
+
+    // 快速请求完成后立即启动后续异步任务（不等慢速请求）
+    await fastTask
     const aiTask = loadAiAnalysis()
     const forecastTask = loadForecast(false)
     const trendTask = loadTrendScore()
     const industryTask = loadIndustryHealth()
     loadMidLongAnalysis()
+
+    // 只在需要锚定到特定区域时等待对应任务完成
     if (detailAnchor.value === 'forecast') {
-      await Promise.all([aiTask, forecastTask, trendTask, industryTask])
+      await Promise.all([slowTask, aiTask, forecastTask, trendTask, industryTask])
     } else if (detailAnchor.value === 'performance-report') {
-      await Promise.all([aiTask, trendTask, industryTask])
+      await Promise.all([slowTask, aiTask, trendTask, industryTask])
+    } else {
+      // 不等待慢速请求，让 loading 先结束
+      slowTask.catch(() => {})
     }
   } catch (err) {
     console.error('[StockDetail] load error:', err)
   } finally {
     if (detailAnchor.value) await scrollToDetailAnchor()
     loading.value = false
+  }
+}
+
+async function retryLoadCapitalFlow() {
+  if (!symbol.value) return
+  capitalFlowLoading.value = true
+  capitalFlowError.value = false
+  try {
+    const res = await stockApi.getCapitalFlow(symbol.value)
+    const flow = (res as any)?.data || res
+    capitalFlow.value = flow
+    capitalFlowError.value = false
+  } catch {
+    capitalFlowError.value = true
+  } finally {
+    capitalFlowLoading.value = false
   }
 }
 
@@ -1920,30 +2018,39 @@ async function loadMidLongAnalysis() {
       stockApi.getMidLongAnalysis(symbol.value, 'mid'),
       stockApi.getMidLongAnalysis(symbol.value, 'long'),
     ])
-    if (midRes.status === 'fulfilled') {
-      midAnalysisData.value = midRes.value
-    } else {
-      // 无缓存时自动触发 LLM 生成
-      try {
-        const created = await stockApi.createMidLongAnalysis(symbol.value, 'mid')
-        midAnalysisData.value = created
-      } catch {
-        midAnalysisData.value = null
-      }
-    }
-    if (longRes.status === 'fulfilled') {
-      longAnalysisData.value = longRes.value
-    } else {
-      try {
-        const created = await stockApi.createMidLongAnalysis(symbol.value, 'long')
-        longAnalysisData.value = created
-      } catch {
-        longAnalysisData.value = null
-      }
-    }
+    midAnalysisData.value = midRes.status === 'fulfilled' ? midRes.value : null
+    longAnalysisData.value = longRes.status === 'fulfilled' ? longRes.value : null
   } catch {
     midAnalysisData.value = null
     longAnalysisData.value = null
+  }
+}
+
+async function refreshMidAnalysis() {
+  if (!symbol.value || midAnalysisLoading.value) return
+  midAnalysisLoading.value = true
+  try {
+    const created = await stockApi.createMidLongAnalysis(symbol.value, 'mid')
+    midAnalysisData.value = created
+    uni.showToast({ title: '已刷新', icon: 'none' })
+  } catch {
+    uni.showToast({ title: '刷新失败', icon: 'none' })
+  } finally {
+    midAnalysisLoading.value = false
+  }
+}
+
+async function refreshLongAnalysis() {
+  if (!symbol.value || longAnalysisLoading.value) return
+  longAnalysisLoading.value = true
+  try {
+    const created = await stockApi.createMidLongAnalysis(symbol.value, 'long')
+    longAnalysisData.value = created
+    uni.showToast({ title: '已刷新', icon: 'none' })
+  } catch {
+    uni.showToast({ title: '刷新失败', icon: 'none' })
+  } finally {
+    longAnalysisLoading.value = false
   }
 }
 
@@ -2161,9 +2268,22 @@ function formatAiDate(dateStr: string): string {
   if (!dateStr) return ''
   try {
     const d = new Date(dateStr)
-    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
   } catch {
     return dateStr
+  }
+}
+
+function isAiDateToday(dateStr: string): boolean {
+  if (!dateStr) return false
+  try {
+    const d = new Date(dateStr)
+    const now = new Date()
+    return d.getFullYear() === now.getFullYear()
+      && d.getMonth() === now.getMonth()
+      && d.getDate() === now.getDate()
+  } catch {
+    return false
   }
 }
 
@@ -2269,7 +2389,7 @@ function formatMarketValue(value: any): string {
 }
 
 function formatSemiAmount(amt: number): string {
-  if (!amt) return '--'
+  if (!amt || amt === 0) return '--'
   const yi = Math.abs(amt) / 100000000
   if (yi >= 1) return yi.toFixed(2) + '亿'
   const wan = Math.abs(amt) / 10000
@@ -2479,217 +2599,70 @@ function goChat() {
   font-size: 24rpx;
 }
 
-/* 综合决策 */
-.decision-card,
+/* 最新重大异动：双平面「重大机会/风险/异动」（对齐事件传导焦点卡：语义渐变顶 + 白正文） */
 .major-event-alert {
   background: $bg-card;
-  border: 2rpx solid $line;
+  border: none;
+  border-left: 6rpx solid $ink-soft;
   border-radius: $r-md;
-  padding: 24rpx 28rpx;
-  margin-bottom: 16rpx;
-}
-
-.decision-card {
-  display: flex;
-  flex-direction: column;
-  gap: $s-2;
-  border-radius: $r-lg;
-  box-shadow: $shadow-xs;
-}
-
-/* 洞见卡风格：结论前的渐变分隔线，替代原先顶部主题色条 */
-.decision-divider {
-  height: 2rpx;
-  margin: $s-1 0;
-  background: linear-gradient(90deg, $primary-100, rgba($primary-100, 0));
-}
-
-.decision-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16rpx;
-}
-
-.decision-kicker {
-  display: block;
-  font-size: 28rpx;
-  line-height: 1.3;
-  font-weight: 800;
-  color: $ink;
-}
-
-.decision-summary {
-  display: block;
-  font-size: $font-size-lg;
-  line-height: $lh-tight;
-  font-weight: 600;
-  color: $ink;
-}
-
-/* 重点：横幅卡（蓝），与机会/风险(point-) 同卡片化结构 */
-.decision-next {
-  --banner-bg: #{$insight-market};
-  --banner-glow: rgba(11, 95, 255, 0.18);
-}
-
-/* 重点行横幅卡排版统一走全局 insight-banner mixin */
-@include insight-banner('.decision-next', '.next-label', '.next-text');
-
-.decision-verdict {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.decision-status {
-  padding: 6rpx 14rpx;
-  border-radius: 10rpx;
-  background: $primary-50;
-  font-size: 24rpx;
-  line-height: 1.35;
-  font-weight: 800;
-
-  &.is-positive {
-    color: $up;
-    background: $up-soft;
-  }
-
-  &.is-neutral {
-    color: $primary;
-    background: $primary-50;
-  }
-
-  &.is-risk {
-    color: $down;
-    background: $down-soft;
-  }
-}
-
-.decision-status.is-sub {
-  background: $bg-deep;
-  color: $ink-soft;
-
-  &.is-positive {
-    color: $up;
-    background: $up-soft;
-  }
-
-  &.is-risk {
-    color: $down;
-    background: $down-soft;
-  }
-}
-
-.decision-period {
-  padding: 6rpx 12rpx;
-  border-radius: 10rpx;
-  background: $bg-deep;
-  color: $ink-soft;
-  font-size: 22rpx;
-  line-height: 1.35;
-  font-weight: 700;
-}
-
-/* 机会/风险：横幅卡（机会绿/风险红），保留展开交互 */
-.decision-points {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-
-.decision-point {
-  --banner-bg: #{$down};
-  --banner-glow: rgba(24, 160, 88, 0.18);
-
-  &.decision-point--risk {
-    --banner-bg: #{$up};
-    --banner-glow: rgba(229, 77, 94, 0.18);
-  }
-}
-
-/* 机会/风险：走洞见解横幅卡全局排版，保留展开交互 */
-@include insight-banner('.decision-point', '.point-label', '.point-text');
-
-.point-more {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 20rpx;
-  font-weight: 600;
-  text-align: right;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.point-text {
-  display: -webkit-box;
+  padding: 0;
+  margin: 24rpx 0 16rpx; /* 与上方综合洞见卡拉开间距 */
   overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-
-  &.expanded {
-    display: block;
-    overflow: visible;
-    -webkit-line-clamp: unset;
-  }
+  box-shadow: $shadow-card;
 }
 
-.major-event-alert {
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-  padding-top: 18rpx;
-  padding-bottom: 18rpx;
-  border-left: 6rpx solid $primary;
+.major-event-alert--positive { border-left-color: #d81f1f; }
+.major-event-alert--negative { border-left-color: #0d9e43; }
 
-  &.is-muted {
-    background: $bg-soft;
-    border-left-color: $line-strong;
-  }
+.major-event-alert.is-muted {
+  background: $bg-soft;
+  border-left-color: $line-strong;
+  box-shadow: none;
 }
 
-.major-event-head {
+/* 上层语义渐变（上浅下深，模拟顶面受光压重） */
+.me-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
+  height: 52rpx;
+  padding: 0 16rpx;
+  box-shadow: inset 0 -2rpx 0 rgba(0, 0, 0, 0.06);
 }
 
-.major-impact {
-  flex-shrink: 0;
-  padding: 4rpx 14rpx;
-  border: 1rpx solid;
-  border-radius: 8rpx;
-  font-size: 22rpx;
-  line-height: 1.4;
-  font-weight: 800;
+.major-event-alert--positive .me-top { background: linear-gradient(180deg, #e22c2c, #d81f1f); }
+.major-event-alert--negative .me-top { background: linear-gradient(180deg, #0faa4a, #0d9e43); }
+.major-event-alert--mixed .me-top { background: linear-gradient(180deg, $ink-soft, $ink); }
+.major-event-alert.is-muted .me-top { display: none; }
 
-  &.is-positive {
-    color: $up;
-    border-color: #fecaca;
-    background: $up-soft;
-  }
+.me-title {
+  font-size: $font-size-md;
+  font-weight: bold;
+  color: #f8f8f8;
+  letter-spacing: 1rpx;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-  &.is-negative {
-    color: $down;
-    border-color: #bbf7d0;
-    background: $down-soft;
-  }
-
-  &.is-neutral {
-    color: $ink-mute;
-    border-color: $line-strong;
-    background: $bg-soft;
-  }
+/* 下层白正文区 */
+.me-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  padding: 14rpx 22rpx 16rpx;
 }
 
 .major-event-title {
   display: block;
-  font-size: 26rpx;
-  line-height: 1.5;
+  font-size: $font-size-md;
+  line-height: 1.4;
   font-weight: 600;
-  color: $ink-soft;
+  color: $ink;
+}
+
+.major-event-empty {
+  padding: 14rpx 22rpx 16rpx;
 }
 
 .major-event-meta {

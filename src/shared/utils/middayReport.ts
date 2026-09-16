@@ -14,6 +14,12 @@
 export interface MiddaySection {
   title: string
   conclusion: string
+  /**
+   * schema 2.1：午后前瞻的机会提示短词（4-5 个、每个 ≤8 字）；老数据无此字段。
+   * 注意：该键存在但为空数组 = 新格式下 LLM 未给出明确机会（合法输出如 [" "] 归一后为空），
+   * 渲染侧据此保留午后前瞻卡并隐藏机会栏（与 risks 双空才整块隐藏）。
+   */
+  opportunities?: string[]
 }
 
 export interface MiddayDisplayReport {
@@ -43,7 +49,24 @@ function isStringList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
-/** 归一化多分段摘要 sections：仅保留含非空 conclusion 的项（容忍 LLM 字段缺漏/顺序变化）。 */
+/** LLM 输出防御：trim、去空、最多取前 5 个、单项 ≤8 字截断（schema 2.1 opportunities）。 */
+function normalizeKeywords(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const result: string[] = []
+  for (const item of value) {
+    if (result.length >= 5) break
+    const text = typeof item === 'string' ? item.trim() : ''
+    if (!text) continue
+    result.push(text.slice(0, 8))
+  }
+  return result
+}
+
+/**
+ * 归一化多分段摘要 sections：保留含非空 conclusion，或带 opportunities 键（含空数组）的项。
+ * 键存在性（hasOwnProperty）而非数组长度判定：新格式「午后前瞻」即使无明确机会（opportunities: [] /
+ * [" "] 归空）也带键 → 视为午后前瞻对位数据保留；老数据无该键 → 仍需 conclusion 非空才保留（行为不回退）。
+ */
 function normalizeSections(value: unknown): MiddaySection[] {
   if (!Array.isArray(value)) return []
   const result: MiddaySection[] = []
@@ -51,9 +74,16 @@ function normalizeSections(value: unknown): MiddaySection[] {
     if (!item || typeof item !== 'object') continue
     const body = item as Record<string, unknown>
     const conclusion = typeof body.conclusion === 'string' ? body.conclusion.trim() : ''
-    if (!conclusion) continue
+    // 新格式键存在（可空）即保留该分段；老数据无键时维持「conclusion 非空才保留」旧语义
+    const hasOppKey = Object.prototype.hasOwnProperty.call(body, 'opportunities')
+    if (!conclusion && !hasOppKey) continue
     const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim() : ''
-    result.push({ title, conclusion })
+    result.push({
+      title,
+      conclusion,
+      // 有键即始终写出 opportunities（可为空数组），保证渲染侧能区分「键存在但空」与「老数据无键」
+      ...(hasOppKey ? { opportunities: normalizeKeywords(body.opportunities) } : {}),
+    })
   }
   return result
 }

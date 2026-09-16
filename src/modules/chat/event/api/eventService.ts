@@ -77,13 +77,55 @@ export function getAiHeadlineEvents(): Promise<AiHeadlineEvents> {
 // ==================== Global Importance 双榜单 ====================
 
 /**
+ * 计算受影响行业主导方向（impactStrength 加权 + 1.5 倍阈值，与后端 chain_dominant_direction 一致）。
+ *
+ * - bullish 权重 ≥ bearish × 1.5 → bullish
+ * - bearish 权重 ≥ bullish × 1.5 → bearish
+ * - 否则 → neutral
+ */
+function getIndustryDominantDirection(
+  industries: Array<{ sentiment?: string; impactStrength?: number }>
+): 'bullish' | 'bearish' | 'neutral' {
+  let bullishW = 0
+  let bearishW = 0
+  for (const ind of industries) {
+    const strength = typeof ind.impactStrength === 'number' ? ind.impactStrength : 0
+    if (ind.sentiment === 'bullish') bullishW += strength
+    else if (ind.sentiment === 'bearish') bearishW += strength
+  }
+  if (bullishW >= bearishW * 1.5) return 'bullish'
+  if (bearishW >= bullishW * 1.5) return 'bearish'
+  return 'neutral'
+}
+
+/**
+ * GI 方向与受影响行业主导方向是否明显冲突（前端历史数据防御，仅兜底）。
+ *
+ * 规则：
+ * - GI 非 bullish/bearish、或行业数据缺失、或行业主导为 neutral（方向不明）→ 不判定冲突（fail-open，不误杀）
+ * - 仅当 GI 方向与行业主导方向**明显相反**（如 GI=bearish 但行业明显 bullish 主导）→ 判定冲突
+ *
+ * 注意：前端只做兜底，不重新实现 GI 排序；方向一致性主要由后端 GI 最终校验保证。
+ */
+function isFocusDirectionConflict(event: EventItem): boolean {
+  const giDir = event.globalImportanceDirection
+  if (giDir !== 'bullish' && giDir !== 'bearish') return false
+  const industries = event.affectedIndustries ?? []
+  if (industries.length === 0) return false
+  const dominant = getIndustryDominantDirection(industries)
+  if (dominant === 'neutral') return false
+  return dominant !== giDir
+}
+
+/**
  * 获取 Global Importance 双榜单事件
  *
  * 基于 event/list 返回的 globalImportanceRank 筛选焦点事件。
  *
  * 数据流（第三阶段）：
  *   Step 1: 调用 getEventList() 获取事件列表（已包含 globalImportanceRank + chain_summary）
- *   Step 2: 筛选 rank=1（当前焦点）和 rank=2（持续影响）的事件
+ *   Step 2: 筛选 rank=1（当前焦点）和 rank=2（持续影响）的事件，并剔除
+ *           GI 方向与行业主导方向明显冲突的历史脏数据
  *   Step 3: 直接消费 adapter 已转换的 affectedIndustries（列表接口直出，不再请求详情）
  *
  * 异常处理：
@@ -102,9 +144,10 @@ export async function getFocusEvents(): Promise<FocusEventViewModel[]> {
       return []
     }
 
-    // Step 2: 筛选 rank=1 和 rank=2 的事件
+    // Step 2: 筛选 rank=1 和 rank=2 的事件，并做方向一致性兜底（剔除明显冲突脏数据）
     const focusEvents = events.filter(e =>
-      e.globalImportanceRank === 1 || e.globalImportanceRank === 2
+      (e.globalImportanceRank === 1 || e.globalImportanceRank === 2)
+      && !isFocusDirectionConflict(e)
     )
 
     if (focusEvents.length === 0) {

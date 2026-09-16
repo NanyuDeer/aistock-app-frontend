@@ -15,7 +15,7 @@
       <view class="profit-axis-col">
         <text v-for="tick in chartModel.ticks" :key="`axis-${tick.label}`" class="profit-axis-text">{{ tick.label }}</text>
       </view>
-      <svg class="profit-svg" viewBox="0 0 360 224" preserveAspectRatio="none">
+      <svg class="profit-svg" viewBox="0 0 360 200" preserveAspectRatio="none">
         <rect
           v-if="chartModel.forecastBand"
           :x="chartModel.forecastBand.x"
@@ -80,7 +80,7 @@ const chartModel = computed(() => {
   const barLeft = 42
   const right = 342
   const top = 24
-  const baseY = 172
+  const baseY = 180
   const maxValue = Math.max(0.01, ...values) * 1.12
   const count = Math.max(1, points.value.length)
   const slot = count <= 1 ? right - barLeft : (right - barLeft) / (count - 1)
@@ -107,7 +107,8 @@ const chartModel = computed(() => {
   const forecastBand = firstForecastIndex >= 0
     ? {
         x: forecastDividerX ?? Math.max(axisLeft, bars[firstForecastIndex].x - barWidth),
-        width: right - (forecastDividerX ?? Math.max(axisLeft, bars[firstForecastIndex].x - barWidth)),
+        // 柱体以坐标点为中心，背景向右延伸半个柱宽，完整覆盖最后一个预测柱。
+        width: Math.min(360, right + barWidth / 2) - (forecastDividerX ?? Math.max(axisLeft, bars[firstForecastIndex].x - barWidth)),
       }
     : null
   const ticks = [maxValue, maxValue * 0.66, maxValue * 0.33, 0].map(value => ({
@@ -178,12 +179,12 @@ const chartModel = computed(() => {
   grid-template-columns: 34px 1fr;
   column-gap: 4rpx;
   width: 100%;
-  height: 224px;
+  height: 200px;
   overflow: visible;
 }
 
 .profit-axis-col {
-  height: 172px;
+  height: 180px;
   padding-top: 20px;
   display: flex;
   flex-direction: column;
@@ -201,7 +202,7 @@ const chartModel = computed(() => {
 .profit-svg {
   display: block;
   width: 100%;
-  height: 224px;
+  height: 200px;
   overflow: visible;
 }
 

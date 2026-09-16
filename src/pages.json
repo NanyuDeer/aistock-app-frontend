@@ -45,7 +45,7 @@
     {
       "path": "modules/favorites/pages/monitor",
       "style": {
-        "navigationBarTitleText": "异动监控",
+        "navigationBarTitleText": "自选股异动",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
@@ -173,6 +173,15 @@
       "path": "modules/market/pages/sector-detail",
       "style": {
         "navigationBarTitleText": "",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
+      "path": "modules/market/pages/sector-loop",
+      "style": {
+        "navigationBarTitleText": "板块四环",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
@@ -357,15 +366,6 @@
       "path": "modules/rhythm/pages/index",
       "style": {
         "navigationBarTitleText": "节奏大师",
-        "navigationStyle": "custom",
-        "disableScroll": true,
-        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
-      }
-    },
-    {
-      "path": "modules/rhythm/pages/calendar",
-      "style": {
-        "navigationBarTitleText": "节奏日历",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }

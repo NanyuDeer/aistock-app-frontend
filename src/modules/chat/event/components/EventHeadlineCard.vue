@@ -81,7 +81,6 @@ const props = withDefaults(defineProps<Props>(), {
   importance: 'normal',
   industries: () => [],
   eventId: '',
-  sourceInfo: () => undefined,
 })
 
 // 定义事件

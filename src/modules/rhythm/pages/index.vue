@@ -1,10 +1,9 @@
 <template>
-  <view class="page">
-    <view class="nav">
-      <text class="back" @tap="goBack">‹</text>
-      <text class="nav-title">{{ pageTitle }}</text>
-    </view>
-    <scroll-view scroll-y class="content">
+  <SubPageCard2 title="节奏大师" :subtitle="navSubtitle" back-url="/modules/home/pages/index">
+    <view class="body">
+      <!-- 顶部可折叠双模式日历面板（仓位/事件；折叠=近 7 日紧凑条、展开=60 日周网格） -->
+      <RhythmCalendarPanel :target-date="targetDate" @pick="onPanelPick" />
+
       <view class="slots" v-if="versions.length > 1">
         <view
           v-for="v in versions"
@@ -17,6 +16,16 @@
         </view>
       </view>
       <view class="fallback" v-if="isFallback">非交易日/当日无报告，沿用前值（{{ basisLabel }}）</view>
+      <view class="insight-wrap" v-if="insightCard">
+        <InsightCard
+          type="market"
+          tag-text="节奏洞见"
+          :title="insightCard.title"
+          :trace="insightCard.trace ?? ''"
+          :structured="insightCard.structured ?? null"
+          :time="insightCard.time"
+        />
+      </view>
       <RhythmCard
         v-if="content"
         :card="content.rhythm_card!"
@@ -27,15 +36,19 @@
         :refresh-slot="content.refresh_slot"
       />
       <EmptyState v-else title="节奏状态暂不可用" />
-    </scroll-view>
-  </view>
+    </view>
+  </SubPageCard2>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { EmptyState } from '@/shared/components'
+import { EmptyState, InsightCard } from '@/shared/components'
+import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import RhythmCard from '../components/RhythmCard.vue'
+import RhythmCalendarPanel from '../components/RhythmCalendarPanel.vue'
+import { toRhythmInsight } from '../utils/rhythmInsight'
+import type { RhythmInsightCard } from '../utils/rhythmInsight'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { RhythmMasterContent } from '@/shared/api/modules/agent'
 
@@ -59,6 +72,11 @@ const content = computed<RhythmMasterContent | undefined>(() => {
   return v?.content
 })
 
+/** 摘要洞见卡入参：仓位/档位/interval 分支上移，mapper 不可拼装时整卡不渲染（去重：RhythmCard 不再重复这些单元） */
+const insightCard = computed<RhythmInsightCard | null>(() =>
+  content.value ? toRhythmInsight(content.value.rhythm_card, activeSlot.value, targetDate.value) : null,
+)
+
 const pageTitle = computed(() => {
   const s = activeSlot.value
   if (s === 'after_close') return `明日节奏（${targetDate.value}）`
@@ -68,11 +86,26 @@ const pageTitle = computed(() => {
 const cardTitle = computed(() => pageTitle.value)
 const basisLabel = computed(() => content.value?.basis_date ?? '')
 
+const navSubtitle = computed(() => {
+  const parts: string[] = []
+  if (targetDate.value) parts.push(`目标日 ${targetDate.value}`)
+  if (isFallback.value && basisLabel.value) parts.push(`沿用前值 ${basisLabel.value}`)
+  else if (activeSlot.value) parts.push(slotLabel(activeSlot.value))
+  return parts.join(' · ')
+})
+
 onLoad(async (options) => {
   const date = String(options?.date ?? '')
   targetDate.value = date
   await loadVersions(date || undefined)
 })
+
+/** 面板点格切日：与旧 pickDay 同语义——重拉该日三时点版本 */
+async function onPanelPick(date: string) {
+  if (date === targetDate.value) return
+  targetDate.value = date
+  await loadVersions(date)
+}
 
 function todayStr(): string {
   const d = new Date()
@@ -123,24 +156,13 @@ async function previousTradingDay(date: string): Promise<string | undefined> {
 }
 
 function switchSlot(s: string) { activeSlot.value = s }
-function goBack() {
-  // H5 直接以 URL 打开详情页时无上级页面栈（getCurrentPages 深度=1），navigateBack 会静默失败
-  if (getCurrentPages().length > 1) {
-    uni.navigateBack()
-  } else {
-    uni.reLaunch({ url: '/modules/home/pages/index' })
-  }
-}
 </script>
 
 <style lang="scss" scoped>
 @import '@/shared/styles/variables.scss';
-.page { display: flex; flex-direction: column; height: 100%; background: $bg-page; }
-.nav { display: flex; align-items: baseline; gap: 16rpx; padding: 24rpx 32rpx; background: $bg-card; }
-.back { font-size: 40rpx; color: $ink; padding-right: 8rpx; }
-.nav-title { font-size: 34rpx; font-weight: 600; color: $ink; }
-.nav-cal { margin-left: auto; font-size: 26rpx; color: $primary; font-weight: 600; padding: 8rpx 16rpx; }
-.content { flex: 1; padding: 24rpx 32rpx; }
+.body { padding: 24rpx 32rpx; }
+.insight-wrap { margin-bottom: 20rpx; }
+
 /* 三时点分段切换（设计稿：surface 底 + 边框 + pill，active 主色填充） */
 .slots { display: flex; gap: 8rpx; background: $bg-card; border: 1rpx solid $line; border-radius: 999rpx; padding: 6rpx; margin-bottom: 24rpx; }
 .slot { flex: 1; text-align: center; padding: 12rpx 0; border-radius: 999rpx; font-size: 24rpx; color: $ink-soft; font-weight: 500; }

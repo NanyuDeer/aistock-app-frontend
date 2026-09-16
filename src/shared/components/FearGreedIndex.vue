@@ -34,11 +34,11 @@ interface RangeDef {
 }
 
 const RANGES: RangeDef[] = [
-  { min: 0, max: 25, label: '冰点', color: '#FF3B30', start: '#FF3B30', end: '#FF6B60', advice: '市场恐慌，可能错配，可关注超跌机会', isExtreme: true },
-  { min: 25, max: 45, label: '寒冷', color: '#FF9500', start: '#FF9500', end: '#FFB84D', advice: '市场偏谨慎，建议控制仓位', isExtreme: false },
+  { min: 0, max: 20, label: '冰点', color: '#00C853', start: '#00C853', end: '#5AFF8F', advice: '市场恐慌，可能错配，可关注超跌机会', isExtreme: true },
+  { min: 20, max: 45, label: '寒冷', color: '#FF9500', start: '#FF9500', end: '#FFB84D', advice: '市场偏谨慎，建议控制仓位', isExtreme: false },
   { min: 45, max: 55, label: '常温', color: '#FFCC00', start: '#FFCC00', end: '#FFE066', advice: '市场情绪平稳，保持观望', isExtreme: false },
   { min: 55, max: 80, label: '温热', color: '#34C759', start: '#34C759', end: '#6AE07A', advice: '市场偏乐观，注意追高风险', isExtreme: false },
-  { min: 80, max: 100, label: '沸点', color: '#00C853', start: '#00C853', end: '#5AFF8F', advice: '市场过热，谨防回调风险', isExtreme: true },
+  { min: 80, max: 100, label: '沸点', color: '#FF3B30', start: '#FF3B30', end: '#FF6B60', advice: '市场过热，谨防回调风险', isExtreme: true },
 ]
 
 /** 指数数值（0-100），页面挂载时从恐贪指数服务拉取真实值；失败时保留默认值 */

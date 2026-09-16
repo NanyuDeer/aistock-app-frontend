@@ -133,6 +133,13 @@ export default defineConfig(({ mode }) => {
           target: apiTarget,
           changeOrigin: true
         },
+        // 板块四环聚合（sector-insight）→ Node.js app-api（sectorInsightRouter 本地路由，
+        // 非 Python）。必须置于 /api/agent 兜底（Python 8080）之前，否则 H5 dev 被转发到
+        // agent-py 404 → 板块四环页/溯源主因板块「加载失败」（2026-09-02 线上复现根因）
+        '/api/agent/sector-insight': {
+          target: apiTarget,
+          changeOrigin: true
+        },
         '/api/agent/audio': {
           target: apiTarget,
           changeOrigin: true
