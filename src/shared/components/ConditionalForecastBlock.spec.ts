@@ -13,3 +13,7 @@ test('单档守卫：watchEffect 把 activeHorizon 初始化为唯一档（防 s
   assert.match(source, /activeHorizon\.value\s*=/)
   assert.match(source, /segs\.includes\(activeHorizon\.value\)/)
 })
+
+test('单档守卫：v-if 精确落在 __seg 容器上（非注释/非其他节点）', () => {
+  assert.match(source, /<view v-if="horizonSegments\.length > 1" class="as-insight-card__seg">/)
+})

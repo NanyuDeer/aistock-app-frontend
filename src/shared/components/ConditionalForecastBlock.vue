@@ -133,7 +133,8 @@
       </view>
 
       <view v-if="!activeBase && !activeConditions.length" class="as-insight-card__sc-empty">
-        该期暂无细分情景
+        <text v-if="displayMode === 'conclusion'">条件未成立 · 暂无已验证结论</text>
+        <text v-else>该期暂无细分情景</text>
       </view>
     </view>
   </view>
@@ -141,6 +142,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
+
+import { selectVisibleConditions } from '@/shared/utils/conditionalForecast'
 
 /**
  * ConditionalForecastBlock 条件化预判块（洞见卡系通用块，2026-09-02 抽取）
@@ -179,13 +182,13 @@ interface StructuredCondition {
   /** 条件满足后的走势预判（含幅度/目标位等，展示原文） */
   scenario: string
   /** 简洁展示用关键词（1~2 个，单条 ≤10 字；仅新数据携带，旧记录无 → 走长句兜底） */
-    keywords?: string[]
-    /** 结构化仓位动作（add/reduce/hold + 成数，如 "+2 成"；后端 position_action 透传，纯 UI 展示） */
-    positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string }
-    /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度，如 上探+3%~+5%） */
-    scenario_keywords?: string[]
-    /** 验证锚点（可选透传：threshold/metric 以 chip 展示） */
-    anchor?: { metric?: string; threshold?: string }
+  keywords?: string[]
+  /** 结构化仓位动作（add/reduce/hold + 成数，如 "+2 成"；后端 position_action 透传，纯 UI 展示） */
+  positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string }
+  /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度，如 上探+3%~+5%） */
+  scenario_keywords?: string[]
+  /** 验证锚点（可选透传：threshold/metric 以 chip 展示） */
+  anchor?: { metric?: string; threshold?: string }
   /** 该条件是否已触发（验证回填）：true=已触发（分支点亮）/ false=未触发（置灰）/ 缺省=待观察常态 */
   met?: boolean | null
 }
@@ -205,9 +208,12 @@ const props = withDefaults(defineProps<{
   structured: InsightStructuredForecast | null
   /** 条件行显示模式：tags=有 keywords 显示关键词标签（无则长句兜底）；sentence=强制长句原文（预测详情页用） */
   conditionDisplay?: 'tags' | 'sentence'
+  /** 展示模式：full=全量分支（现状）；conclusion=只显示已成立分支（spec §7「只显示已验证结论」） */
+  displayMode?: 'full' | 'conclusion'
 }>(), {
   structured: null,
-  conditionDisplay: 'tags'
+  conditionDisplay: 'tags',
+  displayMode: 'full'
 })
 
 /** 该条件是否以关键词标签展示（tags 模式且有 keywords） */
@@ -295,11 +301,12 @@ const activeBase = computed<StructuredHorizon | undefined>(() => {
   return (data.horizons ?? []).find((h) => h.horizon === activeHorizon.value)
 })
 
-/** 当前期内的条件情景（conditions 按 horizon 归组） */
+/** 当前期内的条件情景（conditions 按 horizon 归组；conclusion 模式只留已成立分支） */
 const activeConditions = computed<StructuredCondition[]>(() => {
   const data = props.structured
   if (!data) return []
-  return (data.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
+  const inHorizon = (data.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
+  return selectVisibleConditions(inHorizon, props.displayMode)
 })
 
 const verifyText = computed(() => {

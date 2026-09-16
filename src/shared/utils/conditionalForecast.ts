@@ -82,3 +82,21 @@ export function expandConditionalBranches<T extends BranchLike>(cond: T): T[] {
   })
   return [{ ...cond, scenario: main }, ...extras]
 }
+
+/**
+ * 预判分支可见性（spec §7「只显示已验证结论」）：
+ * - full：原样返回（现状）；
+ * - conclusion：只保留已成立分支（met === true），未满足分支彻底隐藏（不置灰、不提示）。
+ */
+export function selectVisibleConditions<T extends { met?: boolean | null }>(
+  conditions: T[],
+  mode: 'full' | 'conclusion'
+): T[] {
+  if (mode !== 'conclusion') return conditions
+  return conditions.filter((c) => c.met === true)
+}
+
+/** 是否含分支级 met 数据（布尔）；全缺省/null → false（如大盘链路当前恒 undefined） */
+export function hasMetData(conditions: Array<{ met?: boolean | null }>): boolean {
+  return conditions.some((c) => typeof c.met === 'boolean')
+}
