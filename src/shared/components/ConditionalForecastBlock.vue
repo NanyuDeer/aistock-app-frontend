@@ -132,9 +132,13 @@
         </template>
       </view>
 
-      <view v-if="!activeBase && !activeConditions.length" class="as-insight-card__sc-empty">
-        <text v-if="displayMode === 'conclusion'">条件未成立 · 暂无已验证结论</text>
-        <text v-else>该期暂无细分情景</text>
+      <!-- 结论模式：无已成立分支（不看有无基准行）→ 固定空态文案 -->
+      <view v-if="displayMode === 'conclusion' && !activeConditions.length" class="as-insight-card__sc-empty">
+        <text>条件未成立 · 暂无已验证结论</text>
+      </view>
+      <!-- full 模式：沿用既有空态（无基准行且无分支） -->
+      <view v-else-if="!activeBase && !activeConditions.length" class="as-insight-card__sc-empty">
+        <text>该期暂无细分情景</text>
       </view>
     </view>
   </view>

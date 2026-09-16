@@ -87,6 +87,7 @@ export function expandConditionalBranches<T extends BranchLike>(cond: T): T[] {
  * 预判分支可见性（spec §7「只显示已验证结论」）：
  * - full：原样返回（现状）；
  * - conclusion：只保留已成立分支（met === true），未满足分支彻底隐藏（不置灰、不提示）。
+ * 注意：full 模式返回入参同一引用（如需避免下游误改请调用方自行复制）。
  */
 export function selectVisibleConditions<T extends { met?: boolean | null }>(
   conditions: T[],

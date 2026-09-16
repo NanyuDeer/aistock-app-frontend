@@ -16,4 +16,6 @@ test('单档守卫：watchEffect 把 activeHorizon 初始化为唯一档（防 s
 
 test('单档守卫：v-if 精确落在 __seg 容器上（非注释/非其他节点）', () => {
   assert.match(source, /<view v-if="horizonSegments\.length > 1" class="as-insight-card__seg">/)
+  assert.match(source, /条件未成立 · 暂无已验证结论/)
+  assert.match(source, /displayMode === 'conclusion' && !activeConditions\.length/)
 })
