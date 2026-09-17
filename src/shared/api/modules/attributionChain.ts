@@ -7,12 +7,26 @@
  */
 import request from '../request'
 
+/**
+ * 链上事件节点（spec §3.2-4 事件层，2026-09-17 Task 2.1 契约）
+ * source：warehouse=事件抓取中台存量命中（event_id 为权威事件 id，必填）；
+ *         search=板块定向检索补漏（无中台 id，event_id 为 null，ref 为 URL 或检索 query+title）。
+ */
+export interface AttributionChainEvent {
+  event_id: string | null
+  ref: string
+  headline: string
+  source: 'warehouse' | 'search'
+}
+
 /** 归因链板块分支（relation：self_driven=自驱动 / market_follow=跟随大盘 / unknown=未入链语义） */
 export interface AttributionChainChild {
   sector: string
   relation: 'self_driven' | 'market_follow' | 'unknown'
   pct: number | null
   trace_summary: string
+  /** 事件层（可选：旧链无该字段；无命中为空数组，前端按无事件渲染） */
+  events?: AttributionChainEvent[]
 }
 
 /** 归因链大盘根 */
