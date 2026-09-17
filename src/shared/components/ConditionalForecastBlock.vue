@@ -30,8 +30,8 @@
         <text v-if="activeBase.remaining" class="as-insight-card__remain">{{ activeBase.remaining }}</text>
       </view>
 
-      <view v-if="activeConditions.length" class="as-insight-card__sc-list">
-        <template v-for="(cond, idx) in activeConditions" :key="idx">
+      <view v-if="renderedConditions.length" class="as-insight-card__sc-list">
+        <template v-for="(cond, idx) in renderedConditions" :key="idx">
           <!-- 互斥分支间以“或”分隔（2026-09-03 方案 C） -->
           <view v-if="idx > 0" class="as-insight-card__sc-or">
             <text class="as-insight-card__sc-or-tx">或</text>
@@ -132,8 +132,22 @@
         </template>
       </view>
 
-      <!-- 结论模式（实际生效：整块含布尔 met 数据）：无已成立分支（不看有无基准行）→ 固定空态文案 -->
-      <view v-if="resolvedDisplayMode === 'conclusion' && !activeConditions.length" class="as-insight-card__sc-empty">
+      <!-- 隐藏分支纯标注（conclusion 生效且有已成立分支）：被过滤掉的 N 条未成立分支在此告知，纯标注不可点开 -->
+      <view v-if="showHiddenBranchLabel" class="as-insight-card__sc-hidden">
+        <text class="as-insight-card__sc-hidden-tx">另有 {{ hiddenConditionCount }} 条条件未成立</text>
+      </view>
+
+      <!-- 未触发折叠态（仅 tags 形态）：该档无已成立分支 → 基准行照常显示，分支区收为一行入口；
+           点开后再铺开该档全部条件分支（沿用既有分支渲染与样式） -->
+      <view v-if="isFoldedUnmet" class="as-insight-card__sc-fold" @tap.stop="toggleBranches">
+        <!-- 到期未触发（卡级聚合 verification=miss）：中性灰标签，不与 hit 的实心绿混用 -->
+        <text v-if="showMissTag" class="as-insight-card__sc-miss">未命中</text>
+        <text class="as-insight-card__sc-fold-tx">{{ branchesExpanded ? '收起条件化预判 ▴' : '查看条件化预判 ▾' }}</text>
+      </view>
+
+      <!-- 结论模式（实际生效：整块含布尔 met 数据）：无已成立分支（不看有无基准行）→ 空态文案
+           （tags 形态已由上方折叠入口承接；sentence 形态保持原空态不动） -->
+      <view v-else-if="resolvedDisplayMode === 'conclusion' && !activeConditions.length" class="as-insight-card__sc-empty">
         <text>条件未成立 · 暂无已验证结论</text>
       </view>
       <!-- full 模式：沿用既有空态（无基准行且无分支） -->
@@ -320,6 +334,48 @@ const activeConditions = computed(() =>
   selectVisibleConditions(inHorizonConditions.value, resolvedDisplayMode.value)
 )
 
+/** 折叠入口开关（本地展开，仅作用于当前档；归零见 setActiveHorizon） */
+const branchesExpanded = ref(false)
+
+/**
+ * 未触发折叠态（spec：未触发 → 折叠态）：
+ * conclusion 实际生效（该档含布尔 met、且无 met===true 分支）+ tags 形态。
+ * sentence 形态（预测详情页整句原文）不参与折叠，保持原位直显。
+ */
+const isFoldedUnmet = computed<boolean>(() =>
+  props.conditionDisplay !== 'sentence' &&
+  resolvedDisplayMode.value === 'conclusion' &&
+  !activeConditions.value.length
+)
+
+/** 分支区渲染源：折叠未触发态未点开 → 不铺开分支；点开后显示该档全部条件分支（沿用既有渲染与样式） */
+const renderedConditions = computed<StructuredCondition[]>(() => {
+  if (!isFoldedUnmet.value) return activeConditions.value
+  return branchesExpanded.value ? inHorizonConditions.value : []
+})
+
+/** 折叠入口点击（本地展开/收起） */
+function toggleBranches() {
+  branchesExpanded.value = !branchesExpanded.value
+}
+
+/** 被 conclusion 过滤掉的分支数（该档全部条件 − 已成立分支），即隐藏分支数 */
+const hiddenConditionCount = computed(
+  () => inHorizonConditions.value.length - activeConditions.value.length
+)
+
+/**
+ * 隐藏分支纯标注：conclusion 生效 + 有已成立分支（折叠态展开后已铺开全部，不存在"隐藏"故不标注）+ 确有隐藏分支
+ */
+const showHiddenBranchLabel = computed(
+  () => resolvedDisplayMode.value === 'conclusion' && !isFoldedUnmet.value && hiddenConditionCount.value > 0
+)
+
+/** 到期未触发（卡级聚合验证 miss = 该档条件全部未命中）：「未命中」中性标签仅随折叠态显示 */
+const showMissTag = computed(
+  () => isFoldedUnmet.value && props.structured?.verification === 'miss'
+)
+
 const verifyText = computed(() => {
   const v = props.structured?.verification
   if (v === 'hit') return '已验证'
@@ -383,6 +439,7 @@ const setActiveHorizon = (seg: HorizonKey) => {
   if (activeHorizon.value === seg) return
   activeHorizon.value = seg
   expandedScenarios.value = new Set() // 切期段重置展开态
+  branchesExpanded.value = false // 折叠入口同样按档归零（避免换档后误展）
 }
 
 /**
@@ -849,6 +906,51 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   border: 1rpx solid #e6e8ee;
   border-radius: $r-full;
   padding: 1rpx 14rpx;
+}
+
+/* ===== 未触发折叠态 / 隐藏分支标注 / 到期未命中标签（2026-09-17） ===== */
+
+/* 隐藏分支纯标注（中性小标签：caption 字号 + 既有边框色；纯标注不可点开） */
+.as-insight-card__sc-hidden {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  margin: 2rpx 6rpx;
+  padding: 3rpx 16rpx;
+  background: $bg-soft;
+  border: 1rpx solid $line;
+  border-radius: $r-full;
+}
+
+.as-insight-card__sc-hidden-tx {
+  font-size: 20rpx;
+  color: $ink-faint;
+  line-height: 1.5;
+}
+
+/* 未触发折叠入口：一行纯文字入口（非按钮样式，与行1「详情/收起」同款交互） */
+.as-insight-card__sc-fold {
+  display: flex;
+  align-items: center;
+  gap: $s-1;
+  padding: 6rpx 10rpx;
+}
+
+.as-insight-card__sc-fold-tx {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: $ink-mute;
+}
+
+/* 到期未命中标签（沿用 miss 中性灰，不与 hit 实心绿混用） */
+.as-insight-card__sc-miss {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: $ink-mute;
+  background: $bg-soft;
+  border: 1rpx solid $line;
+  border-radius: $r-full;
+  padding: 2rpx 14rpx;
 }
 
 .as-insight-card__sc-empty {

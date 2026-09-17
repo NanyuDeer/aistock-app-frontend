@@ -53,6 +53,11 @@
           </view>
           <view v-for="c in primarySectorCandidates" :key="c.ts_code" class="primary-sector-card">
             <SectorInsightCard :candidate="c" :date="displayedDate" display-mode="conclusion" />
+            <!-- 预判入口（溯源区附加链接）：点击跳该板块详情看完整预判；
+                 预判内容不进主因卡（溯源/预判两轨分离不变） -->
+            <view class="primary-sector-forecast-entry" @tap="goSectorDetail(c.name)">
+              <text class="primary-sector-forecast-entry-text">看该板块预判 →</text>
+            </view>
           </view>
         </view>
       </view>
@@ -213,6 +218,12 @@ function goSectorLoop() {
   uni.navigateTo({ url: `/modules/market/pages/sector-loop${q}` })
 }
 
+/** 主因卡预判入口：跳该板块详情页（入参沿用项目既有约定 ?name=<板块名>，见 sector-loop/leaders） */
+function goSectorDetail(name: string) {
+  if (!name) return
+  uni.navigateTo({ url: `/modules/market/pages/sector-detail?name=${encodeURIComponent(name)}` })
+}
+
 /** 跨 20:30 / 15:30 切日自动刷新定时器句柄 */
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
@@ -336,6 +347,23 @@ onUnload(stopRefreshTimer)
 }
 
 .primary-sector-more-text {
+  font-size: $font-size-sm;
+  color: $primary;
+  font-weight: 500;
+}
+
+/* 主因卡预判入口（溯源区附加链接：右对齐纯文字，预判内容仍只在板块详情页） */
+.primary-sector-forecast-entry {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8rpx 8rpx 0;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.primary-sector-forecast-entry-text {
   font-size: $font-size-sm;
   color: $primary;
   font-weight: 500;

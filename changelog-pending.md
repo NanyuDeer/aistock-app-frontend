@@ -1,5 +1,17 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-17 洞见卡未触发折叠态（查看条件化预判）+ 未命中标签 + 隐藏分支标注 + 市场洞见主因卡预判入口
+
+- CFB（两副本）：**未触发折叠态**——当前档无 `met === true` 分支、且 `conclusion` 实际生效、且 tags 形态 → 分支区不铺开，收为一行入口「查看条件化预判 ▾」/「收起条件化预判 ▴」（本地展开，切期段归零）；展开后铺开该档**全部**条件分支（沿用既有分支渲染与样式）。基准行（方向 + 基准 · label + 置信 + 剩余窗口）照常显示。
+- 取值口径（二选一收敛，已授权）：原空态文案「条件未成立 · 暂无已验证结论」的显示场景（`conclusion` 生效 + 无已成立分支）**整体由折叠态承接，该文案在 tags 形态下不再出现**；仅保留给 `sentence` 形态的同类场景。理由：`conclusion` 生效且无已成立分支在本组件内是同一状态，两条渲染分支会给同一状态两套 UI。
+- 到期未触发标签：折叠态下 `structured.verification === 'miss'`（卡级聚合验证口径；无新增后端字段、不写 `condition_met=false`）→ 入口旁显示中性灰「未命中」（沿用既有 miss 灰/中性色，不与 `hit` 实心绿混用）；`pending`/缺失不显示。
+- 隐藏分支纯标注：`conclusion` 生效 + 有已成立分支（非折叠态）+ 被过滤分支数 > 0 → 分支区末尾「另有 N 条条件未成立」（N = 该档 `inHorizonConditions.length − activeConditions.length`），caption 字号中性小标签、不可点开。
+- 已触发（存在 `met === true`）保持现设计：只渲染已成立分支 + `[条件成立]` 徽 + 验证标识，不折叠、不显示折叠入口。
+- `src/modules/analytics/pages/traceability.vue`：「主因板块 · 板块研判」每张 `SectorInsightCard` 之后加一行「看该板块预判 →」，跳 `/modules/market/pages/sector-detail?name=<candidate.name>`（沿用项目既有 `?name=` 入参约定）；预判内容不进主因卡（溯源/预判两轨分离不变）。
+- spec：`src/shared/components/ConditionalForecastBlock.spec.ts` 在既有用例体内补断言（查看/收起条件化预判、折叠判定的 `conditionDisplay !== 'sentence'` 守卫、`verification === 'miss'`、`另有 {{ hiddenConditionCount }} 条条件未成立`、`renderedConditions`/`toggleBranches`）——用例数不变（仍 3 条），`tests/run-node-specs.mjs` 基线维持 `248/248/0`。
+- 连带生效（同一组件语义，无额外改动）：`market/pages/sector-loop.vue` 的 CFB（`display-mode="conclusion"` + 默认 tags）同样进入折叠态；`MarketTracePrediction` 走 `condition-display="sentence"` → 折叠逻辑不生效（保持整句原文直显）。
+- 验收：`npx vue-tsc --noEmit` 0 错误（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`npx vitest run src/modules/analytics src/modules/market src/modules/fear-greed` 5 files / 42 tests passed（exit 0，无存量红）；CFB 两副本 `Compare-Object` 差异仅 helper 定义块 + App 侧 import 行，InsightCard 两副本无差异。
+
 ## 2026-09-16 洞见卡结论模式（只显示已验证结论）落地
 
 - CFB 新增 `displayMode: 'full' | 'conclusion'`（默认 `full`，向后兼容）：结论模式只渲染 `met === true` 分支，未满足分支彻底隐藏（不置灰、不提示）；该期无已成立分支时显示「条件未成立 · 暂无已验证结论」。
