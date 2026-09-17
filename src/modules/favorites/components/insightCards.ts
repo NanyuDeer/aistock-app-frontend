@@ -135,6 +135,45 @@ export function isUnattributableMovement(m: TraceEventLike): boolean {
 }
 
 /**
+ * 上海交易日键（YYYY-MM-DD）。中国无夏令时，直接按 UTC+8 固定偏移取日期，
+ * 避免依赖运行环境的本地时区。
+ */
+function shanghaiDayKey(iso: string): string {
+  const ts = safeDateParse(iso)
+  if (!ts) return ''
+  const d = new Date(ts + 8 * 60 * 60 * 1000)
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+/**
+ * 同日同股聚合：同一交易日、同一只股票的多次异动只保留"最新一条"（不分涨跌方向）。
+ *
+ * 背景：同一交易日可能因多次打点/多触发源（涨停雷达文章、午盘 11:30、尾盘 15:05）
+ * 或方向来回，产生同股同日多张异动卡片；展示层收敛为当日一张卡，展示最新异动归因。
+ *
+ * 组合用法（"最新 + 失败回退"）：先 filter(isUnattributableMovement) 再调用本函数——
+ * 不可用项已剔除，取最新即"当日最近一条有效归因"；若当日全部不可用则整组消失（与过滤口径一致）。
+ *
+ * 说明：
+ * - 分组键 = symbol（剥 SH/SZ/BJ 前缀）+ 上海交易日（activityAt 转 UTC+8 取日期）
+ * - 最新判定口径与 buildInsightCards 一致：window_end_at ?? triggered_at 的时间更大者
+ * - 不修改输入；输出顺序沿用各分组"首次出现"顺序（接口已按时间倒序，输出近似倒序）
+ */
+export function dedupeDailyMovements<T extends TraceEventLike>(items: T[]): T[] {
+  const latestByKey = new Map<string, T>()
+  for (const item of items) {
+    const at = movementActivityAt(item)
+    const key = `${normalizeSymbol(item.symbol)}@${shanghaiDayKey(at)}`
+    const prev = latestByKey.get(key)
+    if (!prev || safeDateParse(at) > safeDateParse(movementActivityAt(prev))) {
+      // Map.set 对已存在 key 不改变插入顺序 → 保留该组首次出现的位置
+      latestByKey.set(key, item)
+    }
+  }
+  return [...latestByKey.values()]
+}
+
+/**
  * 解析 forecast JSONB 取 slot（close 优先，无则 midday），返回结构化 Payload 或 null。
  * 导出供 insight-detail-move.vue / insight.vue 复用。
  */

@@ -1,5 +1,16 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-13 同日同股异动聚合（展示层收敛为当日一张卡）
+- `src/modules/favorites/components/insightCards.ts`：新增 `dedupeDailyMovements(items)` 纯函数——分组键 = symbol（剥 SH/SZ/BJ）+ 上海交易日（activityAt 经 UTC+8 取日期），组内取 `window_end_at ?? triggered_at` 最新一条；配合"先 `filter(isUnattributableMovement)`"实现"最新 + 失败回退"（当日最新归因失败时自动落到当日最近一条有效归因）。
+- 三处接入：`pages/monitor.vue`（自选股异动）、`components/AlertContent.vue`（首页洞察块 ≤6 行）、`pages/insight.vue`（自选股洞察列表）——均为 `list(20) → filter → dedupeDailyMovements → map → sort`。
+- 测试：`insightCards.spec.ts` 新增 8 例（同日多条/跨日/跨股/上海时区边界/乱序/前缀归一/window_end_at 口径/空数组，共 48 例通过）；`AlertContent.spec.ts` 新增"同日同股只渲染最新一条"1 例，并修正原 ≤6 行用例数据（改 7 只不同股票避免被聚合）。
+- 效果实测（H5 monitor 页）：无同股同日重复卡；黄河旋风当日仅 1 张；跨日同股各自保留。
+
+## 2026-09-04 monitor 移除老雷达数据源（后端 movements 持仓期 + 加入即打点配套）
+- `src/modules/favorites/pages/monitor.vue`：移除 `watchlistInsightApi.getInsights` 老雷达数据源（存量 watchlist_insight_events 08-30 起停用，含 8 月初远古涨停雷达事件）；删除 `toAlertItem`/`attributionMessage`/`confidenceLabel` 与 `WatchlistInsight` 类型依赖；列表统一只消费 `stockTraceApi.list`（movements）+ 无法归因过滤。
+- 配套后端（app-api）：`StockTraceService.listUserEvents` 可见性下界 = 当前持仓期（JOIN ON `first_triggered_at >= user_stocks.created_at`），老自选全历史+今日新触发照常、新加入股只显示加入后触发；新增"加入即打点"（addFavorites 交易时段内检测新加入 symbol）。
+- 文档：`src/modules/favorites/AGENTS.md` 更新 monitor 数据源说明。
+
 ## 2026-09-03 insight-detail-move 接入真实 forecast（Task4）
 - `src/modules/favorites/pages/insight-detail-move.vue`：新增 `forecastSlot` computed（从 `detail.forecast` 取 `close ?? midday` 解析为 `ForecastSlotPayload`）；洞见卡预判字段改为取真实 summary（不再恒空）；新增"预判区"区块渲染完整 conditions 列表（condition/scenario/anchor）；底部显示 slot 标识（基于收盘/午盘预判）。引入 `ForecastSlotPayload` 类型（来自 insightCards.ts）。
 - 文档：`src/modules/favorites/AGENTS.md` 新增预判区说明。`InsightDetailLayout.spec.ts` / `insight-detail.spec.ts` 无 forecast 相关断言，无需更新。

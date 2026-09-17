@@ -75,12 +75,11 @@ import { getMarketStatus } from '@/shared/utils/tradingTime'
 import { formatTime } from '@/shared/utils/datetime'
 import InsightAlertCard from '@/shared/components/InsightAlertCard.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
-import { watchlistInsightApi, type WatchlistInsight } from '@/shared/api/modules/insight'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { WS_BASE_URL } from '@/shared/utils/constants'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
-import { isUnattributableMovement } from '@/modules/favorites/components/insightCards'
+import { isUnattributableMovement, dedupeDailyMovements } from '@/modules/favorites/components/insightCards'
 
 interface AlertItem {
   eventId: string
@@ -115,28 +114,6 @@ function toggleAlert() {
   }
 }
 
-/** 归因结果文案：已确认展示主因 label；unconfirmed 展示待验证；其余为归因中 */
-function attributionMessage(e: WatchlistInsight): string {
-  if (e.attribution_status === 'unconfirmed') return '主因待验证'
-  if (e.attribution_status === 'confirmed' && e.primary_driver?.label) return `主因：${e.primary_driver.label}`
-  return '归因中'
-}
-
-/** 洞察条目 → 异动提醒卡片（列表/详情共用渲染结构） */
-function toAlertItem(e: WatchlistInsight): AlertItem {
-  return {
-    eventId: e.event_id,
-    symbol: e.symbol,
-    name: e.stock_name,
-    direction: e.direction || 'up',
-    type: e.event_type === 'limit_up_radar' ? '涨停雷达' : '异动',
-    eventType: e.event_type,
-    message: attributionMessage(e),
-    time: String(e.trade_date || e.created_at || ''),
-    confidence: e.confidence,
-  }
-}
-
 /** 价格异动（stocktrace 链路）→ 异动提醒卡片 */
 function movementToAlertItem(m: StockTraceEvent): AlertItem {
   let message = '待归因'
@@ -157,28 +134,18 @@ function movementToAlertItem(m: StockTraceEvent): AlertItem {
   }
 }
 
-function confidenceLabel(confidence: AlertItem['confidence']): string {
-  switch (confidence) {
-    case 'high': return '高置信'
-    case 'medium': return '中置信'
-    case 'low': return '低置信'
-    case 'unconfirmed': return '待验证'
-    default: return '归因中'
-  }
-}
-
 async function fetchAlerts() {
   loading.value = true
   try {
-    // 并行拉取涨停雷达（insights）与价格异动（movements），单个失败不影响另一个
-    const [list, page] = await Promise.all([
-      watchlistInsightApi.getInsights().catch(() => [] as WatchlistInsight[]),
-      stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] })),
-    ])
-    // 融合后按事件时间倒序：最新异动（含今日价格异动）优先展示
+    // 2026-09-04：监控页统一只消费 movements（可见性下界 = 持仓期，见后端 listUserEvents），
+    // 老涨停雷达（watchlist_insight_events 存量，08-30 起停用）不再作为列表数据源。
+    const page = await stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] }))
+    // 按事件时间倒序：最新异动优先展示
     // 无法归因的异动（unavailable/证据不足）不展示（与自选股洞察一致）
-    const items = [...list.map(toAlertItem), ...page.items.filter((m) => !isUnattributableMovement(m)).map(movementToAlertItem)]
-    alerts.value = items
+    // 2026-09-13：同一交易日同股多次异动只保留最新一条（打点照常，展示收敛为当日一张卡；
+    // 因不可归因项已先过滤，取最新即"当日最近一条有效归因"，即失败时自动回退）
+    alerts.value = dedupeDailyMovements(page.items.filter((m) => !isUnattributableMovement(m)))
+      .map(movementToAlertItem)
       .sort((a, b) => (new Date(b.time).getTime() || 0) - (new Date(a.time).getTime() || 0))
   } catch {
     // API 失败时展示空状态

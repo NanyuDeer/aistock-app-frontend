@@ -15,6 +15,10 @@
 - `pages/insight-detail-move.vue` - 洞察详情（价格异动/涨停雷达统一入口，数据源为 stocktrace movements API）
 
 > **2026-08-30 链路合并**：涨停雷达命中不再建 watchlist_insight_events（存量保留不展示）；`AlertContent.vue`（首页特别提醒）与 `pages/insight.vue`（自选股洞察列表）均只消费 `stockTraceApi.list`（movements），`watchlistInsightApi.getInsights` 不再被列表页调用（monitor.vue 等存量入口保留历史引用）。
+>
+> **2026-09-04 更新（最终语义）**：`pages/monitor.vue`（自选股异动）已移除老雷达数据源 `watchlistInsightApi.getInsights`（存量 watchlist_insight_events 08-30 起停用，含 8 月初远古涨停雷达事件），监控页统一只消费 `stockTraceApi.list`。后端 `StockTraceService.listUserEvents` 可见性下界改为**当前持仓期**（JOIN ON `e.first_triggered_at >= us.created_at`）：老自选全历史 + 今日新触发照常，新加入股只显示加入后触发/仍活跃的异动；同时新增**加入即打点**（`UserController.addFavorites` 交易时段内对新加入 symbol 调 `PriceTriggerDetector.detectSymbols`，命中即 `immediateEnqueue` 归因）。
+>
+> **2026-09-13 更新（同日同股聚合）**：同一交易日同一只股票的多次异动只展示 **1 张卡片**（打点/落库照常，仅展示收敛）。纯函数 `dedupeDailyMovements(items)`（`components/insightCards.ts`）：分组键 = symbol（剥 SH/SZ/BJ 前缀）+ **上海交易日**（`triggered_at` 经 UTC+8 取日期），组内取 `window_end_at ?? triggered_at` 最新一条。**组合口径（最新 + 失败回退）**：调用方先 `filter(isUnattributableMovement)` 再 `dedupeDailyMovements` —— 不可用项已剔除，取最新即"当日最近一条有效归因"。三处统一接入：`pages/monitor.vue`、`components/AlertContent.vue`（首页洞察块）、`pages/insight.vue`（洞察列表）。
 
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。

@@ -108,10 +108,10 @@ describe('AlertContent.vue 首页特别提醒', () => {
 
   // ===== 自选股洞察 - 旧预览 ListCell 形态 =====
 
-  it('接口成功 → 渲染 ≤6 行（mock 7 条可归因事件 → 只渲染 6 行）', async () => {
-    // 构造 7 条可归因事件
+  it('接口成功 → 渲染 ≤6 行（mock 7 只不同股票的可归因事件 → 只渲染 6 行）', async () => {
+    // 构造 7 条可归因事件（7 只不同股票，避免被同日同股聚合规则合并）
     const sevenMovements = Array.from({ length: 7 }, (_, i) => ({
-      event_id: `mv:test:${i}`, trigger_revision: 1, symbol: '600000', stock_name: `测试股${i}`,
+      event_id: `mv:test:${i}`, trigger_revision: 1, symbol: `60000${i}`, stock_name: `测试股${i}`,
       event_type: 'price' as const, direction: 'up' as const, triggered_at: '2026-08-19T10:00:00.000Z',
       latest_price: 10, previous_close: 9, change_pct: 10, threshold_pct: 7,
       severity: 'high' as const, rule_version: 'price-v1', analysis_status: 'completed' as const,
@@ -127,6 +127,29 @@ describe('AlertContent.vue 首页特别提醒', () => {
     // 验证前 6 条有标题，第 7 条不出现
     expect(cells[0].attributes('data-title')).toBe('测试股0')
     expect(cells[5].attributes('data-title')).toBe('测试股5')
+  })
+
+  it('同日同股多条异动 → 只渲染最新一条（2026-09-13 同日聚合）', async () => {
+    const base = {
+      trigger_revision: 1, event_type: 'price' as const, direction: 'up' as const,
+      latest_price: 10, previous_close: 9, change_pct: 10, threshold_pct: 7,
+      severity: 'high' as const, rule_version: 'price-v1', analysis_status: 'completed' as const,
+    }
+    const items = [
+      { ...base, event_id: 'mv:003018:morning', symbol: '003018', stock_name: '金富科技', triggered_at: '2026-09-04T01:34:00.000Z', primary_cause: '早盘主因' },
+      { ...base, event_id: 'mv:003018:afternoon', symbol: '003018', stock_name: '金富科技', triggered_at: '2026-09-04T05:47:00.000Z', primary_cause: '午后主因' },
+    ]
+    stockTraceApiMock.list.mockResolvedValue({ items, nextCursor: null })
+    const wrapper = mount(AlertContent)
+    await flushPromises()
+    const cells = wrapper.findAll('.list-cell-stub')
+    // 洞察块固定 6 行（不足补占位）：聚合后仅 1 条数据 + 5 行占位
+    expect(cells.length).toBe(6)
+    // 保留当日最新一条的归因
+    expect(cells[0].attributes('data-title')).toBe('金富科技')
+    expect(cells[0].attributes('data-description')).toContain('午后主因')
+    // 其余为占位行（非数据行）
+    expect(cells[1].attributes('data-title')).toBe('　')
   })
 
   it('过滤：混合不可归因与可归因事件 → 仅可归因行渲染', async () => {

@@ -48,7 +48,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import { parseForecastSlot, isUnattributableMovement } from '@/modules/favorites/components/insightCards'
+import { parseForecastSlot, isUnattributableMovement, dedupeDailyMovements } from '@/modules/favorites/components/insightCards'
 
 /** 统一展示模型：价格异动（stocktrace 链路） */
 interface InsightListItem {
@@ -120,8 +120,8 @@ onShow(async () => {
   try {
     // 2026-09-02 链路合并：涨停雷达事件已并入 stock-trace（movements），列表只消费 movements
     const page = await stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] }))
-    insights.value = page.items
-      .filter((m) => !isUnattributableMovement(m))
+    // 2026-09-13：同日同股多次异动只保留最新一条（先过滤不可归因 → 取当日最近一条有效归因）
+    insights.value = dedupeDailyMovements(page.items.filter((m) => !isUnattributableMovement(m)))
       .map(fromMovement)
       .sort((a, b) => b.sortTime - a.sortTime)
   } catch {
