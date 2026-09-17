@@ -2,7 +2,7 @@
  * 板块研判（sector-insight 聚合）辅助工具：候选匹配 + 本地日期。
  */
 import type { SectorInsightCandidate, SectorInsightPrediction } from '@/shared/api/modules/agent'
-import type { AttributionChain, AttributionChainChild } from '@/shared/api/modules/attributionChain'
+import type { AttributionChain, AttributionChainChild, AttributionChainEvent } from '@/shared/api/modules/attributionChain'
 import { expandConditionalBranches } from '@/shared/utils/conditionalForecast'
 
 /** 条件化预判块（ConditionalForecastBlock）的输入形态（与 InsightCard.structured 结构性一致） */
@@ -117,6 +117,10 @@ export interface SectorMarketLink {
   relation: 'self_driven' | 'market_follow' | null
   /** 本板块驱动一句话（入链时 = child.trace_summary） */
   driver: string
+  /** 本板块在链上的涨跌幅（未入链 → null）；市场洞见主因卡列表按 |pct| 降序用（spec §7.1） */
+  pct: number | null
+  /** 链上事件节点（spec §3.2-4；未入链/无命中/旧链 → []，前端按无事件渲染） */
+  events: AttributionChainEvent[]
 }
 
 /** 关系徽文案：自驱动 / 跟随大盘；未入链/unknown → 空（不渲染徽） */
@@ -126,21 +130,83 @@ export function relationLabel(relation: AttributionChainChild['relation'] | null
   return ''
 }
 
+/** 板块名归一化用的空白/括号与常见后缀（与 app-api `ThsBoardService.normName` 同口径） */
+const SECTOR_SPACE_RE = /[\s（）()]/g
+const SECTOR_SUFFIX_RE = /（A股）|\(A股\)|概念$|板块$|行业$|产业链$/g
+
+/**
+ * 板块名归一化（去空白/括号 + 去「概念/板块/行业/产业链」后缀 + 小写）。
+ * 用途：桥接两侧命名口径——链 `children[].sector` 是复盘报告里的原始板块名，
+ * 候选 `name` 是 app-api `resolveBoardName` 归一后的权威名，可能差一个后缀或空格。
+ */
+export function normalizeSectorName(name: string): string {
+  return String(name ?? '').replace(SECTOR_SPACE_RE, '').replace(SECTOR_SUFFIX_RE, '').toLowerCase()
+}
+
+/**
+ * 在当日链 children 中定位板块节点：精确同名优先，未命中回退归一化同名。
+ * **不做包含匹配**（"半导体" 与 "半导体材料" 是不同板块，包含匹配会误连；对比 `findSectorCandidate`
+ * 的包含匹配用于用户手输板块名的宽松检索，场景不同）。
+ */
+export function findChainChild(
+  chain: AttributionChain | null | undefined,
+  sectorName: string
+): AttributionChainChild | null {
+  const children = chain?.children ?? []
+  if (!sectorName) return null
+  const exact = children.find((c) => c.sector === sectorName)
+  if (exact) return exact
+  const norm = normalizeSectorName(sectorName)
+  if (!norm) return null
+  return children.find((c) => normalizeSectorName(c.sector) === norm) ?? null
+}
+
 /**
  * 由大盘归因链构建当前板块的「大盘联动」数据：
  * - 无链 → null（洞见卡溯源行回退板块四环文本形态）；
- * - 链存在 → 按板块名匹配 children（unknown/未命中 → relation=null 未入链语义）。
+ * - 链存在 → 按板块名匹配 children（精确 → 归一化；unknown/未命中 → relation=null 未入链语义）。
  */
 export function buildMarketLink(
   chain: AttributionChain | null | undefined,
   sectorName: string
 ): SectorMarketLink | null {
   if (!chain) return null
-  const node = (chain.children ?? []).find((c) => c.sector === sectorName)
+  const node = findChainChild(chain, sectorName)
   return {
     summary: chain.root?.summary?.trim() || '',
     index_pct: chain.root?.index_pct ?? null,
     relation: node?.relation && node.relation !== 'unknown' ? node.relation : null,
-    driver: node?.trace_summary?.trim() || ''
+    driver: node?.trace_summary?.trim() || '',
+    pct: node?.pct ?? null,
+    events: node?.events ?? []
   }
+}
+
+/**
+ * 市场洞见「今日影响大盘的主要板块」卡列表排序（spec §7.1）：
+ * 自驱动优先 → 按 |涨跌幅| 降序（涨跌幅取链上该板块 pct；未入链无 pct → 排末尾）。
+ * 同组同 |pct| 保持入参原序（显式带原序兜底，不依赖引擎排序稳定性）。
+ * 返回 `{ candidate, marketLink }` 对，避免页面二次匹配（口径单点）。
+ */
+export function rankSectorCandidatesByChain(
+  candidates: SectorInsightCandidate[],
+  chain: AttributionChain | null | undefined
+): Array<{ candidate: SectorInsightCandidate; marketLink: SectorMarketLink | null }> {
+  const rows = candidates.map((candidate, index) => ({
+    candidate,
+    index,
+    marketLink: buildMarketLink(chain, candidate.name)
+  }))
+  // 自驱动 = 0，其余（跟随大盘/未入链）= 1
+  const rank = (link: SectorMarketLink | null): number => (link?.relation === 'self_driven' ? 0 : 1)
+  // 无 pct（未入链/链上 pct 缺失）→ -1，天然排在所有真实 |pct| 之后（避免 -Infinity 相减出 NaN）
+  const absPct = (link: SectorMarketLink | null): number => (link?.pct == null ? -1 : Math.abs(link.pct))
+  rows.sort((a, b) => {
+    const byRank = rank(a.marketLink) - rank(b.marketLink)
+    if (byRank !== 0) return byRank
+    const byPct = absPct(b.marketLink) - absPct(a.marketLink)
+    if (byPct !== 0) return byPct
+    return a.index - b.index
+  })
+  return rows.map(({ candidate, marketLink }) => ({ candidate, marketLink }))
 }

@@ -51,6 +51,18 @@
         <text class="as-insight-card__tlk-drv-text">{{ traceStructured.detail }}</text>
       </view>
 
+      <!-- 链上事件胶囊（spec §7 事件节点：板块根因事件可跳原文；events 空则不渲染该区） -->
+      <view v-if="traceEvents.length" class="as-insight-card__events">
+        <EventRefChip
+          v-for="(ev, i) in traceEvents"
+          :key="`${i}-${ev.headline}`"
+          :headline="ev.headline"
+          :source="ev.source ?? 'search'"
+          :event-ref="ev.ref"
+          @select="emit('eventSelect', ev)"
+        />
+      </view>
+
       <!-- 依据详情（本地展开：展示溯源全文 + 板块链阶段 stages；无内容不渲染入口） -->
       <template v-if="traceDetailText || traceStages.length">
         <view class="as-insight-card__more" @tap.stop="traceExpanded = !traceExpanded">
@@ -111,6 +123,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import ConditionalForecastBlock from './ConditionalForecastBlock.vue'
+import EventRefChip from './EventRefChip.vue'
 import wordmarkPng from './insight-wordmark.png'
 import wordmarkLightPng from './insight-wordmark-light.png'
 
@@ -188,6 +201,18 @@ interface InsightLine {
 }
 
 /**
+ * 链上事件节点（链契约 children[].events，spec §3.2-4 / §7）：
+ * headline + 来源标记（warehouse 中台 / search 检索补漏）+ 引用（URL 可跳原文）。
+ */
+interface InsightTraceEvent {
+  headline: string
+  /** 事件引用：http(s) URL 可跳转；`event:<id>` / `search:<query>|<title>` 仅展示（不伪造跳转） */
+  ref?: string
+  /** 来源：warehouse=事件抓取中台 / search=板块定向检索补漏 */
+  source?: 'warehouse' | 'search'
+}
+
+/**
  * 溯源行结构化形态（V2 大盘联动，2026-09-04）：
  * 溯源蓝卡内双行展示 —— ①大盘一句话 + 指数涨跌右对齐；②板块角色徽（自驱动/跟随大盘）+ 驱动一句话。
  * 未入链（badge 缺省）时只渲染大盘行。传入优先于文本形态 trace；组件保持纯 UI。
@@ -203,6 +228,8 @@ interface InsightTraceStructured {
   detail?: string
   /** 板块自身链阶段（链式溯源 P3' 产出：现象 → 触发 → 传导 → 定价；本期仅预留渲染，无数据不渲染） */
   stages?: Array<{ name: string; text: string }>
+  /** 板块链上事件节点（2026-09-17 P3' Task 4.2；无事件/旧数据缺省 → 不渲染该区） */
+  events?: InsightTraceEvent[]
   /** 依据详情正文（缺省回退 InsightCard 的 traceDetail） */
   more?: string
 }
@@ -257,6 +284,8 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   click: []
+  /** 链上事件胶囊点击（payload = 该事件节点；跳转由调用方按平台惯例执行） */
+  eventSelect: [event: InsightTraceEvent]
 }>()
 
 const typeLabelMap: Record<InsightType, string> = {
@@ -281,6 +310,9 @@ const traceDetailText = computed(() => props.traceStructured?.more?.trim() || pr
 
 /** 板块链阶段（链式溯源 P3' 产出；无数据 → 不渲染阶段区） */
 const traceStages = computed(() => props.traceStructured?.stages ?? [])
+
+/** 板块链上事件节点（spec §7；无数据/旧数据缺省 → 不渲染事件区） */
+const traceEvents = computed(() => props.traceStructured?.events ?? [])
 
 /**
  * 带符号百分号：+1.2% / -1.2% / 0.0%。
@@ -490,6 +522,14 @@ const handleClick = () => {
   font-size: $font-size-xs;
   line-height: 1.6;
   color: var(--ins-card-tx);
+}
+
+/* ===== 链上事件胶囊区（溯源子卡内，spec §7 事件节点；胶囊样式见 EventRefChip） ===== */
+.as-insight-card__events {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-top: $s-2;
 }
 
 /* ===== 溯源「依据详情」入口与展开体（2026-09-16 结论模式配套） ===== */

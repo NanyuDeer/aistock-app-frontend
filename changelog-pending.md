@@ -1,5 +1,16 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-17 市场洞见主因区块改造（今日影响大盘的主要板块）+ 链数据提升 + 链树事件胶囊（P3' Task 4.1/4.2）
+
+- 「主因板块 · 板块研判」→「**今日影响大盘的主要板块**」（spec §7.1）：区块 `v-if` 由「有主因候选」改为「**链存在 && 有候选**」（无链整块隐藏、不占位）；卡列表改按 `rankSectorCandidatesByChain` 排序（自驱动优先 → |pct| 降序，pct 取链上该板块 pct，未入链排末尾；同组同 |pct| 保持原序）。
+- 链数据提升到页面（Task 4.1 Step 1）：`traceability.vue` 持 `chain`/`chainLoading` ref，`watch(displayedDate)` 并行 `fetchAttributionChain(date)` + `agentApi.getSectorInsight(date)`；`AttributionChainView` 改受控 props（`chain`/`loading`/`mock`，移除组件内 fetch + onMounted/watch，保留空态/加载态与 `mock` 内置演示分支——仓库内无 mock 调用方，仅演示用）。
+- 两轨分离（Task 4.1 Step 3）：`SectorInsightCard` 新增 `traceOnly`（默认 false）→ 传给 InsightCard 的 `structured` 恒 null（不渲染 CFB 预判子卡）、标题不回退预判综述（取 `candidate.trace.summary`）；主因卡传 `:market-link`（含 `events`）与 `:sector-name`，保留「依据详情 ▾」与「看该板块预判 →」。
+- 命名口径（Task 4.1 Step 3）：`buildMarketLink` 原为 `children[].sector === name` 精确匹配，而链上 `sector` 是复盘报告原始名、候选 `name` 是 `resolveBoardName` 后的权威名 → 新增 `normalizeSectorName`（与 app-api `ThsBoardService.normName` 同口径：去空白/括号 + 去 概念/板块/行业/产业链 后缀 + 小写）与 `findChainChild`（精确 → 归一化；**不做包含匹配**，避免「半导体」误连「半导体材料」）；`SectorMarketLink` 加性扩展 `pct`/`events`。
+- 链树事件胶囊（Task 4.2）：新建 `shared/components/EventRefChip.vue`（纯 UI：来源标记 中台/检索 + 摘要单行省略；`eventRef` 为 http(s) URL 才可点，emit `select(url)`，跳转由 wrapper 侧执行）；接入 `AttributionChainView`（每分支 `events`）与 `InsightCard`（`traceStructured.events` 加性扩展，空则不渲染该区，胶囊点击 emit `eventSelect`）；`SectorInsightCard` 接 `@event-select` → H5 `window.open` / App+小程序 webview 承载页（`pages-sub-app/webview/index?url=`）。两副本（`EventRefChip.vue` / `InsightCard.vue`）与组件库 SHA256 相等（`Compare-Object` 无输出）。
+- 测试（先红后绿）：新增 `src/modules/analytics/pages/traceability.mount.spec.ts`（5 条：无链不渲染区块 / 自驱动优先排序 / 角色徽 / 主因卡无 `.as-insight-card__sc` / 事件胶囊条数）与 `src/shared/components/EventRefChip.mount.spec.ts`（8 条：来源文案区分 / URL 可点 emit / 非 URL 不可点 / InsightCard 空与有值 / `eventSelect` / 链视图空与有值）；两文件已登记 `vitest.config.ts` 的 `test.include` 白名单（`tests/run-node-specs.mjs` 未改，node:test 基线保持 `248/248/0`）。
+- 验收：`npx vue-tsc --noEmit` **0 错误**（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`npx vitest run src/modules/analytics src/modules/market` 2 files / 8 tests passed（exit 0）；`npx vitest run src/shared/components` 7 files / 35 tests passed + 1 套件存量失败（`NotificationDropdown.spec.ts`：`KLineChart.vue` 的 `<script setup lang="ts">` 与 `<script module="chartView" lang="renderjs">` 编译冲突，HEAD 的 barrel 已导出 KLineChart，非本次引入，未改该文件）；组件库 `npm run type-check` 仅存量 5 条（`dev/App.vue` Segmented ×4 + `AudioPlayer.vue` ×1）。
+- 文档同步：`AGENTS.md`（InsightCard / SectorInsightCard / AttributionChainView 行 + 新增 EventRefChip 行）、`src/modules/analytics/AGENTS.md`（traceability 行）。
+
 ## 2026-09-17 CFB 折叠/过滤按 displayMode 收口（修复节奏大师洞见卡零分支）+ sentence 空态文案还原 + 新增 mount 三态护栏
 
 - 问题（复审必须项 A）：上一轮「三态判定改按已成立分支」后 `displayMode` prop 完全不再驱动 UI，折叠对所有调用方生效 → **节奏大师洞见卡**（`src/modules/rhythm/pages/index.vue:20-27` 未传 `display-mode` → 默认 `full`；其 structured 只有 conditions、无 horizons → `activeBase` 恒空；`met` 恒 null）100% 折叠，卡内只剩一行入口、核心分支内容默认不可见。

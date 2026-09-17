@@ -23,6 +23,7 @@
       :time="timeLabel"
       :structured="structured"
       :display-mode="displayMode"
+      @event-select="openEventRef"
     />
   </view>
 </template>
@@ -43,8 +44,10 @@ import type { SectorMarketLink } from '@/shared/utils/sectorInsight'
  * - candidate 命中（prediction/trace 任一存在）→ InsightCard 条件化预判形态；
  * - candidate 为空 → 严格占位（不跨日兜底，D4）。
  * 大盘联动（2026-09-04，P1 chain-attribution）：marketLink 传入时，溯源行升级为
- * InsightCard 结构化溯源（大盘一句话 + 板块角色徽 + 驱动句），优先于四环文本 trace；
+ * InsightCard 结构化溯源（大盘一句话 + 板块角色徽 + 驱动句 + 链上事件胶囊），优先于四环文本 trace；
  * 无链（marketLink=null）回退四环文本形态。板块入链但四环无内容 → 仍渲染大盘联动溯源。
+ * traceOnly（2026-09-17，P3' 两轨分离）：市场洞见主因卡只渲染溯源侧——不渲染 CFB 预判子卡、
+ * 标题不回退预判综述；其余调用方（板块详情/四环）不传 → 行为与改造前一致。
  * 复用点：风口详情页 sector-detail / 大盘溯源页 traceability（主因板块）。
  */
 const props = withDefaults(defineProps<{
@@ -60,6 +63,8 @@ const props = withDefaults(defineProps<{
   sectorName?: string
   /** 预判展示模式（spec §7）：full=全量分支；conclusion=只显示已成立分支 */
   displayMode?: 'full' | 'conclusion'
+  /** 只渲染溯源侧（spec §2.1 两轨分离）：不渲染预判子卡、标题不回退预判综述；默认 false（保持既有行为） */
+  traceOnly?: boolean
   /** 溯源「依据详情」正文（缺省取 candidate.trace.summary） */
   traceDetail?: string
 }>(), {
@@ -68,6 +73,7 @@ const props = withDefaults(defineProps<{
   marketLink: null,
   sectorName: '',
   displayMode: 'full',
+  traceOnly: false,
   traceDetail: ''
 })
 
@@ -94,9 +100,19 @@ const marketLinkFallbackTitle = computed(() => {
   return m.relation === 'self_driven' ? `${nm}为大盘主要驱动` : `${nm}随大盘联动`
 })
 
+/**
+ * traceOnly 标题（spec §2.1 两轨分离，2026-09-17 P3'）：
+ * 主因卡只承载溯源 → 标题取板块溯源主句（不回退预判综述/预判基准档，避免预判内容混入溯源轨）。
+ */
+const traceOnlyTitle = computed(() => {
+  const c = props.candidate
+  return c?.trace?.summary?.trim() || marketLinkFallbackTitle.value || c?.name || ''
+})
+
 const cardTitle = computed(() => {
   const c = props.candidate
   if (!c) return marketLinkFallbackTitle.value
+  if (props.traceOnly) return traceOnlyTitle.value
   const conclusion = c.prediction?.attribution_summary?.trim()
   if (conclusion && !REDACT_PLACEHOLDER_RE.test(conclusion)) return conclusion
   const traceSum = c.trace?.summary?.trim()
@@ -124,11 +140,14 @@ const timeLabel = computed(() => {
 })
 
 /** InsightCard 条件化预判结构化数据（映射自聚合接口 horizons/conditions/met；与 sector-loop 共用映射工具） */
-const structured = computed(() => sectorPredictionToStructured(props.candidate?.prediction))
+const structuredAll = computed(() => sectorPredictionToStructured(props.candidate?.prediction))
+
+/** 传给 InsightCard 的预判数据：traceOnly（市场洞见主因卡）恒 null → 不渲染 CFB 预判子卡（两轨分离） */
+const structured = computed(() => (props.traceOnly ? null : structuredAll.value))
 
 /**
  * 溯源行结构化数据（V2 大盘联动）：marketLink 传入 → InsightCard 结构化溯源
- * （大盘一句话行；入链时附加角色徽 + 驱动句行）；未传入 → null 回退文本形态 traceText。
+ * （大盘一句话行；入链时附加角色徽 + 驱动句行 + 链上事件胶囊）；未传入 → null 回退文本形态 traceText。
  */
 const traceStructured = computed(() => {
   const m = props.marketLink
@@ -138,7 +157,9 @@ const traceStructured = computed(() => {
     summary: m.summary,
     index_pct: m.index_pct,
     badge: m.relation ? relationLabel(m.relation) : '',
-    detail: m.driver
+    detail: m.driver,
+    // 链上事件节点（spec §7.1：驱动事件可跳原文）；无事件空数组 → InsightCard 侧不渲染该区
+    events: m.events ?? []
   }
 })
 
@@ -152,10 +173,10 @@ const traceDetailText = computed(() => {
   return sum
 })
 
-/** 四环聚合本身是否有实际洞察内容（溯源主句或预判分支任一存在） */
+/** 四环聚合本身是否有实际洞察内容（溯源主句或预判分支任一存在；traceOnly 下也用它判"有无内容"，不因隐藏预判而变空壳） */
 const hasContent = computed<boolean>(() => {
   const c = props.candidate
-  const s = structured.value
+  const s = structuredAll.value
   return Boolean(c?.trace?.summary?.trim() || s?.horizons?.length || s?.conditions?.length)
 })
 
@@ -164,6 +185,23 @@ const inChain = computed(() => Boolean(props.marketLink?.relation))
 
 /** 是否渲染洞见卡：四环有内容，或板块已入归因链 */
 const showCard = computed(() => Boolean(hasContent.value || inChain.value))
+
+const URL_RE = /^https?:\/\//i
+
+/**
+ * 链上事件胶囊 → 事件原文（仅 URL 会触发；EventRefChip 已保证非 URL 不可点）。
+ * 跨端惯例同既有事件链页：H5 新标签打开，App/小程序走 webview 承载页。
+ */
+function openEventRef(ev: { ref?: string }): void {
+  const url = ev?.ref?.trim() ?? ''
+  if (!URL_RE.test(url)) return
+  // #ifdef H5
+  window.open(url, '_blank', 'noopener')
+  // #endif
+  // #ifndef H5
+  uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
+  // #endif
+}
 </script>
 
 <style lang="scss" scoped>

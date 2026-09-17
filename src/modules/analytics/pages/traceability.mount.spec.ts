@@ -1,0 +1,227 @@
+/**
+ * 市场洞见页「今日影响大盘的主要板块」区块挂载护栏（vitest + happy-dom）。
+ *
+ * 覆盖 spec §7.1（2026-09-17 P3' 改造）与 §2.1 两轨分离：
+ * - 无链 → 整块不渲染（隐藏不占位）；
+ * - 有链 → 候选卡按「自驱动优先 → |pct| 降序」排序；
+ * - 每卡只渲染溯源侧（角色徽 + 事件胶囊），**不出现预判内容**（CFB 分支节点 `.as-insight-card__sc` 为 0）
+ *   —— 用「候选自带已成立条件（met:true）」构造最严场景：若 structured 未被 traceOnly 拦下，CFB 必渲染分支。
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+
+const h = vi.hoisted(() => ({
+  onShowCb: null as null | (() => void),
+  onUnloadCb: null as null | (() => void),
+}))
+
+const agentApiMock = vi.hoisted(() => ({
+  getMarketTraceReview: vi.fn(),
+  getSectorInsight: vi.fn(),
+  getNextTradingDay: vi.fn(),
+  getPreviousTradingDay: vi.fn(),
+}))
+vi.mock('@/shared/api/modules/agent', () => ({ agentApi: agentApiMock }))
+
+const predictionApiMock = vi.hoisted(() => ({ list: vi.fn() }))
+vi.mock('@/shared/api/modules/prediction', () => ({ predictionApi: predictionApiMock }))
+
+const chainApiMock = vi.hoisted(() => ({ fetchAttributionChain: vi.fn() }))
+vi.mock('@/shared/api/modules/attributionChain', () => chainApiMock)
+
+// 报告 → ViewModel 映射替换为最小桩：本 spec 只关心区块，不关心大盘洞见卡内容
+vi.mock('@/modules/analytics/utils/marketTraceReview', () => ({
+  toMarketTracePresentation: vi.fn(() => ({ reportTitle: '大盘洞见桩' })),
+}))
+
+vi.mock('@/modules/analytics/components/MarketInsightCard.vue', () => ({
+  default: { name: 'MarketInsightCard', props: ['presentation'], template: '<view class="mic-stub" />' },
+}))
+
+vi.mock('@/shared/components/AttributionChainView.vue', () => ({
+  default: {
+    name: 'AttributionChainView',
+    props: ['date', 'chain', 'loading', 'mock'],
+    template: '<view class="acv-stub" />',
+  },
+}))
+
+vi.mock('@/shared/components/SubPageCard.vue', () => ({
+  default: {
+    name: 'SubPageCard',
+    props: ['title'],
+    template: '<view class="subpage-stub"><slot /><slot name="header-right" /><slot name="footer" /></view>',
+  },
+}))
+
+vi.mock('@/shared/components/SvgIcon.vue', () => ({
+  default: { name: 'SvgIcon', props: ['name', 'size', 'color'], template: '<view class="svg-stub" />' },
+}))
+
+// barrel 桩：挂载页与 SectorInsightCard 的 LoadingState 均走此入口
+vi.mock('@/shared/components', () => ({
+  LoadingState: { name: 'LoadingState', props: ['size', 'text', 'layout'], template: '<view class="loading-stub" />' },
+  EmptyState: { name: 'EmptyState', props: ['title', 'description', 'text', 'icon'], template: '<view class="empty-stub" />' },
+  Button: { name: 'Button', props: ['size'], template: '<view class="btn-stub"><slot /></view>' },
+  Card: { name: 'Card', props: ['title', 'subtitle'], template: '<view class="card-stub"><slot /></view>' },
+}))
+
+vi.stubGlobal('uni', { navigateTo: vi.fn(), showToast: vi.fn() })
+
+vi.mock('@dcloudio/uni-app', () => ({
+  onShow: (cb: () => void) => {
+    h.onShowCb = cb
+  },
+  onHide: () => {},
+  onUnload: (cb: () => void) => {
+    h.onUnloadCb = cb
+  },
+}))
+
+import traceabilityPage from './traceability.vue'
+
+const DATE = '2026-09-16'
+
+type Child = {
+  sector: string
+  relation: 'self_driven' | 'market_follow' | 'unknown'
+  pct: number | null
+  trace_summary: string
+  events?: Array<{ event_id: string | null; ref: string; headline: string; source: 'warehouse' | 'search' }>
+}
+
+const chainOf = (children: Child[]) => ({
+  date: DATE,
+  root: { type: 'market' as const, date: DATE, summary: '半导体材料与券商走弱拖累大盘', index_pct: -1.2 },
+  children,
+})
+
+const evt = (id: string, headline: string, source: 'warehouse' | 'search', ref: string) => ({
+  event_id: source === 'warehouse' ? id : null,
+  ref,
+  headline,
+  source,
+})
+
+/** 候选：均带 trace + 带「已成立条件」的 prediction（两轨分离下预判内容不得出现在卡内） */
+const candidate = (
+  name: string,
+  source: 'review_primary' | 'both',
+  traceSummary: string,
+): Record<string, unknown> => ({
+  ts_code: `${name}-code.TI`,
+  name,
+  category: 'industry',
+  source,
+  quote: null,
+  trace: { present: true, status: 'completed', summary: traceSummary, sectors: [name] },
+  prediction: {
+    present: true,
+    status: 'pending',
+    attribution_summary: `${name}预判综述一句话（不得出现在主因卡）`,
+    verification: 'pending',
+    horizons: [{ horizon: 'short', label: '弱势整理', direction: 'bearish', confidence: 'medium' }],
+    conditions: [
+      { horizon: 'short', condition: `${name}放量站上20日线`, scenario: '上探+3%', met: true },
+    ],
+  },
+})
+
+const SEMI = '半导体材料'
+const BROKER = '券商'
+const POWER = '电力'
+
+/** 候选与链：半导体材料（自驱动，-3.0%）、券商（跟随，-0.8%）、电力（不在链上） */
+const candidatesFixture = [
+  candidate(BROKER, 'review_primary', '大盘情绪拖累，资金观望'),
+  candidate(POWER, 'both', '电力板块当日无链上溯源记录'),
+  candidate(SEMI, 'review_primary', '美对华设备出口限制落地，产业链避险'),
+]
+
+const chainFixture = chainOf([
+  { sector: BROKER, relation: 'market_follow', pct: -0.8, trace_summary: '大盘情绪拖累，资金观望', events: [] },
+  {
+    sector: SEMI,
+    relation: 'self_driven',
+    pct: -3,
+    trace_summary: '美对华设备出口限制落地，产业链避险',
+    events: [
+      evt('e1', '美对华设备出口限制落地', 'warehouse', 'https://news.example.com/a'),
+      evt('', '半导体材料板块定向检索命中', 'search', 'search:半导体材料|检索命中'),
+    ],
+  },
+])
+
+async function mountPage() {
+  const wrapper = mount(traceabilityPage)
+  h.onShowCb?.()
+  await flushPromises()
+  await flushPromises()
+  return wrapper
+}
+
+const titles = (wrapper: ReturnType<typeof mount>) =>
+  wrapper.findAll('.primary-sector-card .as-insight-card__title').map((n) => n.text())
+
+beforeEach(() => {
+  agentApiMock.getMarketTraceReview.mockResolvedValue({ report_date: DATE, status: 'completed' })
+  agentApiMock.getSectorInsight.mockResolvedValue({ date: DATE, hasData: true, candidates: candidatesFixture })
+  predictionApiMock.list.mockResolvedValue({ items: [] })
+  chainApiMock.fetchAttributionChain.mockResolvedValue(chainFixture)
+})
+
+afterEach(() => {
+  h.onUnloadCb?.()
+  vi.clearAllMocks()
+})
+
+describe('市场洞见页「今日影响大盘的主要板块」区块', () => {
+  it('无链（chain=null）→ 整块不渲染、不占位', async () => {
+    chainApiMock.fetchAttributionChain.mockResolvedValue(null)
+    const wrapper = await mountPage()
+
+    expect(wrapper.find('.primary-sector-block').exists()).toBe(false)
+    expect(wrapper.findAll('.primary-sector-card')).toHaveLength(0)
+  })
+
+  it('有链 → 卡片按「自驱动优先 → |pct| 降序」排序（不在链上的候选排末尾）', async () => {
+    const wrapper = await mountPage()
+
+    expect(wrapper.find('.primary-sector-block').exists()).toBe(true)
+    expect(wrapper.find('.primary-sector-title').text()).toBe('今日影响大盘的主要板块')
+    // 半导体材料（self_driven, -3.0%）> 券商（market_follow, -0.8%）> 电力（未入链）
+    expect(titles(wrapper)).toEqual([
+      '美对华设备出口限制落地，产业链避险',
+      '大盘情绪拖累，资金观望',
+      '电力板块当日无链上溯源记录',
+    ])
+    // 主因卡标题不得回退到预判综述（两轨分离）
+    expect(titles(wrapper).some((t) => t.includes('预判综述'))).toBe(false)
+  })
+
+  it('有链 → 入链卡出角色徽；未入链卡无角色徽', async () => {
+    const wrapper = await mountPage()
+    const cards = wrapper.findAll('.primary-sector-card')
+
+    expect(cards[0]!.find('.as-insight-card__tlk-badge').text()).toBe('自驱动')
+    expect(cards[1]!.find('.as-insight-card__tlk-badge').text()).toBe('跟随大盘')
+    expect(cards[2]!.find('.as-insight-card__tlk-badge').exists()).toBe(false)
+  })
+
+  it('主因卡只出溯源侧：不出现预判分支节点（.as-insight-card__sc）', async () => {
+    const wrapper = await mountPage()
+
+    expect(wrapper.findAll('.primary-sector-card')).toHaveLength(3)
+    expect(wrapper.findAll('.as-insight-card__sc')).toHaveLength(0)
+    // 溯源行仍在（角色徽驱动句）
+    expect(wrapper.findAll('.as-insight-card__tlk-badge')).toHaveLength(2)
+  })
+
+  it('链上事件透传到主因卡：事件胶囊条数 = 该板块链事件数', async () => {
+    const wrapper = await mountPage()
+    const cards = wrapper.findAll('.primary-sector-card')
+
+    expect(cards[0]!.findAll('.as-event-chip')).toHaveLength(2)
+    expect(cards[1]!.findAll('.as-event-chip')).toHaveLength(0)
+  })
+})

@@ -36,26 +36,35 @@
       <view v-else class="report-content">
         <MarketInsightCard :presentation="presentation" />
 
-        <!-- 大盘归因链（P1 chain-attribution）：大盘根 → 主驱动板块分支（relation 徽 + 一句话驱动卡）；
+        <!-- 大盘归因链（P1 chain-attribution）：大盘根 → 主驱动板块分支（relation 徽 + 一句话驱动卡 + 事件胶囊）；
+             链数据由本页拉取后受控传入（页面同时用它做主因卡排序/marketLink 匹配）；
              链空/接口失败由组件内空态承接（无链日不报错，不阻断报告内容） -->
         <view class="chain-view-block">
-          <AttributionChainView :date="displayedDate" />
+          <AttributionChainView :date="displayedDate" :chain="chain" :loading="chainLoading" />
         </view>
 
-        <!-- 主因板块 · 板块研判：仅当日存在大盘主因候选（review_primary/both）时渲染；
-             拉取失败静默置空 → 整块不渲染，不阻断主内容 -->
-        <view v-if="primarySectorCandidates.length" class="primary-sector-block">
+        <!-- 今日影响大盘的主要板块（spec §7.1）：**仅当日链存在时渲染**（无链隐藏、不占位）；
+             排序 自驱动优先 → |pct| 降序；每卡只出溯源侧（trace-only，两轨分离 §2.1）：
+             角色徽 + 事件胶囊 + 驱动句 + 依据详情，预判内容只走「看该板块预判 →」入口 -->
+        <view v-if="chain && rankedCandidates.length" class="primary-sector-block">
           <view class="primary-sector-head">
-            <text class="primary-sector-title">主因板块 · 板块研判</text>
+            <text class="primary-sector-title">今日影响大盘的主要板块</text>
             <view class="primary-sector-more" @tap="goSectorLoop">
               <text class="primary-sector-more-text">全部板块 ›</text>
             </view>
           </view>
-          <view v-for="c in primarySectorCandidates" :key="c.ts_code" class="primary-sector-card">
-            <SectorInsightCard :candidate="c" :date="displayedDate" display-mode="conclusion" />
+          <view v-for="row in rankedCandidates" :key="row.candidate.ts_code" class="primary-sector-card">
+            <SectorInsightCard
+              :candidate="row.candidate"
+              :date="displayedDate"
+              display-mode="conclusion"
+              trace-only
+              :market-link="row.marketLink"
+              :sector-name="row.candidate.name"
+            />
             <!-- 预判入口（溯源区附加链接）：点击跳该板块详情看完整预判；
                  预判内容不进主因卡（溯源/预判两轨分离不变） -->
-            <view class="primary-sector-forecast-entry" @tap="goSectorDetail(c.name)">
+            <view class="primary-sector-forecast-entry" @tap="goSectorDetail(row.candidate.name)">
               <text class="primary-sector-forecast-entry-text">看该板块预判 →</text>
             </view>
           </view>
@@ -80,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SectorInsightCard from '@/shared/components/SectorInsightCard.vue'
@@ -94,6 +103,8 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { toMarketTracePresentation, type MarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 import MarketInsightCard from '@/modules/analytics/components/MarketInsightCard.vue'
 import AttributionChainView from '@/shared/components/AttributionChainView.vue'
+import { fetchAttributionChain, type AttributionChain } from '@/shared/api/modules/attributionChain'
+import { rankSectorCandidatesByChain } from '@/shared/utils/sectorInsight'
 
 const loading = ref(false)
 const error = ref(false)
@@ -188,10 +199,28 @@ function goPredictionHistory() {
   uni.navigateTo({ url: '/modules/analytics/pages/prediction-history' })
 }
 
-/* ===== 主因板块 · 板块研判（板块四环聚合，2026-09-02） ===== */
+/* ===== 今日影响大盘的主要板块（链式溯源 P3'，2026-09-17 改造自主因板块区块） ===== */
+
+/** 当日大盘归因链（页面持有：主因卡排序 + marketLink 匹配 + 链视图展示共用一份，避免重复请求/口径漂移） */
+const chain = ref<AttributionChain | null>(null)
+const chainLoading = ref(false)
+
+/** 拉取归因链：fetchAttributionChain 内部已兜底 → null（无链日/失败均落 null），此处仅结算 loading */
+async function loadChain(d: string) {
+  if (!d) return
+  chainLoading.value = true
+  try {
+    chain.value = await fetchAttributionChain(d)
+  } finally {
+    chainLoading.value = false
+  }
+}
 
 /** 当日大盘复盘主因板块的聚合候选（source 含 review_primary）；空 → 整块不渲染 */
 const primarySectorCandidates = ref<SectorInsightCandidate[]>([])
+
+/** 主因卡列表：自驱动优先 → |pct| 降序（排序与 marketLink 匹配同源，spec §7.1） */
+const rankedCandidates = computed(() => rankSectorCandidatesByChain(primarySectorCandidates.value, chain.value))
 
 /** 拉取主因板块研判：失败静默置空，不阻断原有报告内容 */
 async function loadPrimarySectorInsight(d: string) {
@@ -207,9 +236,13 @@ async function loadPrimarySectorInsight(d: string) {
   }
 }
 
-// 复盘报告实际展示日期确定后（成功展示/切日），追加拉取主因板块研判
+// 复盘报告实际展示日期确定后（成功展示/切日），并行拉取归因链与主因板块研判
+// （链是主因区块渲染的前置：无链 → 区块整体隐藏，见模板 v-if）
 watch(displayedDate, (d) => {
-  if (d) void loadPrimarySectorInsight(d)
+  if (d) {
+    void loadChain(d)
+    void loadPrimarySectorInsight(d)
+  }
 })
 
 /** 全部板块入口：跳板块四环页并定位到当前展示日期（traceability 当日为交易日、接口按交易日落库） */
