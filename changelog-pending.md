@@ -1,5 +1,16 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-17 CFB 折叠态判定修正（按已成立分支 lit 判，不再依赖降级模式）+ 未命中标签去重
+
+- 问题（用户报障）：折叠态判定挂在 `resolvedDisplayMode === 'conclusion'`（= 当期含布尔 `met`），而后端按决策 D1 只写 `condition_met=true`、不写 false → 未触发档没有任何布尔 `met` → `hasMetData` 为假 → `resolveDisplayMode` 降级 `full` → 分支渲染源返回全部分支 → **折叠态在真实数据下不可达**。
+- 修正（CFB 两副本）：三态判定改为按「当期有无已成立分支」——① `folded = conditionDisplay !== 'sentence' && lit.length === 0 && inHorizon.length > 0`（`lit` = 当期 `met===true`，取 `selectVisibleConditions(inHorizon, 'conclusion')`；`inHorizon.length > 0` 守卫避免「该档无条件分支」时渲染出点开后空无一物的入口）→ 只显基准行 + 折叠入口「查看条件化预判 ▾ / 收起条件化预判 ▴」（本地展开后铺开该档全部分支）；② 已触发（`lit.length > 0`）只渲染 `lit` 分支 + 分支区末尾「另有 N 条条件未成立」（N = `inHorizon − lit`，仅 N>0）；③ `sentence` 形态不折叠、不过滤，维持整句原文直显。
+- 去重：folded 且 `verification === 'miss'` → 头部同义 pill「验证未中」由 `verifyText` 抑制，只保留入口行「未命中」标签；`pending`/`hit`/未折叠的 `miss` 保持既有 pill 行为不变。
+- 取值：空态文案「条件未成立 · 暂无已验证结论」在 tags 形态下不再出现（由折叠态承接）；最终保留在模板三元里仅由 `sentence` 形态命中（该档无基准行且无分支时）。
+- `resolveDisplayMode` / `hasMetData` 在组件内已无消费方：`src/shared/utils/conditionalForecast.ts` 函数与 8 条单测保留（供后续使用），App 侧 import 收窄为 `selectVisibleConditions`；CFB 的 `displayMode` prop 保留但不再驱动 UI。
+- spec：`src/shared/components/ConditionalForecastBlock.spec.ts` **用例数不变（仍 3 条）**，仅加/改断言——锚定 `litConditions`（`selectVisibleConditions(inHorizonConditions.value, 'conclusion')`、`litConditions.value.length === 0`、`if (!isFoldedUnmet.value) return litConditions.value`）+ `doesNotMatch(/resolvedDisplayMode/)` 防回归 + miss pill 抑制表达式；`tests/run-node-specs.mjs` 基线维持 `248/248/0`（未改常量）。
+- 验收：`npx vue-tsc --noEmit` **0 错误**（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`npx vitest run src/modules/analytics src/modules/market src/modules/fear-greed` 5 files / 42 tests passed（exit 0）；组件库 `npm run type-check` 仅存量 5 条（`dev/App.vue` Segmented ×4 + `AudioPlayer.vue` ×1）；两副本 `Compare-Object` 差异仅 helper 定义块（库 25 行）↔ App import 行（1 行 + 空行），InsightCard 两副本无输出。
+- 文档同步：`AGENTS.md`（CFB 行）、`src/modules/analytics/AGENTS.md`（traceability 行）。
+
 ## 2026-09-17 洞见卡未触发折叠态（查看条件化预判）+ 未命中标签 + 隐藏分支标注 + 市场洞见主因卡预判入口
 
 - CFB（两副本）：**未触发折叠态**——当前档无 `met === true` 分支、且 `conclusion` 实际生效、且 tags 形态 → 分支区不铺开，收为一行入口「查看条件化预判 ▾」/「收起条件化预判 ▴」（本地展开，切期段归零）；展开后铺开该档**全部**条件分支（沿用既有分支渲染与样式）。基准行（方向 + 基准 · label + 置信 + 剩余窗口）照常显示。
