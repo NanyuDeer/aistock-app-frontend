@@ -32,7 +32,7 @@
 import { computed } from 'vue'
 import InsightCard from './InsightCard.vue'
 import { LoadingState } from '@/shared/components'
-import { sectorPredictionToStructured, relationLabel } from '@/shared/utils/sectorInsight'
+import { sectorPredictionToStructured, relationLabel, extractionWeakLabel } from '@/shared/utils/sectorInsight'
 import type { SectorInsightCandidate } from '@/shared/api/modules/agent'
 import type { SectorMarketLink } from '@/shared/utils/sectorInsight'
 
@@ -159,7 +159,10 @@ const traceStructured = computed(() => {
     badge: m.relation ? relationLabel(m.relation) : '',
     detail: m.driver,
     // 链上事件节点（spec §7.1：驱动事件可跳原文）；无事件空数组 → InsightCard 侧不渲染该区
-    events: m.events ?? []
+    events: m.events ?? [],
+    // 弱依据（2026-09-17 R16）：链级「归因较弱」；板块级由 extraction.source 决定「依据较弱」/「无归因依据」
+    weak: m.chainWeak,
+    weakText: extractionWeakLabel(m.extraction)
   }
 })
 

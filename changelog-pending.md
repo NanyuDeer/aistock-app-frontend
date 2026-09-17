@@ -1,5 +1,17 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-17 溯源弱依据提示（R16 前端呈现）+ 角色徽匹配升级 ts_code/sector_std（R14，Task 10.2）
+
+- **数据侧已就绪、前端此前未呈现**：弱归因日（`root.evidence_weak=true` + `child.extraction={source,weak:true}`）在前端有链、有卡但看不出"依据偏弱"。本次做中性、克制的弱化呈现（不引入新色系、不用告警色）。
+- **类型加性扩展**（`src/shared/api/modules/attributionChain.ts`，全部可选，老数据零影响）：`AttributionChainRoot.evidence_weak?/attribution_status?`；`AttributionChainChild.extraction?: { source?: string; weak?: boolean }`（新增导出 `AttributionChainExtraction`）、`ts_code?: string | null`、`sector_std?: string | null`。
+- **R14 匹配优先级升级**（`src/shared/utils/sectorInsight.ts::findChainChild`）：由「`sector` 精确 → 归一化」改为 **`ts_code` 精确（去 `.TI` 后缀比较）→ `sector_std` 精确 → `sector` 精确 → 归一化（`sector` 优先、`sector_std` 兜底）**；`buildMarketLink(chain, name, { code })` 新增第三参；`rankSectorCandidatesByChain` 传 `candidate.ts_code`，`sector-detail.vue` 传 `{ code: cur.code }`。修复"链上 `sector` 是复盘原文名、候选是 THS 权威名 → 有链但角色徽/驱动句不显示"。
+- **弱标记文案单点**：新增纯函数 `extractionWeakLabel(extraction)`——`weak !== true` → `''`（不渲染）；`source === 'snapshot'` → 「无归因依据」（纯快照异动兜底、无归因理由）；其余（`candidate_claim`）→ 「依据较弱」。`SectorMarketLink` 加性扩展 `chainWeak: boolean` + `extraction: AttributionChainExtraction | null`。
+- **UI（中性灰，克制）**：① 链级 —— `InsightCard` 溯源蓝卡摘要行旁「归因较弱」（`traceStructured.weak`），并沿用 `root.summary`（弱归因日的中性摘要「证据不足，未确认主因」）作一句话行；市场洞见页主因区块标题「今日影响大盘的主要板块」旁同款小标（`.primary-sector-weak`，`chainWeak`）。② 板块级 —— 溯源子卡角色徽驱动行旁「依据较弱」/「无归因依据」（`traceStructured.weakText`）与 `AttributionChainView` 板块行关系徽旁同款（`.acv-weak`）。三者均**可选渲染**：字段缺失（老数据/正常日）零标记、零变化；样式走 CSS 变量 `--ins-weak-bd/--ins-weak-tx`（light/dark 双套），未用红绿涨跌色与告警色。
+- **两副本同步**：`aistock-component-lib/src/components/InsightCard.vue` 做同样改动（模板 2 处 + 接口 2 字段 + 样式 1 块 + 2 个 CSS 变量）；本次改动块两副本 `git diff` 正文各 30 行、`Compare-Object` **0 行差异**；全文件仍差 55 行 = **HEAD 已存在的允许差异**（app-only `lineStyle`/`plain-lines`，HEAD 实测 app 4 处 / 库 0 处）。`AttributionChainView.vue` 在组件库无对应文件（App 专属 wrapper），无需镜像。
+- **测试（先红后绿）**：`traceability.mount.spec.ts` 新增 5 条（零弱标记回归 / `ts_code` 优先命中 / `sector_std` 次优先命中 / 弱归因日链级 + 板块级文案分流 + `root.summary` 保留）；`EventRefChip.mount.spec.ts` 新增 2 条（`AttributionChainView` 板块行弱标记：缺省与非 `true` 不渲染 / `snapshot` vs `candidate_claim` 文案）。红验：临时关闭 `findChainChild` 的 `ts_code` 分支 → `ts_code` 优先用例失败（`Cannot call text on an empty DOMWrapper`），还原后转绿。两 spec 均已在 `vitest.config.ts` `test.include` 白名单内（**未新增文件**，node:test 基线不受影响）。
+- 验收：`npx vue-tsc --noEmit` exit 0（**0 错误**）；`npm run test:node` **248/248/0**（exit 0）；`npx vitest run` 5 files / 4 tests 失败（与既有基线 5 files / 4 tests 完全一致，零新增）；组件库 `npm run type-check` 仅存量 5 条（`dev/App.vue` Segmented ×4 + `AudioPlayer.vue` ×1），零新增。
+- 文档同步：`AGENTS.md`（`attributionChain.ts` / `InsightCard` / `SectorInsightCard` / `AttributionChainView` 行）、`src/modules/analytics/AGENTS.md`（traceability 行）、`src/modules/market/AGENTS.md`（归因链类型消费方，顺带修正 sector-detail「待接入」陈旧表述）。
+
 ## 2026-09-17 到期未触发（condition_met=false）口径复核 + CFB mount 用例（Task 6.1）
 
 - **结论：组件无需改动**（后端 Task 6.1 起到期对未触发条件写 `condition_met=false`）。CFB 的折叠/过滤/「未命中」

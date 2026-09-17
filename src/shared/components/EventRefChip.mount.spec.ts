@@ -131,3 +131,38 @@ describe('AttributionChainView 板块分支事件胶囊', () => {
     expect(wrapper.findAll('.as-event-chip__src').map((n) => n.text())).toEqual(['中台', '检索'])
   })
 })
+
+describe('AttributionChainView 板块行弱依据标记（R16，2026-09-17）', () => {
+  const chainWith = (extraction?: { source?: string; weak?: boolean }) => ({
+    date: '2026-09-16',
+    root: { type: 'market' as const, date: '2026-09-16', summary: '证据不足，未确认主因', index_pct: -0.411 },
+    children: [
+      {
+        sector: '黄金概念',
+        relation: 'self_driven' as const,
+        pct: -1.87,
+        trace_summary: '避险资金流出',
+        ...(extraction === undefined ? {} : { extraction }),
+      },
+    ],
+  })
+
+  it('extraction 缺省 / weak 非 true → 不渲染弱标记（老数据与正常日零变化）', () => {
+    for (const ex of [undefined, { source: 'snapshot' }, { source: 'candidate_claim', weak: false }]) {
+      const wrapper = mount(AttributionChainView, { props: { date: '2026-09-16', chain: chainWith(ex) } })
+      expect(wrapper.find('.acv-weak').exists()).toBe(false)
+    }
+  })
+
+  it('extraction.weak=true → 中性灰标记文案按 source 分流（snapshot=无归因依据 / candidate_claim=依据较弱）', () => {
+    const snapshot = mount(AttributionChainView, {
+      props: { date: '2026-09-16', chain: chainWith({ source: 'snapshot', weak: true }) },
+    })
+    expect(snapshot.find('.acv-weak').text()).toBe('无归因依据')
+
+    const claim = mount(AttributionChainView, {
+      props: { date: '2026-09-16', chain: chainWith({ source: 'candidate_claim', weak: true }) },
+    })
+    expect(claim.find('.acv-weak').text()).toBe('依据较弱')
+  })
+})

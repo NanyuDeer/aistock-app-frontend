@@ -646,7 +646,8 @@ async function loadSectorInsight() {
     ])
     sectorInsight.value = findSectorCandidate(res?.candidates ?? [], { name: cur.name, code: cur.code })
     // 大盘联动：同日归因链命中当前板块 → 溯源行升级为「大盘一句话 + 角色徽 + 驱动句」；无链 → null 回退
-    marketLink.value = buildMarketLink(chain, cur.name)
+    // R14（2026-09-17）：先按板块 code 精确匹配链上快照行码，未命中回退名称口径
+    marketLink.value = buildMarketLink(chain, cur.name, { code: cur.code })
   } catch (error) {
     console.error('板块研判加载失败:', error)
     sectorInsight.value = null

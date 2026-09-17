@@ -48,7 +48,11 @@
              角色徽 + 事件胶囊 + 驱动句 + 依据详情，预判内容只走「看该板块预判 →」入口 -->
         <view v-if="chain && rankedCandidates.length" class="primary-sector-block">
           <view class="primary-sector-head">
-            <text class="primary-sector-title">今日影响大盘的主要板块</text>
+            <view class="primary-sector-head-left">
+              <text class="primary-sector-title">今日影响大盘的主要板块</text>
+              <!-- 链级弱依据标记（root.evidence_weak=true：当日大盘未确认主因）中性灰小字，非告警色 -->
+              <text v-if="chainWeak" class="primary-sector-weak">归因较弱</text>
+            </view>
             <view class="primary-sector-more" @tap="goSectorLoop">
               <text class="primary-sector-more-text">全部板块 ›</text>
             </view>
@@ -222,6 +226,9 @@ const primarySectorCandidates = ref<SectorInsightCandidate[]>([])
 /** 主因卡列表：自驱动优先 → |pct| 降序（排序与 marketLink 匹配同源，spec §7.1） */
 const rankedCandidates = computed(() => rankSectorCandidatesByChain(primarySectorCandidates.value, chain.value))
 
+/** 链级弱依据（root.evidence_weak=true：当日大盘未确认主因，2026-09-17 R16）→ 区块标题旁中性灰「归因较弱」 */
+const chainWeak = computed(() => chain.value?.root?.evidence_weak === true)
+
 /** 拉取主因板块研判：失败静默置空，不阻断原有报告内容 */
 async function loadPrimarySectorInsight(d: string) {
   if (!d) return
@@ -363,10 +370,29 @@ onUnload(stopRefreshTimer)
   margin: $spacing-sm 0 $spacing-xs;
 }
 
+.primary-sector-head-left {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  min-width: 0;
+}
+
 .primary-sector-title {
   font-size: 28rpx;
   font-weight: 600;
   color: $text-color-title;
+}
+
+/* 链级弱依据标记：中性灰描边小字（2026-09-17 R16；弱化呈现，刻意不用告警色） */
+.primary-sector-weak {
+  flex-shrink: 0;
+  padding: 2rpx 10rpx;
+  border: 2rpx solid $line-strong;
+  border-radius: $r-xs;
+  font-size: $font-size-xs;
+  font-weight: 400;
+  line-height: 1.6;
+  color: $ink-mute;
 }
 
 .primary-sector-more {

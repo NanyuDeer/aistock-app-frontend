@@ -224,4 +224,95 @@ describe('市场洞见页「今日影响大盘的主要板块」区块', () => {
     expect(cards[0]!.findAll('.as-event-chip')).toHaveLength(2)
     expect(cards[1]!.findAll('.as-event-chip')).toHaveLength(0)
   })
+
+  it('老数据/正常日（无 evidence_weak / extraction）→ 零弱标记', async () => {
+    const wrapper = await mountPage()
+
+    expect(wrapper.find('.primary-sector-weak').exists()).toBe(false)
+    expect(wrapper.findAll('.as-insight-card__weak')).toHaveLength(0)
+  })
+
+  it('R14：链上 sector 名与候选不一致时，按 ts_code 精确匹配仍出角色徽/驱动句', async () => {
+    chainApiMock.fetchAttributionChain.mockResolvedValue({
+      date: DATE,
+      root: { type: 'market', date: DATE, summary: '复盘原文名与权威名不一致', index_pct: -1.2 },
+      children: [
+        {
+          // sector 用复盘原文名、sector_std 用另一个权威名 → 名称口径全不命中，只能靠 ts_code 命中
+          sector: '半导体材料(复盘原文)',
+          sector_std: '半导体材料Ⅱ',
+          ts_code: `${SEMI}-code.TI`,
+          relation: 'self_driven',
+          pct: -3,
+          trace_summary: '链上驱动句',
+        },
+      ],
+    })
+    const wrapper = await mountPage()
+    const card = wrapper.findAll('.primary-sector-card')[0]!
+
+    expect(card.find('.as-insight-card__tlk-badge').text()).toBe('自驱动')
+    expect(card.find('.as-insight-card__tlk-drv-text').text()).toBe('链上驱动句')
+  })
+
+  it('R14：无 ts_code 时按 sector_std 精确命中（次优先）', async () => {
+    chainApiMock.fetchAttributionChain.mockResolvedValue({
+      date: DATE,
+      root: { type: 'market', date: DATE, summary: '仅权威名可比', index_pct: -1.2 },
+      children: [
+        {
+          sector: '半导体材料(复盘原文)',
+          sector_std: SEMI,
+          relation: 'self_driven',
+          pct: -3,
+          trace_summary: '权威名命中驱动句',
+        },
+      ],
+    })
+    const wrapper = await mountPage()
+    const card = wrapper.findAll('.primary-sector-card')[0]!
+
+    expect(card.find('.as-insight-card__tlk-badge').text()).toBe('自驱动')
+    expect(card.find('.as-insight-card__tlk-drv-text').text()).toBe('权威名命中驱动句')
+  })
+
+  it('弱归因日：链级「归因较弱」+ 板块级按 extraction.source 分流（依据较弱 / 无归因依据）', async () => {
+    chainApiMock.fetchAttributionChain.mockResolvedValue({
+      date: DATE,
+      root: {
+        type: 'market',
+        date: DATE,
+        summary: '证据不足，未确认主因',
+        index_pct: -0.411,
+        attribution_status: 'hypothesis',
+        evidence_weak: true,
+      },
+      children: [
+        {
+          sector: SEMI,
+          relation: 'self_driven',
+          pct: -1.87,
+          trace_summary: '美对华设备出口限制落地，产业链避险',
+          extraction: { source: 'candidate_claim', weak: true },
+        },
+        {
+          sector: BROKER,
+          relation: 'market_follow',
+          pct: -0.8,
+          trace_summary: '大盘情绪拖累，资金观望',
+          extraction: { source: 'snapshot', weak: true },
+        },
+      ],
+    })
+    const wrapper = await mountPage()
+    const cards = wrapper.findAll('.primary-sector-card')
+
+    // 链级：区块标题旁中性灰「归因较弱」
+    expect(wrapper.find('.primary-sector-weak').text()).toBe('归因较弱')
+    // 板块级：溯源子卡内标记文案按 source 分流（首条为链级标记、次条为板块级标记）
+    expect(cards[0]!.findAll('.as-insight-card__weak').map((n) => n.text())).toEqual(['归因较弱', '依据较弱'])
+    expect(cards[1]!.findAll('.as-insight-card__weak').map((n) => n.text())).toEqual(['归因较弱', '无归因依据'])
+    // 溯源子卡保留 root.summary 作为一句话行（弱归因日的中性摘要）
+    expect(cards[0]!.find('.as-insight-card__tlk-sum').text()).toBe('证据不足，未确认主因')
+  })
 })

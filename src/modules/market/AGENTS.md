@@ -25,7 +25,7 @@
 - 其他模块通过 navigateTo 跳转到异动捕手或长线风口页面
 
 ## 依赖的 shared/ 中的类型
-- `@/shared/api/modules/attributionChain` - 大盘归因链 API（2026-09-04 提升至共享层；`fetchAttributionChain(date)` → `GET /api/agent/attribution-chain/:date`，返回 `{date, chain|null}`；无链/失败返回 null；类型 `AttributionChain`/`AttributionChainChild` 同文件导出；消费方：analytics/traceability 经共享组件 AttributionChainView，sector-detail「大盘联动」待接入）
+- `@/shared/api/modules/attributionChain` - 大盘归因链 API（2026-09-04 提升至共享层；`fetchAttributionChain(date)` → `GET /api/agent/attribution-chain/:date`，返回 `{date, chain|null}`；无链/失败返回 null；类型 `AttributionChain`/`AttributionChainChild` 同文件导出；消费方：analytics/traceability 经共享组件 AttributionChainView、sector-detail「大盘联动」（`buildMarketLink(chain, name, { code })`，2026-09-17 R14 起按 `ts_code` 优先匹配）；弱依据字段 `root.evidence_weak` / `child.extraction` 由 `SectorInsightCard` → `InsightCard` 弱化呈现（2026-09-17 R16））
 - `@/shared/api/modules/stock` - 股票 API（含 getTrendEvents、getFavoritesNews、getWindLeaders）
 - `@/shared/utils/stock` - 股票格式化工具
 - `@/shared/utils/datetime` - 日期时间格式化

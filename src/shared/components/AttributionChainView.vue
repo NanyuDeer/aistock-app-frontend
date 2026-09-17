@@ -31,6 +31,9 @@
         <view v-for="c in sortedChildren" :key="c.sector" class="acv-child">
           <view class="acv-child-row">
             <text class="acv-badge" :class="'rel-' + c.relation">{{ relText(c.relation) }}</text>
+            <!-- 板块级弱依据标记（child.extraction.weak=true，2026-09-17 R16）：
+                 snapshot=纯异动兜底无归因理由 →「无归因依据」；candidate_claim →「依据较弱」；缺省不渲染 -->
+            <text v-if="weakTextOf(c)" class="acv-weak">{{ weakTextOf(c) }}</text>
             <text class="acv-sec">{{ c.sector }}</text>
             <text v-if="c.pct != null" class="acv-pct" :class="pctCls(c.pct)">{{ fmtPct(c.pct) }}</text>
           </view>
@@ -56,6 +59,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { AttributionChain, AttributionChainChild } from '@/shared/api/modules/attributionChain'
+import { extractionWeakLabel } from '@/shared/utils/sectorInsight'
 import EventRefChip from './EventRefChip.vue'
 
 /**
@@ -113,6 +117,11 @@ function relText(relation: AttributionChainChild['relation']): string {
   if (relation === 'self_driven') return '自驱动'
   if (relation === 'market_follow') return '跟随大盘'
   return '关系未知'
+}
+
+/** 板块级弱依据标记文案（2026-09-17 R16；口径单点在 sectorInsight.extractionWeakLabel） */
+function weakTextOf(c: AttributionChainChild): string {
+  return extractionWeakLabel(c.extraction)
 }
 
 /**
@@ -285,6 +294,17 @@ const sortedChildren = computed(() => {
 .acv-badge.rel-unknown {
   color: $ink-faint;
   border-color: $line;
+}
+
+/* 弱依据标记：中性灰描边小标（2026-09-17 R16 弱归因日；弱化呈现，刻意不用告警色/涨跌色） */
+.acv-weak {
+  flex-shrink: 0;
+  padding: 2rpx 10rpx;
+  border: 2rpx solid $line-strong;
+  border-radius: $r-xs;
+  color: $ink-mute;
+  font-size: $font-size-xs;
+  line-height: 1.6;
 }
 
 .acv-sec {

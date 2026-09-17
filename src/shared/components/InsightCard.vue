@@ -38,6 +38,8 @@
       <text class="as-insight-card__key">溯源</text>
       <view class="as-insight-card__tlk">
         <text class="as-insight-card__tlk-sum">{{ traceStructured.summary }}</text>
+        <!-- 链级弱依据标记（root.evidence_weak=true：当日大盘未确认主因）中性灰小标，非告警色 -->
+        <text v-if="traceStructured.weak" class="as-insight-card__weak">归因较弱</text>
         <text
           v-if="traceStructured.index_pct != null"
           class="as-insight-card__tlk-pct"
@@ -46,8 +48,10 @@
           {{ fmtSignedPct(traceStructured.index_pct) }}
         </text>
       </view>
-      <view v-if="traceStructured.badge" class="as-insight-card__tlk-drv">
-        <text class="as-insight-card__tlk-badge">{{ traceStructured.badge }}</text>
+      <view v-if="traceStructured.badge || traceStructured.weakText" class="as-insight-card__tlk-drv">
+        <text v-if="traceStructured.badge" class="as-insight-card__tlk-badge">{{ traceStructured.badge }}</text>
+        <!-- 板块级弱依据标记（child.extraction.weak=true）：snapshot 兜底无归因理由 →「无归因依据」 -->
+        <text v-if="traceStructured.weakText" class="as-insight-card__weak">{{ traceStructured.weakText }}</text>
         <text class="as-insight-card__tlk-drv-text">{{ traceStructured.detail }}</text>
       </view>
 
@@ -232,6 +236,10 @@ interface InsightTraceStructured {
   events?: InsightTraceEvent[]
   /** 依据详情正文（缺省回退 InsightCard 的 traceDetail） */
   more?: string
+  /** 链级弱依据（2026-09-17 R16：root.evidence_weak=true，当日大盘未确认主因）→ 摘要行旁中性灰「归因较弱」 */
+  weak?: boolean
+  /** 板块级弱依据标记文案（child.extraction.weak=true：「依据较弱」/「无归因依据」）；缺省 → 不渲染 */
+  weakText?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -429,6 +437,9 @@ const handleClick = () => {
   /* 结构化溯源涨跌（A 股红涨绿跌，随主题切换明暗） */
   --ins-up: #e03e3e;
   --ins-down: #0e9f5f;
+  /* 弱依据标记（中性灰，2026-09-17 R16；刻意不用告警色/涨跌色） */
+  --ins-weak-bd: #dfe3ea;
+  --ins-weak-tx: #8a929e;
 }
 
 .as-insight-card--dark {
@@ -441,6 +452,8 @@ const handleClick = () => {
   --ins-card-tx: rgba(255, 255, 255, 0.74);
   --ins-up: #f87171;
   --ins-down: #34d399;
+  --ins-weak-bd: rgba(255, 255, 255, 0.18);
+  --ins-weak-tx: rgba(255, 255, 255, 0.58);
 }
 
 .as-insight-card__line {
@@ -522,6 +535,19 @@ const handleClick = () => {
   font-size: $font-size-xs;
   line-height: 1.6;
   color: var(--ins-card-tx);
+}
+
+/* 弱依据标记：中性灰描边小标（链级「归因较弱」/ 板块级「依据较弱」「无归因依据」，2026-09-17 R16）。
+   弱化呈现、刻意避开告警色与涨跌色；字段缺失（老数据/正常日）时标记不渲染、零变化。 */
+.as-insight-card__weak {
+  flex-shrink: 0;
+  padding: 2rpx 10rpx;
+  border: 1rpx solid var(--ins-weak-bd);
+  border-radius: $r-md;
+  font-size: $font-size-xs;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--ins-weak-tx);
 }
 
 /* ===== 链上事件胶囊区（溯源子卡内，spec §7 事件节点；胶囊样式见 EventRefChip） ===== */

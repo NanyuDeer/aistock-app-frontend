@@ -2,7 +2,7 @@
  * 板块研判（sector-insight 聚合）辅助工具：候选匹配 + 本地日期。
  */
 import type { SectorInsightCandidate, SectorInsightPrediction } from '@/shared/api/modules/agent'
-import type { AttributionChain, AttributionChainChild, AttributionChainEvent } from '@/shared/api/modules/attributionChain'
+import type { AttributionChain, AttributionChainChild, AttributionChainEvent, AttributionChainExtraction } from '@/shared/api/modules/attributionChain'
 import { expandConditionalBranches } from '@/shared/utils/conditionalForecast'
 
 /** 条件化预判块（ConditionalForecastBlock）的输入形态（与 InsightCard.structured 结构性一致） */
@@ -121,6 +121,10 @@ export interface SectorMarketLink {
   pct: number | null
   /** 链上事件节点（spec §3.2-4；未入链/无命中/旧链 → []，前端按无事件渲染） */
   events: AttributionChainEvent[]
+  /** 链级弱依据（root.evidence_weak=true：当日大盘未确认主因，2026-09-17 R16） */
+  chainWeak: boolean
+  /** 本板块的兜底来源标记（未入链/正常日 → null）；展示文案由 extractionWeakLabel 单点产出 */
+  extraction: AttributionChainExtraction | null
 }
 
 /** 关系徽文案：自驱动 / 跟随大盘；未入链/unknown → 空（不渲染徽） */
@@ -144,41 +148,78 @@ export function normalizeSectorName(name: string): string {
 }
 
 /**
- * 在当日链 children 中定位板块节点：精确同名优先，未命中回退归一化同名。
+ * 在当日链 children 中定位板块节点（R14 匹配优先级，2026-09-17 升级）：
+ * ① `ts_code` 精确（去交易所后缀比较）→ ② `sector_std` 精确（归一化权威名） →
+ * ③ `sector` 精确（复盘报告原始名）→ ④ 现有归一化比较（`sector` 优先，其次 `sector_std`）。
+ * 起因：链 `children[].sector` 是复盘原文名、候选是 THS 权威名，仅靠"精确名 → 归一化名"
+ * 会出现"有链但角色徽/驱动句不显示"；链路侧已补 `ts_code`（快照行码）与 `sector_std`。
  * **不做包含匹配**（"半导体" 与 "半导体材料" 是不同板块，包含匹配会误连；对比 `findSectorCandidate`
  * 的包含匹配用于用户手输板块名的宽松检索，场景不同）。
  */
 export function findChainChild(
   chain: AttributionChain | null | undefined,
-  sectorName: string
+  sectorName: string,
+  opts?: { code?: string | null }
 ): AttributionChainChild | null {
   const children = chain?.children ?? []
-  if (!sectorName) return null
-  const exact = children.find((c) => c.sector === sectorName)
+  if (!children.length) return null
+
+  const code = opts?.code?.trim()
+  if (code) {
+    const bare = stripExchangeSuffix(code)
+    const byCode = children.find((c) => {
+      const t = c.ts_code?.trim()
+      return Boolean(t) && stripExchangeSuffix(t as string) === bare
+    })
+    if (byCode) return byCode
+  }
+
+  const name = sectorName?.trim()
+  if (!name) return null
+  const exact = children.find((c) => c.sector_std === name) ?? children.find((c) => c.sector === name)
   if (exact) return exact
-  const norm = normalizeSectorName(sectorName)
+  const norm = normalizeSectorName(name)
   if (!norm) return null
-  return children.find((c) => normalizeSectorName(c.sector) === norm) ?? null
+  return (
+    children.find((c) => normalizeSectorName(c.sector) === norm) ??
+    children.find((c) => normalizeSectorName(c.sector_std ?? '') === norm) ??
+    null
+  )
+}
+
+/**
+ * 板块级弱依据标记文案（2026-09-17 R16，单点口径）：
+ * - `extraction.weak !== true` → ''（老数据/正常日/未入链 → 不渲染任何标记）；
+ * - `source === 'snapshot'` → 「无归因依据」（纯快照异动兜底，无归因理由）；
+ * - 其余（`candidate_claim` 等）→ 「依据较弱」。
+ */
+export function extractionWeakLabel(extraction: AttributionChainExtraction | null | undefined): string {
+  if (extraction?.weak !== true) return ''
+  return extraction.source === 'snapshot' ? '无归因依据' : '依据较弱'
 }
 
 /**
  * 由大盘归因链构建当前板块的「大盘联动」数据：
  * - 无链 → null（洞见卡溯源行回退板块四环文本形态）；
- * - 链存在 → 按板块名匹配 children（精确 → 归一化；unknown/未命中 → relation=null 未入链语义）。
+ * - 链存在 → 按板块名/代码匹配 children（ts_code → sector_std → sector → 归一化；
+ *   unknown/未命中 → relation=null 未入链语义）。
  */
 export function buildMarketLink(
   chain: AttributionChain | null | undefined,
-  sectorName: string
+  sectorName: string,
+  opts?: { code?: string | null }
 ): SectorMarketLink | null {
   if (!chain) return null
-  const node = findChainChild(chain, sectorName)
+  const node = findChainChild(chain, sectorName, opts)
   return {
     summary: chain.root?.summary?.trim() || '',
     index_pct: chain.root?.index_pct ?? null,
     relation: node?.relation && node.relation !== 'unknown' ? node.relation : null,
     driver: node?.trace_summary?.trim() || '',
     pct: node?.pct ?? null,
-    events: node?.events ?? []
+    events: node?.events ?? [],
+    chainWeak: chain.root?.evidence_weak === true,
+    extraction: node?.extraction ?? null
   }
 }
 
@@ -195,7 +236,8 @@ export function rankSectorCandidatesByChain(
   const rows = candidates.map((candidate, index) => ({
     candidate,
     index,
-    marketLink: buildMarketLink(chain, candidate.name)
+    // R14：先按候选 ts_code 精确匹配链上快照行码（修复"有链但角色徽不显示"），未命中回退名称口径
+    marketLink: buildMarketLink(chain, candidate.name, { code: candidate.ts_code })
   }))
   // 自驱动 = 0，其余（跟随大盘/未入链）= 1
   const rank = (link: SectorMarketLink | null): number => (link?.relation === 'self_driven' ? 0 : 1)
