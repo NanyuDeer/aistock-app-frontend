@@ -1,5 +1,15 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-17 CFB 折叠/过滤按 displayMode 收口（修复节奏大师洞见卡零分支）+ sentence 空态文案还原 + 新增 mount 三态护栏
+
+- 问题（复审必须项 A）：上一轮「三态判定改按已成立分支」后 `displayMode` prop 完全不再驱动 UI，折叠对所有调用方生效 → **节奏大师洞见卡**（`src/modules/rhythm/pages/index.vue:20-27` 未传 `display-mode` → 默认 `full`；其 structured 只有 conditions、无 horizons → `activeBase` 恒空；`met` 恒 null）100% 折叠，卡内只剩一行入口、核心分支内容默认不可见。
+- 修正（CFB 两副本，最小改动）：① `isFoldedUnmet` 前置 `props.displayMode === 'conclusion'`；② `renderedConditions` 前置 `if (props.displayMode !== 'conclusion') return inHorizonConditions.value`（恢复改造前 full 全量行为）；③ `showHiddenBranchLabel` 与 `showMissTag` 同样以 `displayMode === 'conclusion'` 收口（「另有 N 条条件未成立」与「未命中」标签只在结论模式出现）；④ `litConditions = selectVisibleConditions(inHorizonConditions, 'conclusion')` 口径不变，`resolveDisplayMode` / `hasMetData` 仍保留（无消费方，函数与单测保留）；`displayMode` prop 的 JSDoc 同步改为「折叠/过滤/隐藏标注/未命中标签一律以此收口」。
+- 行为分档：`full`（rhythm / 未传 display-mode）→ 全量分支 + 既有 pill/空态（与改造前一致，无折叠入口）；`conclusion`（sector-detail / sector-loop / traceability）→ 三态不变（未触发折叠 / 只显已触发 / 到期未触发 + 入口行「未命中」且抑制头部同义 pill）。
+- 空态文案还原（附带项 B）：模板三元改回 `conditionDisplay === 'sentence' ? '该期暂无细分情景' : '条件未成立 · 暂无已验证结论'`（sentence 恢复改造前原文案）；`ConditionalForecastBlock.spec.ts` 中该串断言同步改锚定整个三元表达式，**用例数不变（仍 3 条）**。
+- 新增挂载护栏（附带项 C）：`src/shared/components/ConditionalForecastBlock.mount.spec.ts`（vitest + happy-dom，5 条）——① conclusion + 全无 met → 有折叠入口且分支节点 0；② 点开入口 → 分支节点 == 该档 conditions 数；③ conclusion + 一条 `met:true` → 「条件成立」徽 + 无折叠入口 + 「另有 1 条条件未成立」；④ `verification:'miss'` + 折叠态 → 「未命中」且头部 `.as-insight-card__verify` 不渲染；⑤ full / 不传 display-mode → 分支节点 == conditions 数且无折叠入口（A 的回归护栏，反向变异实测可捕获）。新文件已登记进 `vitest.config.ts` 的 `test.include` 白名单（`tests/run-node-specs.mjs` 未改，node:test 计数保持 `248/248/0`）。
+- 验收：`npx vue-tsc --noEmit` **0 错误**（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`node --import tsx --test src/shared/components/ConditionalForecastBlock.spec.ts src/shared/utils/conditionalForecast.spec.ts` 11/11 passed；`npx vitest run src/shared/components/ConditionalForecastBlock.mount.spec.ts src/modules/analytics src/modules/market src/modules/rhythm src/modules/fear-greed` 6 files / 47 tests passed（exit 0，无存量红）；组件库 `npm run type-check` 仅存量 5 条（`dev/App.vue` Segmented ×4 + `AudioPlayer.vue` ×1）。两副本 `Compare-Object` 差异仍仅内联 helper 定义块（库 233-257，25 行）↔ App import 行（161 行 + 空行），切除后逐行相等；`InsightCard.vue` 两副本一致。
+- 文档同步：`AGENTS.md`（CFB 行）、`src/modules/analytics/AGENTS.md`（traceability 行）。
+
 ## 2026-09-17 CFB 折叠态判定修正（按已成立分支 lit 判，不再依赖降级模式）+ 未命中标签去重
 
 - 问题（用户报障）：折叠态判定挂在 `resolvedDisplayMode === 'conclusion'`（= 当期含布尔 `met`），而后端按决策 D1 只写 `condition_met=true`、不写 false → 未触发档没有任何布尔 `met` → `hasMetData` 为假 → `resolveDisplayMode` 降级 `full` → 分支渲染源返回全部分支 → **折叠态在真实数据下不可达**。

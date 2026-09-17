@@ -16,7 +16,11 @@ test('单档守卫：watchEffect 把 activeHorizon 初始化为唯一档（防 s
 
 test('单档守卫：v-if 精确落在 __seg 容器上（非注释/非其他节点）', () => {
   assert.match(source, /<view v-if="horizonSegments\.length > 1" class="as-insight-card__seg">/)
-  assert.match(source, /条件未成立 · 暂无已验证结论/)
+  // 空态文案（B 还原）：sentence 形态恢复改造前原文案「该期暂无细分情景」（tags 形态沿用结论空态文案）
+  assert.match(
+    source,
+    /conditionDisplay === 'sentence' \? '该期暂无细分情景' : '条件未成立 · 暂无已验证结论'/
+  )
 
   // 折叠/过滤判定改为按「该档有无已成立分支（lit = met===true 分支）」——
   // 真实数据只写 condition_met=true（决策 D1）→ 未触发档没有任何布尔 met，旧口径

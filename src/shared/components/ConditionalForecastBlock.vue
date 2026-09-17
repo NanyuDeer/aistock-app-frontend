@@ -132,12 +132,12 @@
         </template>
       </view>
 
-      <!-- 已触发档隐藏分支纯标注（只渲染已成立分支、其余被过滤 → 在此告知剩余 N 条，纯标注不可点开） -->
+      <!-- 已触发档隐藏分支纯标注（仅结论模式；只渲染已成立分支、其余被过滤 → 在此告知剩余 N 条，纯标注不可点开） -->
       <view v-if="showHiddenBranchLabel" class="as-insight-card__sc-hidden">
         <text class="as-insight-card__sc-hidden-tx">另有 {{ hiddenConditionCount }} 条条件未成立</text>
       </view>
 
-      <!-- 未触发折叠态（仅 tags 形态）：该档无已成立分支（与有无 met 数据无关）→ 基准行照常显示，
+      <!-- 未触发折叠态（仅结论模式 + tags 形态）：该档无已成立分支（与有无 met 数据无关）→ 基准行照常显示，
            分支区收为一行入口；点开后再铺开该档全部条件分支（沿用既有分支渲染与样式） -->
       <view v-if="isFoldedUnmet" class="as-insight-card__sc-fold" @tap.stop="toggleBranches">
         <!-- 到期未触发（卡级聚合 verification=miss）：中性灰标签，不与 hit 的实心绿混用；
@@ -146,10 +146,10 @@
         <text class="as-insight-card__sc-fold-tx">{{ branchesExpanded ? '收起条件化预判 ▴' : '查看条件化预判 ▾' }}</text>
       </view>
 
-      <!-- 空态（无基准行且无分支）：sentence 形态保留原空态文案，tags 形态沿用既有文案
-           （tags 的「该档无已成立分支」状态已由上方折叠入口承接） -->
+      <!-- 空态（无基准行且无分支）：sentence 形态恢复改造前原文案「该期暂无细分情景」；
+           tags 形态（结论模式）用结论空态文案（其「该档无已成立分支」状态已由上方折叠入口承接） -->
       <view v-else-if="!activeBase && !renderedConditions.length" class="as-insight-card__sc-empty">
-        <text>{{ conditionDisplay === 'sentence' ? '条件未成立 · 暂无已验证结论' : '该期暂无细分情景' }}</text>
+        <text>{{ conditionDisplay === 'sentence' ? '该期暂无细分情景' : '条件未成立 · 暂无已验证结论' }}</text>
       </view>
     </view>
   </view>
@@ -223,8 +223,8 @@ const props = withDefaults(defineProps<{
   structured: InsightStructuredForecast | null
   /** 条件行显示模式：tags=有 keywords 显示关键词标签（无则长句兜底）；sentence=强制长句原文（预测详情页用） */
   conditionDisplay?: 'tags' | 'sentence'
-  /** 展示模式：full=全量分支；conclusion=只显示已成立分支（spec §7「只显示已验证结论」）。
-   *  2026-09-17 起组件内不再据此判定 UI（折叠/过滤统一按「该档有无已成立分支」），保留仅为调用方 API 兼容 */
+  /** 展示模式：full=全量分支（未传时的默认，与改造前一致）；conclusion=只显示已成立分支（spec §7「只显示已验证结论」）。
+   *  折叠/过滤/隐藏标注/未命中标签**一律以此收口**：非 conclusion 直接全量直显（防"未触发"口径误伤 full 调用方）。 */
   displayMode?: 'full' | 'conclusion'
 }>(), {
   structured: null,
@@ -336,22 +336,26 @@ const branchesExpanded = ref(false)
 
 /**
  * 未触发折叠态（spec：未触发 → 折叠态）：
+ * 仅结论模式生效（`displayMode === 'conclusion'`）——full 调用方（如节奏大师洞见卡）恒全量直显，不被本折叠收口。
  * 该档无已成立分支（`lit` 为空）+ tags 形态；sentence 形态（预测详情页整句原文）不参与折叠，保持原位直显。
  * `inHorizonConditions.length > 0` 守卫：该档本就没有条件分支时无从折叠（否则会渲染出点开后空无一物的入口）。
  */
 const isFoldedUnmet = computed<boolean>(() =>
+  props.displayMode === 'conclusion' &&
   props.conditionDisplay !== 'sentence' &&
   litConditions.value.length === 0 &&
   inHorizonConditions.value.length > 0
 )
 
 /**
- * 分支区渲染源（三态）：
+ * 分支区渲染源（三态，仅结论模式参与）：
+ * - 非 conclusion（full）：全量分支直显（与改造前 full 行为逐字节一致）；
  * - sentence 形态：不过滤（保持整句原文直显）；
  * - 未触发折叠态：未点开 → 不铺开；点开后 → 铺开该档**全部**条件分支（沿用既有渲染与样式）；
  * - 已触发：只渲染已成立分支（`lit`）。
  */
 const renderedConditions = computed<StructuredCondition[]>(() => {
+  if (props.displayMode !== 'conclusion') return inHorizonConditions.value
   if (props.conditionDisplay === 'sentence') return inHorizonConditions.value
   if (!isFoldedUnmet.value) return litConditions.value
   return branchesExpanded.value ? inHorizonConditions.value : []
@@ -368,16 +372,20 @@ const hiddenConditionCount = computed(
 )
 
 /**
- * 隐藏分支纯标注：已触发档（只渲染已成立分支、其余被过滤）+ 确有隐藏分支；
+ * 隐藏分支纯标注：**仅结论模式**的已触发档（只渲染已成立分支、其余被过滤）+ 确有隐藏分支；
  * 折叠态展开后已铺开全部（不存在“隐藏”）故不标注，sentence 形态保持现状不标注。
  */
 const showHiddenBranchLabel = computed(
-  () => props.conditionDisplay !== 'sentence' && !isFoldedUnmet.value && hiddenConditionCount.value > 0
+  () =>
+    props.displayMode === 'conclusion' &&
+    props.conditionDisplay !== 'sentence' &&
+    !isFoldedUnmet.value &&
+    hiddenConditionCount.value > 0
 )
 
-/** 到期未触发（卡级聚合验证 miss = 该档条件全部未命中）：「未命中」中性标签仅随折叠态显示 */
+/** 到期未触发（卡级聚合验证 miss = 该档条件全部未命中）：「未命中」中性标签仅随结论模式折叠态显示 */
 const showMissTag = computed(
-  () => isFoldedUnmet.value && props.structured?.verification === 'miss'
+  () => props.displayMode === 'conclusion' && isFoldedUnmet.value && props.structured?.verification === 'miss'
 )
 
 const verifyText = computed(() => {
