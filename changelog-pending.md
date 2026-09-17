@@ -1,5 +1,19 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-17 到期未触发（condition_met=false）口径复核 + CFB mount 用例（Task 6.1）
+
+- **结论：组件无需改动**（后端 Task 6.1 起到期对未触发条件写 `condition_met=false`）。CFB 的折叠/过滤/「未命中」
+  标签一律按「当期有无已成立分支（`met === true`）」收口——与 met 是 `false` 还是**缺省**无关 → `false` 落库后
+  仍是**折叠态 + 「未命中」**（需卡级 `verification === 'miss'`），**不会**落到空态文案「条件未成立 · 暂无已验证结论」
+  （该文案仅在无任何分支可渲染时出现，折叠态优先 —— 2026-09-17 既有决议）。`resolveDisplayMode`/`hasMetData`
+  在生产已无调用方（仅导出待用），故不存在旧口径"false 触发结论模式却无 true 分支 → 大面积空态"的风险。
+- 测试：`src/shared/components/ConditionalForecastBlock.mount.spec.ts` 新增 1 例（`met:false` ×2 + `verification=miss`
+  → 折叠入口存在 + 「未命中」+ 分支节点 0 + 全文不含空态文案）→ **6/6 通过**（vitest）。
+- 两副本一致性：`ConditionalForecastBlock.vue` 本次**未改动**；库/App 差异仍仅限允许项（App `import selectVisibleConditions`
+  vs 库内联 + 内联 `hasMetData`/`resolveDisplayMode`），SHA256 不等属预期（`Compare-Object` 复核差异行即该段）。
+- 验收：`npx vue-tsc --noEmit` exit 0；`npm run test:node` **248/248/0**（基线一致）；`npx vitest run
+  src/shared/components/ConditionalForecastBlock.mount.spec.ts src/modules/analytics src/modules/market` **3 files / 14 tests passed**。
+
 ## 2026-09-17 市场洞见主因区块改造（今日影响大盘的主要板块）+ 链数据提升 + 链树事件胶囊（P3' Task 4.1/4.2）
 
 - 「主因板块 · 板块研判」→「**今日影响大盘的主要板块**」（spec §7.1）：区块 `v-if` 由「有主因候选」改为「**链存在 && 有候选**」（无链整块隐藏、不占位）；卡列表改按 `rankSectorCandidatesByChain` 排序（自驱动优先 → |pct| 降序，pct 取链上该板块 pct，未入链排末尾；同组同 |pct| 保持原序）。

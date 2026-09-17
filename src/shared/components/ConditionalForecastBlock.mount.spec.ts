@@ -98,6 +98,19 @@ describe('ConditionalForecastBlock 折叠/过滤按 displayMode 收口', () => {
     expect(wrapper.find('.as-insight-card__verify').exists()).toBe(false)
   })
 
+  it('conclusion + 到期未触发（条件显式 met:false）→ 折叠态 + 「未命中」+ 无空态文案', () => {
+    // Task 6.1 新形态：到期对未触发条件写 condition_met=false（此前只写 true，未触发档
+    // 没有任何布尔 met）。三态判定按「当期有无已成立分支」收口，与 met 是 false 还是缺省无关：
+    // 仍为折叠态 + 「未命中」，且**不得**落到空态文案（空态仅在无任何分支可渲染时出现，
+    // 折叠态优先——既有 2026-09-17 决议）。
+    const wrapper = mountCfb([cond(1, false), cond(2, false)], 'conclusion', 'miss')
+
+    expect(wrapper.find(FOLD).exists()).toBe(true)
+    expect(wrapper.find('.as-insight-card__sc-miss').text()).toBe('未命中')
+    expect(wrapper.findAll(BRANCH)).toHaveLength(0)
+    expect(wrapper.text()).not.toContain('条件未成立 · 暂无已验证结论')
+  })
+
   it('full（含不传 display-mode）→ 全量分支 + 无折叠入口（防 full 被折叠的回归护栏）', () => {
     for (const wrapper of [mountCfb([cond(1), cond(2)], 'full'), mountCfb([cond(1), cond(2)])]) {
       expect(wrapper.findAll(BRANCH)).toHaveLength(2)
