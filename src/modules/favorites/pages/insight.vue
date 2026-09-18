@@ -28,7 +28,7 @@
             {{ item.statusText }}
           </text>
         </view>
-        </view>
+      </view>
     </view>
 
     <!-- 空态 -->

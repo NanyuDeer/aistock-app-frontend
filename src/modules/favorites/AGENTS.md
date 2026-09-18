@@ -19,6 +19,11 @@
 > **2026-09-04 更新（最终语义）**：`pages/monitor.vue`（自选股异动）已移除老雷达数据源 `watchlistInsightApi.getInsights`（存量 watchlist_insight_events 08-30 起停用，含 8 月初远古涨停雷达事件），监控页统一只消费 `stockTraceApi.list`。后端 `StockTraceService.listUserEvents` 可见性下界改为**当前持仓期**（JOIN ON `e.first_triggered_at >= us.created_at`）：老自选全历史 + 今日新触发照常，新加入股只显示加入后触发/仍活跃的异动；同时新增**加入即打点**（`UserController.addFavorites` 交易时段内对新加入 symbol 调 `PriceTriggerDetector.detectSymbols`，命中即 `immediateEnqueue` 归因）。
 >
 > **2026-09-13 更新（同日同股聚合）**：同一交易日同一只股票的多次异动只展示 **1 张卡片**（打点/落库照常，仅展示收敛）。纯函数 `dedupeDailyMovements(items)`（`components/insightCards.ts`）：分组键 = symbol（剥 SH/SZ/BJ 前缀）+ **上海交易日**（`triggered_at` 经 UTC+8 取日期），组内取 `window_end_at ?? triggered_at` 最新一条。**组合口径（最新 + 失败回退）**：调用方先 `filter(isUnattributableMovement)` 再 `dedupeDailyMovements` —— 不可用项已剔除，取最新即"当日最近一条有效归因"。三处统一接入：`pages/monitor.vue`、`components/AlertContent.vue`（首页洞察块）、`pages/insight.vue`（洞察列表）。
+> **2026-09-13 更新（完整洞察报告 PDF + 详情页精简 + 预判移除）**：
+> - 洞察详情页（insight-detail-move.vue）精简为：报价头 + 一句话主因 + 报告下载按钮。删除了归因候选/六阶段链/证据清单等展开区块，仅在底部保留"下载完整报告"按钮调用 `shared/utils/downloadInsightReport.ts`。
+> - 「异动卡片」下端新增「洞察报告」按钮（`InsightAlertCard.vue` 中 `hasReport` 判定 → downloadInsightReport）。
+> - 预判区（forecast）已随后端迁移 019 全部移除：`detail.forecast` 不再可用，`ForecastSlotPayload`/`parseForecastSlot` 类型和工具函数已删除。
+> - 预判 Tab 与 `hasForecast` 筛选已从洞察列表移除。
 
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。
@@ -31,7 +36,7 @@
 - 归因候选：直接取 `artifactJson.candidates` 展示全部五层候选（含偏弱/证据不足/排除判定），主候选排第一（按 `primary_chain_id` → 链的 candidateId 定位）。不依赖 `movementView.alternatives`（其仅含 supported 候选，证据不足时为空）。
 - 六阶段链：仅渲染主因链（`artifactJson.chains` 中 `role=primary`）。备选链统一不展示——其信息已由归因候选全量覆盖，且证据不足时 LLM 仅生成主因链，避免时有时无。
 - 证据清单：`artifactJson.evidence_index` 中过滤掉系统生成的 trigger_fact/quote_fact 条目（"触发时刻行情"/"价格触发事件"不展示）；market_fact/sector_fact 的英文模板摘要由 `evidenceExcerpt` 转中文展示（"涨跌幅 -X%"、"板块最新日涨跌幅 -X%（MM-DD）"）。
-- 预判区（2026-09-03 新增）：`detail.forecast` 取 `close ?? midday` slot，解析为 `ForecastSlotPayload`（summary + conditions[]）。洞见卡预判字段展示 summary 文本；另在页面底部渲染完整 conditions 列表（condition/scenario/anchor）。无 forecast 时整块不渲染（不再恒空兜底）。
+- 预判区（2026-09-03 新增，已于 2026-09-13 移除）：`detail.forecast` 曾取 `close ?? midday` slot 展示预判 summary 与 conditions，该功能已随 forecast 列删除而移除，无 forecast 时整块不渲染。
 
 ## 组件
 - `components/StockCard.vue` - 股票卡片

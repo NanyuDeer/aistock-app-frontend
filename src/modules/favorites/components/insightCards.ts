@@ -95,7 +95,7 @@ function shanghaiDayKey(iso: string): string {
  *
  * 说明：
  * - 分组键 = symbol（剥 SH/SZ/BJ 前缀）+ 上海交易日（activityAt 转 UTC+8 取日期）
- * - 最新判定口径与 buildInsightCards 一致：window_end_at ?? triggered_at 的时间更大者
+ * - 最新判定口径与组内活动时间一致：window_end_at ?? triggered_at 的时间更大者
  * - 不修改输入；输出顺序沿用各分组"首次出现"顺序（接口已按时间倒序，输出近似倒序）
  */
 export function dedupeDailyMovements<T extends TraceEventLike>(items: T[]): T[] {

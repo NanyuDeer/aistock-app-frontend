@@ -144,7 +144,7 @@ describe('dedupeDailyMovements 同日同股聚合', () => {
     expect(items[0].event_id).toBe('mv:plain')
   })
 
-  // window_end_at 优先作为活动时间（与 buildInsightCards 口径一致）
+  // window_end_at 优先作为活动时间（与组内活动时间口径一致）
   it('以 window_end_at 优先判定最新（活动时间口径一致）', () => {
     const items = dedupeDailyMovements([
       makeMovement({ symbol: '003018', event_id: 'mv:early', triggered_at: '2026-09-04T01:00:00Z', window_end_at: '2026-09-04T06:00:00Z' }),
