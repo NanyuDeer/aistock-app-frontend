@@ -49,8 +49,14 @@ test('情绪周期在 phase 缺失时兜底"数据缺失（沿用前值）"可�
 test('P1：next_event_anchor 锚点条渲染（无锚点整块不渲染）', () => {
   assert.match(source, /next_event_anchor/)
   assert.match(source, /v-if="card\.next_event_anchor"/)
-  assert.match(source, /下一重大事件/)
+  assert.match(source, /下一事件/)
   assert.match(source, /rc-anchor/)
+})
+
+test('事件锚点块标题改为「下一事件」并含强度标签', () => {
+  assert.ok(source.includes('下一事件'))
+  assert.ok(!source.includes('下一重大事件'))
+  assert.ok(source.includes('重大'))
 })
 
 test('去重瘦身：rc-pos 长句 / rc-branch 区块 / rc-phase-ev 证据行已移除（摘要上移洞见卡）', () => {

@@ -53,9 +53,15 @@
     <!-- 事件日历（自 target_date 起 ≤5 交易日；空态两态区分 G7） -->
     <view class="rc-sec">
       <text class="rc-sec-title">未来 5 交易日事件日历</text>
-      <!-- 下一重大事件锚点（design-debate P1：无锚点整块不渲染） -->
+      <!-- 下一事件锚点（design-debate P1：无锚点整块不渲染） -->
       <view class="rc-anchor" v-if="card.next_event_anchor">
-        <text class="rc-anchor-label">下一重大事件</text>
+        <view class="rc-anchor-head">
+          <text class="rc-anchor-label">下一事件</text>
+          <text
+            v-if="card.next_event_anchor.importance === 'high'"
+            class="rc-anchor-flag"
+          >重大</text>
+        </view>
         <text class="rc-anchor-title">{{ card.next_event_anchor.title }}</text>
         <text class="rc-anchor-note">{{ card.next_event_anchor.note }}（{{ card.next_event_anchor.event_date }}）</text>
       </view>
@@ -223,6 +229,16 @@ function tempValue(score: number): string {
 .rc-hint { font-size: 26rpx; color: $warning; background: rgba($warning, 0.08); border: 1rpx solid rgba($warning, 0.35); border-radius: 12rpx; padding: 16rpx 20rpx; margin-bottom: 20rpx; }
 
 .rc-anchor { display: flex; align-items: center; gap: 12rpx; flex-wrap: wrap; background: rgba($warning, 0.08); border: 1rpx solid rgba($warning, 0.35); border-radius: 12rpx; padding: 14rpx 20rpx; margin-bottom: 16rpx; }
+.rc-anchor-head { display: flex; align-items: center; }
+.rc-anchor-flag {
+  margin-left: 8rpx;
+  padding: 0 8rpx;
+  font-size: 20rpx;
+  line-height: 28rpx;
+  border-radius: 6rpx;
+  color: $up;
+  border: 1rpx solid $up;
+}
 .rc-anchor-label { font-size: 22rpx; color: $warning; font-weight: 600; }
 .rc-anchor-title { font-size: 26rpx; color: $ink; font-weight: 600; }
 .rc-anchor-note { font-size: 24rpx; color: $ink-soft; }
