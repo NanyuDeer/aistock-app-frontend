@@ -1,5 +1,14 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-18 「未确认驱动原因」否定词表扩表（与 agent-py 逐字对齐）
+
+- **背景（生产实证）**：`isUnconfirmedAttribution` 的正则只有 `未确认驱动原因 | 证据不足[，,]?\s*未确认主因` 两条，而链上更常见的否定句是「**未检索到**可解释当日行情的独立触发事件」（2026-09-18 `注册制次新股` 的链摘要）。不匹配 → **两个视图都会把它出成卡**（大盘归因链树 + 今日影响大盘的主要板块），驱动句就是那句否定句本身——等于「未确认驱动原因的不放」这条口径没落实。
+- **改动（`src/shared/utils/sectorInsight.ts`，单文件）**：`UNCONFIRMED_ATTRIBUTION_RE` 扩为与 agent-py `attribution_chain._NEGATIVE_SUMMARY_MARKERS`（同一晚迭代 4 引入）**逐字对齐**的 15 词：`未检索到 | 没有检索到 | 未找到 | 没有找到 | 未发现 | 没有发现 | 未确认 | 未明确 | 未识别 | 未匹配 | 无法确认 | 无法判断 | 不能确认 | 暂无 | 尚未`。原第二条 `证据不足，未确认主因` 被 `未确认` 覆盖，故删除（行为不变）。判定语义（`trace_summary` 去空白为空或命中即不展示）与两个消费方均未变，**口径单点**——改一处两个区块同时生效。
+- **刻意不收（反向护栏）**：`不足 / 没有 / 缺少 / 缺乏 / 未出现`。理由：肯定归因句里的这些词不能误伤——2026-09-17 玉米的真实摘要是「未出现单一独立公告；催化来自超强厄尔尼诺供给扰动预期」，它是有内容的归因句，必须保留。
+- **测试（TDD 先红后绿，`src/shared/components/AttributionChainView.mount.spec.ts`）**：**+27 例** —— 20 条 NEGATIVE（15 个否定词各 1 例 + 生产实证原句 + 空/纯空格 + `null`/`undefined`）× `isUnconfirmedAttribution === true`；6 条 POSITIVE（含「供给不足推动多晶硅价格上涨」「未出现单一独立公告；催化来自…」两个易误伤样本）× `=== false`；1 例端到端 mount（链上「未检索到…」的 child 不再渲染、`.acv-child` 只剩 1 个、页面不含「未检索到」）。**RED 取证**：`14 failed, 15 passed`（13 例 `expected true, received false` + 端到端 `toHaveLength(1)` 实际 2）→ 实现后 **GREEN 29 passed**。
+- **验收**：`npx vitest run src/shared/components/AttributionChainView.mount.spec.ts src/modules/analytics/pages/traceability.mount.spec.ts` → **41 passed / 0 failed**；全量 `npx vitest run` → **471 passed / 4 failed**（4 条为**本次无关**的存量红：`tests/AnalyticsCardLayout.test.ts` 1 + `src/modules/favorites/pages/insight-detail.spec.ts` 1 + `src/modules/favorites/components/AlertContent.spec.ts` 2 + `CardRenderer.spec.ts` 套件级 `uni is not defined`；**已核对全仓只有本 spec 引用 `isUnconfirmedAttribution`**，其余 spec 不 import `sectorInsight` → 与本次改动无关联）；`npx vue-tsc --noEmit` **通过（无输出）**。
+- **跨端**：仅改 `aistock-app-frontend`（1 源文件 + 1 测试文件 + `src/modules/analytics/AGENTS.md` + 本记录）。**web 前端 `aistock-frontend` 无此工具函数（全仓检索 0 命中）→ 无需同步**；agent-py / app-api / 组件库 0 改动（纯展示端过滤口径）。
+
 ## 2026-09-18 市场洞见主因区块改「以链 children 为准出卡」+ 未确认驱动原因过滤 + 板块名标签（R17）
 
 - **问题（用户实测 2026-09-17）**：弱归因日链上有 3 个板块（CRO概念 +2.09 / 转基因 +4.04 / 玉米 +3.74，均为弱归因兜底），但 `sector-insight` 只给 1 个 `review_primary`（玉米）→ 旧实现「按候选出卡」只显示 1 张卡，用户误以为"只分析了一个板块"；且卡标题取 `candidate.trace.summary`（溯源主句）→ 卡片上看不出"这是哪个板块"。
