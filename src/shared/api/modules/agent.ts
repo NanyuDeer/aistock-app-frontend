@@ -180,6 +180,8 @@ export interface MarketTracePredictionValidation {
 
 export interface MarketTracePredictionHorizon {
   horizon: 'short' | 'mid' | 'long'
+  /** 基准走势短语（4~6 字，如 恐慌出清为主；2026-09-03 起新数据携带） */
+  label?: string
   remaining_estimate: string
   phase: 'building' | 'peaking' | 'decaying' | 'returning'
   direction: 'bullish' | 'bearish' | 'neutral'
@@ -210,8 +212,12 @@ export interface MarketTracePredictionAnchor {
 /** 条件化预判单条（Spec A：condition + scenario + anchor） */
 export interface MarketTracePredictionCondition {
   condition: string
+  /** 路径短语名（两段式“状态 · 走势”，2026-09-03 起新数据携带）；旧记录无 */
+  label?: string
   scenario: string
   anchor?: MarketTracePredictionAnchor
+  /** 简洁展示用关键词（2026-09-02 起新数据携带：1~2 个，单条 ≤10 字）；旧记录无 */
+  keywords?: string[]
 }
 
 export interface MarketTracePrediction {
@@ -384,6 +390,11 @@ export interface MiddayReportRecord {
       details?: string
       stocks?: string[]
       risks?: string[]
+      sections?: Array<{
+        title?: string
+        conclusion?: string
+        opportunities?: string[]
+      }>
     }
     podcast_brief?: string
     schema_version?: string
@@ -465,6 +476,16 @@ export interface RhythmEvent {
   event_time?: string | null
   result?: string | null
 }
+export interface RhythmPositionAction {
+  direction: 'add' | 'reduce' | 'hold'
+  change: string
+  band?: RhythmPositionBand | null
+}
+export interface RhythmAnchor {
+  metric: 'index_close' | 'close' | 'high' | 'low'
+  threshold: string
+  direction: 'bullish' | 'bearish' | 'neutral'
+}
 export interface RhythmBranch {
   condition: {
     kind: 'interval' | 'enum'
@@ -475,8 +496,12 @@ export interface RhythmBranch {
     label?: string
     value?: string
   }
+  position_action?: RhythmPositionAction
+  anchor?: RhythmAnchor
+  touch_strength?: number | null
   conclusion: { direction: 'bullish' | 'bearish' | 'neutral'; range?: string; validity: number; note?: string }
   event_ref?: { event_date: string; title: string }
+  met?: boolean | null
 }
 export interface RhythmCard {
   score?: number | null
@@ -509,6 +534,29 @@ export interface RhythmMasterReport {
   content?: RhythmMasterContent
 }
 
+/** 每日收盘基准建议仓位（rhythm_card.position_band 透传；缺失/无仓位语义 = null，前端如实展示） */
+export interface RhythmPositionBand {
+  min?: number | null
+  max?: number | null
+  text?: string
+}
+
+/** 节奏日历热力图行（契约 #7）：恒取 after_close 收盘基准；level 可空 = 灰格（行缺失/沿用前值）；
+ *  events（2026-09-03 扩展）：该交易日 macro 事件（对外契约子集，后端恒下发，无事件 = []；前端可选以兼容旧缓存/降级） */
+export interface RhythmCalendarDay {
+  date: string
+  refresh_slot: 'after_close'
+  level: string | null
+  score: number | null
+  basis_date: string | null
+  position_band: RhythmPositionBand | null
+  events?: RhythmEvent[]
+}
+
+export interface RhythmCalendarResponse {
+  days: RhythmCalendarDay[]
+}
+
 /** 板块四环聚合（/api/agent/sector-insight/:date，2026-09-02）：单板块候选 */
 export interface SectorInsightQuote {
   pct_change: number | null
@@ -529,6 +577,8 @@ export type SectorConfidence = 'high' | 'medium' | 'low'
 export interface SectorInsightHorizon {
   horizon: 'short' | 'mid' | 'long'
   remaining?: string
+  /** 基准走势短语（4~6 字，2026-09-03 起新数据携带） */
+  label?: string
   direction?: SectorDirection
   confidence?: SectorConfidence
 }
@@ -537,7 +587,13 @@ export interface SectorInsightCondition {
   horizon: 'short' | 'mid' | 'long'
   direction?: SectorDirection
   condition: string
+  /** 路径短语名（两段式“状态 · 走势”，2026-09-03 起新数据携带）；旧记录无 */
+  label?: string
   scenario: string
+  /** 简洁展示用关键词（2026-09-02 起新数据携带：1~2 个，单条 ≤10 字）；旧记录无 */
+  keywords?: string[]
+  /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度，如 上探+3%~+5%）；旧记录无 */
+  scenario_keywords?: string[]
   /** 该条件是否已触发（验证回填），缺省 null=待观察 */
   met?: boolean | null
 }
@@ -547,6 +603,8 @@ export interface SectorInsightPrediction {
   status?: 'pending' | 'verified' | 'skipped'
   dueLabel?: string | null
   verification?: 'pending' | 'hit' | 'miss'
+  /** 一句话研判结论（LLM 30~40 字；洞见卡标题用；旧记录无） */
+  attribution_summary?: string | null
   /** 概览方向/置信（取首档有值者），detail 在 horizons */
   direction?: SectorDirection
   confidence?: SectorConfidence
@@ -738,9 +796,12 @@ export const agentApi = {
   },
 
   /** 节奏日历热力图聚合（契约 #7）：最近 N 个交易日 after_close 收盘基准档位。
-   *  返回 { days: [{date, refresh_slot, level, score, basis_date}] }，level 可空（灰格）。 */
-  getRhythmMasterCalendar(days = 60) {
-    return request.get('/agent/rhythm-master/calendar', { params: { days } })
+   *  返回 { days: [{date, refresh_slot, level, score, basis_date, position_band}] }，
+   *  level 可空（灰格）；position_band 为空 = 该日无仓位语义（如实展示，不伪造）。 */
+  getRhythmMasterCalendar(days = 60, naturalDays = 0) {
+    return request.get<RhythmCalendarResponse>('/agent/rhythm-master/calendar', {
+      params: naturalDays > 0 ? { naturalDays } : { days },
+    })
   },
 
   /**

@@ -28,10 +28,8 @@
         <Tag :type="tagType(stock.tag)">{{ stock.tag }}</Tag>
       </view>
       <view class="header-sub">
-        <text class="header-meta">{{ stock.industry }}</text>
-        <text class="header-meta-divider">|</text>
-        <text class="header-meta">披露：{{ stock.disclosureDate }}</text>
-        <text class="header-meta-divider">|</text>
+        <text v-if="stock.industry" class="header-meta">{{ stock.industry }}</text>
+        <text v-if="stock.industry" class="header-meta-divider">|</text>
         <text class="header-meta">更新：{{ stock.updateTime }}</text>
       </view>
       <view class="header-actions">
@@ -48,6 +46,7 @@
       :title="reportInsight.content"
       :lines="reportInsight.lines"
       theme="light"
+      line-style="plain"
       class="report-insight-card"
     />
 
@@ -132,7 +131,6 @@ const stock = ref({
   period: '',
   tag: '',
   industry: '',
-  disclosureDate: '',
   updateTime: '',
 })
 
@@ -409,13 +407,16 @@ async function fetchAnalysisData(sym: string) {
     // 标签兜底：AI研判为空时，快报股票显示"预告"（与列表页一致）
     stock.value.tag = aiTag || (reportType === 'express' ? '预告' : '')
 
-    // 解析 stockInfo 参数中的行业/日期等额外信息
+    // 更新时间以接口返回的最新报告时间为准（列表页传入的 stockInfo 作为兜底）
+    const apiUpdateTime = String(data['更新时间'] || '')
+    if (apiUpdateTime) stock.value.updateTime = apiUpdateTime
+
+    // 解析 stockInfo 参数中的行业等额外信息
     if (options?.stockInfo) {
       try {
         const info = JSON.parse(decodeURIComponent(options.stockInfo))
         if (info.industry) stock.value.industry = info.industry
-        if (info.disclosureDate) stock.value.disclosureDate = info.disclosureDate
-        if (info.updateTime) stock.value.updateTime = info.updateTime
+        if (info.updateTime && !apiUpdateTime) stock.value.updateTime = info.updateTime
       } catch (_) {}
     }
 

@@ -21,8 +21,8 @@
 > **2026-09-13 更新（同日同股聚合）**：同一交易日同一只股票的多次异动只展示 **1 张卡片**（打点/落库照常，仅展示收敛）。纯函数 `dedupeDailyMovements(items)`（`components/insightCards.ts`）：分组键 = symbol（剥 SH/SZ/BJ 前缀）+ **上海交易日**（`triggered_at` 经 UTC+8 取日期），组内取 `window_end_at ?? triggered_at` 最新一条。**组合口径（最新 + 失败回退）**：调用方先 `filter(isUnattributableMovement)` 再 `dedupeDailyMovements` —— 不可用项已剔除，取最新即"当日最近一条有效归因"。三处统一接入：`pages/monitor.vue`、`components/AlertContent.vue`（首页洞察块）、`pages/insight.vue`（洞察列表）。
 > **2026-09-13 更新（完整洞察报告 PDF + 详情页精简 + 预判移除）**：
 > - 洞察详情页（insight-detail-move.vue）精简为：报价头 + 一句话主因 + 报告下载按钮。删除了归因候选/六阶段链/证据清单等展开区块，仅在底部保留"下载完整报告"按钮调用 `shared/utils/downloadInsightReport.ts`。
-> - 「异动卡片」下端新增「洞察报告」按钮（`InsightAlertCard.vue` 中 `hasReport` 判定 → downloadInsightReport）。
-> - 预判区（forecast）已随后端迁移 019 全部移除：`detail.forecast` 不再可用，`ForecastSlotPayload`/`parseForecastSlot` 类型和工具函数已删除。
+> - 「异动卡片」下端新增「洞察报告」按钮（`InsightAlertCard.vue` 的 `reportable` prop + `report` emit，monitor.vue 据 `analysisStatus === 'completed'` 判定 → downloadInsightReport）。
+> - 预判区（forecast）已随后端迁移 022 全部移除：`detail.forecast` 不再可用，`ForecastSlotPayload`/`parseForecastSlot` 类型和工具函数已删除。
 > - 预判 Tab 与 `hasForecast` 筛选已从洞察列表移除。
 
 ## 异动卡片主因展示（价格异动）

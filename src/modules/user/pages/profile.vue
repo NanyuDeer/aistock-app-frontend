@@ -280,7 +280,7 @@ function goAccountSecurity() {
 function goAbout() {
   openModal({
     title: '关于洞见',
-    content: '洞见 v0.1.2\nAI 股票资讯智能分析助手\n仅供研究参考，不构成投资建议',
+    content: '洞见 v0.1.3\nAI 股票资讯智能分析助手\n仅供研究参考，不构成投资建议',
     showCancel: false,
     confirmText: '知道了',
   })

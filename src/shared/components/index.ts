@@ -60,6 +60,7 @@ export { default as StatGrid } from './StatGrid.vue'
 export { default as InsightTag } from './InsightTag.vue'
 export { default as InsightCard } from './InsightCard.vue'
 export { default as ConditionalForecastBlock } from './ConditionalForecastBlock.vue'
+export { default as EventRefChip } from './EventRefChip.vue'
 
 /**
  * InsightListItem 类型定义

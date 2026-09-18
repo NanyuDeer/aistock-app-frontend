@@ -138,6 +138,8 @@ export interface PredictionValidationPresentation {
 
 export interface PredictionHorizonPresentation {
   horizon: 'short' | 'mid' | 'long'
+  /** 基准走势短语（4~6 字；2026-09-03 起新数据携带，旧记录无） */
+  label?: string
   remainingEstimate: string
   phase: 'building' | 'peaking' | 'decaying' | 'returning'
   direction: 'bullish' | 'bearish' | 'neutral'
@@ -167,7 +169,13 @@ export interface PredictionAnchorPresentation {
 /** 条件化预判单条展示（Spec A §4.3） */
 export interface PredictionConditionPresentation {
   condition: string
+  /** 路径短语名（两段式“状态 · 走势”；2026-09-03 起新数据携带，旧记录无） */
+  label?: string
   scenario: string
+  /** 触发条件关键词（1~2 个；2026-09-02 起新数据携带，旧记录无） */
+  keywords?: string[]
+  /** 预判关键词（scenario 摘要，侧重方向+幅度；2026-09-03 起新数据携带，旧记录无） */
+  scenario_keywords?: string[]
   anchor: PredictionAnchorPresentation | null
 }
 
@@ -287,6 +295,7 @@ export function toPredictionPresentation(raw: MarketTracePrediction | null | und
           && CONFIDENCE_KEYS.has(h.confidence))
         .map(h => ({
           horizon: h.horizon,
+          label: asString((h as { label?: unknown }).label) || undefined,
           remainingEstimate: asString(h.remaining_estimate),
           phase: h.phase,
           direction: h.direction,
@@ -307,6 +316,9 @@ export function toPredictionPresentation(raw: MarketTracePrediction | null | und
         .filter(c => Boolean(c) && typeof c === 'object' && typeof c.condition === 'string' && typeof c.scenario === 'string')
         .map(c => ({
           condition: asString(c.condition),
+          label: asString((c as { label?: unknown }).label) || undefined,
+          keywords: asStringList((c as { keywords?: unknown }).keywords),
+          scenario_keywords: asStringList((c as { scenario_keywords?: unknown }).scenario_keywords),
           scenario: asString(c.scenario),
           anchor: c.anchor && typeof c.anchor === 'object'
             ? {

@@ -22,41 +22,99 @@
 - `src/modules/favorites/pages/insight-detail-move.vue`：新增 `forecastSlot` computed（从 `detail.forecast` 取 `close ?? midday` 解析为 `ForecastSlotPayload`）；洞见卡预判字段改为取真实 summary（不再恒空）；新增"预判区"区块渲染完整 conditions 列表（condition/scenario/anchor）；底部显示 slot 标识（基于收盘/午盘预判）。引入 `ForecastSlotPayload` 类型（来自 insightCards.ts）。
 - 文档：`src/modules/favorites/AGENTS.md` 新增预判区说明。`InsightDetailLayout.spec.ts` / `insight-detail.spec.ts` 无 forecast 相关断言，无需更新。
 
-## 2026-09-02 板块四环弱溯源还原 + 条件卡内文本拆分（全粒度）
-- `src/modules/market/pages/sector-loop.vue`：还原弱溯源原文（不再替换为短标签），改用**溯源横幅样式**（浅蓝底 + “溯源” key，对齐洞见卡）展示在预判块上方；头行第 2 行只保留来源 tag + 右侧日期/验证文案。
-- `src/shared/utils/conditionalForecast.ts`（新增）：`expandConditionalBranches`——把 scenario 内嵌“；若X则Y”的对冲/后续情形拆成独立条件条目（方向/锚点置空随主卡），解决一张条件卡里多段文本“杂糅”。
-- `src/shared/utils/sectorInsight.ts` / `src/modules/analytics/components/MarketTracePrediction.vue`：板块与大盘条件化预判映射统一接入拆分器（板块洞见卡/四环列表/大盘预测详情同源）。
+## 2026-09-17 溯源弱依据提示（R16 前端呈现）+ 角色徽匹配升级 ts_code/sector_std（R14，Task 10.2）
 
-## 2026-09-02 板块四环列表改版（主因置顶 + 行内条件化预判块）
-- `src/modules/market/pages/sector-loop.vue`：卡片列表重构——大盘溯源主因（review_primary/both）**置顶分组**（红强调描边 + “大盘溯源·主因板块”标题），下接“风口板块（长线）”；行卡＝第 1 行（板块名+当日涨跌+方向 pill 同行，长名单行省略）+ 第 2 行（来源 tag+溯源短句两行截断，验证/日期副文案靠卡片右侧）+ 预判详情区（复用共享 ConditionalForecastBlock，无预判/无期段分支不渲染空块）。
-- `src/shared/utils/sectorInsight.ts`：新增 `sectorPredictionToStructured`（板块预测→通用条件化预判块结构化，单一映射源）；`SectorInsightCard.vue` 改为复用。
-- 弱溯源精简：`traceSummary` 命中“未出现可明确解释当日行情/无单一触发事件”时替换为短标签“当日无单一明确触发事件（溯源证据不足）”。
+- **数据侧已就绪、前端此前未呈现**：弱归因日（`root.evidence_weak=true` + `child.extraction={source,weak:true}`）在前端有链、有卡但看不出"依据偏弱"。本次做中性、克制的弱化呈现（不引入新色系、不用告警色）。
+- **类型加性扩展**（`src/shared/api/modules/attributionChain.ts`，全部可选，老数据零影响）：`AttributionChainRoot.evidence_weak?/attribution_status?`；`AttributionChainChild.extraction?: { source?: string; weak?: boolean }`（新增导出 `AttributionChainExtraction`）、`ts_code?: string | null`、`sector_std?: string | null`。
+- **R14 匹配优先级升级**（`src/shared/utils/sectorInsight.ts::findChainChild`）：由「`sector` 精确 → 归一化」改为 **`ts_code` 精确（去 `.TI` 后缀比较）→ `sector_std` 精确 → `sector` 精确 → 归一化（`sector` 优先、`sector_std` 兜底）**；`buildMarketLink(chain, name, { code })` 新增第三参；`rankSectorCandidatesByChain` 传 `candidate.ts_code`，`sector-detail.vue` 传 `{ code: cur.code }`。修复"链上 `sector` 是复盘原文名、候选是 THS 权威名 → 有链但角色徽/驱动句不显示"。
+- **弱标记文案单点**：新增纯函数 `extractionWeakLabel(extraction)`——`weak !== true` → `''`（不渲染）；`source === 'snapshot'` → 「无归因依据」（纯快照异动兜底、无归因理由）；其余（`candidate_claim`）→ 「依据较弱」。`SectorMarketLink` 加性扩展 `chainWeak: boolean` + `extraction: AttributionChainExtraction | null`。
+- **UI（中性灰，克制）**：① 链级 —— `InsightCard` 溯源蓝卡摘要行旁「归因较弱」（`traceStructured.weak`），并沿用 `root.summary`（弱归因日的中性摘要「证据不足，未确认主因」）作一句话行；市场洞见页主因区块标题「今日影响大盘的主要板块」旁同款小标（`.primary-sector-weak`，`chainWeak`）。② 板块级 —— 溯源子卡角色徽驱动行旁「依据较弱」/「无归因依据」（`traceStructured.weakText`）与 `AttributionChainView` 板块行关系徽旁同款（`.acv-weak`）。三者均**可选渲染**：字段缺失（老数据/正常日）零标记、零变化；样式走 CSS 变量 `--ins-weak-bd/--ins-weak-tx`（light/dark 双套），未用红绿涨跌色与告警色。
+- **两副本同步**：`aistock-component-lib/src/components/InsightCard.vue` 做同样改动（模板 2 处 + 接口 2 字段 + 样式 1 块 + 2 个 CSS 变量）；本次改动块两副本 `git diff` 正文各 30 行、`Compare-Object` **0 行差异**；全文件仍差 55 行 = **HEAD 已存在的允许差异**（app-only `lineStyle`/`plain-lines`，HEAD 实测 app 4 处 / 库 0 处）。`AttributionChainView.vue` 在组件库无对应文件（App 专属 wrapper），无需镜像。
+- **测试（先红后绿）**：`traceability.mount.spec.ts` 新增 5 条（零弱标记回归 / `ts_code` 优先命中 / `sector_std` 次优先命中 / 弱归因日链级 + 板块级文案分流 + `root.summary` 保留）；`EventRefChip.mount.spec.ts` 新增 2 条（`AttributionChainView` 板块行弱标记：缺省与非 `true` 不渲染 / `snapshot` vs `candidate_claim` 文案）。红验：临时关闭 `findChainChild` 的 `ts_code` 分支 → `ts_code` 优先用例失败（`Cannot call text on an empty DOMWrapper`），还原后转绿。两 spec 均已在 `vitest.config.ts` `test.include` 白名单内（**未新增文件**，node:test 基线不受影响）。
+- 验收：`npx vue-tsc --noEmit` exit 0（**0 错误**）；`npm run test:node` **248/248/0**（exit 0）；`npx vitest run` 5 files / 4 tests 失败（与既有基线 5 files / 4 tests 完全一致，零新增）；组件库 `npm run type-check` 仅存量 5 条（`dev/App.vue` Segmented ×4 + `AudioPlayer.vue` ×1），零新增。
+- 文档同步：`AGENTS.md`（`attributionChain.ts` / `InsightCard` / `SectorInsightCard` / `AttributionChainView` 行）、`src/modules/analytics/AGENTS.md`（traceability 行）、`src/modules/market/AGENTS.md`（归因链类型消费方，顺带修正 sector-detail「待接入」陈旧表述）。
 
-## 2026-09-02 H5 dev 板块四环「加载失败」修复（vite 代理）
-- `vite.config.ts`：新增 `/api/agent/sector-insight` 代理 → Node.js app-api（sectorInsightRouter 是 Node 本地路由非 Python）。此前缺失导致 H5 dev 将其落入 `/api/agent` 兜底（→ agent-py 8080）404 → 板块四环页/溯源主因板块显示「加载失败」（线上复现根因，2026-09-02）。置于 Python 兜底之前，与 trading-calendar 同款模式。
+## 2026-09-17 到期未触发（condition_met=false）口径复核 + CFB mount 用例（Task 6.1）
 
-## 2026-09-02 条件化预判块通用化（板块洞见组件全粒度共用）
-- `src/shared/components/ConditionalForecastBlock.vue`（新增，同步组件库）：从 InsightCard structured 抽取的**通用条件化预判块**——期段 Tab（短/中/长）+ 每期基准方向/置信/剩余时长 + 互斥分支（若 条件 → 方向 pill → scenario 幅度置灰）+ met 触发点亮/置灰 + 验证 pill + **验证锚点 chip（anchor.threshold/metric，大盘等粒度透传，板块暂无则不渲染）**。凡有条件化预判的粒度（大盘/板块/个股）一律渲染本块，与板块洞见卡同款 UI。
-- `src/shared/components/InsightCard.vue`：structured 内块改为内部复用 ConditionalForecastBlock（公共 props/API 与视觉零变化）；删除迁出后冗余的期段状态/文案净化/样式。
-- `src/shared/components/index.ts`：导出 ConditionalForecastBlock。
-- `src/modules/analytics/components/MarketTracePrediction.vue`：删除 2026-09-02 上午自绘的 conditions 分支块（f016903），条件化预判区改嵌 ConditionalForecastBlock（PredictionPresentation → condStructured：horizon 校验自 anchor.horizon、方向自 anchor.direction、threshold/metric 作 chip）；大盘专属的状态/归因摘要/期段明细（target/metricProjection/phase）/演化路径/风险保留。prediction-detail 与市场洞见展开（MarketInsightCard）两处共用。
-- 用户指示："板块洞见那个组件应属所有有条件化预判的粒度都用，而非板块粒度独占"（推翻 f016903 commit 中"不用洞见组件"的范围决策）。
+- **结论：组件无需改动**（后端 Task 6.1 起到期对未触发条件写 `condition_met=false`）。CFB 的折叠/过滤/「未命中」
+  标签一律按「当期有无已成立分支（`met === true`）」收口——与 met 是 `false` 还是**缺省**无关 → `false` 落库后
+  仍是**折叠态 + 「未命中」**（需卡级 `verification === 'miss'`），**不会**落到空态文案「条件未成立 · 暂无已验证结论」
+  （该文案仅在无任何分支可渲染时出现，折叠态优先 —— 2026-09-17 既有决议）。`resolveDisplayMode`/`hasMetData`
+  在生产已无调用方（仅导出待用），故不存在旧口径"false 触发结论模式却无 true 分支 → 大面积空态"的风险。
+- 测试：`src/shared/components/ConditionalForecastBlock.mount.spec.ts` 新增 1 例（`met:false` ×2 + `verification=miss`
+  → 折叠入口存在 + 「未命中」+ 分支节点 0 + 全文不含空态文案）→ **6/6 通过**（vitest）。
+- 两副本一致性：`ConditionalForecastBlock.vue` 本次**未改动**；库/App 差异仍仅限允许项（App `import selectVisibleConditions`
+  vs 库内联 + 内联 `hasMetData`/`resolveDisplayMode`），SHA256 不等属预期（`Compare-Object` 复核差异行即该段）。
+- 验收：`npx vue-tsc --noEmit` exit 0；`npm run test:node` **248/248/0**（基线一致）；`npx vitest run
+  src/shared/components/ConditionalForecastBlock.mount.spec.ts src/modules/analytics src/modules/market` **3 files / 14 tests passed**。
 
-## 2026-09-02 板块四环前端（sector-loop 新页 + 入口 + 主因板块洞见）
-- 新增 `src/modules/market/pages/sector-loop.vue`：板块四环页（SubPageCard 白卡容器；近 7 交易日胶囊回看、默认最近交易日；大盘归因链「上证 涨/跌 → 主因板块（±x%）」；行=板块名+来源 tag(风口/大盘主因/风口·主因)+溯源短句+当日行情(红涨绿跌)+预判概要(方向 pill/待验证/已验证·命中/未中/置信)；wind_leader/both 行跳板块详情、review_primary-only 行跳大盘溯源页；空态提示「收盘后数据更全」）
-- `src/pages.json`：注册 `modules/market/pages/sector-loop`（navigationBarTitleText 板块四环 / navigationStyle custom / disableScroll / slide-in-right）
-- `src/modules/market/pages/leaders.vue`：GuideCard 下新增「板块预判 · 今日 ›」入口行 → `/modules/market/pages/sector-loop`
-- `src/modules/analytics/pages/traceability.vue`：MarketInsightCard 后新增「主因板块 · 板块研判」区块——按展示日期（displayedDate）拉 `agentApi.getSectorInsight`，source 含 review_primary/both 的候选逐个渲染 `SectorInsightCard`；失败静默置空整块不渲染；标题右侧「全部板块 ›」跳 `sector-loop?date=`
+## 2026-09-17 市场洞见主因区块改造（今日影响大盘的主要板块）+ 链数据提升 + 链树事件胶囊（P3' Task 4.1/4.2）
 
-## 2026-09-02 板块四环前端（组件/API/板块详情卡，配套上一条）
-- `src/shared/components/InsightCard.vue`：同步组件库升级版（条件化预判兼容扩展）——新增 `structured` prop（horizons/conditions/dueLabel/verification）渲染"期段 Tab + 每期基准方向 + 互斥条件情景（分支点亮：met=true 整支点亮蓝缘+已触发签 / false 置灰未触发 / 缺省待观察）"；新增 `tag-text` 覆盖标签文字；condition 展示主干（括号补充剔除 condMain）、scenario 幅度段自动置灰（splitScenario）；标题「预判」；文本形态（trace/forecast）零破坏兼容
-- `src/shared/components/SectorInsightCard.vue`（新增）：板块洞见卡 wrapper——candidate 命中渲染 InsightCard（板块洞见，title=板块名+当日涨跌/溯源 summary/条件化预判块），null 严格占位（D4）
-- `src/shared/api/modules/agent.ts`：新增 `agentApi.getSectorInsight(date)` + SectorInsight 类型族（Candidate/Quote/Trace/Horizon/Condition/Prediction/Response；direction/confidence 窄联合）
-- `src/modules/market/pages/sector-detail.vue`：AI 分析卡**洞见化回退**（还原 commit 3c319a2 前的 "AI 分析"标题 + 灰底传递行 + 风险红字样式，洞见语义让位给板块洞见卡）；新增板块洞见卡嵌入（loadSectorInsight：最近交易日 getSectorInsight → findSectorCandidate 按 code/name 匹配），位于 AI 分析卡之后、K线卡之前
-- `src/shared/utils/sectorInsight.ts`（新增）：`findSectorCandidate`（code/.TI/name 匹配）+ `todayDateStr()`
-- 文档：modules/market/AGENTS.md、modules/analytics/AGENTS.md、根 AGENTS.md §7 组件表同步（InsightCard 升级说明 + SectorInsightCard 新增）
+- 「主因板块 · 板块研判」→「**今日影响大盘的主要板块**」（spec §7.1）：区块 `v-if` 由「有主因候选」改为「**链存在 && 有候选**」（无链整块隐藏、不占位）；卡列表改按 `rankSectorCandidatesByChain` 排序（自驱动优先 → |pct| 降序，pct 取链上该板块 pct，未入链排末尾；同组同 |pct| 保持原序）。
+- 链数据提升到页面（Task 4.1 Step 1）：`traceability.vue` 持 `chain`/`chainLoading` ref，`watch(displayedDate)` 并行 `fetchAttributionChain(date)` + `agentApi.getSectorInsight(date)`；`AttributionChainView` 改受控 props（`chain`/`loading`/`mock`，移除组件内 fetch + onMounted/watch，保留空态/加载态与 `mock` 内置演示分支——仓库内无 mock 调用方，仅演示用）。
+- 两轨分离（Task 4.1 Step 3）：`SectorInsightCard` 新增 `traceOnly`（默认 false）→ 传给 InsightCard 的 `structured` 恒 null（不渲染 CFB 预判子卡）、标题不回退预判综述（取 `candidate.trace.summary`）；主因卡传 `:market-link`（含 `events`）与 `:sector-name`，保留「依据详情 ▾」与「看该板块预判 →」。
+- 命名口径（Task 4.1 Step 3）：`buildMarketLink` 原为 `children[].sector === name` 精确匹配，而链上 `sector` 是复盘报告原始名、候选 `name` 是 `resolveBoardName` 后的权威名 → 新增 `normalizeSectorName`（与 app-api `ThsBoardService.normName` 同口径：去空白/括号 + 去 概念/板块/行业/产业链 后缀 + 小写）与 `findChainChild`（精确 → 归一化；**不做包含匹配**，避免「半导体」误连「半导体材料」）；`SectorMarketLink` 加性扩展 `pct`/`events`。
+- 链树事件胶囊（Task 4.2）：新建 `shared/components/EventRefChip.vue`（纯 UI：来源标记 中台/检索 + 摘要单行省略；`eventRef` 为 http(s) URL 才可点，emit `select(url)`，跳转由 wrapper 侧执行）；接入 `AttributionChainView`（每分支 `events`）与 `InsightCard`（`traceStructured.events` 加性扩展，空则不渲染该区，胶囊点击 emit `eventSelect`）；`SectorInsightCard` 接 `@event-select` → H5 `window.open` / App+小程序 webview 承载页（`pages-sub-app/webview/index?url=`）。两副本（`EventRefChip.vue` / `InsightCard.vue`）与组件库 SHA256 相等（`Compare-Object` 无输出）。
+- 测试（先红后绿）：新增 `src/modules/analytics/pages/traceability.mount.spec.ts`（5 条：无链不渲染区块 / 自驱动优先排序 / 角色徽 / 主因卡无 `.as-insight-card__sc` / 事件胶囊条数）与 `src/shared/components/EventRefChip.mount.spec.ts`（8 条：来源文案区分 / URL 可点 emit / 非 URL 不可点 / InsightCard 空与有值 / `eventSelect` / 链视图空与有值）；两文件已登记 `vitest.config.ts` 的 `test.include` 白名单（`tests/run-node-specs.mjs` 未改，node:test 基线保持 `248/248/0`）。
+- 验收：`npx vue-tsc --noEmit` **0 错误**（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`npx vitest run src/modules/analytics src/modules/market` 2 files / 8 tests passed（exit 0）；`npx vitest run src/shared/components` 7 files / 35 tests passed + 1 套件存量失败（`NotificationDropdown.spec.ts`：`KLineChart.vue` 的 `<script setup lang="ts">` 与 `<script module="chartView" lang="renderjs">` 编译冲突，HEAD 的 barrel 已导出 KLineChart，非本次引入，未改该文件）；组件库 `npm run type-check` 仅存量 5 条（`dev/App.vue` Segmented ×4 + `AudioPlayer.vue` ×1）。
+- 文档同步：`AGENTS.md`（InsightCard / SectorInsightCard / AttributionChainView 行 + 新增 EventRefChip 行）、`src/modules/analytics/AGENTS.md`（traceability 行）。
 
-## 2026-09-02 大盘条件化预判前端展示升级（MarketTracePrediction）
-- `src/modules/analytics/components/MarketTracePrediction.vue`：条件化预判区由"蓝缘平铺列表"升级为**按期段（短/中/长，按 anchor.horizon 分组）的分支卡**——每组含档位标题 + 该档基准方向 pill（取 horizons 同期 direction）+ 互斥分支（序号 + 若[条件] → 方向 pill + scenario + anchor 阈值/指标 chips）；不再用洞见组件（prediction-detail/市场洞见展开两页面共用本组件，大盘条件化预判 now 后即自动展示分组分支）。注释定位"大盘/板块/个股有条件化预判同构展示"。
+## 2026-09-17 CFB 折叠/过滤按 displayMode 收口（修复节奏大师洞见卡零分支）+ sentence 空态文案还原 + 新增 mount 三态护栏
 
-- 2026-09-03: 自选股洞察阶段3+4 — AlertContent 自选股洞察块升级为按股票聚合卡（Segmented 全部/预判/溯源 + 溯源区/预判区/情报折叠/AI解读，复用 insightCards.ts buildInsightCards/cardInTab/parseForecastSlot）；详情页 insight-detail-move 接入真实 forecast（close??midday，洞见卡预判字段不再恒空 + conditions 预判区，独立于归因完成守卫）；insight.vue 列表加 forecast 摘要行；app-api 公开情报接口透出 stock_info_judgements.forecast（monitor/service + crawler queryJudgements 等 SELECT/类型/映射）；涨停文案改用 is_limit_up（删 9.5% 启发式）；重大判定改用 ai_impact
+- 问题（复审必须项 A）：上一轮「三态判定改按已成立分支」后 `displayMode` prop 完全不再驱动 UI，折叠对所有调用方生效 → **节奏大师洞见卡**（`src/modules/rhythm/pages/index.vue:20-27` 未传 `display-mode` → 默认 `full`；其 structured 只有 conditions、无 horizons → `activeBase` 恒空；`met` 恒 null）100% 折叠，卡内只剩一行入口、核心分支内容默认不可见。
+- 修正（CFB 两副本，最小改动）：① `isFoldedUnmet` 前置 `props.displayMode === 'conclusion'`；② `renderedConditions` 前置 `if (props.displayMode !== 'conclusion') return inHorizonConditions.value`（恢复改造前 full 全量行为）；③ `showHiddenBranchLabel` 与 `showMissTag` 同样以 `displayMode === 'conclusion'` 收口（「另有 N 条条件未成立」与「未命中」标签只在结论模式出现）；④ `litConditions = selectVisibleConditions(inHorizonConditions, 'conclusion')` 口径不变，`resolveDisplayMode` / `hasMetData` 仍保留（无消费方，函数与单测保留）；`displayMode` prop 的 JSDoc 同步改为「折叠/过滤/隐藏标注/未命中标签一律以此收口」。
+- 行为分档：`full`（rhythm / 未传 display-mode）→ 全量分支 + 既有 pill/空态（与改造前一致，无折叠入口）；`conclusion`（sector-detail / sector-loop / traceability）→ 三态不变（未触发折叠 / 只显已触发 / 到期未触发 + 入口行「未命中」且抑制头部同义 pill）。
+- 空态文案还原（附带项 B）：模板三元改回 `conditionDisplay === 'sentence' ? '该期暂无细分情景' : '条件未成立 · 暂无已验证结论'`（sentence 恢复改造前原文案）；`ConditionalForecastBlock.spec.ts` 中该串断言同步改锚定整个三元表达式，**用例数不变（仍 3 条）**。
+- 新增挂载护栏（附带项 C）：`src/shared/components/ConditionalForecastBlock.mount.spec.ts`（vitest + happy-dom，5 条）——① conclusion + 全无 met → 有折叠入口且分支节点 0；② 点开入口 → 分支节点 == 该档 conditions 数；③ conclusion + 一条 `met:true` → 「条件成立」徽 + 无折叠入口 + 「另有 1 条条件未成立」；④ `verification:'miss'` + 折叠态 → 「未命中」且头部 `.as-insight-card__verify` 不渲染；⑤ full / 不传 display-mode → 分支节点 == conditions 数且无折叠入口（A 的回归护栏，反向变异实测可捕获）。新文件已登记进 `vitest.config.ts` 的 `test.include` 白名单（`tests/run-node-specs.mjs` 未改，node:test 计数保持 `248/248/0`）。
+- 验收：`npx vue-tsc --noEmit` **0 错误**（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`node --import tsx --test src/shared/components/ConditionalForecastBlock.spec.ts src/shared/utils/conditionalForecast.spec.ts` 11/11 passed；`npx vitest run src/shared/components/ConditionalForecastBlock.mount.spec.ts src/modules/analytics src/modules/market src/modules/rhythm src/modules/fear-greed` 6 files / 47 tests passed（exit 0，无存量红）；组件库 `npm run type-check` 仅存量 5 条（`dev/App.vue` Segmented ×4 + `AudioPlayer.vue` ×1）。两副本 `Compare-Object` 差异仍仅内联 helper 定义块（库 233-257，25 行）↔ App import 行（161 行 + 空行），切除后逐行相等；`InsightCard.vue` 两副本一致。
+- 文档同步：`AGENTS.md`（CFB 行）、`src/modules/analytics/AGENTS.md`（traceability 行）。
+
+## 2026-09-17 CFB 折叠态判定修正（按已成立分支 lit 判，不再依赖降级模式）+ 未命中标签去重
+
+- 问题（用户报障）：折叠态判定挂在 `resolvedDisplayMode === 'conclusion'`（= 当期含布尔 `met`），而后端按决策 D1 只写 `condition_met=true`、不写 false → 未触发档没有任何布尔 `met` → `hasMetData` 为假 → `resolveDisplayMode` 降级 `full` → 分支渲染源返回全部分支 → **折叠态在真实数据下不可达**。
+- 修正（CFB 两副本）：三态判定改为按「当期有无已成立分支」——① `folded = conditionDisplay !== 'sentence' && lit.length === 0 && inHorizon.length > 0`（`lit` = 当期 `met===true`，取 `selectVisibleConditions(inHorizon, 'conclusion')`；`inHorizon.length > 0` 守卫避免「该档无条件分支」时渲染出点开后空无一物的入口）→ 只显基准行 + 折叠入口「查看条件化预判 ▾ / 收起条件化预判 ▴」（本地展开后铺开该档全部分支）；② 已触发（`lit.length > 0`）只渲染 `lit` 分支 + 分支区末尾「另有 N 条条件未成立」（N = `inHorizon − lit`，仅 N>0）；③ `sentence` 形态不折叠、不过滤，维持整句原文直显。
+- 去重：folded 且 `verification === 'miss'` → 头部同义 pill「验证未中」由 `verifyText` 抑制，只保留入口行「未命中」标签；`pending`/`hit`/未折叠的 `miss` 保持既有 pill 行为不变。
+- 取值：空态文案「条件未成立 · 暂无已验证结论」在 tags 形态下不再出现（由折叠态承接）；最终保留在模板三元里仅由 `sentence` 形态命中（该档无基准行且无分支时）。
+- `resolveDisplayMode` / `hasMetData` 在组件内已无消费方：`src/shared/utils/conditionalForecast.ts` 函数与 8 条单测保留（供后续使用），App 侧 import 收窄为 `selectVisibleConditions`；CFB 的 `displayMode` prop 保留但不再驱动 UI。
+- spec：`src/shared/components/ConditionalForecastBlock.spec.ts` **用例数不变（仍 3 条）**，仅加/改断言——锚定 `litConditions`（`selectVisibleConditions(inHorizonConditions.value, 'conclusion')`、`litConditions.value.length === 0`、`if (!isFoldedUnmet.value) return litConditions.value`）+ `doesNotMatch(/resolvedDisplayMode/)` 防回归 + miss pill 抑制表达式；`tests/run-node-specs.mjs` 基线维持 `248/248/0`（未改常量）。
+- 验收：`npx vue-tsc --noEmit` **0 错误**（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`npx vitest run src/modules/analytics src/modules/market src/modules/fear-greed` 5 files / 42 tests passed（exit 0）；组件库 `npm run type-check` 仅存量 5 条（`dev/App.vue` Segmented ×4 + `AudioPlayer.vue` ×1）；两副本 `Compare-Object` 差异仅 helper 定义块（库 25 行）↔ App import 行（1 行 + 空行），InsightCard 两副本无输出。
+- 文档同步：`AGENTS.md`（CFB 行）、`src/modules/analytics/AGENTS.md`（traceability 行）。
+
+## 2026-09-17 洞见卡未触发折叠态（查看条件化预判）+ 未命中标签 + 隐藏分支标注 + 市场洞见主因卡预判入口
+
+- CFB（两副本）：**未触发折叠态**——当前档无 `met === true` 分支、且 `conclusion` 实际生效、且 tags 形态 → 分支区不铺开，收为一行入口「查看条件化预判 ▾」/「收起条件化预判 ▴」（本地展开，切期段归零）；展开后铺开该档**全部**条件分支（沿用既有分支渲染与样式）。基准行（方向 + 基准 · label + 置信 + 剩余窗口）照常显示。
+- 取值口径（二选一收敛，已授权）：原空态文案「条件未成立 · 暂无已验证结论」的显示场景（`conclusion` 生效 + 无已成立分支）**整体由折叠态承接，该文案在 tags 形态下不再出现**；仅保留给 `sentence` 形态的同类场景。理由：`conclusion` 生效且无已成立分支在本组件内是同一状态，两条渲染分支会给同一状态两套 UI。
+- 到期未触发标签：折叠态下 `structured.verification === 'miss'`（卡级聚合验证口径；无新增后端字段、不写 `condition_met=false`）→ 入口旁显示中性灰「未命中」（沿用既有 miss 灰/中性色，不与 `hit` 实心绿混用）；`pending`/缺失不显示。
+- 隐藏分支纯标注：`conclusion` 生效 + 有已成立分支（非折叠态）+ 被过滤分支数 > 0 → 分支区末尾「另有 N 条条件未成立」（N = 该档 `inHorizonConditions.length − activeConditions.length`），caption 字号中性小标签、不可点开。
+- 已触发（存在 `met === true`）保持现设计：只渲染已成立分支 + `[条件成立]` 徽 + 验证标识，不折叠、不显示折叠入口。
+- `src/modules/analytics/pages/traceability.vue`：「主因板块 · 板块研判」每张 `SectorInsightCard` 之后加一行「看该板块预判 →」，跳 `/modules/market/pages/sector-detail?name=<candidate.name>`（沿用项目既有 `?name=` 入参约定）；预判内容不进主因卡（溯源/预判两轨分离不变）。
+- spec：`src/shared/components/ConditionalForecastBlock.spec.ts` 在既有用例体内补断言（查看/收起条件化预判、折叠判定的 `conditionDisplay !== 'sentence'` 守卫、`verification === 'miss'`、`另有 {{ hiddenConditionCount }} 条条件未成立`、`renderedConditions`/`toggleBranches`）——用例数不变（仍 3 条），`tests/run-node-specs.mjs` 基线维持 `248/248/0`。
+- 连带生效（同一组件语义，无额外改动）：`market/pages/sector-loop.vue` 的 CFB（`display-mode="conclusion"` + 默认 tags）同样进入折叠态；`MarketTracePrediction` 走 `condition-display="sentence"` → 折叠逻辑不生效（保持整句原文直显）。
+- 验收：`npx vue-tsc --noEmit` 0 错误（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`npx vitest run src/modules/analytics src/modules/market src/modules/fear-greed` 5 files / 42 tests passed（exit 0，无存量红）；CFB 两副本 `Compare-Object` 差异仅 helper 定义块 + App 侧 import 行，InsightCard 两副本无差异。
+
+## 2026-09-16 洞见卡结论模式（只显示已验证结论）落地
+
+- CFB 新增 `displayMode: 'full' | 'conclusion'`（默认 `full`，向后兼容）：结论模式只渲染 `met === true` 分支，未满足分支彻底隐藏（不置灰、不提示）；该期无已成立分支时显示「条件未成立 · 暂无已验证结论」。
+- 降级口径（用户裁决，Task 5b）：`resolveDisplayMode` 使 `conclusion` 仅在整块含布尔 `met` 时生效；整块无布尔 `met`（后端未回填 `condition_met`）时自动降级 `full`，避免全空态，后端回填后自然生效。
+- 纯函数 `selectVisibleConditions` / `hasMetData` / `resolveDisplayMode`（`src/shared/utils/conditionalForecast.ts`）+ 8 条 node:test 单测（`conditionalForecast.spec.ts`）。
+- InsightCard：新增溯源「依据详情」展开入口（`traceDetail` + `traceStructured.more`，本地展开不新增接口）+ `traceStructured.stages` 预留链式溯源 P3'（无数据不渲染）+ `displayMode` 透传 CFB；SectorInsightCard 透传 `displayMode` / `traceDetail`（缺省回退 `candidate.trace.summary`，与溯源行同句时不重复渲染入口）。
+- 板块粒度接入：sector-detail / sector-loop / traceability 传 `display-mode="conclusion"`。
+- 基线修复与同步：CFB 回灌 `positionAction` 仓位动作徽标至组件库、补单档守卫（`horizonSegments.length > 1`）+ `activeHorizon` `watchEffect` 校正使既有红测转绿；`tests/run-node-specs.mjs` 基线同步 `237/237/0` → `243/243/0` → `246/246/0`（实测 `246/246/0`，exit 0）。
+- 覆盖缺口（不含本次范围，需另行排期）：
+  - **大盘粒度**（MarketTracePrediction）分支级 `met` 恒为 `undefined`（2026-09-16 取证）→ 保持 full 渲染，待后端补齐 `conditions[].met` 后再接入 `display-mode="conclusion"`。
+  - 取证证据：`src/shared/api/modules/agent.ts:213-221` `MarketTracePredictionCondition` 仅 `condition/label/scenario/anchor/keywords`，**无 `met` 字段**（对照 `agent.ts:586-599` 板块 `SectorInsightCondition.met?: boolean | null`）；`src/modules/analytics/utils/marketTraceReview.ts:314-332` `toPredictionPresentation` 不产出 `met`（同文件 170-180 `PredictionConditionPresentation` 亦无该字段）；`MarketTracePrediction.vue:145` 写死 `met: undefined`。唯一分支级 `met` 来源是板块链路（`aistock-app-api/src/core/routes/sectorInsightRouter.ts:260-300` 由 `verification[].condition_met` 按 `condition_index` 派生）；且该 `condition_met` 当前后端恒为 `null`（`aistock-agent-py/src/aistock_agent/services/prediction_validator.py:370,391`「两段判定推迟，§9-5」，agent-py 权威 schema 亦无 `met` 字段）。备选口径（**未采用**）：大盘 entry 级 `conditionStage`（`predictionHistory.ts:37-41` 读 `verification[c{i}].result`）语义是「scenario 是否命中」而非 spec §9-5「条件成立」，故不作 `met` 代理。
+  - **板块页观察**：因上述恒 `null`，板块粒度在无 `met === true` 数据时同样走降级全量渲染（不再落空态）；待后端条件验证两段判定落地后自然出结论。
+  - **个股粒度**：App 端无 CFB 接入点（现仅 `insight-detail-move.vue` 裸渲染 conditions 列表）→ 需先建接入点。
+  - **Web 端**（`aistock-frontend`）：零等价组件（仅 `modules/event/components/AiEventReport.vue` 内联手写文本洞见卡）→ 跨端属新增工作。
+- 验收（Task 8 全量回归）：App `npx vue-tsc --noEmit` **0 错误**（exit 0）；`npm run test:node` `246/246/0`（exit 0）；`npx vitest run` 4 failed / 406 passed——5 个失败文件经 A/B 回退到本计划前基线复核**全部为存量基线红**（KLineChart.vue renderjs 双 script 编译错 ×2 suite、reports.vue 布局断言、favorites AlertContent/insight-detail 断言），本次零引入；CFB 两副本差异仅 helper 定义块、InsightCard 两副本无差异。
+- 终审收口（2026-09-16 全分支终审 I/L 项）：`resolvedDisplayMode` 改为按**当前期段**判定降级（新增 `inHorizonConditions` computed，`activeConditions` 改由它过滤）——消除跨档假空态：某档有布尔 `met`、另一档全为 `null/undefined` 时，切到后者不再误显「条件未成立 · 暂无已验证结论」并隐藏该档全部分支（I1）；spec 追加 2 条锚定断言（过滤必须取 `resolvedDisplayMode`；App 侧必须 import shared util，防「库→App 整文件复制」把内联灌回使 utils 变死代码）（I3/L2）；SectorInsightCard `traceDetailText` 补「与卡标题同句 → 空」，与既有「与溯源行同句 → 空」并列（L1）。验证：`npx vue-tsc --noEmit` 0 错误（exit 0）；`npm run test:node` `246/246/0`（exit 0，断言加在既有用例内，基线不变）。
+
+## 2026-09-16 condition_met 两段判定：条件点亮中间态不再误标「已验证」（终审阻塞项 #1）
+
+- 问题：后端两段判定第①段（到期前点亮）只写 `verification[c{i}].condition_met = true`、**不写 `result`**；`conditionStage` 旧口径「entry 存在即 verified」把中间态判成 `result: undefined`，`condBadgeText` 落到 `map[undefined] || '已验证'` → 详情页误显「已验证」+「实际 --」。
+- 修复：`src/modules/analytics/utils/predictionHistory.ts` 新增 `ConditionStage` 分支 `{ kind: 'condition_met' }`（判定：entry 存在、`result == null`、`condition_met === true`），置于「有 result → verified」之前；`verified` 分支返回形状不变（向后兼容）。
+- 组件：`src/modules/analytics/components/PredictionVerification.vue` 的 `condBadgeText` 对新 kind 输出「条件已成立 · 待验证」，颜色沿用既有 `badge-pending`（`condBadgeClass` 未改，fallthrough 即 pending）；「实际 X」仍只在 `kind === 'verified'` 渲染，中间态不再出现「实际 --」。
+- 测试（先红后绿）：`predictionHistory.spec.ts` 新增 2 条（中间态 → `condition_met`；到期后 `condition_met` 保留 + 有 `result` → `verified`）；新增 vitest 挂载 spec `src/modules/analytics/components/PredictionVerification.spec.ts`（3 条：中间态文案+pending 色且不含「已验证」/「实际」、到期后「命中」+「实际 +5.2%」、无 c{i} 仍「待验证」），并登记进 `vitest.config.ts` 的 `test.include` 白名单（否则 vitest 静默跳过）。
+- 基线同步：`tests/run-node-specs.mjs` `EXPECTED_BASELINE` `246/246/0` → `248/248/0`。
+- 验收：`npx vitest run src/modules/analytics` 3/3 passed（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`npx vue-tsc --noEmit` 0 错误（exit 0）；`npx vitest run` 全量为存量红（4 failed / 409 passed + 2 失败 suite，A/B 回退取证与本次改动前逐条一致）。
+- 未改：`PredictionVerification` 其他状态文案/样式、后端契约、`overallStatus`（c{i} entry 本就不参与 `status=verified`）。

@@ -27,22 +27,35 @@ test('首页展示真实缺失来源，且零条 Brief 不显示为关键线索'
 test('首页卡片替换为节奏大师（今日分析概览移至交易入口占位）', () => {
   assert.match(componentSource, /节奏大师/)
   assert.match(componentSource, /modules\/rhythm\/pages\/index/)
-  assert.match(componentSource, /getRhythmMaster/)
+  assert.match(componentSource, /getRhythmMasterCalendar/)
   // 今日分析概览已从首页卡片移除
   assert.ok(!/今日分析概览/.test(componentSource))
 })
 
-test('loadRhythm 解包行为：拦截器已解包 {code,data} 信封，直接取 .versions（mock getRhythmMaster 返回 {date, versions}）', () => {
-  // 从源码提取解包行并模拟执行：响应拦截器（request.ts）code===0 时 return data，
-  // 故 getRhythmMaster 解析值即 {date, versions}，无 .data 字段；?.data?.versions 写法会导致 versions 恒为 undefined
-  const unwrapLine = componentSource.match(/const versions = \(res as \{.*\}\)\.versions \?\? \[\]/)?.[0]
-  assert.ok(unwrapLine, 'loadRhythm 应存在直接解包 .versions ?? [] 的表达式（而非 ?.data?.versions）')
-  const js = unwrapLine.replace(/\(res as \{[^]*?\}\)/, '(res)')
-  const unwrap = new Function('res', `${js}\nreturn versions`) as (res: unknown) => unknown[]
-  const versions = [{ refresh_slot: 'after_close' }, { refresh_slot: 'morning' }]
-  // mock agentApi.getRhythmMaster 返回 {date, versions:[...]} → versions 被填充
-  assert.deepEqual(unwrap({ date: '2026-08-28', versions }), versions)
-  // versions 缺失/空 → 兜底 []
-  assert.deepEqual(unwrap({ date: '2026-08-28' }), [])
-  assert.deepEqual(unwrap({ date: '2026-08-28', versions: [] }), [])
+test('节奏卡改近几日摘要：一次 getRhythmMasterCalendar 取多日，映射 position_band 仓位文案；不逐日 getRhythmMaster', () => {
+  assert.match(componentSource, /agentApi\.getRhythmMasterCalendar\(HOME_RHYTHM_DAYS\)/)
+  assert.match(componentSource, /band: d\.position_band\?\.text \?\? ''/)
+  // 首页摘要只消费日历聚合接口（含 position_band），避免为多日结论发 N 次单日报告请求
+  assert.doesNotMatch(componentSource, /agentApi\.getRhythmMaster\(/)
+  assert.doesNotMatch(componentSource, /rhythmSummary/)
+})
+
+test('节奏卡近几日行可点入对应交易日详情（带 date 参数），且 stop 防触整卡跳转', () => {
+  assert.match(componentSource, /@tap\.stop="goRhythmDate\(r\.date\)"/)
+  assert.match(componentSource, /function goRhythmDate\(date: string\)/)
+  assert.match(componentSource, /modules\/rhythm\/pages\/index\?date=\$\{date\}/)
+  // 整卡点击仍保留（默认进最近交易日）
+  assert.match(componentSource, /function goRhythm\(\)/)
+})
+
+test('节奏卡 loadRhythmHistory 失败/空数据兜底为空数组（不显示假数据），onShow 接入新取数函数', () => {
+  assert.match(componentSource, /async function loadRhythmHistory\(\)/)
+  assert.match(componentSource, /agentApi\.getRhythmMasterCalendar\(HOME_RHYTHM_DAYS\)/)
+  assert.match(componentSource, /res\?\.days \?\? \[\]/)
+  // 失败兜底写在 catch 内（空数组，不显示假数据）
+  assert.match(componentSource, /catch \{\s*\n\s*rhythmRows\.value = \[\]/)
+  // onShow 调用点同步更新（防手改函数却忘接入口）
+  const onShowBlock = componentSource.match(/onShow\(\(\) => \{[\s\S]*?\n\s*\}\)/)?.[0] ?? ''
+  assert.match(onShowBlock, /loadRhythmHistory\(\)/)
+  assert.doesNotMatch(onShowBlock, /loadRhythm\(\)/)
 })

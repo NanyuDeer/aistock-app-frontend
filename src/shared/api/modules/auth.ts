@@ -53,9 +53,9 @@ export const authApi = {
     return request.post('/auth/wx-login', { code })
   },
 
-  /** 发送短信验证码（限流 60s，dev 环境回显 123456） */
-  sendSmsCode(phone: string) {
-    return request.post<{ expireSeconds: number }>('/auth/sms/send', { phone })
+  /** 发送短信验证码（限流 60s，dev 环境回显 123456；scenario=bind 走"绑定新手机号"模板 100004） */
+  sendSmsCode(phone: string, scenario: 'login' | 'bind' = 'login') {
+    return request.post<{ expireSeconds: number }>('/auth/sms/send', { phone, scenario })
   },
 
   /** 手机号 + 短信验证码登录（无账户自动创建） */
@@ -86,6 +86,11 @@ export const authApi = {
   /** 给当前登录的邮箱账户绑定微信（Bearer，邮箱+验证码证明归属） */
   bindWechat(email: string, code: string, wxCode: string) {
     return request.post<{ wechatBound: boolean }>('/auth/bind/wechat', { email, code, wxCode })
+  },
+
+  /** 给当前登录的手机号账户绑定微信（Bearer，手机号+短信验证码证明归属） */
+  bindWechatByPhone(phone: string, code: string, wxCode: string) {
+    return request.post<{ wechatBound: boolean }>('/auth/bind/wechat', { phone, code, wxCode })
   },
 
   /** 账号密码登录（App/H5，保留兼容） */

@@ -108,7 +108,7 @@ describe('AlertContent.vue 首页特别提醒', () => {
 
   // ===== 自选股洞察 - 旧预览 ListCell 形态 =====
 
-  it('接口成功 → 渲染 ≤6 行（mock 7 只不同股票的可归因事件 → 只渲染 6 行）', async () => {
+  it('接口成功 → 渲染 ≤4 行（mock 7 只不同股票的可归因事件 → 只渲染 4 行）', async () => {
     // 构造 7 条可归因事件（7 只不同股票，避免被同日同股聚合规则合并）
     const sevenMovements = Array.from({ length: 7 }, (_, i) => ({
       event_id: `mv:test:${i}`, trigger_revision: 1, symbol: `60000${i}`, stock_name: `测试股${i}`,
@@ -120,13 +120,13 @@ describe('AlertContent.vue 首页特别提醒', () => {
     stockTraceApiMock.list.mockResolvedValue({ items: sevenMovements, nextCursor: null })
     const wrapper = mount(AlertContent)
     await flushPromises()
-    // 洞察块 ListCell 应为 6 行（第 7 条被截断）
+    // 洞察块 ListCell 应为 4 行（MAX_PREVIEW=4，第 5 条起被截断）
     const cells = wrapper.findAll('.list-cell-stub')
     // 个股情报块为空（无情报数据），所以所有 list-cell-stub 都来自洞察块
-    expect(cells.length).toBe(6)
-    // 验证前 6 条有标题，第 7 条不出现
+    expect(cells.length).toBe(4)
+    // 验证前 4 条有标题，第 5 条不出现
     expect(cells[0].attributes('data-title')).toBe('测试股0')
-    expect(cells[5].attributes('data-title')).toBe('测试股5')
+    expect(cells[3].attributes('data-title')).toBe('测试股3')
   })
 
   it('同日同股多条异动 → 只渲染最新一条（2026-09-13 同日聚合）', async () => {
@@ -143,8 +143,8 @@ describe('AlertContent.vue 首页特别提醒', () => {
     const wrapper = mount(AlertContent)
     await flushPromises()
     const cells = wrapper.findAll('.list-cell-stub')
-    // 洞察块固定 6 行（不足补占位）：聚合后仅 1 条数据 + 5 行占位
-    expect(cells.length).toBe(6)
+    // 洞察块固定 4 行（不足补占位）：聚合后仅 1 条数据 + 3 行占位
+    expect(cells.length).toBe(4)
     // 保留当日最新一条的归因
     expect(cells[0].attributes('data-title')).toBe('金富科技')
     expect(cells[0].attributes('data-description')).toContain('午后主因')
@@ -181,10 +181,10 @@ describe('AlertContent.vue 首页特别提醒', () => {
     const wrapper = mount(AlertContent)
     await flushPromises()
     const cells = wrapper.findAll('.list-cell-stub')
-    // 仅有 2 条可归因行渲染（其余 4 行为空占位保持 6 行）
-    // 但空占位也渲染 ListCell（title='\u3000'），所以总共有 6 个 ListCell
-    // 其中 2 个有真实 title，4 个为空占位
-    expect(cells.length).toBe(6)
+    // 仅有 2 条可归因行渲染（其余 2 行为空占位保持 4 行）
+    // 但空占位也渲染 ListCell（title='\u3000'），所以总共有 4 个 ListCell
+    // 其中 2 个有真实 title，2 个为空占位
+    expect(cells.length).toBe(4)
     // 检查有真实标题的行
     const realCells = cells.filter((c) => {
       const title = c.attributes('data-title')

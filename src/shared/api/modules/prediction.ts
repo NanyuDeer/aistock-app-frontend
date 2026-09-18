@@ -48,6 +48,8 @@ export interface PredictionCondition {
   condition: string
   scenario: string
   anchor?: PredictionConditionAnchor
+  /** 简洁展示用关键词（2026-09-02 起新数据携带：1~2 个，单条 ≤10 字）；旧记录无 */
+  keywords?: string[]
 }
 
 /** 预测记录（对齐后端 PredictionRecord + 补 report_date） */
@@ -96,6 +98,8 @@ export const predictionApi = {
   list(params: {
     status?: 'all' | 'pending' | 'verified'
     source_id?: string
+    /** 记录类型过滤：大盘溯源预测（market_trace）/ 板块预判（sector_prediction）；大盘历史页传 market_trace */
+    source_type?: 'market_trace' | 'sector_prediction'
     page?: number
     pageSize?: number
   } = {}) {

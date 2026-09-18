@@ -17,6 +17,12 @@ export interface BranchLike {
   direction?: string | null
   met?: boolean | null
   anchor?: unknown
+  /** 路径短语名（对冲拆分分支无 → 置空，不复用主支 label） */
+  label?: string
+  /** 简洁展示关键词（新数据携带）；对冲拆分分支无 → 置空 */
+  keywords?: string[]
+  /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度）；对冲拆分分支无 → 置空 */
+  scenario_keywords?: string[]
 }
 
 /** 以“；若”/“;若”切分 scenario 为多段（保留各段文本，前导分隔符去除） */
@@ -42,9 +48,17 @@ function parseElseSegment(segment: string): { condition: string; scenario: strin
   return { condition: parsed[1].trim(), scenario: parsed[2].trim() }
 }
 
+/** 主条件方向 → 对冲分支方向（主 bullish → bearish，反之亦然；neutral 保持中性） */
+function oppositeDirection(direction: BranchLike['direction']): BranchLike['direction'] {
+  if (direction === 'bullish') return 'bearish'
+  if (direction === 'bearish') return 'bullish'
+  if (direction === 'neutral') return 'neutral'
+  return undefined
+}
+
 /**
  * 把一个条件展开为多个条件：主条目（原 condition + 首段 scenario）+
- * 每条内嵌“若X则Y”对冲拆出的独立条目（direction/anchor 置空）。
+ * 每条内嵌“若X则Y”对冲拆出的独立条目（方向取主条件的反向，anchor 置空）。
  */
 export function expandConditionalBranches<T extends BranchLike>(cond: T): T[] {
   const segments = splitScenarioSegments(cond.scenario)
@@ -57,11 +71,42 @@ export function expandConditionalBranches<T extends BranchLike>(cond: T): T[] {
       ...cond,
       condition: parsed ? parsed.condition : seg.replace(/^若\s*/, '').trim() || cond.condition,
       scenario: parsed ? parsed.scenario : '',
-      direction: undefined,
+      direction: oppositeDirection(cond.direction),
       met: undefined,
       anchor: undefined,
+      label: undefined,
+      keywords: undefined,
+      scenario_keywords: undefined,
     }
     return extra as T
   })
   return [{ ...cond, scenario: main }, ...extras]
+}
+
+/**
+ * 预判分支可见性（spec §7「只显示已验证结论」）：
+ * - full：原样返回（现状）；
+ * - conclusion：只保留已成立分支（met === true），未满足分支彻底隐藏（不置灰、不提示）。
+ * 注意：full 模式返回入参同一引用（如需避免下游误改请调用方自行复制）。
+ */
+export function selectVisibleConditions<T extends { met?: boolean | null }>(
+  conditions: T[],
+  mode: 'full' | 'conclusion'
+): T[] {
+  if (mode !== 'conclusion') return conditions
+  return conditions.filter((c) => c.met === true)
+}
+
+/** 是否含分支级 met 数据（布尔）；全缺省/null → false（如大盘链路当前恒 undefined） */
+export function hasMetData(conditions: Array<{ met?: boolean | null }>): boolean {
+  return conditions.some((c) => typeof c.met === 'boolean')
+}
+
+/** 解析实际展示模式：conclusion 仅在整块含布尔 met 数据时生效，否则降级 full（防后端未回填 met 造成全空态） */
+export function resolveDisplayMode(
+  conditions: Array<{ met?: boolean | null }>,
+  mode: 'full' | 'conclusion'
+): 'full' | 'conclusion' {
+  if (mode !== 'conclusion') return 'full'
+  return hasMetData(conditions) ? 'conclusion' : 'full'
 }

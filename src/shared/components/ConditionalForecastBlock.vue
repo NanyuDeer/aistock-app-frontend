@@ -6,8 +6,8 @@
       <text v-if="verifyText" class="as-insight-card__verify" :class="verifyClass">{{ verifyText }}</text>
     </view>
 
-    <!-- 期段切换 -->
-    <view class="as-insight-card__seg">
+    <!-- 期段切换（仅多档时展示：单档不显孤 Tab） -->
+    <view v-if="horizonSegments.length > 1" class="as-insight-card__seg">
       <view
         v-for="seg in horizonSegments"
         :key="seg"
@@ -22,65 +22,143 @@
     <!-- 当前期内容：基准方向 + 该期条件情景 -->
     <view class="as-insight-card__ph">
       <view v-if="activeBase" class="as-insight-card__ph-head">
-        <text class="as-insight-card__ph-label">基准</text>
         <text v-if="activeBase.direction" class="as-insight-card__dir" :class="dirClass(activeBase.direction)">
           {{ dirText(activeBase.direction) }}
         </text>
+        <text v-if="activeBase.label" class="as-insight-card__ph-tt">基准 · {{ activeBase.label }}</text>
         <text v-if="activeBase.confidence" class="as-insight-card__conf">置信 {{ confText(activeBase.confidence) }}</text>
         <text v-if="activeBase.remaining" class="as-insight-card__remain">{{ activeBase.remaining }}</text>
       </view>
 
-      <view v-if="activeConditions.length" class="as-insight-card__sc-list">
-        <view
-          v-for="(cond, idx) in activeConditions"
-          :key="idx"
-          class="as-insight-card__sc"
-          :class="{
-            'as-insight-card__sc--on': cond.met === true,
-            'as-insight-card__sc--off': cond.met === false
-          }"
-        >
+      <view v-if="renderedConditions.length" class="as-insight-card__sc-list">
+        <template v-for="(cond, idx) in renderedConditions" :key="idx">
+          <!-- 互斥分支间以“或”分隔（2026-09-03 方案 C） -->
+          <view v-if="idx > 0" class="as-insight-card__sc-or">
+            <text class="as-insight-card__sc-or-tx">或</text>
+          </view>
+
           <view
-            class="as-insight-card__sc-bar"
-            :class="{ 'as-insight-card__sc-bar--on': cond.met === true }"
-          />
-          <view class="as-insight-card__sc-body">
-            <view class="as-insight-card__sc-if">
-              <text class="as-insight-card__sc-no">{{ idx + 1 }}</text>
-              <text class="as-insight-card__sc-prefix">若</text>
-              <text class="as-insight-card__sc-cond">{{ condMain(cond.condition) }}</text>
-            </view>
-            <view class="as-insight-card__sc-then">
+            class="as-insight-card__sc"
+            :class="{
+              'as-insight-card__sc--live': cond.met === true,
+              'as-insight-card__sc--off': cond.met === false,
+              'as-insight-card__sc--up': cond.direction === 'bullish',
+              'as-insight-card__sc--dn': cond.direction === 'bearish'
+            }"
+          >
+            <!-- 条件已触发：右上四字状态徽（染方向色） -->
+            <text v-if="cond.met === true" class="as-insight-card__sc-live">条件成立</text>
+
+            <!-- 行1 · 路径首行：方向徽 + 短语名（label；sentence/旧数据无 label → 长句主干）
+                 右侧“详情 ▾”（右对齐纯文字）：点击在行3展开完整预判句 -->
+            <view
+              class="as-insight-card__sc-top"
+              :class="{ 'as-insight-card__sc-top--badge': cond.met === true }"
+            >
               <text v-if="cond.direction" class="as-insight-card__dir" :class="dirClass(cond.direction)">
                 {{ dirText(cond.direction) }}
               </text>
-              <template v-for="(part, i) in splitScenario(cond.scenario)" :key="i">
+              <text v-if="cond.label && conditionDisplay !== 'sentence'" class="as-insight-card__sc-lead">{{ cond.label }}</text>
+              <text v-else class="as-insight-card__sc-lead">{{ condMain(cond.condition) }}</text>
+              <view
+                v-if="canFoldScenario(cond)"
+                class="as-insight-card__sc-more"
+                :class="{ 'as-insight-card__sc-more--open': isScenarioExpanded(cond.horizon, idx) }"
+                @tap.stop="toggleScenario(cond.horizon, idx)"
+              >
+                <text class="as-insight-card__sc-more-tx">{{ isScenarioExpanded(cond.horizon, idx) ? '收起' : '详情' }}</text>
+                <view class="as-insight-card__sc-more-chev" />
+              </view>
+            </view>
+
+            <!-- 行2 · 若[触发条件关键词] 则[预判幅度]（2026-09-03 若·则 语义行；仅可折叠标签形态） -->
+            <view v-if="canFoldScenario(cond)" class="as-insight-card__sc-rules">
+              <text class="as-insight-card__sc-conn">若</text>
+              <text
+                v-for="(k, ki) in cond.keywords"
+                :key="ki"
+                class="as-insight-card__sc-chip"
+              >{{ k }}</text>
+              <text class="as-insight-card__sc-conn">则</text>
+              <text
+                v-for="(pre, ai) in scenarioRuleChips(cond)"
+                :key="'a' + ai"
+                class="as-insight-card__sc-chip as-insight-card__sc-amp-chip"
+              >{{ pre }}</text>
+            </view>
+
+            <!-- 关键词行（老形态）：非可折叠（sentence/旧数据/无幅度段）时保留原关键词 chips -->
+            <view v-else-if="useKeywords(cond) && cond.label" class="as-insight-card__sc-kws">
+              <text
+                v-for="(k, ki) in cond.keywords"
+                :key="ki"
+                class="as-insight-card__sc-chip"
+              >{{ k }}</text>
+            </view>
+
+            <!-- 行3 · 完整预判句：可折叠形态点击“详情”后在此展开；非可折叠形态直接原文展示 -->
+            <view
+              v-if="canFoldScenario(cond) && isScenarioExpanded(cond.horizon, idx)"
+              class="as-insight-card__sc-full"
+            >
+              <text
+                v-for="(part, pi) in scenarioParts(cond.scenario)"
+                :key="pi"
+                class="as-insight-card__sc-scenario"
+                :class="{ 'as-insight-card__sc-amp': part.kind === 'amp' }"
+              >{{ part.t }}</text>
+            </view>
+            <view v-else-if="!canFoldScenario(cond)" class="as-insight-card__sc-then">
+              <template v-for="(part, i) in scenarioParts(cond.scenario)" :key="i">
                 <text
-                  class="as-insight-card__sc-scenario"
-                  :class="{ 'as-insight-card__sc-amp': part.kind === 'amp' }"
+                  v-if="part.kind === 'amp'"
+                  class="as-insight-card__sc-amp"
                 >{{ part.t }}</text>
+                <text v-else class="as-insight-card__sc-scenario">{{ part.t }}</text>
               </template>
             </view>
+
+            <!-- 结构化仓位动作徽标（add/reduce/hold + 成数，如 加仓 +2 成；后端 position_action 透传） -->
+            <view v-if="cond.positionAction" class="as-insight-card__sc-action" :class="actionClass(cond.positionAction.direction)">
+              <text class="as-insight-card__sc-action-tx">{{ actionText(cond.positionAction) }}</text>
+            </view>
+
             <!-- 验证锚点（大盘等粒度 anchor.threshold/metric 透传，板块暂无则不渲染） -->
             <view v-if="hasAnchor(cond)" class="as-insight-card__sc-anchors">
               <text v-if="cond.anchor?.threshold" class="as-insight-card__anchor-chip">{{ cond.anchor.threshold }}</text>
               <text v-if="cond.anchor?.metric" class="as-insight-card__anchor-chip">{{ cond.anchor.metric }}</text>
             </view>
           </view>
-          <text v-if="cond.met === true" class="as-insight-card__sc-st as-insight-card__sc-st--yes">已触发</text>
-          <text v-else-if="cond.met === false" class="as-insight-card__sc-st as-insight-card__sc-st--no">未触发</text>
-        </view>
+        </template>
       </view>
 
-      <view v-if="!activeBase && !activeConditions.length" class="as-insight-card__sc-empty">
-        该期暂无细分情景
+      <!-- 已触发档隐藏分支纯标注（仅结论模式；只渲染已成立分支、其余被过滤 → 在此告知剩余 N 条，纯标注不可点开） -->
+      <view v-if="showHiddenBranchLabel" class="as-insight-card__sc-hidden">
+        <text class="as-insight-card__sc-hidden-tx">另有 {{ hiddenConditionCount }} 条条件未成立</text>
+      </view>
+
+      <!-- 未触发折叠态（仅结论模式 + tags 形态）：该档无已成立分支（与有无 met 数据无关）→ 基准行照常显示，
+           分支区收为一行入口；点开后再铺开该档全部条件分支（沿用既有分支渲染与样式） -->
+      <view v-if="isFoldedUnmet" class="as-insight-card__sc-fold" @tap.stop="toggleBranches">
+        <!-- 到期未触发（卡级聚合 verification=miss）：中性灰标签，不与 hit 的实心绿混用；
+             此时头部同义 pill「验证未中」由 verifyText 抑制（避免同一状态两处重复表述） -->
+        <text v-if="showMissTag" class="as-insight-card__sc-miss">未命中</text>
+        <text class="as-insight-card__sc-fold-tx">{{ branchesExpanded ? '收起条件化预判 ▴' : '查看条件化预判 ▾' }}</text>
+      </view>
+
+      <!-- 空态（无基准行且无分支）：sentence 形态恢复改造前原文案「该期暂无细分情景」；
+           tags 形态（结论模式）用结论空态文案（其「该档无已成立分支」状态已由上方折叠入口承接） -->
+      <view v-else-if="!activeBase && !renderedConditions.length" class="as-insight-card__sc-empty">
+        <text>{{ conditionDisplay === 'sentence' ? '该期暂无细分情景' : '条件未成立 · 暂无已验证结论' }}</text>
       </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
+
+import { selectVisibleConditions } from '@/shared/utils/conditionalForecast'
 
 /**
  * ConditionalForecastBlock 条件化预判块（洞见卡系通用块，2026-09-02 抽取）
@@ -99,6 +177,8 @@ interface StructuredHorizon {
   horizon: HorizonKey
   /** 档位时长描述，如 "1-5 交易日"（缺省只显示 短/中/长） */
   remaining?: string
+  /** 基准走势短语（4~6 字，如 恐慌出清为主；基准行“基准 · {label}”展示；旧数据无则回退） */
+  label?: string
   /** 该期基准方向 */
   direction?: Direction
   /** 该期基准置信度 */
@@ -110,10 +190,18 @@ interface StructuredCondition {
   horizon: HorizonKey
   /** 情景方向（自挂，可与同档基准方向相反） */
   direction?: Direction
+  /** 路径短语名，两段式“状态 · 走势”（如 恐慌出清 · 下跌中继；路径首行加粗展示） */
+  label?: string
   /** 触发条件（可量化的市场事实描述） */
   condition: string
   /** 条件满足后的走势预判（含幅度/目标位等，展示原文） */
   scenario: string
+  /** 简洁展示用关键词（1~2 个，单条 ≤10 字；仅新数据携带，旧记录无 → 走长句兜底） */
+  keywords?: string[]
+  /** 结构化仓位动作（add/reduce/hold + 成数，如 "+2 成"；后端 position_action 透传，纯 UI 展示） */
+  positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string }
+  /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度，如 上探+3%~+5%） */
+  scenario_keywords?: string[]
   /** 验证锚点（可选透传：threshold/metric 以 chip 展示） */
   anchor?: { metric?: string; threshold?: string }
   /** 该条件是否已触发（验证回填）：true=已触发（分支点亮）/ false=未触发（置灰）/ 缺省=待观察常态 */
@@ -133,9 +221,71 @@ interface InsightStructuredForecast {
 const props = withDefaults(defineProps<{
   /** 条件化预判结构化数据（null → 整块不渲染） */
   structured: InsightStructuredForecast | null
+  /** 条件行显示模式：tags=有 keywords 显示关键词标签（无则长句兜底）；sentence=强制长句原文（预测详情页用） */
+  conditionDisplay?: 'tags' | 'sentence'
+  /** 展示模式：full=全量分支（未传时的默认，与改造前一致）；conclusion=只显示已成立分支（spec §7「只显示已验证结论」）。
+   *  折叠/过滤/隐藏标注/未命中标签**一律以此收口**：非 conclusion 直接全量直显（防"未触发"口径误伤 full 调用方）。 */
+  displayMode?: 'full' | 'conclusion'
 }>(), {
-  structured: null
+  structured: null,
+  conditionDisplay: 'tags',
+  displayMode: 'full'
 })
+
+/** 该条件是否以关键词标签展示（tags 模式且有 keywords） */
+function useKeywords(cond: StructuredCondition): boolean {
+  return props.conditionDisplay === 'tags' && Boolean(cond.keywords?.length)
+}
+
+// ===== 预判句折叠（2026-09-03 若·则 语义行 + 行1“详情”入口） =====
+
+/** 预判句中的幅度/目标位段集合（作为“则”后预判标签；无幅度段 → 视为不可折叠） */
+function scenarioAmpChips(scenario: string): string[] {
+  return splitScenario(scenario)
+    .filter((p) => p.kind === 'amp')
+    .map((p) => p.t)
+}
+
+/** 行2 “则”后预判标签集合：优先 LLM 产出的 scenario_keywords（方向+幅度），
+ * 旧记录（无该字段）回退前端从 scenario 提取幅度段，保证过渡期仍可折叠 */
+function scenarioRuleChips(cond: StructuredCondition): string[] {
+  const sk = cond.scenario_keywords?.filter((k) => k && k.trim())
+  if (sk?.length) return sk
+  return scenarioAmpChips(cond.scenario)
+}
+
+/**
+ * 是否可折叠为“行1 label + 行2 若[关键词]则[预判]”（展开存行3）：
+ * 需 tags 形态 + 有 label 短语名 + 有关键词触发条件 + 可提炼预判标签。
+ * 不满足（sentence 模式 / 旧数据无 label / 预判句无幅度与字段）→ 保持整句原文直显。
+ */
+function canFoldScenario(cond: StructuredCondition): boolean {
+  return (
+    props.conditionDisplay !== 'sentence' &&
+    Boolean(cond.label) &&
+    Boolean(cond.keywords?.length) &&
+    scenarioRuleChips(cond).length > 0
+  )
+}
+
+/** 各条件支的展开态（key=horizon:idx；切期段时重置） */
+const expandedScenarios = ref<Set<string>>(new Set())
+
+function scenarioKey(horizon: HorizonKey, idx: number): string {
+  return `${horizon}:${idx}`
+}
+
+function isScenarioExpanded(horizon: HorizonKey, idx: number): boolean {
+  return expandedScenarios.value.has(scenarioKey(horizon, idx))
+}
+
+function toggleScenario(horizon: HorizonKey, idx: number) {
+  const key = scenarioKey(horizon, idx)
+  const next = new Set(expandedScenarios.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expandedScenarios.value = next
+}
 
 // ===== 期段状态 =====
 const HORIZON_ORDER: HorizonKey[] = ['short', 'mid', 'long']
@@ -152,6 +302,14 @@ const horizonSegments = computed<HorizonKey[]>(() => {
   return HORIZON_ORDER.filter((k) => keys.has(k))
 })
 
+/** 档位切换后校正：data 不含当前档（或首次拿到数据）时回到首个可见档 */
+watchEffect(() => {
+  const segs = horizonSegments.value
+  if (segs.length > 0 && !segs.includes(activeHorizon.value)) {
+    activeHorizon.value = segs[0]
+  }
+})
+
 /** 当前期内的基准方向（horizons 匹配当期） */
 const activeBase = computed<StructuredHorizon | undefined>(() => {
   const data = props.structured
@@ -159,17 +317,83 @@ const activeBase = computed<StructuredHorizon | undefined>(() => {
   return (data.horizons ?? []).find((h) => h.horizon === activeHorizon.value)
 })
 
-/** 当前期内的条件情景（conditions 按 horizon 归组） */
-const activeConditions = computed<StructuredCondition[]>(() => {
-  const data = props.structured
-  if (!data) return []
-  return (data.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
+/** 当前档内的条件（按 horizon 归组） */
+const inHorizonConditions = computed(() =>
+  (props.structured?.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
+)
+
+/**
+ * 该档**已成立分支**（`met === true`）= 结论模式下应渲染的分支集合。
+ * 未触发档后端只写 `condition_met=true`、不写 false（决策 D1）→ met 缺省/null/false 一律视为未成立，
+ * 故 `lit` 为空 ⟺ 该档未触发（与有无 met 数据无关）。
+ */
+const litConditions = computed(() =>
+  selectVisibleConditions(inHorizonConditions.value, 'conclusion')
+)
+
+/** 折叠入口开关（本地展开，仅作用于当前档；归零见 setActiveHorizon） */
+const branchesExpanded = ref(false)
+
+/**
+ * 未触发折叠态（spec：未触发 → 折叠态）：
+ * 仅结论模式生效（`displayMode === 'conclusion'`）——full 调用方（如节奏大师洞见卡）恒全量直显，不被本折叠收口。
+ * 该档无已成立分支（`lit` 为空）+ tags 形态；sentence 形态（预测详情页整句原文）不参与折叠，保持原位直显。
+ * `inHorizonConditions.length > 0` 守卫：该档本就没有条件分支时无从折叠（否则会渲染出点开后空无一物的入口）。
+ */
+const isFoldedUnmet = computed<boolean>(() =>
+  props.displayMode === 'conclusion' &&
+  props.conditionDisplay !== 'sentence' &&
+  litConditions.value.length === 0 &&
+  inHorizonConditions.value.length > 0
+)
+
+/**
+ * 分支区渲染源（三态，仅结论模式参与）：
+ * - 非 conclusion（full）：全量分支直显（与改造前 full 行为逐字节一致）；
+ * - sentence 形态：不过滤（保持整句原文直显）；
+ * - 未触发折叠态：未点开 → 不铺开；点开后 → 铺开该档**全部**条件分支（沿用既有渲染与样式）；
+ * - 已触发：只渲染已成立分支（`lit`）。
+ */
+const renderedConditions = computed<StructuredCondition[]>(() => {
+  if (props.displayMode !== 'conclusion') return inHorizonConditions.value
+  if (props.conditionDisplay === 'sentence') return inHorizonConditions.value
+  if (!isFoldedUnmet.value) return litConditions.value
+  return branchesExpanded.value ? inHorizonConditions.value : []
 })
+
+/** 折叠入口点击（本地展开/收起） */
+function toggleBranches() {
+  branchesExpanded.value = !branchesExpanded.value
+}
+
+/** 已触发档被过滤掉的分支数（该档全部条件 − 已成立分支），即隐藏分支数 */
+const hiddenConditionCount = computed(
+  () => inHorizonConditions.value.length - litConditions.value.length
+)
+
+/**
+ * 隐藏分支纯标注：**仅结论模式**的已触发档（只渲染已成立分支、其余被过滤）+ 确有隐藏分支；
+ * 折叠态展开后已铺开全部（不存在“隐藏”）故不标注，sentence 形态保持现状不标注。
+ */
+const showHiddenBranchLabel = computed(
+  () =>
+    props.displayMode === 'conclusion' &&
+    props.conditionDisplay !== 'sentence' &&
+    !isFoldedUnmet.value &&
+    hiddenConditionCount.value > 0
+)
+
+/** 到期未触发（卡级聚合验证 miss = 该档条件全部未命中）：「未命中」中性标签仅随结论模式折叠态显示 */
+const showMissTag = computed(
+  () => props.displayMode === 'conclusion' && isFoldedUnmet.value && props.structured?.verification === 'miss'
+)
 
 const verifyText = computed(() => {
   const v = props.structured?.verification
-  if (v === 'hit') return '已验证 · 命中'
-  if (v === 'miss') return '已验证 · 未中'
+  // 折叠态已由入口行「未命中」标签承载 miss 语义 → 抑制头部同义 pill（否则同状态两处重复文案）
+  if (v === 'miss' && showMissTag.value) return ''
+  if (v === 'hit') return '已验证'
+  if (v === 'miss') return '验证未中'
   if (v === 'pending') {
     const due = props.structured?.dueLabel
     return due ? `待验证 · ${due}` : '待验证'
@@ -189,9 +413,20 @@ function hasAnchor(cond: StructuredCondition): boolean {
   return Boolean(cond.anchor && (cond.anchor.metric || cond.anchor.threshold))
 }
 
+/** 仓位动作徽标 class（加仓=红 / 减仓=绿 / 观望=灰，对齐方向色语义） */
+function actionClass(d: 'add' | 'reduce' | 'hold'): string {
+  return d === 'add' ? 'is-add' : d === 'reduce' ? 'is-reduce' : 'is-hold'
+}
+
+/** 仓位动作文案：加仓/减仓/观望 + 成数（如 加仓 +2 成；change 由后端下发原文） */
+function actionText(a: NonNullable<StructuredCondition['positionAction']>): string {
+  const verb = a.direction === 'add' ? '加仓' : a.direction === 'reduce' ? '减仓' : '观望'
+  return `${verb} ${a.change}`
+}
+
 // ===== 文案与样式映射 =====
 function horizonLabel(h: HorizonKey): string {
-  const map: Record<HorizonKey, string> = { short: '短', mid: '中', long: '长' }
+  const map: Record<HorizonKey, string> = { short: '短期', mid: '中期', long: '长期' }
   return map[h]
 }
 
@@ -215,15 +450,20 @@ function dirClass(d: Direction): string {
 
 /** 期段点击切换（方法化：避免模板内联赋值在跨端编译下的边界问题） */
 const setActiveHorizon = (seg: HorizonKey) => {
+  if (activeHorizon.value === seg) return
   activeHorizon.value = seg
+  expandedScenarios.value = new Set() // 切期段重置展开态
+  branchesExpanded.value = false // 折叠入口同样按档归零（避免换档后误展）
 }
 
 /**
- * 拆解 scenario 文本：幅度/目标位段（如 -3% ~ -5%、+3%、75 元）置灰弱化，
+ * 拆解 scenario 文本：幅度/目标位段（如 -3% ~ -5%、+3%、±1%、75 元）置灰弱化，
  * 其余正文保持主色。仅按带符号数字+%的形态拆分，不解析语义。
+ * 幅度段首尾插入零宽连字符（U+2060）：段与前后文字不可在边界断开——避免
+ * "+3%" 孤立到行首/行尾导致黑字换行（洞见卡换行优化 2026-09-03）。
  */
 function splitScenario(text: string): Array<{ t: string; kind: 'text' | 'amp' }> {
-  const ampRe = /[+-]?\d+(?:\.\d+)?%?(?:\s*[~～至到]\s*[+-]?\d+(?:\.\d+)?%?)?/g
+  const ampRe = /[±+\-]?\d+(?:\.\d+)?%?(?:\s*[~～至到]\s*[±+\-]?\d+(?:\.\d+)?%?)?/g
   const parts: Array<{ t: string; kind: 'text' | 'amp' }> = []
   let last = 0
   let m: RegExpExecArray | null
@@ -235,6 +475,13 @@ function splitScenario(text: string): Array<{ t: string; kind: 'text' | 'amp' }>
   if (last < text.length) parts.push({ t: text.slice(last), kind: 'text' })
   if (!parts.length) parts.push({ t: text, kind: 'text' })
   return parts
+}
+
+/** 供模板渲染：与 splitScenario 同构，但幅度段首尾带 U+2060 防断行 */
+function scenarioParts(text: string): Array<{ t: string; kind: 'text' | 'amp' }> {
+  return splitScenario(text).map((p) =>
+    p.kind === 'amp' ? { t: `\u2060${p.t}\u2060`, kind: 'amp' } : p,
+  )
 }
 
 /**
@@ -269,10 +516,10 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 </script>
 
 <style lang="scss" scoped>
-/* ===== 条件化预判块（浅金柔底；由 InsightCard structured 内块抽取而来，全粒度共用） ===== */
+/* ===== 预判子卡（浅中性面板；与 InsightCard 文本形态预判同款。去金全中性 2026-09-03 方案 C） ===== */
 .as-insight-card__fc {
-  background: $gold-soft-bg;
-  border: 1rpx solid $gold-soft-border;
+  background: #f7f8fb;
+  border: 1rpx solid #e3e6ec;
   border-radius: $r-md;
   padding: $s-2 $s-2 $s-3;
   display: flex;
@@ -284,61 +531,65 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 2rpx 6rpx 0;
 }
 
 .as-insight-card__fc-key {
-  font-size: $font-size-xs;
-  font-weight: 600;
+  font-size: 24rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
   color: $ink;
 }
 
-/* 验证状态 */
+/* 验证状态 pill */
 .as-insight-card__verify {
-  font-size: 20rpx;
+  font-size: 22rpx;
+  font-weight: 600;
   border-radius: $r-full;
-  padding: 2rpx 14rpx;
+  padding: 3rpx 16rpx;
 }
 
 .as-insight-card__verify--pending {
-  color: $gold-deep;
-  background: $white;
-  border: 1rpx solid $gold-soft-border;
+  color: #a4640b;
+  background: #fff7e6;
+  border: 1rpx solid #f0dcae;
 }
 
 .as-insight-card__verify--hit {
-  color: $down;
-  background: $down-soft;
+  color: $white;
+  background: #1faf64;
 }
 
 .as-insight-card__verify--miss {
-  color: $up;
-  background: $up-soft;
+  color: $ink-mute;
+  background: $bg-soft;
+  border: 1rpx solid $line;
 }
 
 /* 期段切换 */
 .as-insight-card__seg {
   display: flex;
-  background: rgba($white, 0.55);
-  border: 1rpx solid $gold-soft-border;
+  background: $white;
+  border: 1rpx solid $line;
   border-radius: $r-sm;
-  padding: 2rpx;
+  padding: 3rpx;
+  margin: 0 4rpx;
 }
 
 .as-insight-card__seg-item {
   flex: 1;
   text-align: center;
-  font-size: $font-size-xs;
+  font-size: 24rpx;
   font-weight: 600;
-  color: $gold-deep;
-  opacity: 0.7;
+  color: $ink-mute;
   padding: 6rpx 0;
   border-radius: $r-xs;
+  transition: background $t-fast, color $t-fast;
 }
 
 .as-insight-card__seg-item--on {
-  background: $white;
-  box-shadow: 0 2rpx 8rpx rgba(138, 100, 17, 0.16);
-  opacity: 1;
+  background: #edf2ff;
+  color: #2455e6;
   font-weight: 700;
 }
 
@@ -354,11 +605,12 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   align-items: center;
   gap: $s-1;
   flex-wrap: wrap;
+  padding: 0 6rpx;
 }
 
-.as-insight-card__ph-label {
-  font-size: 20rpx;
-  color: $ink-mute;
+.as-insight-card__ph-tt {
+  font-size: 24rpx;
+  color: $ink;
 }
 
 .as-insight-card__remain {
@@ -369,12 +621,13 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 
 /* 方向徽标（A股：看多=红 看空=绿 震荡=灰，文字随附消除歧义） */
 .as-insight-card__dir {
-  font-size: 20rpx;
+  font-size: 22rpx;
   font-weight: 600;
   border-radius: $r-full;
-  padding: 1rpx 12rpx;
+  padding: 2rpx 14rpx;
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .as-insight-card__dir--up {
@@ -396,102 +649,259 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__conf {
-  font-size: 20rpx;
+  font-size: 22rpx;
   color: $ink-mute;
 }
 
-/* 分支情景（触发点亮 / 未触发置灰 / 缺省待观察） */
+/* 互斥情景路径（每支一张卡；行间“或”分隔；触发点亮/未触发置灰/缺省待观察） */
 .as-insight-card__sc-list {
   display: flex;
   flex-direction: column;
-  gap: $s-1;
-  margin-top: 2rpx;
+  padding: 0 4rpx;
 }
 
-.as-insight-card__sc {
+.as-insight-card__sc-or {
   display: flex;
-  align-items: stretch;
-  gap: $s-1;
-  padding: $s-1 $s-2;
-  border-radius: $r-sm;
-  background: rgba($white, 0.45);
-  border: 1rpx solid rgba($gold-soft-border, 0.6);
-  transition: opacity $t-fast;
+  align-items: center;
+  gap: 12rpx;
+  margin: 8rpx 8rpx 2rpx;
+  color: $ink-faint;
 }
 
-/* 已触发：整支点亮（白底 + 蓝色描边/光晕 + 蓝缘条 + 蓝签） */
-.as-insight-card__sc--on {
-  background: rgba($white, 0.92);
-  border-color: rgba($primary, 0.55);
-  box-shadow: 0 2rpx 12rpx rgba($primary, 0.16);
-}
-
-/* 未触发：整支置灰 */
-.as-insight-card__sc--off {
-  opacity: 0.45;
-}
-
-/* 左缘触发条：灰=待观察/未触发，蓝=已触发 */
-.as-insight-card__sc-bar {
-  width: 4rpx;
-  flex-shrink: 0;
-  border-radius: $r-full;
+.as-insight-card__sc-or::before,
+.as-insight-card__sc-or::after {
+  content: '';
+  flex: 1;
+  height: 1rpx;
   background: $line;
 }
 
-.as-insight-card__sc-bar--on {
-  background: $primary;
+.as-insight-card__sc-or-tx {
+  font-size: 22rpx;
+  color: $ink-faint;
 }
 
-.as-insight-card__sc-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.as-insight-card__sc-if {
+.as-insight-card__sc {
+  position: relative;
   display: flex;
-  align-items: baseline;
-  gap: $s-1;
-  font-size: $font-size-xs;
-  color: $ink-soft;
-  line-height: $lh-tight;
+  flex-direction: column;
+  gap: 6rpx;
+  padding: $s-2 $s-3;
+  border-radius: $r-sm;
+  background: $white;
+  border: 1rpx solid $line;
+  transition: opacity $t-fast;
 }
 
-.as-insight-card__sc-no {
+.as-insight-card__sc + .as-insight-card__sc-or + .as-insight-card__sc {
+  margin-top: 0;
+}
+
+/* 触发（条件成立）：染方向色（看多=红 / 看空=绿），幅度段同染 */
+.as-insight-card__sc--up.as-insight-card__sc--live {
+  border-color: rgba(229, 77, 94, 0.6);
+  background: linear-gradient(0deg, rgba(229, 77, 94, 0.08) 0%, $white 78%);
+}
+
+.as-insight-card__sc--dn.as-insight-card__sc--live {
+  border-color: rgba(24, 160, 88, 0.6);
+  background: linear-gradient(0deg, rgba(24, 160, 88, 0.08) 0%, $white 78%);
+}
+
+/* 明确未触发：整支降饱和 */
+.as-insight-card__sc--off {
+  opacity: 0.42;
+}
+
+/* 条件成立徽（右上；染方向色实心） */
+.as-insight-card__sc-live {
+  position: absolute;
+  top: 10rpx;
+  right: 12rpx;
   font-size: 20rpx;
-  font-weight: 600;
-  color: $ink-mute;
-  flex-shrink: 0;
+  font-weight: 700;
+  color: $white;
+  border-radius: $r-full;
+  padding: 2rpx 14rpx;
 }
 
-.as-insight-card__sc-prefix {
-  color: $ink-mute;
-  flex-shrink: 0;
+.as-insight-card__sc--up.as-insight-card__sc--live .as-insight-card__sc-live {
+  background: $up;
 }
 
-/* 条件句：预判块内唯一金色加粗文字段（展示主干，括号补充不渲染） */
-.as-insight-card__sc-cond {
-  font-weight: 600;
-  color: $gold-deep;
+.as-insight-card__sc--dn.as-insight-card__sc--live .as-insight-card__sc-live {
+  background: $down;
 }
 
-.as-insight-card__sc-then {
+/* 路径首行：方向 + 短语名（label）或长句主干；详情/收起右对齐贴右缘 */
+.as-insight-card__sc-top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: $s-1;
-  margin-top: 2rpx;
   flex-wrap: wrap;
 }
 
-.as-insight-card__sc-scenario {
-  font-size: $font-size-xs;
+/* 命中态：右上“条件成立”徽占位，行1内容与详情让出右侧空间 */
+.as-insight-card__sc-top--badge {
+  padding-right: 90rpx;
+}
+
+/* 路径短语名（两段式 label；长句兜底同款）：加粗主句 */
+.as-insight-card__sc-lead {
+  font-size: 24rpx;
+  font-weight: 600;
   color: $ink;
   line-height: $lh-tight;
 }
 
-/* 幅度/目标位段（-3% ~ -5%、+3% 等）：弱化置灰 */
+/* 关键词量化行（独立于短语名下一行） */
+.as-insight-card__sc-kws {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: $s-1;
+  align-items: center;
+  padding-right: 90rpx;
+}
+
+.as-insight-card__sc-chip {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: $ink;
+  background: #f4f5f7;
+  border: 1rpx solid #e3e6ec;
+  border-radius: $r-xs;
+  padding: 2rpx 14rpx;
+  line-height: $lh-tight;
+}
+
+/* 行1 右侧“详情/收起”（纯文字+箭头，右对齐；非按钮样式） */
+.as-insight-card__sc-more {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  padding: 4rpx 2rpx 4rpx 10rpx;
+}
+
+.as-insight-card__sc-more-tx {
+  font-size: 20rpx;
+  font-weight: 500;
+  color: $ink-mute;
+  line-height: 1.4;
+}
+
+/* 展开箭头（CSS 三角形，向下；展开态旋转朝上） */
+.as-insight-card__sc-more-chev {
+  width: 0;
+  height: 0;
+  border-left: 6rpx solid transparent;
+  border-right: 6rpx solid transparent;
+  border-top: 8rpx solid $ink-mute;
+  transition: transform 0.15s ease;
+}
+
+.as-insight-card__sc-more--open .as-insight-card__sc-more-chev {
+  transform: rotate(180deg);
+}
+
+/* 行2 若[条件关键词] 则[预判标签]：连接词中性、预判标签弱化灰 */
+.as-insight-card__sc-rules {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $s-1;
+}
+
+.as-insight-card__sc-conn {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: $ink-faint;
+  flex: none;
+}
+
+.as-insight-card__sc-amp-chip {
+  color: $ink-mute;
+}
+
+.as-insight-card__sc--up.as-insight-card__sc--live .as-insight-card__sc-amp-chip {
+  color: $up;
+}
+
+.as-insight-card__sc--dn.as-insight-card__sc--live .as-insight-card__sc-amp-chip {
+  color: $down;
+}
+
+/* 行3 完整预判句（展开态浅块；黑字 + 幅度灰，随触发路径方向色） */
+.as-insight-card__sc-full {
+  display: block;
+  background: #f7f8fb;
+  border: 1rpx solid #eef0f4;
+  border-radius: $r-sm;
+  padding: 10rpx 12rpx;
+  line-height: $lh-tight;
+}
+
+/* 情景正文：整句内联文本流（黑/灰同句排版，非 chip 拆分）——
+   灰色幅度段以 U+2060 与前后文字粘连，行内自然换行不再孤立断句（2026-09-03） */
+.as-insight-card__sc-then {
+  display: block;
+  font-size: 24rpx;
+  color: $ink;
+  line-height: $lh-tight;
+}
+
+.as-insight-card__sc-scenario {
+  font-size: 24rpx;
+  color: $ink;
+  line-height: $lh-tight;
+}
+
+/* 幅度/目标位段（-3% ~ -5%、+3% 等）：弱化置灰；触发路径内随方向色 */
 .as-insight-card__sc-amp {
   color: $ink-mute;
+  font-weight: 600;
+}
+
+.as-insight-card__sc--up.as-insight-card__sc--live .as-insight-card__sc-amp {
+  color: $up;
+}
+
+.as-insight-card__sc--dn.as-insight-card__sc--live .as-insight-card__sc-amp {
+  color: $down;
+}
+
+/* 结构化仓位动作徽标（加仓=红 / 减仓=绿 / 观望=灰，对齐方向色语义；后端 position_action 透传） */
+.as-insight-card__sc-action {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  border-radius: $r-full;
+  padding: 2rpx 14rpx;
+}
+
+.as-insight-card__sc-action-tx {
+  font-size: 22rpx;
+  font-weight: 600;
+  line-height: $lh-tight;
+}
+
+.as-insight-card__sc-action.is-add {
+  color: $up;
+  background: $up-soft;
+  border: 1rpx solid rgba(229, 77, 94, 0.35);
+}
+
+.as-insight-card__sc-action.is-reduce {
+  color: $down;
+  background: $down-soft;
+  border: 1rpx solid rgba(24, 160, 88, 0.35);
+}
+
+.as-insight-card__sc-action.is-hold {
+  color: $flat;
+  background: $bg-soft;
+  border: 1rpx solid $line;
 }
 
 /* 验证锚点 chip（threshold/metric；大盘等粒度传入时展示） */
@@ -499,41 +909,67 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   display: flex;
   flex-wrap: wrap;
   gap: $s-1;
-  margin-top: 4rpx;
+  margin-top: 2rpx;
 }
 
 .as-insight-card__anchor-chip {
-  font-size: 18rpx;
+  font-size: 20rpx;
   line-height: 1.6;
   color: $ink-mute;
-  background: rgba($white, 0.6);
-  border: 1rpx solid rgba($gold-soft-border, 0.7);
+  background: #f4f5f7;
+  border: 1rpx solid #e6e8ee;
   border-radius: $r-full;
-  padding: 1rpx 12rpx;
+  padding: 1rpx 14rpx;
 }
 
-/* 触发状态签 */
-.as-insight-card__sc-st {
-  align-self: center;
-  flex-shrink: 0;
-  font-size: 18rpx;
+/* ===== 未触发折叠态 / 隐藏分支标注 / 到期未命中标签（2026-09-17） ===== */
+
+/* 隐藏分支纯标注（中性小标签：caption 字号 + 既有边框色；纯标注不可点开） */
+.as-insight-card__sc-hidden {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  margin: 2rpx 6rpx;
+  padding: 3rpx 16rpx;
+  background: $bg-soft;
+  border: 1rpx solid $line;
+  border-radius: $r-full;
+}
+
+.as-insight-card__sc-hidden-tx {
+  font-size: 20rpx;
+  color: $ink-faint;
+  line-height: 1.5;
+}
+
+/* 未触发折叠入口：一行纯文字入口（非按钮样式，与行1「详情/收起」同款交互） */
+.as-insight-card__sc-fold {
+  display: flex;
+  align-items: center;
+  gap: $s-1;
+  padding: 6rpx 10rpx;
+}
+
+.as-insight-card__sc-fold-tx {
+  font-size: 22rpx;
   font-weight: 600;
-  border-radius: $r-full;
-  padding: 2rpx 12rpx;
+  color: $ink-mute;
 }
 
-.as-insight-card__sc-st--yes {
-  color: $white;
-  background: $primary;
-}
-
-.as-insight-card__sc-st--no {
+/* 到期未命中标签（沿用 miss 中性灰，不与 hit 实心绿混用） */
+.as-insight-card__sc-miss {
+  font-size: 20rpx;
+  font-weight: 600;
   color: $ink-mute;
   background: $bg-soft;
+  border: 1rpx solid $line;
+  border-radius: $r-full;
+  padding: 2rpx 14rpx;
 }
 
 .as-insight-card__sc-empty {
   font-size: 20rpx;
   color: $ink-faint;
+  padding: 0 6rpx;
 }
 </style>

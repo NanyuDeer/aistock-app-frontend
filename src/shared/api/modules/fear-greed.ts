@@ -66,9 +66,35 @@ export interface FearGreedDashboard {
   historySnapshots?: FearGreedHistorySnapshots
 }
 
+/** 后端 /api/fear-greed/sectors 返回的板块行情（camel 契约） */
+export interface FgSectorFact {
+  tsCode: string
+  name: string
+  pctChange: number
+  netAmount: number
+  leadStock: string
+}
+
+export interface FgSectorBoard {
+  availability: boolean
+  tradeDate: string
+  source: 'eastmoney' | 'tencent' | ''
+  sectors: {
+    topGainers: FgSectorFact[]
+    topInflows: FgSectorFact[]
+    topLosers: FgSectorFact[]
+    topOutflows: FgSectorFact[]
+  }
+}
+
 export const fearGreedApi = {
   /** 获取韭圈儿恐贪指数主面板数据 */
   getDashboard(index = 'jq') {
     return request.get<FearGreedDashboard>('/fear-greed/dashboard', { params: { index } })
+  },
+
+  /** 获取当日板块行情榜（配置方向数据源；availability=false 表示行情不可用） */
+  getSectors() {
+    return request.get<FgSectorBoard>('/fear-greed/sectors')
   },
 }

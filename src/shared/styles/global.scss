@@ -59,6 +59,40 @@ uni-page {
 }
 /* #endif */
 
+/* ===== 滚动条（仅 H5）：窄 + 细 + 浅 ===== */
+/* 覆盖桌面浏览器默认的粗深灰滚动条；App/小程序端为原生滚动条，不由此处控制 */
+/* #ifdef H5 */
+::-webkit-scrollbar {
+  width: 6rpx;
+  height: 6rpx;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba($ink-mute, 0.45);
+  border-radius: 6rpx;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba($ink-mute, 0.7);
+}
+
+/* Firefox 等不支持 ::-webkit-scrollbar 的内核兜底 */
+/* 注意：Chromium 下只要声明了 scrollbar-width/scrollbar-color 就会改走原生滚动条渲染，
+ * 导致上面的 ::-webkit-scrollbar 尺寸被忽略，因此这里必须用 @supports 限定作用范围 */
+@supports not selector(::-webkit-scrollbar) {
+  html,
+  uni-page,
+  uni-scroll-view {
+    scrollbar-width: thin;
+    scrollbar-color: rgba($ink-mute, 0.45) transparent;
+  }
+}
+/* #endif */
+
 /* #ifdef APP-PLUS */
 /* App 端整体放大 20%（rpx 换算基准不变，用 zoom 缩放整个页面） */
 /* zoom 放大后 statusBarHeight 也被放大，需要除以 zoom 补偿 */

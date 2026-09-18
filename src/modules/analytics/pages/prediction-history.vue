@@ -133,7 +133,8 @@ async function loadData() {
   loading.value = true
   error.value = false
   try {
-    const data = await predictionApi.list({ status: activeFilter.value })
+    // 本页为大盘溯源预测历史（B2.1）：只展示 market_trace 记录，板块预判走板块四环聚合页
+    const data = await predictionApi.list({ status: activeFilter.value, source_type: 'market_trace' })
     list.value = data?.items ?? []
     if (data?.stats) {
       stats.value = data.stats

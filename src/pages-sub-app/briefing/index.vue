@@ -48,14 +48,52 @@
             </view>
           </view>
 
+          <!-- 午后前瞻 · 机会/风险对位（schema 2.1：带 opportunities 键（可空）即渲染对位卡；两栏均空时整块不渲染；风险栏取 display_report.risks 短词） -->
+          <view v-if="afternoonSection && (afternoonSection.opportunities?.length || middayRisks.length)" class="midday-section-card">
+            <view class="midday-section-head">
+              <view class="midday-badge" :class="sectionBadgeClass(afternoonSection.title)">{{ sectionBadgeText(afternoonSection.title) }}</view>
+              <view class="midday-section-body">
+                <text class="midday-section-title">{{ afternoonSection.title }}</text>
+              </view>
+            </view>
+            <view class="midday-dual-col">
+              <view v-if="afternoonSection.opportunities?.length" class="midday-col">
+                <view class="midday-col-label">
+                  <view class="midday-dot midday-dot--up" />
+                  <text class="midday-col-label-text midday-col-label-text--up">机会提示</text>
+                </view>
+                <view class="midday-pills">
+                  <text
+                    v-for="(kw, kwIndex) in afternoonSection.opportunities"
+                    :key="`op-${kwIndex}`"
+                    class="midday-pill midday-pill--up"
+                  >{{ kw }}</text>
+                </view>
+              </view>
+              <view v-if="middayRisks.length" class="midday-col">
+                <view class="midday-col-label">
+                  <view class="midday-dot midday-dot--down" />
+                  <text class="midday-col-label-text midday-col-label-text--down">风险提示</text>
+                </view>
+                <view class="midday-pills">
+                  <text
+                    v-for="(risk, riskIndex) in middayRisks"
+                    :key="`risk-${riskIndex}`"
+                    class="midday-pill midday-pill--down"
+                  >{{ risk }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+
           <!-- 多分段摘要：与晨/晚报 Agent 洞见卡一致的多个精简要点，每张卡片标题前带圆角方标 -->
-          <template v-if="middayReport.content.display_report.sections.length">
+          <template v-if="displaySections.length">
             <view class="section-label">
               <text class="section-label-text">Agent 洞见</text>
               <view class="section-line" />
             </view>
             <view
-              v-for="(sec, index) in middayReport.content.display_report.sections"
+              v-for="(sec, index) in displaySections"
               :key="index"
               class="midday-section-card"
             >
@@ -71,15 +109,15 @@
             </view>
           </template>
 
-          <!-- 风险提示（单卡片 + 编号列表，仅当日存在风险时展示） -->
-          <template v-if="middayReport.content.display_report.risks.length">
+          <!-- 风险提示（单卡片 + 编号列表）：仅老格式（无机会/风险对位区）展示，避免与对位区重复 -->
+          <template v-if="showStandaloneRiskCard">
             <view class="midday-risk-card">
               <view class="midday-label">
                 <view class="midday-badge midday-badge--risk">警</view>
                 <text class="midday-label-text midday-risk-label-text">风险提示</text>
               </view>
               <view
-                v-for="(risk, index) in middayReport.content.display_report.risks"
+                v-for="(risk, index) in middayRisks"
                 :key="index"
                 class="midday-risk-item"
               >
@@ -279,6 +317,34 @@ const report = ref<BroadcastV1 | null>(null)
 const items = ref<BriefingItem[]>([])
 /** 午间报报告（方案 A：audio_path 回填在 content 内，可能无音频） */
 const middayReport = ref<MiddayReport | null>(null)
+
+/** 午间报：午后前瞻分段（schema 2.1 带 opportunities 键即视为对位数据，键可空）；老数据无 opportunities 键时为 null（回退段落流）。 */
+const afternoonSection = computed(() => {
+  if (broadcastType.value !== 'midday') return null
+  const sections = middayReport.value?.content.display_report.sections ?? []
+  return sections.find((sec) => sec.opportunities !== undefined) ?? null
+})
+
+/** Agent 洞见列表：排除已由机会/风险对位区渲染的午后前瞻分段（老数据无 opportunities 时保留段落卡）。 */
+const displaySections = computed(() => {
+  if (broadcastType.value !== 'midday') return []
+  const sections = middayReport.value?.content.display_report.sections ?? []
+  if (!afternoonSection.value) return sections
+  return sections.filter((sec) => sec !== afternoonSection.value)
+})
+
+/** 午间报风险短词（对位区风险栏数据源，与完整报告/老格式共用 display_report.risks）。 */
+const middayRisks = computed(() => {
+  return broadcastType.value === 'midday'
+    ? (middayReport.value?.content.display_report.risks ?? [])
+    : []
+})
+
+/** 是否展示底部独立「风险提示」卡：新格式已并入对位区 → false；老格式无对位区 → 维持原条件。 */
+const showStandaloneRiskCard = computed(() => {
+  if (broadcastType.value !== 'midday') return false
+  return middayRisks.value.length > 0 && !afternoonSection.value
+})
 
 /** 播放状态来自悬浮窗 store（FloatingPodcast AudioPlayer 事件同步），页面内按钮与悬浮球状态一致 */
 const isPlaying = computed(() => podcastStore.playing)
@@ -930,6 +996,66 @@ onLoad((options) => {
   font-size: 24rpx;
   color: #4b5563;
   line-height: 1.5;
+}
+
+/* 午后前瞻 · 机会/风险双栏对位（schema 2.1） */
+.midday-dual-col {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+  margin-top: 20rpx;
+}
+
+.midday-col {
+  flex: 1 1 240rpx;
+  min-width: 0;
+}
+
+.midday-col-label {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 12rpx;
+}
+
+.midday-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 4rpx;
+}
+
+.midday-dot--up { background: #0b5fff; }
+.midday-dot--down { background: #e04545; }
+
+.midday-col-label-text {
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.midday-col-label-text--up { color: #0b5fff; }
+.midday-col-label-text--down { color: #e04545; }
+
+.midday-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.midday-pill {
+  font-size: 24rpx;
+  line-height: 1;
+  padding: 12rpx 20rpx;
+  border-radius: 999rpx;
+}
+
+.midday-pill--up {
+  color: #0b5fff;
+  background: rgba(11, 95, 255, 0.08);
+}
+
+.midday-pill--down {
+  color: #e04545;
+  background: rgba(224, 69, 69, 0.08);
 }
 
 /* 午间报风险提示：单卡片容器（标题方标 + 编号列表） */
