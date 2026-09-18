@@ -28,12 +28,7 @@
             {{ item.statusText }}
           </text>
         </view>
-        <!-- 轻量预判摘要（有 forecast 且 summary 存在时展示） -->
-        <view v-if="item.forecastSummary" class="card-forecast">
-          <text class="forecast-label">预判</text>
-          <text class="forecast-text">{{ item.forecastSummary }}</text>
         </view>
-      </view>
     </view>
 
     <!-- 空态 -->
@@ -48,7 +43,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import { parseForecastSlot, isUnattributableMovement, dedupeDailyMovements } from '@/modules/favorites/components/insightCards'
+import { isUnattributableMovement, dedupeDailyMovements } from '@/modules/favorites/components/insightCards'
 
 /** 统一展示模型：价格异动（stocktrace 链路） */
 interface InsightListItem {
@@ -65,8 +60,6 @@ interface InsightListItem {
   statusText: string
   /** 事件时间戳（按此倒序排列） */
   sortTime: number
-  /** 轻量预判摘要（有 forecast 且 summary 存在时填充） */
-  forecastSummary?: string
 }
 
 const insights = ref<InsightListItem[]>([])
@@ -77,13 +70,6 @@ function fmtDateMMDD(t?: string): string {
   const date = new Date(t)
   if (Number.isNaN(date.getTime())) return '--'
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-/** 从 forecast JSONB 中提取轻量预判摘要：复用 parseForecastSlot 获取 close??midday 的 summary；截断至 50 字 */
-function extractForecastSummary(forecast: Record<string, unknown> | null | undefined): string | undefined {
-  const parsed = parseForecastSlot(forecast)
-  if (!parsed?.summary) return undefined
-  return parsed.summary.length > 50 ? parsed.summary.slice(0, 50) + '…' : parsed.summary
 }
 
 /** 价格异动（stocktrace 链路）→ 统一模型 */
@@ -106,7 +92,6 @@ function fromMovement(m: StockTraceEvent): InsightListItem {
     dateText: fmtDateMMDD(recent),
     statusText,
     sortTime: recent ? new Date(recent).getTime() : 0,
-    forecastSummary: extractForecastSummary(m.forecast),
   }
 }
 
@@ -221,28 +206,4 @@ onShow(async () => {
   background: $warning-bg;
 }
 
-/* 轻量预判摘要行 */
-.card-forecast {
-  display: flex;
-  align-items: center;
-  gap: $s-1;
-  padding: 4rpx 0;
-}
-.forecast-label {
-  font-size: $font-size-xs;
-  color: $primary;
-  background: $primary-50;
-  padding: 0 8rpx;
-  border-radius: $r-xs;
-  flex-shrink: 0;
-  line-height: 1.6;
-}
-.forecast-text {
-  font-size: $font-size-xs;
-  color: $ink-soft;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.6;
-}
 </style>
