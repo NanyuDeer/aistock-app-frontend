@@ -197,7 +197,7 @@ function tempValue(score: number): string {
 .rc-chip.ph-warm { color: #b45309; background: #fef3c7; }
 .rc-chip.ph-overheat { color: $up; background: rgba($up, 0.1); }
 .rc-chip.ph-ebb { color: $ink-soft; background: rgba($ink-soft, 0.12); }
-.ph-rally { color: $up; }
+.rc-chip.ph-rally { color: $up; background: rgba($up, 0.1); }
 .rc-chip.ph-missing { color: $ink-soft; background: rgba($ink-soft, 0.12); }
 .rc-exp { font-size: 20rpx; color: $ink-soft; border: 1rpx dashed $line; border-radius: 8rpx; padding: 2rpx 10rpx; }
 
