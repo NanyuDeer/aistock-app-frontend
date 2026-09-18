@@ -42,6 +42,14 @@ vi.mock('@/shared/components/LoadingState.vue', () => ({
   default: { name: 'LoadingState', template: '<view class="loading-stub" />' },
 }))
 
+vi.mock('@/shared/components/NotificationInsightModal.vue', () => ({
+  default: {
+    name: 'NotificationInsightModal',
+    props: ['visible'],
+    template: '<view v-if="visible" class="notification-detail-stub" />',
+  },
+}))
+
 vi.stubGlobal('uni', {
   navigateTo: vi.fn(),
 })
@@ -100,11 +108,11 @@ describe('NotificationDropdown', () => {
     await flushPromises()
 
     expect(notificationApiMock.list).toHaveBeenCalled()
-    expect(notificationApiMock.list).toHaveBeenCalledWith({ limit: 20, cursor: undefined })
+    expect(notificationApiMock.list).toHaveBeenCalledWith({ limit: 20, cursor: undefined, unread: undefined })
     expect(wrapper.find('.bell-badge').text()).toBe('2')
   })
 
-  it('打开列表不会自动标记已读，点击单条消息才标记并跳转', async () => {
+  it('打开列表不会自动标记已读，点击单条消息才标记已读并打开详情', async () => {
     const wrapper = mount(NotificationDropdown)
     await flushPromises()
 
@@ -115,8 +123,29 @@ describe('NotificationDropdown', () => {
     await wrapper.findAll('.notification-item')[0].trigger('tap')
     await flushPromises()
     expect(notificationApiMock.markRead).toHaveBeenCalledWith([firstItem.id])
-    expect(uni.navigateTo).toHaveBeenCalledWith({ url: firstItem.targetPath })
+    expect(wrapper.find('.notification-detail-stub').exists()).toBe(true)
+    expect(uni.navigateTo).not.toHaveBeenCalled()
     expect(wrapper.find('.bell-badge').text()).toBe('1')
+  })
+
+  it('未读筛选会剔除接口混入的已读消息', async () => {
+    const readItem = { ...secondItem, id: 'read-item', readAt: '2026-08-19T02:00:00.000Z' }
+    notificationApiMock.list.mockResolvedValue({
+      items: [firstItem, readItem],
+      nextCursor: null,
+      unreadCount: 1,
+    })
+    const wrapper = mount(NotificationDropdown)
+    await flushPromises()
+
+    await wrapper.find('.bell-button').trigger('tap')
+    await flushPromises()
+    await wrapper.findAll('.notification-filter__option')[1].trigger('tap')
+    await flushPromises()
+
+    expect(notificationApiMock.list).toHaveBeenLastCalledWith({ limit: 20, cursor: undefined, unread: true })
+    expect(wrapper.findAll('.notification-item')).toHaveLength(1)
+    expect(wrapper.find('.notification-item__title').text()).toBe(firstItem.title)
   })
 
   it('收到 WS 新通知后立即更新未读角标', async () => {
@@ -142,6 +171,6 @@ describe('NotificationDropdown', () => {
     await wrapper.find('.notification-panel__list').trigger('scrolltolower')
     await flushPromises()
 
-    expect(notificationApiMock.list).toHaveBeenCalledWith({ limit: 20, cursor: 'next-page' })
+    expect(notificationApiMock.list).toHaveBeenCalledWith({ limit: 20, cursor: 'next-page', unread: undefined })
   })
 })

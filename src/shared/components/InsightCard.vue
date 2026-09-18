@@ -22,7 +22,7 @@
     <view class="as-insight-card__divider" />
 
     <!-- 多要点行（优势/风险/建议等）：key 固定宽 + 正文，tone 语义底色 -->
-    <view v-if="lines.length" class="as-insight-card__lines">
+    <view v-if="lines.length && linePlacement === 'before-trace'" class="as-insight-card__lines">
       <view
         v-for="(l, i) in lines"
         :key="i"
@@ -35,7 +35,7 @@
 
     <!-- 溯源：结构化大盘联动形态（溯源蓝卡双行：大盘一句话行 + 角色徽驱动行；traceStructured 传入优先于文本 trace） -->
     <view v-if="traceStructured" class="as-insight-card__line as-insight-card__line--trace">
-      <text class="as-insight-card__key">溯源</text>
+      <text class="as-insight-card__key">{{ traceWord }}</text>
       <view class="as-insight-card__tlk">
         <text class="as-insight-card__tlk-sum">{{ traceStructured.summary }}</text>
         <text
@@ -81,7 +81,7 @@
 
     <!-- 溯源（横幅卡：蓝，文本形态兼容旧用法） -->
     <view v-else-if="trace" class="as-insight-card__line as-insight-card__line--trace">
-      <text class="as-insight-card__key">溯源</text>
+      <text class="as-insight-card__key">{{ traceWord }}</text>
       <text class="as-insight-card__text">{{ trace }}</text>
 
       <!-- 依据详情（本地展开：展示溯源全文 + 板块链阶段 stages；无内容不渲染入口） -->
@@ -98,6 +98,17 @@
           <text v-if="traceDetailText" class="as-insight-card__detail-tx">{{ traceDetailText }}</text>
         </view>
       </template>
+    </view>
+
+    <view v-if="lines.length && linePlacement === 'after-trace'" class="as-insight-card__lines">
+      <view
+        v-for="(l, i) in lines"
+        :key="i"
+        :class="['as-insight-card__line', 'as-insight-card__line--point', l.tone ? `is-${l.tone}` : 'is-default']"
+      >
+        <text class="as-insight-card__key">{{ l.key }}</text>
+        <text class="as-insight-card__text">{{ l.text }}</text>
+      </view>
     </view>
 
     <!-- 预判：条件化结构化块（structured 传入时；渲染通用 ConditionalForecastBlock，全粒度共用） -->
@@ -241,6 +252,7 @@ const props = withDefaults(defineProps<{
   title: string
   /** 溯源：原因说明（文本形态；traceStructured 传入时忽略） */
   trace?: string
+  traceLabel?: string
   /** 溯源行结构化形态（大盘联动双行；传入优先于 trace 文本行） */
   traceStructured?: InsightTraceStructured | null
   /** 溯源「依据详情」正文（可选；有值时溯源区显示「依据详情 ▾」入口并在卡片内展开） */
@@ -255,6 +267,7 @@ const props = withDefaults(defineProps<{
   structured?: InsightStructuredForecast | null
   /** 多要点行（优势/风险/建议等，渲染于分隔线后、溯源前；不依赖 trace/forecast/structured） */
   lines?: InsightLine[]
+  linePlacement?: 'before-trace' | 'after-trace'
   /** 时间，如 '08-21 · 09:10' */
   time?: string
   /** 主题：light 亮色列表卡 / dark 深蓝研报卡 */
@@ -273,8 +286,10 @@ const props = withDefaults(defineProps<{
   displayMode: 'full',
   forecast: '',
   tagText: '',
+  traceLabel: '',
   structured: null,
   lines: () => [],
+  linePlacement: 'before-trace',
   time: '',
   theme: 'light',
   lineStyle: 'banner',
@@ -301,6 +316,8 @@ const typeWord = computed(() => {
   const t = props.tagText?.trim()
   return t ? t.replace(/洞见$/, '') : typeLabelMap[props.type]
 })
+
+const traceWord = computed(() => props.traceLabel.trim() || '溯源')
 
 /** 溯源「依据详情」展开态（本地交互；不新增接口） */
 const traceExpanded = ref(false)
@@ -624,10 +641,11 @@ const handleClick = () => {
 
   .as-insight-card__key {
     display: block;
-    flex: 0 0 72rpx;
+    flex: 0 0 128rpx;
     font-size: $font-size-xs;
     color: $ink;
     margin-bottom: 0;
+    white-space: nowrap;
   }
 
   .as-insight-card__text {
