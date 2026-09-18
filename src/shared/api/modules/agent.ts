@@ -501,7 +501,6 @@ export interface RhythmBranch {
   touch_strength?: number | null
   conclusion: { direction: 'bullish' | 'bearish' | 'neutral'; range?: string; validity: number; note?: string }
   event_ref?: { event_date: string; title: string }
-  met?: boolean | null
 }
 export interface RhythmCard {
   score?: number | null
@@ -510,7 +509,7 @@ export interface RhythmCard {
   phase?: string | null
   phase_evidence?: Record<string, unknown>
   temperature_series: { date: string; score: number }[]
-  event_window: RhythmEvent[]
+  event_window: Pick<RhythmEvent, 'date' | 'type' | 'title' | 'importance'>[]
   event_source_missing?: boolean
   event_high_hint?: string
   next_event_anchor?: { title: string; event_date: string; days_until: number; note: string; importance?: 'high' | 'medium' } | null
@@ -520,6 +519,7 @@ export interface RhythmCard {
   data_missing?: string[]
 }
 export interface RhythmMasterContent {
+  /** @deprecated 节奏大师不产双层 schema（spec §5.9 登记废止 08-29 的 2.0 要求）；该槽为历史契约遗留，勿新增消费方 */
   display_report?: { summary?: string; details?: string; risks?: string[] }
   schema_version?: string
   target_date?: string
