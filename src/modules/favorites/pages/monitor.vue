@@ -47,8 +47,10 @@
           :type="alert.type"
           :time="formatTime(String(alert.time))"
           :confidence="alert.confidence"
+          :reportable="alert.analysisStatus === 'completed'"
           clickable
           @click="goTrace(alert.eventId, alert.eventType)"
+          @report="onReport(alert.eventId)"
         />
       </view>
 
@@ -80,6 +82,7 @@ import { WS_BASE_URL } from '@/shared/utils/constants'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 import { isUnattributableMovement, dedupeDailyMovements } from '@/modules/favorites/components/insightCards'
+import { downloadInsightReport } from '@/shared/utils/downloadInsightReport'
 
 interface AlertItem {
   eventId: string
@@ -91,6 +94,7 @@ interface AlertItem {
   message: string
   time: string | number
   confidence?: 'high' | 'medium' | 'low' | 'unconfirmed'
+  analysisStatus?: string
 }
 
 const favoritesStore = useFavoritesStore()
@@ -131,6 +135,7 @@ function movementToAlertItem(m: StockTraceEvent): AlertItem {
     message,
     time: String(m.triggered_at || ''),
     confidence: undefined,
+    analysisStatus: m.analysis_status,
   }
 }
 
@@ -205,6 +210,19 @@ function disconnectWs() {
 /** 洞察详情：按事件类型分流（涨停雷达 → insight-detail，价格异动 → insight-detail-move） */
 function goTrace(eventId: string, eventType?: string) {
   navigateToInsightDetail(eventId, eventType)
+}
+
+const reportBusy = ref(false)
+async function onReport(eventId: string): Promise<void> {
+  if (reportBusy.value || !eventId) return
+  reportBusy.value = true
+  try {
+    await downloadInsightReport(eventId)
+  } catch (err) {
+    uni.showToast({ title: (err as Error).message || '报告生成失败，请重试', icon: 'none' })
+  } finally {
+    reportBusy.value = false
+  }
 }
 
 onShow(() => {

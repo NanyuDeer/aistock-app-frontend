@@ -86,3 +86,20 @@ describe('InsightAlertCard', () => {
     expect(text).toContain('2026-08-07 10:30')
   })
 })
+
+describe('InsightAlertCard 洞察报告按钮', () => {
+  it('reportable=true 时渲染报告按钮并 emit report（不冒泡触发卡片点击）', async () => {
+    const wrapper = mount(InsightAlertCard, { props: { ...baseProps, reportable: true, clickable: true } })
+    const btn = wrapper.find('.insight-alert-card__report')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('tap')
+    expect(wrapper.emitted('report')).toBeTruthy()
+    // @tap.stop 阻止冒泡，卡片 tap 事件不应触发
+    expect(wrapper.emitted('click')).toBeFalsy()
+  })
+
+  it('reportable 缺省时不渲染报告按钮', () => {
+    const wrapper = mount(InsightAlertCard, { props: baseProps })
+    expect(wrapper.find('.insight-alert-card__report').exists()).toBe(false)
+  })
+})
