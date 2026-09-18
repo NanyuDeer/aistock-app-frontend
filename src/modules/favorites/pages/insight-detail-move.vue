@@ -93,7 +93,7 @@
         <text class="report-btn-text">{{ reportBusy ? '正在生成报告…' : '生成完整洞察报告 PDF' }}</text>
       </view>
       <text v-else-if="analysis?.processing_status === 'completed'" class="report-hint">
-        完整报告将在归因完成后可下载
+        本次归因未产出完整报告
       </text>
 
       <!-- 归因完成但结果不可用 -->
@@ -153,14 +153,17 @@ const oneLineCause = computed<string>(() => {
   const verdict = artifact.value?.artifactJson.candidates
     ?.find((c) => c.candidateId === artifact.value?.artifactJson.chains
       ?.find((ch) => ch.chainId === artifact.value?.artifactJson.primary_chain_id)?.candidateId)?.verdict
-  return String(verdict ?? detail.value?.primary_cause ?? '').trim()
+  return String(verdict || detail.value?.primary_cause || '').trim()
 })
 
-/** 置信度等级（高/中/低） */
+/** 置信度等级（高/中/低）；level 与 score 皆缺时不显示徽标 */
 const confidenceLevel = computed<string>(() => {
   const conf = artifact.value?.artifactJson.confidence
   if (!conf) return ''
-  return conf.level ?? (conf.score != null && conf.score >= 0.7 ? 'high' : conf.score != null && conf.score >= 0.5 ? 'medium' : 'low')
+  const level = conf.level
+  const score = conf.score
+  if (level == null && score == null) return ''
+  return level ?? (score! >= 0.7 ? 'high' : score! >= 0.5 ? 'medium' : 'low')
 })
 
 /** 报告可下载：归因已完成且存在有效 artifact */
@@ -170,7 +173,10 @@ const reportBusy = ref(false)
 async function onDownloadReport(): Promise<void> {
   if (reportBusy.value || !detail.value) return
   const eventId = detail.value.event_id
-  if (!eventId) return
+  if (!eventId) {
+    uni.showToast({ title: '该异动暂无完整归因', icon: 'none' })
+    return
+  }
   reportBusy.value = true
   try {
     await downloadInsightReport(eventId)

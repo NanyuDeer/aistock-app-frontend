@@ -1,6 +1,6 @@
-/**
+﻿﻿/**
  * 完整洞察报告 PDF 下载（2026-09-13）。
- * H5：fetch(带 JWT) → Blob → a[download]；App：uni.downloadFile + uni.openDocument。
+ * H5：fetch(带JWT) → Blob → a[download]；App：uni.downloadFile + uni.openDocument。
  * 备注：报告由 app-api 组装数据并调用 agent-py 实时渲染，无落盘。
  */
 import { API_BASE_URL } from '@/shared/utils/constants'
@@ -8,7 +8,7 @@ import { API_BASE_URL } from '@/shared/utils/constants'
 /** 报告端点 URL（H5 fetch / App downloadFile 共用） */
 export function buildInsightReportUrl(eventId: string): string {
   const base = API_BASE_URL.replace(/\/$/, '')
-  return `${base}/api/cn/favorites/movements/${encodeURIComponent(eventId)}/report.pdf`
+  return `${base}/cn/favorites/movements/${encodeURIComponent(eventId)}/report.pdf`
 }
 
 function authHeader(): Record<string, string> {
@@ -20,7 +20,7 @@ function authHeader(): Record<string, string> {
 async function downloadOnH5(eventId: string): Promise<void> {
   const res = await fetch(buildInsightReportUrl(eventId), { headers: authHeader() })
   if (res.status === 409) throw new Error('该异动暂无完整归因')
-  if (!res.ok) throw new Error('报告生成失败，请重试')
+  if (res.status !== 200) throw new Error('报告生成失败，请重试')
   const blob = await res.blob()
   const objectUrl = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -57,8 +57,7 @@ function downloadOnApp(eventId: string): Promise<void> {
 /** 统一下载入口：按平台分流 */
 export async function downloadInsightReport(eventId: string): Promise<void> {
   // #ifdef H5
-  await downloadOnH5(eventId)
-  return
+  return await downloadOnH5(eventId)
   // #endif
   // #ifndef H5
   await downloadOnApp(eventId)
