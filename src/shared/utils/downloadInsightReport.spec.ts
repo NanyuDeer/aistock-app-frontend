@@ -58,4 +58,15 @@ describe('downloadInsightReport (H5 分支)', () => {
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
     expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1)
   })
+
+  it('DOM 操作抛错时仍释放 objectUrl', async () => {
+    const blob = new Blob(['fake-pdf'], { type: 'application/pdf' })
+    const mockFetch = vi.fn().mockResolvedValue({ status: 200, blob: () => Promise.resolve(blob) })
+    vi.stubGlobal('fetch', mockFetch)
+    const origAppendChild = document.body.appendChild
+    document.body.appendChild = vi.fn(() => { throw new Error('DOM error') }) as typeof origAppendChild
+
+    await expect(downloadInsightReport('test-event')).rejects.toThrow('DOM error')
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1)
+  })
 })

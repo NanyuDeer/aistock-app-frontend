@@ -1,4 +1,4 @@
-﻿﻿/**
+/**
  * 完整洞察报告 PDF 下载（2026-09-13）。
  * H5：fetch(带JWT) → Blob → a[download]；App：uni.downloadFile + uni.openDocument。
  * 备注：报告由 app-api 组装数据并调用 agent-py 实时渲染，无落盘。
@@ -26,10 +26,13 @@ async function downloadOnH5(eventId: string): Promise<void> {
   const link = document.createElement('a')
   link.href = objectUrl
   link.download = `insight-report-${eventId.split(':')[1] ?? 'report'}.pdf`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(objectUrl)
+  try {
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
 }
 
 /** App：uni.downloadFile（带鉴权）后调用系统阅读器打开 */
