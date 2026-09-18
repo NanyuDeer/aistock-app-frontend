@@ -64,3 +64,11 @@ test('事件日历空态文案不再断言"今日无事件"', () => {
   assert.ok(source.includes('未来 5 个交易日暂无已登记事件'))
   assert.ok(source.includes('该维度数据源未接入'))
 })
+
+test('PHASE_META 覆盖后端五态（含启动/主升）', () => {
+  for (const key of ['ice', 'launch', 'rally', 'overheat', 'ebb']) {
+    assert.ok(source.includes(`${key}:`), `PHASE_META 缺少 ${key}`)
+  }
+  assert.ok(source.includes('启动'))
+  assert.ok(source.includes('主升'))
+})

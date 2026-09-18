@@ -119,10 +119,11 @@ const levelMeta = computed(() => LEVEL_META[props.card.level ?? ''] ?? { label: 
 const bandLabels = BAND_LABELS
 const bandSegs = BAND_SEG_CLS.map((cls, i) => ({ cls, on: levelMeta.value.idx === i }))
 
-// ── 情绪周期四态（G3 仅展示，实验性判定）──
+// ── 情绪周期五态（对齐后端 stage：ice/launch/rally/overheat/ebb；G3 仅展示，实验性判定）──
 const PHASE_META: Record<string, { label: string; cls: string }> = {
   ice: { label: '冰点', cls: 'ph-ice' },
-  warm_up: { label: '升温', cls: 'ph-warm' },
+  launch: { label: '启动', cls: 'ph-warm' },
+  rally: { label: '主升', cls: 'ph-rally' },
   overheat: { label: '过热', cls: 'ph-overheat' },
   ebb: { label: '退潮', cls: 'ph-ebb' },
 }
@@ -196,6 +197,7 @@ function tempValue(score: number): string {
 .rc-chip.ph-warm { color: #b45309; background: #fef3c7; }
 .rc-chip.ph-overheat { color: $up; background: rgba($up, 0.1); }
 .rc-chip.ph-ebb { color: $ink-soft; background: rgba($ink-soft, 0.12); }
+.ph-rally { color: $up; }
 .rc-chip.ph-missing { color: $ink-soft; background: rgba($ink-soft, 0.12); }
 .rc-exp { font-size: 20rpx; color: $ink-soft; border: 1rpx dashed $line; border-radius: 8rpx; padding: 2rpx 10rpx; }
 
