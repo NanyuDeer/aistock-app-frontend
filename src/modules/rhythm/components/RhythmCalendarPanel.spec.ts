@@ -31,9 +31,15 @@ test('折叠近 7 交易日紧凑条走交易日数据源（dayList），展开�
   assert.match(source, /const dayListRaw = ref<RhythmCalendarDay\[\]>\(\[\]\)/)
 })
 
-test('selectedEvents 在交易日数据源未命中时回退自然日数据源（周末/节假日 cell 仍可看当日 macro 事件）', () => {
+test('selectedEvents 在交易日数据源未命中时回退自然日数据源（周末/节假日 cell 仍可看当日事件；事件面板不得宣称仅宏观）', () => {
   // 事件面板查找需同时覆盖交易日（dayList/ascending）与自然日（dayListRaw）两条来源，
-  // 保证展开网格周末/节假日格显示的事件角标在选中后仍能在事件面板列出，而非"当日无宏观事件"。
+  // 保证展开网格周末/节假日格显示的事件角标在选中后仍能在事件面板列出，而非「当日无已登记事件」。
   assert.match(source, /ascending\.value\.find\(\(d\) => d\.date === props\.targetDate\)/)
   assert.match(source, /dayListRaw\.value\.find\(\(d\) => d\.date === props\.targetDate\)/)
+  // 同一 events 通道已含规则派生交割日（type=delivery）与宏观（type=macro），
+  // 事件面板标题/空态若仍宣称"仅宏观"即类别陈述与事实相反（空态不得与事实相反）。
+  assert.match(source, /<view class="ev-panel-title">当日事件<\/view>/)
+  assert.match(source, /<text v-else class="ev-empty">当日无已登记事件<\/text>/)
+  assert.ok(!source.includes('当日宏观事件'), '事件面板标题不得退回仅宏观口径')
+  assert.ok(!source.includes('当日无宏观事件'), '事件面板空态不得退回仅宏观口径')
 })

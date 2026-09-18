@@ -64,7 +64,7 @@
 
       <!-- 事件模式：选中日事件行（tradingvane 风格：影响度·时间·标题；result 尾注；US 隔夜角标） -->
       <view v-if="mode === 'event'" class="ev-panel">
-        <view class="ev-panel-title">当日宏观事件</view>
+        <view class="ev-panel-title">当日事件</view>
         <template v-if="selectedEvents.length">
           <view v-for="(ev, i) in selectedEvents" :key="i" class="ev-item">
             <view class="ev-imp" :class="`imp-${ev.importance}`"></view>
@@ -74,7 +74,7 @@
             <text v-if="ev.result" class="ev-result">{{ ev.result }}</text>
           </view>
         </template>
-        <text v-else class="ev-empty">当日无宏观事件</text>
+        <text v-else class="ev-empty">当日无已登记事件</text>
       </view>
     </view>
   </view>
