@@ -1,4 +1,5 @@
 import type { RhythmBranch, RhythmCard } from '@/shared/api/modules/agent'
+import { formatBandText } from '@/shared/utils/rhythmBand'
 
 /** 洞见卡结构化预判子集（结构性对齐 ConditionalForecastBlock/InsightCard 入参，仅节奏用到的字段） */
 export interface RhythmInsightCondition {
@@ -64,7 +65,7 @@ function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
 export function toRhythmInsight(card: RhythmCard | null | undefined, slot: string, targetDate: string): RhythmInsightCard | null {
   if (!card) return null
   const level = LEVEL_LABEL[card.level ?? ''] ?? ''
-  const band = (card.position_band?.text ?? '').trim().replace(/^建议仓位[：:]*\s*/, '')
+  const band = formatBandText(card.position_band?.text)
   const title = card.conflict
     ? '信号背离 · 仅区间与提示'
     : [level, band].filter(Boolean).join(' · ')
