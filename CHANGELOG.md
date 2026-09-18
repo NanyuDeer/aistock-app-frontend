@@ -2,6 +2,22 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-18 — 大盘归因链：隐藏「检索」来源新闻条 + 撤掉「看该板块预判 →」入口
+
+**开发者**: Aria
+
+### 改进
+
+- 链上事件胶囊只展示「中台」（`source === 'warehouse'`）来源；`search`（板块定向检索补漏，多为行情综述/研报观点/栏目碎片）在链上隐藏。全被过滤时事件区不渲染（不占位），旧链无 `events` 行为不变。
+- 撤掉每个链分支的「看该板块预判 →」入口（`.acv-forecast` 模板块 + `defineEmits(['select-sector'])` + 页面 `goSectorDetail` 一并删除），预判改由板块详情页/风口页进入；分支只留溯源侧（关系徽 + 板块名 + 驱动句 + 事件胶囊 + 「溯源过程 ▾」）。
+
+### 测试
+
+- `AttributionChainView.mount.spec.ts` 原 4 例预判入口用例替换为 1 例「不挂预判入口」+ 3 例「隐藏检索来源新闻条」；`EventRefChip.mount.spec.ts` 链视图用例由「渲染 2 条（中台+检索）」改为「只渲染中台 1 条」；`traceability.mount.spec.ts` 删除预判跳转用例（余 9 例）。
+- `npx vue-tsc --noEmit` 0 错误；定向 3 spec 56 passed；全量 476 passed / 4 failed（4 条为存量红：`AnalyticsCardLayout` 1 + `insight-detail` 1 + `AlertContent` 2，零新增）。
+
+---
+
 ## [changer] 2026-09-18 — 节奏大师事件可见性与展示一致性修复
 
 **开发者**: 37588

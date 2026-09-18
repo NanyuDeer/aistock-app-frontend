@@ -36,17 +36,17 @@
       <view v-else class="report-content">
         <MarketInsightCard :presentation="presentation" />
 
-        <!-- 大盘归因链（P1 chain-attribution）：大盘根 → 主驱动板块分支（relation 徽 + 一句话驱动卡 + 事件胶囊）；
+        <!-- 大盘归因链（P1 chain-attribution）：大盘根 → 主驱动板块分支（relation 徽 + 驱动句 + 中台事件胶囊 + 溯源过程 ▾）；
              链数据由本页拉取后受控传入；链空/接口失败由组件内空态承接（无链日不报错，不阻断报告内容）。
              2026-09-18：原「今日影响大盘的主要板块」区块已并入本视图（同一份链、同一过滤判据、信息重复），
-             其「看该板块预判 →」入口下移到每个链分支上（AttributionChainView 的 select-sector 事件）。 -->
+             其「归因较弱」/「全部板块 ›」迁到下方 chain-foot 行；同日**撤掉链分支上的「看该板块预判 →」入口**
+             （板块详情页仍可从板块四环页/风口页进入），并**只展示「中台」来源事件**（隐藏「检索」新闻条）。 -->
         <view class="chain-view-block">
           <AttributionChainView
             :date="displayedDate"
             :chain="chain"
             :loading="chainLoading"
             :sector-stages="sectorStageMap"
-            @select-sector="goSectorDetail"
           />
           <!-- 链级标记行：弱依据提示 + 全部板块入口（原挂在被合并区块的标题行上，随区块移除后保留于此） -->
           <view v-if="chain" class="chain-foot">
@@ -59,9 +59,9 @@
 
         <!-- 2026-09-18：「今日影响大盘的主要板块」区块已移除 —— 与上方大盘归因链同一份链、同一过滤判据、
              同一批板块，信息重复；其能力去向往下：
-             「看该板块预判 →」→ 每个链分支（AttributionChainView select-sector）；
              「归因较弱」/「全部板块 ›」→ 上方 chain-foot 行；
-             「今日暂无可确认的驱动板块」空态 → 不再需要（链树本身已过滤未确认节点，无分支即无卡）。 -->
+             「今日暂无可确认的驱动板块」空态 → 不再需要（链树本身已过滤未确认节点，无分支即无卡）；
+             「看该板块预判 →」→ 同日**撤掉**（链分支不挂预判入口，板块详情页从板块四环页/风口页进入）。 -->
       </view>
 
       <!-- 日期切换（放在 footer 插槽，固定在底部不依赖 scroll-view 滚动） -->
@@ -192,7 +192,7 @@ function goPredictionHistory() {
 
 /* ===== 大盘归因链（链式溯源 P3'；2026-09-18 起「今日影响大盘的主要板块」区块已并入本视图） ===== */
 
-/** 当日大盘归因链（页面持有：链视图展示 + 「看该板块预判」跳转） */
+/** 当日大盘归因链（页面持有：链视图展示 + 板块原因链索引的键空间） */
 const chain = ref<AttributionChain | null>(null)
 const chainLoading = ref(false)
 
@@ -249,12 +249,6 @@ watch(displayedDate, (d) => {
 function goSectorLoop() {
   const q = displayedDate.value ? `?date=${encodeURIComponent(displayedDate.value)}` : ''
   uni.navigateTo({ url: `/modules/market/pages/sector-loop${q}` })
-}
-
-/** 主因卡预判入口：跳该板块详情页（入参沿用项目既有约定 ?name=<板块名>，见 sector-loop/leaders） */
-function goSectorDetail(name: string) {
-  if (!name) return
-  uni.navigateTo({ url: `/modules/market/pages/sector-detail?name=${encodeURIComponent(name)}` })
 }
 
 /** 跨 20:30 / 15:30 切日自动刷新定时器句柄 */

@@ -1,5 +1,23 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-18 晚 大盘归因链：隐藏「检索」来源新闻条 + 撤掉「看该板块预判 →」入口
+
+- **背景（组长两项裁定）**：
+  1. **隐藏检索的新闻条**——链上事件胶囊按来源打标（`warehouse`→「中台」/ `search`→「检索」），检索那批是**板块定向检索补漏**，多为行情综述/研报观点/栏目碎片，属于反复要求挡在链外的噪声 → 链上只展示「中台」来源。
+  2. **撤掉预判入口**——上一轮把「看该板块预判 →」从被删区块迁到了每个链分支；组长裁定链分支**不挂预判入口**（预判改由板块详情页/风口页进入），分支只留溯源侧。
+- **改动**：
+  | 文件 | 改动 |
+  |---|---|
+  | `src/shared/components/AttributionChainView.vue` | ① 新增 `warehouseEvents(c)` 过滤（只留 `source === 'warehouse'`），模板事件区改用它、`v-if` 以过滤后长度判断 → **全被滤掉则整区不渲染（不占位）**；补 `AttributionChainEvent` 类型 import（`vue-tsc` TS2532 根因：类型名未导入致返回值退化为可能 undefined）。② 删除 `.acv-forecast` 模板块 + `selectSector()` + `defineEmits(['select-sector'])` + `.acv-forecast*` 样式 + 一条失效注释 |
+  | `src/modules/analytics/pages/traceability.vue` | 去掉模板 `@select-sector="goSectorDetail"`、删除 `goSectorDetail` 函数、更新两处注释（区块能力去向改为"同日撤掉（链分支不挂预判入口）"、链视图注释加"只展示「中台」来源事件"） |
+  | `src/shared/components/AttributionChainView.mount.spec.ts` | 原「分支预判入口」describe（4 例）**替换**为：1 例「不挂预判入口」（`.acv-forecast` 不存在 + 文本不含"看该板块预判" + `emitted('select-sector')` 为 undefined）+ 3 例「隐藏检索来源新闻条」（中台保留/检索不渲染；全检索 → 事件区不渲染且分支其余照常；空数组 → 不渲染）；`withEvents` 形参类型改为 `AttributionChainEvent[]` |
+  | `src/shared/components/EventRefChip.mount.spec.ts` | 「AttributionChainView 分支事件胶囊」里"渲染 2 条（中台+检索）"改为"**只渲染中台 1 条**"（旧断言随裁定作废）；文件头注释同步 |
+  | `src/modules/analytics/pages/traceability.mount.spec.ts` | 删除「链分支『看该板块预判』→ select-sector」用例；mock 桩去掉 `emits: ['select-sector']`；文件头注释更新 |
+  | `AGENTS.md` + `src/modules/analytics/AGENTS.md` | `AttributionChainView` / `EventRefChip` / `traceability` 三行同步两项裁定；顺带修正 traceability 护栏例数（10 → 9） |
+- **未动（有意保留）**：链分支「溯源过程 ▾」展开、`sectorStages` prop、`chain-foot` 行（弱标记 + 全部板块 ›）、`isUnconfirmedAttribution` 过滤、事件胶囊组件本身（`EventRefChip` 两来源标记能力保留，其它接入点不受影响）。
+- **验收**：`npx vue-tsc --noEmit` **exit 0（0 错误）**；三个 spec（AttributionChainView 37 + EventRefChip 10 + traceability 9 = **56 passed**）；全量 `npx vitest run` → **476 passed / 4 failed**，4 条红均为**本次无关**的存量红（`AnalyticsCardLayout` 1 + `insight-detail` 1 + `AlertContent` 2），**零新增**（另有 `CardRenderer.spec.ts` 套件级失败：`KLineChart.vue` 的 `<script setup>` 与 `<script module="chartView" lang="renderjs">` 编译冲突，**HEAD 存量**，本次未改该文件）。
+- **跨端**：仅改 `aistock-app-frontend`（3 源文件 + 3 测试文件 + 2 份 AGENTS.md + 本记录）；`aistock-frontend`（web）无该页面/该组件 → **无需同步**；app-api / agent-py / 组件库 0 改动（纯展示端过滤与入口裁撤，接口契约未变）。
+
 ## 2026-09-18 板块原因链前端展示：3 字段（触发/传导/结果）可展开，三处同源
 
 - **背景（组长裁定）**：板块溯源本身就是一条原因链（后端 **4 段** `现象→触发→传导→影响`，已由 app-api `24b53a5` 加性透出为 `trace.stages`），但前端一个字段都没显示。要求：**和大盘主因链一样只显示 3 个字段（触发、传导、结果）**，且**市场洞见 + 板块详情/板块预判页都能展开**。

@@ -39,10 +39,12 @@
           </view>
           <!-- 每分支溯源一句话驱动卡 -->
           <view v-if="c.trace_summary" class="acv-driver">{{ c.trace_summary }}</view>
-          <!-- 事件胶囊（spec §7.2 链树补事件节点：点击跳事件原文；无事件/旧链缺省不渲染该区） -->
-          <view v-if="c.events?.length" class="acv-events">
+          <!-- 事件胶囊（spec §7.2 链树补事件节点）：**只展示「中台」来源**（2026-09-18 晚组长裁定
+               「隐藏检索的新闻条」）—— 检索补漏来的多是行情综述/研报观点/栏目碎片；
+               过滤后为空 → 整区不渲染（不占位），旧链无 events 行为不变 -->
+          <view v-if="warehouseEvents(c).length" class="acv-events">
             <EventRefChip
-              v-for="(ev, i) in c.events"
+              v-for="(ev, i) in warehouseEvents(c)"
               :key="`${i}-${ev.headline}`"
               :headline="ev.headline"
               :source="ev.source"
@@ -64,11 +66,6 @@
               </view>
             </view>
           </template>
-          <!-- 预判入口（2026-09-18 自「今日影响大盘的主要板块」区块迁来）：只跳转，
-               不在链上渲染预判内容（溯源/预判两轨分离不变） -->
-          <view class="acv-forecast" @tap="selectSector(c)">
-            <text class="acv-forecast-text">看该板块预判 →</text>
-          </view>
         </view>
       </view>
     </template>
@@ -77,7 +74,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { AttributionChain, AttributionChainChild } from '@/shared/api/modules/attributionChain'
+import type { AttributionChain, AttributionChainChild, AttributionChainEvent } from '@/shared/api/modules/attributionChain'
 import { extractionWeakLabel, isUnconfirmedAttribution, type ReasonStageRow } from '@/shared/utils/sectorInsight'
 import EventRefChip from './EventRefChip.vue'
 
@@ -119,7 +116,7 @@ function keyOf(c: AttributionChainChild): string {
 
 /**
  * 取该分支的板块原因链 3 段：`ts_code` → `sector_std` → 原始名逐级降级查表
- * （链节点命名会在权威名↔复盘原始名之间漂移，与 `selectSector` 同一解析顺序）。
+ * （链节点命名会在权威名↔复盘原始名之间漂移，故三级都试）。
  */
 function stageRowsOf(c: AttributionChainChild): ReasonStageRow[] {
   const map = props.sectorStages
@@ -149,17 +146,13 @@ function toggleStages(c: AttributionChainChild): void {
 const displayDate = computed(() => props.date)
 
 /**
- * 预判入口事件（2026-09-18）：「今日影响大盘的主要板块」区块并入本视图后，其**唯一**功能入口
- * （跳该板块详情看完整预判）迁到每个分支上。组件只上报板块名、不持路由语义——跳转由页面处理
- * （与 `openEventRef` 自己开 webview 不同：板块详情页是站内路由，页面更清楚当前展示日期）。
+ * 该分支可展示的事件胶囊（2026-09-18 晚组长裁定「隐藏检索的新闻条」）：
+ * **只保留 `source === 'warehouse'`（中台）**，丢弃 `search`（板块定向检索补漏）——
+ * 检索那批多是行情综述/研报观点/栏目碎片，是反复要求挡在链外的噪声。
+ * 旧链无 events / 全被过滤 → 返回空数组 → 模板侧整区不渲染（不占位）。
  */
-const emit = defineEmits<{ (e: 'select-sector', name: string): void }>()
-
-/** 上报板块名：权威名（`sector_std`）优先 → 复盘原始名（与角色徽匹配优先级一致，抗命名漂移）。
- *  两侧都先 trim 判空——`sector_std` 可能是**空白串**（脏数据），不能因它把入口丢掉。 */
-function selectSector(c: AttributionChainChild): void {
-  const name = (c.sector_std ?? '').trim() || (c.sector ?? '').trim()
-  if (name) emit('select-sector', name)
+function warehouseEvents(c: AttributionChainChild): AttributionChainEvent[] {
+  return (c.events ?? []).filter((ev) => ev.source === 'warehouse')
 }
 
 /**
@@ -430,7 +423,6 @@ const sortedChildren = computed(() => {
   gap: 8rpx;
 }
 
-/* 预判入口（2026-09-18 自「今日影响大盘的主要板块」区块迁来）：右对齐纯文字链接 */
 /* 溯源过程展开（2026-09-18）：与组件库 InsightCard「依据详情」同款交互与排布
    （右对齐文字入口 + 展开后「阶段名 | 文本」两列），保持全站洞见类展开一致 */
 .acv-more {
@@ -492,21 +484,5 @@ const sortedChildren = computed(() => {
   font-size: $font-size-xs;
   line-height: 1.6;
   color: $ink;
-}
-
-.acv-forecast {
-  display: flex;
-  justify-content: flex-end;
-  padding: 8rpx 0 0;
-
-  &:active {
-    opacity: 0.8;
-  }
-}
-
-.acv-forecast-text {
-  font-size: $font-size-sm;
-  color: $primary;
-  font-weight: 500;
 }
 </style>
