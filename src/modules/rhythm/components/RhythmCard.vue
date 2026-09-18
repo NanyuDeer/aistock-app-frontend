@@ -71,7 +71,7 @@
         <text>该维度数据源未接入</text>
       </view>
       <view class="rc-empty" v-else>
-        <text>今日无事件（正常交易日）</text>
+        <text>未来 5 个交易日暂无已登记事件</text>
       </view>
     </view>
 

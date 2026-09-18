@@ -58,3 +58,9 @@ test('去重瘦身：rc-pos 长句 / rc-branch 区块 / rc-phase-ev 证据行已
   assert.doesNotMatch(source, /rc-branch/)
   assert.doesNotMatch(source, /rc-phase-ev/)
 })
+
+test('事件日历空态文案不再断言"今日无事件"', () => {
+  assert.ok(!source.includes('今日无事件（正常交易日）'))
+  assert.ok(source.includes('未来 5 个交易日暂无已登记事件'))
+  assert.ok(source.includes('该维度数据源未接入'))
+})
