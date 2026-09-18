@@ -126,7 +126,7 @@
                    无数据（旧记录/未溯源）→ 该行不出入口（不占位） -->
               <template v-if="row.stages.length">
                 <view class="sl-more" @tap.stop="toggleStages(row.key)">
-                  <text class="sl-more__tx">{{ isStagesOpen(row.key) ? '收起' : '溯源过程' }}</text>
+                  <text class="sl-more__tx">{{ isStagesOpen(row.key) ? '收起' : '依据详情' }}</text>
                   <view class="sl-more__chev" :class="{ 'sl-more__chev--open': isStagesOpen(row.key) }" />
                 </view>
                 <view v-if="isStagesOpen(row.key)" class="sl-detail">
@@ -278,14 +278,14 @@ interface RowVM {
   stages: ReasonStageRow[]
 }
 
-/** 溯源过程展开态（本地交互；键 = 行 key，即 ts_code） */
+/** 依据详情展开态（本地交互；键 = 行 key，即 ts_code） */
 const expandedKeys = ref<Set<string>>(new Set())
 
 function isStagesOpen(key: string): boolean {
   return expandedKeys.value.has(key)
 }
 
-/** 展开/收起该行溯源过程（新建 Set 触发响应式：Set 原地增删不触发 ref 更新） */
+/** 展开/收起该行依据详情（新建 Set 触发响应式：Set 原地增删不触发 ref 更新） */
 function toggleStages(key: string): void {
   if (!key) return
   const next = new Set(expandedKeys.value)
@@ -770,7 +770,7 @@ onLoad(async (options) => {
   line-height: 1.6;
 }
 
-/* 溯源过程展开（2026-09-18）：与组件库 InsightCard「依据详情」同款交互与排布
+/* 依据详情展开（2026-09-18，2026-09-19 文案统一）：与组件库 InsightCard「依据详情」同款交互与排布
    （右对齐文字入口 + 展开后「阶段名 | 文本」两列），保持全站洞见类展开一致 */
 .sl-more {
   display: flex;

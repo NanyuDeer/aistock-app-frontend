@@ -36,7 +36,8 @@
       <view v-else class="report-content">
         <MarketInsightCard :presentation="presentation" />
 
-        <!-- 大盘归因链（P1 chain-attribution）：大盘根 → 主驱动板块分支（relation 徽 + 驱动句 + 中台事件胶囊 + 溯源过程 ▾）；
+        <!-- 今日驱动板块（P1 chain-attribution，2026-09-19 由「大盘归因链」更名 + 改洞见卡行语言）：
+             大盘行 → 驱动板块分支（key + 归因结论 + 关系徽 + 中台事件胶囊 + 依据详情 ▾）；
              链数据由本页拉取后受控传入；链空/接口失败由组件内空态承接（无链日不报错，不阻断报告内容）。
              2026-09-18：原「今日影响大盘的主要板块」区块已并入本视图（同一份链、同一过滤判据、信息重复），
              其「归因较弱」/「全部板块 ›」迁到下方 chain-foot 行；同日**撤掉链分支上的「看该板块预判 →」入口**
@@ -190,7 +191,7 @@ function goPredictionHistory() {
   uni.navigateTo({ url: '/modules/analytics/pages/prediction-history' })
 }
 
-/* ===== 大盘归因链（链式溯源 P3'；2026-09-18 起「今日影响大盘的主要板块」区块已并入本视图） ===== */
+/* ===== 今日驱动板块（链式溯源 P3'，2026-09-19 命名；2026-09-18 起「今日影响大盘的主要板块」区块已并入本视图） ===== */
 
 /** 当日大盘归因链（页面持有：链视图展示 + 板块原因链索引的键空间） */
 const chain = ref<AttributionChain | null>(null)

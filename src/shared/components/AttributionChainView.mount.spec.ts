@@ -55,7 +55,7 @@ describe('AttributionChainView 未确认驱动原因过滤（R17）', () => {
 
 /**
  * 不挂预判入口（2026-09-18 晚，组长裁定）：**大盘归因链去掉「看该板块预判 →」入口** ——
- * 分支只留溯源侧（角色徽 + 板块名 + 驱动句 + 事件胶囊 + 溯源过程 ▾），预判不再从链上跳转
+ * 分支只留溯源侧（角色徽 + 板块名 + 驱动句 + 事件胶囊 + 依据详情 ▾），预判不再从链上跳转
  * （板块详情页仍可从板块四环页 / 风口页进入）。
  */
 describe('AttributionChainView 不挂预判入口（2026-09-18 晚）', () => {
@@ -131,7 +131,7 @@ describe('AttributionChainView 隐藏「检索」来源新闻条（2026-09-18 �
  * 板块原因链展开（2026-09-18）：每个分支可展开看该板块的 3 段溯源（触发 → 传导 → 结果），
  * 与大盘主因链 3 步同形。数据由页面首屏拉一次 sector-insight 后索引传入（组件不自己请求）。
  */
-describe('AttributionChainView 分支溯源过程展开（2026-09-18）', () => {
+describe('AttributionChainView 分支依据详情展开（2026-09-18；2026-09-19 文案对齐洞见卡）', () => {
   const chainWith = (children: Array<Record<string, unknown>>) => ({
     date: DATE,
     root: { type: 'market' as const, date: DATE, summary: 'x', index_pct: 1 },
@@ -144,7 +144,7 @@ describe('AttributionChainView 分支溯源过程展开（2026-09-18）', () => 
     { name: '结果', text: '国产替代预期升温' },
   ]
 
-  it('无 sectorStages 数据 → 分支不出「溯源过程」入口（不占位）', () => {
+  it('无 sectorStages 数据 → 分支不出「依据详情」入口（不占位）', () => {
     const wrapper = mount(AttributionChainView, {
       props: {
         date: DATE,
@@ -169,7 +169,7 @@ describe('AttributionChainView 分支溯源过程展开（2026-09-18）', () => 
       },
     })
 
-    expect(wrapper.find('.acv-more-tx').text()).toBe('溯源过程')
+    expect(wrapper.find('.acv-more-tx').text()).toBe('依据详情')
     expect(wrapper.find('.acv-detail').exists()).toBe(false)
 
     await wrapper.find('.acv-more').trigger('tap')
@@ -217,7 +217,7 @@ describe('AttributionChainView 分支溯源过程展开（2026-09-18）', () => 
     await wrapper.findAll('.acv-more')[0]!.trigger('tap')
 
     expect(wrapper.findAll('.acv-detail')).toHaveLength(1)
-    expect(wrapper.findAll('.acv-more-tx').map((n) => n.text())).toEqual(['收起', '溯源过程'])
+    expect(wrapper.findAll('.acv-more-tx').map((n) => n.text())).toEqual(['收起', '依据详情'])
   })
 })
 

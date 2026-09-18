@@ -1,72 +1,84 @@
 <template>
   <view class="acv">
     <view class="acv-head">
-      <text class="acv-title">大盘归因链</text>
+      <text class="acv-title">今日驱动板块</text>
       <text v-if="mock" class="acv-mock-tag">演示数据</text>
       <text class="acv-date">{{ displayDate }}</text>
     </view>
 
     <!-- 加载中 -->
     <view v-if="loading" class="acv-state">
-      <text class="acv-state-text">归因链加载中…</text>
+      <text class="acv-state-text">驱动板块加载中…</text>
     </view>
 
     <!-- 空态：无链（无板块驱动异动或尚未生成）不报错 -->
     <view v-else-if="displayChain === null" class="acv-state">
-      <text class="acv-state-text">当日无主驱动归因链（无板块驱动异动或尚未生成）</text>
+      <text class="acv-state-text">当日无驱动板块（无板块驱动异动或尚未生成）</text>
     </view>
 
     <template v-else>
-      <!-- 大盘根 -->
+      <!-- 大盘行：key 行 + 归因结论（与板块分支同构：结论另起一行）
+           2026-09-19 组长裁定：「大盘」二字要比板块名显眼一点——同取品牌蓝，靠**字号 $font-size-md(28rpx) + 字重 700** 区分；
+           同行右侧放指数涨跌（行情右对齐） -->
       <view class="acv-root">
-        <text class="acv-root-tag">大盘</text>
+        <view class="acv-root-head">
+          <text class="acv-key acv-root-key">大盘</text>
+          <text
+            v-if="displayChain.root.index_pct != null"
+            class="acv-pct"
+            :class="pctCls(displayChain.root.index_pct)"
+          >
+            {{ fmtPct(displayChain.root.index_pct) }}
+          </text>
+        </view>
         <text class="acv-root-sum">{{ displayChain.root.summary || '今日无显著主因' }}</text>
-        <text v-if="displayChain.root.index_pct != null" class="acv-pct" :class="pctCls(displayChain.root.index_pct)">
-          {{ fmtPct(displayChain.root.index_pct) }}
-        </text>
       </view>
 
-      <!-- 板块分支（按 |pct| 降序，null 排末尾） -->
-      <view class="acv-children">
-        <view v-for="c in sortedChildren" :key="c.sector" class="acv-child">
-          <view class="acv-child-row">
-            <text class="acv-badge" :class="'rel-' + c.relation">{{ relText(c.relation) }}</text>
-            <!-- 板块级弱依据标记（child.extraction.weak=true，2026-09-17 R16）：
-                 snapshot=纯异动兜底无归因理由 →「无归因依据」；candidate_claim →「依据较弱」；缺省不渲染 -->
-            <text v-if="weakTextOf(c)" class="acv-weak">{{ weakTextOf(c) }}</text>
-            <text class="acv-sec">{{ c.sector }}</text>
-            <text v-if="c.pct != null" class="acv-pct" :class="pctCls(c.pct)">{{ fmtPct(c.pct) }}</text>
-          </view>
-          <!-- 每分支溯源一句话驱动卡 -->
-          <view v-if="c.trace_summary" class="acv-driver">{{ c.trace_summary }}</view>
-          <!-- 事件胶囊（spec §7.2 链树补事件节点）：**只展示「中台」来源**（2026-09-18 晚组长裁定
-               「隐藏检索的新闻条」）—— 检索补漏来的多是行情综述/研报观点/栏目碎片；
-               过滤后为空 → 整区不渲染（不占位），旧链无 events 行为不变 -->
-          <view v-if="warehouseEvents(c).length" class="acv-events">
-            <EventRefChip
-              v-for="(ev, i) in warehouseEvents(c)"
-              :key="`${i}-${ev.headline}`"
-              :headline="ev.headline"
-              :source="ev.source"
-              :event-ref="ev.ref"
-              @select="openEventRef"
-            />
-          </view>
-          <!-- 板块原因链 3 段（2026-09-18）：触发 → 传导 → 结果，与大盘主因链同形；
-               数据由页面首屏拉一次 sector-insight 索引传入，无数据 → 该分支不出入口（不占位） -->
-          <template v-if="stageRowsOf(c).length">
-            <view class="acv-more" @tap.stop="toggleStages(c)">
-              <text class="acv-more-tx">{{ isStagesOpen(c) ? '收起' : '溯源过程' }}</text>
-              <view class="acv-more-chev" :class="{ 'acv-more-chev--open': isStagesOpen(c) }" />
-            </view>
-            <view v-if="isStagesOpen(c)" class="acv-detail">
-              <view v-for="(st, i) in stageRowsOf(c)" :key="i" class="acv-detail-st">
-                <text class="acv-detail-k">{{ st.name }}</text>
-                <text class="acv-detail-v">{{ st.text }}</text>
-              </view>
-            </view>
-          </template>
+      <view class="acv-divider" />
+
+      <!-- 板块分支（按 |pct| 降序，null 排末尾）：key 行 + 结论正文 + 事件 + 依据详情 -->
+      <view v-for="c in sortedChildren" :key="c.sector" class="acv-child">
+        <view class="acv-child-head">
+          <!-- 关系徽（2026-09-17 R16 弱依据标记贴在关系徽前，保持同族中性样式） -->
+          <text v-if="weakTextOf(c)" class="acv-weak">{{ weakTextOf(c) }}</text>
+          <text class="acv-key acv-sec">{{ c.sector }}</text>
+          <text v-if="c.pct != null" class="acv-pct" :class="pctCls(c.pct)">{{ fmtPct(c.pct) }}</text>
+          <text class="acv-rel" :class="'rel-' + c.relation">{{ relText(c.relation) }}</text>
         </view>
+
+        <!-- 该板块的归因结论（2026-09-18 R25：链上 trace_summary 已是结论句） -->
+        <text v-if="c.trace_summary" class="acv-driver">{{ c.trace_summary }}</text>
+
+        <!-- 事件胶囊（spec §7.2 链树补事件节点）：**只展示「中台」来源**（2026-09-18 晚组长裁定
+             「隐藏检索的新闻条」）—— 检索补漏来的多是行情综述/研报观点/栏目碎片；
+             过滤后为空 → 整区不渲染（不占位），旧链无 events 行为不变 -->
+        <view v-if="warehouseEvents(c).length" class="acv-events">
+          <EventRefChip
+            v-for="(ev, i) in warehouseEvents(c)"
+            :key="`${i}-${ev.headline}`"
+            :headline="ev.headline"
+            :source="ev.source"
+            :event-ref="ev.ref"
+            @select="openEventRef"
+          />
+        </view>
+
+        <!-- 板块原因链 3 段（2026-09-18）：触发 → 传导 → 结果，与大盘主因链同形；
+             数据由页面首屏拉一次 sector-insight 索引传入，无数据 → 该分支不出入口（不占位） -->
+        <template v-if="stageRowsOf(c).length">
+          <view class="acv-more" @tap.stop="toggleStages(c)">
+            <text class="acv-more-tx">{{ isStagesOpen(c) ? '收起' : '依据详情' }}</text>
+            <view class="acv-more-chev" :class="{ 'acv-more-chev--open': isStagesOpen(c) }" />
+          </view>
+          <view v-if="isStagesOpen(c)" class="acv-detail">
+            <view v-for="(st, i) in stageRowsOf(c)" :key="i" class="acv-detail-st">
+              <text class="acv-detail-k">{{ st.name }}</text>
+              <text class="acv-detail-v">{{ st.text }}</text>
+            </view>
+          </view>
+        </template>
+
+        <view class="acv-divider" />
       </view>
     </template>
   </view>
@@ -79,12 +91,17 @@ import { extractionWeakLabel, isUnconfirmedAttribution, type ReasonStageRow } fr
 import EventRefChip from './EventRefChip.vue'
 
 /**
- * 大盘归因链视图（App 专属 wrapper）
+ * 今日驱动板块视图（App 专属 wrapper；2026-09-19 由「大盘归因链」更名 + 改洞见卡行语言）
  *
  * 2026-09-17 P3' Task 4.1：**改为受控组件**——链数据由页面侧拉取（`fetchAttributionChain`）
  * 后经 `chain` prop 传入。原因：市场洞见页需要同一份链做「主因卡排序 + marketLink 匹配」，
  * 组件内自拉会让页面拿不到链（两处重复请求/口径漂移）。空态/加载态仍由本组件承接
  * （loading prop / chain=null）；`:date` 仅作展示与 mock 数据日期。
+ *
+ * 2026-09-19（组长裁定，方案 E）：**视觉改向洞见卡看齐**——卡内改为「加粗彩色 key + 正文行块 +
+ * 渐变分隔线」的语言（与 `InsightCard` 的溯源/预判行同构），去掉原「大盘根卡浅底块 + 每分支
+ * 浅蓝驱动句块」的重复底色块（同重量色块看不出主因）；展开入口文案同步对齐洞见卡的「依据详情」。
+ * 更名理由（组长）：内容主体是「哪些板块驱动了大盘」，与板块更相关。
  */
 const props = withDefaults(defineProps<{
   /** 展示日期（YYYY-MM-DD），仅用于表头与 mock 演示数据构造 */
@@ -132,7 +149,7 @@ function isStagesOpen(c: AttributionChainChild): boolean {
   return expandedKeys.value.has(keyOf(c))
 }
 
-/** 展开/收起该分支的溯源过程（新建 Set 触发响应式：Set 原地增删不触发 ref 更新） */
+/** 展开/收起该分支的依据详情（新建 Set 触发响应式：Set 原地增删不触发 ref 更新） */
 function toggleStages(c: AttributionChainChild): void {
   const k = keyOf(c)
   if (!k) return
@@ -289,63 +306,71 @@ const sortedChildren = computed(() => {
   text-align: center;
 }
 
-/* 大盘根：浅底圆角卡，tag + 一句话 + 涨跌 */
-.acv-root {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-  padding: 20rpx 24rpx;
-  background: $bg-soft;
-  border-radius: $r-md;
+/* ===== 洞见卡行语言（2026-09-19 方案 E）：加粗彩色 key + 正文，行间用渐变分隔线 ===== */
+.acv-key {
+  flex-shrink: 0;
+  font-size: $font-size-sm;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  color: $primary;
 }
 
-.acv-root-tag {
-  flex-shrink: 0;
-  padding: 2rpx 12rpx;
-  border-radius: $r-xs;
-  background: $primary-50;
-  color: $primary;
-  font-size: $font-size-xs;
-  font-weight: 600;
-  line-height: 1.6;
+/* 大盘行：与板块分支同构（key 行 + 结论另起一行）；「大盘」比板块名显眼（更大 + 墨色） */
+.acv-root {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.acv-root-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+/* 大盘 key：同色（品牌蓝）但更显眼——字号 $font-size-md（28rpx）+ 字重 700（板块名走 key 基准 24rpx/600）；
+   同行右侧放指数涨跌（`justify-content: space-between` → 行情右对齐） */
+.acv-root-key {
+  font-size: $font-size-md;
+  font-weight: 700;
 }
 
 .acv-root-sum {
-  flex: 1;
-  min-width: 0;
   font-size: $font-size-sm;
   color: $ink-soft;
   line-height: 1.6;
 }
 
-/* 板块分支区：与根卡之间留白，分支间细分隔线 */
-.acv-children {
-  display: flex;
-  flex-direction: column;
-  margin-top: $spacing-base;
+/* 分隔线：与 InsightCard 同款渐变（primary-100 → 透明） */
+.acv-divider {
+  height: 2rpx;
+  margin: 16rpx 0;
+  background: linear-gradient(90deg, $primary-100, rgba($primary-100, 0));
 }
 
+/* 板块分支：key 行 + 结论正文 + 事件 + 依据详情 */
 .acv-child {
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
-  padding-top: 18rpx;
+  gap: 10rpx;
 }
 
-.acv-child + .acv-child {
-  border-top: 2rpx solid $line-soft;
-  margin-top: 18rpx;
-}
-
-.acv-child-row {
+.acv-child-head {
   display: flex;
   align-items: center;
-  gap: 14rpx;
+  gap: 12rpx;
+}
+
+/* 板块名：兼作 key（撑满剩余宽度，把涨跌/关系徽推到右侧） */
+.acv-sec {
+  flex: 1;
+  min-width: 0;
 }
 
 /* relation 徽：中性描边文字徽（方向语义交由涨跌 pct 表达，避免颜色双语义）；
    自驱动=墨色强调，跟随大盘=常规，关系未知=弱化灰 */
-.acv-badge {
+.acv-rel {
   flex-shrink: 0;
   padding: 2rpx 12rpx;
   border: 2rpx solid $line-strong;
@@ -355,13 +380,13 @@ const sortedChildren = computed(() => {
   line-height: 1.6;
 }
 
-.acv-badge.rel-self_driven {
+.acv-rel.rel-self_driven {
   color: $ink;
   border-color: $ink-soft;
   font-weight: 600;
 }
 
-.acv-badge.rel-unknown {
+.acv-rel.rel-unknown {
   color: $ink-faint;
   border-color: $line;
 }
@@ -375,15 +400,6 @@ const sortedChildren = computed(() => {
   color: $ink-mute;
   font-size: $font-size-xs;
   line-height: 1.6;
-}
-
-.acv-sec {
-  flex: 1;
-  min-width: 0;
-  font-size: $font-size-base;
-  font-weight: 600;
-  color: $ink;
-  line-height: 1.4;
 }
 
 /* 涨跌 pct：A 股红涨绿跌 */
@@ -406,11 +422,8 @@ const sortedChildren = computed(() => {
   color: $ink-mute;
 }
 
-/* 溯源一句话驱动卡：浅蓝底（对齐 sl-trace 溯源横幅）灰字换行 */
+/* 板块归因结论一句话：正文灰字换行（去掉了原浅蓝底块——重复底色块看不出主因） */
 .acv-driver {
-  padding: 10rpx 14rpx;
-  border-radius: $r-sm;
-  background: $primary-50;
   font-size: $font-size-sm;
   color: $ink-soft;
   line-height: 1.6;
@@ -423,7 +436,7 @@ const sortedChildren = computed(() => {
   gap: 8rpx;
 }
 
-/* 溯源过程展开（2026-09-18）：与组件库 InsightCard「依据详情」同款交互与排布
+/* 依据详情展开（2026-09-18）：与组件库 InsightCard「依据详情」同款交互与排布
    （右对齐文字入口 + 展开后「阶段名 | 文本」两列），保持全站洞见类展开一致 */
 .acv-more {
   display: flex;
@@ -460,7 +473,6 @@ const sortedChildren = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
-  margin-top: 10rpx;
   padding-top: 10rpx;
   border-top: 2rpx dashed $line-soft;
 }
