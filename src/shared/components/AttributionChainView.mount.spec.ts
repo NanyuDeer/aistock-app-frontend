@@ -53,6 +53,97 @@ describe('AttributionChainView 未确认驱动原因过滤（R17）', () => {
 })
 
 /**
+ * 预判入口（2026-09-18）：「今日影响大盘的主要板块」区块并入本视图后，其**唯一**功能入口
+ * （跳该板块详情看完整预判）迁到每个链分支上。组件只上报板块名（`select-sector`），
+ * 路由语义留给页面（页面更清楚当前展示日期）。
+ */
+describe('AttributionChainView 分支预判入口（2026-09-18）', () => {
+  it('每个渲染出的分支都有一个「看该板块预判 →」入口（被过滤的分支没有）', () => {
+    const wrapper = mount(AttributionChainView, { props: { date: DATE, chain: chainFixture } })
+
+    expect(wrapper.findAll('.acv-child')).toHaveLength(1) // CRO概念/转基因 已被未确认过滤剔除
+    expect(wrapper.findAll('.acv-forecast')).toHaveLength(1)
+    expect(wrapper.find('.acv-forecast-text').text()).toBe('看该板块预判 →')
+    // 被过滤的两个板块不出入口（不出卡即不出入口）
+    expect(wrapper.text()).not.toContain('CRO概念')
+  })
+
+  it('点击入口 → emit select-sector，板块名取 sector_std 权威名优先', async () => {
+    const wrapper = mount(AttributionChainView, {
+      props: {
+        date: DATE,
+        chain: {
+          date: DATE,
+          root: { type: 'market' as const, date: DATE, summary: 'x', index_pct: 1 },
+          children: [
+            {
+              sector: '次新股',
+              sector_std: '注册制次新股',
+              relation: 'self_driven' as const,
+              pct: 7.3,
+              trace_summary: '某公司公告中标5亿元订单',
+            },
+          ],
+        },
+      },
+    })
+
+    await wrapper.find('.acv-forecast').trigger('tap')
+
+    expect(wrapper.emitted('select-sector')).toEqual([['注册制次新股']])
+  })
+
+  it('无 sector_std → 回退复盘原始 sector 名（抗命名漂移的兜底）', async () => {
+    const wrapper = mount(AttributionChainView, {
+      props: {
+        date: DATE,
+        chain: {
+          date: DATE,
+          root: { type: 'market' as const, date: DATE, summary: 'x', index_pct: 1 },
+          children: [
+            {
+              sector: '汽车芯片',
+              relation: 'self_driven' as const,
+              pct: 4.03,
+              trace_summary: '市场监管总局严查汽车芯片炒作',
+            },
+          ],
+        },
+      },
+    })
+
+    await wrapper.find('.acv-forecast').trigger('tap')
+
+    expect(wrapper.emitted('select-sector')).toEqual([['汽车芯片']])
+  })
+
+  it('sector_std 为空白串 → 回退原始名（不因空白权威名丢掉入口）', async () => {
+    const wrapper = mount(AttributionChainView, {
+      props: {
+        date: DATE,
+        chain: {
+          date: DATE,
+          root: { type: 'market' as const, date: DATE, summary: 'x', index_pct: 1 },
+          children: [
+            {
+              sector: '国家大基金持股',
+              sector_std: '   ',
+              relation: 'self_driven' as const,
+              pct: 4.03,
+              trace_summary: '大基金三期再落子',
+            },
+          ],
+        },
+      },
+    })
+
+    await wrapper.find('.acv-forecast').trigger('tap')
+
+    expect(wrapper.emitted('select-sector')).toEqual([['国家大基金持股']])
+  })
+})
+
+/**
  * 否定句口径（2026-09-18 补）：原判据只认「未确认驱动原因」「证据不足，未确认主因」两条，
  * 生产链上更常见的否定句是「**未检索到**可解释当日行情的独立触发事件」（2026-09-18 注册制次新股）
  * —— 不匹配 → 两个视图都会把它出成卡，驱动句就是那句否定句本身，等于「未确认驱动原因的不放」

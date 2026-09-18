@@ -50,6 +50,11 @@
               @select="openEventRef"
             />
           </view>
+          <!-- 预判入口（2026-09-18 自「今日影响大盘的主要板块」区块迁来）：只跳转，
+               不在链上渲染预判内容（溯源/预判两轨分离不变） -->
+          <view class="acv-forecast" @tap="selectSector(c)">
+            <text class="acv-forecast-text">看该板块预判 →</text>
+          </view>
         </view>
       </view>
     </template>
@@ -87,6 +92,20 @@ const props = withDefaults(defineProps<{
 
 /** 展示日期：沿用页面传入的交易日（YYYY-MM-DD） */
 const displayDate = computed(() => props.date)
+
+/**
+ * 预判入口事件（2026-09-18）：「今日影响大盘的主要板块」区块并入本视图后，其**唯一**功能入口
+ * （跳该板块详情看完整预判）迁到每个分支上。组件只上报板块名、不持路由语义——跳转由页面处理
+ * （与 `openEventRef` 自己开 webview 不同：板块详情页是站内路由，页面更清楚当前展示日期）。
+ */
+const emit = defineEmits<{ (e: 'select-sector', name: string): void }>()
+
+/** 上报板块名：权威名（`sector_std`）优先 → 复盘原始名（与角色徽匹配优先级一致，抗命名漂移）。
+ *  两侧都先 trim 判空——`sector_std` 可能是**空白串**（脏数据），不能因它把入口丢掉。 */
+function selectSector(c: AttributionChainChild): void {
+  const name = (c.sector_std ?? '').trim() || (c.sector ?? '').trim()
+  if (name) emit('select-sector', name)
+}
 
 /**
  * 内置演示数据（mock=true 时渲染，供无链日/后端未生成时向老师演示）。
@@ -354,5 +373,22 @@ const sortedChildren = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
+}
+
+/* 预判入口（2026-09-18 自「今日影响大盘的主要板块」区块迁来）：右对齐纯文字链接 */
+.acv-forecast {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8rpx 0 0;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.acv-forecast-text {
+  font-size: $font-size-sm;
+  color: $primary;
+  font-weight: 500;
 }
 </style>

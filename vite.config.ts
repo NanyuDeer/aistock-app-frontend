@@ -143,8 +143,8 @@ export default defineConfig(({ mode }) => {
         // 大盘归因链读取（GET /api/agent/attribution-chain/:date）→ Node.js app-api
         // （attributionChainRouter 的本地路由，非 Python）。同样必须置于 `/api/agent`
         // 兜底之前，否则被转发到 agent-py 恒 404 → fetchAttributionChain 静默返回 null →
-        // 市场洞见页「今日影响大盘的主要板块」与链树视图**整块不渲染**
-        // （2026-09-18 复现：本地 dev 下该区块从未出现，而库里当天确有链）
+        // 市场洞见页链树视图**整块不渲染**（2026-09-18 复现：本地 dev 下该区块从未出现，
+        // 而库里当天确有链）
         '/api/agent/attribution-chain': {
           target: apiTarget,
           changeOrigin: true

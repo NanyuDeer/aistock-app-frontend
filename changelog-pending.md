@@ -1,5 +1,21 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-18 市场洞见页：删除「今日影响大盘的主要板块」区块，能力并入大盘归因链
+
+- **背景（组长裁定）**：该区块与上方「大盘归因链」**读同一份链**（页面 `fetchAttributionChain` 拉一次两处共用）、**用同一个过滤判据**（`sectorInsight.isUnconfirmedAttribution`）、**显示同一批板块**（角色徽 + 事件胶囊 + 驱动句），信息重复且同一批板块渲染两遍 → 只保留归因链。
+- **改动（`src/modules/analytics/pages/traceability.vue` + `src/shared/components/AttributionChainView.vue`）**：被删区块的三个能力全部有去向，不丢功能：
+  | 原能力 | 去向 |
+  |---|---|
+  | 「看该板块预判 →」（跳板块详情） | **迁到每个链分支**：`AttributionChainView` 新增 `defineEmits(['select-sector'])` + 每分支 `.acv-forecast` 入口；页面 `@select-sector="goSectorDetail"` 处理路由（组件只上报板块名、不持路由语义）。板块名取 `sector_std` 权威名，**空白则回退 `sector`**（脏数据不丢入口） |
+  | 「归因较弱」（`root.evidence_weak`）+「全部板块 ›」（跳板块四环页） | 链视图下方新增 `chain-foot` 行（左弱标记 / 右入口），无链时不渲染 |
+  | 「今日暂无可确认的驱动板块」空态 | **取消**（链树本身已过滤未确认节点，无分支即无卡，空态冗余） |
+  - 同时清掉页面侧死代码：`SectorInsightCard` 引入、`SectorInsightCandidate` 类型引入、`primarySectorCandidates`、`rankedCandidates`、`loadPrimarySectorInsight`、`sectorInsight` 工具引入、watch 里的第二次请求、全部 `.primary-sector-*` 样式。
+  - **页面不再请求 `agentApi.getSectorInsight`**（少一次接口往返）；该接口 `sector-loop`/`sector-detail` 仍在用，**接口与 vite proxy 均不动**。
+- **测试（`src/modules/analytics/pages/traceability.mount.spec.ts` 重写 + `AttributionChainView.mount.spec.ts` 扩充）**：旧 spec 的 12 例全部断言被删区块（`.primary-sector-*` / 排序 / R14 / R16 / R17 出卡），随区块一并作废 → 重写为 8 例：旧区块彻底消失 / **不再请求 sector-insight**（负向护栏）/ 链数据仍受控传入 / 无链时 `chain-foot` 不渲染 / 有链出「全部板块 ›」且正常日无「归因较弱」/ 弱归因日出「归因较弱」/ `select-sector` → 跳板块详情（URL 编码断言）/「全部板块 ›」→ 跳四环页带展示日期。`AttributionChainView.mount.spec.ts` **+4 例**：每个渲染出的分支都有入口（被过滤分支没有）/ `sector_std` 权威名优先 / 无 `sector_std` 回退原始名 / **`sector_std` 为空白串仍回退原始名**（此例先红后绿——初版实现用 `c.sector_std || c.sector` 会让空白串吃掉入口，`trim` 判空后修正）。
+- **验收**：两个 spec `npx vitest run` → **41 passed / 0 failed**；全量 `npx vitest run` → **471 passed / 4 failed**（4 条为**本次无关**的存量红：`tests/AnalyticsCardLayout.test.ts` 1 + `favorites/pages/insight-detail.spec.ts` 1 + `favorites/components/AlertContent.spec.ts` 2 + `CardRenderer.spec.ts` 套件级 `uni is not defined`，与上一版全量结果同集）；`npx vue-tsc --noEmit` **通过**。
+- **遗留（未做，等指示）**：`src/shared/utils/sectorInsight.ts` 的 `buildPrimarySectorCandidates` / `rankSectorCandidatesByChain` / `rowDriverSummary` / `SectorInsightRow` 随区块移除**失去消费方**（`isUnconfirmedAttribution` / `buildMarketLink` / `findSectorCandidate` 仍在用）。本轮**保留未删**（区块若恢复可复用），仅在 docstring 标注"当前无消费方"；要清理说一声。
+- **跨端**：仅改 `aistock-app-frontend`（4 源文件 + 2 测试文件 + `src/modules/analytics/AGENTS.md` + `vite.config.ts` 注释 + 本记录）；`aistock-frontend`（web）无该页面、无该工具函数 → **无需同步**；app-api / agent-py / 组件库 0 改动（接口契约未变，只是少了一个消费方）。
+
 ## 2026-09-18 「未确认驱动原因」否定词表扩表（与 agent-py 逐字对齐）
 
 - **背景（生产实证）**：`isUnconfirmedAttribution` 的正则只有 `未确认驱动原因 | 证据不足[，,]?\s*未确认主因` 两条，而链上更常见的否定句是「**未检索到**可解释当日行情的独立触发事件」（2026-09-18 `注册制次新股` 的链摘要）。不匹配 → **两个视图都会把它出成卡**（大盘归因链树 + 今日影响大盘的主要板块），驱动句就是那句否定句本身——等于「未确认驱动原因的不放」这条口径没落实。

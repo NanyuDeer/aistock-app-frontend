@@ -204,7 +204,8 @@ export function extractionWeakLabel(extraction: AttributionChainExtraction | nul
  *
  * **为什么无条件按摘要判、不看 `events[]`**：当前 `events[]` 里常是「沪指跌0.41%…」「A股收評」
  * 这类**行情综述（现象）**，不是驱动原因；把它们当作归因理由会让用户误以为已归因。
- * 消费方：市场洞见「今日影响大盘的主要板块」卡列表 + 大盘归因链树（AttributionChainView）children。
+ * 消费方：大盘归因链树（AttributionChainView）children —— 命中的分支整条不渲染（自然也不出预判入口）。
+ * （2026-09-18：市场洞见「今日影响大盘的主要板块」卡列表已并入链树视图，不再是本函数的消费方。）
  *
  * **2026-09-18 补（否定句口径扩表）**：原判据只认「未确认驱动原因」「证据不足，未确认主因」两条，
  * 而链上更常见的否定句是「**未检索到**可解释当日行情的独立触发事件」（2026-09-18 注册制次新股
@@ -250,10 +251,14 @@ export function buildMarketLink(
 }
 
 /**
- * 市场洞见「今日影响大盘的主要板块」卡列表排序（spec §7.1）：
+ * 「候选 + 该候选在链上的大盘联动」列表排序（spec §7.1 原「今日影响大盘的主要板块」卡列表口径）：
  * 自驱动优先 → 按 |涨跌幅| 降序（涨跌幅取链上该板块 pct；未入链无 pct → 排末尾）。
  * 同组同 |pct| 保持入参原序（显式带原序兜底，不依赖引擎排序稳定性）。
  * 返回 `{ candidate, marketLink }` 对，避免页面二次匹配（口径单点）。
+ *
+ * **当前无消费方**（2026-09-18）：市场洞见「今日影响大盘的主要板块」区块并入链树视图后，
+ * 本函数与 `buildPrimarySectorCandidates` / `rowDriverSummary` / `SectorInsightRow` 一并失去调用方；
+ * 保留待该区块若恢复时复用（是否清理见 changelog 同日条目）。
  */
 export function rankSectorCandidatesByChain(
   candidates: SectorInsightCandidate[],
