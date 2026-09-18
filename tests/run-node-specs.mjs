@@ -21,7 +21,7 @@ const SRC = join(REPO, 'src')
 const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
 /** 采集器跑通后的干净基线（tests/pass/fail）；残余 2 条为 ConditionalForecastBlock「单档守卫」既有真实失败。
  *  修改此常量须同步 `project_memory.md` 的「节奏档位色板唯一副本（2026-09-15）」条目与 README 快速开始。 */
-const EXPECTED_BASELINE = '237/235/2'
+const EXPECTED_BASELINE = '241/239/2'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {
