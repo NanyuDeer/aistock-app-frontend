@@ -2,6 +2,25 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-19 — 板块溯源/预判三处修复（溯源雷同 / 去掉「待验证」/ 溯源小卡对齐洞见卡）
+
+**开发者**: Aria
+
+### 修复
+
+- 修「所有板块详情里的溯源都显示同一句大盘结论」：`SectorInsightCard.traceStructured` 渲染判据改为**真正入链**（有角色徽 `relation` 或该板块驱动句 `driver`）。根因：`buildMarketLink` 在**未命中链节点时仍填 `chain.root.summary`**，而 2026-09-18 的链只覆盖 2 个板块 → 其余板块全部显示同一句大盘结论。未入链 → 回退该板块自己的溯源文本（无则整块不渲染）。
+- 板块粒度不再显示「待验证」pill：`sectorPredictionToStructured` 只保留 `hit/miss`，`pending`（含"到期后仍在验证窗口内"）归一 `null`（CFB 头部 pill 消失；折叠态由 `met` 驱动，不受影响）。口径说明：验证窗口 = [到期日, 到期+3 交易日]，**到期 ≠ 出结论**。
+
+### 改进
+
+- 板块预判页（`sector-loop.vue`）行内**溯源小卡**样式对齐组件库 `InsightCard` 溯源块：冷雾蓝底 `#f4f8fe` + 描边 `#dce7f8` + `$r-md` 圆角 + `16rpx 20rpx` 内边距，key `$font-size-sm`/700/字距 2rpx/`#4a6fbf`，正文 `$font-size-sm`/`#5e6673`。只改溯源小卡样式；涨跌、来源 tag、预判概要 pill、依据详情入口与展开体全部保留。
+
+### 测试
+
+- `npx vue-tsc --noEmit` 0 错误；全量 `npx vitest run` 476 passed / 4 failed（4 条为无关存量红，零新增）。
+
+---
+
 ## [master] 2026-09-19 — 「大盘归因链」更名「今日驱动板块」+ 卡片视觉改向洞见卡
 
 **开发者**: Aria

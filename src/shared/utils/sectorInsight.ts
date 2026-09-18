@@ -59,7 +59,13 @@ export function sectorPredictionToStructured(p: SectorInsightPrediction | null |
         met: c.met ?? undefined
       })) ?? [],
     dueLabel: p.dueLabel ?? undefined,
-    verification: p.verification ?? null
+    /**
+     * 验证 pill 口径（2026-09-19 组长裁定「板块详情中的预判不用显示待验证标签」）：
+     * 板块粒度只保留**已验证结论**（hit/miss），`pending`（含"到期仍在验证窗口内"）归一为 `null`
+     * → CFB 不渲染头部「待验证 · {due}」pill（该 pill 对板块卡是噪音，且到期≠出结论易被误读为卡住）。
+     * 注意：折叠态判定由 `met` 驱动，不依赖本字段，故不影响折叠/未命中标签。
+     */
+    verification: p.verification === 'hit' || p.verification === 'miss' ? p.verification : null
   }
 }
 

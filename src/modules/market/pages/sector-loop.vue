@@ -743,30 +743,36 @@ onLoad(async (options) => {
   min-width: 0;
 }
 
-/* 溯源横幅（对齐洞见卡溯源样式：浅蓝底 + 溯源 key） */
+/* 溯源小卡（2026-09-19：样式对齐组件库 InsightCard 的溯源块 `__line--trace`——
+   冷雾蓝底 + 描边 + key 加粗字距 / 正文同款字级与色值；两处取值逐字一致，仅组件内不共享变量） */
 .sl-trace {
+  --ins-trace-bg: #f4f8fe;
+  --ins-trace-bd: #dce7f8;
+  --ins-trace-key: #4a6fbf;
+  --ins-card-tx: #5e6673;
   display: flex;
   align-items: flex-start;
   gap: 10rpx;
-  padding: 10rpx 14rpx;
-  border-radius: $r-sm;
-  background: $primary-50;
-  border: 1rpx solid rgba(11, 95, 255, 0.12);
+  padding: 16rpx 20rpx;
+  border-radius: $r-md;
+  background: var(--ins-trace-bg);
+  border: 1rpx solid var(--ins-trace-bd);
 }
 
 .sl-trace__key {
   flex-shrink: 0;
-  font-size: $font-size-xs;
-  font-weight: 600;
-  color: $primary;
+  font-size: $font-size-sm;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  color: var(--ins-trace-key);
   line-height: 1.6;
 }
 
 .sl-trace__text {
   flex: 1;
   min-width: 0;
-  font-size: $font-size-xs;
-  color: $ink-soft;
+  font-size: $font-size-sm;
+  color: var(--ins-card-tx);
   line-height: 1.6;
 }
 
