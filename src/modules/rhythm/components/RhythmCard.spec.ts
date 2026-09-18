@@ -49,12 +49,32 @@ test('情绪周期在 phase 缺失时兜底"数据缺失（沿用前值）"可�
 test('P1：next_event_anchor 锚点条渲染（无锚点整块不渲染）', () => {
   assert.match(source, /next_event_anchor/)
   assert.match(source, /v-if="card\.next_event_anchor"/)
-  assert.match(source, /下一重大事件/)
+  assert.match(source, /下一事件/)
   assert.match(source, /rc-anchor/)
+})
+
+test('事件锚点块标题改为「下一事件」并含强度标签', () => {
+  assert.ok(source.includes('下一事件'))
+  assert.ok(!source.includes('下一重大事件'))
+  assert.ok(source.includes('重大'))
 })
 
 test('去重瘦身：rc-pos 长句 / rc-branch 区块 / rc-phase-ev 证据行已移除（摘要上移洞见卡）', () => {
   assert.doesNotMatch(source, /rc-pos/)
   assert.doesNotMatch(source, /rc-branch/)
   assert.doesNotMatch(source, /rc-phase-ev/)
+})
+
+test('事件日历空态文案不再断言"今日无事件"', () => {
+  assert.ok(!source.includes('今日无事件（正常交易日）'))
+  assert.ok(source.includes('未来 5 个交易日暂无已登记事件'))
+  assert.ok(source.includes('该维度数据源未接入'))
+})
+
+test('PHASE_META 覆盖后端五态（含启动/主升）', () => {
+  for (const key of ['ice', 'launch', 'rally', 'overheat', 'ebb']) {
+    assert.ok(source.includes(`${key}:`), `PHASE_META 缺少 ${key}`)
+  }
+  assert.ok(source.includes('启动'))
+  assert.ok(source.includes('主升'))
 })

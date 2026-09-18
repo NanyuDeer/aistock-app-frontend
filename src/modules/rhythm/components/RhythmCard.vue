@@ -53,9 +53,15 @@
     <!-- 事件日历（自 target_date 起 ≤5 交易日；空态两态区分 G7） -->
     <view class="rc-sec">
       <text class="rc-sec-title">未来 5 交易日事件日历</text>
-      <!-- 下一重大事件锚点（design-debate P1：无锚点整块不渲染） -->
+      <!-- 下一事件锚点（design-debate P1：无锚点整块不渲染） -->
       <view class="rc-anchor" v-if="card.next_event_anchor">
-        <text class="rc-anchor-label">下一重大事件</text>
+        <view class="rc-anchor-head">
+          <text class="rc-anchor-label">下一事件</text>
+          <text
+            v-if="card.next_event_anchor.importance === 'high'"
+            class="rc-anchor-flag"
+          >重大</text>
+        </view>
         <text class="rc-anchor-title">{{ card.next_event_anchor.title }}</text>
         <text class="rc-anchor-note">{{ card.next_event_anchor.note }}（{{ card.next_event_anchor.event_date }}）</text>
       </view>
@@ -71,7 +77,7 @@
         <text>该维度数据源未接入</text>
       </view>
       <view class="rc-empty" v-else>
-        <text>今日无事件（正常交易日）</text>
+        <text>未来 5 个交易日暂无已登记事件</text>
       </view>
     </view>
 
@@ -119,10 +125,11 @@ const levelMeta = computed(() => LEVEL_META[props.card.level ?? ''] ?? { label: 
 const bandLabels = BAND_LABELS
 const bandSegs = BAND_SEG_CLS.map((cls, i) => ({ cls, on: levelMeta.value.idx === i }))
 
-// ── 情绪周期四态（G3 仅展示，实验性判定）──
+// ── 情绪周期五态（对齐后端 stage：ice/launch/rally/overheat/ebb；G3 仅展示，实验性判定）──
 const PHASE_META: Record<string, { label: string; cls: string }> = {
   ice: { label: '冰点', cls: 'ph-ice' },
-  warm_up: { label: '升温', cls: 'ph-warm' },
+  launch: { label: '启动', cls: 'ph-warm' },
+  rally: { label: '主升', cls: 'ph-rally' },
   overheat: { label: '过热', cls: 'ph-overheat' },
   ebb: { label: '退潮', cls: 'ph-ebb' },
 }
@@ -196,6 +203,7 @@ function tempValue(score: number): string {
 .rc-chip.ph-warm { color: #b45309; background: #fef3c7; }
 .rc-chip.ph-overheat { color: $up; background: rgba($up, 0.1); }
 .rc-chip.ph-ebb { color: $ink-soft; background: rgba($ink-soft, 0.12); }
+.rc-chip.ph-rally { color: $up; background: rgba($up, 0.1); }
 .rc-chip.ph-missing { color: $ink-soft; background: rgba($ink-soft, 0.12); }
 .rc-exp { font-size: 20rpx; color: $ink-soft; border: 1rpx dashed $line; border-radius: 8rpx; padding: 2rpx 10rpx; }
 
@@ -221,6 +229,16 @@ function tempValue(score: number): string {
 .rc-hint { font-size: 26rpx; color: $warning; background: rgba($warning, 0.08); border: 1rpx solid rgba($warning, 0.35); border-radius: 12rpx; padding: 16rpx 20rpx; margin-bottom: 20rpx; }
 
 .rc-anchor { display: flex; align-items: center; gap: 12rpx; flex-wrap: wrap; background: rgba($warning, 0.08); border: 1rpx solid rgba($warning, 0.35); border-radius: 12rpx; padding: 14rpx 20rpx; margin-bottom: 16rpx; }
+.rc-anchor-head { display: flex; align-items: center; }
+.rc-anchor-flag {
+  margin-left: 8rpx;
+  padding: 0 8rpx;
+  font-size: 20rpx;
+  line-height: 28rpx;
+  border-radius: 6rpx;
+  color: $up;
+  border: 1rpx solid $up;
+}
 .rc-anchor-label { font-size: 22rpx; color: $warning; font-weight: 600; }
 .rc-anchor-title { font-size: 26rpx; color: $ink; font-weight: 600; }
 .rc-anchor-note { font-size: 24rpx; color: $ink-soft; }
