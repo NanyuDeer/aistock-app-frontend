@@ -6,6 +6,8 @@
  * - 有链 → 候选卡按「自驱动优先 → |pct| 降序」排序；
  * - 每卡只渲染溯源侧（角色徽 + 事件胶囊），**不出现预判内容**（CFB 分支节点 `.as-insight-card__sc` 为 0）
  *   —— 用「候选自带已成立条件（met:true）」构造最严场景：若 structured 未被 traceOnly 拦下，CFB 必渲染分支。
+ * - R17（2026-09-18）：出卡以**链 children 为主**（弱归因日链上有 3 个板块而候选只有 1 个）、
+ *   「未确认驱动原因」的链节点不出卡、chain_only 卡与空态文案。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -108,8 +110,10 @@ const candidate = (
   name: string,
   source: 'review_primary' | 'both',
   traceSummary: string,
+  /** 链上快照行码（省略时按 `${name}-code.TI` 造；与链 child.ts_code 精确匹配用） */
+  tsCode = `${name}-code.TI`,
 ): Record<string, unknown> => ({
-  ts_code: `${name}-code.TI`,
+  ts_code: tsCode,
   name,
   category: 'industry',
   source,
@@ -130,6 +134,8 @@ const candidate = (
 const SEMI = '半导体材料'
 const BROKER = '券商'
 const POWER = '电力'
+/** R17 弱归因日场景：链上批量兜底板块（玉米为唯一确认主因） */
+const CORN = '玉米'
 
 /** 候选与链：半导体材料（自驱动，-3.0%）、券商（跟随，-0.8%）、电力（不在链上） */
 const candidatesFixture = [
@@ -314,5 +320,107 @@ describe('市场洞见页「今日影响大盘的主要板块」区块', () => {
     expect(cards[1]!.findAll('.as-insight-card__weak').map((n) => n.text())).toEqual(['归因较弱', '无归因依据'])
     // 溯源子卡保留 root.summary 作为一句话行（弱归因日的中性摘要）
     expect(cards[0]!.find('.as-insight-card__tlk-sum').text()).toBe('证据不足，未确认主因')
+  })
+
+  /**
+   * R17（2026-09-18 链路侧实测复现）：弱归因日链上有 3 个板块、sector-insight 只给 1 个 review_primary，
+   * 旧实现按候选出卡 → 只显示 1 张卡，用户误以为"只分析了一个板块"。
+   * 现改为**以链 children 为主出卡**，「未确认驱动原因」的链节点不出卡（行情综述 ≠ 驱动原因）。
+   */
+  it('R17：以链 children 为主出卡——未确认驱动原因的链节点不出卡，卡上带板块名标签', async () => {
+    agentApiMock.getSectorInsight.mockResolvedValue({
+      date: DATE,
+      hasData: true,
+      candidates: [candidate(CORN, 'review_primary', '玉米期货走强带动种植链', `${CORN}.TI`)],
+    })
+    chainApiMock.fetchAttributionChain.mockResolvedValue({
+      date: DATE,
+      root: {
+        type: 'market',
+        date: DATE,
+        summary: '证据不足，未确认主因',
+        index_pct: -0.411,
+        attribution_status: 'hypothesis',
+        evidence_weak: true,
+      },
+      children: [
+        { sector: 'CRO概念', relation: 'market_follow', pct: 2.09, trace_summary: '未确认驱动原因' },
+        { sector: '转基因', relation: 'market_follow', pct: 4.04, trace_summary: '证据不足，未确认主因' },
+        {
+          sector: CORN,
+          sector_std: CORN,
+          ts_code: `${CORN}.TI`,
+          relation: 'self_driven',
+          pct: 3.74,
+          trace_summary: '玉米期货走强带动种植链',
+        },
+      ],
+    })
+    const wrapper = await mountPage()
+
+    // 3 个链节点 → 只出 1 张卡（另 2 个是「未确认驱动原因」）
+    expect(wrapper.findAll('.primary-sector-card')).toHaveLength(1)
+    expect(titles(wrapper)).toEqual(['玉米期货走强带动种植链'])
+    // 卡上明确显示板块名（标题是溯源主句，不看标签看不出是哪个板块）
+    expect(wrapper.find('.primary-sector-card .as-insight-card__name-tag-text').text()).toBe(CORN)
+    // 未确认节点整体不出现（含链树外的区块文案）
+    const blockText = wrapper.find('.primary-sector-block').text()
+    expect(blockText).not.toContain('CRO概念')
+    expect(blockText).not.toContain('转基因')
+  })
+
+  it('R17：链上板块在 sector-insight 候选中不存在 → 合成 chain_only 候选仍出卡', async () => {
+    agentApiMock.getSectorInsight.mockResolvedValue({
+      date: DATE,
+      hasData: true,
+      candidates: [candidate(BROKER, 'review_primary', '大盘情绪拖累，资金观望')],
+    })
+    chainApiMock.fetchAttributionChain.mockResolvedValue({
+      date: DATE,
+      root: { type: 'market', date: DATE, summary: '玉米与券商分化', index_pct: 0.6 },
+      children: [
+        {
+          sector: '玉米(复盘原文)',
+          sector_std: CORN,
+          ts_code: 'CORN.TI',
+          relation: 'self_driven',
+          pct: 3.74,
+          trace_summary: '玉米期货走强带动种植链',
+        },
+      ],
+    })
+    const wrapper = await mountPage()
+    const cards = wrapper.findAll('.primary-sector-card')
+
+    // 链上 1 个（候选里没有 → 合成）+ 候选里有、链上没有的券商 1 个
+    expect(cards).toHaveLength(2)
+    expect(titles(wrapper)).toEqual(['玉米为大盘主要驱动', '大盘情绪拖累，资金观望'])
+    // chain_only 卡：板块名标签取 sector_std；链上角色徽/驱动句照常
+    expect(cards[0]!.find('.as-insight-card__name-tag-text').text()).toBe(CORN)
+    expect(cards[0]!.find('.as-insight-card__tlk-badge').text()).toBe('自驱动')
+    expect(cards[0]!.find('.as-insight-card__tlk-drv-text').text()).toBe('玉米期货走强带动种植链')
+  })
+
+  it('R17：链有 children 但全部未确认驱动原因 → 区块仍渲染 + 中性空态文案（与"无数据"可区分）', async () => {
+    agentApiMock.getSectorInsight.mockResolvedValue({ date: DATE, hasData: true, candidates: [] })
+    chainApiMock.fetchAttributionChain.mockResolvedValue({
+      date: DATE,
+      root: {
+        type: 'market',
+        date: DATE,
+        summary: '证据不足，未确认主因',
+        index_pct: -0.411,
+        evidence_weak: true,
+      },
+      children: [
+        { sector: 'CRO概念', relation: 'market_follow', pct: 2.09, trace_summary: '未确认驱动原因' },
+        { sector: '转基因', relation: 'market_follow', pct: 4.04, trace_summary: '  ' },
+      ],
+    })
+    const wrapper = await mountPage()
+
+    expect(wrapper.find('.primary-sector-block').exists()).toBe(true)
+    expect(wrapper.findAll('.primary-sector-card')).toHaveLength(0)
+    expect(wrapper.find('.primary-sector-empty').text()).toContain('今日暂无可确认的驱动板块')
   })
 })

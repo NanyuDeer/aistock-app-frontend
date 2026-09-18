@@ -43,10 +43,12 @@
           <AttributionChainView :date="displayedDate" :chain="chain" :loading="chainLoading" />
         </view>
 
-        <!-- 今日影响大盘的主要板块（spec §7.1）：**仅当日链存在时渲染**（无链隐藏、不占位）；
+        <!-- 今日影响大盘的主要板块（spec §7.1 + 2026-09-18 R17）：**仅当日链存在时渲染**（无链隐藏、不占位）；
+             卡列表以**链 children 为主**（弱归因日链上板块常多于 sector-insight 候选，只按候选出卡会漏板块），
+             再补"候选里有、链上没有"的主因候选；「未确认驱动原因」的链节点不出卡（行情综述≠驱动原因）；
              排序 自驱动优先 → |pct| 降序；每卡只出溯源侧（trace-only，两轨分离 §2.1）：
              角色徽 + 事件胶囊 + 驱动句 + 依据详情，预判内容只走「看该板块预判 →」入口 -->
-        <view v-if="chain && rankedCandidates.length" class="primary-sector-block">
+        <view v-if="chain" class="primary-sector-block">
           <view class="primary-sector-head">
             <view class="primary-sector-head-left">
               <text class="primary-sector-title">今日影响大盘的主要板块</text>
@@ -57,21 +59,31 @@
               <text class="primary-sector-more-text">全部板块 ›</text>
             </view>
           </view>
-          <view v-for="row in rankedCandidates" :key="row.candidate.ts_code" class="primary-sector-card">
-            <SectorInsightCard
-              :candidate="row.candidate"
-              :date="displayedDate"
-              display-mode="conclusion"
-              trace-only
-              :market-link="row.marketLink"
-              :sector-name="row.candidate.name"
-            />
-            <!-- 预判入口（溯源区附加链接）：点击跳该板块详情看完整预判；
-                 预判内容不进主因卡（溯源/预判两轨分离不变） -->
-            <view class="primary-sector-forecast-entry" @tap="goSectorDetail(row.candidate.name)">
-              <text class="primary-sector-forecast-entry-text">看该板块预判 →</text>
-            </view>
+          <!-- 有链但过滤后无卡（全是「未确认驱动原因」）→ 中性空态：与"无数据/无链"可区分 -->
+          <view v-if="!rankedCandidates.length" class="primary-sector-empty">
+            <text class="primary-sector-empty-text">今日暂无可确认的驱动板块（大盘主因未确认）</text>
           </view>
+          <template v-else>
+            <view
+              v-for="row in rankedCandidates"
+              :key="row.candidate.ts_code || row.candidate.name"
+              class="primary-sector-card"
+            >
+              <SectorInsightCard
+                :candidate="row.candidate"
+                :date="displayedDate"
+                display-mode="conclusion"
+                trace-only
+                :market-link="row.marketLink"
+                :sector-name="row.candidate.name"
+              />
+              <!-- 预判入口（溯源区附加链接）：点击跳该板块详情看完整预判；
+                   预判内容不进主因卡（溯源/预判两轨分离不变） -->
+              <view class="primary-sector-forecast-entry" @tap="goSectorDetail(row.candidate.name)">
+                <text class="primary-sector-forecast-entry-text">看该板块预判 →</text>
+              </view>
+            </view>
+          </template>
         </view>
       </view>
 
@@ -108,7 +120,7 @@ import { toMarketTracePresentation, type MarketTracePresentation } from '@/modul
 import MarketInsightCard from '@/modules/analytics/components/MarketInsightCard.vue'
 import AttributionChainView from '@/shared/components/AttributionChainView.vue'
 import { fetchAttributionChain, type AttributionChain } from '@/shared/api/modules/attributionChain'
-import { rankSectorCandidatesByChain } from '@/shared/utils/sectorInsight'
+import { rankSectorCandidatesByChain, buildPrimarySectorCandidates, isUnconfirmedAttribution, rowDriverSummary } from '@/shared/utils/sectorInsight'
 
 const loading = ref(false)
 const error = ref(false)
@@ -220,11 +232,22 @@ async function loadChain(d: string) {
   }
 }
 
-/** 当日大盘复盘主因板块的聚合候选（source 含 review_primary）；空 → 整块不渲染 */
+/** 当日大盘复盘主因板块的聚合候选（source 含 review_primary/both）；链缺失/过滤后为空 → 区块空态 */
 const primarySectorCandidates = ref<SectorInsightCandidate[]>([])
 
-/** 主因卡列表：自驱动优先 → |pct| 降序（排序与 marketLink 匹配同源，spec §7.1） */
-const rankedCandidates = computed(() => rankSectorCandidatesByChain(primarySectorCandidates.value, chain.value))
+/**
+ * 主因卡列表（2026-09-18 R17）：
+ * ① 以链 children 为主出卡 + 补"候选里有、链上没有"的主因候选（`buildPrimarySectorCandidates`）；
+ * ② 过滤「未确认驱动原因」的行（`isUnconfirmedAttribution`：驱动句空或中性未确认表述；
+ *    行情综述类 events 不算驱动原因，故只按驱动句判）；
+ * ③ 排序 自驱动优先 → |pct| 降序（`rankSectorCandidatesByChain`，spec §7.1）。
+ */
+const rankedCandidates = computed(() =>
+  rankSectorCandidatesByChain(
+    buildPrimarySectorCandidates(chain.value, primarySectorCandidates.value),
+    chain.value
+  ).filter((row) => !isUnconfirmedAttribution(rowDriverSummary(row)))
+)
 
 /** 链级弱依据（root.evidence_weak=true：当日大盘未确认主因，2026-09-17 R16）→ 区块标题旁中性灰「归因较弱」 */
 const chainWeak = computed(() => chain.value?.root?.evidence_weak === true)
@@ -381,6 +404,21 @@ onUnload(stopRefreshTimer)
   font-size: 28rpx;
   font-weight: 600;
   color: $text-color-title;
+}
+
+/* 无卡空态（有链，但链上节点全是「未确认驱动原因」）：中性灰一行
+   —— 让"没归因"与"没数据（无链整块不渲染）"可区分（2026-09-18 R17） */
+.primary-sector-empty {
+  display: flex;
+  justify-content: center;
+  padding: 28rpx 0 8rpx;
+}
+
+.primary-sector-empty-text {
+  font-size: $font-size-sm;
+  color: $ink-mute;
+  line-height: 1.6;
+  text-align: center;
 }
 
 /* 链级弱依据标记：中性灰描边小字（2026-09-17 R16；弱化呈现，刻意不用告警色） */

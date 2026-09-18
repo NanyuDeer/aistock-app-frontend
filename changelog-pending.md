@@ -1,5 +1,17 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-18 市场洞见主因区块改「以链 children 为准出卡」+ 未确认驱动原因过滤 + 板块名标签（R17）
+
+- **问题（用户实测 2026-09-17）**：弱归因日链上有 3 个板块（CRO概念 +2.09 / 转基因 +4.04 / 玉米 +3.74，均为弱归因兜底），但 `sector-insight` 只给 1 个 `review_primary`（玉米）→ 旧实现「按候选出卡」只显示 1 张卡，用户误以为"只分析了一个板块"；且卡标题取 `candidate.trace.summary`（溯源主句）→ 卡片上看不出"这是哪个板块"。
+- **出卡口径改为链优先**（`src/shared/utils/sectorInsight.ts::buildPrimarySectorCandidates(chain, candidates)`）：卡列表 = 链 `children[]` 逐个出卡，再补"候选里有、链上没有"的主因候选（链不全时信息不丢）；链上板块匹配不到候选 → 合成最小候选（`source='chain_only'`、`quote/trace/prediction=null`、`category='concept'`、`ts_code=child.ts_code`、`name=sector_std||sector`）。链↔候选匹配为 `findChainChild` 的**反向复用**（同 R14 优先级：`ts_code`（去 `.TI`）→ `sector_std` → `sector` → 归一化，`matchesChainChild` 私有函数），展示用的大盘联动仍走正向 `buildMarketLink`。排序复用 `rankSectorCandidatesByChain`（自驱动优先 → |pct| 降序，链上 pct 优先）不变。
+- **类型加性扩展**（`src/shared/api/modules/agent.ts`）：新增导出 `SectorInsightSource = 'wind_leader' | 'review_primary' | 'both' | 'chain_only'`，`SectorInsightCandidate.source` 引用之。**消费方核查**：无 switch/exhaustive 判断因新值报类型错（`vue-tsc` 0 错误）；`sector-loop.vue::tagModel` 的末档 fallback（→「风口 · 主因」）仅在 chain_only 流入时才会语义不符，而 `chain_only` 只在 traceability 前端合成、sector-loop 直接消费接口原始候选 → 实际不可达，故按其"最小改动"原则未改（保留原样）。
+- **未确认驱动原因过滤**（`sectorInsight.isUnconfirmedAttribution(traceSummary)` 单点口径）：驱动句去空白后为空、或命中 `/未确认驱动原因|证据不足[，,]?\s*未确认主因/` → 不展示。**不看 `events[]`**：当前 events 里常是「沪指跌0.41%…」「A股收評」这类行情综述（现象）而非驱动原因。应用到 ① 新区块卡列表（行驱动句 `rowDriverSummary`：链上驱动句优先、未入链回退候选溯源主句）② `AttributionChainView` 的 children 渲染（同一函数、同一口径）。
+- **板块名标签**：`SectorInsightCard` 新增 `titleTag` 计算（仅 `traceOnly`：`sectorName` 优先、回退 `candidate.name`）→ `InsightCard` 新增可选 `titleTag` prop，渲染在标题**上方**的中性描边小标（`.as-insight-card__name-tag`，底色/文字走 `--ins-fc-bg`/`--ins-card-tx` 主题变量，刻意不用告警色/涨跌色；缺省不渲染 → 其他调用方零变化）。另：`traceOnly` 下 `inChain` 兼容"链上有驱动句但 relation=unknown"（链 only 卡无候选 trace，否则退化成"暂无板块研判"空壳）。
+- **空态**：区块渲染条件由「链存在 && 有候选」改为**「链存在」**（无链仍整块不渲染，回归不变）；有链但过滤后无卡 → 中性空态一行「今日暂无可确认的驱动板块（大盘主因未确认）」（`.primary-sector-empty`），让"没归因"与"没数据"可区分。卡 `:key` 改为 `ts_code || name`（合成候选可能无 ts_code，避免重复 key）。
+- **测试（先红后绿）**：`traceability.mount.spec.ts` 新增 3 条（链 3 children 中 2 个未确认 → 只出 1 卡 + 卡上板块名标签 / 链上板块不在候选中 → chain_only 仍出卡 + 名称取 `sector_std` / 全是未确认 → 区块仍渲染 + 空态文案），既有 8 条回归不变；新建 `src/shared/components/AttributionChainView.mount.spec.ts`（2 条：未确认 children 不渲染、root 不受影响）并登记 `vitest.config.ts` 的 `test.include` 白名单（node:test 基线不受影响）。红验：4 条新用例按预期失败（缺 `.as-insight-card__name-tag` / 卡数 1≠2 / 区块不存在 / 链节点未过滤）。
+- 验收：`npx vue-tsc --noEmit` **0 错误**（exit 0）；`npm run test:node` `248/248/0`（exit 0，基线一致）；`npx vitest run src/modules/analytics/pages/traceability.mount.spec.ts src/shared/components/AttributionChainView.mount.spec.ts` **2 files / 14 tests passed**；`npm run test` 4 failed / 444 passed（失败文件 = `AnalyticsCardLayout.test.ts`、`favorites/AlertContent.spec.ts`、`favorites/insight-detail.spec.ts`、`chat/cards/CardRenderer.spec.ts`，与 changelog 记录的存量基线红完全一致，**零新增**）。
+- 文档同步：`AGENTS.md`（`agent.ts` / `InsightCard` / `SectorInsightCard` / `AttributionChainView` 行）、`src/modules/analytics/AGENTS.md`（traceability 行）。组件库副本（`aistock-component-lib`）本次**未改**——`InsightCard.vue` 的 `titleTag` 属加性改动，需后续同步镜像（本任务只改 app-frontend）。
+
 ## 2026-09-17 溯源弱依据提示（R16 前端呈现）+ 角色徽匹配升级 ts_code/sector_std（R14，Task 10.2）
 
 - **数据侧已就绪、前端此前未呈现**：弱归因日（`root.evidence_weak=true` + `child.extraction={source,weak:true}`）在前端有链、有卡但看不出"依据偏弱"。本次做中性、克制的弱化呈现（不引入新色系、不用告警色）。

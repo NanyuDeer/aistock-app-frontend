@@ -17,6 +17,7 @@
       type="market"
       tag-text="板块洞见"
       :title="cardTitle"
+      :title-tag="titleTag"
       :trace="traceText"
       :trace-structured="traceStructured"
       :trace-detail="traceDetailText"
@@ -48,6 +49,8 @@ import type { SectorMarketLink } from '@/shared/utils/sectorInsight'
  * 无链（marketLink=null）回退四环文本形态。板块入链但四环无内容 → 仍渲染大盘联动溯源。
  * traceOnly（2026-09-17，P3' 两轨分离）：市场洞见主因卡只渲染溯源侧——不渲染 CFB 预判子卡、
  * 标题不回退预判综述；其余调用方（板块详情/四环）不传 → 行为与改造前一致。
+ * 板块名标签（2026-09-18 R17）：traceOnly 下标题上方渲染 `sectorName`（缺省回退 `candidate.name`），
+ * 让"标题是溯源主句"的卡也能看出是哪个板块。
  * 复用点：风口详情页 sector-detail / 大盘溯源页 traceability（主因板块）。
  */
 const props = withDefaults(defineProps<{
@@ -125,6 +128,16 @@ const cardTitle = computed(() => {
   return marketLinkFallbackTitle.value || c.name
 })
 
+/**
+ * 板块名标签（2026-09-18 R17）：仅 traceOnly（市场洞见主因卡）渲染——
+ * 该形态标题取溯源主句/角色兜底句，单看卡片无法判断是哪个板块（弱归因日链上兜底板块尤其明显）。
+ * 文案：显式 `sectorName` 优先（页面传 `row.candidate.name`），缺省回退 `candidate.name`。
+ */
+const titleTag = computed(() => {
+  if (!props.traceOnly) return ''
+  return props.sectorName?.trim() || props.candidate?.name?.trim() || ''
+})
+
 /** 溯源行文案（文本形态）：标题已用溯源主句时不再重复展示（仅无 attribution_summary 回退场景） */
 const traceText = computed(() => {
   const c = props.candidate
@@ -183,8 +196,12 @@ const hasContent = computed<boolean>(() => {
   return Boolean(c?.trace?.summary?.trim() || s?.horizons?.length || s?.conditions?.length)
 })
 
-/** 板块已入归因链（大盘联动入链）：即便四环暂无内容也应展示溯源行 */
-const inChain = computed(() => Boolean(props.marketLink?.relation))
+/** 板块已入归因链（大盘联动入链）：即便四环暂无内容也应展示溯源行。
+ *  traceOnly 下链上驱动句（driver）也算入链证据（2026-09-18 R17：链 only 卡无候选 trace，
+ *  relation=unknown 时仍需出卡，否则会退化成"暂无板块研判"空壳）。 */
+const inChain = computed(() =>
+  Boolean(props.marketLink?.relation || (props.traceOnly && props.marketLink?.driver?.trim()))
+)
 
 /** 是否渲染洞见卡：四环有内容，或板块已入归因链 */
 const showCard = computed(() => Boolean(hasContent.value || inChain.value))

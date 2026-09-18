@@ -199,6 +199,22 @@ export function extractionWeakLabel(extraction: AttributionChainExtraction | nul
 }
 
 /**
+ * 「未确认驱动原因」判定（2026-09-18 R17，单点口径）：
+ * 驱动句（`trace_summary`）去空白后为空、或命中中性/未确认表述 → 该归因节点属"未确认驱动原因"，不展示。
+ *
+ * **为什么无条件按摘要判、不看 `events[]`**：当前 `events[]` 里常是「沪指跌0.41%…」「A股收評」
+ * 这类**行情综述（现象）**，不是驱动原因；把它们当作归因理由会让用户误以为已归因。
+ * 消费方：市场洞见「今日影响大盘的主要板块」卡列表 + 大盘归因链树（AttributionChainView）children。
+ */
+const UNCONFIRMED_ATTRIBUTION_RE = /未确认驱动原因|证据不足[，,]?\s*未确认主因/
+
+export function isUnconfirmedAttribution(traceSummary: string | null | undefined): boolean {
+  const s = String(traceSummary ?? '').replace(/\s+/g, '')
+  if (!s) return true
+  return UNCONFIRMED_ATTRIBUTION_RE.test(s)
+}
+
+/**
  * 由大盘归因链构建当前板块的「大盘联动」数据：
  * - 无链 → null（洞见卡溯源行回退板块四环文本形态）；
  * - 链存在 → 按板块名/代码匹配 children（ts_code → sector_std → sector → 归一化；
@@ -232,7 +248,7 @@ export function buildMarketLink(
 export function rankSectorCandidatesByChain(
   candidates: SectorInsightCandidate[],
   chain: AttributionChain | null | undefined
-): Array<{ candidate: SectorInsightCandidate; marketLink: SectorMarketLink | null }> {
+): SectorInsightRow[] {
   const rows = candidates.map((candidate, index) => ({
     candidate,
     index,
@@ -251,4 +267,90 @@ export function rankSectorCandidatesByChain(
     return a.index - b.index
   })
   return rows.map(({ candidate, marketLink }) => ({ candidate, marketLink }))
+}
+
+/** 主因卡行：聚合候选 + 该候选在当日链上的大盘联动（排序与展示同源） */
+export interface SectorInsightRow {
+  candidate: SectorInsightCandidate
+  marketLink: SectorMarketLink | null
+}
+
+/**
+ * 行驱动句（`isUnconfirmedAttribution` 的输入口径单点）：
+ * 链上驱动句优先（区块已改为以链 children 为准），未入链/链上无驱动句时回退候选溯源主句。
+ */
+export function rowDriverSummary(row: SectorInsightRow): string {
+  return row.marketLink?.driver?.trim() || row.candidate.trace?.summary?.trim() || ''
+}
+
+/**
+ * 链节点 ↔ 板块洞见候选匹配（2026-09-18 R17）——`findChainChild` 的**反向复用**，
+ * 优先级与 R14 完全一致：① `ts_code`（去交易所后缀）→ ② `sector_std` 精确 →
+ * ③ `sector` 精确 → ④ 归一化名比较（链原名优先，其次权威名）。
+ * 与正向一样**不做包含匹配**；仅用于"该链节点在候选里是谁"（配对/补漏判重），
+ * 展示用的大盘联动仍走 `buildMarketLink` 的正向口径，两处不会漂移。
+ */
+function matchesChainChild(candidate: SectorInsightCandidate, child: AttributionChainChild): boolean {
+  const childCode = child.ts_code?.trim()
+  if (childCode) {
+    const bare = stripExchangeSuffix(childCode)
+    const candCode = candidate.ts_code?.trim()
+    if (candCode && stripExchangeSuffix(candCode) === bare) return true
+  }
+
+  const std = child.sector_std?.trim()
+  if (std && candidate.name === std) return true
+
+  const raw = child.sector?.trim()
+  if (raw && candidate.name === raw) return true
+
+  const norm = normalizeSectorName(candidate.name)
+  if (!norm) return false
+  return (
+    normalizeSectorName(child.sector ?? '') === norm ||
+    normalizeSectorName(child.sector_std ?? '') === norm
+  )
+}
+
+/**
+ * 由链节点合成最小候选（`source='chain_only'`）：链上有、sector-insight 候选里没有的板块。
+ * 无四环数据（quote/trace/prediction 恒 null）——展示内容全部来自链（驱动句/角色徽/事件），
+ * 名称取 `sector_std || sector`（权威名优先），category 按概念兜底。
+ */
+function chainOnlyCandidate(child: AttributionChainChild): SectorInsightCandidate {
+  return {
+    ts_code: child.ts_code?.trim() || '',
+    name: child.sector_std?.trim() || child.sector,
+    category: 'concept',
+    source: 'chain_only',
+    cycle: null,
+    quote: null,
+    trace: null,
+    prediction: null
+  }
+}
+
+/**
+ * 主因卡候选合成（2026-09-18 R17，spec §7.1 修订）：
+ * **以当日链 `children` 为主出卡**，再补上"候选里有、链上没有"的候选（避免链不全时信息丢失）。
+ * 起因：弱归因日链上有 3 个板块、`sector-insight` 只给 1 个 `review_primary`，
+ * 只按候选出卡会让用户误以为"只分析了一个板块"。
+ * 调用方（traceability）此前已把候选过滤为 `review_primary`/`both`，本函数不再筛 source。
+ */
+export function buildPrimarySectorCandidates(
+  chain: AttributionChain | null | undefined,
+  candidates: SectorInsightCandidate[]
+): SectorInsightCandidate[] {
+  const rest = [...(candidates ?? [])]
+  const fromChain: SectorInsightCandidate[] = []
+  for (const child of chain?.children ?? []) {
+    const idx = rest.findIndex((c) => matchesChainChild(c, child))
+    if (idx >= 0) {
+      fromChain.push(rest[idx] as SectorInsightCandidate)
+      rest.splice(idx, 1)
+    } else {
+      fromChain.push(chainOnlyCandidate(child))
+    }
+  }
+  return [...fromChain, ...rest]
 }

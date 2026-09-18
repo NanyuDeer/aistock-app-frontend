@@ -59,7 +59,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { AttributionChain, AttributionChainChild } from '@/shared/api/modules/attributionChain'
-import { extractionWeakLabel } from '@/shared/utils/sectorInsight'
+import { extractionWeakLabel, isUnconfirmedAttribution } from '@/shared/utils/sectorInsight'
 import EventRefChip from './EventRefChip.vue'
 
 /**
@@ -155,9 +155,12 @@ function openEventRef(url: string): void {
   // #endif
 }
 
-/** 板块分支展示序：按 |pct| 降序稳定排序；pct 为 null 的分支排末尾（保持原相对顺序） */
+/** 板块分支展示序：「未确认驱动原因」的分支先剔除（口径单点在 sectorInsight.isUnconfirmedAttribution）→
+ *  按 |pct| 降序稳定排序；pct 为 null 的分支排末尾（保持原相对顺序）。
+ *  2026-09-18 R17：摘要为空/中性未确认表述（如「未确认驱动原因」）的节点不是驱动原因（events 里多是行情综述），
+ *  与市场洞见页主因卡列表同一过滤口径，避免"看起来已归因"。 */
 const sortedChildren = computed(() => {
-  const list = [...(displayChain.value?.children ?? [])]
+  const list = [...(displayChain.value?.children ?? [])].filter((c) => !isUnconfirmedAttribution(c.trace_summary))
   const withPct = list.filter((c): c is AttributionChainChild & { pct: number } => c.pct != null)
   const withoutPct = list.filter((c) => c.pct == null)
   withPct.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))

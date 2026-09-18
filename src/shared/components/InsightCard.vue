@@ -15,6 +15,11 @@
       <text v-if="time" class="as-insight-card__time">{{ time }}</text>
     </view>
 
+    <!-- 板块名标签（2026-09-18 R17）：标题为溯源主句时，标明"这是哪个板块"（中性描边小标，非告警色） -->
+    <view v-if="titleTag" class="as-insight-card__name-tag">
+      <text class="as-insight-card__name-tag-text">{{ titleTag }}</text>
+    </view>
+
     <!-- 结论标题（一句话） -->
     <text class="as-insight-card__title">{{ title }}</text>
 
@@ -153,6 +158,7 @@ const wmStyle = computed(() => ({
  * - 条件化形态（structured 传入）：溯源 → 通用条件化预判块（ConditionalForecastBlock，
  *   2026-09-02 抽取：大盘/板块/个股等一切有条件化预判的粒度共用同款分支 UI）。
  * 组件保持纯 UI：方向/置信/期段/条件全部经 props 结构化传入，不引业务。
+ * titleTag（2026-09-18 R17）：标题上方可选板块名标签（标题为溯源主句、看不出板块名时用）。
  */
 type InsightType = 'emotion' | 'fund' | 'event' | 'market' | 'trend'
 type InsightTheme = 'light' | 'dark'
@@ -271,6 +277,8 @@ const props = withDefaults(defineProps<{
   forecast?: string
   /** 标签词覆盖（如板块卡传 tag-text="板块洞见"，剥"洞见"后缀后显示"板块"）；缺省按 type 取短词 */
   tagText?: string
+  /** 标题上方的板块名标签（2026-09-18 R17：标题是溯源主句、看不出板块名时用；缺省不渲染） */
+  titleTag?: string
   /** 条件化预判结构化数据（传入则渲染期段切换的预判块） */
   structured?: InsightStructuredForecast | null
   /** 多要点行（优势/风险/建议等，渲染于分隔线后、溯源前；不依赖 trace/forecast/structured） */
@@ -294,6 +302,7 @@ const props = withDefaults(defineProps<{
   displayMode: 'full',
   forecast: '',
   tagText: '',
+  titleTag: '',
   traceLabel: '',
   structured: null,
   lines: () => [],
@@ -425,6 +434,24 @@ const handleClick = () => {
 .wm-tag--event   { --wm-color: #00a8d8; }
 .wm-tag--market  { --wm-color: #{$insight-market}; }
 .wm-tag--trend   { --wm-color: #{$insight-trend}; }
+
+/* ===== 板块名标签（标题上方；2026-09-18 R17） =====
+   中性描边小标：标题是溯源主句时标明"这是哪个板块"；与弱依据标记同族样式，
+   刻意不用告警色/涨跌色，底色/文字随主题变量切换（light/dark 通用）。 */
+.as-insight-card__name-tag {
+  align-self: flex-start;
+  padding: 2rpx 12rpx;
+  border: 1rpx solid var(--ins-weak-bd);
+  border-radius: $r-md;
+  background: var(--ins-fc-bg);
+}
+
+.as-insight-card__name-tag-text {
+  font-size: $font-size-xs;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--ins-card-tx);
+}
 
 /* ===== Title ===== */
 .as-insight-card__title {
