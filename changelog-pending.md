@@ -1,5 +1,12 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-13 完整的洞察报告 PDF + 详情页精简 + 预判移除
+- `src/shared/utils/downloadInsightReport.ts`：新增——封装 JWT 报告下载请求，含 401/404/409/502 错误提示
+- 洞察详情页（insight-detail-move.vue）：精简为报价头 + 一句话主因 + 报告下载按钮；删除归因候选/六阶段链/证据清单等展开区块
+- `InsightAlertCard.vue`：异动卡片下端新增「洞察报告」按钮（`reportable` prop + `report` emit，父组件 monitor.vue 据 `analysisStatus === 'completed'` 判定 → downloadInsightReport）
+- 预判相关已移除：`detail.forecast`、`ForecastSlotPayload`/`parseForecastSlot` 类型和工具函数、预判 Tab 与 `hasForecast` 筛选
+- 文档：AGENTS.md 同步更新详情页精简、报告入口、预判移除
+
 ## 2026-09-13 同日同股异动聚合（展示层收敛为当日一张卡）
 - `src/modules/favorites/components/insightCards.ts`：新增 `dedupeDailyMovements(items)` 纯函数——分组键 = symbol（剥 SH/SZ/BJ）+ 上海交易日（activityAt 经 UTC+8 取日期），组内取 `window_end_at ?? triggered_at` 最新一条；配合"先 `filter(isUnattributableMovement)`"实现"最新 + 失败回退"（当日最新归因失败时自动落到当日最近一条有效归因）。
 - 三处接入：`pages/monitor.vue`（自选股异动）、`components/AlertContent.vue`（首页洞察块 ≤6 行）、`pages/insight.vue`（自选股洞察列表）——均为 `list(20) → filter → dedupeDailyMovements → map → sort`。
