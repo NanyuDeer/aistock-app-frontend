@@ -1,5 +1,25 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-18 板块原因链前端展示：3 字段（触发/传导/结果）可展开，三处同源
+
+- **背景（组长裁定）**：板块溯源本身就是一条原因链（后端 **4 段** `现象→触发→传导→影响`，已由 app-api `24b53a5` 加性透出为 `trace.stages`），但前端一个字段都没显示。要求：**和大盘主因链一样只显示 3 个字段（触发、传导、结果）**，且**市场洞见 + 板块详情/板块预判页都能展开**。
+- **关键发现（省掉一半工作）**：组件库 `InsightCard` 的 `traceStructured.stages` 槽位**早就实现**（注释写着"板块自身链阶段…本期仅预留渲染，无数据不渲染"），折叠入口「依据详情 ▾」+ `阶段名 | 文本` 两列渲染全都现成 —— **只是没人喂数据**。
+- **改动**：
+  | 文件 | 改动 |
+  |---|---|
+  | `src/shared/utils/sectorInsight.ts` | 新增 `toReasonStages(stages)` + `ReasonStageRow`：4 段 → **3 段**（触发/传导/结果←`impact`，**丢弃 `phenomenon`**），**保源序**、段名未知或 headline 空白跳过、全空返回 `[]`。**映射口径单点**，三处消费方共用 |
+  | `src/shared/api/modules/agent.ts` | `SectorInsightTraceStage` + `SectorInsightTrace.stages?`（对齐 app-api 契约） |
+  | `src/shared/components/InsightCard.vue` | 新增顶层 `traceStages` prop（**优先于** `traceStructured.stages`）；原槽位只挂在结构化形态上，导致"未入链但已有板块溯源"（无 marketLink → 走文本形态）时原因链无处可放 → 提到顶层；内部 computed `traceStages` 更名 `stageRows` |
+  | `src/shared/components/SectorInsightCard.vue` | 把 `toReasonStages(candidate.trace.stages)` 传 `:trace-stages` → 板块详情页**零额外改动**即获得展开能力 |
+  | `src/modules/analytics/pages/traceability.vue` | **首屏拉一次 `sector-insight`** 建 `sectorStageMap`（键 = `ts_code` **与**板块名双形态，抗命名漂移），传 `:sector-stages`；失败静默空映射不阻断报告 |
+  | `src/shared/components/AttributionChainView.vue` | 新增 `sectorStages` prop + 分支「溯源过程 ▾」展开（键三级降级 `ts_code → sector_std → 原始名`，按分支独立展开态）；样式与 `InsightCard` 依据详情同款（右对齐入口 + 三角箭头翻转 + 阶段名两列 + 虚线分隔） |
+  | `src/modules/market/pages/sector-loop.vue` | 行内新增同款「溯源过程 ▾」展开（`toReasonStages` 同源），复用现有行 UI，不改列表结构 |
+- **交互分工（明确边界）**：链分支/四环行**只展开过程**，标题与驱动句仍是入口（板块详情页看完整预判）；`溯源过程` 与 `看该板块预判 →` 并列，溯源/预判两轨分离不变。
+- **测试**：`AttributionChainView.mount.spec.ts` **+4 例**（无数据不出入口 / 展开显示 3 段并可收起 / 键三级降级 / 展开态按分支独立）；`traceability.mount.spec.ts` 原"**不再请求 sector-insight**"负向护栏**改为正向**（首屏恰 1 次、只为原因链）+ **+2 例**（双键索引且现象段被丢弃保源序 / 接口失败静默空映射）。**两个 spec 47 passed**。
+- **验收**：`npx vue-tsc --noEmit` **TSC_OK**；全量 `npx vitest run` → **477 passed / 4 failed**（4 条为**本次无关**的存量红：`AnalyticsCardLayout` 1 + `insight-detail` 1 + `AlertContent` 2；改动前基线 475 passed / 同 4 条 → **零新增失败**）。
+- **组件库归档（本轮**未做**，需你定）**：查证发现 ① app 的 `InsightCard.vue`（856 行）已**领先**组件库版本（800 行）——`titleTag` / `linePlacement` / `traceWord` 等 lib 都没有；② `SectorInsightCard.vue` 依赖 app 专属模块（`@/shared/api` 类型 + `@/shared/utils/sectorInsight`，后者又依赖 `expandConditionalBranches`），直接搬进 lib 会 type-check 不过，需先做依赖下沉或改成结构化 props；③ lib README 写明改动走「分支 → PR → review」流程（林晓研维护）。故**本轮未动 `aistock-component-lib`**，建议单独立项做"组件库回灌"（先把 app 领先的改动回灌，再归档 SectorInsightCard）。
+- **跨端**：仅改 `aistock-app-frontend`；`aistock-frontend`（web）无该页面 → 无需同步；app-api 已在 `24b53a5` 提供 `stages`（本轮 0 改动）；agent-py 0 改动。
+
 ## 2026-09-18 市场洞见页：删除「今日影响大盘的主要板块」区块，能力并入大盘归因链
 
 - **背景（组长裁定）**：该区块与上方「大盘归因链」**读同一份链**（页面 `fetchAttributionChain` 拉一次两处共用）、**用同一个过滤判据**（`sectorInsight.isUnconfirmedAttribution`）、**显示同一批板块**（角色徽 + 事件胶囊 + 驱动句），信息重复且同一批板块渲染两遍 → 只保留归因链。

@@ -45,6 +45,7 @@
             :date="displayedDate"
             :chain="chain"
             :loading="chainLoading"
+            :sector-stages="sectorStageMap"
             @select-sector="goSectorDetail"
           />
           <!-- 链级标记行：弱依据提示 + 全部板块入口（原挂在被合并区块的标题行上，随区块移除后保留于此） -->
@@ -94,6 +95,7 @@ import { toMarketTracePresentation, type MarketTracePresentation } from '@/modul
 import MarketInsightCard from '@/modules/analytics/components/MarketInsightCard.vue'
 import AttributionChainView from '@/shared/components/AttributionChainView.vue'
 import { fetchAttributionChain, type AttributionChain } from '@/shared/api/modules/attributionChain'
+import { toReasonStages, type ReasonStageRow } from '@/shared/utils/sectorInsight'
 
 const loading = ref(false)
 const error = ref(false)
@@ -208,9 +210,39 @@ async function loadChain(d: string) {
 /** 链级弱依据（root.evidence_weak=true：当日大盘未确认主因，2026-09-17 R16）→ 链视图下方中性灰「归因较弱」 */
 const chainWeak = computed(() => chain.value?.root?.evidence_weak === true)
 
-// 复盘报告实际展示日期确定后（成功展示/切日）拉取归因链
+/**
+ * 每板块原因链 3 段（2026-09-18）：**首屏拉一次 `sector-insight` 缓存**，链分支展开时零延迟读取
+ * （与板块详情/四环页同源同映射；不再用它出卡列表 —— 那个区块已并入链树）。
+ * 键同时给 `ts_code` 与板块名两种形态：链节点以 ts_code 为主，名称会在权威名↔复盘原始名之间漂移。
+ */
+const sectorStageMap = ref<Record<string, ReasonStageRow[]>>({})
+
+/** 拉取并索引每板块原因链：失败静默置空（分支展开入口不出现），不阻断报告内容 */
+async function loadSectorStages(d: string) {
+  if (!d) return
+  try {
+    const res = await agentApi.getSectorInsight(d)
+    const map: Record<string, ReasonStageRow[]> = {}
+    for (const c of res?.candidates ?? []) {
+      const rows = toReasonStages(c.trace?.stages)
+      if (!rows.length) continue
+      if (c.ts_code) map[c.ts_code] = rows
+      const name = (c.name ?? '').trim()
+      if (name) map[name] = rows
+    }
+    sectorStageMap.value = map
+  } catch (err) {
+    console.error('板块原因链加载失败:', err)
+    sectorStageMap.value = {}
+  }
+}
+
+// 复盘报告实际展示日期确定后（成功展示/切日）拉取归因链与每板块原因链
 watch(displayedDate, (d) => {
-  if (d) void loadChain(d)
+  if (d) {
+    void loadChain(d)
+    void loadSectorStages(d)
+  }
 })
 
 /** 全部板块入口：跳板块四环页并定位到当前展示日期（traceability 当日为交易日、接口按交易日落库） */

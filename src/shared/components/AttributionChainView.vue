@@ -50,6 +50,20 @@
               @select="openEventRef"
             />
           </view>
+          <!-- 板块原因链 3 段（2026-09-18）：触发 → 传导 → 结果，与大盘主因链同形；
+               数据由页面首屏拉一次 sector-insight 索引传入，无数据 → 该分支不出入口（不占位） -->
+          <template v-if="stageRowsOf(c).length">
+            <view class="acv-more" @tap.stop="toggleStages(c)">
+              <text class="acv-more-tx">{{ isStagesOpen(c) ? '收起' : '溯源过程' }}</text>
+              <view class="acv-more-chev" :class="{ 'acv-more-chev--open': isStagesOpen(c) }" />
+            </view>
+            <view v-if="isStagesOpen(c)" class="acv-detail">
+              <view v-for="(st, i) in stageRowsOf(c)" :key="i" class="acv-detail-st">
+                <text class="acv-detail-k">{{ st.name }}</text>
+                <text class="acv-detail-v">{{ st.text }}</text>
+              </view>
+            </view>
+          </template>
           <!-- 预判入口（2026-09-18 自「今日影响大盘的主要板块」区块迁来）：只跳转，
                不在链上渲染预判内容（溯源/预判两轨分离不变） -->
           <view class="acv-forecast" @tap="selectSector(c)">
@@ -62,9 +76,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { AttributionChain, AttributionChainChild } from '@/shared/api/modules/attributionChain'
-import { extractionWeakLabel, isUnconfirmedAttribution } from '@/shared/utils/sectorInsight'
+import { extractionWeakLabel, isUnconfirmedAttribution, type ReasonStageRow } from '@/shared/utils/sectorInsight'
 import EventRefChip from './EventRefChip.vue'
 
 /**
@@ -84,11 +98,52 @@ const props = withDefaults(defineProps<{
   loading?: boolean
   /** 演示模式：忽略 chain prop，渲染内置演示数据（本地/演示环境用，生产不传） */
   mock?: boolean
+  /**
+   * 每板块原因链 3 段（触发/传导/结果），键为 `ts_code` 或板块名（两种形态都查）。
+   * 由页面侧首屏拉一次 `sector-insight` 后索引传入（组件不自己请求；无数据 → 该分支不出展开入口）。
+   */
+  sectorStages?: Record<string, ReasonStageRow[]>
 }>(), {
   chain: null,
   loading: false,
-  mock: false
+  mock: false,
+  sectorStages: () => ({})
 })
+
+/** 分支展开态（本地交互；键 = ts_code 优先 → 权威名 → 原始名，与板块名解析同序） */
+const expandedKeys = ref<Set<string>>(new Set())
+
+function keyOf(c: AttributionChainChild): string {
+  return (c.ts_code ?? '').trim() || (c.sector_std ?? '').trim() || (c.sector ?? '').trim()
+}
+
+/**
+ * 取该分支的板块原因链 3 段：`ts_code` → `sector_std` → 原始名逐级降级查表
+ * （链节点命名会在权威名↔复盘原始名之间漂移，与 `selectSector` 同一解析顺序）。
+ */
+function stageRowsOf(c: AttributionChainChild): ReasonStageRow[] {
+  const map = props.sectorStages
+  if (!map) return []
+  const keys = [(c.ts_code ?? '').trim(), (c.sector_std ?? '').trim(), (c.sector ?? '').trim()]
+  for (const k of keys) {
+    if (k && map[k]?.length) return map[k]
+  }
+  return []
+}
+
+function isStagesOpen(c: AttributionChainChild): boolean {
+  return expandedKeys.value.has(keyOf(c))
+}
+
+/** 展开/收起该分支的溯源过程（新建 Set 触发响应式：Set 原地增删不触发 ref 更新） */
+function toggleStages(c: AttributionChainChild): void {
+  const k = keyOf(c)
+  if (!k) return
+  const next = new Set(expandedKeys.value)
+  if (next.has(k)) next.delete(k)
+  else next.add(k)
+  expandedKeys.value = next
+}
 
 /** 展示日期：沿用页面传入的交易日（YYYY-MM-DD） */
 const displayDate = computed(() => props.date)
@@ -376,6 +431,69 @@ const sortedChildren = computed(() => {
 }
 
 /* 预判入口（2026-09-18 自「今日影响大盘的主要板块」区块迁来）：右对齐纯文字链接 */
+/* 溯源过程展开（2026-09-18）：与组件库 InsightCard「依据详情」同款交互与排布
+   （右对齐文字入口 + 展开后「阶段名 | 文本」两列），保持全站洞见类展开一致 */
+.acv-more {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+  padding: 4rpx 0 0;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.acv-more-tx {
+  font-size: $font-size-xs;
+  color: $primary;
+}
+
+/* 展开箭头：右下三角，展开时翻转（与 InsightCard 同款） */
+.acv-more-chev {
+  width: 0;
+  height: 0;
+  border-left: 8rpx solid transparent;
+  border-right: 8rpx solid transparent;
+  border-top: 8rpx solid $primary;
+  transition: transform 0.2s;
+
+  &--open {
+    transform: rotate(180deg);
+  }
+}
+
+.acv-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-top: 10rpx;
+  padding-top: 10rpx;
+  border-top: 2rpx dashed $line-soft;
+}
+
+.acv-detail-st {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.acv-detail-k {
+  flex: 0 0 72rpx;
+  font-size: $font-size-xs;
+  font-weight: 600;
+  color: $ink-mute;
+}
+
+.acv-detail-v {
+  flex: 1;
+  min-width: 0;
+  font-size: $font-size-xs;
+  line-height: 1.6;
+  color: $ink;
+}
+
 .acv-forecast {
   display: flex;
   justify-content: flex-end;

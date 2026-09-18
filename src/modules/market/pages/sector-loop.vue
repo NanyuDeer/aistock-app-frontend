@@ -122,6 +122,21 @@
                 <text class="sl-trace__text">{{ row.summary }}</text>
               </view>
 
+              <!-- 板块原因链 3 段（2026-09-18）：触发 → 传导 → 结果，与大盘主因链同形；
+                   无数据（旧记录/未溯源）→ 该行不出入口（不占位） -->
+              <template v-if="row.stages.length">
+                <view class="sl-more" @tap.stop="toggleStages(row.key)">
+                  <text class="sl-more__tx">{{ isStagesOpen(row.key) ? '收起' : '溯源过程' }}</text>
+                  <view class="sl-more__chev" :class="{ 'sl-more__chev--open': isStagesOpen(row.key) }" />
+                </view>
+                <view v-if="isStagesOpen(row.key)" class="sl-detail">
+                  <view v-for="(st, i) in row.stages" :key="i" class="sl-detail__st">
+                    <text class="sl-detail__k">{{ st.name }}</text>
+                    <text class="sl-detail__v">{{ st.text }}</text>
+                  </view>
+                </view>
+              </template>
+
               <!-- 预判详情区：复用组件库条件化预判格式（分支/期段/点亮），行样式白卡 -->
               <view v-if="row.structured" class="sl-row__fc" @tap.stop>
                 <ConditionalForecastBlock :structured="row.structured" display-mode="conclusion" />
@@ -146,8 +161,8 @@ import type {
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { LoadingState, EmptyState, Button, Card } from '@/shared/components'
 import ConditionalForecastBlock from '@/shared/components/ConditionalForecastBlock.vue'
-import { todayDateStr, sectorPredictionToStructured } from '@/shared/utils/sectorInsight'
-import type { SectorStructuredForecast } from '@/shared/utils/sectorInsight'
+import { todayDateStr, sectorPredictionToStructured, toReasonStages } from '@/shared/utils/sectorInsight'
+import type { SectorStructuredForecast, ReasonStageRow } from '@/shared/utils/sectorInsight'
 
 /** 回看窗口：近 20 个交易日（含当日若为交易日），供步进与日期列表回看 */
 const RECENT_DAYS = 20
@@ -259,6 +274,24 @@ interface RowVM {
   isPrimary: boolean
   /** 预判结构化数据（存在分支/期段才渲染详情块） */
   structured: SectorStructuredForecast | null
+  /** 板块原因链 3 段（触发/传导/结果，2026-09-18）；空数组 → 该行不出展开入口 */
+  stages: ReasonStageRow[]
+}
+
+/** 溯源过程展开态（本地交互；键 = 行 key，即 ts_code） */
+const expandedKeys = ref<Set<string>>(new Set())
+
+function isStagesOpen(key: string): boolean {
+  return expandedKeys.value.has(key)
+}
+
+/** 展开/收起该行溯源过程（新建 Set 触发响应式：Set 原地增删不触发 ref 更新） */
+function toggleStages(key: string): void {
+  if (!key) return
+  const next = new Set(expandedKeys.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expandedKeys.value = next
 }
 
 /** 来源 tag：wind_leader→风口(蓝) / review_primary→大盘主因(红) / both→风口 · 主因(红) */
@@ -311,7 +344,9 @@ function buildRow(c: SectorInsightCandidate): RowVM {
     pred: predModel(c.prediction),
     isPrimary,
     // 仅当预判含期段/分支时渲染条件化预判块，避免空块（纯概要行保持轻量）
-    structured: structured && (structured.horizons?.length || structured.conditions?.length) ? structured : null
+    structured: structured && (structured.horizons?.length || structured.conditions?.length) ? structured : null,
+    // 板块原因链 3 段（映射口径单点在 toReasonStages，与板块详情/市场洞见链分支同源）
+    stages: toReasonStages(c.trace?.stages)
   }
 }
 
@@ -733,6 +768,69 @@ onLoad(async (options) => {
   font-size: $font-size-xs;
   color: $ink-soft;
   line-height: 1.6;
+}
+
+/* 溯源过程展开（2026-09-18）：与组件库 InsightCard「依据详情」同款交互与排布
+   （右对齐文字入口 + 展开后「阶段名 | 文本」两列），保持全站洞见类展开一致 */
+.sl-more {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+  padding: 4rpx 2rpx 0;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.sl-more__tx {
+  font-size: $font-size-xs;
+  color: $primary;
+}
+
+/* 展开箭头：右下三角，展开时翻转（与 InsightCard 同款） */
+.sl-more__chev {
+  width: 0;
+  height: 0;
+  border-left: 8rpx solid transparent;
+  border-right: 8rpx solid transparent;
+  border-top: 8rpx solid $primary;
+  transition: transform 0.2s;
+
+  &--open {
+    transform: rotate(180deg);
+  }
+}
+
+.sl-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-top: 10rpx;
+  padding-top: 10rpx;
+  border-top: 1rpx dashed $line-soft;
+}
+
+.sl-detail__st {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.sl-detail__k {
+  flex: 0 0 72rpx;
+  font-size: $font-size-xs;
+  font-weight: 600;
+  color: $ink-mute;
+}
+
+.sl-detail__v {
+  flex: 1;
+  min-width: 0;
+  font-size: $font-size-xs;
+  line-height: 1.6;
+  color: $ink-soft;
 }
 
 /* 右区（第 1 行方向 pill）：与板块名同行右端 */

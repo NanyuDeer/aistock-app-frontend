@@ -144,6 +144,100 @@ describe('AttributionChainView 分支预判入口（2026-09-18）', () => {
 })
 
 /**
+ * 板块原因链展开（2026-09-18）：每个分支可展开看该板块的 3 段溯源（触发 → 传导 → 结果），
+ * 与大盘主因链 3 步同形。数据由页面首屏拉一次 sector-insight 后索引传入（组件不自己请求）。
+ */
+describe('AttributionChainView 分支溯源过程展开（2026-09-18）', () => {
+  const chainWith = (children: Array<Record<string, unknown>>) => ({
+    date: DATE,
+    root: { type: 'market' as const, date: DATE, summary: 'x', index_pct: 1 },
+    children: children as never,
+  })
+
+  const STAGES = [
+    { name: '触发', text: '大基金三期再落子' },
+    { name: '传导', text: '持仓共振走强' },
+    { name: '结果', text: '国产替代预期升温' },
+  ]
+
+  it('无 sectorStages 数据 → 分支不出「溯源过程」入口（不占位）', () => {
+    const wrapper = mount(AttributionChainView, {
+      props: {
+        date: DATE,
+        chain: chainWith([
+          { sector: '汽车芯片', ts_code: '885893', relation: 'self_driven', pct: 4, trace_summary: '关税豁免' },
+        ]),
+      },
+    })
+
+    expect(wrapper.findAll('.acv-more')).toHaveLength(0)
+    expect(wrapper.find('.acv-detail').exists()).toBe(false)
+  })
+
+  it('有数据 → 出入口；点击展开 3 段（触发/传导/结果）、再点收起', async () => {
+    const wrapper = mount(AttributionChainView, {
+      props: {
+        date: DATE,
+        chain: chainWith([
+          { sector: '汽车芯片', ts_code: '885893', relation: 'self_driven', pct: 4, trace_summary: '关税豁免' },
+        ]),
+        sectorStages: { '885893': STAGES },
+      },
+    })
+
+    expect(wrapper.find('.acv-more-tx').text()).toBe('溯源过程')
+    expect(wrapper.find('.acv-detail').exists()).toBe(false)
+
+    await wrapper.find('.acv-more').trigger('tap')
+    expect(wrapper.find('.acv-more-tx').text()).toBe('收起')
+    expect(wrapper.findAll('.acv-detail-k').map((n) => n.text())).toEqual(['触发', '传导', '结果'])
+    expect(wrapper.findAll('.acv-detail-v').map((n) => n.text())).toEqual([
+      '大基金三期再落子',
+      '持仓共振走强',
+      '国产替代预期升温',
+    ])
+
+    await wrapper.find('.acv-more').trigger('tap')
+    expect(wrapper.find('.acv-detail').exists()).toBe(false)
+  })
+
+  it('键降级：ts_code 无数据时用板块名查到（权威名/原始名都能命中）', async () => {
+    const wrapper = mount(AttributionChainView, {
+      props: {
+        date: DATE,
+        chain: chainWith([
+          // ts_code 有值但映射里没有 → 降级到 sector_std
+          { sector: '次新股', sector_std: '注册制次新股', ts_code: '999999', relation: 'self_driven', pct: 7, trace_summary: 'x' },
+          // 连 sector_std 都没有 → 降级到原始名
+          { sector: '汽车芯片', relation: 'self_driven', pct: 4, trace_summary: 'y' },
+        ]),
+        sectorStages: { 注册制次新股: STAGES, 汽车芯片: STAGES },
+      },
+    })
+
+    expect(wrapper.findAll('.acv-more')).toHaveLength(2)
+  })
+
+  it('展开态按分支独立（点开一个不影响另一个）', async () => {
+    const wrapper = mount(AttributionChainView, {
+      props: {
+        date: DATE,
+        chain: chainWith([
+          { sector: '汽车芯片', ts_code: 'A', relation: 'self_driven', pct: 4, trace_summary: 'x' },
+          { sector: '券商', ts_code: 'B', relation: 'market_follow', pct: 1, trace_summary: 'y' },
+        ]),
+        sectorStages: { A: STAGES, B: STAGES },
+      },
+    })
+
+    await wrapper.findAll('.acv-more')[0]!.trigger('tap')
+
+    expect(wrapper.findAll('.acv-detail')).toHaveLength(1)
+    expect(wrapper.findAll('.acv-more-tx').map((n) => n.text())).toEqual(['收起', '溯源过程'])
+  })
+})
+
+/**
  * 否定句口径（2026-09-18 补）：原判据只认「未确认驱动原因」「证据不足，未确认主因」两条，
  * 生产链上更常见的否定句是「**未检索到**可解释当日行情的独立触发事件」（2026-09-18 注册制次新股）
  * —— 不匹配 → 两个视图都会把它出成卡，驱动句就是那句否定句本身，等于「未确认驱动原因的不放」

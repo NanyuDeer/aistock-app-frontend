@@ -73,13 +73,13 @@
       </view>
 
       <!-- 依据详情（本地展开：展示溯源全文 + 板块链阶段 stages；无内容不渲染入口） -->
-      <template v-if="traceDetailText || traceStages.length">
+      <template v-if="traceDetailText || stageRows.length">
         <view class="as-insight-card__more" @tap.stop="traceExpanded = !traceExpanded">
           <text class="as-insight-card__more-tx">{{ traceExpanded ? '收起' : '依据详情' }}</text>
           <view class="as-insight-card__more-chev" :class="{ 'as-insight-card__more-chev--open': traceExpanded }" />
         </view>
         <view v-if="traceExpanded" class="as-insight-card__detail">
-          <view v-for="(st, i) in traceStages" :key="i" class="as-insight-card__detail-st">
+          <view v-for="(st, i) in stageRows" :key="i" class="as-insight-card__detail-st">
             <text class="as-insight-card__detail-k">{{ st.name }}</text>
             <text class="as-insight-card__detail-v">{{ st.text }}</text>
           </view>
@@ -94,13 +94,13 @@
       <text class="as-insight-card__text">{{ trace }}</text>
 
       <!-- 依据详情（本地展开：展示溯源全文 + 板块链阶段 stages；无内容不渲染入口） -->
-      <template v-if="traceDetailText || traceStages.length">
+      <template v-if="traceDetailText || stageRows.length">
         <view class="as-insight-card__more" @tap.stop="traceExpanded = !traceExpanded">
           <text class="as-insight-card__more-tx">{{ traceExpanded ? '收起' : '依据详情' }}</text>
           <view class="as-insight-card__more-chev" :class="{ 'as-insight-card__more-chev--open': traceExpanded }" />
         </view>
         <view v-if="traceExpanded" class="as-insight-card__detail">
-          <view v-for="(st, i) in traceStages" :key="i" class="as-insight-card__detail-st">
+          <view v-for="(st, i) in stageRows" :key="i" class="as-insight-card__detail-st">
             <text class="as-insight-card__detail-k">{{ st.name }}</text>
             <text class="as-insight-card__detail-v">{{ st.text }}</text>
           </view>
@@ -271,6 +271,13 @@ const props = withDefaults(defineProps<{
   traceStructured?: InsightTraceStructured | null
   /** 溯源「依据详情」正文（可选；有值时溯源区显示「依据详情 ▾」入口并在卡片内展开） */
   traceDetail?: string
+  /**
+   * 板块原因链 3 段（触发 / 传导 / 结果）—— 显式传入，**两种溯源形态（结构化 traceStructured /
+   * 纯文本 trace）都能展示**；优先于 `traceStructured.stages`。
+   * 2026-09-18：原槽位只挂在 traceStructured 上，导致"未入链但已有板块溯源"（无 marketLink →
+   * 走文本形态）时原因链无处可放 → 提到顶层 prop。
+   */
+  traceStages?: Array<{ name: string; text: string }>
   /** 预判展示模式：full=全量分支（现状）；conclusion=只显示已成立分支（透传 CFB，spec §7） */
   displayMode?: 'full' | 'conclusion'
   /** 预判：后续走向（文本形态，structured 传入时忽略） */
@@ -299,6 +306,7 @@ const props = withDefaults(defineProps<{
   trace: '',
   traceStructured: null,
   traceDetail: '',
+  traceStages: () => [],
   displayMode: 'full',
   forecast: '',
   tagText: '',
@@ -342,8 +350,11 @@ const traceExpanded = ref(false)
 /** 依据详情正文：结构化 more 优先，其次 traceDetail prop */
 const traceDetailText = computed(() => props.traceStructured?.more?.trim() || props.traceDetail?.trim() || '')
 
-/** 板块链阶段（链式溯源 P3' 产出；无数据 → 不渲染阶段区） */
-const traceStages = computed(() => props.traceStructured?.stages ?? [])
+/** 板块链阶段（链式溯源 P3' 产出；无数据 → 不渲染阶段区）。
+ *  顶层 `traceStages` prop 优先（两种溯源形态都可用），其次 `traceStructured.stages`。 */
+const stageRows = computed(() =>
+  props.traceStages?.length ? props.traceStages : (props.traceStructured?.stages ?? [])
+)
 
 /** 板块链上事件节点（spec §7；无数据/旧数据缺省 → 不渲染事件区） */
 const traceEvents = computed(() => props.traceStructured?.events ?? [])

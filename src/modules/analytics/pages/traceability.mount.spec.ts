@@ -53,7 +53,7 @@ vi.mock('@/modules/analytics/components/MarketInsightCard.vue', () => ({
 vi.mock('@/shared/components/AttributionChainView.vue', () => ({
   default: {
     name: 'AttributionChainView',
-    props: ['date', 'chain', 'loading', 'mock'],
+    props: ['date', 'chain', 'loading', 'mock', 'sectorStages'],
     emits: ['select-sector'],
     template: '<view class="acv-stub" />',
   },
@@ -170,10 +170,54 @@ describe('市场洞见页：主因板块区块并入大盘归因链（2026-09-18
     expect(wrapper.find('.primary-sector-empty').exists()).toBe(false)
   })
 
-  it('不再请求 sector-insight（区块移除后不应多拉一次接口）', async () => {
+  it('首屏拉一次 sector-insight：只为链分支的板块原因链（不再出卡列表）', async () => {
     await mountPage()
 
-    expect(agentApiMock.getSectorInsight).not.toHaveBeenCalled()
+    expect(agentApiMock.getSectorInsight).toHaveBeenCalledTimes(1)
+    expect(agentApiMock.getSectorInsight).toHaveBeenCalledWith(DATE)
+  })
+
+  it('每板块原因链按 ts_code 与板块名双键索引后传给链视图（4 段→3 段）', async () => {
+    agentApiMock.getSectorInsight.mockResolvedValue({
+      date: DATE,
+      hasData: true,
+      candidates: [
+        {
+          ts_code: '885893',
+          name: '国家大基金持股',
+          source: 'review_primary',
+          trace: {
+            present: true,
+            summary: '大基金三期再落子',
+            sectors: ['国家大基金持股'],
+            stages: [
+              { kind: 'phenomenon', headline: '板块大涨 4.03%', claims: [], evidence: [] },
+              { kind: 'trigger', headline: '大基金三期再落子', claims: [], evidence: [] },
+              { kind: 'transmission', headline: '持仓共振走强', claims: [], evidence: [] },
+              { kind: 'impact', headline: '国产替代预期升温', claims: [], evidence: [] },
+            ],
+          },
+        },
+      ],
+    })
+
+    const wrapper = await mountPage()
+    const map = acv(wrapper).props('sectorStages') as Record<string, { name: string; text: string }[]>
+
+    // 双键都索引（链节点可能用 ts_code 或板块名）
+    expect(Object.keys(map).sort()).toEqual(['885893', '国家大基金持股'])
+    // 现象段被丢掉、保源序：触发 → 传导 → 结果
+    expect(map['885893']!.map((r) => r.name)).toEqual(['触发', '传导', '结果'])
+    expect(map['885893']![0]!.text).toBe('大基金三期再落子')
+    expect(map['国家大基金持股']).toEqual(map['885893'])
+  })
+
+  it('sector-insight 失败 → 静默空映射（不阻断报告；链视图不出展开入口）', async () => {
+    agentApiMock.getSectorInsight.mockRejectedValue(new Error('boom'))
+    const wrapper = await mountPage()
+
+    expect(acv(wrapper).props('sectorStages')).toEqual({})
+    expect(wrapper.find('.chain-view-block').exists()).toBe(true)
   })
 
   it('链数据仍受控传给归因链视图（页面拉一次，两处共用不再需要）', async () => {

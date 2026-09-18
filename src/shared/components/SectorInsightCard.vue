@@ -21,6 +21,7 @@
       :trace="traceText"
       :trace-structured="traceStructured"
       :trace-detail="traceDetailText"
+      :trace-stages="reasonStages"
       :time="timeLabel"
       :structured="structured"
       :display-mode="displayMode"
@@ -33,7 +34,7 @@
 import { computed } from 'vue'
 import InsightCard from './InsightCard.vue'
 import { LoadingState } from '@/shared/components'
-import { sectorPredictionToStructured, relationLabel, extractionWeakLabel } from '@/shared/utils/sectorInsight'
+import { sectorPredictionToStructured, relationLabel, extractionWeakLabel, toReasonStages } from '@/shared/utils/sectorInsight'
 import type { SectorInsightCandidate } from '@/shared/api/modules/agent'
 import type { SectorMarketLink } from '@/shared/utils/sectorInsight'
 
@@ -178,6 +179,12 @@ const traceStructured = computed(() => {
     weakText: extractionWeakLabel(m.extraction)
   }
 })
+
+/**
+ * 板块原因链 3 段（触发 / 传导 / 结果）：映射口径**单点**在 `toReasonStages`
+ * （与市场洞见链分支展开共用同一函数，避免两处口径漂移）。
+ */
+const reasonStages = computed(() => toReasonStages(props.candidate?.trace?.stages))
 
 /** 依据详情正文：显式传入优先；文本溯源形态下若与溯源行同句则不重复展示（返回空 → 入口不渲染） */
 const traceDetailText = computed(() => {
