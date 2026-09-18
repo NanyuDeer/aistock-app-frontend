@@ -292,7 +292,7 @@ function onClick(event: Event) {
   margin-top: 12rpx;
   padding: 10rpx 0;
   border-radius: 12rpx;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba($primary, 0.1);
   text-align: center;
   /* #ifdef H5 */
   cursor: pointer;
@@ -300,6 +300,7 @@ function onClick(event: Event) {
 }
 .insight-alert-card__report-text {
   font-size: 24rpx;
-  color: #ffffff;
+  color: $primary;
+  font-weight: 500;
 }
 </style>

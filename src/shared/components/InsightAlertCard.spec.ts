@@ -93,7 +93,7 @@ describe('InsightAlertCard 洞察报告按钮', () => {
     const btn = wrapper.find('.insight-alert-card__report')
     expect(btn.exists()).toBe(true)
     await btn.trigger('tap')
-    expect(wrapper.emitted('report')).toBeTruthy()
+    expect(wrapper.emitted('report')).toEqual([[]])
     // @tap.stop 阻止冒泡，卡片 tap 事件不应触发
     expect(wrapper.emitted('click')).toBeFalsy()
   })

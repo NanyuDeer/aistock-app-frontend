@@ -94,7 +94,7 @@ interface AlertItem {
   message: string
   time: string | number
   confidence?: 'high' | 'medium' | 'low' | 'unconfirmed'
-  analysisStatus?: string
+  analysisStatus?: StockTraceEvent['analysis_status']
 }
 
 const favoritesStore = useFavoritesStore()
@@ -219,7 +219,7 @@ async function onReport(eventId: string): Promise<void> {
   try {
     await downloadInsightReport(eventId)
   } catch (err) {
-    uni.showToast({ title: (err as Error).message || '报告生成失败，请重试', icon: 'none' })
+    uni.showToast({ title: (err instanceof Error ? err.message : '') || '报告生成失败，请重试', icon: 'none' })
   } finally {
     reportBusy.value = false
   }
