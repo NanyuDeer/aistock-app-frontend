@@ -205,8 +205,18 @@ export function extractionWeakLabel(extraction: AttributionChainExtraction | nul
  * **为什么无条件按摘要判、不看 `events[]`**：当前 `events[]` 里常是「沪指跌0.41%…」「A股收評」
  * 这类**行情综述（现象）**，不是驱动原因；把它们当作归因理由会让用户误以为已归因。
  * 消费方：市场洞见「今日影响大盘的主要板块」卡列表 + 大盘归因链树（AttributionChainView）children。
+ *
+ * **2026-09-18 补（否定句口径扩表）**：原判据只认「未确认驱动原因」「证据不足，未确认主因」两条，
+ * 而链上更常见的否定句是「**未检索到**可解释当日行情的独立触发事件」（2026-09-18 注册制次新股
+ * 生产实证）——不匹配 → 两个视图都会把它出成卡，驱动句就是那句否定句本身，等于"未确认驱动原因的
+ * 不放"没落实。现与 agent-py `attribution_chain._NEGATIVE_SUMMARY_MARKERS`（同一晚迭代 4 引入）
+ * **逐字对齐**，两侧同一口径。
+ *
+ * 刻意**不收**「不足/没有/缺少/缺乏/未出现」：肯定归因句里的这些词不能误伤——2026-09-17 玉米的
+ * 真实摘要是「未出现单一独立公告；催化来自超强厄尔尼诺供给扰动预期」，它是有内容的归因句。
  */
-const UNCONFIRMED_ATTRIBUTION_RE = /未确认驱动原因|证据不足[，,]?\s*未确认主因/
+const UNCONFIRMED_ATTRIBUTION_RE =
+  /未检索到|没有检索到|未找到|没有找到|未发现|没有发现|未确认|未明确|未识别|未匹配|无法确认|无法判断|不能确认|暂无|尚未/
 
 export function isUnconfirmedAttribution(traceSummary: string | null | undefined): boolean {
   const s = String(traceSummary ?? '').replace(/\s+/g, '')
