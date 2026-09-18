@@ -19,9 +19,15 @@ import { fileURLToPath } from 'node:url'
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SRC = join(REPO, 'src')
 const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
-/** 采集器跑通后的干净基线（tests/pass/fail）；残余 2 条为 ConditionalForecastBlock「单档守卫」既有真实失败。
- *  修改此常量须同步 `project_memory.md` 的「节奏档位色板唯一副本（2026-09-15）」条目与 README 快速开始。 */
-const EXPECTED_BASELINE = '241/239/2'
+/** 采集器跑通后的干净基线（tests/pass/fail）；与实测一致 = 无回归，不一致 = 基线漂移（exit 2）。
+ *  2026-09-16：ConditionalForecastBlock 单档守卫 + activeHorizon watchEffect 已实现，既有 2 条失败转绿，残余失败清零。
+ *  2026-09-16：结论模式落地新增 6 条（conditionalForecast.spec.ts 5 条 + CFB spec __seg 容器断言 1 条）。
+ *  2026-09-16：无 met 数据降级全量渲染新增 3 条（conditionalForecast.spec.ts 的 resolveDisplayMode 三态）。
+ *  2026-09-16：condition_met 两段判定（条件点亮中间态不再误标「已验证」）新增 2 条
+ *    （predictionHistory.spec.ts 的 conditionStage 中间态/到期后）。
+ *  2026-09-18：节奏大师事件可见性修复（PR #134）新增 4 条（rhythmBand.spec.ts + 节奏卡/日历 spec 扩充）。
+ *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
+const EXPECTED_BASELINE = '252/252/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {
@@ -104,12 +110,12 @@ console.log(
 )
 
 // 机器判定：基线漂移（含"残余失败数变化"）必须显式报错，不能只靠人眼比对文本。
-// 注意退出码语义：1 = 基线一致（子进程仍因 2 条已知真实失败返回 1，属预期）；2 = 基线漂移。
+// 注意退出码语义：1 = 子进程自身退出码（基线一致时透传，非漂移）；2 = 基线漂移。
 const actualBaseline = `${metric('tests')}/${metric('pass')}/${metric('fail')}`
 if (actualBaseline !== EXPECTED_BASELINE) {
   console.error(
     `\n[node-specs] ✖ 基线漂移：期望 ${EXPECTED_BASELINE}，实际 ${actualBaseline}。` +
-      `\n  （残余失败必须恰为 ConditionalForecastBlock.spec.ts 的「单档守卫」2 条；新增失败 = 回归，请先定位）\n`,
+      `\n  （fail 大于基线值 0 = 新增回归，请先定位；新增/删除 spec 导致计数变化须同步本常量与注释）\n`,
   )
   process.exit(2)
 }

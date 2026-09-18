@@ -4,7 +4,6 @@
     <view class="section-header">
       <view class="title-bar" />
       <text class="title-text">四维分析评分</text>
-      <text class="subtitle">{{ dataPeriod || '' }}</text>
     </view>
 
     <!-- 加载中 -->
@@ -79,7 +78,7 @@
 
     <!-- 完整数据 -->
     <template v-else-if="data.dataStatus === 'complete' && data.score != null">
-      <!-- 评分区 -->
+      <!-- 评分区：分数与评级标签居中，简短描述排列在分数下方 -->
       <view class="score-card">
         <view class="score-left">
           <view class="score-number-row">
@@ -90,10 +89,7 @@
             {{ data.rating }}
           </view>
         </view>
-        <view class="score-right">
-          <text class="conclusion-main">洞见：{{ data.conclusion }}</text>
-          <text class="conclusion-sub">{{ data.conclusionSub }}</text>
-        </view>
+        <text v-if="data.conclusionSub" class="conclusion-sub">{{ data.conclusionSub }}</text>
       </view>
 
       <!-- 四维卡片 -->
@@ -143,10 +139,6 @@ const props = defineProps<{
   loading: boolean
   data: any
 }>()
-
-const dataPeriod = computed(() => {
-  return props.data?.dataPeriod || ''
-})
 
 /** 缺失字段文案（如"毛利率、经营现金流"） */
 const missingFieldsText = computed(() => {
@@ -226,22 +218,17 @@ function formatMetricKey(key: string): string {
     font-weight: 600;
     color: $ink;
   }
-
-  .subtitle {
-    margin-left: auto;
-    font-size: 11px;
-    color: $ink-mute;
-  }
 }
 
-// 评分区
+// 评分区（竖向居中：分数+评级标签居中，简短描述在其下方）
 .score-card {
   background: $primary-50;
   border-radius: 12px;
   padding: 20px 16px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
 
   .score-left {
     display: flex;
@@ -290,23 +277,11 @@ function formatMetricKey(key: string): string {
     line-height: 1.6;
   }
 
-  .score-right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .conclusion-main {
-    font-size: 15px;
-    font-weight: 500;
-    color: $ink;
-  }
-
   .conclusion-sub {
     font-size: 12px;
     color: $ink-mute;
     line-height: 1.4;
+    text-align: center;
   }
 }
 

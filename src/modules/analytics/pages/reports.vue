@@ -187,13 +187,13 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 // 报告类型筛选（formal=正式报告 / express=快报）
 const reportType = ref<'formal' | 'express'>('formal')
 
-// 排序字段（updateTime=更新时间 / score=四维评分 / performance=业绩）
+// 排序字段（updateTime=最新 / score=四维评分 / performance=业绩）
 const sortField = ref<'updateTime' | 'score' | 'performance'>('updateTime')
 const sortAsc = ref(false)           // true=从低到高（上箭头）, false=从高到低（下箭头）
 
 // 排序字段按钮配置（均匀分布展示）
 const sortFields = [
-  { key: 'updateTime', label: '更新时间' },
+  { key: 'updateTime', label: '最新' },
   { key: 'score', label: '四维评分' },
   { key: 'performance', label: '业绩' },
 ] as const
@@ -728,28 +728,47 @@ fetchData(false)
   flex-shrink: 0;
 }
 
+/* 上下三角：容器提供点击热区，伪元素绘制超小三角并向中间贴紧（保持紧凑间距） */
 .sort-arrow-up,
 .sort-arrow-down {
+  position: relative;
+  width: 36rpx;
+  height: 18rpx;
+  display: flex;
+  justify-content: center;
+}
+
+.sort-arrow-up {
+  align-items: flex-end;
+}
+
+.sort-arrow-down {
+  align-items: flex-start;
+}
+
+.sort-arrow-up::after,
+.sort-arrow-down::after {
+  content: '';
   width: 0;
   height: 0;
   border-left: 5rpx solid transparent;
   border-right: 5rpx solid transparent;
 }
 
-.sort-arrow-up {
+.sort-arrow-up::after {
   border-bottom: 6rpx solid #9ca3af;
-
-  &.active {
-    border-bottom-color: $primary;
-  }
 }
 
-.sort-arrow-down {
+.sort-arrow-down::after {
   border-top: 6rpx solid #9ca3af;
+}
 
-  &.active {
-    border-top-color: $primary;
-  }
+.sort-arrow-up.active::after {
+  border-bottom-color: $primary;
+}
+
+.sort-arrow-down.active::after {
+  border-top-color: $primary;
 }
 
 /* 加载/空/失败状态 */

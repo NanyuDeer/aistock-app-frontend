@@ -612,14 +612,22 @@ export interface SectorInsightPrediction {
   conditions?: SectorInsightCondition[]
 }
 
+/**
+ * 候选来源（2026-09-18 R17 扩展 `chain_only`）：
+ * - `wind_leader` 风口榜 / `review_primary` 当日大盘复盘主因 / `both` 两者皆有（以上由 sector-insight 接口下发）；
+ * - `chain_only` **前端合成**：仅当日大盘归因链 children 上有、sector-insight 候选里没有的板块
+ *   （链与候选口径不全时信息不丢；quote/trace/prediction 恒 null，见 `buildPrimarySectorCandidates`）。
+ */
+export type SectorInsightSource = 'wind_leader' | 'review_primary' | 'both' | 'chain_only'
+
 export interface SectorInsightCandidate {
   ts_code: string
   name: string
   category: 'industry' | 'concept'
-  source: 'wind_leader' | 'review_primary' | 'both'
+  source: SectorInsightSource
   cycle?: 'long' | 'short' | 'both' | null
   quote: SectorInsightQuote | null
-  /** 仅 review_primary/both（读当日 sector_trace 报告）；wind_leader-only 恒 null */
+  /** 仅 review_primary/both（读当日 sector_trace 报告）；wind_leader-only 与 chain_only 恒 null */
   trace: SectorInsightTrace | null
   prediction: SectorInsightPrediction | null
 }

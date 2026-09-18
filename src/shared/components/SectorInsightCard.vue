@@ -17,10 +17,14 @@
       type="market"
       tag-text="板块洞见"
       :title="cardTitle"
+      :title-tag="titleTag"
       :trace="traceText"
       :trace-structured="traceStructured"
+      :trace-detail="traceDetailText"
       :time="timeLabel"
       :structured="structured"
+      :display-mode="displayMode"
+      @event-select="openEventRef"
     />
   </view>
 </template>
@@ -29,7 +33,7 @@
 import { computed } from 'vue'
 import InsightCard from './InsightCard.vue'
 import { LoadingState } from '@/shared/components'
-import { sectorPredictionToStructured, relationLabel } from '@/shared/utils/sectorInsight'
+import { sectorPredictionToStructured, relationLabel, extractionWeakLabel } from '@/shared/utils/sectorInsight'
 import type { SectorInsightCandidate } from '@/shared/api/modules/agent'
 import type { SectorMarketLink } from '@/shared/utils/sectorInsight'
 
@@ -41,8 +45,12 @@ import type { SectorMarketLink } from '@/shared/utils/sectorInsight'
  * - candidate 命中（prediction/trace 任一存在）→ InsightCard 条件化预判形态；
  * - candidate 为空 → 严格占位（不跨日兜底，D4）。
  * 大盘联动（2026-09-04，P1 chain-attribution）：marketLink 传入时，溯源行升级为
- * InsightCard 结构化溯源（大盘一句话 + 板块角色徽 + 驱动句），优先于四环文本 trace；
+ * InsightCard 结构化溯源（大盘一句话 + 板块角色徽 + 驱动句 + 链上事件胶囊），优先于四环文本 trace；
  * 无链（marketLink=null）回退四环文本形态。板块入链但四环无内容 → 仍渲染大盘联动溯源。
+ * traceOnly（2026-09-17，P3' 两轨分离）：市场洞见主因卡只渲染溯源侧——不渲染 CFB 预判子卡、
+ * 标题不回退预判综述；其余调用方（板块详情/四环）不传 → 行为与改造前一致。
+ * 板块名标签（2026-09-18 R17）：traceOnly 下标题上方渲染 `sectorName`（缺省回退 `candidate.name`），
+ * 让"标题是溯源主句"的卡也能看出是哪个板块。
  * 复用点：风口详情页 sector-detail / 大盘溯源页 traceability（主因板块）。
  */
 const props = withDefaults(defineProps<{
@@ -56,11 +64,20 @@ const props = withDefaults(defineProps<{
   marketLink?: SectorMarketLink | null
   /** 板块名（入链但四环无内容时标题兜底用） */
   sectorName?: string
+  /** 预判展示模式（spec §7）：full=全量分支；conclusion=只显示已成立分支 */
+  displayMode?: 'full' | 'conclusion'
+  /** 只渲染溯源侧（spec §2.1 两轨分离）：不渲染预判子卡、标题不回退预判综述；默认 false（保持既有行为） */
+  traceOnly?: boolean
+  /** 溯源「依据详情」正文（缺省取 candidate.trace.summary） */
+  traceDetail?: string
 }>(), {
   loading: false,
   date: '',
   marketLink: null,
-  sectorName: ''
+  sectorName: '',
+  displayMode: 'full',
+  traceOnly: false,
+  traceDetail: ''
 })
 
 /**
@@ -86,9 +103,19 @@ const marketLinkFallbackTitle = computed(() => {
   return m.relation === 'self_driven' ? `${nm}为大盘主要驱动` : `${nm}随大盘联动`
 })
 
+/**
+ * traceOnly 标题（spec §2.1 两轨分离，2026-09-17 P3'）：
+ * 主因卡只承载溯源 → 标题取板块溯源主句（不回退预判综述/预判基准档，避免预判内容混入溯源轨）。
+ */
+const traceOnlyTitle = computed(() => {
+  const c = props.candidate
+  return c?.trace?.summary?.trim() || marketLinkFallbackTitle.value || c?.name || ''
+})
+
 const cardTitle = computed(() => {
   const c = props.candidate
   if (!c) return marketLinkFallbackTitle.value
+  if (props.traceOnly) return traceOnlyTitle.value
   const conclusion = c.prediction?.attribution_summary?.trim()
   if (conclusion && !REDACT_PLACEHOLDER_RE.test(conclusion)) return conclusion
   const traceSum = c.trace?.summary?.trim()
@@ -99,6 +126,16 @@ const cardTitle = computed(() => {
   if (first?.label) return `${horizonCn}预计${first.label}`
   // 入链时优先角色标题（如 "半导体材料为大盘主要驱动"），否则兜底板块名
   return marketLinkFallbackTitle.value || c.name
+})
+
+/**
+ * 板块名标签（2026-09-18 R17）：仅 traceOnly（市场洞见主因卡）渲染——
+ * 该形态标题取溯源主句/角色兜底句，单看卡片无法判断是哪个板块（弱归因日链上兜底板块尤其明显）。
+ * 文案：显式 `sectorName` 优先（页面传 `row.candidate.name`），缺省回退 `candidate.name`。
+ */
+const titleTag = computed(() => {
+  if (!props.traceOnly) return ''
+  return props.sectorName?.trim() || props.candidate?.name?.trim() || ''
 })
 
 /** 溯源行文案（文本形态）：标题已用溯源主句时不再重复展示（仅无 attribution_summary 回退场景） */
@@ -116,11 +153,14 @@ const timeLabel = computed(() => {
 })
 
 /** InsightCard 条件化预判结构化数据（映射自聚合接口 horizons/conditions/met；与 sector-loop 共用映射工具） */
-const structured = computed(() => sectorPredictionToStructured(props.candidate?.prediction))
+const structuredAll = computed(() => sectorPredictionToStructured(props.candidate?.prediction))
+
+/** 传给 InsightCard 的预判数据：traceOnly（市场洞见主因卡）恒 null → 不渲染 CFB 预判子卡（两轨分离） */
+const structured = computed(() => (props.traceOnly ? null : structuredAll.value))
 
 /**
  * 溯源行结构化数据（V2 大盘联动）：marketLink 传入 → InsightCard 结构化溯源
- * （大盘一句话行；入链时附加角色徽 + 驱动句行）；未传入 → null 回退文本形态 traceText。
+ * （大盘一句话行；入链时附加角色徽 + 驱动句行 + 链上事件胶囊）；未传入 → null 回退文本形态 traceText。
  */
 const traceStructured = computed(() => {
   const m = props.marketLink
@@ -130,22 +170,58 @@ const traceStructured = computed(() => {
     summary: m.summary,
     index_pct: m.index_pct,
     badge: m.relation ? relationLabel(m.relation) : '',
-    detail: m.driver
+    detail: m.driver,
+    // 链上事件节点（spec §7.1：驱动事件可跳原文）；无事件空数组 → InsightCard 侧不渲染该区
+    events: m.events ?? [],
+    // 弱依据（2026-09-17 R16）：链级「归因较弱」；板块级由 extraction.source 决定「依据较弱」/「无归因依据」
+    weak: m.chainWeak,
+    weakText: extractionWeakLabel(m.extraction)
   }
 })
 
-/** 四环聚合本身是否有实际洞察内容（溯源主句或预判分支任一存在） */
+/** 依据详情正文：显式传入优先；文本溯源形态下若与溯源行同句则不重复展示（返回空 → 入口不渲染） */
+const traceDetailText = computed(() => {
+  const explicit = props.traceDetail?.trim()
+  if (explicit) return explicit
+  const sum = props.candidate?.trace?.summary?.trim() || ''
+  if (!traceStructured.value && sum && sum === traceText.value.trim()) return ''
+  if (sum && sum === cardTitle.value.trim()) return ''
+  return sum
+})
+
+/** 四环聚合本身是否有实际洞察内容（溯源主句或预判分支任一存在；traceOnly 下也用它判"有无内容"，不因隐藏预判而变空壳） */
 const hasContent = computed<boolean>(() => {
   const c = props.candidate
-  const s = structured.value
+  const s = structuredAll.value
   return Boolean(c?.trace?.summary?.trim() || s?.horizons?.length || s?.conditions?.length)
 })
 
-/** 板块已入归因链（大盘联动入链）：即便四环暂无内容也应展示溯源行 */
-const inChain = computed(() => Boolean(props.marketLink?.relation))
+/** 板块已入归因链（大盘联动入链）：即便四环暂无内容也应展示溯源行。
+ *  traceOnly 下链上驱动句（driver）也算入链证据（2026-09-18 R17：链 only 卡无候选 trace，
+ *  relation=unknown 时仍需出卡，否则会退化成"暂无板块研判"空壳）。 */
+const inChain = computed(() =>
+  Boolean(props.marketLink?.relation || (props.traceOnly && props.marketLink?.driver?.trim()))
+)
 
 /** 是否渲染洞见卡：四环有内容，或板块已入归因链 */
 const showCard = computed(() => Boolean(hasContent.value || inChain.value))
+
+const URL_RE = /^https?:\/\//i
+
+/**
+ * 链上事件胶囊 → 事件原文（仅 URL 会触发；EventRefChip 已保证非 URL 不可点）。
+ * 跨端惯例同既有事件链页：H5 新标签打开，App/小程序走 webview 承载页。
+ */
+function openEventRef(ev: { ref?: string }): void {
+  const url = ev?.ref?.trim() ?? ''
+  if (!URL_RE.test(url)) return
+  // #ifdef H5
+  window.open(url, '_blank', 'noopener')
+  // #endif
+  // #ifndef H5
+  uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
+  // #endif
+}
 </script>
 
 <style lang="scss" scoped>

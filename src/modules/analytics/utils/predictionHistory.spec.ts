@@ -122,3 +122,17 @@ test('conditionStage：condition_index 与 c{i} 对齐，c1 独立读取', () =>
   assert.equal(conditionStage(condRecord({ c1: entry }), 0).kind, 'pending')
   assert.equal(conditionStage(condRecord({ c1: entry }), 1).kind, 'verified')
 })
+
+test('conditionStage：中间态（condition_met 为 true 且无 result）→ condition_met，不得判为 verified', () => {
+  // 后端两段判定的第①段只写 condition_met: true，entry 无 result 键
+  const entry = { horizon: 'c0', condition_met: true } as unknown as PredictionVerificationEntry
+  assert.deepEqual(conditionStage(condRecord({ c0: entry }), 0), { kind: 'condition_met' })
+})
+
+test('conditionStage：到期后（condition_met 保留 + 有 result）→ verified', () => {
+  const entry = {
+    horizon: 'c0', result: 'hit', actual: '+5.2%', reason: 'x',
+    verified_at: '2026-08-15T08:00:00.000Z', condition_met: true,
+  } as const
+  assert.deepEqual(conditionStage(condRecord({ c0: entry }), 0), { kind: 'verified', result: 'hit', entry })
+})

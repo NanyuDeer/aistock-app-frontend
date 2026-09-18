@@ -6,8 +6,8 @@
       <text v-if="verifyText" class="as-insight-card__verify" :class="verifyClass">{{ verifyText }}</text>
     </view>
 
-    <!-- 期段切换 -->
-    <view class="as-insight-card__seg">
+    <!-- 期段切换（仅多档时展示：单档不显孤 Tab） -->
+    <view v-if="horizonSegments.length > 1" class="as-insight-card__seg">
       <view
         v-for="seg in horizonSegments"
         :key="seg"
@@ -30,8 +30,8 @@
         <text v-if="activeBase.remaining" class="as-insight-card__remain">{{ activeBase.remaining }}</text>
       </view>
 
-      <view v-if="activeConditions.length" class="as-insight-card__sc-list">
-        <template v-for="(cond, idx) in activeConditions" :key="idx">
+      <view v-if="renderedConditions.length" class="as-insight-card__sc-list">
+        <template v-for="(cond, idx) in renderedConditions" :key="idx">
           <!-- 互斥分支间以“或”分隔（2026-09-03 方案 C） -->
           <view v-if="idx > 0" class="as-insight-card__sc-or">
             <text class="as-insight-card__sc-or-tx">或</text>
@@ -132,15 +132,33 @@
         </template>
       </view>
 
-      <view v-if="!activeBase && !activeConditions.length" class="as-insight-card__sc-empty">
-        该期暂无细分情景
+      <!-- 已触发档隐藏分支纯标注（仅结论模式；只渲染已成立分支、其余被过滤 → 在此告知剩余 N 条，纯标注不可点开） -->
+      <view v-if="showHiddenBranchLabel" class="as-insight-card__sc-hidden">
+        <text class="as-insight-card__sc-hidden-tx">另有 {{ hiddenConditionCount }} 条条件未成立</text>
+      </view>
+
+      <!-- 未触发折叠态（仅结论模式 + tags 形态）：该档无已成立分支（与有无 met 数据无关）→ 基准行照常显示，
+           分支区收为一行入口；点开后再铺开该档全部条件分支（沿用既有分支渲染与样式） -->
+      <view v-if="isFoldedUnmet" class="as-insight-card__sc-fold" @tap.stop="toggleBranches">
+        <!-- 到期未触发（卡级聚合 verification=miss）：中性灰标签，不与 hit 的实心绿混用；
+             此时头部同义 pill「验证未中」由 verifyText 抑制（避免同一状态两处重复表述） -->
+        <text v-if="showMissTag" class="as-insight-card__sc-miss">未命中</text>
+        <text class="as-insight-card__sc-fold-tx">{{ branchesExpanded ? '收起条件化预判 ▴' : '查看条件化预判 ▾' }}</text>
+      </view>
+
+      <!-- 空态（无基准行且无分支）：sentence 形态恢复改造前原文案「该期暂无细分情景」；
+           tags 形态（结论模式）用结论空态文案（其「该档无已成立分支」状态已由上方折叠入口承接） -->
+      <view v-else-if="!activeBase && !renderedConditions.length" class="as-insight-card__sc-empty">
+        <text>{{ conditionDisplay === 'sentence' ? '该期暂无细分情景' : '条件未成立 · 暂无已验证结论' }}</text>
       </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
+
+import { selectVisibleConditions } from '@/shared/utils/conditionalForecast'
 
 /**
  * ConditionalForecastBlock 条件化预判块（洞见卡系通用块，2026-09-02 抽取）
@@ -179,13 +197,13 @@ interface StructuredCondition {
   /** 条件满足后的走势预判（含幅度/目标位等，展示原文） */
   scenario: string
   /** 简洁展示用关键词（1~2 个，单条 ≤10 字；仅新数据携带，旧记录无 → 走长句兜底） */
-    keywords?: string[]
-    /** 结构化仓位动作（add/reduce/hold + 成数，如 "+2 成"；后端 position_action 透传，纯 UI 展示） */
-    positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string }
-    /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度，如 上探+3%~+5%） */
-    scenario_keywords?: string[]
-    /** 验证锚点（可选透传：threshold/metric 以 chip 展示） */
-    anchor?: { metric?: string; threshold?: string }
+  keywords?: string[]
+  /** 结构化仓位动作（add/reduce/hold + 成数，如 "+2 成"；后端 position_action 透传，纯 UI 展示） */
+  positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string }
+  /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度，如 上探+3%~+5%） */
+  scenario_keywords?: string[]
+  /** 验证锚点（可选透传：threshold/metric 以 chip 展示） */
+  anchor?: { metric?: string; threshold?: string }
   /** 该条件是否已触发（验证回填）：true=已触发（分支点亮）/ false=未触发（置灰）/ 缺省=待观察常态 */
   met?: boolean | null
 }
@@ -205,9 +223,13 @@ const props = withDefaults(defineProps<{
   structured: InsightStructuredForecast | null
   /** 条件行显示模式：tags=有 keywords 显示关键词标签（无则长句兜底）；sentence=强制长句原文（预测详情页用） */
   conditionDisplay?: 'tags' | 'sentence'
+  /** 展示模式：full=全量分支（未传时的默认，与改造前一致）；conclusion=只显示已成立分支（spec §7「只显示已验证结论」）。
+   *  折叠/过滤/隐藏标注/未命中标签**一律以此收口**：非 conclusion 直接全量直显（防"未触发"口径误伤 full 调用方）。 */
+  displayMode?: 'full' | 'conclusion'
 }>(), {
   structured: null,
-  conditionDisplay: 'tags'
+  conditionDisplay: 'tags',
+  displayMode: 'full'
 })
 
 /** 该条件是否以关键词标签展示（tags 模式且有 keywords） */
@@ -280,6 +302,14 @@ const horizonSegments = computed<HorizonKey[]>(() => {
   return HORIZON_ORDER.filter((k) => keys.has(k))
 })
 
+/** 档位切换后校正：data 不含当前档（或首次拿到数据）时回到首个可见档 */
+watchEffect(() => {
+  const segs = horizonSegments.value
+  if (segs.length > 0 && !segs.includes(activeHorizon.value)) {
+    activeHorizon.value = segs[0]
+  }
+})
+
 /** 当前期内的基准方向（horizons 匹配当期） */
 const activeBase = computed<StructuredHorizon | undefined>(() => {
   const data = props.structured
@@ -287,15 +317,81 @@ const activeBase = computed<StructuredHorizon | undefined>(() => {
   return (data.horizons ?? []).find((h) => h.horizon === activeHorizon.value)
 })
 
-/** 当前期内的条件情景（conditions 按 horizon 归组） */
-const activeConditions = computed<StructuredCondition[]>(() => {
-  const data = props.structured
-  if (!data) return []
-  return (data.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
+/** 当前档内的条件（按 horizon 归组） */
+const inHorizonConditions = computed(() =>
+  (props.structured?.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
+)
+
+/**
+ * 该档**已成立分支**（`met === true`）= 结论模式下应渲染的分支集合。
+ * 未触发档后端只写 `condition_met=true`、不写 false（决策 D1）→ met 缺省/null/false 一律视为未成立，
+ * 故 `lit` 为空 ⟺ 该档未触发（与有无 met 数据无关）。
+ */
+const litConditions = computed(() =>
+  selectVisibleConditions(inHorizonConditions.value, 'conclusion')
+)
+
+/** 折叠入口开关（本地展开，仅作用于当前档；归零见 setActiveHorizon） */
+const branchesExpanded = ref(false)
+
+/**
+ * 未触发折叠态（spec：未触发 → 折叠态）：
+ * 仅结论模式生效（`displayMode === 'conclusion'`）——full 调用方（如节奏大师洞见卡）恒全量直显，不被本折叠收口。
+ * 该档无已成立分支（`lit` 为空）+ tags 形态；sentence 形态（预测详情页整句原文）不参与折叠，保持原位直显。
+ * `inHorizonConditions.length > 0` 守卫：该档本就没有条件分支时无从折叠（否则会渲染出点开后空无一物的入口）。
+ */
+const isFoldedUnmet = computed<boolean>(() =>
+  props.displayMode === 'conclusion' &&
+  props.conditionDisplay !== 'sentence' &&
+  litConditions.value.length === 0 &&
+  inHorizonConditions.value.length > 0
+)
+
+/**
+ * 分支区渲染源（三态，仅结论模式参与）：
+ * - 非 conclusion（full）：全量分支直显（与改造前 full 行为逐字节一致）；
+ * - sentence 形态：不过滤（保持整句原文直显）；
+ * - 未触发折叠态：未点开 → 不铺开；点开后 → 铺开该档**全部**条件分支（沿用既有渲染与样式）；
+ * - 已触发：只渲染已成立分支（`lit`）。
+ */
+const renderedConditions = computed<StructuredCondition[]>(() => {
+  if (props.displayMode !== 'conclusion') return inHorizonConditions.value
+  if (props.conditionDisplay === 'sentence') return inHorizonConditions.value
+  if (!isFoldedUnmet.value) return litConditions.value
+  return branchesExpanded.value ? inHorizonConditions.value : []
 })
+
+/** 折叠入口点击（本地展开/收起） */
+function toggleBranches() {
+  branchesExpanded.value = !branchesExpanded.value
+}
+
+/** 已触发档被过滤掉的分支数（该档全部条件 − 已成立分支），即隐藏分支数 */
+const hiddenConditionCount = computed(
+  () => inHorizonConditions.value.length - litConditions.value.length
+)
+
+/**
+ * 隐藏分支纯标注：**仅结论模式**的已触发档（只渲染已成立分支、其余被过滤）+ 确有隐藏分支；
+ * 折叠态展开后已铺开全部（不存在“隐藏”）故不标注，sentence 形态保持现状不标注。
+ */
+const showHiddenBranchLabel = computed(
+  () =>
+    props.displayMode === 'conclusion' &&
+    props.conditionDisplay !== 'sentence' &&
+    !isFoldedUnmet.value &&
+    hiddenConditionCount.value > 0
+)
+
+/** 到期未触发（卡级聚合验证 miss = 该档条件全部未命中）：「未命中」中性标签仅随结论模式折叠态显示 */
+const showMissTag = computed(
+  () => props.displayMode === 'conclusion' && isFoldedUnmet.value && props.structured?.verification === 'miss'
+)
 
 const verifyText = computed(() => {
   const v = props.structured?.verification
+  // 折叠态已由入口行「未命中」标签承载 miss 语义 → 抑制头部同义 pill（否则同状态两处重复文案）
+  if (v === 'miss' && showMissTag.value) return ''
   if (v === 'hit') return '已验证'
   if (v === 'miss') return '验证未中'
   if (v === 'pending') {
@@ -357,6 +453,7 @@ const setActiveHorizon = (seg: HorizonKey) => {
   if (activeHorizon.value === seg) return
   activeHorizon.value = seg
   expandedScenarios.value = new Set() // 切期段重置展开态
+  branchesExpanded.value = false // 折叠入口同样按档归零（避免换档后误展）
 }
 
 /**
@@ -823,6 +920,51 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   border: 1rpx solid #e6e8ee;
   border-radius: $r-full;
   padding: 1rpx 14rpx;
+}
+
+/* ===== 未触发折叠态 / 隐藏分支标注 / 到期未命中标签（2026-09-17） ===== */
+
+/* 隐藏分支纯标注（中性小标签：caption 字号 + 既有边框色；纯标注不可点开） */
+.as-insight-card__sc-hidden {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  margin: 2rpx 6rpx;
+  padding: 3rpx 16rpx;
+  background: $bg-soft;
+  border: 1rpx solid $line;
+  border-radius: $r-full;
+}
+
+.as-insight-card__sc-hidden-tx {
+  font-size: 20rpx;
+  color: $ink-faint;
+  line-height: 1.5;
+}
+
+/* 未触发折叠入口：一行纯文字入口（非按钮样式，与行1「详情/收起」同款交互） */
+.as-insight-card__sc-fold {
+  display: flex;
+  align-items: center;
+  gap: $s-1;
+  padding: 6rpx 10rpx;
+}
+
+.as-insight-card__sc-fold-tx {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: $ink-mute;
+}
+
+/* 到期未命中标签（沿用 miss 中性灰，不与 hit 实心绿混用） */
+.as-insight-card__sc-miss {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: $ink-mute;
+  background: $bg-soft;
+  border: 1rpx solid $line;
+  border-radius: $r-full;
+  padding: 2rpx 14rpx;
 }
 
 .as-insight-card__sc-empty {

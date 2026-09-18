@@ -15,35 +15,29 @@
       <view class="profit-axis-col">
         <text v-for="tick in chartModel.ticks" :key="`axis-${tick.label}`" class="profit-axis-text">{{ tick.label }}</text>
       </view>
-      <svg class="profit-svg" viewBox="0 0 360 200" preserveAspectRatio="none">
-        <rect
+      <!-- 图表区不用内联 <svg>：uni-app 无 <svg> 组件，App 端会被当作未知标签不渲染，改用 HTML+CSS 柱条 -->
+      <view class="profit-plot">
+        <view
           v-if="chartModel.forecastBand"
-          :x="chartModel.forecastBand.x"
-          :y="chartModel.top"
-          :width="chartModel.forecastBand.width"
-          :height="chartModel.baseY - chartModel.top"
-          fill="rgba(245, 158, 11, 0.08)"
-          rx="8"
-        />
-        <g v-for="tick in chartModel.ticks" :key="tick.label">
-          <line :x1="chartModel.plotLeft" :y1="tick.y" :x2="chartModel.plotRight" :y2="tick.y" stroke="#eef2f7" stroke-width="1" />
-        </g>
-        <line :x1="chartModel.plotLeft" :y1="chartModel.baseY" :x2="chartModel.plotRight" :y2="chartModel.baseY" stroke="#cbd5e1" stroke-width="1" />
-        <line
-          v-if="chartModel.forecastDividerX"
-          :x1="chartModel.forecastDividerX"
-          :y1="chartModel.top"
-          :x2="chartModel.forecastDividerX"
-          :y2="chartModel.baseY"
-          stroke="#f59e0b"
-          stroke-width="1"
-          stroke-dasharray="4 5"
-        />
-        <g v-for="bar in chartModel.bars" :key="bar.year">
-          <rect :x="bar.x - chartModel.barWidth / 2" :y="bar.y" :width="chartModel.barWidth" :height="bar.height" rx="5" :fill="bar.color" />
-          <text :x="bar.x" :y="bar.labelY" text-anchor="middle" :fill="bar.color" class="profit-bar-label">{{ bar.valueText }}</text>
-        </g>
-      </svg>
+          class="forecast-band"
+          :style="{ left: chartModel.forecastBand.left + '%', width: chartModel.forecastBand.width + '%' }"
+        ></view>
+        <view v-for="gl in chartModel.gridlines" :key="`gl-${gl.top}`" class="plot-gridline" :style="{ top: gl.top + '%' }"></view>
+        <view
+          v-if="chartModel.forecastDividerLeft != null"
+          class="forecast-divider"
+          :style="{ left: chartModel.forecastDividerLeft + '%' }"
+        ></view>
+        <view
+          v-for="bar in chartModel.bars"
+          :key="bar.year"
+          class="bar-anchor"
+          :style="{ left: bar.leftPct + '%', width: bar.widthPx + 'px', marginLeft: -(bar.widthPx / 2) + 'px' }"
+        >
+          <view class="bar-rect" :style="{ height: bar.heightPct + '%', background: bar.color }"></view>
+          <text class="bar-label" :style="{ bottom: bar.labelBottom + '%', color: bar.color }">{{ bar.valueText }}</text>
+        </view>
+      </view>
     </view>
     <view class="profit-value-grid">
       <view v-for="bar in chartModel.bars" :key="`detail-${bar.year}`" class="profit-value-item">
@@ -76,46 +70,39 @@ const points = computed(() => props.items || [])
 
 const chartModel = computed(() => {
   const values = points.value.map(item => Number(item.value) || 0)
-  const axisLeft = 8
-  const barLeft = 42
-  const right = 342
-  const top = 24
-  const baseY = 180
   const maxValue = Math.max(0.01, ...values) * 1.12
   const count = Math.max(1, points.value.length)
-  const slot = count <= 1 ? right - barLeft : (right - barLeft) / (count - 1)
-  const barWidth = Math.min(24, Math.max(16, slot * 0.34))
+  const maxBarHeightPct = 96
   const bars = points.value.map((item, idx) => {
-    const x = count === 1 ? (barLeft + right) / 2 : barLeft + (idx / (count - 1)) * (right - barLeft)
-    const height = Math.max(8, Math.min(124, ((Number(item.value) || 0) / maxValue) * 124))
+    const raw = Number(item.value) || 0
     const kind = item.kind || 'actual'
+    const heightPct = Math.max(6, Math.min(maxBarHeightPct, (raw / maxValue) * 100))
+    const leftPct = count === 1 ? 50 : (idx / (count - 1)) * 100
+    const widthPx = Math.min(24, Math.max(14, (340 / Math.max(1, count - 1)) * 0.34))
     return {
       year: item.year,
-      valueText: compactNumber(Number(item.value) || 0),
+      valueText: compactNumber(raw),
       kind,
-      x,
-      y: baseY - height,
-      labelY: Math.max(top + 10, baseY - height - 8),
-      height,
       color: kind === 'forecast' ? '#e6a23c' : '#409eff',
+      leftPct,
+      heightPct,
+      labelBottom: Math.max(heightPct + 2, 12),
+      widthPx,
     }
   })
   const firstForecastIndex = bars.findIndex(bar => bar.kind === 'forecast')
-  const forecastDividerX = firstForecastIndex > 0
-    ? (bars[firstForecastIndex - 1].x + bars[firstForecastIndex].x) / 2
-    : null
+  const forecastDividerLeft = firstForecastIndex > 0
+    ? (bars[firstForecastIndex - 1].leftPct + bars[firstForecastIndex].leftPct) / 2
+    : (firstForecastIndex === 0 ? 0 : null)
   const forecastBand = firstForecastIndex >= 0
-    ? {
-        x: forecastDividerX ?? Math.max(axisLeft, bars[firstForecastIndex].x - barWidth),
-        // 柱体以坐标点为中心，背景向右延伸半个柱宽，完整覆盖最后一个预测柱。
-        width: Math.min(360, right + barWidth / 2) - (forecastDividerX ?? Math.max(axisLeft, bars[firstForecastIndex].x - barWidth)),
-      }
+    ? { left: forecastDividerLeft ?? 0, width: 100 - (forecastDividerLeft ?? 0) }
     : null
   const ticks = [maxValue, maxValue * 0.66, maxValue * 0.33, 0].map(value => ({
     label: compactNumber(value),
-    y: top + (1 - value / maxValue) * (baseY - top),
   }))
-  return { bars, ticks, left: axisLeft, right, plotLeft: axisLeft, plotRight: right, top, baseY, barWidth, forecastDividerX, forecastBand }
+  const gridlines = [maxValue, maxValue * 0.66, maxValue * 0.33, 0]
+    .map(value => ({ top: Math.round((1 - value / maxValue) * 100) }))
+  return { bars, ticks, gridlines, forecastBand, forecastDividerLeft }
 })
 </script>
 
@@ -180,7 +167,6 @@ const chartModel = computed(() => {
   column-gap: 4rpx;
   width: 100%;
   height: 200px;
-  overflow: visible;
 }
 
 .profit-axis-col {
@@ -199,17 +185,59 @@ const chartModel = computed(() => {
   color: $ink-mute;
 }
 
-.profit-svg {
-  display: block;
-  width: 100%;
-  height: 200px;
-  overflow: visible;
+.profit-plot {
+  position: relative;
+  height: 100%;
+  border-bottom: 1px solid #eef2f7;
 }
 
-.profit-bar-label {
+.plot-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #eef2f7;
+}
+
+.forecast-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(245, 158, 11, 0.10);
+  border-radius: 8px;
+}
+
+.forecast-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed #f59e0b;
+}
+
+.bar-anchor {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 100%;
+}
+
+.bar-rect {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 5px;
+}
+
+.bar-label {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  text-align: center;
   font-size: 10px;
   line-height: 1;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .profit-value-grid {

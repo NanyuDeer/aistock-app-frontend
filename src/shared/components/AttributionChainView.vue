@@ -12,7 +12,7 @@
     </view>
 
     <!-- 空态：无链（无板块驱动异动或尚未生成）不报错 -->
-    <view v-else-if="chain === null" class="acv-state">
+    <view v-else-if="displayChain === null" class="acv-state">
       <text class="acv-state-text">当日无主驱动归因链（无板块驱动异动或尚未生成）</text>
     </view>
 
@@ -20,9 +20,9 @@
       <!-- 大盘根 -->
       <view class="acv-root">
         <text class="acv-root-tag">大盘</text>
-        <text class="acv-root-sum">{{ chain.root.summary || '今日无显著主因' }}</text>
-        <text v-if="chain.root.index_pct != null" class="acv-pct" :class="pctCls(chain.root.index_pct)">
-          {{ fmtPct(chain.root.index_pct) }}
+        <text class="acv-root-sum">{{ displayChain.root.summary || '今日无显著主因' }}</text>
+        <text v-if="displayChain.root.index_pct != null" class="acv-pct" :class="pctCls(displayChain.root.index_pct)">
+          {{ fmtPct(displayChain.root.index_pct) }}
         </text>
       </view>
 
@@ -31,11 +31,25 @@
         <view v-for="c in sortedChildren" :key="c.sector" class="acv-child">
           <view class="acv-child-row">
             <text class="acv-badge" :class="'rel-' + c.relation">{{ relText(c.relation) }}</text>
+            <!-- 板块级弱依据标记（child.extraction.weak=true，2026-09-17 R16）：
+                 snapshot=纯异动兜底无归因理由 →「无归因依据」；candidate_claim →「依据较弱」；缺省不渲染 -->
+            <text v-if="weakTextOf(c)" class="acv-weak">{{ weakTextOf(c) }}</text>
             <text class="acv-sec">{{ c.sector }}</text>
             <text v-if="c.pct != null" class="acv-pct" :class="pctCls(c.pct)">{{ fmtPct(c.pct) }}</text>
           </view>
           <!-- 每分支溯源一句话驱动卡 -->
           <view v-if="c.trace_summary" class="acv-driver">{{ c.trace_summary }}</view>
+          <!-- 事件胶囊（spec §7.2 链树补事件节点：点击跳事件原文；无事件/旧链缺省不渲染该区） -->
+          <view v-if="c.events?.length" class="acv-events">
+            <EventRefChip
+              v-for="(ev, i) in c.events"
+              :key="`${i}-${ev.headline}`"
+              :headline="ev.headline"
+              :source="ev.source"
+              :event-ref="ev.ref"
+              @select="openEventRef"
+            />
+          </view>
         </view>
       </view>
     </template>
@@ -43,22 +57,41 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import {
-  fetchAttributionChain,
-  type AttributionChain,
-  type AttributionChainChild
-} from '@/shared/api/modules/attributionChain'
+import { computed } from 'vue'
+import type { AttributionChain, AttributionChainChild } from '@/shared/api/modules/attributionChain'
+import { extractionWeakLabel, isUnconfirmedAttribution } from '@/shared/utils/sectorInsight'
+import EventRefChip from './EventRefChip.vue'
 
-const props = withDefaults(defineProps<{ date: string; mock?: boolean }>(), { mock: false })
+/**
+ * 大盘归因链视图（App 专属 wrapper）
+ *
+ * 2026-09-17 P3' Task 4.1：**改为受控组件**——链数据由页面侧拉取（`fetchAttributionChain`）
+ * 后经 `chain` prop 传入。原因：市场洞见页需要同一份链做「主因卡排序 + marketLink 匹配」，
+ * 组件内自拉会让页面拿不到链（两处重复请求/口径漂移）。空态/加载态仍由本组件承接
+ * （loading prop / chain=null）；`:date` 仅作展示与 mock 数据日期。
+ */
+const props = withDefaults(defineProps<{
+  /** 展示日期（YYYY-MM-DD），仅用于表头与 mock 演示数据构造 */
+  date: string
+  /** 链数据（页面侧拉取；null=无链 → 组件内空态） */
+  chain?: AttributionChain | null
+  /** 拉取中（页面侧传入） */
+  loading?: boolean
+  /** 演示模式：忽略 chain prop，渲染内置演示数据（本地/演示环境用，生产不传） */
+  mock?: boolean
+}>(), {
+  chain: null,
+  loading: false,
+  mock: false
+})
 
 /** 展示日期：沿用页面传入的交易日（YYYY-MM-DD） */
 const displayDate = computed(() => props.date)
 
 /**
  * 内置演示数据（mock=true 时渲染，供无链日/后端未生成时向老师演示）。
- * 按当前展示日期动态构造：date 切换（watch 重拉）时 date 字段同步更新，不残留旧日。
- * 语义与后端组装契约一致：大盘根一句话 + 多主驱动板块分支（relation/pct/trace_summary）。
+ * 按当前展示日期动态构造：date 切换时 date 字段同步更新，不残留旧日。
+ * 语义与后端组装契约一致：大盘根一句话 + 多主驱动板块分支（relation/pct/trace_summary/events）。
  */
 function buildMockChain(date: string): AttributionChain {
   return {
@@ -76,40 +109,19 @@ function buildMockChain(date: string): AttributionChain {
   }
 }
 
-const chain = ref<AttributionChain | null>(null)
-const loading = ref(false)
-
-/** 按日期加载：mock → 内置演示数据；真实 → fetchAttributionChain（内部已 catch → null，此处兜底异常与 loading 结算） */
-async function load(date: string) {
-  if (props.mock) {
-    chain.value = buildMockChain(date)
-    return
-  }
-  loading.value = true
-  try {
-    chain.value = await fetchAttributionChain(date)
-  } catch (e) {
-    console.error('[AttributionChainView] load failed:', e)
-    chain.value = null
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  void load(displayDate.value)
-})
-
-// date 变化（父页切日/回退报告日变化，组件实例复用不重建）时重拉，避免依赖父级卸载/重建机制
-watch(() => props.date, (d) => {
-  if (d) void load(d)
-})
+/** 实际渲染的链：mock 模式用内置演示数据，否则用页面传入的链 */
+const displayChain = computed<AttributionChain | null>(() => (props.mock ? buildMockChain(props.date) : props.chain))
 
 /** relation 徽文案：自驱动 / 跟随大盘 / 关系未知 */
 function relText(relation: AttributionChainChild['relation']): string {
   if (relation === 'self_driven') return '自驱动'
   if (relation === 'market_follow') return '跟随大盘'
   return '关系未知'
+}
+
+/** 板块级弱依据标记文案（2026-09-17 R16；口径单点在 sectorInsight.extractionWeakLabel） */
+function weakTextOf(c: AttributionChainChild): string {
+  return extractionWeakLabel(c.extraction)
 }
 
 /**
@@ -129,9 +141,26 @@ function pctCls(n: number): string {
   return 'acv-down'
 }
 
-/** 板块分支展示序：按 |pct| 降序稳定排序；pct 为 null 的分支排末尾（保持原相对顺序） */
+/**
+ * 事件胶囊 → 事件原文：非 URL 引用不会触发本回调（EventRefChip 侧保证不可点）。
+ * 跨端惯例同既有事件链页：H5 新标签打开，App/小程序走 webview 承载页。
+ */
+function openEventRef(url: string): void {
+  if (!url) return
+  // #ifdef H5
+  window.open(url, '_blank', 'noopener')
+  // #endif
+  // #ifndef H5
+  uni.navigateTo({ url: `/pages-sub-app/webview/index?url=${encodeURIComponent(url)}` })
+  // #endif
+}
+
+/** 板块分支展示序：「未确认驱动原因」的分支先剔除（口径单点在 sectorInsight.isUnconfirmedAttribution）→
+ *  按 |pct| 降序稳定排序；pct 为 null 的分支排末尾（保持原相对顺序）。
+ *  2026-09-18 R17：摘要为空/中性未确认表述（如「未确认驱动原因」）的节点不是驱动原因（events 里多是行情综述），
+ *  与市场洞见页主因卡列表同一过滤口径，避免"看起来已归因"。 */
 const sortedChildren = computed(() => {
-  const list = [...(chain.value?.children ?? [])]
+  const list = [...(displayChain.value?.children ?? [])].filter((c) => !isUnconfirmedAttribution(c.trace_summary))
   const withPct = list.filter((c): c is AttributionChainChild & { pct: number } => c.pct != null)
   const withoutPct = list.filter((c) => c.pct == null)
   withPct.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
@@ -270,6 +299,17 @@ const sortedChildren = computed(() => {
   border-color: $line;
 }
 
+/* 弱依据标记：中性灰描边小标（2026-09-17 R16 弱归因日；弱化呈现，刻意不用告警色/涨跌色） */
+.acv-weak {
+  flex-shrink: 0;
+  padding: 2rpx 10rpx;
+  border: 2rpx solid $line-strong;
+  border-radius: $r-xs;
+  color: $ink-mute;
+  font-size: $font-size-xs;
+  line-height: 1.6;
+}
+
 .acv-sec {
   flex: 1;
   min-width: 0;
@@ -307,5 +347,12 @@ const sortedChildren = computed(() => {
   font-size: $font-size-sm;
   color: $ink-soft;
   line-height: 1.6;
+}
+
+/* 链上事件胶囊区（spec §7.2 事件节点；胶囊样式见 EventRefChip） */
+.acv-events {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
 }
 </style>
