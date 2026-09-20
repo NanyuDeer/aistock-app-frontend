@@ -34,7 +34,7 @@ test('首页卡片替换为节奏大师（今日分析概览移至交易入口�
 
 test('节奏卡改近几日摘要：一次 getRhythmMasterCalendar 取多日，映射 position_band 仓位文案；不逐日 getRhythmMaster', () => {
   assert.match(componentSource, /agentApi\.getRhythmMasterCalendar\(HOME_RHYTHM_DAYS\)/)
-  assert.match(componentSource, /band: d\.position_band\?\.text \?\? ''/)
+  assert.match(componentSource, /band: formatBandText\(d\.position_band\?\.text\)/)
   // 首页摘要只消费日历聚合接口（含 position_band），避免为多日结论发 N 次单日报告请求
   assert.doesNotMatch(componentSource, /agentApi\.getRhythmMaster\(/)
   assert.doesNotMatch(componentSource, /rhythmSummary/)

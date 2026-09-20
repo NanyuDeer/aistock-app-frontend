@@ -501,7 +501,6 @@ export interface RhythmBranch {
   touch_strength?: number | null
   conclusion: { direction: 'bullish' | 'bearish' | 'neutral'; range?: string; validity: number; note?: string }
   event_ref?: { event_date: string; title: string }
-  met?: boolean | null
 }
 export interface RhythmCard {
   score?: number | null
@@ -510,16 +509,17 @@ export interface RhythmCard {
   phase?: string | null
   phase_evidence?: Record<string, unknown>
   temperature_series: { date: string; score: number }[]
-  event_window: RhythmEvent[]
+  event_window: Pick<RhythmEvent, 'date' | 'type' | 'title' | 'importance'>[]
   event_source_missing?: boolean
   event_high_hint?: string
-  next_event_anchor?: { title: string; event_date: string; days_until: number; note: string } | null
+  next_event_anchor?: { title: string; event_date: string; days_until: number; note: string; importance?: 'high' | 'medium' } | null
   conflict: boolean
   conflict_detail?: string
   branches: RhythmBranch[]
   data_missing?: string[]
 }
 export interface RhythmMasterContent {
+  /** @deprecated 节奏大师不产双层 schema（spec §5.9 登记废止 08-29 的 2.0 要求）；该槽为历史契约遗留，勿新增消费方 */
   display_report?: { summary?: string; details?: string; risks?: string[] }
   schema_version?: string
   target_date?: string
@@ -564,11 +564,26 @@ export interface SectorInsightQuote {
   lead_stock: string | null
 }
 
+/** 板块溯源链单段（4 段固定语义：phenomenon → trigger → transmission → impact） */
+export interface SectorInsightTraceStage {
+  kind: string
+  headline: string
+  claims: string[]
+  /** 该段证据来源；url 可点跳原文，title-only 也保留（url 缺失为 null） */
+  evidence: { url: string | null; title: string | null }[]
+}
+
 export interface SectorInsightTrace {
   present: boolean
   status?: 'completed' | 'insufficient'
   summary: string | null
   sectors: string[]
+  /**
+   * 该板块自己的完整 4 段原因链（2026-09-18 app-api 加性透出，保源序）。
+   * 展示口径：只取 3 段给用户看（触发 / 传导 / 结果←impact），`phenomenon`（现象）不展示
+   * —— 与大盘主因链的 3 步同形。旧数据/无链 → 缺省不渲染。
+   */
+  stages?: SectorInsightTraceStage[]
 }
 
 export type SectorDirection = 'bullish' | 'bearish' | 'neutral'
@@ -612,14 +627,22 @@ export interface SectorInsightPrediction {
   conditions?: SectorInsightCondition[]
 }
 
+/**
+ * 候选来源（2026-09-18 R17 扩展 `chain_only`）：
+ * - `wind_leader` 风口榜 / `review_primary` 当日大盘复盘主因 / `both` 两者皆有（以上由 sector-insight 接口下发）；
+ * - `chain_only` **前端合成**：仅当日大盘归因链 children 上有、sector-insight 候选里没有的板块
+ *   （链与候选口径不全时信息不丢；quote/trace/prediction 恒 null，见 `buildPrimarySectorCandidates`）。
+ */
+export type SectorInsightSource = 'wind_leader' | 'review_primary' | 'both' | 'chain_only'
+
 export interface SectorInsightCandidate {
   ts_code: string
   name: string
   category: 'industry' | 'concept'
-  source: 'wind_leader' | 'review_primary' | 'both'
+  source: SectorInsightSource
   cycle?: 'long' | 'short' | 'both' | null
   quote: SectorInsightQuote | null
-  /** 仅 review_primary/both（读当日 sector_trace 报告）；wind_leader-only 恒 null */
+  /** 仅 review_primary/both（读当日 sector_trace 报告）；wind_leader-only 与 chain_only 恒 null */
   trace: SectorInsightTrace | null
   prediction: SectorInsightPrediction | null
 }

@@ -71,7 +71,7 @@ const detailOpen = ref(false)
 const selectedNotification = ref<UserNotification | null>(null)
 const unreadOnly = ref(false)
 const loggedIn = computed(() => userStore.isLoggedIn())
-const displayItems = computed(() => items.value)
+const displayItems = computed(() => unreadOnly.value ? items.value.filter(item => !item.readAt) : items.value)
 let latestLoadRequest = 0
 let notificationRevision = 0
 

@@ -15,6 +15,11 @@
       <text v-if="time" class="as-insight-card__time">{{ time }}</text>
     </view>
 
+    <!-- 板块名标签（2026-09-18 R17）：标题为溯源主句时，标明"这是哪个板块"（中性描边小标，非告警色） -->
+    <view v-if="titleTag" class="as-insight-card__name-tag">
+      <text class="as-insight-card__name-tag-text">{{ titleTag }}</text>
+    </view>
+
     <!-- 结论标题（一句话） -->
     <text class="as-insight-card__title">{{ title }}</text>
 
@@ -22,7 +27,7 @@
     <view class="as-insight-card__divider" />
 
     <!-- 多要点行（优势/风险/建议等）：key 固定宽 + 正文，tone 语义底色 -->
-    <view v-if="lines.length" class="as-insight-card__lines">
+    <view v-if="lines.length && linePlacement === 'before-trace'" class="as-insight-card__lines">
       <view
         v-for="(l, i) in lines"
         :key="i"
@@ -35,9 +40,11 @@
 
     <!-- 溯源：结构化大盘联动形态（溯源蓝卡双行：大盘一句话行 + 角色徽驱动行；traceStructured 传入优先于文本 trace） -->
     <view v-if="traceStructured" class="as-insight-card__line as-insight-card__line--trace">
-      <text class="as-insight-card__key">溯源</text>
+      <text class="as-insight-card__key">{{ traceWord }}</text>
       <view class="as-insight-card__tlk">
         <text class="as-insight-card__tlk-sum">{{ traceStructured.summary }}</text>
+        <!-- 链级弱依据标记（root.evidence_weak=true：当日大盘未确认主因）中性灰小标，非告警色 -->
+        <text v-if="traceStructured.weak" class="as-insight-card__weak">归因较弱</text>
         <text
           v-if="traceStructured.index_pct != null"
           class="as-insight-card__tlk-pct"
@@ -46,20 +53,75 @@
           {{ fmtSignedPct(traceStructured.index_pct) }}
         </text>
       </view>
-      <view v-if="traceStructured.badge" class="as-insight-card__tlk-drv">
-        <text class="as-insight-card__tlk-badge">{{ traceStructured.badge }}</text>
+      <view v-if="traceStructured.badge || traceStructured.weakText" class="as-insight-card__tlk-drv">
+        <text v-if="traceStructured.badge" class="as-insight-card__tlk-badge">{{ traceStructured.badge }}</text>
+        <!-- 板块级弱依据标记（child.extraction.weak=true）：snapshot 兜底无归因理由 →「无归因依据」 -->
+        <text v-if="traceStructured.weakText" class="as-insight-card__weak">{{ traceStructured.weakText }}</text>
         <text class="as-insight-card__tlk-drv-text">{{ traceStructured.detail }}</text>
       </view>
+
+      <!-- 链上事件胶囊（spec §7 事件节点：板块根因事件可跳原文；events 空则不渲染该区） -->
+      <view v-if="traceEvents.length" class="as-insight-card__events">
+        <EventRefChip
+          v-for="(ev, i) in traceEvents"
+          :key="`${i}-${ev.headline}`"
+          :headline="ev.headline"
+          :source="ev.source ?? 'search'"
+          :event-ref="ev.ref"
+          @select="emit('eventSelect', ev)"
+        />
+      </view>
+
+      <!-- 依据详情（本地展开：展示溯源全文 + 板块链阶段 stages；无内容不渲染入口） -->
+      <template v-if="traceDetailText || stageRows.length">
+        <view class="as-insight-card__more" @tap.stop="traceExpanded = !traceExpanded">
+          <text class="as-insight-card__more-tx">{{ traceExpanded ? '收起' : '依据详情' }}</text>
+          <view class="as-insight-card__more-chev" :class="{ 'as-insight-card__more-chev--open': traceExpanded }" />
+        </view>
+        <view v-if="traceExpanded" class="as-insight-card__detail">
+          <view v-for="(st, i) in stageRows" :key="i" class="as-insight-card__detail-st">
+            <text class="as-insight-card__detail-k">{{ st.name }}</text>
+            <text class="as-insight-card__detail-v">{{ st.text }}</text>
+          </view>
+          <text v-if="traceDetailText" class="as-insight-card__detail-tx">{{ traceDetailText }}</text>
+        </view>
+      </template>
     </view>
 
     <!-- 溯源（横幅卡：蓝，文本形态兼容旧用法） -->
     <view v-else-if="trace" class="as-insight-card__line as-insight-card__line--trace">
-      <text class="as-insight-card__key">溯源</text>
+      <text class="as-insight-card__key">{{ traceWord }}</text>
       <text class="as-insight-card__text">{{ trace }}</text>
+
+      <!-- 依据详情（本地展开：展示溯源全文 + 板块链阶段 stages；无内容不渲染入口） -->
+      <template v-if="traceDetailText || stageRows.length">
+        <view class="as-insight-card__more" @tap.stop="traceExpanded = !traceExpanded">
+          <text class="as-insight-card__more-tx">{{ traceExpanded ? '收起' : '依据详情' }}</text>
+          <view class="as-insight-card__more-chev" :class="{ 'as-insight-card__more-chev--open': traceExpanded }" />
+        </view>
+        <view v-if="traceExpanded" class="as-insight-card__detail">
+          <view v-for="(st, i) in stageRows" :key="i" class="as-insight-card__detail-st">
+            <text class="as-insight-card__detail-k">{{ st.name }}</text>
+            <text class="as-insight-card__detail-v">{{ st.text }}</text>
+          </view>
+          <text v-if="traceDetailText" class="as-insight-card__detail-tx">{{ traceDetailText }}</text>
+        </view>
+      </template>
+    </view>
+
+    <view v-if="lines.length && linePlacement === 'after-trace'" class="as-insight-card__lines">
+      <view
+        v-for="(l, i) in lines"
+        :key="i"
+        :class="['as-insight-card__line', 'as-insight-card__line--point', l.tone ? `is-${l.tone}` : 'is-default']"
+      >
+        <text class="as-insight-card__key">{{ l.key }}</text>
+        <text class="as-insight-card__text">{{ l.text }}</text>
+      </view>
     </view>
 
     <!-- 预判：条件化结构化块（structured 传入时；渲染通用 ConditionalForecastBlock，全粒度共用） -->
-    <ConditionalForecastBlock v-if="structured" :structured="structured" />
+    <ConditionalForecastBlock v-if="structured" :structured="structured" :display-mode="displayMode" />
 
     <!-- 预判（横幅卡：金，文本形态，兼容旧用法） -->
     <view v-else-if="forecast" class="as-insight-card__line as-insight-card__line--forecast">
@@ -79,8 +141,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import ConditionalForecastBlock from './ConditionalForecastBlock.vue'
+import EventRefChip from './EventRefChip.vue'
 import wordmarkPng from './insight-wordmark.png'
 import wordmarkLightPng from './insight-wordmark-light.png'
 
@@ -95,6 +158,7 @@ const wmStyle = computed(() => ({
  * - 条件化形态（structured 传入）：溯源 → 通用条件化预判块（ConditionalForecastBlock，
  *   2026-09-02 抽取：大盘/板块/个股等一切有条件化预判的粒度共用同款分支 UI）。
  * 组件保持纯 UI：方向/置信/期段/条件全部经 props 结构化传入，不引业务。
+ * titleTag（2026-09-18 R17）：标题上方可选板块名标签（标题为溯源主句、看不出板块名时用）。
  */
 type InsightType = 'emotion' | 'fund' | 'event' | 'market' | 'trend'
 type InsightTheme = 'light' | 'dark'
@@ -158,6 +222,18 @@ interface InsightLine {
 }
 
 /**
+ * 链上事件节点（链契约 children[].events，spec §3.2-4 / §7）：
+ * headline + 来源标记（warehouse 中台 / search 检索补漏）+ 引用（URL 可跳原文）。
+ */
+interface InsightTraceEvent {
+  headline: string
+  /** 事件引用：http(s) URL 可跳转；`event:<id>` / `search:<query>|<title>` 仅展示（不伪造跳转） */
+  ref?: string
+  /** 来源：warehouse=事件抓取中台 / search=板块定向检索补漏 */
+  source?: 'warehouse' | 'search'
+}
+
+/**
  * 溯源行结构化形态（V2 大盘联动，2026-09-04）：
  * 溯源蓝卡内双行展示 —— ①大盘一句话 + 指数涨跌右对齐；②板块角色徽（自驱动/跟随大盘）+ 驱动一句话。
  * 未入链（badge 缺省）时只渲染大盘行。传入优先于文本形态 trace；组件保持纯 UI。
@@ -171,6 +247,16 @@ interface InsightTraceStructured {
   badge?: string
   /** 角色徽后驱动一句话（入链时） */
   detail?: string
+  /** 板块自身链阶段（链式溯源 P3' 产出：现象 → 触发 → 传导 → 定价；本期仅预留渲染，无数据不渲染） */
+  stages?: Array<{ name: string; text: string }>
+  /** 板块链上事件节点（2026-09-17 P3' Task 4.2；无事件/旧数据缺省 → 不渲染该区） */
+  events?: InsightTraceEvent[]
+  /** 依据详情正文（缺省回退 InsightCard 的 traceDetail） */
+  more?: string
+  /** 链级弱依据（2026-09-17 R16：root.evidence_weak=true，当日大盘未确认主因）→ 摘要行旁中性灰「归因较弱」 */
+  weak?: boolean
+  /** 板块级弱依据标记文案（child.extraction.weak=true：「依据较弱」/「无归因依据」）；缺省 → 不渲染 */
+  weakText?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -180,16 +266,31 @@ const props = withDefaults(defineProps<{
   title: string
   /** 溯源：原因说明（文本形态；traceStructured 传入时忽略） */
   trace?: string
+  traceLabel?: string
   /** 溯源行结构化形态（大盘联动双行；传入优先于 trace 文本行） */
   traceStructured?: InsightTraceStructured | null
+  /** 溯源「依据详情」正文（可选；有值时溯源区显示「依据详情 ▾」入口并在卡片内展开） */
+  traceDetail?: string
+  /**
+   * 板块原因链 3 段（触发 / 传导 / 结果）—— 显式传入，**两种溯源形态（结构化 traceStructured /
+   * 纯文本 trace）都能展示**；优先于 `traceStructured.stages`。
+   * 2026-09-18：原槽位只挂在 traceStructured 上，导致"未入链但已有板块溯源"（无 marketLink →
+   * 走文本形态）时原因链无处可放 → 提到顶层 prop。
+   */
+  traceStages?: Array<{ name: string; text: string }>
+  /** 预判展示模式：full=全量分支（现状）；conclusion=只显示已成立分支（透传 CFB，spec §7） */
+  displayMode?: 'full' | 'conclusion'
   /** 预判：后续走向（文本形态，structured 传入时忽略） */
   forecast?: string
   /** 标签词覆盖（如板块卡传 tag-text="板块洞见"，剥"洞见"后缀后显示"板块"）；缺省按 type 取短词 */
   tagText?: string
+  /** 标题上方的板块名标签（2026-09-18 R17：标题是溯源主句、看不出板块名时用；缺省不渲染） */
+  titleTag?: string
   /** 条件化预判结构化数据（传入则渲染期段切换的预判块） */
   structured?: InsightStructuredForecast | null
   /** 多要点行（优势/风险/建议等，渲染于分隔线后、溯源前；不依赖 trace/forecast/structured） */
   lines?: InsightLine[]
+  linePlacement?: 'before-trace' | 'after-trace'
   /** 时间，如 '08-21 · 09:10' */
   time?: string
   /** 主题：light 亮色列表卡 / dark 深蓝研报卡 */
@@ -204,10 +305,16 @@ const props = withDefaults(defineProps<{
   type: 'emotion',
   trace: '',
   traceStructured: null,
+  traceDetail: '',
+  traceStages: () => [],
+  displayMode: 'full',
   forecast: '',
   tagText: '',
+  titleTag: '',
+  traceLabel: '',
   structured: null,
   lines: () => [],
+  linePlacement: 'before-trace',
   time: '',
   theme: 'light',
   lineStyle: 'banner',
@@ -217,6 +324,8 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   click: []
+  /** 链上事件胶囊点击（payload = 该事件节点；跳转由调用方按平台惯例执行） */
+  eventSelect: [event: InsightTraceEvent]
 }>()
 
 const typeLabelMap: Record<InsightType, string> = {
@@ -232,6 +341,23 @@ const typeWord = computed(() => {
   const t = props.tagText?.trim()
   return t ? t.replace(/洞见$/, '') : typeLabelMap[props.type]
 })
+
+const traceWord = computed(() => props.traceLabel.trim() || '溯源')
+
+/** 溯源「依据详情」展开态（本地交互；不新增接口） */
+const traceExpanded = ref(false)
+
+/** 依据详情正文：结构化 more 优先，其次 traceDetail prop */
+const traceDetailText = computed(() => props.traceStructured?.more?.trim() || props.traceDetail?.trim() || '')
+
+/** 板块链阶段（链式溯源 P3' 产出；无数据 → 不渲染阶段区）。
+ *  顶层 `traceStages` prop 优先（两种溯源形态都可用），其次 `traceStructured.stages`。 */
+const stageRows = computed(() =>
+  props.traceStages?.length ? props.traceStages : (props.traceStructured?.stages ?? [])
+)
+
+/** 板块链上事件节点（spec §7；无数据/旧数据缺省 → 不渲染事件区） */
+const traceEvents = computed(() => props.traceStructured?.events ?? [])
 
 /**
  * 带符号百分号：+1.2% / -1.2% / 0.0%。
@@ -320,6 +446,24 @@ const handleClick = () => {
 .wm-tag--market  { --wm-color: #{$insight-market}; }
 .wm-tag--trend   { --wm-color: #{$insight-trend}; }
 
+/* ===== 板块名标签（标题上方；2026-09-18 R17） =====
+   中性描边小标：标题是溯源主句时标明"这是哪个板块"；与弱依据标记同族样式，
+   刻意不用告警色/涨跌色，底色/文字随主题变量切换（light/dark 通用）。 */
+.as-insight-card__name-tag {
+  align-self: flex-start;
+  padding: 2rpx 12rpx;
+  border: 1rpx solid var(--ins-weak-bd);
+  border-radius: $r-md;
+  background: var(--ins-fc-bg);
+}
+
+.as-insight-card__name-tag-text {
+  font-size: $font-size-xs;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--ins-card-tx);
+}
+
 /* ===== Title ===== */
 .as-insight-card__title {
   font-size: $font-size-md;
@@ -348,6 +492,9 @@ const handleClick = () => {
   /* 结构化溯源涨跌（A 股红涨绿跌，随主题切换明暗） */
   --ins-up: #e03e3e;
   --ins-down: #0e9f5f;
+  /* 弱依据标记（中性灰，2026-09-17 R16；刻意不用告警色/涨跌色） */
+  --ins-weak-bd: #dfe3ea;
+  --ins-weak-tx: #8a929e;
 }
 
 .as-insight-card--dark {
@@ -360,6 +507,8 @@ const handleClick = () => {
   --ins-card-tx: rgba(255, 255, 255, 0.74);
   --ins-up: #f87171;
   --ins-down: #34d399;
+  --ins-weak-bd: rgba(255, 255, 255, 0.18);
+  --ins-weak-tx: rgba(255, 255, 255, 0.58);
 }
 
 .as-insight-card__line {
@@ -443,6 +592,92 @@ const handleClick = () => {
   color: var(--ins-card-tx);
 }
 
+/* 弱依据标记：中性灰描边小标（链级「归因较弱」/ 板块级「依据较弱」「无归因依据」，2026-09-17 R16）。
+   弱化呈现、刻意避开告警色与涨跌色；字段缺失（老数据/正常日）时标记不渲染、零变化。 */
+.as-insight-card__weak {
+  flex-shrink: 0;
+  padding: 2rpx 10rpx;
+  border: 1rpx solid var(--ins-weak-bd);
+  border-radius: $r-md;
+  font-size: $font-size-xs;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--ins-weak-tx);
+}
+
+/* ===== 链上事件胶囊区（溯源子卡内，spec §7 事件节点；胶囊样式见 EventRefChip） ===== */
+.as-insight-card__events {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-top: $s-2;
+}
+
+/* ===== 溯源「依据详情」入口与展开体（2026-09-16 结论模式配套） ===== */
+.as-insight-card__more {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+  margin-top: 8rpx;
+  padding: 6rpx 0;
+}
+
+.as-insight-card__more-tx {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--ins-trace-key);
+}
+
+.as-insight-card__more-chev {
+  width: 0;
+  height: 0;
+  border-left: 8rpx solid transparent;
+  border-right: 8rpx solid transparent;
+  border-top: 10rpx solid var(--ins-trace-key);
+  transition: transform 0.15s ease;
+}
+
+.as-insight-card__more-chev--open {
+  transform: rotate(180deg);
+}
+
+.as-insight-card__detail {
+  margin-top: 10rpx;
+  padding-top: 10rpx;
+  border-top: 1rpx dashed var(--ins-trace-bd);
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.as-insight-card__detail-st {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.as-insight-card__detail-k {
+  flex: 0 0 72rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--ins-trace-key);
+}
+
+.as-insight-card__detail-v {
+  flex: 1;
+  min-width: 0;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: var(--ins-card-tx);
+}
+
+.as-insight-card__detail-tx {
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: var(--ins-card-tx);
+}
+
 /* 预判（文本形态）子卡：浅中性（structured 形态由 ConditionalForecastBlock 同款呈现） */
 .as-insight-card__line--forecast {
   background: var(--ins-fc-bg);
@@ -470,10 +705,11 @@ const handleClick = () => {
 
   .as-insight-card__key {
     display: block;
-    flex: 0 0 72rpx;
+    flex: 0 0 128rpx;
     font-size: $font-size-xs;
     color: $ink;
     margin-bottom: 0;
+    white-space: nowrap;
   }
 
   .as-insight-card__text {

@@ -76,6 +76,11 @@ export default defineConfig({
       'src/modules/fear-greed/utils/fgRhythmSummary.spec.ts',
       'src/modules/fear-greed/utils/fgRhythmGate.spec.ts',
       'src/modules/fear-greed/pages/index.spec.ts',
+      'src/modules/analytics/components/PredictionVerification.spec.ts',
+      'src/shared/components/ConditionalForecastBlock.mount.spec.ts',
+      'src/shared/components/EventRefChip.mount.spec.ts',
+      'src/shared/components/AttributionChainView.mount.spec.ts',
+      'src/modules/analytics/pages/traceability.mount.spec.ts',
     ],
   },
 })

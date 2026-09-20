@@ -31,13 +31,20 @@ export function horizonStage(
 
 export type ConditionStage =
   | { kind: 'verified'; result: 'hit' | 'miss' | 'insufficient'; entry: PredictionVerificationEntry }
+  | { kind: 'condition_met' } // 条件已成立·待到期验证（两段判定第①段：只点亮、无 result）
   | { kind: 'pending' } // 尚未验证 / 条件未触发
 
-/** 条件状态（Spec A §4.2/§4.3）：condition 验证按 c{i} key 读取，独立于 horizon key */
+/**
+ * 条件状态（Spec A §4.2/§4.3）：condition 验证按 c{i} key 读取，独立于 horizon key。
+ * 两段判定（2026-09-16）：到期前只写 condition_met（entry **无 result**）→ condition_met；
+ * 到期后写入 result → verified。缺 result 时不得按「已验证」渲染。
+ */
 export function conditionStage(record: PredictionRecord, index: number): ConditionStage {
   const entry = record.verification?.[`c${index}`]
-  if (entry) return { kind: 'verified', result: entry.result, entry }
-  return { kind: 'pending' }
+  if (!entry) return { kind: 'pending' }
+  const result: unknown = entry.result
+  if (result == null && entry.condition_met === true) return { kind: 'condition_met' }
+  return { kind: 'verified', result: entry.result, entry }
 }
 
 /** 整体状态：全部已登记档位已验证 → verified，否则 pending（以 verification 实况计算，与后端 status 双保险） */

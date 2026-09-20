@@ -2,16 +2,10 @@
   <view v-if="visible" class="ni-modal">
     <view class="ni-backdrop" @tap="emit('close')" />
     <view class="ni-panel">
-      <view :class="['ni-head', notification?.category === 'performance_report' ? 'is-report' : '']">
-        <InsightTag v-if="notification?.category === 'price_movement'" type="event" size="sm">个股异动</InsightTag>
-        <InsightTag v-else-if="notification?.category !== 'performance_report'" :type="tagType" size="sm">{{ notification?.category === 'stock_info' ? '事件洞见' : categoryLabel }}</InsightTag>
-        <InsightTag v-else type="fund" size="sm">财报详情</InsightTag>
-        <view class="ni-close" @tap="emit('close')">
-          <SvgIcon name="close-line" size="28rpx" color="#4b5a7a" />
-        </view>
+      <view class="ni-close" @tap.stop="emit('close')">
+        <SvgIcon name="close-line" size="22rpx" color="#8e97a8" />
       </view>
-
-      <scroll-view class="ni-body" scroll-y>
+      <scroll-view class="ni-body" scroll-y :show-scrollbar="false">
         <view v-if="loading" class="ni-state">
           <LoadingState text="" />
         </view>
@@ -19,44 +13,30 @@
           <text class="ni-state-text">{{ error }}</text>
         </view>
         <template v-else-if="notification">
-          <view v-if="notification.category === 'stock_info'" class="ni-notification-card">
-            <text class="ni-notification-card__title">{{ notification.title }}</text>
-            <view class="ni-notification-card__divider" />
-            <view v-if="notification.summary" class="ni-notification-card__line is-message">
-              <text class="ni-notification-card__key">消息</text>
-              <text class="ni-notification-card__text">{{ notification.summary }}</text>
-            </view>
-            <view class="ni-notification-card__line is-time">
-              <text class="ni-notification-card__key">时间</text>
-              <text class="ni-notification-card__text">{{ formatTime(notification.occurredAt || notification.createdAt) }}</text>
-            </view>
-          </view>
-
-          <view v-else-if="notification.category === 'forecast'" class="ni-notification-card">
-            <text class="ni-notification-card__title">{{ notification.title }}</text>
-            <view class="ni-notification-card__divider" />
-            <view v-if="notification.summary" class="ni-notification-card__line is-message">
-              <text class="ni-notification-card__key">消息 · {{ formatTime(notification.occurredAt || notification.createdAt) }}</text>
-              <text class="ni-notification-card__text">{{ notification.summary }}</text>
-            </view>
-            <view v-if="forecastData?.netProfitYoy != null" class="ni-notification-card__line is-yoy">
-              <text class="ni-notification-card__key">净利润同比</text>
-              <text :class="['ni-notification-card__text', Number(forecastData.netProfitYoy) >= 0 ? 'is-up' : 'is-down']">
-                {{ Number(forecastData.netProfitYoy) >= 0 ? '+' : '' }}{{ forecastData.netProfitYoy }}%
-              </text>
-            </view>
-          </view>
-
           <InsightCard
-            v-if="notification.category !== 'performance_report' && notification.category !== 'stock_info' && notification.category !== 'forecast' && notification.category !== 'price_movement' && notification.category !== 'insight'"
-            :type="cardType"
+            v-if="notification.category === 'stock_info'"
+            type="event"
+            tag-text="事件洞见"
             :title="notification.title"
-            :trace="notification.summary"
-            :trace-label="notification.category === 'forecast' ? `消息 · ${formatTime(notification.occurredAt || notification.createdAt)}` : '消息'"
-            :forecast="notification.category === 'forecast' ? (forecastData?.netProfitYoy != null ? `${Number(forecastData.netProfitYoy) >= 0 ? '+' : ''}${forecastData.netProfitYoy}%` : '') : formatTime(notification.occurredAt || notification.createdAt)"
-            :forecast-label="notification.category === 'forecast' ? '净利润同比' : '时间'"
+            :trace="stockInfoMessage"
+            trace-label="消息"
+            :time="formatTime(notification.occurredAt || notification.createdAt)"
             theme="light"
             class="ni-card"
+          />
+
+          <InsightCard
+            v-else-if="notification.category === 'forecast'"
+            type="fund"
+            tag-text="业绩预测"
+            :title="notification.title"
+            :trace="notification.summary"
+            trace-label="消息"
+            :lines="forecastSummaryLines"
+            line-placement="after-trace"
+            :time="formatTime(notification.occurredAt || notification.createdAt)"
+            theme="light"
+            class="ni-card ni-card--forecast"
           />
 
           <template v-if="notification.category === 'forecast'">
@@ -108,135 +88,103 @@
           </template>
 
           <template v-else-if="notification.category === 'stock_info'">
-            <view class="ni-major-event">
-              <view class="ni-major-event__head">
-                <text class="ni-major-event__kicker">最新重大异动</text>
-                <text v-if="majorEvent" :class="['ni-impact', impactClass(majorEvent)]">{{ majorEvent.ai_impact || majorEvent.level || majorEvent.change_type_name }}</text>
-              </view>
+            <view :class="['major-event-alert', `major-event-alert--${majorEventDirection}`, { 'is-muted': !majorEvent }]">
               <template v-if="majorEvent">
-                <text class="ni-major-event__title">{{ majorEvent.summary || majorEvent.title || majorEvent.change_type_name }}</text>
-                <view class="ni-major-event__meta">
-                  <text>{{ majorEvent.ai_horizon || majorEvent.cycle || '周期待判' }}</text>
-                  <text>{{ majorEvent.change_type_name || majorEvent.info_type || '资讯研判' }}</text>
-                  <text>{{ formatMaybeTime(majorEvent.event_time_display || majorEvent.event_time) }}</text>
-                </view>
-              </template>
-              <text v-else class="ni-major-event__title">暂无数据</text>
-            </view>
-
-            <view v-if="stockEvents.length" class="ni-section">
-              <text class="ni-section-title">个股异动</text>
-              <view class="ni-event-list">
-                <view v-for="(evt, idx) in stockEvents" :key="idx" class="ni-event-item">
-                  <view class="ni-dot" />
-                  <view class="ni-event-main">
-                    <text class="ni-event-title">{{ evt.title || evt.change_type_name || evt.summary || '异动' }}</text>
-                    <text class="ni-event-time">{{ formatMaybeTime(evt.event_time_display || evt.event_time) }}</text>
+                <view class="me-top"><text class="me-title">{{ majorEventTitle }}</text></view>
+                <view class="me-body">
+                  <text class="major-event-title">{{ majorEvent.summary || majorEvent.title || majorEvent.change_type_name }}</text>
+                  <view class="major-event-meta">
+                    <text>{{ majorEvent.ai_horizon || majorEvent.cycle || '周期待判' }}</text>
+                    <text>{{ majorEvent.change_type_name || majorEvent.info_type || '资讯研判' }}</text>
+                    <text>{{ formatMaybeTime(majorEvent.event_time_display || majorEvent.event_time) }}</text>
                   </view>
                 </view>
+              </template>
+              <text v-else class="major-event-title major-event-empty">暂无数据</text>
+            </view>
+
+            <view v-if="displayedStockEvents.length" class="section-card">
+              <text class="section-title">个股异动</text>
+              <view class="event-list">
+                <view v-for="(evt, idx) in displayedStockEventsVisible" :key="idx" class="event-item">
+                  <view :class="['event-dot', evt.change_type || evt.cycle || 'default']" />
+                  <view class="event-content">
+                    <text class="event-title">{{ evt.summary || evt.title || evt.change_type_name || '异动' }}</text>
+                    <text v-if="evt.event_time || evt.event_time_display" class="event-time">{{ formatMaybeTime(evt.event_time_display || evt.event_time) }}</text>
+                  </view>
+                </view>
+              </view>
+              <view v-if="hasMoreStockEvents" class="event-toggle" @tap="eventListExpanded = !eventListExpanded">
+                <text class="event-toggle-text">{{ eventListExpanded ? '收起' : '展开查看全部' }}</text>
               </view>
             </view>
           </template>
 
           <template v-else-if="notification.category === 'price_movement'">
-            <view v-if="movementDetail" class="ni-movement-section">
-              <view class="ni-movement-quote">
-                <view class="ni-movement-top">
-                  <view class="ni-movement-info">
-                    <view class="ni-movement-name-row">
-                      <text class="ni-movement-name">{{ movementDetail.stock_name }}</text>
-                      <text :class="['ni-movement-tag', movementDetail.direction === 'up' ? 'is-up' : 'is-down']">
+            <view v-if="movementDetail" class="ni-detail-page">
+              <view class="quote">
+                <view class="o3-top">
+                  <view class="o3-info">
+                    <view class="q-name-row">
+                      <text class="q-name">{{ movementDetail.stock_name }}</text>
+                      <text :class="['q-tag', movementDetail.direction === 'up' ? 'tag-up' : 'tag-down']">
                         {{ movementDetail.direction === 'up' ? '上涨异动' : '下跌异动' }}
                       </text>
                     </view>
-                    <text class="ni-movement-code">{{ movementDetail.symbol }} · {{ formatTime(movementDetail.triggered_at) }}</text>
+                    <text class="q-code">{{ movementDetail.symbol }} · {{ formatTime(movementDetail.triggered_at) }}</text>
                   </view>
-                  <view class="ni-movement-price">
-                    <text :class="['ni-movement-price__value', movementDetail.direction === 'up' ? 'is-up' : 'is-down']">{{ fmtPrice(movementDetail.latest_price) }}</text>
-                    <text :class="['ni-movement-price__change', movementDetail.direction === 'up' ? 'is-up' : 'is-down']">{{ fmtPercent(movementDetail.change_pct) }}</text>
+                  <view class="o3-price">
+                    <text :class="['o3-p', movementDetail.direction === 'up' ? 'is-up' : 'is-down']">{{ fmtPrice(movementDetail.latest_price) }}</text>
+                    <text :class="['o3-c', movementDetail.direction === 'up' ? 'is-up' : 'is-down']">{{ fmtPercent(movementDetail.change_pct) }}</text>
                   </view>
                 </view>
-                <view class="ni-movement-metrics">
-                  <view class="ni-movement-metric"><text class="ni-movement-metric__value">{{ fmtPrice(movementDetail.previous_close) }}</text><text class="ni-movement-metric__label">开盘</text></view>
-                  <view class="ni-movement-metric"><text :class="['ni-movement-metric__value', movementDetail.direction === 'up' ? 'is-up' : 'is-down']">≥{{ movementDetail.threshold_pct }}%</text><text class="ni-movement-metric__label">涨跌幅阈值</text></view>
-                  <view class="ni-movement-metric"><text class="ni-movement-metric__value is-warning">{{ severityText(movementDetail.severity) }}</text><text class="ni-movement-metric__label">严重度</text></view>
-                  <view class="ni-movement-metric"><text :class="['ni-movement-metric__value', movementDetail.direction === 'up' ? 'is-up' : 'is-down']">{{ fmtAmount(movementDetail.latest_price, movementDetail.change_pct) }}</text><text class="ni-movement-metric__label">触发</text></view>
+                <view class="o3-metrics">
+                  <view class="o3-m"><text class="o3-v o3-mid">{{ fmtPrice(movementDetail.previous_close) }}</text><text class="o3-l">开盘</text></view>
+                  <view class="o3-m"><text :class="['o3-v', movementDetail.direction === 'up' ? 'is-up' : 'is-down']">≥{{ movementDetail.threshold_pct }}%</text><text class="o3-l">涨跌幅阈值</text></view>
+                  <view v-if="movementDetail.severity" class="o3-m"><text class="o3-v o3-warn">{{ severityText(movementDetail.severity) }}</text><text class="o3-l">严重度</text></view>
+                  <view class="o3-m"><text :class="['o3-v', movementDetail.direction === 'up' ? 'is-up' : 'is-down']">{{ fmtAmount(movementDetail.latest_price, movementDetail.change_pct) }}</text><text class="o3-l">触发</text></view>
                 </view>
               </view>
+              <InsightCard v-if="movementInsightCard.content" type="event" :title="movementInsightCard.content" :trace="movementInsightCard.trace" :forecast="movementInsightCard.forecast" :time="movementInsightCard.time" theme="light" class="insight-in-page" />
               <PriceMovementAnalysisContent :detail="movementDetail" :analysis="movementAnalysis" />
             </view>
           </template>
 
           <template v-else-if="notification.category === 'insight'">
-            <view v-if="insightDetail" class="ni-section">
-              <InsightCard
-                v-if="insightCard.title"
-                type="event"
-                head-badge="涨停雷达"
-                :title="`${insightDetail.stock_name}：${insightCard.title}`"
-                trace-label="依据"
-                :trace="insightCard.trace"
-                forecast-label="展望"
-                :forecast="''"
-                :time="fmtShortDate(insightDetail.trade_date).slice(5)"
-                theme="light"
-              />
-              <view v-if="insightDetail.primary_driver" class="ni-soft-box">
-                <view class="ni-insight-driver-head">
-                  <text class="ni-title-text">支撑性主因</text>
-                  <view class="ni-insight-driver-tags">
-                    <text class="ni-insight-driver-tag">{{ categoryText(insightDetail.primary_driver.category) }}</text>
-                    <text :class="['ni-insight-driver-tag', confidenceClass(insightDetail.primary_driver.confidence)]">{{ confidenceText(insightDetail.primary_driver.confidence) }}</text>
-                    <text v-if="insightDetail.attribution_status === 'confirmed'" class="ni-insight-driver-tag is-confirmed">已确认</text>
+            <view v-if="insightDetail" class="ni-detail-page">
+              <view class="quote">
+                <view class="o3-top">
+                  <view class="avatar">{{ (insightDetail.stock_name || '').charAt(0) }}</view>
+                  <view class="o3-info">
+                    <view class="q-name-row"><text class="q-name">{{ insightDetail.stock_name }}</text><text class="q-tag tag-up">涨停雷达</text></view>
+                    <text class="q-code">{{ insightDetail.symbol }} · {{ fmtShortDate(insightDetail.trade_date) }}</text>
+                  </view>
+                  <view class="o3-price">
+                    <text :class="['o3-p', insightDetail.direction === 'up' ? 'is-up' : 'is-down']">{{ fmtPrice(insightDetail.latest_price) }}</text>
+                    <text :class="['o3-c', insightDetail.direction === 'up' ? 'is-up' : 'is-down']">{{ fmtPercent(insightDetail.change_pct) }}</text>
                   </view>
                 </view>
-                <view class="ni-insight-driver-banner">
-                  <text class="ni-insight-driver-banner__label">归因结论</text>
-                  <text class="ni-insight-driver-banner__text">{{ insightDetail.primary_driver.label }}</text>
-                </view>
-                <view v-if="insightDriverQuotes.length" class="ni-insight-quotes">
-                  <view v-for="quote in insightDriverQuotes" :key="`${quote.kind}-${quote.label}`" class="ni-insight-quote">
-                    <text :class="['ni-insight-quote__label', quote.kind === '主因' ? 'is-primary' : '']">{{ quote.kind }} · {{ quote.label }}</text>
-                    <text class="ni-insight-quote__text">{{ quote.text }}</text>
-                  </view>
+                <view class="o3-metrics">
+                  <view class="o3-m"><text class="o3-v o3-mid">{{ fmtPrice(insightDetail.open_price) }}</text><text class="o3-l">开盘</text></view>
+                  <view class="o3-m"><text :class="['o3-v', insightDetail.direction === 'up' ? 'is-up' : 'is-down']">{{ fmtAmount(insightDetail.latest_price, insightDetail.change_pct) }}</text><text class="o3-l">涨跌额</text></view>
+                  <view v-if="insightDetail.confidence" class="o3-m"><text class="o3-v o3-warn">{{ confidenceText(insightDetail.confidence) }}</text><text class="o3-l">置信度</text></view>
+                  <view v-if="insightDetail.attribution_status === 'confirmed'" class="o3-m"><text class="o3-v is-down">已确认</text><text class="o3-l">归因</text></view>
                 </view>
               </view>
-              <view v-if="insightDetail.secondary_drivers?.length" class="ni-list">
-                <text class="ni-section-title">候选归因</text>
-                <view class="ni-candidate-list">
-                  <view v-for="driver in insightDetail.secondary_drivers" :key="driver.label" class="ni-candidate-card">
-                    <view class="ni-candidate-header">
-                      <text class="ni-candidate-label">{{ driver.label }}</text>
-                      <text class="ni-candidate-tag">{{ categoryText(driver.category) }}</text>
-                      <text v-if="driver.confidence" :class="['ni-candidate-confidence', confidenceClass(driver.confidence)]">{{ confidenceText(driver.confidence) }}</text>
-                    </view>
-                    <text v-if="driver.evidence_quote" class="ni-candidate-text">{{ driver.evidence_quote }}</text>
-                  </view>
-                </view>
+              <InsightCard v-if="insightCard.title" :type="insightCard.type" :tag-text="insightCard.tagText" :title="insightCard.title" :trace="insightCard.trace" :forecast="''" :time="fmtShortDate(insightDetail.trade_date).slice(5)" theme="light" class="insight-in-page" />
+              <view v-if="insightDetail.primary_driver" class="hero-card">
+                <view class="hero-head"><text class="hero-tag">支撑性主因</text><view class="hero-chips"><text class="cat-badge">{{ categoryText(insightDetail.primary_driver.category) }}</text><text v-if="insightDetail.primary_driver.confidence" :class="['badge', confidenceClass(insightDetail.primary_driver.confidence)]">{{ confidenceText(insightDetail.primary_driver.confidence) }}</text><text v-if="insightDetail.attribution_status === 'confirmed'" class="badge is-confirmed">已确认</text></view></view>
+                <view class="hero-banner"><text class="banner-label">归因结论</text><text class="banner-text">{{ insightDetail.primary_driver.label }}</text></view>
+                <view v-if="insightDriverQuotes.length" class="hero-quote"><view v-for="quote in insightDriverQuotes" :key="`${quote.kind}-${quote.label}`" class="hq-item"><text :class="['hq-label', { 'is-pri': quote.kind === '主因' }]">{{ quote.kind }} · {{ quote.label }}</text><text class="hq-text">{{ quote.text }}</text></view></view>
               </view>
-              <view v-if="insightDetail.attribution_status === 'unconfirmed'" class="ni-insight-unconfirmed">主因待验证</view>
-              <view v-if="insightDetail.evidence_package?.length" class="ni-event-list">
-                <text class="ni-section-title">归因证据</text>
-                <view v-for="evi in insightDetail.evidence_package" :key="evi.source_id || evi.title" class="ni-event-item">
-                  <view class="ni-dot" />
-                  <view class="ni-event-main">
-                    <text class="ni-event-title">{{ evi.title }}</text>
-                    <text class="ni-event-time">{{ providerText(evi) }} · {{ fmtShortDate(evi.published_at) }}</text>
-                  </view>
-                </view>
+              <view v-if="insightDetail.secondary_drivers?.length" class="detail-section">
+                <text class="detail-section-title">候选归因</text>
+                <view class="cand-list"><view v-for="driver in insightDetail.secondary_drivers" :key="driver.label" class="cand-card"><view class="cand-header"><text class="cand-label">{{ driver.label }}</text><text class="cand-tag is-weak">{{ categoryText(driver.category) }}</text><text v-if="driver.confidence" :class="['badge', confidenceClass(driver.confidence)]">{{ confidenceText(driver.confidence) }}</text></view><text v-if="driver.evidence_quote" class="cand-text">{{ driver.evidence_quote }}</text></view></view>
               </view>
-              <view v-if="insightDetail.display_report?.details" class="ni-insight-detail">
-                <text class="ni-section-title">详细分析</text>
-                <text class="ni-insight-detail__text">{{ insightDetail.display_report.details }}</text>
-              </view>
-              <view v-if="insightDetail.source_id" class="ni-insight-source" @tap="openInsightSource">
-                <text class="ni-section-title">原始来源</text>
-                <text class="ni-insight-source__title">{{ insightDetail.title }}</text>
-                <view v-if="insightDetail.keywords?.length" class="ni-insight-source__keywords">
-                  <text v-for="keyword in insightDetail.keywords" :key="keyword" class="ni-insight-source__keyword">{{ keyword }}</text>
-                </view>
-                <text v-if="insightDetail.published_at" class="ni-insight-source__meta">发布于 {{ insightDetail.published_at }}</text>
-              </view>
+              <view v-if="insightDetail.attribution_status === 'unconfirmed'" class="unconfirmed">主因待验证</view>
+              <template v-if="insightDetail.evidence_package?.length"><text class="detail-section-title">归因证据</text><view class="timeline"><view v-for="evi in insightDetail.evidence_package" :key="evi.source_id || evi.title" class="tl-item"><view class="tl-dot" /><text class="tl-title">{{ evi.title }}</text><text class="tl-meta">{{ providerText(evi) }} · {{ fmtShortDate(evi.published_at) }}</text></view></view></template>
+              <template v-if="insightDetail.display_report?.details"><text class="detail-section-title">详细分析</text><text class="detail-text">{{ insightDetail.display_report.details }}</text></template>
+              <template v-if="insightDetail.source_id"><text class="detail-section-title">原始来源</text><view class="source"><text class="src" @tap="openInsightSource">{{ insightDetail.title }}</text><view v-if="insightDetail.keywords?.length" class="kw"><text v-for="keyword in insightDetail.keywords" :key="keyword" class="kw-item">{{ keyword }}</text></view><text v-if="insightDetail.published_at" class="meta">发布于 {{ insightDetail.published_at }}</text></view></template>
             </view>
           </template>
 
@@ -249,7 +197,6 @@
                     <text class="ni-report-code">{{ reportStock.code }}</text>
                     <text class="ni-report-period">{{ reportStock.period }}</text>
                   </view>
-                  <text v-if="reportStock.tag" class="ni-report-tag">{{ reportStock.tag }}</text>
                 </view>
                 <view class="ni-report-meta">
                   <text v-if="reportStock.industry" class="ni-report-meta__item">{{ reportStock.industry }}</text>
@@ -257,17 +204,17 @@
                 </view>
               </view>
 
-              <view
+              <InsightCard
                 v-if="hasReportInsight"
-                class="ni-report-insight"
-              >
-                <InsightTag class="ni-report-insight-tag" type="fund" size="sm">资金洞见</InsightTag>
-                <text class="ni-report-insight__title">{{ reportInsight.title }}</text>
-                <view v-for="line in reportInsight.lines" :key="line.key" :class="['ni-report-insight__line', line.tone ? `is-${line.tone}` : '']">
-                  <text class="ni-report-insight__key">{{ line.key }}</text>
-                  <text class="ni-report-insight__text">{{ line.text }}</text>
-                </view>
-              </view>
+                type="fund"
+                tag-text="资金"
+                :title="reportInsight.title"
+                :lines="reportInsight.lines"
+                :time="reportStock.updateTime"
+                theme="light"
+                line-style="plain"
+                class="ni-card"
+              />
               <view v-if="aiScoreData?.dataStatus === 'complete'" class="ni-report-score">
                 <AiAnalysis :loading="scoreLoading" :data="aiScoreData" />
               </view>
@@ -321,17 +268,17 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import InsightTag from '@/shared/components/InsightTag.vue'
 import InsightCard from '@/shared/components/InsightCard.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import ForecastProfitChart from '@/modules/favorites/components/ForecastProfitChart.vue'
 import PriceMovementAnalysisContent from '@/modules/favorites/components/PriceMovementAnalysisContent.vue'
+import { parseForecastSlot } from '@/modules/favorites/components/insightCards'
 import AiAnalysis from '@/modules/analytics/components/ai-analysis.vue'
 import { stockApi, type ForecastData } from '@/shared/api/modules/stock'
 import { stockTraceApi, type StockTraceAnalysisResponse, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { watchlistInsightApi, type InsightEvidenceItem, type WatchlistInsight } from '@/shared/api/modules/insight'
-import type { UserNotification, NotificationCategory } from '@/shared/api/modules/notifications'
+import type { UserNotification } from '@/shared/api/modules/notifications'
 import { formatShanghaiDateTime } from '@/shared/utils/datetime'
 
 const props = defineProps<{
@@ -356,19 +303,31 @@ const aiScoreData = ref<any>(null)
 const scoreLoading = ref(false)
 const scoreSnapshotUnavailable = ref(false)
 const reportTableYearRange = ref<2 | 3>(2)
+const eventListExpanded = ref(false)
 
-const categoryLabelMap: Record<NotificationCategory, string> = {
-  price_movement: '价格异动',
-  insight: '自选洞察',
-  stock_info: '资讯异动',
-  forecast: '业绩预测',
-  performance_report: '财报快报',
-}
-
-const categoryLabel = computed(() => props.notification ? categoryLabelMap[props.notification.category] : '自选消息')
-const tagType = computed(() => props.notification?.category === 'performance_report' || props.notification?.category === 'forecast' ? 'fund' : 'event')
-const cardType = computed(() => tagType.value)
 const majorEvent = computed(() => stockEvents.value[0] || null)
+const stockInfoMessage = computed(() => {
+  if (props.notification?.category !== 'stock_info') return ''
+  const stored = String(props.notification.summary || '').trim()
+  const matched = stockEvents.value.find((evt: any) => {
+    const title = String(evt?.title || '').trim()
+    return title && (title === stored || stored.includes(title) || title.includes(stored))
+  })
+  return String(matched?.summary || '').trim() || stored
+})
+const displayedStockEvents = computed(() => stockEvents.value.slice(1))
+const EVENT_PREVIEW_COUNT = 3
+const displayedStockEventsVisible = computed(() => eventListExpanded.value
+  ? displayedStockEvents.value
+  : displayedStockEvents.value.slice(0, EVENT_PREVIEW_COUNT))
+const hasMoreStockEvents = computed(() => displayedStockEvents.value.length > EVENT_PREVIEW_COUNT)
+const majorEventDirection = computed(() => {
+  const impact = String(majorEvent.value?.ai_impact || majorEvent.value?.level || majorEvent.value?.change_type_name || '')
+  if (/利好|上涨|增长/.test(impact)) return 'positive'
+  if (/利空|风险|下降|下跌/.test(impact)) return 'negative'
+  return 'mixed'
+})
+const majorEventTitle = computed(() => ({ positive: '重大机会', negative: '重大风险', mixed: '重大异动' }[majorEventDirection.value]))
 
 function formatTime(value?: string) {
   return value ? formatShanghaiDateTime(value) : ''
@@ -417,6 +376,7 @@ function resetData() {
   forecastData.value = null
   forecastDetailExpanded.value = false
   stockEvents.value = []
+  eventListExpanded.value = false
   movementDetail.value = null
   movementAnalysis.value = null
   insightDetail.value = null
@@ -538,6 +498,17 @@ const forecastChartItems = computed(() => buildForecastChartSource()
   })
   .filter(Boolean) as Array<{ year: string; value: number; label: string; kind?: 'actual' | 'forecast' }>)
 
+const forecastSummaryLines = computed(() => {
+  const value = forecastData.value?.netProfitYoy
+  if (value == null || !Number.isFinite(Number(value))) return []
+  const numeric = Number(value)
+  return [{
+    key: '净利润同比',
+    text: `${numeric >= 0 ? '+' : ''}${numeric}%`,
+    tone: numeric >= 0 ? 'positive' as const : 'risk' as const,
+  }]
+})
+
 const forecastYearRows = computed(() => {
   const rows = Array.isArray(forecastData.value?.predictions) ? forecastData.value.predictions : []
   const parsed = rows.slice(0, 3).map(item => {
@@ -575,13 +546,6 @@ function forecastHeader(key: string): { year: string; kind: string } {
   return { year: key, kind: '' }
 }
 
-function impactClass(evt: any) {
-  const text = String(evt?.ai_impact || evt?.level || evt?.change_type_name || '')
-  if (/利空|风险|下降|下跌/.test(text)) return 'is-down'
-  if (/利好|上涨|增长|高/.test(text)) return 'is-up'
-  return ''
-}
-
 function fmtPrice(price?: number) {
   return price == null || Number.isNaN(price) ? '--' : Number(price).toFixed(2)
 }
@@ -615,21 +579,52 @@ function statusText(value?: string) {
 }
 
 const insightCard = computed(() => {
-  const primary = insightDetail.value?.primary_driver
+  const detail = insightDetail.value
+  const primary = detail?.primary_driver
+  const status = detail?.attribution_status === 'confirmed' ? '已确认' : '待验证'
+  const lines = primary
+    ? [
+        { key: '归因类型', text: categoryText(primary.category) || '综合研判', tone: 'default' as const },
+        {
+          key: '判断状态',
+          text: [confidenceText(primary.confidence), status].filter(Boolean).join(' · '),
+          tone: detail?.attribution_status === 'confirmed' ? 'positive' as const : 'default' as const,
+        },
+      ]
+    : []
   return {
-    title: primary?.label || insightDetail.value?.title || '',
-    trace: primary?.evidence_quote || insightDetail.value?.display_report?.details || '',
+    type: 'trend' as const,
+    tagText: detail?.event_type === 'limit_up_radar' ? '涨停雷达' : '异动洞见',
+    title: primary?.label || detail?.title || '',
+    trace: primary?.evidence_quote || detail?.display_report?.summary || '',
+    traceDetail: primary?.evidence_quote ? detail?.display_report?.details || '' : '',
+    lines,
+  }
+})
+
+const movementInsightCard = computed(() => {
+  const detail = movementDetail.value
+  const artifact = movementAnalysis.value?.artifact?.artifactJson
+  const primaryChainId = artifact?.primary_chain_id
+  const primaryCandidateId = artifact?.chains?.find(chain => chain.chainId === primaryChainId)?.candidateId
+  const cause = artifact?.candidates?.find(candidate => candidate.candidateId === primaryCandidateId)
+  const trace = artifact?.chains?.find(chain => chain.role === 'primary')?.nodes
+    .map(node => node.claim)
+    .filter(Boolean)
+    .join(' → ') || ''
+  return {
+    content: cause?.verdict || '',
+    trace,
+    forecast: parseForecastSlot(detail?.forecast)?.summary || '',
+    time: detail?.triggered_at ? formatTime(detail.triggered_at).slice(5) : '',
   }
 })
 
 const insightDriverQuotes = computed(() => {
-  const detail = insightDetail.value
-  if (!detail) return [] as Array<{ kind: string; label: string; text: string }>
-  const quotes: Array<{ kind: string; label: string; text: string }> = []
-  if (detail.primary_driver?.evidence_quote) {
-    quotes.push({ kind: '主因', label: detail.primary_driver.label, text: detail.primary_driver.evidence_quote })
-  }
-  for (const driver of detail.secondary_drivers || []) {
+  const quotes: Array<{ kind: '主因' | '次因'; label: string; text: string }> = []
+  const primary = insightDetail.value?.primary_driver
+  if (primary?.evidence_quote) quotes.push({ kind: '主因', label: primary.label, text: primary.evidence_quote })
+  for (const driver of insightDetail.value?.secondary_drivers ?? []) {
     if (driver.evidence_quote) quotes.push({ kind: '次因', label: driver.label, text: driver.evidence_quote })
   }
   return quotes
@@ -669,7 +664,6 @@ const reportStock = computed(() => {
     code: currentSymbol(),
     name: String(data['股票名称'] || props.notification?.stockName || ''),
     period: `${String(data['报告期'] || '')}${data['最新报告类型'] === 'express' ? '（快报）' : ''}`,
-    tag: String(data['AI研判'] || (data['最新报告类型'] === 'express' ? '预告' : '')),
     industry: String(data['行业'] || ''),
     disclosureDate: String(data['披露日期'] || payloadString('annDate') || ''),
     updateTime: formatMaybeTime((data['更新时间'] || props.notification?.payload?.updateTime || '') as string),
@@ -783,28 +777,40 @@ function valueClass(row: FinanceTableRow, periodKey: string) {
 .ni-modal { position: fixed; inset: 0; z-index: $z-modal + 10; }
 .ni-backdrop { position: absolute; inset: 0; background: rgba(10, 23, 51, 0.48); }
 .ni-panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 640rpx; max-width: 92vw; height: 78vh; max-height: 980rpx; display: flex; flex-direction: column; overflow: hidden; border: 2rpx solid $line; border-radius: $r-lg; background: $bg-card; box-shadow: $shadow-card; }
-.ni-head { display: flex; align-items: center; justify-content: space-between; gap: $s-2; padding: $s-3; border-bottom: 2rpx solid $line-soft; }
-.ni-head.is-report { justify-content: space-between; }
-.ni-close { width: 52rpx; height: 52rpx; display: flex; align-items: center; justify-content: center; border-radius: $r-full; background: $bg-soft; }
-.ni-body { flex: 1; height: 0; min-height: 0; box-sizing: border-box; padding: $s-3; }
+.ni-close { position: absolute; z-index: 3; top: 16rpx; right: 16rpx; width: 44rpx; height: 44rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #eef1f6; }
+.ni-close:active { opacity: 0.7; }
+.ni-body { flex: 1; height: 0; min-height: 0; box-sizing: border-box; padding: 64rpx 28rpx 28rpx; scrollbar-width: none; -ms-overflow-style: none; }
+.ni-body::-webkit-scrollbar,
+.ni-body ::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.ni-body {
+  :deep(.uni-scroll-view),
+  :deep(.uni-scroll-view-content) {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  :deep(.uni-scroll-view::-webkit-scrollbar),
+  :deep(.uni-scroll-view-content::-webkit-scrollbar) {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+.ni-card--forecast {
+  :deep(.as-insight-card__line--point),
+  :deep(.as-insight-card__line--point.is-positive),
+  :deep(.as-insight-card__line--point.is-risk) {
+    background: var(--ins-trace-bg);
+    border: 1rpx solid var(--ins-trace-bd);
+  }
+}
 .ni-state { min-height: 360rpx; display: flex; align-items: center; justify-content: center; }
 .ni-state-text, .ni-empty { font-size: $font-size-sm; color: $ink-mute; }
 .ni-card { margin-bottom: $s-3; }
-.ni-notification-card { display: flex; flex-direction: column; gap: $s-3; margin-bottom: $s-3; padding: $s-3; border: 2rpx solid $line-soft; border-radius: $r-md; background: $bg-card; }
-.ni-notification-card__title { font-size: $font-size-lg; font-weight: 700; line-height: 1.5; color: $ink; }
-.ni-notification-card__divider { height: 2rpx; background: $line-soft; }
-.ni-notification-card__line { display: flex; flex-direction: column; gap: 6rpx; padding: $s-3; border-radius: $r-sm; }
-.ni-notification-card__line.is-message { background: $primary; color: #fff; }
-.ni-notification-card__line.is-time { border: 2rpx solid #f4d7a1; background: #fff4df; color: #9a6a12; }
-.ni-notification-card__line.is-yoy { flex-direction: row; align-items: center; justify-content: space-between; border: 2rpx solid #f4d7a1; background: #fff4df; color: #9a6a12; }
-.ni-notification-card__key { font-size: $font-size-xs; font-weight: 700; }
-.ni-notification-card__text { font-size: $font-size-base; line-height: 1.5; font-weight: 700; }
 .ni-section { margin-bottom: $s-3; padding: $s-3; border: 2rpx solid $line-soft; border-radius: $r-md; background: $bg-card; }
 .ni-report-section { padding: 0.2rem; border: 0; }
 .ni-section-head { display: flex; align-items: center; justify-content: space-between; gap: $s-2; margin-bottom: $s-2; }
 .ni-section-title { font-size: $font-size-base; font-weight: 700; color: $ink; }
 .ni-section-sub, .ni-meta, .ni-event-time, .ni-quote-code, .ni-list-sub { font-size: $font-size-xs; color: $ink-mute; }
-.ni-soft-box { display: flex; flex-direction: column; gap: $s-2; padding: $s-3; border-radius: $r-md; background: $bg-soft; }
 .ni-text, .ni-title-text { font-size: $font-size-sm; line-height: 1.6; color: $ink-soft; }
 .ni-title-text { font-weight: 700; color: $ink; }
 .ni-meta { display: flex; flex-wrap: wrap; gap: $s-2; }
@@ -861,14 +867,6 @@ function valueClass(row: FinanceTableRow, periodKey: string) {
 .ni-forecast-row:last-child .ni-forecast-cell.is-name { border-bottom: 0; }
 .ni-finance-cell.is-name { position: sticky; left: 0; z-index: 2; background: $bg-card; }
 .ni-finance-row.is-head .ni-finance-cell.is-name { z-index: 3; background: $bg-soft; }
-.ni-report-insight { display: flex; flex-direction: column; gap: $s-2; padding: $s-3; border: 2rpx solid $line-soft; border-radius: $r-md; background: $bg-card; }
-.ni-report-insight-tag { align-self: flex-start; }
-.ni-report-insight__title { font-size: $font-size-base; font-weight: 700; line-height: 1.5; color: $ink; }
-.ni-report-insight__line { display: flex; gap: $s-2; padding: $s-2; border-radius: $r-sm; background: $bg-card; }
-.ni-report-insight__line.is-positive { background: $up-soft; }
-.ni-report-insight__line.is-risk { background: $warning-soft; }
-.ni-report-insight__key { width: 72rpx; flex-shrink: 0; font-size: $font-size-xs; font-weight: 700; color: $ink; }
-.ni-report-insight__text { flex: 1; min-width: 0; font-size: $font-size-xs; line-height: 1.6; color: $ink-soft; }
 .ni-report-score { margin-top: $s-6; }
 .ni-report-score-unavailable {
   margin-top: $s-6;
@@ -882,38 +880,38 @@ function valueClass(row: FinanceTableRow, periodKey: string) {
 .ni-impact { border: 1rpx solid $line-strong; border-radius: 8rpx; background: $bg-soft; color: $ink-mute; }
 .ni-impact.is-up { border-color: #fecaca; background: $up-soft; color: $up; }
 .ni-impact.is-down { border-color: #bbf7d0; background: $down-soft; color: $down; }
-.ni-major-event { display: flex; flex-direction: column; gap: 10rpx; margin-bottom: $s-3; padding: 18rpx 28rpx; border: 2rpx solid $line; border-left: 6rpx solid $primary; border-radius: $r-md; background: $bg-card; }
-.ni-major-event__head { display: flex; align-items: center; justify-content: space-between; gap: $s-2; }
-.ni-major-event__kicker { font-size: 28rpx; line-height: 1.3; font-weight: 800; color: $ink; }
-.ni-major-event__title { display: block; font-size: 26rpx; line-height: 1.5; font-weight: 600; color: $ink-soft; }
-.ni-major-event__meta { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 2rpx; }
-.ni-major-event__meta text { padding: 4rpx 12rpx; border-radius: 8rpx; background: $bg-deep; color: $ink-mute; font-size: 22rpx; line-height: 1.4; font-weight: 700; }
-.ni-event-list { display: flex; flex-direction: column; gap: $s-2; margin-top: $s-2; }
-.ni-event-item { justify-content: flex-start; align-items: flex-start; padding-bottom: $s-2; border-bottom: 2rpx solid $line-soft; }
-.ni-dot { width: 12rpx; height: 12rpx; margin-top: 14rpx; border-radius: $r-full; background: $primary; flex-shrink: 0; }
-.ni-event-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4rpx; }
-.ni-event-title { font-size: $font-size-sm; color: $ink; line-height: 1.6; }
+.major-event-alert { background: $bg-card; border: none; border-left: 6rpx solid $ink-soft; border-radius: $r-md; padding: 0; margin: 24rpx 0 16rpx; overflow: hidden; box-shadow: $shadow-card; }
+.major-event-alert--positive { border-left-color: #d81f1f; }
+.major-event-alert--negative { border-left-color: #0d9e43; }
+.major-event-alert.is-muted { background: $bg-soft; border-left-color: $line-strong; box-shadow: none; }
+.me-top { display: flex; align-items: center; height: 52rpx; padding: 0 16rpx; box-shadow: inset 0 -2rpx 0 rgba(0, 0, 0, 0.06); }
+.major-event-alert--positive .me-top { background: linear-gradient(180deg, #e22c2c, #d81f1f); }
+.major-event-alert--negative .me-top { background: linear-gradient(180deg, #0faa4a, #0d9e43); }
+.major-event-alert--mixed .me-top { background: linear-gradient(180deg, $ink-soft, $ink); }
+.major-event-alert.is-muted .me-top { display: none; }
+.me-title { font-size: $font-size-md; font-weight: bold; color: #f8f8f8; letter-spacing: 1rpx; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me-body { display: flex; flex-direction: column; gap: 6rpx; padding: 14rpx 22rpx 16rpx; }
+.major-event-title { display: block; font-size: $font-size-md; line-height: 1.4; font-weight: 600; color: $ink; }
+.major-event-empty { padding: 14rpx 22rpx 16rpx; }
+.major-event-meta { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 2rpx; }
+.major-event-meta text { padding: 4rpx 12rpx; border-radius: 8rpx; background: $bg-deep; color: $ink-mute; font-size: 22rpx; line-height: 1.4; font-weight: 700; }
+.section-card { background: $bg-card; border: 2rpx solid $line; border-radius: $r-md; padding: 28rpx; margin-bottom: 16rpx; }
+.section-title { display: block; margin-bottom: 20rpx; color: $ink; font-size: 30rpx; font-weight: 600; }
+.event-list { display: flex; flex-direction: column; gap: 16rpx; }
+.event-toggle { margin-top: 20rpx; padding: 16rpx 0; text-align: center; border-top: 2rpx solid $line; }
+.event-toggle-text { color: $primary; font-size: 24rpx; font-weight: 600; }
+.event-item { display: flex; align-items: flex-start; gap: 12rpx; }
+.event-dot { width: 16rpx; height: 16rpx; margin-top: 8rpx; flex-shrink: 0; border-radius: 50%; background: $primary; }
+.event-dot.default { background: $ink-mute; }
+.event-content { flex: 1; display: flex; flex-direction: column; gap: 4rpx; }
+.event-title { color: $ink; font-size: 28rpx; line-height: 1.4; }
+.event-time { color: $ink-faint; font-size: 22rpx; }
 .ni-quote { align-items: flex-start; margin-bottom: $s-3; padding: $s-3; border-radius: $r-md; background: $bg-soft; }
 .ni-quote-name { display: block; font-size: $font-size-lg; font-weight: 700; color: $ink; }
 .ni-quote-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; }
 .ni-insight-price { font-family: $font-mono; font-size: $font-size-xl; font-weight: 800; line-height: $lh-tight; }
 .is-up { color: $up; }
 .is-down { color: $down; }
-.ni-insight-driver-head { display: flex; align-items: center; justify-content: space-between; gap: $s-2; }
-.ni-insight-driver-tags { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8rpx; }
-.ni-insight-driver-tag { padding: 2rpx 12rpx; border-radius: $r-sm; background: $primary-50; color: $primary; font-size: $font-size-xs; }
-.ni-insight-driver-tag.is-high { background: $warning-bg; color: $warning; }
-.ni-insight-driver-tag.is-neutral { background: $primary-50; color: $primary; }
-.ni-insight-driver-tag.is-confirmed { background: $down-soft; color: $down; }
-.ni-insight-driver-banner { display: flex; flex-direction: column; gap: 6rpx; margin-top: $s-3; padding: $s-3 $s-4; border-radius: $r-md; background: $primary; }
-.ni-insight-driver-banner__label { color: rgba(255, 255, 255, .8); font-size: $font-size-xs; }
-.ni-insight-driver-banner__text { color: $white; font-size: $font-size-base; font-weight: 600; line-height: 1.5; }
-.ni-insight-quotes { margin-top: $s-2; padding: $s-2 $s-3; border-left: 6rpx solid $primary; border-radius: $r-sm; background: $primary-50; }
-.ni-insight-quote + .ni-insight-quote { margin-top: $s-2; padding-top: $s-2; border-top: 2rpx solid $primary-100; }
-.ni-insight-quote__label, .ni-insight-quote__text { display: block; font-size: $font-size-xs; line-height: $lh-base; }
-.ni-insight-quote__label { margin-bottom: 4rpx; color: $ink-soft; font-weight: 600; }
-.ni-insight-quote__label.is-primary { color: $primary; }
-.ni-insight-quote__text { color: $ink-soft; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ni-insight-unconfirmed { margin-top: $s-3; padding: $s-2 $s-3; border-radius: $r-sm; background: $warning-bg; color: $warning; font-size: $font-size-sm; }
 .ni-candidate-list { display: flex; flex-direction: column; gap: $s-2; }
 .ni-candidate-card { padding: $s-3; border-radius: $r-md; background: $bg-soft; }
@@ -956,6 +954,24 @@ function valueClass(row: FinanceTableRow, periodKey: string) {
 .ni-movement-status { display: flex; align-items: center; gap: $s-2; margin-top: $s-3; padding: $s-3; border-radius: $r-md; background: $bg-card; box-shadow: $shadow-card; font-size: $font-size-sm; }
 .ni-movement-status.is-processing { color: $primary; }
 .ni-movement-status.is-unavailable { color: $ink-mute; }
+.ni-detail-page { margin-bottom: $s-3; }
+.quote { margin-bottom: $s-3; padding: $s-4; border-radius: $r-md; background: $bg-card; box-shadow: $shadow-card; }
+.o3-top { display: flex; align-items: flex-start; gap: $s-3; }
+.avatar { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 80rpx; height: 80rpx; border-radius: 50%; background: $brand-gradient; color: $white; font-size: $font-size-lg; font-weight: 700; }
+.o3-info { flex: 1; min-width: 0; }
+.q-name-row { display: flex; align-items: center; gap: $s-2; }
+.q-name { font-size: $font-size-lg; font-weight: 700; color: $ink; }
+.q-code { display: block; margin-top: 2rpx; color: $ink-mute; font-size: $font-size-xs; }
+.q-tag { flex: 0 0 auto; padding: 4rpx 16rpx; border-radius: $r-full; font-size: $font-size-xs; font-weight: 600; }
+.q-tag.tag-up { color: $up; background: $up-soft; }.q-tag.tag-down { color: $down; background: $down-soft; }
+.o3-price { flex: 0 0 auto; text-align: right; }.o3-p { display: block; font-family: $font-mono; font-size: $font-size-3xl; font-weight: 800; line-height: $lh-tight; }.o3-c { display: block; font-family: $font-mono; font-size: $font-size-md; font-weight: 600; }.o3-p.is-up, .o3-c.is-up, .o3-v.is-up { color: $up; }.o3-p.is-down, .o3-c.is-down, .o3-v.is-down { color: $down; }
+.o3-metrics { display: flex; justify-content: space-between; gap: $s-2; margin-top: $s-3; padding-top: $s-3; border-top: 2rpx solid $line; }.o3-m { flex: 1; min-width: 0; text-align: center; }.o3-v { display: block; font-family: $font-mono; font-size: $font-size-sm; font-weight: 700; color: $ink; }.o3-v.o3-warn { color: $warning; }.o3-l { display: block; margin-top: 4rpx; color: $ink-soft; font-size: $font-size-xs; }
+.insight-in-page { margin-bottom: $s-3; }
+.hero-card { margin-bottom: $s-3; padding: $s-3; border-radius: $r-md; background: $bg-card; box-shadow: $shadow-card; }.hero-head, .cand-header { display: flex; align-items: center; gap: $s-2; }.hero-head { justify-content: space-between; }.hero-tag { flex: 0 0 auto; color: $primary; font-size: $font-size-xs; font-weight: 600; }.hero-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: $s-2; }.cat-badge, .badge, .cand-tag { flex: 0 0 auto; padding: 2rpx 12rpx; border-radius: $r-sm; background: $primary-50; color: $primary; font-size: $font-size-xs; }.badge.is-gold, .cand-tag.is-weak { background: $warning-bg; color: $warning; }.badge.is-confirmed { background: $down-bg; color: $down; }
+.hero-banner { margin-top: $s-3; padding: $s-3 $s-4; border-radius: $r-lg; background: $primary; box-shadow: 0 4rpx 12rpx rgba(11, 95, 255, .2); }.banner-label { display: block; margin-bottom: 4rpx; color: rgba(255,255,255,.8); font-size: $font-size-xs; letter-spacing: 2rpx; }.banner-text { display: block; color: $white; font-size: $font-size-base; font-weight: 600; line-height: 1.5; }
+.hero-quote { margin-top: $s-2; padding: $s-2 $s-3; border-left: 6rpx solid $primary; border-radius: $r-sm; background: $primary-50; }.hq-item + .hq-item { margin-top: $s-2; padding-top: $s-2; border-top: 2rpx solid $primary-100; }.hq-label { display: block; margin-bottom: 4rpx; color: $ink-soft; font-size: $font-size-xs; font-weight: 600; }.hq-label.is-pri { color: $primary; }.hq-text { display: block; color: $ink-soft; font-size: $font-size-xs; line-height: $lh-base; white-space: pre-wrap; overflow-wrap: anywhere; }
+.detail-section { margin-bottom: $s-3; padding: $s-3; border: 2rpx solid $line; border-radius: $r-md; background: $bg-card; }.detail-section-title { display: flex; align-items: center; margin-bottom: $s-2; color: $ink; font-size: $font-size-base; font-weight: 600; }.cand-list { display: flex; flex-direction: column; gap: $s-2; }.cand-card { padding: $s-3; border-radius: $r-md; background: $bg-soft; }.cand-label { flex: 1; color: $ink; font-size: $font-size-sm; font-weight: 600; }.cand-text { display: block; margin-top: $s-1; color: $ink-soft; font-size: $font-size-xs; line-height: 1.5; }
+.unconfirmed { margin-bottom: $s-3; padding: $s-2 $s-3; border-radius: $r-sm; background: $warning-bg; color: $warning; font-size: $font-size-sm; }.timeline, .source { margin-bottom: $s-3; padding: $s-3; border-radius: $r-md; background: $bg-card; box-shadow: $shadow-sm; }.tl-item { position: relative; display: flex; flex-direction: column; padding-bottom: $s-3; padding-left: $s-4; border-left: 2rpx solid $line; }.tl-item:last-child { padding-bottom: 0; border-color: transparent; }.tl-dot { position: absolute; top: 6rpx; left: -7rpx; width: 12rpx; height: 12rpx; border-radius: 50%; background: $primary; }.tl-title { color: $ink; font-size: $font-size-sm; font-weight: 500; line-height: $lh-base; }.tl-meta, .meta { margin-top: 4rpx; color: $ink-mute; font-size: $font-size-xs; }.detail-text { display: block; box-sizing: border-box; width: 100%; margin-bottom: $s-3; padding: $s-3; border-radius: $r-md; background: $bg-card; box-shadow: $shadow-sm; color: $ink-soft; font-size: $font-size-sm; line-height: $lh-loose; white-space: pre-wrap; overflow-wrap: anywhere; }.src { display: block; color: $primary; font-size: $font-size-sm; font-weight: 500; line-height: $lh-base; }.kw { display: flex; flex-wrap: wrap; gap: $s-2; margin-top: $s-2; }.kw-item { padding: 4rpx 12rpx; border-radius: $r-sm; background: $bg-soft; color: $ink-soft; font-size: $font-size-xs; }
 .ni-report-header { margin-bottom: $s-3; padding: $s-3; border-radius: $r-md; background: $bg-card; border: 2rpx solid $line-soft; }
 .ni-report-header__top { display: flex; align-items: center; justify-content: space-between; gap: $s-2; }
 .ni-report-header__main { display: flex; align-items: center; gap: $s-2; min-width: 0; flex-wrap: wrap; }
@@ -965,15 +981,6 @@ function valueClass(row: FinanceTableRow, periodKey: string) {
 .ni-report-tag { flex-shrink: 0; padding: 6rpx 18rpx; border-radius: $r-sm; background: $primary-50; color: $primary; font-size: $font-size-sm; font-weight: 700; }
 .ni-report-meta { display: flex; flex-wrap: wrap; gap: $s-2; margin-top: $s-2; color: $ink-mute; }
 .ni-report-meta__item { font-size: $font-size-xs; }
-.ni-report-insight__line.is-default { background: $primary; }
-.ni-report-insight__line.is-positive { background: $up; }
-.ni-report-insight__line.is-risk { background: $down; }
-.ni-report-insight__line.is-default .ni-report-insight__key,
-.ni-report-insight__line.is-default .ni-report-insight__text,
-.ni-report-insight__line.is-positive .ni-report-insight__key,
-.ni-report-insight__line.is-positive .ni-report-insight__text,
-.ni-report-insight__line.is-risk .ni-report-insight__key,
-.ni-report-insight__line.is-risk .ni-report-insight__text { color: #fff; }
 .ni-report-table-section { margin-top: $s-3; border: 2rpx solid $line-soft; border-radius: $r-md; overflow: hidden; background: $bg-card; }
 .ni-report-table-head { display: flex; align-items: center; justify-content: space-between; gap: $s-2; padding: $s-3 $s-3 $s-2; }
 .ni-report-table-title { display: flex; align-items: center; gap: $s-2; font-size: $font-size-base; font-weight: 700; color: $ink; }

@@ -61,8 +61,11 @@ function formatMultiple(value: any): string {
 function formatAmountYi(value: any): string {
   const num = toFiniteNumber(value)
   if (num === null || num === 0) return '--'
-  const yi = Math.abs(num) >= 100000000 ? num / 100000000 : num
-  return `${yi.toFixed(2)}亿`
+  // 原始单位为元，按数值量级换算为 亿/万/元，避免小于1亿的值仍被标成“X亿”
+  const abs = Math.abs(num)
+  if (abs >= 100000000) return `${(num / 100000000).toFixed(2)}亿`
+  if (abs >= 10000) return `${(num / 10000).toFixed(2)}万`
+  return `${num.toFixed(2)}元`
 }
 
 function growthType(value: any): string {

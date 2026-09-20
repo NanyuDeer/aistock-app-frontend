@@ -64,7 +64,7 @@
 
       <!-- 事件模式：选中日事件行（tradingvane 风格：影响度·时间·标题；result 尾注；US 隔夜角标） -->
       <view v-if="mode === 'event'" class="ev-panel">
-        <view class="ev-panel-title">当日宏观事件</view>
+        <view class="ev-panel-title">当日事件</view>
         <template v-if="selectedEvents.length">
           <view v-for="(ev, i) in selectedEvents" :key="i" class="ev-item">
             <view class="ev-imp" :class="`imp-${ev.importance}`"></view>
@@ -74,7 +74,7 @@
             <text v-if="ev.result" class="ev-result">{{ ev.result }}</text>
           </view>
         </template>
-        <text v-else class="ev-empty">当日无宏观事件</text>
+        <text v-else class="ev-empty">当日无已登记事件</text>
       </view>
     </view>
   </view>
@@ -86,6 +86,7 @@ import { Segmented } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { RhythmCalendarDay, RhythmEvent } from '@/shared/api/modules/agent'
 import { RHYTHM_LEVEL_COLORS, RHYTHM_GREY, isRhythmLevelKey, levelShort } from '@/shared/utils/rhythmColors'
+import { formatBandText } from '@/shared/utils/rhythmBand'
 
 const props = withDefaults(defineProps<{ targetDate?: string }>(), { targetDate: '' })
 const emit = defineEmits<{ pick: [date: string] }>()
@@ -106,7 +107,7 @@ function dayCellBg(d: RhythmCalendarDay): string {
   return isRhythmLevelKey(d.level) ? RHYTHM_LEVEL_COLORS[d.level] : RHYTHM_GREY
 }
 function bandShort(d: RhythmCalendarDay): string {
-  return (d.position_band?.text?.trim() ?? '').replace(/^建议仓位[：:]*\s*/, '')
+  return formatBandText(d.position_band?.text)
 }
 
 // 今日高亮：模板以 todayStr() 调用取当日 YYYY-MM-DD 串（brief 样例漏了括号——函数引用恒不等于字符串，今日格永不亮，此处修正）
