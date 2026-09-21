@@ -1,5 +1,15 @@
 # changelog-pending.md（待提交修改记录）
 
+## 本批外部记录（2026-09-21 节奏大师：时点自动展示 + 生成时刻显示 + 事件日历放开 5 日）
+
+> 随 `changer` 提交（PR #xxx）。此段仅供本地留痕。
+
+- 范围：仅 `aistock-app-frontend` 改动（8 源文件/测试 + rhythm/AGENTS.md + CHANGELOG）；`aistock-frontend`（web）无对等组件、app-api 不消费 event_window → 无需同步；agent-py 配套改动单独提交（CHANGELOG 另条记录）。
+- 判定表 `pickSlotByClock()`（UTC+8 固定）：<8:30→after_close、8:30-12:30→morning、12:30-16:05→midday、≥16:05→after_close；onLoad 一次 + onShow 跨时段重判定（不轮询）；目标 slot 缺失回退 SLOT_ORDER 就近（B6）。
+- 洞见卡时间 `MM-DD · HH:MM`（日期=targetDate、时分=created_at 上海时区；createdAt 缺省/非法回退 slot 标签）——B7/B8：toRhythmInsight 增 createdAt 第 4 参。
+- 观感/口径（分歧未物理消除，approved）：锚点(5日窗)与列表首条(全量)允许并存；卡片(high/medium)与面板(macro+delivery)口径不同定位不同。
+- 验证：node:test 基线 252→256/256/0 一致；vue-tsc 通过；H5 模块编译 200（修复 `<script setup>` 误 export 的 500）。
+
 ## 2026-09-18 市场洞见页：删除「今日影响大盘的主要板块」区块，能力并入大盘归因链
 
 - **背景（组长裁定）**：该区块与上方「大盘归因链」**读同一份链**（页面 `fetchAttributionChain` 拉一次两处共用）、**用同一个过滤判据**（`sectorInsight.isUnconfirmedAttribution`）、**显示同一批板块**（角色徽 + 事件胶囊 + 驱动句），信息重复且同一批板块渲染两遍 → 只保留归因链。

@@ -50,9 +50,9 @@
       <text>{{ card.conflict_detail || '信号背离，仅提供区间与提示' }}</text>
     </view>
 
-    <!-- 事件日历（自 target_date 起 ≤5 交易日；空态两态区分 G7） -->
+    <!-- 事件日历（需求 2：展示窗放开 5 交易日限制，改全量提前展示） -->
     <view class="rc-sec">
-      <text class="rc-sec-title">未来 5 交易日事件日历</text>
+      <text class="rc-sec-title">未来事件日历</text>
       <!-- 下一事件锚点（design-debate P1：无锚点整块不渲染） -->
       <view class="rc-anchor" v-if="card.next_event_anchor">
         <view class="rc-anchor-head">
@@ -77,7 +77,7 @@
         <text>该维度数据源未接入</text>
       </view>
       <view class="rc-empty" v-else>
-        <text>未来 5 个交易日暂无已登记事件</text>
+        <text>暂无已登记事件</text>
       </view>
     </view>
 

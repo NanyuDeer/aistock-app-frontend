@@ -29,7 +29,7 @@ test('设计稿：分区卡（情绪周期/事件日历）+ 阶段 chip + 实验
   assert.match(source, /情绪周期/)
   assert.match(source, /rc-chip/)
   assert.match(source, /实验性判定/)
-  assert.match(source, /未来 5 交易日事件日历/)
+  assert.match(source, /未来事件日历/)
   assert.match(source, /rc-evtag/)
 })
 
@@ -65,9 +65,11 @@ test('去重瘦身：rc-pos 长句 / rc-branch 区块 / rc-phase-ev 证据行已
   assert.doesNotMatch(source, /rc-phase-ev/)
 })
 
-test('事件日历空态文案不再断言"今日无事件"', () => {
+test('事件日历空态文案不再断言"今日无事件"（需求 2：标题改"未来事件日历"、去 5 交易日）', () => {
   assert.ok(!source.includes('今日无事件（正常交易日）'))
-  assert.ok(source.includes('未来 5 个交易日暂无已登记事件'))
+  assert.ok(source.includes('未来事件日历'))
+  assert.ok(!source.includes('未来 5 交易日事件日历'))
+  assert.ok(source.includes('暂无已登记事件'))
   assert.ok(source.includes('该维度数据源未接入'))
 })
 
