@@ -4,14 +4,15 @@
  * 背景：「今日影响大盘的主要板块」与上方「大盘归因链」读**同一份链**、用**同一个过滤判据**
  * （`sectorInsight.isUnconfirmedAttribution`）、显示**同一批板块**（角色徽 + 事件胶囊 + 驱动句），
  * 信息重复且同一批板块渲染两遍 → 决定只保留归因链。被移除区块的三个能力去向：
- * - 「看该板块预判 →」→ 每个链分支（本页 `@select-sector` → `goSectorDetail`）；
  * - 「归因较弱」/「全部板块 ›」→ 链视图下方的 `chain-foot` 行；
- * - 「今日暂无可确认的驱动板块」空态 → 取消（链树已过滤未确认节点，无分支即无卡）。
+ * - 「今日暂无可确认的驱动板块」空态 → 取消（链树已过滤未确认节点，无分支即无卡）；
+ * - 「看该板块预判 →」→ **2026-09-18 晚已撤掉**（组长裁定）：链分支不再挂预判入口
+ *   （板块详情页仍可从板块四环页 / 风口页进入）。
  *
  * 本 spec 守住三件事：
- * ① 旧区块与其 `sector-insight` 请求彻底消失（不再多拉一次接口）；
+ * ① 旧区块与其 `sector-insight` 出卡逻辑彻底消失（该接口只为首屏原因链拉一次）；
  * ② `chain-foot` 行（归因较弱 / 全部板块）随链存在与否显隐；
- * ③ 链分支的 `select-sector` 与「全部板块」跳转正确。
+ * ③ 「全部板块」跳转正确、链分支不再有预判入口。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -48,13 +49,12 @@ vi.mock('@/modules/analytics/components/MarketInsightCard.vue', () => ({
   default: { name: 'MarketInsightCard', props: ['presentation'], template: '<view class="mic-stub" />' },
 }))
 
-// 链视图桩：本 spec 只验证页面侧接线（props 传入 + select-sector 事件处理），
-// 分支渲染与过滤由 AttributionChainView.mount.spec.ts 覆盖
+// 链视图桩：本 spec 只验证页面侧接线（props 传入 + 链/原因链数据流），
+// 分支渲染、过滤、事件来源过滤由 AttributionChainView.mount.spec.ts 覆盖
 vi.mock('@/shared/components/AttributionChainView.vue', () => ({
   default: {
     name: 'AttributionChainView',
-    props: ['date', 'chain', 'loading', 'mock'],
-    emits: ['select-sector'],
+    props: ['date', 'chain', 'loading', 'mock', 'sectorStages'],
     template: '<view class="acv-stub" />',
   },
 }))
@@ -170,10 +170,54 @@ describe('市场洞见页：主因板块区块并入大盘归因链（2026-09-18
     expect(wrapper.find('.primary-sector-empty').exists()).toBe(false)
   })
 
-  it('不再请求 sector-insight（区块移除后不应多拉一次接口）', async () => {
+  it('首屏拉一次 sector-insight：只为链分支的板块原因链（不再出卡列表）', async () => {
     await mountPage()
 
-    expect(agentApiMock.getSectorInsight).not.toHaveBeenCalled()
+    expect(agentApiMock.getSectorInsight).toHaveBeenCalledTimes(1)
+    expect(agentApiMock.getSectorInsight).toHaveBeenCalledWith(DATE)
+  })
+
+  it('每板块原因链按 ts_code 与板块名双键索引后传给链视图（4 段→3 段）', async () => {
+    agentApiMock.getSectorInsight.mockResolvedValue({
+      date: DATE,
+      hasData: true,
+      candidates: [
+        {
+          ts_code: '885893',
+          name: '国家大基金持股',
+          source: 'review_primary',
+          trace: {
+            present: true,
+            summary: '大基金三期再落子',
+            sectors: ['国家大基金持股'],
+            stages: [
+              { kind: 'phenomenon', headline: '板块大涨 4.03%', claims: [], evidence: [] },
+              { kind: 'trigger', headline: '大基金三期再落子', claims: [], evidence: [] },
+              { kind: 'transmission', headline: '持仓共振走强', claims: [], evidence: [] },
+              { kind: 'impact', headline: '国产替代预期升温', claims: [], evidence: [] },
+            ],
+          },
+        },
+      ],
+    })
+
+    const wrapper = await mountPage()
+    const map = acv(wrapper).props('sectorStages') as Record<string, { name: string; text: string }[]>
+
+    // 双键都索引（链节点可能用 ts_code 或板块名）
+    expect(Object.keys(map).sort()).toEqual(['885893', '国家大基金持股'])
+    // 现象段被丢掉、保源序：触发 → 传导 → 结果
+    expect(map['885893']!.map((r) => r.name)).toEqual(['触发', '传导', '结果'])
+    expect(map['885893']![0]!.text).toBe('大基金三期再落子')
+    expect(map['国家大基金持股']).toEqual(map['885893'])
+  })
+
+  it('sector-insight 失败 → 静默空映射（不阻断报告；链视图不出展开入口）', async () => {
+    agentApiMock.getSectorInsight.mockRejectedValue(new Error('boom'))
+    const wrapper = await mountPage()
+
+    expect(acv(wrapper).props('sectorStages')).toEqual({})
+    expect(wrapper.find('.chain-view-block').exists()).toBe(true)
   })
 
   it('链数据仍受控传给归因链视图（页面拉一次，两处共用不再需要）', async () => {
@@ -203,17 +247,6 @@ describe('市场洞见页：主因板块区块并入大盘归因链（2026-09-18
     const wrapper = await mountPage()
 
     expect(wrapper.find('.chain-foot-weak').text()).toBe('归因较弱')
-  })
-
-  it('链分支「看该板块预判」→ select-sector 事件驱动跳板块详情页（板块名做 URL 编码）', async () => {
-    const wrapper = await mountPage()
-
-    acv(wrapper).vm.$emit('select-sector', '半导体材料')
-    await flushPromises()
-
-    expect(uniMock.navigateTo).toHaveBeenCalledWith({
-      url: `/modules/market/pages/sector-detail?name=${encodeURIComponent('半导体材料')}`,
-    })
   })
 
   it('「全部板块 ›」→ 跳板块四环页并带当前展示日期', async () => {

@@ -21,6 +21,60 @@
 
 ---
 
+## [master] 2026-09-19 — 板块溯源/预判三处修复（溯源雷同 / 去掉「待验证」/ 溯源小卡对齐洞见卡）
+
+**开发者**: Aria
+
+### 修复
+
+- 修「所有板块详情里的溯源都显示同一句大盘结论」：`SectorInsightCard.traceStructured` 渲染判据改为**真正入链**（有角色徽 `relation` 或该板块驱动句 `driver`）。根因：`buildMarketLink` 在**未命中链节点时仍填 `chain.root.summary`**，而 2026-09-18 的链只覆盖 2 个板块 → 其余板块全部显示同一句大盘结论。未入链 → 回退该板块自己的溯源文本（无则整块不渲染）。
+- 板块粒度不再显示「待验证」pill：`sectorPredictionToStructured` 只保留 `hit/miss`，`pending`（含"到期后仍在验证窗口内"）归一 `null`（CFB 头部 pill 消失；折叠态由 `met` 驱动，不受影响）。口径说明：验证窗口 = [到期日, 到期+3 交易日]，**到期 ≠ 出结论**。
+
+### 改进
+
+- 板块预判页（`sector-loop.vue`）行内**溯源小卡**样式对齐组件库 `InsightCard` 溯源块：冷雾蓝底 `#f4f8fe` + 描边 `#dce7f8` + `$r-md` 圆角 + `16rpx 20rpx` 内边距，key `$font-size-sm`/700/字距 2rpx/`#4a6fbf`，正文 `$font-size-sm`/`#5e6673`。只改溯源小卡样式；涨跌、来源 tag、预判概要 pill、依据详情入口与展开体全部保留。
+
+### 测试
+
+- `npx vue-tsc --noEmit` 0 错误；全量 `npx vitest run` 476 passed / 4 failed（4 条为无关存量红，零新增）。
+
+---
+
+## [master] 2026-09-19 — 「大盘归因链」更名「今日驱动板块」+ 卡片视觉改向洞见卡
+
+**开发者**: Aria
+
+### 改进
+
+- 用户可见标题「大盘归因链」→「**今日驱动板块**」（内容主体是「哪些板块驱动大盘」）；组件名 `AttributionChainView` 与 API `attribution-chain` 保持不变。
+- 卡片视觉改向洞见卡（`InsightCard`）：卡内改为「加粗彩色 key + 正文 + 渐变分隔线」行语言；去掉原「大盘根卡浅底块 + 每分支浅蓝驱动句块」的**重复底色块**（同重量色块导致看不出哪个板块是主因）。
+- 大盘行与板块分支同构（key 行 + 归因结论另起一行）；key「大盘」比板块名显眼——**同取品牌蓝**，靠字号 `$font-size-md` 28rpx / 字重 700（板块名 `$font-size-sm` 24rpx / 600）；同行指数涨跌**右对齐**。
+- 展开入口文案「溯源过程」→ 洞见卡同款「**依据详情**」；板块预判页四环行（`sector-loop.vue`）同步统一，**全站洞见类展开入口文案一致**。
+- 逻辑与判别口径**零改动**（弱依据标记 / 未确认驱动原因过滤 / 只展示中台事件 / 3 段展开 / |pct| 降序 / 空态 全部保留）。
+
+### 测试
+
+- `AttributionChainView.mount.spec.ts` 文案断言同步（「溯源过程」→「依据详情」），其余断言零改动（`.acv-sec` / `.acv-driver` 类名保留）。
+- `vue-tsc` 0 错误；定向 3 spec 56 passed；全量 vitest 476 passed / 4 failed（4 条为存量红，零新增）。
+
+---
+
+## [master] 2026-09-18 — 大盘归因链：隐藏「检索」来源新闻条 + 撤掉「看该板块预判 →」入口
+
+**开发者**: Aria
+
+### 改进
+
+- 链上事件胶囊只展示「中台」（`source === 'warehouse'`）来源；`search`（板块定向检索补漏，多为行情综述/研报观点/栏目碎片）在链上隐藏。全被过滤时事件区不渲染（不占位），旧链无 `events` 行为不变。
+- 撤掉每个链分支的「看该板块预判 →」入口（`.acv-forecast` 模板块 + `defineEmits(['select-sector'])` + 页面 `goSectorDetail` 一并删除），预判改由板块详情页/风口页进入；分支只留溯源侧（关系徽 + 板块名 + 驱动句 + 事件胶囊 + 「溯源过程 ▾」）。
+
+### 测试
+
+- `AttributionChainView.mount.spec.ts` 原 4 例预判入口用例替换为 1 例「不挂预判入口」+ 3 例「隐藏检索来源新闻条」；`EventRefChip.mount.spec.ts` 链视图用例由「渲染 2 条（中台+检索）」改为「只渲染中台 1 条」；`traceability.mount.spec.ts` 删除预判跳转用例（余 9 例）。
+- `npx vue-tsc --noEmit` 0 错误；定向 3 spec 56 passed；全量 476 passed / 4 failed（4 条为存量红：`AnalyticsCardLayout` 1 + `insight-detail` 1 + `AlertContent` 2，零新增）。
+
+---
+
 ## [changer] 2026-09-18 — 节奏大师事件可见性与展示一致性修复
 
 **开发者**: 37588

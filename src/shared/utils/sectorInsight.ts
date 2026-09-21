@@ -59,7 +59,13 @@ export function sectorPredictionToStructured(p: SectorInsightPrediction | null |
         met: c.met ?? undefined
       })) ?? [],
     dueLabel: p.dueLabel ?? undefined,
-    verification: p.verification ?? null
+    /**
+     * 验证 pill 口径（2026-09-19 组长裁定「板块详情中的预判不用显示待验证标签」）：
+     * 板块粒度只保留**已验证结论**（hit/miss），`pending`（含"到期仍在验证窗口内"）归一为 `null`
+     * → CFB 不渲染头部「待验证 · {due}」pill（该 pill 对板块卡是噪音，且到期≠出结论易被误读为卡住）。
+     * 注意：折叠态判定由 `met` 驱动，不依赖本字段，故不影响折叠/未命中标签。
+     */
+    verification: p.verification === 'hit' || p.verification === 'miss' ? p.verification : null
   }
 }
 
@@ -223,6 +229,43 @@ export function isUnconfirmedAttribution(traceSummary: string | null | undefined
   const s = String(traceSummary ?? '').replace(/\s+/g, '')
   if (!s) return true
   return UNCONFIRMED_ATTRIBUTION_RE.test(s)
+}
+
+/** 展示用的原因链段（组件库 `InsightCard.traceStages` / 链分支展开共用形状） */
+export interface ReasonStageRow {
+  name: string
+  text: string
+}
+
+/** 段名映射：板块溯源 4 段 → 展示 3 段（与大盘主因链 3 步同形） */
+const REASON_STAGE_LABELS: Record<string, string> = {
+  trigger: '触发',
+  transmission: '传导',
+  impact: '结果'
+}
+
+/**
+ * 板块溯源链 `stages`（4 段）→ 展示用 **3 段**（触发 / 传导 / 结果）。
+ *
+ * 2026-09-18 口径（组长裁定「也是和大盘主因链一样显示三个字段：触发、传导、结果」）：
+ * - 保留 `trigger`（触发，**这才是原因**）、`transmission`（传导）、`impact`（结果，即板块的"影响"段）；
+ * - **丢弃 `phenomenon`（现象）**—— 现象不是原因，且溯源行/标题本身已是现象句；
+ * - **保源序**（触发 → 传导 → 结果 的顺序本身是语义，不排序）；
+ * - 段名未知（未来新增段）或 `headline` 去空白后为空 → 跳过该段（不渲染空行）；
+ * - 全空 → 返回 `[]`（调用方侧折叠入口不出现，不编造空链）。
+ *
+ * 单点口径：`SectorInsightCard`（板块详情 / 四环洞见卡）与市场洞见链分支展开共用本函数。
+ */
+export function toReasonStages(
+  stages: Array<{ kind?: string; headline?: string }> | null | undefined
+): ReasonStageRow[] {
+  const rows: ReasonStageRow[] = []
+  for (const st of stages ?? []) {
+    const name = REASON_STAGE_LABELS[String(st?.kind ?? '').trim()]
+    const text = String(st?.headline ?? '').trim()
+    if (name && text) rows.push({ name, text })
+  }
+  return rows
 }
 
 /**

@@ -21,6 +21,7 @@
       :trace="traceText"
       :trace-structured="traceStructured"
       :trace-detail="traceDetailText"
+      :trace-stages="reasonStages"
       :time="timeLabel"
       :structured="structured"
       :display-mode="displayMode"
@@ -33,7 +34,7 @@
 import { computed } from 'vue'
 import InsightCard from './InsightCard.vue'
 import { LoadingState } from '@/shared/components'
-import { sectorPredictionToStructured, relationLabel, extractionWeakLabel } from '@/shared/utils/sectorInsight'
+import { sectorPredictionToStructured, relationLabel, extractionWeakLabel, toReasonStages } from '@/shared/utils/sectorInsight'
 import type { SectorInsightCandidate } from '@/shared/api/modules/agent'
 import type { SectorMarketLink } from '@/shared/utils/sectorInsight'
 
@@ -161,11 +162,15 @@ const structured = computed(() => (props.traceOnly ? null : structuredAll.value)
 /**
  * 溯源行结构化数据（V2 大盘联动）：marketLink 传入 → InsightCard 结构化溯源
  * （大盘一句话行；入链时附加角色徽 + 驱动句行 + 链上事件胶囊）；未传入 → null 回退文本形态 traceText。
+ *
+ * 2026-09-19 组长裁定（修复「所有板块详情的溯源都是同一句大盘结论」）：**必须真正入链**才渲染该块——
+ * 链只覆盖少数板块（如 2026-09-18 仅 2 个），未入链板块原先仍拿到 `chain.root.summary`（同一句大盘结论）
+ * 充当自己的溯源，看起来"每个板块溯源都一样"。判定口径 = 有角色徽（relation）或有该板块驱动句（driver）；
+ * 未入链 → null，回退该板块自己的溯源文本（无则整块不渲染）。
  */
 const traceStructured = computed(() => {
   const m = props.marketLink
-  // 链无大盘一句话且未入链 → 无可用内容，回退文本形态（避免空溯源卡）
-  if (!m || (!m.summary && !m.relation)) return null
+  if (!m || (!m.relation && !m.driver?.trim())) return null
   return {
     summary: m.summary,
     index_pct: m.index_pct,
@@ -178,6 +183,12 @@ const traceStructured = computed(() => {
     weakText: extractionWeakLabel(m.extraction)
   }
 })
+
+/**
+ * 板块原因链 3 段（触发 / 传导 / 结果）：映射口径**单点**在 `toReasonStages`
+ * （与市场洞见链分支展开共用同一函数，避免两处口径漂移）。
+ */
+const reasonStages = computed(() => toReasonStages(props.candidate?.trace?.stages))
 
 /** 依据详情正文：显式传入优先；文本溯源形态下若与溯源行同句则不重复展示（返回空 → 入口不渲染） */
 const traceDetailText = computed(() => {

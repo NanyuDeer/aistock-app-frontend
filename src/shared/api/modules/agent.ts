@@ -564,11 +564,26 @@ export interface SectorInsightQuote {
   lead_stock: string | null
 }
 
+/** 板块溯源链单段（4 段固定语义：phenomenon → trigger → transmission → impact） */
+export interface SectorInsightTraceStage {
+  kind: string
+  headline: string
+  claims: string[]
+  /** 该段证据来源；url 可点跳原文，title-only 也保留（url 缺失为 null） */
+  evidence: { url: string | null; title: string | null }[]
+}
+
 export interface SectorInsightTrace {
   present: boolean
   status?: 'completed' | 'insufficient'
   summary: string | null
   sectors: string[]
+  /**
+   * 该板块自己的完整 4 段原因链（2026-09-18 app-api 加性透出，保源序）。
+   * 展示口径：只取 3 段给用户看（触发 / 传导 / 结果←impact），`phenomenon`（现象）不展示
+   * —— 与大盘主因链的 3 步同形。旧数据/无链 → 缺省不渲染。
+   */
+  stages?: SectorInsightTraceStage[]
 }
 
 export type SectorDirection = 'bullish' | 'bearish' | 'neutral'
