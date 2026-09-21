@@ -2,7 +2,7 @@
 
 ## 本批外部记录（2026-09-21 节奏大师：时点自动展示 + 生成时刻显示 + 事件日历放开 5 日）
 
-> 随 `changer` 提交（PR #xxx）。此段仅供本地留痕。
+> 随 `changer` 提交（PR #136）。此段仅供本地留痕。
 
 - 范围：仅 `aistock-app-frontend` 改动（8 源文件/测试 + rhythm/AGENTS.md + CHANGELOG）；`aistock-frontend`（web）无对等组件、app-api 不消费 event_window → 无需同步；agent-py 配套改动单独提交（CHANGELOG 另条记录）。
 - 判定表 `pickSlotByClock()`（UTC+8 固定）：<8:30→after_close、8:30-12:30→morning、12:30-16:05→midday、≥16:05→after_close；onLoad 一次 + onShow 跨时段重判定（不轮询）；目标 slot 缺失回退 SLOT_ORDER 就近（B6）。
