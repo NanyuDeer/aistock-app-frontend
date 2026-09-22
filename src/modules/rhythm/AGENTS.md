@@ -10,10 +10,10 @@
 
 | 文件                                   | 说明                                                                                                                                                                                                                                          |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pages/index.vue`                    | 节奏大师详情页（SubPageCard2 容器；内容流 = 顶部 **RhythmCalendarPanel**（折叠近 7 日紧凑条 / 展开 60 交易日周网格，仓位/事件 Segmented；事件模式 = macro 角标 + 选中日事件行）+ 三时点 pill / 沿用前值 fallback + **节奏洞见卡**（InsightCard 摘要：仓位/档位/interval 分支上移）→ RhythmCard（明细已去重瘦身）+ EmptyState 兜底） |
+| `pages/index.vue`                    | 节奏大师详情页（SubPageCard2 容器；内容流 = 顶部 **RhythmCalendarPanel**（折叠近 7 日紧凑条 / 展开 60 交易日周网格，仓位/事件 Segmented；事件模式 = macro 角标 + 选中日事件行）+ 三时点 pill / 沿用前值 fallback + **节奏洞见卡**（InsightCard 摘要：仓位/档位/interval 分支上移）→ RhythmCard（明细已去重瘦身）+ EmptyState 兜底）。**2026-09-21 时点自动选中**：进页/onShow 按 `pickSlotByClock()`（上海时刻：<8:30→after_close、8:30-12:30→morning、12:30-16:05→midday、≥16:05→after_close）自动选中对应 refresh_slot，无需手动切三 tab；目标 slot 缺失回退 SLOT_ORDER 就近 |
 | `components/RhythmCalendarPanel.vue` | 顶部可折叠双模式日历面板（2026-09-03）：折叠 = 近 7 交易日紧凑条（左旧右新，点格切日）；展开 = 60 交易日自然周网格（默认展开，`rhythm.calendar.expanded` storage 记忆）；仓位/事件 Segmented 仅展开态；事件模式 = macro 角标（high 红点计数 / medium-low 灰点）+ 选中日事件行；点格以 `pick` 事件上抛切日（不导航）                             |
-| `components/RhythmCard.vue`          | 状态卡组件（瘦身后保留：score + 五档色带 / 情绪周期 chip / 温度曲线 / 事件日历 / conflict / data\_missing；仓位长句、档位 chip、证据行、关键节点分支已上移洞见卡——**同屏去重**）                                                                                                                      |
-| `utils/rhythmInsight.ts`             | 洞见卡映射（2026-09-03）：`toRhythmInsight(card, slot, date)` → `RhythmInsightCard`（结构化子集对齐 ConditionalForecastBlock/InsightCard 入参；不可拼装返回 null → 整卡不渲染）                                                                                            |
+| `components/RhythmCard.vue`          | 状态卡组件（瘦身后保留：score + 五档色带 / 情绪周期 chip / 温度曲线 / 事件日历 / conflict / data\_missing；仓位长句、档位 chip、证据行、关键节点分支已上移洞见卡——**同屏去重**）。**2026-09-21**：事件日历标题"未来 5 交易日事件日历"→"未来事件日历"（展示窗不再限 5 交易日，改全量） |
+| `utils/rhythmInsight.ts`             | 洞见卡映射（2026-09-03）：`toRhythmInsight(card, slot, date, createdAt?)` → `RhythmInsightCard`（结构化子集对齐 ConditionalForecastBlock/InsightCard 入参；不可拼装返回 null → 整卡不渲染）。**2026-09-21**：右上角时间改展示**节奏生成时刻**——`MM-DD · HH:MM`（日期取 targetDate、时分取所选版本 created_at 上海时区；createdAt 缺省/非法回退 slot 标签旧语义），B7：不再拼 target_date+slot 标签 |
 
 ## 首页节奏卡（modules/home/components/MorningContent.vue）
 
@@ -51,7 +51,7 @@
 | `position_band`                | `{ min?, max?, text }`                     | 仓位区间（min/max 缺失=无区间语义，text 必须展示；`conflict=true` 时隐藏，G2 背离纪律）    |
 | `phase` / `phase_evidence`     | string? / record?                          | 阶段判定与证据                                                         |
 | `temperature_series`           | `{ date, score }[]`                        | 温度序列（分时点状态卡趋势）                                                  |
-| `event_window`                 | `RhythmEvent[]`                            | 事件窗口（delivery/earnings/seed/macro）                              |
+| `event_window`                 | `RhythmEvent[]`                            | 事件窗口（delivery/earnings/seed/macro；**2026-09-21 起展示窗放开 5 交易日限制**：agent-py 单次拉全量展示窗 + 切 ≤5 交易日分析子窗，本字段=全量事件投影（过滤 importance≥medium、上限 30）——仅展示，分析/锚点/分支仍 5 交易日口径） |
 | `event_source_missing`         | boolean?                                   | 事件源缺失标记（缺失时展示缺源提示）                                              |
 | `event_high_hint`              | string?                                    | 高影响事件提示文案                                                       |
 | `next_event_anchor`            | `{ title, event_date, days_until, note }?` | 下一重大事件锚点（窗口内首条 high 事件 + 距目标交易日**交易日差**，2026-09-14 由自然日改为交易日口径；`note` ∈ 今日/明日/N 天后；无锚点整块不渲染） |
@@ -75,7 +75,7 @@
 
 - 网格按交易日（服务端展开，前端不依赖交易日历），展开态为自然周网格：周一列开头、周末列留空
 
-- 档位色板/短码唯一副本见 `src/shared/utils/rhythmColors.ts`（ice 紫灰 `#8a6fae` / low 青 `#2f9e9e` / normal 主蓝 `#4d7cfe` / active 橙 `#f59e0b` / euphoria 红 `#ef4444`；灰格 `#eceef1`），禁止组件内第二份副本
+- 档位色板/短码唯一副本见 `src/shared/utils/rhythmColors.ts`（ice 紫灰 `#8a6fae` / low 青 `#2f9e9e` / normal 主蓝 `#4d7cfe` / active 橙 `#f59e0b` / euphoria 红 `#ef4444`；灰格 `#eceef1`），禁止组件内第二份副本；短码读取**统一走 `levelShort()`**（键守卫 `isRhythmLevelKey()`），短码表类型为「按档位键映射」（定义处漏键即编译报错）。仓位文案前缀剥离正则在本面板 :109 与 `utils/rhythmInsight.ts`、恐贪页 `fgRhythmSummary.ts` **三处同源，改格式须同批改**。
 
 - `level=null` = 灰格（行缺失 / 沿用前值），如实展示不伪造
 

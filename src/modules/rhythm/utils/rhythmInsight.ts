@@ -1,5 +1,6 @@
 import type { RhythmBranch, RhythmCard } from '@/shared/api/modules/agent'
 import { formatBandText } from '@/shared/utils/rhythmBand'
+import { shanghaiDateTimeParts } from '@/shared/utils/tradingTime'
 
 /** 洞见卡结构化预判子集（结构性对齐 ConditionalForecastBlock/InsightCard 入参，仅节奏用到的字段） */
 export interface RhythmInsightCondition {
@@ -58,8 +59,28 @@ function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
   return condition
 }
 
+/** 洞见卡右上角时间串：MM-DD · HH:MM（需求 2：日期取 targetDate、时间取节奏生成时刻，
+ * 均为上海时区）。createdAt 为版本生成时间（PG timestamptz → ISO，可能带 Z/偏移；
+ * 如 after_close 卡 T-1 生成、targetDate=T，日期须固定显示 T 而非生成日）。
+ * createdAt 缺省/非法回退旧语义（slot 标签），兼容旧数据。 */
+function formatCardTime(targetDate: string, slot: string, createdAt?: string): string {
+  const datePart = targetDate.slice(5)
+  const fallback = `${datePart} · ${SLOT_LABEL[slot] ?? slot}`
+  if (!createdAt) return fallback
+  const ts = new Date(createdAt)
+  if (Number.isNaN(ts.getTime())) return fallback
+  const { hour, minute } = shanghaiDateTimeParts(ts)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${datePart} · ${p(hour)}:${p(minute)}`
+}
+
 /** 节奏状态卡 → 统一洞见卡入参；不可拼装/为空返回 null（整卡不渲染，杜绝空壳与臆造） */
-export function toRhythmInsight(card: RhythmCard | null | undefined, slot: string, targetDate: string): RhythmInsightCard | null {
+export function toRhythmInsight(
+  card: RhythmCard | null | undefined,
+  slot: string,
+  targetDate: string,
+  createdAt?: string,
+): RhythmInsightCard | null {
   if (!card) return null
   const level = LEVEL_LABEL[card.level ?? ''] ?? ''
   const band = formatBandText(card.position_band?.text)
@@ -70,7 +91,7 @@ export function toRhythmInsight(card: RhythmCard | null | undefined, slot: strin
 
   const structured = (card.branches ?? []).map(toCondition).filter((c): c is RhythmInsightCondition => c !== null)
   const trace = buildTrace(card)
-  const time = `${targetDate.slice(5)} · ${SLOT_LABEL[slot] ?? slot}`
+  const time = formatCardTime(targetDate, slot, createdAt)
 
   return {
     title,

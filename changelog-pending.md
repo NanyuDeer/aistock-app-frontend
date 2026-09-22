@@ -1,5 +1,15 @@
 # changelog-pending.md（待提交修改记录）
 
+## 本批外部记录（2026-09-21 节奏大师：时点自动展示 + 生成时刻显示 + 事件日历放开 5 日）
+
+> 随 `changer` 提交（PR #136）。此段仅供本地留痕。
+
+- 范围：仅 `aistock-app-frontend` 改动（8 源文件/测试 + rhythm/AGENTS.md + CHANGELOG）；`aistock-frontend`（web）无对等组件、app-api 不消费 event_window → 无需同步；agent-py 配套改动单独提交（CHANGELOG 另条记录）。
+- 判定表 `pickSlotByClock()`（UTC+8 固定）：<8:30→after_close、8:30-12:30→morning、12:30-16:05→midday、≥16:05→after_close；onLoad 一次 + onShow 跨时段重判定（不轮询）；目标 slot 缺失回退 SLOT_ORDER 就近（B6）。
+- 洞见卡时间 `MM-DD · HH:MM`（日期=targetDate、时分=created_at 上海时区；createdAt 缺省/非法回退 slot 标签）——B7/B8：toRhythmInsight 增 createdAt 第 4 参。
+- 观感/口径（分歧未物理消除，approved）：锚点(5日窗)与列表首条(全量)允许并存；卡片(high/medium)与面板(macro+delivery)口径不同定位不同。
+- 验证：node:test 基线 252→256/256/0 一致；vue-tsc 通过；H5 模块编译 200（修复 `<script setup>` 误 export 的 500）。
+
 ## 2026-09-19 板块溯源/预判三处修复（① 溯源雷同、④ 去掉「待验证」、⑤ 溯源小卡对齐洞见卡）
 
 - **① 修「所有板块详情的溯源都是同一句大盘结论」**：`SectorInsightCard.traceStructured` 的渲染判据改为**真正入链**（有 `relation` 或该板块 `driver` 非空）。根因：`buildMarketLink` 在**未命中链节点时仍填 `chain.root.summary`**，而 2026-09-18 的链只覆盖 2 个板块（汽车芯片/国家大基金持股）→ 其余所有板块都显示同一句大盘结论。未入链 → 回退该板块自己的溯源文本（无则整块不渲染）。
@@ -66,6 +76,7 @@
 - **验收**：`npx vue-tsc --noEmit` **TSC_OK**；全量 `npx vitest run` → **477 passed / 4 failed**（4 条为**本次无关**的存量红：`AnalyticsCardLayout` 1 + `insight-detail` 1 + `AlertContent` 2；改动前基线 475 passed / 同 4 条 → **零新增失败**）。
 - **组件库归档（本轮**未做**，需你定）**：查证发现 ① app 的 `InsightCard.vue`（856 行）已**领先**组件库版本（800 行）——`titleTag` / `linePlacement` / `traceWord` 等 lib 都没有；② `SectorInsightCard.vue` 依赖 app 专属模块（`@/shared/api` 类型 + `@/shared/utils/sectorInsight`，后者又依赖 `expandConditionalBranches`），直接搬进 lib 会 type-check 不过，需先做依赖下沉或改成结构化 props；③ lib README 写明改动走「分支 → PR → review」流程（林晓研维护）。故**本轮未动 `aistock-component-lib`**，建议单独立项做"组件库回灌"（先把 app 领先的改动回灌，再归档 SectorInsightCard）。
 - **跨端**：仅改 `aistock-app-frontend`；`aistock-frontend`（web）无该页面 → 无需同步；app-api 已在 `24b53a5` 提供 `stages`（本轮 0 改动）；agent-py 0 改动。
+>>>>>>> origin/master
 
 ## 2026-09-18 市场洞见页：删除「今日影响大盘的主要板块」区块，能力并入大盘归因链
 

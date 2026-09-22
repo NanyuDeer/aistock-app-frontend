@@ -52,3 +52,34 @@ test('F2：主请求 getRhythmMaster 包 try/catch（网络错误不 unhandled r
   assert.match(loadVersions, /res = await agentApi\.getRhythmMaster\(d\)/)
   assert.match(loadVersions, /} catch \{/)
 })
+
+test('需求 2：pickSlotByClock 按上海时刻自动选中时点（固定 UTC+8，不依赖设备时区）', () => {
+  // 从源码提取纯函数体；将函数体内的 new Date() 替换为注入的 now()（stub 控制时刻），
+  // shanghaiDateTimeParts 也注入 stub（避免 import .vue 的依赖链）
+  const fn = pageSource.match(/function pickSlotByClock\(date\?: Date\): string \{\n([\s\S]*?)\n\}/)?.[1] ?? ''
+  assert.ok(fn, '应存在 pickSlotByClock 函数（stub 依赖后可直接执行；<script setup> 内不可 export，故不匹配 export 前缀）')
+  const body = fn.replace(/shanghaiDateTimeParts\(date \?\? new Date\(\)\)/, 'shanghaiDateTimeParts(now())')
+  const shanghaiDateTimeParts = (d: Date) => {
+    const sh = new Date(d.getTime() + 8 * 60 * 60 * 1000)
+    return { hour: sh.getUTCHours(), minute: sh.getUTCMinutes(), month: 1, day: 1, weekday: 1, year: 2026 }
+  }
+  const pick = new Function('shanghaiDateTimeParts', 'now', `${body}\nreturn pickSlotByClock()`)
+  const at = (iso: string) => pick(shanghaiDateTimeParts, () => new Date(iso))
+  // 上海时间边界：08:29 → after_close；08:30 → morning；12:29 → morning；12:30 → midday
+  // 16:04 → midday；16:05 → after_close（对齐 config 生成时刻 9:00/12:30/16:05）
+  assert.equal(at('2026-09-21T00:29:00Z'), 'after_close')
+  assert.equal(at('2026-09-21T00:30:00Z'), 'morning')
+  assert.equal(at('2026-09-21T04:29:00Z'), 'morning')
+  assert.equal(at('2026-09-21T04:30:00Z'), 'midday')
+  assert.equal(at('2026-09-21T08:04:00Z'), 'midday')
+  assert.equal(at('2026-09-21T08:05:00Z'), 'after_close')
+  // 午夜后（上海 00:00，UTC 前一日 16:00）→ after_close（weekday 未判定，恒按时刻）
+  assert.equal(at('2026-09-20T16:10:00Z'), 'after_close')
+})
+
+test('需求 2：loadVersions 成功后改走 selectSlotByClock（不再默认 list[0]=midday），含 onShow 重判定', () => {
+  assert.match(pageSource, /selectSlotByClock\(\)\s*\/\/\s*需求/)
+  assert.doesNotMatch(pageSource, /activeSlot\.value = list\[0\]\?\.refresh_slot/)
+  assert.match(pageSource, /onShow\(/)
+  assert.match(pageSource, /pickSlotByClock\(\)/)
+})
