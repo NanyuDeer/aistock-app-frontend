@@ -28,8 +28,10 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *  2026-09-18：节奏大师事件可见性修复（PR #134）新增 4 条（rhythmBand.spec.ts + 节奏卡/日历 spec 扩充）。
  *  2026-09-21：节奏大师「事件提前展示 + 按生成时间自动选中时点」新增 4 条
  *    （rhythmInsight.spec.ts 时间显示 2 条 + index.spec.ts 时点判定/接线 2 条）。
+ *  2026-09-22：Task 14 事件区分层折叠 + overflow 适配新增 3 条
+ *    （RhythmCard.spec.ts 折叠 2 条 + RhythmCalendarPanel.spec.ts overflow「另有 N 条」1 条）。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '256/256/0'
+const EXPECTED_BASELINE = '259/259/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {

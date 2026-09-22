@@ -80,3 +80,17 @@ test('PHASE_META 覆盖后端五态（含启动/主升）', () => {
   assert.ok(source.includes('启动'))
   assert.ok(source.includes('主升'))
 })
+
+test('事件区分层折叠：event_window_near_end_date 近窗平铺 + 更远折叠计数（默认收起）', () => {
+  assert.match(source, /event_window_near_end_date/)
+  assert.match(source, /nearEvents\s*=\s*computed/)
+  assert.match(source, /farEvents\s*=\s*computed/)
+  assert.match(source, /更远事件（共 \{\{ farEvents\.length \}\} 条）/)
+  assert.match(source, /farExpanded/)
+  assert.match(source, /rc-evfar/)
+})
+
+test('near_end_date 为 null 时近窗全部平铺（不折叠）', () => {
+  assert.match(source, /if \(!end\) return props\.card\.event_window \?\? \[\]/)
+  assert.match(source, /if \(!end\) return \[\]/)
+})

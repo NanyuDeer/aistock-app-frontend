@@ -475,6 +475,8 @@ export interface RhythmEvent {
   source: 'L1' | 'L2' | 'L3' | 'L4'
   event_time?: string | null
   result?: string | null
+  /** publicRouter 网格行可含 `{overflow:N}` 占位条目（无 date/type/title/importance），本字段承载其溢出计数（控制器裁决①） */
+  overflow?: number
 }
 export interface RhythmPositionAction {
   direction: 'add' | 'reduce' | 'hold'
@@ -510,6 +512,7 @@ export interface RhythmCard {
   phase_evidence?: Record<string, unknown>
   temperature_series: { date: string; score: number }[]
   event_window: Pick<RhythmEvent, 'date' | 'type' | 'title' | 'importance'>[]
+  event_window_near_end_date?: string | null
   event_source_missing?: boolean
   event_high_hint?: string
   next_event_anchor?: { title: string; event_date: string; days_until: number; note: string; importance?: 'high' | 'medium' } | null

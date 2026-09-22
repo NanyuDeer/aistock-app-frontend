@@ -65,14 +65,19 @@
       <!-- 事件模式：选中日事件行（tradingvane 风格：影响度·时间·标题；result 尾注；US 隔夜角标） -->
       <view v-if="mode === 'event'" class="ev-panel">
         <view class="ev-panel-title">当日事件</view>
-        <template v-if="selectedEvents.length">
-          <view v-for="(ev, i) in selectedEvents" :key="i" class="ev-item">
-            <view class="ev-imp" :class="`imp-${ev.importance}`"></view>
-            <text class="ev-time">{{ ev.event_time ?? '--:--' }}</text>
-            <text class="ev-title">{{ ev.title }}</text>
-            <text v-if="isOvernight(ev)" class="ev-tag">隔夜</text>
-            <text v-if="ev.result" class="ev-result">{{ ev.result }}</text>
-          </view>
+        <template v-if="selectedEvents.length || selectedOverflow > 0">
+          <template v-if="selectedEvents.length">
+            <view v-for="(ev, i) in selectedEvents" :key="i" class="ev-item">
+              <view class="ev-imp" :class="`imp-${ev.importance}`"></view>
+              <text class="ev-time">{{ ev.event_time ?? '--:--' }}</text>
+              <text class="ev-title">{{ ev.title }}</text>
+              <text v-if="isOvernight(ev)" class="ev-tag">隔夜</text>
+              <text v-if="ev.result" class="ev-result">{{ ev.result }}</text>
+            </view>
+            <!-- 控制器裁决①：当日真实事件未列出 overflow 占位条目外的更多条，补一行计数而非空白行 -->
+            <view v-if="selectedOverflow > 0" class="ev-more">另有 {{ selectedOverflow }} 条</view>
+          </template>
+          <view v-else class="ev-more">另有 {{ selectedOverflow }} 条</view>
         </template>
         <text v-else class="ev-empty">当日无已登记事件</text>
       </view>
@@ -118,8 +123,13 @@ function todayStr(): string {
 }
 
 // 事件角标口径：high 计数 >0 → 红点+计数；否则当日有 medium/low → 灰点
+// 控制器裁决①：publicRouter 网格行可含 `{overflow:N}` 占位（无 title/importance），
+// 在真实事件渲染/计数前过滤，防空白行；溢出条数另算显示「另有 N 条」。
 function eventsOf(d: RhythmCalendarDay): RhythmEvent[] {
-  return d.events ?? []
+  return (d.events ?? []).filter((e) => e.title)
+}
+function overflowCount(d: RhythmCalendarDay): number {
+  return (d.events ?? []).reduce((sum, e) => sum + ((e.overflow ?? 0) || 0), 0)
 }
 function highCount(d: RhythmCalendarDay): number {
   return eventsOf(d).filter((e) => e.importance === 'high').length
@@ -130,12 +140,13 @@ function isOvernight(ev: RhythmEvent): boolean {
   return !!ev.event_time && Number(ev.event_time.slice(0, 2)) >= 15
 }
 
-const selectedEvents = computed<RhythmEvent[]>(() => {
+const selectedDay = computed<RhythmCalendarDay | undefined>(() => {
   // 交易日数据源优先；周末/节假日命中不到交易日时回退自然日数据源，保证展开网格的事件角标与事件面板一致
-  const day = ascending.value.find((d) => d.date === props.targetDate)
+  return ascending.value.find((d) => d.date === props.targetDate)
     ?? dayListRaw.value.find((d) => d.date === props.targetDate)
-  return day ? eventsOf(day) : []
 })
+const selectedEvents = computed<RhythmEvent[]>(() => (selectedDay.value ? eventsOf(selectedDay.value) : []))
+const selectedOverflow = computed<number>(() => (selectedDay.value ? overflowCount(selectedDay.value) : 0))
 
 // —— 展开网格：自然月铺满（周一列开头；含周末/节假日 cell=灰格 level=null；每行恒 7 列）——
 const WEEK_COL: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 } // jsDay(0=周日) → col(0=周一)
@@ -352,4 +363,6 @@ agentApi.getRhythmMasterCalendar(60).then((res) => { dayList.value = res?.days ?
   text-overflow: ellipsis;
 }
 .ev-empty { display: block; font-size: 24rpx; color: $ink-mute; padding: 8rpx 0; }
+/* 控制器裁决①：overflow 占位条目的「另有 N 条」计数行 */
+.ev-more { display: block; font-size: 24rpx; color: $primary; padding: 8rpx 0; }
 </style>
