@@ -66,11 +66,24 @@
         <text class="rc-anchor-note">{{ card.next_event_anchor.note }}（{{ card.next_event_anchor.event_date }}）</text>
       </view>
       <view class="rc-evlist" v-if="card.event_window && card.event_window.length">
-        <view class="rc-evit" v-for="(ev, i) in card.event_window" :key="i">
+        <!-- 近窗平铺：event.date <= event_window_near_end_date；null 时全部平铺（裁决 C4） -->
+        <view class="rc-evit" v-for="(ev, i) in nearEvents" :key="i">
           <text class="rc-evd">{{ ev.date }}</text>
           <text class="rc-evtag">{{ eventTypeLabel(ev.type) }}</text>
           <text class="rc-evimp" :class="importanceCls(ev.importance)">{{ ev.importance }}</text>
           <text class="rc-evtitle">{{ ev.title }}</text>
+        </view>
+        <!-- 更远折叠（裁决 C4：文案不写死数字，计数取自 farEvents.length） -->
+        <view v-if="farEvents.length" class="rc-evfar">
+          <view v-if="!farExpanded" class="rc-far-toggle" @tap="farExpanded = true">更远事件（共 {{ farEvents.length }} 条）</view>
+          <template v-if="farExpanded">
+            <view v-for="(ev, i) in farEvents" :key="'f' + i" class="rc-evit">
+              <text class="rc-evd">{{ ev.date }}</text>
+              <text class="rc-evtag">{{ eventTypeLabel(ev.type) }}</text>
+              <text class="rc-evimp" :class="importanceCls(ev.importance)">{{ ev.importance }}</text>
+              <text class="rc-evtitle">{{ ev.title }}</text>
+            </view>
+          </template>
         </view>
       </view>
       <view class="rc-empty" v-else-if="card.event_source_missing">
@@ -95,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { RhythmCard as RhythmCardData } from '@/shared/api/modules/agent'
 
 const props = withDefaults(
@@ -148,6 +161,19 @@ const refreshSlotLabel = computed(() => {
 })
 
 // ── 事件日历 ──
+// 分层折叠（Task 14）：近窗（date <= event_window_near_end_date）平铺；更远折叠默认收起。
+// null（越年后端置 null）= 近窗全部平铺，不折叠（裁决 C4）。
+const farExpanded = ref(false)
+const nearEvents = computed(() => {
+  const end = props.card.event_window_near_end_date
+  if (!end) return props.card.event_window ?? [] // null → 近窗全部平铺（裁决 C4）
+  return (props.card.event_window ?? []).filter((ev) => ev.date <= end)
+})
+const farEvents = computed(() => {
+  const end = props.card.event_window_near_end_date
+  if (!end) return []
+  return (props.card.event_window ?? []).filter((ev) => ev.date > end)
+})
 function eventTypeLabel(t: string): string {
   const m: Record<string, string> = { delivery: '交割日', earnings: '财报', macro: '宏观', seed: '种子' }
   return m[t] ?? t
@@ -224,6 +250,8 @@ function tempValue(score: number): string {
 .rc-evimp.imp-med { color: #b45309; background: rgba($warning, 0.14); }
 .rc-evimp.imp-low { color: $ink-soft; background: rgba($ink-soft, 0.1); }
 .rc-evtitle { font-size: 26rpx; color: $ink; flex: 1; }
+.rc-evfar { display: flex; flex-direction: column; gap: 14rpx; }
+.rc-far-toggle { font-size: 24rpx; color: $primary; }
 .rc-empty { font-size: 26rpx; color: $ink-soft; }
 
 .rc-hint { font-size: 26rpx; color: $warning; background: rgba($warning, 0.08); border: 1rpx solid rgba($warning, 0.35); border-radius: 12rpx; padding: 16rpx 20rpx; margin-bottom: 20rpx; }
