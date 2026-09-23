@@ -129,6 +129,7 @@ async function onPanelPick(date: string) {
   if (date === targetDate.value) return
   requestedDate.value = date
   targetDate.value = date
+  isFallback.value = false // 用户新一轮点选先清残留提示；该日无数据时回退链重新置位（态 2 可达）
   await loadVersions(date)
 }
 
@@ -160,7 +161,6 @@ async function loadVersions(date?: string) {
     if (prev && prev !== d) return loadVersions(prev)
     return
   }
-  isFallback.value = false // 回退后切回正常日时清除残留提示
   versions.value = list
   targetDate.value = d
 }

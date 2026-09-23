@@ -96,6 +96,12 @@ test('v3 极简：requestedDate 分离 + 未来日/无报告提示三态（spec 
   assert.match(pageSource, /节奏尚未生成，当前展示/)
   assert.match(pageSource, /非交易日\/当日无报告，沿用前值/)
   assert.match(pageSource, /requestedDate\.value = date/)
+  // 态 2 可达性（审查修复）：isFallback 重置在 onPanelPick 入口（用户新一轮点选），
+  // loadVersions 内不清除——否则回退链递归成功会清掉刚置位的标志，点非交易日/无报告日回退后提示立即消失
+  const onPanelPickSrc = pageSource.match(/async function onPanelPick[\s\S]*?\n\}/)?.[0] ?? ''
+  assert.match(onPanelPickSrc, /isFallback\.value = false/)
+  const loadVersionsSrc = pageSource.match(/async function loadVersions[\s\S]*?\n\}/)?.[0] ?? ''
+  assert.doesNotMatch(loadVersionsSrc, /isFallback\.value = false/)
 })
 
 test('v3 极简：pageTitle 统一「节奏（date）」（删明日/今日 slot 语义错位）', () => {
