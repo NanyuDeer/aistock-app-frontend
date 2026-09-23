@@ -33,8 +33,9 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  * 2026-09-23：v3 极简展示新增 6 条（rhythmEventWindow.spec.ts 未来 3 事件分组）。
  * 2026-09-23：v3 极简 RhythmCard 事件区收敛 + 色彩三色 + 空态占位（-2 旧断言 +5 新断言）。
  * 2026-09-23：时间行拆主/次（rhythmInsight time + timeNote）改 1 增 1。
+ * 2026-09-23：v3 极简页面改造（-2 时点判定旧断言 +4 pickVersion/提示行/pageTitle 新断言）。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '269/269/0'
+const EXPECTED_BASELINE = '271/271/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {

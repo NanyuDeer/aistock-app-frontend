@@ -4,18 +4,7 @@
       <!-- 顶部可折叠双模式日历面板（仓位/事件；折叠=近 7 日紧凑条、展开=60 日周网格） -->
       <RhythmCalendarPanel :target-date="targetDate" @pick="onPanelPick" />
 
-      <view class="slots" v-if="versions.length > 1">
-        <view
-          v-for="v in versions"
-          :key="v.refresh_slot"
-          class="slot"
-          :class="{ active: activeSlot === v.refresh_slot }"
-          @tap="switchSlot(v.refresh_slot)"
-        >
-          {{ slotLabel(v.refresh_slot) }}
-        </view>
-      </view>
-      <view class="fallback" v-if="isFallback">非交易日/当日无报告，沿用前值（{{ basisLabel }}）</view>
+      <view class="fallback" v-if="pendingHint">{{ pendingHint }}</view>
       <view class="insight-wrap" v-if="insightCard">
         <InsightCard
           type="market"
@@ -24,6 +13,7 @@
           :trace="insightCard.trace ?? ''"
           :structured="insightCard.structured ?? null"
           :time="insightCard.time"
+          :time-note="insightCard.timeNote"
         />
       </view>
       <RhythmCard
@@ -45,7 +35,7 @@ import { computed, ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { EmptyState, InsightCard } from '@/shared/components'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import { shanghaiDateTimeParts } from '@/shared/utils/tradingTime'
+import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import RhythmCard from '../components/RhythmCard.vue'
 import RhythmCalendarPanel from '../components/RhythmCalendarPanel.vue'
 import { toRhythmInsight } from '../utils/rhythmInsight'
@@ -60,88 +50,84 @@ interface RhythmMasterVersion {
 }
 
 const versions = ref<RhythmMasterVersion[]>([])
-const activeSlot = ref('')
 const targetDate = ref('')
 const isFallback = ref(false)
 
+/** 用户面板点选的原始日期（提示行用；回退后与 targetDate 分离，spec §4.3） */
+const requestedDate = ref('')
+
 const SLOT_LABEL: Record<string, string> = { after_close: '收盘基准', morning: '盘前', midday: '午间' }
-const SLOT_ORDER = ['midday', 'morning', 'after_close']
 function slotLabel(s: string) { return SLOT_LABEL[s] ?? s }
 
-/** 需求 2：按当前上海时刻自动选中对应时点（固定 UTC+8，不依赖设备时区）。
- *  <8:30 → after_close（盘前未生成，展示昨日收盘基准=今日节奏）；8:30-12:30 → morning；
- *  12:30-16:05 → midday；≥16:05 → after_close。与后端生成时刻
- *  （9:00 盘前 / 12:30 午间 / 16:05 收盘，config.py scheduler_rhythm_*_cron）对齐。
- *  注意：<script setup> 内禁止 export（Vue SFC 编译限制），测试经源码提取执行。 */
-function pickSlotByClock(date?: Date): string {
-  const { hour, minute } = shanghaiDateTimeParts(date ?? new Date())
-  const minutes = hour * 60 + minute
-  if (minutes < 8 * 60 + 30) return 'after_close'
-  if (minutes < 12 * 60 + 30) return 'morning'
-  if (minutes < 16 * 60 + 5) return 'midday'
-  return 'after_close'
+/** v3 极简版本选取（spec §4.2）：今日 = created_at 最新；历史日 = after_close 优先（缺失降级最新，时间行如实标注实际版本） */
+function pickVersion(
+  versions: RhythmMasterVersion[],
+  targetDate: string,
+  today: string,
+): RhythmMasterVersion | undefined {
+  if (!versions.length) return undefined
+  const latest = [...versions].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0]
+  if (targetDate >= today) return latest
+  return versions.find((v) => v.refresh_slot === 'after_close') ?? latest
 }
 
-/** 自动选中：优先按时间判定，次按 SLOT_ORDER（同 slot 有多个版本取 created_at 最新）。 */
-function selectSlotByClock(): void {
-  const wanted = pickSlotByClock()
-  const list = versions.value
-  if (list.some((v) => v.refresh_slot === wanted)) {
-    activeSlot.value = wanted
-    return
-  }
-  // 目标 slot 缺失（生成失败/延迟/周末回退）→ 按 SLOT_ORDER 就近取可用版本
-  activeSlot.value = SLOT_ORDER.find((s) => list.some((v) => v.refresh_slot === s))
-    ?? (list[0]?.refresh_slot ?? '')
-}
+const activeVersion = computed(() => pickVersion(versions.value, targetDate.value, shanghaiDateString()))
 
-/** 当前选中版本的 created_at（供洞见卡显示生成时刻，B7：用所选版本而非 target_date）。 */
-const activeCreatedAt = computed(() => versions.value.find((v) => v.refresh_slot === activeSlot.value)?.created_at)
+/** 当前展示版本的 created_at（timeNote 灰字，B7 恒真展示） */
+const activeCreatedAt = computed(() => activeVersion.value?.created_at)
 
-const content = computed<RhythmMasterContent | undefined>(() => {
-  const v = versions.value.find((x) => x.refresh_slot === activeSlot.value)
-  return v?.content
-})
+const content = computed<RhythmMasterContent | undefined>(() => activeVersion.value?.content)
 
 /** 摘要洞见卡入参：仓位/档位/interval 分支上移，mapper 不可拼装时整卡不渲染（去重：RhythmCard 不再重复这些单元） */
 const insightCard = computed<RhythmInsightCard | null>(() =>
   content.value
-    ? toRhythmInsight(content.value.rhythm_card, activeSlot.value, targetDate.value, activeCreatedAt.value)
+    ? toRhythmInsight(content.value.rhythm_card, activeVersion.value?.refresh_slot ?? '', targetDate.value, activeCreatedAt.value)
     : null,
 )
 
-const pageTitle = computed(() => {
-  const s = activeSlot.value
-  if (s === 'after_close') return `明日节奏（${targetDate.value}）`
-  if (s === 'morning' || s === 'midday') return `今日节奏（${targetDate.value}）`
-  return '节奏大师'
-})
+const pageTitle = computed(() => (targetDate.value ? `节奏（${targetDate.value}）` : '节奏大师'))
 const cardTitle = computed(() => pageTitle.value)
 const basisLabel = computed(() => content.value?.basis_date ?? '')
+
+/** 回退提示行三态（spec §4.3）：未来日（尚未生成）/ 无报告（沿用前值）/ 正常（空） */
+const pendingHint = computed(() => {
+  if (requestedDate.value && requestedDate.value > shanghaiDateString() && requestedDate.value !== targetDate.value) {
+    return `${requestedDate.value} 节奏尚未生成，当前展示 ${targetDate.value} 数据`
+  }
+  if (isFallback.value) {
+    return `非交易日/当日无报告，沿用前值（${basisLabel.value}）`
+  }
+  return ''
+})
 
 const navSubtitle = computed(() => {
   const parts: string[] = []
   if (targetDate.value) parts.push(`目标日 ${targetDate.value}`)
   if (isFallback.value && basisLabel.value) parts.push(`沿用前值 ${basisLabel.value}`)
-  else if (activeSlot.value) parts.push(slotLabel(activeSlot.value))
+  else if (activeVersion.value) parts.push(slotLabel(activeVersion.value.refresh_slot))
   return parts.join(' · ')
 })
 
+let initialized = false
+
 onLoad(async (options) => {
   const date = String(options?.date ?? '')
+  if (date) requestedDate.value = date
   targetDate.value = date
   await loadVersions(date || undefined)
+  initialized = true
 })
 
-// 需求 2：跨盘段时间（9:00/12:30/16:05）从后台回前台时重判定自动选 slot（B5 裁决：
-// onLoad 一次 + onShow 一次，不引入定时轮询）
+// v3：onShow 重拉数据（16:05 后回前台自动切新收盘基准）；onLoad 紧随的首个 onShow 跳过防双拉
 onShow(() => {
-  if (versions.value.length) selectSlotByClock()
+  if (!initialized) return
+  if (targetDate.value) void loadVersions(targetDate.value)
 })
 
-/** 面板点格切日：与旧 pickDay 同语义——重拉该日三时点版本 */
+/** 面板点格切日：记录原始点击日期（requestedDate 供提示行），重拉该日版本 */
 async function onPanelPick(date: string) {
   if (date === targetDate.value) return
+  requestedDate.value = date
   targetDate.value = date
   await loadVersions(date)
 }
@@ -174,8 +160,8 @@ async function loadVersions(date?: string) {
     if (prev && prev !== d) return loadVersions(prev)
     return
   }
-  versions.value = list.sort((a, b) => SLOT_ORDER.indexOf(a.refresh_slot) - SLOT_ORDER.indexOf(b.refresh_slot))
-  selectSlotByClock() // 需求 2：按当前时刻自动选中对应时点（不再默认 midday）
+  isFallback.value = false // 回退后切回正常日时清除残留提示
+  versions.value = list
   targetDate.value = d
 }
 
@@ -194,7 +180,6 @@ async function previousTradingDay(date: string): Promise<string | undefined> {
   } catch { return undefined }
 }
 
-function switchSlot(s: string) { activeSlot.value = s }
 </script>
 
 <style lang="scss" scoped>
@@ -202,9 +187,5 @@ function switchSlot(s: string) { activeSlot.value = s }
 .body { padding: 24rpx 32rpx; }
 .insight-wrap { margin-bottom: 20rpx; }
 
-/* 三时点分段切换（设计稿：surface 底 + 边框 + pill，active 主色填充） */
-.slots { display: flex; gap: 8rpx; background: $bg-card; border: 1rpx solid $line; border-radius: 999rpx; padding: 6rpx; margin-bottom: 24rpx; }
-.slot { flex: 1; text-align: center; padding: 12rpx 0; border-radius: 999rpx; font-size: 24rpx; color: $ink-soft; font-weight: 500; }
-.slot.active { background: $primary; color: #fff; }
 .fallback { margin-bottom: 16rpx; font-size: 24rpx; color: $warning; }
 </style>
