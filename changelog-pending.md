@@ -211,3 +211,7 @@
 - 基线同步：`tests/run-node-specs.mjs` `EXPECTED_BASELINE` `246/246/0` → `248/248/0`。
 - 验收：`npx vitest run src/modules/analytics` 3/3 passed（exit 0）；`npm run test:node` `248/248/0`（exit 0）；`npx vue-tsc --noEmit` 0 错误（exit 0）；`npx vitest run` 全量为存量红（4 failed / 409 passed + 2 失败 suite，A/B 回退取证与本次改动前逐条一致）。
 - 未改：`PredictionVerification` 其他状态文案/样式、后端契约、`overallStatus`（c{i} entry 本就不参与 `status=verified`）。
+
+## 2026-09-23 rhythm：v3 极简展示
+
+- 2026-09-23 rhythm：v3 极简展示（spec 2026-09-23-rhythm-next3-events-simple-display-design.md）——底部事件区收敛未来 3 事件；砍三时点 pill（今日最新/历史收盘基准）；未来日回退明确提示；时间行 slot 标签主 + 生成时刻灰字次；O2 根因落档（生产外部 cron UTC-8 触发，服务器侧修复，代码零改动）

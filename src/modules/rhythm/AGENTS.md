@@ -2,7 +2,7 @@
 
 ## 模块职责
 
-节奏大师详情页：展示"节奏大师"报告（`report_type=rhythm_master`）的三时点版本（收盘后 / 早盘 / 午盘），顶部为可折叠双模式节奏日历面板（仓位/事件，60 日热力网格内嵌于此），下方渲染节奏洞见摘要卡（InsightCard）与瘦身状态卡（`rhythm_card`）。前端只读消费，不产生修改动作。
+节奏大师详情页：展示"节奏大师"报告（`report_type=rhythm_master`）的单一版本（今日=最新生成、历史=收盘基准），顶部为可折叠双模式节奏日历面板（仓位/事件，60 日热力网格内嵌于此），下方渲染节奏洞见摘要卡（InsightCard）与瘦身状态卡（`rhythm_card`）。前端只读消费，不产生修改动作。
 
 **页面容器（2026-09-02 起）**：详情页已迁移到通用子页容器 `SubPageCard2`（白底导航 + 原生滚动 + 内置 GlobalChatBar 全局 AI 对话栏 + 自动返回兜底）。自绘 nav + `.page{height:100%}` 滚动方案已废弃——H5 固定 9:16 视口下非 fixed 布局滚动区高度链不可靠，易"翻不动"。
 
@@ -10,10 +10,10 @@
 
 | 文件                                   | 说明                                                                                                                                                                                                                                          |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pages/index.vue`                    | 节奏大师详情页（SubPageCard2 容器；内容流 = 顶部 **RhythmCalendarPanel**（折叠近 7 日紧凑条 / 展开 60 交易日周网格，仓位/事件 Segmented；事件模式 = macro 角标 + 选中日事件行）+ 三时点 pill / 沿用前值 fallback + **节奏洞见卡**（InsightCard 摘要：仓位/档位/interval 分支上移）→ RhythmCard（明细已去重瘦身）+ EmptyState 兜底）。**2026-09-21 时点自动选中**：进页/onShow 按 `pickSlotByClock()`（上海时刻：<8:30→after_close、8:30-12:30→morning、12:30-16:05→midday、≥16:05→after_close）自动选中对应 refresh_slot，无需手动切三 tab；目标 slot 缺失回退 SLOT_ORDER 就近 |
+| `pages/index.vue`                    | 节奏大师详情页（SubPageCard2 容器；内容流 = 顶部 RhythmCalendarPanel + 回退提示行（三态：未来日「尚未生成」/ 无报告「沿用前值」/ 无）+ 节奏洞见卡（InsightCard，:time 主行 slot 标签 + :time-note 生成时刻灰字）→ RhythmCard + EmptyState 兜底）。**2026-09-23 v3 极简**：三时点 pill 已删除——`pickVersion(versions, targetDate, today)` 单版本选取（今日=created_at 最新；历史日=after_close 优先、缺失降级最新）；`requestedDate`（用户点选原始日）与 `targetDate`（实际展示日）分离供提示行；pageTitle 统一「节奏（date）」；onShow 重拉数据（收盘后回前台自动切新版） |
 | `components/RhythmCalendarPanel.vue` | 顶部可折叠双模式日历面板（2026-09-03）：折叠 = 近 7 交易日紧凑条（左旧右新，点格切日）；展开 = 60 交易日自然周网格（默认展开，`rhythm.calendar.expanded` storage 记忆）；仓位/事件 Segmented 仅展开态；事件模式 = macro 角标（high 红点计数 / medium-low 灰点）+ 选中日事件行；点格以 `pick` 事件上抛切日（不导航）                             |
-| `components/RhythmCard.vue`          | 状态卡组件（瘦身后保留：score + 五档色带 / 情绪周期 chip / 温度曲线 / 事件日历 / conflict / data\_missing；仓位长句、档位 chip、证据行、关键节点分支已上移洞见卡——**同屏去重**）。**2026-09-21**：事件日历标题"未来 5 交易日事件日历"→"未来事件日历"（展示窗不再限 5 交易日，改全量） |
-| `utils/rhythmInsight.ts`             | 洞见卡映射（2026-09-03）：`toRhythmInsight(card, slot, date, createdAt?)` → `RhythmInsightCard`（结构化子集对齐 ConditionalForecastBlock/InsightCard 入参；不可拼装返回 null → 整卡不渲染）。**2026-09-21**：右上角时间改展示**节奏生成时刻**——`MM-DD · HH:MM`（日期取 targetDate、时分取所选版本 created_at 上海时区；createdAt 缺省/非法回退 slot 标签旧语义），B7：不再拼 target_date+slot 标签 |
+| `components/RhythmCard.vue`          | 状态卡组件（瘦身后保留：score + 五档色带 / 情绪周期 chip / 温度曲线 / 事件日历 / conflict / data\_missing；仓位长句、档位 chip、证据行、关键节点分支已上移洞见卡——**同屏去重**）。**2026-09-21**：事件日历标题"未来 5 交易日事件日历"→"未来事件日历"（展示窗不再限 5 交易日，改全量）。**2026-09-23 v3**：事件区收敛为未来 3 个事件（`groupEventWindow`：date≥targetDate 升序、跳过锚点重复）+ 锚点卡 + 「更远事件（共 N 条）」折叠；`event_window_near_end_date` 消费已删；主档位卡恒渲染（R-J：`position_band`/`score` 缺失显示「仓位建议暂缺」/「档位数据不足」占位不留空白）；色彩三色（R-I：情绪周期 chip 中性化、importance medium 去橙，UI 装饰=蓝/墨/灰） |
+| `utils/rhythmInsight.ts`             | 洞见卡映射（2026-09-03）：`toRhythmInsight(card, slot, date, createdAt?)` → `RhythmInsightCard`（结构化子集对齐 ConditionalForecastBlock/InsightCard 入参；不可拼装返回 null → 整卡不渲染）。**2026-09-23 v3**：`time` 主行 = `MM-DD · slot 标签`（无 pill 后的版本标注）+ `timeNote` 灰字次行 = `HH:MM 生成`（created_at 上海时区恒真展示） |
 
 ## 首页节奏卡（modules/home/components/MorningContent.vue）
 
@@ -81,7 +81,7 @@
 
 - 展开态默认展开（`rhythm.calendar.expanded` storage 记忆）；仓位/事件 Segmented 仅展开态展示；事件模式 = macro 角标（high 红点+计数 / medium-low 灰点）+ 选中日事件行（影响度·时间·标题 / result 尾注 / US 隔夜角标），空日显示「当日无宏观事件」，不标点不填充
 
-- 点格切日 = 面板 `pick` 事件上抛，详情页原地重拉该日三时点版本（无页面跳转）
+- 点格切日 = 面板 `pick` 事件上抛，详情页原地重拉该日版本（v3：pickVersion 单版本选取）（无页面跳转）
 
 ## 预判分支契约（RhythmBranch v2，2026-09-03）
 
