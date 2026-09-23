@@ -13,6 +13,7 @@
         <text class="wm-label">{{ typeWord }}</text>
       </view>
       <text v-if="time" class="as-insight-card__time">{{ time }}</text>
+      <text v-if="timeNote" class="as-insight-card__time-note">{{ timeNote }}</text>
     </view>
 
     <!-- 板块名标签（2026-09-18 R17）：标题为溯源主句时，标明"这是哪个板块"（中性描边小标，非告警色） -->
@@ -293,6 +294,8 @@ const props = withDefaults(defineProps<{
   linePlacement?: 'before-trace' | 'after-trace'
   /** 时间，如 '08-21 · 09:10' */
   time?: string
+  /** 时间次行（生成时刻灰字，v3 节奏大师；缺省不渲染——加性，既有调用方零变化） */
+  timeNote?: string
   /** 主题：light 亮色列表卡 / dark 深蓝研报卡 */
   theme?: InsightTheme
   /** 行样式：banner 彩色实底（默认）/ plain 白底 + 语义色文字（无大面积重色底） */
@@ -316,6 +319,7 @@ const props = withDefaults(defineProps<{
   lines: () => [],
   linePlacement: 'before-trace',
   time: '',
+  timeNote: '',
   theme: 'light',
   lineStyle: 'banner',
   showMeta: false,
@@ -404,6 +408,11 @@ const handleClick = () => {
 .as-insight-card__time {
   font-size: $font-size-xs;
   color: $ink-mute;
+}
+
+.as-insight-card__time-note {
+  font-size: $font-size-xs;
+  color: $ink-faint;
 }
 
 /* ===== 洞见字标标签（字标 PNG + 灰点 + 彩色类型词；2026-09-03 由瞳孔标签 InsightTag 换为洞见字标） ===== */
