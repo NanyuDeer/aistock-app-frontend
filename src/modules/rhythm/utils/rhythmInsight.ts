@@ -22,6 +22,8 @@ export interface RhythmInsightCard {
   trace?: string
   structured?: RhythmInsightStructured | null
   time: string
+  /** 生成时刻灰字（次行；created_at 上海时区 HH:MM，恒真展示，不做补偿） */
+  timeNote?: string
 }
 
 const LEVEL_LABEL: Record<string, string> = { ice: '冰点', low: '低迷', normal: '常温', active: '活跃', euphoria: '亢奋' }
@@ -59,19 +61,17 @@ function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
   return condition
 }
 
-/** 洞见卡右上角时间串：MM-DD · HH:MM（需求 2：日期取 targetDate、时间取节奏生成时刻，
- * 均为上海时区）。createdAt 为版本生成时间（PG timestamptz → ISO，可能带 Z/偏移；
- * 如 after_close 卡 T-1 生成、targetDate=T，日期须固定显示 T 而非生成日）。
- * createdAt 缺省/非法回退旧语义（slot 标签），兼容旧数据。 */
-function formatCardTime(targetDate: string, slot: string, createdAt?: string): string {
+/** 洞见卡时间行（v3 R-H）：主 = MM-DD · slot 标签（版本标注，恒有——无三时点 pill 后卡上唯一的版本说明）；
+ * 次 = HH:MM 生成（created_at 上海时区，恒真展示生产漂移值，spec §8.1 反成诊断线索；缺失/非法不渲染次行）。 */
+function formatCardTimeParts(targetDate: string, slot: string, createdAt?: string): { time: string; timeNote?: string } {
   const datePart = targetDate.slice(5)
-  const fallback = `${datePart} · ${SLOT_LABEL[slot] ?? slot}`
-  if (!createdAt) return fallback
+  const time = `${datePart} · ${SLOT_LABEL[slot] ?? slot}`
+  if (!createdAt) return { time }
   const ts = new Date(createdAt)
-  if (Number.isNaN(ts.getTime())) return fallback
+  if (Number.isNaN(ts.getTime())) return { time }
   const { hour, minute } = shanghaiDateTimeParts(ts)
   const p = (n: number) => String(n).padStart(2, '0')
-  return `${datePart} · ${p(hour)}:${p(minute)}`
+  return { time, timeNote: `${p(hour)}:${p(minute)} 生成` }
 }
 
 /** 节奏状态卡 → 统一洞见卡入参；不可拼装/为空返回 null（整卡不渲染，杜绝空壳与臆造） */
@@ -91,13 +91,14 @@ export function toRhythmInsight(
 
   const structured = (card.branches ?? []).map(toCondition).filter((c): c is RhythmInsightCondition => c !== null)
   const trace = buildTrace(card)
-  const time = formatCardTime(targetDate, slot, createdAt)
+  const { time, timeNote } = formatCardTimeParts(targetDate, slot, createdAt)
 
   return {
     title,
     trace,
     structured: structured.length ? { conditions: structured } : undefined,
     time,
+    timeNote,
   }
 }
 

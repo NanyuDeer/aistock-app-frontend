@@ -43,7 +43,7 @@ test('情绪周期在 phase 缺失时兜底"数据缺失（沿用前值）"可�
   assert.doesNotMatch(source, /class="rc-phase" v-if="card\.phase"/)
   assert.match(source, /rc-chip/)
   assert.match(source, /数据缺失（沿用前值）/)
-  assert.match(source, /phaseMeta\.value\.label \|\| props\.card\.phase \|\| '数据缺失（沿用前值）'/)
+  assert.match(source, /PHASE_META\[props\.card\.phase \?\? ''\] \?\? props\.card\.phase \?\? '数据缺失（沿用前值）'/)
 })
 
 test('P1：next_event_anchor 锚点条渲染（无锚点整块不渲染）', () => {
@@ -59,8 +59,8 @@ test('事件锚点块标题改为「下一事件」并含强度标签', () => {
   assert.ok(source.includes('重大'))
 })
 
-test('去重瘦身：rc-pos 长句 / rc-branch 区块 / rc-phase-ev 证据行已移除（摘要上移洞见卡）', () => {
-  assert.doesNotMatch(source, /rc-pos/)
+test('去重瘦身：rc-branch 区块 / rc-phase-ev 证据行已移除；v3 R-J rc-pos 占位行回归', () => {
+  assert.match(source, /仓位建议暂缺/)
   assert.doesNotMatch(source, /rc-branch/)
   assert.doesNotMatch(source, /rc-phase-ev/)
 })
@@ -81,16 +81,42 @@ test('PHASE_META 覆盖后端五态（含启动/主升）', () => {
   assert.ok(source.includes('主升'))
 })
 
-test('事件区分层折叠：event_window_near_end_date 近窗平铺 + 更远折叠计数（默认收起）', () => {
-  assert.match(source, /event_window_near_end_date/)
-  assert.match(source, /nearEvents\s*=\s*computed/)
-  assert.match(source, /farEvents\s*=\s*computed/)
-  assert.match(source, /更远事件（共 \{\{ farEvents\.length \}\} 条）/)
+test('v3 极简：事件区分组渲染 groupEventWindow（未来 3 事件 + 更远折叠入口）', () => {
+  assert.match(source, /groupEventWindow\(/)
+  assert.match(source, /eventGroups/)
+  assert.match(source, /更远事件（共 \{\{ eventGroups\.far\.length \}\} 条）/)
   assert.match(source, /farExpanded/)
-  assert.match(source, /rc-evfar/)
 })
 
-test('near_end_date 为 null 时近窗全部平铺（不折叠）', () => {
-  assert.match(source, /if \(!end\) return props\.card\.event_window \?\? \[\]/)
-  assert.match(source, /if \(!end\) return \[\]/)
+test('v3 极简：near/far 按日期切分与 event_window_near_end_date 消费已删除', () => {
+  assert.doesNotMatch(source, /event_window_near_end_date/)
+  assert.doesNotMatch(source, /nearEvents/)
+  assert.doesNotMatch(source, /farEvents/)
+})
+
+test('v3 极简：锚点卡保留 + 空态三态（源未接入/无事件）不变', () => {
+  assert.match(source, /rc-anchor/)
+  assert.match(source, /该维度数据源未接入/)
+  assert.match(source, /暂无已登记事件/)
+})
+
+test('v3 色彩三色（R-I）：情绪周期 chip 中性化 + importance medium 去橙', () => {
+  // 情绪周期 chip 不再按 phase 五态着色（阶段名文字本身已表达语义）
+  assert.doesNotMatch(source, /ph-ice/)
+  assert.doesNotMatch(source, /ph-warm/)
+  assert.doesNotMatch(source, /ph-rally/)
+  assert.doesNotMatch(source, /ph-overheat/)
+  assert.doesNotMatch(source, /ph-ebb/)
+  // imp-med 去橙（原 #b45309 / $warning），改中性灰；imp-high 保留 $up 红（A 股语义）
+  const impMed = source.match(/\.rc-evimp\.imp-med \{[^}]*\}/)?.[0] ?? ''
+  assert.ok(impMed, '应存在 .rc-evimp.imp-med 样式')
+  assert.ok(!impMed.includes('#b45309') && !impMed.includes('$warning'))
+  assert.match(source, /\.rc-evimp\.imp-high \{[^}]*\$up/)
+})
+
+test('v3 空态有字（R-J）：主档位卡恒渲染，position_band/score 缺失各显示占位', () => {
+  // rc-main 无整体 v-if 门控（恒渲染，缺失不留空白）
+  assert.ok(!/"rc-main"\s*v-if/.test(source))
+  assert.match(source, /仓位建议暂缺/)
+  assert.match(source, /档位数据不足/)
 })

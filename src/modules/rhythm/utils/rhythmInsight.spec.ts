@@ -64,16 +64,24 @@ test('toCondition 透传 direction / positionAction / anchor（结构化仓位�
   assert.match(toCondition, /anchor:\s*b\.anchor\s*\?/)
 })
 
-test('time：无 createdAt 回退 slot 标签；有 createdAt 显示 MM-DD · HH:MM（上海时区）', () => {
+test('time：主行 slot 标签（版本标注）+ timeNote 生成时刻灰字（上海时区恒真展示，v3 R-H）', () => {
   const card = { level: 'normal', position_band: { text: '建议仓位：五成~六成' }, conflict: false, branches: [] } as unknown as RhythmCard
-  // 兼容旧数据：无 createdAt → 旧语义（slot 标签）
-  assert.equal(toRhythmInsight(card, 'midday', '2026-09-21')?.time, '09-21 · 午间')
-  // createdAt 为 UTC ISO（PG timestamptz 序列化）→ 上海时区转换：04:30Z = 12:30 上海
-  assert.equal(toRhythmInsight(card, 'midday', '2026-09-21', '2026-09-21T04:30:00.000Z')?.time, '09-21 · 12:30')
+  // 无 createdAt → 只有主行 slot 标签，无 timeNote
+  const noCreated = toRhythmInsight(card, 'midday', '2026-09-21')
+  assert.equal(noCreated?.time, '09-21 · 午间')
+  assert.equal(noCreated?.timeNote, undefined)
+  // createdAt 为 UTC ISO（PG timestamptz 序列化）→ 上海时区转换：04:30Z = 12:30 上海（生产漂移值恒真展示）
+  const withCreated = toRhythmInsight(card, 'midday', '2026-09-21', '2026-09-21T04:30:00.000Z')
+  assert.equal(withCreated?.time, '09-21 · 午间')
+  assert.equal(withCreated?.timeNote, '12:30 生成')
   // 带偏移格式
-  assert.equal(toRhythmInsight(card, 'morning', '2026-09-21', '2026-09-21T01:00:00+08:00')?.time, '09-21 · 01:00')
-  // 非法 createdAt → 回退旧语义
-  assert.equal(toRhythmInsight(card, 'morning', '2026-09-21', 'not-a-date')?.time, '09-21 · 盘前')
+  assert.equal(toRhythmInsight(card, 'morning', '2026-09-21', '2026-09-21T01:00:00+08:00')?.timeNote, '01:00 生成')
+  // 非法 createdAt → 回退（无 timeNote）
+  assert.equal(toRhythmInsight(card, 'morning', '2026-09-21', 'not-a-date')?.timeNote, undefined)
+})
+
+test('RhythmInsightCard 接口含 timeNote 可选字段（无 pill 后的版本标注次行）', () => {
+  assert.match(source, /timeNote\?: string/)
 })
 
 test('toRhythmInsight 签名含 createdAt 第 4 参（B8：created_at 必须传进 mapper）', () => {
