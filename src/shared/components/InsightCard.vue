@@ -12,8 +12,11 @@
         <text class="wm-dot">·</text>
         <text class="wm-label">{{ typeWord }}</text>
       </view>
-      <text v-if="time" class="as-insight-card__time">{{ time }}</text>
-      <text v-if="timeNote" class="as-insight-card__time-note">{{ timeNote }}</text>
+      <!-- 时间分组：主时间 + 次行灰字紧邻（v3 节奏大师；space-between 下需分组防主/次被推向两端） -->
+      <view v-if="time || timeNote" class="as-insight-card__time-group">
+        <text v-if="time" class="as-insight-card__time">{{ time }}</text>
+        <text v-if="timeNote" class="as-insight-card__time-note">{{ timeNote }}</text>
+      </view>
     </view>
 
     <!-- 板块名标签（2026-09-18 R17）：标题为溯源主句时，标明"这是哪个板块"（中性描边小标，非告警色） -->
@@ -403,6 +406,13 @@ const handleClick = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* 时间分组（透明包裹：不设 margin/justify，head 的 space-between 定位单元素分组 = 原 time 位置，既有调用方零变化） */
+.as-insight-card__time-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
 }
 
 .as-insight-card__time {

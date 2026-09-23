@@ -1,6 +1,6 @@
 <template>
   <view class="rhythm-card">
-    <!-- 标题行：卡片标题 + 三时点 slot 标注 -->
+    <!-- 标题行：卡片标题 + 版本 slot 标注 -->
     <view class="rc-head">
       <text class="rc-title">{{ title }}</text>
       <text class="rc-slot" v-if="slot">{{ slotLabel }}</text>
