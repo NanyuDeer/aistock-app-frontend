@@ -5,7 +5,8 @@
  * - 胶囊：headline + 来源标记（warehouse=中台 / search=检索，文案不同）；ref 为 http(s) URL 可点（emit select），
  *   非 URL（`event:<id>` / `search:<query>|<title>`）不可点（不伪造跳转）；
  * - InsightCard 溯源子卡：traceStructured.events 为空/缺省 → 该区不渲染；有值 → 条数一致；
- * - AttributionChainView：每个板块分支下渲染其 props.chain 的 events（缺省/空数组不渲染该区）。
+ * - AttributionChainView：每个板块分支下渲染其 props.chain 的 events（缺省/空数组不渲染该区；
+ *   2026-09-18 晚起仅渲染「中台」来源，检索来源在链上隐藏）。
  */
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -116,7 +117,7 @@ describe('AttributionChainView 板块分支事件胶囊', () => {
     }
   })
 
-  it('child.events 有值 → 渲染对应条数（中台/检索标记）', () => {
+  it('child.events 有值 → 仅渲染「中台」来源（检索来源不渲染，2026-09-18 晚裁定）', () => {
     const wrapper = mount(AttributionChainView, {
       props: {
         date: '2026-09-16',
@@ -127,8 +128,8 @@ describe('AttributionChainView 板块分支事件胶囊', () => {
       },
     })
 
-    expect(wrapper.findAll(CHIP)).toHaveLength(2)
-    expect(wrapper.findAll('.as-event-chip__src').map((n) => n.text())).toEqual(['中台', '检索'])
+    expect(wrapper.findAll(CHIP)).toHaveLength(1)
+    expect(wrapper.findAll('.as-event-chip__src').map((n) => n.text())).toEqual(['中台'])
   })
 })
 

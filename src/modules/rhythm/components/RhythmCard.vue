@@ -1,15 +1,18 @@
 <template>
   <view class="rhythm-card">
-    <!-- 标题行：卡片标题 + 三时点 slot 标注 -->
+    <!-- 标题行：卡片标题 + 版本 slot 标注 -->
     <view class="rc-head">
       <text class="rc-title">{{ title }}</text>
       <text class="rc-slot" v-if="slot">{{ slotLabel }}</text>
     </view>
 
-    <!-- 主档位卡：大数字 + 五档色带刻度 + target/basis/refresh 元信息（档位词/仓位句已上移洞见卡，G2 冲突态由洞见卡标题承接） -->
-    <view class="rc-main" v-if="card.position_band">
+    <!-- 主档位卡（v3 R-J：恒渲染，缺失显示占位文字不留空白；档位词/仓位句已上移洞见卡） -->
+    <view class="rc-main">
       <view class="rc-bandline">
         <text class="rc-score" v-if="card.score != null">{{ card.score }}</text>
+        <text class="rc-pos" v-else>档位数据不足</text>
+        <text class="rc-pos" v-if="card.position_band">{{ card.position_band.text }}</text>
+        <text class="rc-pos rc-pos-missing" v-else>仓位建议暂缺</text>
       </view>
       <view class="rc-scale">
         <view v-for="(s, i) in bandSegs" :key="i" class="rc-seg" :class="s.cls"></view>
@@ -28,7 +31,7 @@
     <view class="rc-sec" v-if="showPhase">
       <text class="rc-sec-title">情绪周期</text>
       <view class="rc-phase-row">
-        <text class="rc-chip" :class="phaseMeta.cls">{{ phaseLabel }}</text>
+        <text class="rc-chip">{{ phaseLabel }}</text>
         <text class="rc-exp">实验性判定</text>
       </view>
     </view>
@@ -50,28 +53,46 @@
       <text>{{ card.conflict_detail || '信号背离，仅提供区间与提示' }}</text>
     </view>
 
-    <!-- 事件日历（自 target_date 起 ≤5 交易日；空态两态区分 G7） -->
+    <!-- 事件日历（v3 极简：未来最近 3 个事件 + 锚点 + 更远折叠；事件明细看顶部日历事件模式） -->
     <view class="rc-sec">
-      <text class="rc-sec-title">未来 5 交易日事件日历</text>
-      <!-- 下一重大事件锚点（design-debate P1：无锚点整块不渲染） -->
+      <text class="rc-sec-title">未来事件日历</text>
+      <!-- 下一事件锚点（design-debate P1：无锚点整块不渲染） -->
       <view class="rc-anchor" v-if="card.next_event_anchor">
-        <text class="rc-anchor-label">下一重大事件</text>
+        <view class="rc-anchor-head">
+          <text class="rc-anchor-label">下一事件</text>
+          <text
+            v-if="card.next_event_anchor.importance === 'high'"
+            class="rc-anchor-flag"
+          >重大</text>
+        </view>
         <text class="rc-anchor-title">{{ card.next_event_anchor.title }}</text>
         <text class="rc-anchor-note">{{ card.next_event_anchor.note }}（{{ card.next_event_anchor.event_date }}）</text>
       </view>
-      <view class="rc-evlist" v-if="card.event_window && card.event_window.length">
-        <view class="rc-evit" v-for="(ev, i) in card.event_window" :key="i">
+      <view class="rc-evlist" v-if="eventGroups.next.length || eventGroups.far.length">
+        <view class="rc-evit" v-for="(ev, i) in eventGroups.next" :key="i">
           <text class="rc-evd">{{ ev.date }}</text>
           <text class="rc-evtag">{{ eventTypeLabel(ev.type) }}</text>
           <text class="rc-evimp" :class="importanceCls(ev.importance)">{{ ev.importance }}</text>
           <text class="rc-evtitle">{{ ev.title }}</text>
+        </view>
+        <template v-if="farExpanded">
+          <view v-for="(ev, i) in eventGroups.far" :key="'f' + i" class="rc-evit">
+            <text class="rc-evd">{{ ev.date }}</text>
+            <text class="rc-evtag">{{ eventTypeLabel(ev.type) }}</text>
+            <text class="rc-evimp" :class="importanceCls(ev.importance)">{{ ev.importance }}</text>
+            <text class="rc-evtitle">{{ ev.title }}</text>
+          </view>
+        </template>
+        <view v-if="eventGroups.far.length" class="rc-far-toggle" @tap="farExpanded = !farExpanded">
+          <text v-if="!farExpanded">更远事件（共 {{ eventGroups.far.length }} 条）</text>
+          <text v-else>收起更远事件</text>
         </view>
       </view>
       <view class="rc-empty" v-else-if="card.event_source_missing">
         <text>该维度数据源未接入</text>
       </view>
       <view class="rc-empty" v-else>
-        <text>今日无事件（正常交易日）</text>
+        <text>暂无已登记事件</text>
       </view>
     </view>
 
@@ -89,7 +110,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { groupEventWindow } from '../utils/rhythmEventWindow'
 import type { RhythmCard as RhythmCardData } from '@/shared/api/modules/agent'
 
 const props = withDefaults(
@@ -119,16 +141,12 @@ const levelMeta = computed(() => LEVEL_META[props.card.level ?? ''] ?? { label: 
 const bandLabels = BAND_LABELS
 const bandSegs = BAND_SEG_CLS.map((cls, i) => ({ cls, on: levelMeta.value.idx === i }))
 
-// ── 情绪周期四态（G3 仅展示，实验性判定）──
-const PHASE_META: Record<string, { label: string; cls: string }> = {
-  ice: { label: '冰点', cls: 'ph-ice' },
-  warm_up: { label: '升温', cls: 'ph-warm' },
-  overheat: { label: '过热', cls: 'ph-overheat' },
-  ebb: { label: '退潮', cls: 'ph-ebb' },
+// ── 情绪周期五态（对齐后端 stage：ice/launch/rally/overheat/ebb；G3 仅展示，实验性判定）──
+const PHASE_META: Record<string, string> = {
+  ice: '冰点', launch: '启动', rally: '主升', overheat: '过热', ebb: '退潮',
 }
-const phaseMeta = computed(() => PHASE_META[props.card.phase ?? ''] ?? { label: '', cls: 'ph-missing' })
-const phaseLabel = computed(() => phaseMeta.value.label || props.card.phase || '数据缺失（沿用前值）')
-const showPhase = computed(() => !!props.card.phase || !!phaseMeta.value.label)
+const phaseLabel = computed(() => PHASE_META[props.card.phase ?? ''] ?? props.card.phase ?? '数据缺失（沿用前值）')
+const showPhase = computed(() => !!props.card.phase)
 
 // ── slot 标注 ──
 const slotLabel = computed(() => {
@@ -140,7 +158,11 @@ const refreshSlotLabel = computed(() => {
   return `refresh ${m[props.refreshSlot] ?? props.refreshSlot}`
 })
 
-// ── 事件日历 ──
+// ── 事件日历（v3 极简，spec §4.1）：未来最近 3 个事件（跳过锚点重复）+ 更远折叠；明细看顶部日历事件模式 ──
+const farExpanded = ref(false)
+const eventGroups = computed(() =>
+  groupEventWindow(props.card.event_window, props.targetDate, props.card.next_event_anchor),
+)
 function eventTypeLabel(t: string): string {
   const m: Record<string, string> = { delivery: '交割日', earnings: '财报', macro: '宏观', seed: '种子' }
   return m[t] ?? t
@@ -172,6 +194,8 @@ function tempValue(score: number): string {
 
 .rc-main { background: $bg-card; border: 1rpx solid $line; border-radius: 24rpx; padding: 24rpx 28rpx; margin-bottom: 20rpx; }
 .rc-bandline { display: flex; align-items: center; gap: 16rpx; flex-wrap: wrap; }
+.rc-pos { font-size: 24rpx; color: $ink-soft; }
+.rc-pos-missing { font-style: normal; color: $ink-mute; }
 .rc-score { font-size: 72rpx; font-weight: 700; color: $primary; font-family: 'DIN Alternate', sans-serif; }
 
 .rc-scale { display: flex; height: 12rpx; border-radius: 999rpx; overflow: hidden; margin: 20rpx 0 10rpx; }
@@ -191,12 +215,7 @@ function tempValue(score: number): string {
 .rc-sec-title { display: block; font-size: 24rpx; color: $ink-soft; font-weight: 600; letter-spacing: 1rpx; margin-bottom: 16rpx; }
 
 .rc-phase-row { display: flex; align-items: center; gap: 12rpx; flex-wrap: wrap; }
-.rc-chip { font-size: 24rpx; font-weight: 600; border-radius: 999rpx; padding: 6rpx 22rpx; }
-.rc-chip.ph-ice { color: #33518f; background: #e8eefc; }
-.rc-chip.ph-warm { color: #b45309; background: #fef3c7; }
-.rc-chip.ph-overheat { color: $up; background: rgba($up, 0.1); }
-.rc-chip.ph-ebb { color: $ink-soft; background: rgba($ink-soft, 0.12); }
-.rc-chip.ph-missing { color: $ink-soft; background: rgba($ink-soft, 0.12); }
+.rc-chip { font-size: 24rpx; font-weight: 600; border-radius: 999rpx; padding: 6rpx 22rpx; color: $ink-soft; background: rgba($ink-soft, 0.12); }
 .rc-exp { font-size: 20rpx; color: $ink-soft; border: 1rpx dashed $line; border-radius: 8rpx; padding: 2rpx 10rpx; }
 
 .rc-temp-bars { display: flex; align-items: flex-end; gap: 14rpx; height: 200rpx; }
@@ -213,14 +232,25 @@ function tempValue(score: number): string {
 .rc-evtag { font-size: 20rpx; color: $ink-soft; background: $primary-50; border-radius: 8rpx; padding: 2rpx 12rpx; }
 .rc-evimp { font-size: 20rpx; border-radius: 8rpx; padding: 2rpx 10rpx; }
 .rc-evimp.imp-high { color: $up; background: rgba($up, 0.1); }
-.rc-evimp.imp-med { color: #b45309; background: rgba($warning, 0.14); }
+.rc-evimp.imp-med { color: $ink-soft; background: rgba($ink-soft, 0.1); }
 .rc-evimp.imp-low { color: $ink-soft; background: rgba($ink-soft, 0.1); }
 .rc-evtitle { font-size: 26rpx; color: $ink; flex: 1; }
+.rc-far-toggle { font-size: 24rpx; color: $primary; }
 .rc-empty { font-size: 26rpx; color: $ink-soft; }
 
 .rc-hint { font-size: 26rpx; color: $warning; background: rgba($warning, 0.08); border: 1rpx solid rgba($warning, 0.35); border-radius: 12rpx; padding: 16rpx 20rpx; margin-bottom: 20rpx; }
 
 .rc-anchor { display: flex; align-items: center; gap: 12rpx; flex-wrap: wrap; background: rgba($warning, 0.08); border: 1rpx solid rgba($warning, 0.35); border-radius: 12rpx; padding: 14rpx 20rpx; margin-bottom: 16rpx; }
+.rc-anchor-head { display: flex; align-items: center; }
+.rc-anchor-flag {
+  margin-left: 8rpx;
+  padding: 0 8rpx;
+  font-size: 20rpx;
+  line-height: 28rpx;
+  border-radius: 6rpx;
+  color: $up;
+  border: 1rpx solid $up;
+}
 .rc-anchor-label { font-size: 22rpx; color: $warning; font-weight: 600; }
 .rc-anchor-title { font-size: 26rpx; color: $ink; font-weight: 600; }
 .rc-anchor-note { font-size: 24rpx; color: $ink-soft; }

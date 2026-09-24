@@ -1,4 +1,6 @@
 import type { RhythmBranch, RhythmCard } from '@/shared/api/modules/agent'
+import { formatBandText } from '@/shared/utils/rhythmBand'
+import { shanghaiDateTimeParts } from '@/shared/utils/tradingTime'
 
 /** 洞见卡结构化预判子集（结构性对齐 ConditionalForecastBlock/InsightCard 入参，仅节奏用到的字段） */
 export interface RhythmInsightCondition {
@@ -11,8 +13,6 @@ export interface RhythmInsightCondition {
   positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string; band?: { min?: number | null; max?: number | null; text?: string } | null }
   /** 验证锚点（阈值/指标；括号兜底或后端 anchor 透传） */
   anchor?: { threshold?: string; metric?: string }
-  /** 公布后已实现/未实现（true 点亮 / false 置灰 / null 待观察）；事件分支透传 */
-  met?: boolean | null
 }
 export interface RhythmInsightStructured {
   conditions: RhythmInsightCondition[]
@@ -22,6 +22,8 @@ export interface RhythmInsightCard {
   trace?: string
   structured?: RhythmInsightStructured | null
   time: string
+  /** 生成时刻灰字（次行；created_at 上海时区 HH:MM，恒真展示，不做补偿） */
+  timeNote?: string
 }
 
 const LEVEL_LABEL: Record<string, string> = { ice: '冰点', low: '低迷', normal: '常温', active: '活跃', euphoria: '亢奋' }
@@ -54,17 +56,34 @@ function toCondition(b: RhythmBranch): RhythmInsightCondition | null {
     direction: b.conclusion.direction,
     positionAction: b.position_action,
     anchor: b.anchor ? { threshold: b.anchor.threshold, metric: b.anchor.metric } : undefined,
-    met: b.met,
   }
   if (paren && !condition.anchor) condition.anchor = { threshold: paren }
   return condition
 }
 
+/** 洞见卡时间行（v3 R-H）：主 = MM-DD · slot 标签（版本标注，恒有——无三时点 pill 后卡上唯一的版本说明）；
+ * 次 = HH:MM 生成（created_at 上海时区，恒真展示生产漂移值，spec §8.1 反成诊断线索；缺失/非法不渲染次行）。 */
+function formatCardTimeParts(targetDate: string, slot: string, createdAt?: string): { time: string; timeNote?: string } {
+  const datePart = targetDate.slice(5)
+  const time = `${datePart} · ${SLOT_LABEL[slot] ?? slot}`
+  if (!createdAt) return { time }
+  const ts = new Date(createdAt)
+  if (Number.isNaN(ts.getTime())) return { time }
+  const { hour, minute } = shanghaiDateTimeParts(ts)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return { time, timeNote: `${p(hour)}:${p(minute)} 生成` }
+}
+
 /** 节奏状态卡 → 统一洞见卡入参；不可拼装/为空返回 null（整卡不渲染，杜绝空壳与臆造） */
-export function toRhythmInsight(card: RhythmCard | null | undefined, slot: string, targetDate: string): RhythmInsightCard | null {
+export function toRhythmInsight(
+  card: RhythmCard | null | undefined,
+  slot: string,
+  targetDate: string,
+  createdAt?: string,
+): RhythmInsightCard | null {
   if (!card) return null
   const level = LEVEL_LABEL[card.level ?? ''] ?? ''
-  const band = (card.position_band?.text ?? '').trim().replace(/^建议仓位[：:]*\s*/, '')
+  const band = formatBandText(card.position_band?.text)
   const title = card.conflict
     ? '信号背离 · 仅区间与提示'
     : [level, band].filter(Boolean).join(' · ')
@@ -72,13 +91,14 @@ export function toRhythmInsight(card: RhythmCard | null | undefined, slot: strin
 
   const structured = (card.branches ?? []).map(toCondition).filter((c): c is RhythmInsightCondition => c !== null)
   const trace = buildTrace(card)
-  const time = `${targetDate.slice(5)} · ${SLOT_LABEL[slot] ?? slot}`
+  const { time, timeNote } = formatCardTimeParts(targetDate, slot, createdAt)
 
   return {
     title,
     trace,
     structured: structured.length ? { conditions: structured } : undefined,
     time,
+    timeNote,
   }
 }
 

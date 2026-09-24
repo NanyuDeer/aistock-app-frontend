@@ -25,8 +25,17 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *  2026-09-16：无 met 数据降级全量渲染新增 3 条（conditionalForecast.spec.ts 的 resolveDisplayMode 三态）。
  *  2026-09-16：condition_met 两段判定（条件点亮中间态不再误标「已验证」）新增 2 条
  *    （predictionHistory.spec.ts 的 conditionStage 中间态/到期后）。
+ *  2026-09-18：节奏大师事件可见性修复（PR #134）新增 4 条（rhythmBand.spec.ts + 节奏卡/日历 spec 扩充）。
+ *  2026-09-21：节奏大师「事件提前展示 + 按生成时间自动选中时点」新增 4 条
+ *    （rhythmInsight.spec.ts 时间显示 2 条 + index.spec.ts 时点判定/接线 2 条）。
+ *  2026-09-22：Task 14 事件区分层折叠 + overflow 适配新增 3 条
+ *    （RhythmCard.spec.ts 折叠 2 条 + RhythmCalendarPanel.spec.ts overflow「另有 N 条」1 条）。
+ * 2026-09-23：v3 极简展示新增 6 条（rhythmEventWindow.spec.ts 未来 3 事件分组）。
+ * 2026-09-23：v3 极简 RhythmCard 事件区收敛 + 色彩三色 + 空态占位（-2 旧断言 +5 新断言）。
+ * 2026-09-23：时间行拆主/次（rhythmInsight time + timeNote）改 1 增 1。
+ * 2026-09-23：v3 极简页面改造（-2 时点判定旧断言 +4 pickVersion/提示行/pageTitle 新断言）。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '248/248/0'
+const EXPECTED_BASELINE = '271/271/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {

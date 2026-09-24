@@ -40,30 +40,33 @@
             @tap="toggleFavoritesOnly"
           >自选股</text>
 
-          <!-- 排序字段：选中项放大（其他项滑动缩小），选中项显示上下双三角 -->
-          <view class="sort-field-group">
-            <view
-              v-for="f in sortFields"
-              :key="f.key"
-              :class="['sort-field-item', activeSort === f.key ? 'active' : '']"
-              @tap="setSortField(f.key)"
-            >
-              <text class="sort-field-text">{{ f.label }}</text>
-              <!-- 选中项显示上下三角：上=从低到高，下=从高到低 -->
-              <view v-if="activeSort === f.key" class="sort-arrows">
-                <view
-                  class="sort-arrow-up"
-                  :class="{ active: sortAsc }"
-                  @tap.stop="setSortField(f.key, true)"
-                />
-                <view
-                  class="sort-arrow-down"
-                  :class="{ active: !sortAsc }"
-                  @tap.stop="setSortField(f.key, false)"
-                />
+          <!-- 排序字段：横向滑动查看（手机屏较窄，五项无法一次排满，不定死在页面上） -->
+          <scroll-view class="sort-field-group" scroll-x :show-scrollbar="false">
+            <view class="sort-field-row">
+              <!-- 选中项放大，并显示上下双三角 -->
+              <view
+                v-for="f in sortFields"
+                :key="f.key"
+                :class="['sort-field-item', activeSort === f.key ? 'active' : '']"
+                @tap="setSortField(f.key)"
+              >
+                <text class="sort-field-text">{{ f.label }}</text>
+                <!-- 选中项显示上下三角：上=从低到高，下=从高到低 -->
+                <view v-if="activeSort === f.key" class="sort-arrows">
+                  <view
+                    class="sort-arrow-up"
+                    :class="{ active: sortAsc }"
+                    @tap.stop="setSortField(f.key, true)"
+                  />
+                  <view
+                    class="sort-arrow-down"
+                    :class="{ active: !sortAsc }"
+                    @tap.stop="setSortField(f.key, false)"
+                  />
+                </view>
               </view>
             </view>
-          </view>
+          </scroll-view>
         </view>
       </view>
 
@@ -438,30 +441,30 @@ onShow(() => {
   }
 }
 
-/* 排序字段组：占满剩余空间，五项分布（无方框） */
+/* 排序字段组：横向滚动容器，占满剩余空间，内容按实际宽度排布（不再压缩定死） */
 .sort-field-group {
   flex: 1;
-  display: flex;
-  align-items: center;
-  margin-left: 12rpx;
   min-width: 0;
+  margin-left: 12rpx;
+  white-space: nowrap;
 }
 
-/* 未选中：flex:1 均匀分布；选中：flex-grow 放大，带动其他项滑动缩小 */
+/* 滚动内容：inline-flex 撑开实际宽度，超出即可左右滑动 */
+.sort-field-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding-right: 4rpx;
+}
+
+/* 单个筛选项：宽度按文案，不参与压缩 */
 .sort-field-item {
-  /* 基准宽度按文字内容（auto），剩余空间再按 flex-grow 分配，避免短文案占宽过多 */
-  flex: 1 1 auto;
-  display: flex;
+  flex-shrink: 0;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4rpx;
-  padding: 8rpx 0;
-  min-width: 0;
-  transition: flex-grow 0.3s ease;
-
-  &.active {
-    flex-grow: 1.2;
-  }
+  padding: 8rpx 10rpx;
 }
 
 /* 未选中：小号灰色文字 */

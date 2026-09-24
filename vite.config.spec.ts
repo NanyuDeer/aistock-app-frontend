@@ -90,10 +90,18 @@ test('公共 Brief 与 Broadcast 精确代理到 Node，近似路径仍代理到
   assert.equal(await request(address.port, '/api/agent/broadcast/evening/2026-07-25'), 'node')
   assert.equal(await request(address.port, '/api/agent/briefing/morning'), 'python')
   assert.equal(await request(address.port, '/api/agent/broadcasting/evening'), 'python')
+  // 归因链 / 板块四环的**读接口都在 app-api（Node）**实现 → 必须显式前置规则；
+  // 否则被 `/api/agent` 兜底转发到 agent-py（Python）恒 404：
+  //   链 404 → fetchAttributionChain 静默返回 null → 市场洞见页「今日影响大盘的主要板块」
+  //   与链树视图整块不渲染（2026-09-18 复现：dev 下该区块从未出现，而库里有链）。
+  assert.equal(await request(address.port, '/api/agent/attribution-chain/2026-09-17'), 'node')
+  assert.equal(await request(address.port, '/api/agent/sector-insight/2026-09-17'), 'node')
 
   assert.deepEqual(nodeRequests, [
     { path: '/api/agent/brief/morning/2026-07-25' },
     { path: '/api/agent/broadcast/evening/2026-07-25' },
+    { path: '/api/agent/attribution-chain/2026-09-17' },
+    { path: '/api/agent/sector-insight/2026-09-17' },
   ])
   assert.deepEqual(pythonRequests, [
     { path: '/api/agent/briefing/morning' },

@@ -178,6 +178,7 @@ import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import { toMarketTraceViewModel } from '@/modules/analytics/utils/marketTraceReview'
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
 import { RHYTHM_LEVEL_COLORS, RHYTHM_GREY, levelShort, type RhythmLevelKey } from '@/shared/utils/rhythmColors'
+import { formatBandText } from '@/shared/utils/rhythmBand'
 
 const {
   type: briefingType,
@@ -402,7 +403,7 @@ async function loadRhythmHistory() {
       level: d.level,
       score: d.score,
       basis_date: d.basis_date,
-      band: d.position_band?.text ?? '',
+      band: formatBandText(d.position_band?.text),
     }))
   } catch {
     rhythmRows.value = []

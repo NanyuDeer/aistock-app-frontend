@@ -59,7 +59,13 @@ export function sectorPredictionToStructured(p: SectorInsightPrediction | null |
         met: c.met ?? undefined
       })) ?? [],
     dueLabel: p.dueLabel ?? undefined,
-    verification: p.verification ?? null
+    /**
+     * 验证 pill 口径（2026-09-19 组长裁定「板块详情中的预判不用显示待验证标签」）：
+     * 板块粒度只保留**已验证结论**（hit/miss），`pending`（含"到期仍在验证窗口内"）归一为 `null`
+     * → CFB 不渲染头部「待验证 · {due}」pill（该 pill 对板块卡是噪音，且到期≠出结论易被误读为卡住）。
+     * 注意：折叠态判定由 `met` 驱动，不依赖本字段，故不影响折叠/未命中标签。
+     */
+    verification: p.verification === 'hit' || p.verification === 'miss' ? p.verification : null
   }
 }
 
@@ -199,6 +205,70 @@ export function extractionWeakLabel(extraction: AttributionChainExtraction | nul
 }
 
 /**
+ * 「未确认驱动原因」判定（2026-09-18 R17，单点口径）：
+ * 驱动句（`trace_summary`）去空白后为空、或命中中性/未确认表述 → 该归因节点属"未确认驱动原因"，不展示。
+ *
+ * **为什么无条件按摘要判、不看 `events[]`**：当前 `events[]` 里常是「沪指跌0.41%…」「A股收評」
+ * 这类**行情综述（现象）**，不是驱动原因；把它们当作归因理由会让用户误以为已归因。
+ * 消费方：大盘归因链树（AttributionChainView）children —— 命中的分支整条不渲染（自然也不出预判入口）。
+ * （2026-09-18：市场洞见「今日影响大盘的主要板块」卡列表已并入链树视图，不再是本函数的消费方。）
+ *
+ * **2026-09-18 补（否定句口径扩表）**：原判据只认「未确认驱动原因」「证据不足，未确认主因」两条，
+ * 而链上更常见的否定句是「**未检索到**可解释当日行情的独立触发事件」（2026-09-18 注册制次新股
+ * 生产实证）——不匹配 → 两个视图都会把它出成卡，驱动句就是那句否定句本身，等于"未确认驱动原因的
+ * 不放"没落实。现与 agent-py `attribution_chain._NEGATIVE_SUMMARY_MARKERS`（同一晚迭代 4 引入）
+ * **逐字对齐**，两侧同一口径。
+ *
+ * 刻意**不收**「不足/没有/缺少/缺乏/未出现」：肯定归因句里的这些词不能误伤——2026-09-17 玉米的
+ * 真实摘要是「未出现单一独立公告；催化来自超强厄尔尼诺供给扰动预期」，它是有内容的归因句。
+ */
+const UNCONFIRMED_ATTRIBUTION_RE =
+  /未检索到|没有检索到|未找到|没有找到|未发现|没有发现|未确认|未明确|未识别|未匹配|无法确认|无法判断|不能确认|暂无|尚未/
+
+export function isUnconfirmedAttribution(traceSummary: string | null | undefined): boolean {
+  const s = String(traceSummary ?? '').replace(/\s+/g, '')
+  if (!s) return true
+  return UNCONFIRMED_ATTRIBUTION_RE.test(s)
+}
+
+/** 展示用的原因链段（组件库 `InsightCard.traceStages` / 链分支展开共用形状） */
+export interface ReasonStageRow {
+  name: string
+  text: string
+}
+
+/** 段名映射：板块溯源 4 段 → 展示 3 段（与大盘主因链 3 步同形） */
+const REASON_STAGE_LABELS: Record<string, string> = {
+  trigger: '触发',
+  transmission: '传导',
+  impact: '结果'
+}
+
+/**
+ * 板块溯源链 `stages`（4 段）→ 展示用 **3 段**（触发 / 传导 / 结果）。
+ *
+ * 2026-09-18 口径（组长裁定「也是和大盘主因链一样显示三个字段：触发、传导、结果」）：
+ * - 保留 `trigger`（触发，**这才是原因**）、`transmission`（传导）、`impact`（结果，即板块的"影响"段）；
+ * - **丢弃 `phenomenon`（现象）**—— 现象不是原因，且溯源行/标题本身已是现象句；
+ * - **保源序**（触发 → 传导 → 结果 的顺序本身是语义，不排序）；
+ * - 段名未知（未来新增段）或 `headline` 去空白后为空 → 跳过该段（不渲染空行）；
+ * - 全空 → 返回 `[]`（调用方侧折叠入口不出现，不编造空链）。
+ *
+ * 单点口径：`SectorInsightCard`（板块详情 / 四环洞见卡）与市场洞见链分支展开共用本函数。
+ */
+export function toReasonStages(
+  stages: Array<{ kind?: string; headline?: string }> | null | undefined
+): ReasonStageRow[] {
+  const rows: ReasonStageRow[] = []
+  for (const st of stages ?? []) {
+    const name = REASON_STAGE_LABELS[String(st?.kind ?? '').trim()]
+    const text = String(st?.headline ?? '').trim()
+    if (name && text) rows.push({ name, text })
+  }
+  return rows
+}
+
+/**
  * 由大盘归因链构建当前板块的「大盘联动」数据：
  * - 无链 → null（洞见卡溯源行回退板块四环文本形态）；
  * - 链存在 → 按板块名/代码匹配 children（ts_code → sector_std → sector → 归一化；
@@ -224,15 +294,19 @@ export function buildMarketLink(
 }
 
 /**
- * 市场洞见「今日影响大盘的主要板块」卡列表排序（spec §7.1）：
+ * 「候选 + 该候选在链上的大盘联动」列表排序（spec §7.1 原「今日影响大盘的主要板块」卡列表口径）：
  * 自驱动优先 → 按 |涨跌幅| 降序（涨跌幅取链上该板块 pct；未入链无 pct → 排末尾）。
  * 同组同 |pct| 保持入参原序（显式带原序兜底，不依赖引擎排序稳定性）。
  * 返回 `{ candidate, marketLink }` 对，避免页面二次匹配（口径单点）。
+ *
+ * **当前无消费方**（2026-09-18）：市场洞见「今日影响大盘的主要板块」区块并入链树视图后，
+ * 本函数与 `buildPrimarySectorCandidates` / `rowDriverSummary` / `SectorInsightRow` 一并失去调用方；
+ * 保留待该区块若恢复时复用（是否清理见 changelog 同日条目）。
  */
 export function rankSectorCandidatesByChain(
   candidates: SectorInsightCandidate[],
   chain: AttributionChain | null | undefined
-): Array<{ candidate: SectorInsightCandidate; marketLink: SectorMarketLink | null }> {
+): SectorInsightRow[] {
   const rows = candidates.map((candidate, index) => ({
     candidate,
     index,
@@ -251,4 +325,90 @@ export function rankSectorCandidatesByChain(
     return a.index - b.index
   })
   return rows.map(({ candidate, marketLink }) => ({ candidate, marketLink }))
+}
+
+/** 主因卡行：聚合候选 + 该候选在当日链上的大盘联动（排序与展示同源） */
+export interface SectorInsightRow {
+  candidate: SectorInsightCandidate
+  marketLink: SectorMarketLink | null
+}
+
+/**
+ * 行驱动句（`isUnconfirmedAttribution` 的输入口径单点）：
+ * 链上驱动句优先（区块已改为以链 children 为准），未入链/链上无驱动句时回退候选溯源主句。
+ */
+export function rowDriverSummary(row: SectorInsightRow): string {
+  return row.marketLink?.driver?.trim() || row.candidate.trace?.summary?.trim() || ''
+}
+
+/**
+ * 链节点 ↔ 板块洞见候选匹配（2026-09-18 R17）——`findChainChild` 的**反向复用**，
+ * 优先级与 R14 完全一致：① `ts_code`（去交易所后缀）→ ② `sector_std` 精确 →
+ * ③ `sector` 精确 → ④ 归一化名比较（链原名优先，其次权威名）。
+ * 与正向一样**不做包含匹配**；仅用于"该链节点在候选里是谁"（配对/补漏判重），
+ * 展示用的大盘联动仍走 `buildMarketLink` 的正向口径，两处不会漂移。
+ */
+function matchesChainChild(candidate: SectorInsightCandidate, child: AttributionChainChild): boolean {
+  const childCode = child.ts_code?.trim()
+  if (childCode) {
+    const bare = stripExchangeSuffix(childCode)
+    const candCode = candidate.ts_code?.trim()
+    if (candCode && stripExchangeSuffix(candCode) === bare) return true
+  }
+
+  const std = child.sector_std?.trim()
+  if (std && candidate.name === std) return true
+
+  const raw = child.sector?.trim()
+  if (raw && candidate.name === raw) return true
+
+  const norm = normalizeSectorName(candidate.name)
+  if (!norm) return false
+  return (
+    normalizeSectorName(child.sector ?? '') === norm ||
+    normalizeSectorName(child.sector_std ?? '') === norm
+  )
+}
+
+/**
+ * 由链节点合成最小候选（`source='chain_only'`）：链上有、sector-insight 候选里没有的板块。
+ * 无四环数据（quote/trace/prediction 恒 null）——展示内容全部来自链（驱动句/角色徽/事件），
+ * 名称取 `sector_std || sector`（权威名优先），category 按概念兜底。
+ */
+function chainOnlyCandidate(child: AttributionChainChild): SectorInsightCandidate {
+  return {
+    ts_code: child.ts_code?.trim() || '',
+    name: child.sector_std?.trim() || child.sector,
+    category: 'concept',
+    source: 'chain_only',
+    cycle: null,
+    quote: null,
+    trace: null,
+    prediction: null
+  }
+}
+
+/**
+ * 主因卡候选合成（2026-09-18 R17，spec §7.1 修订）：
+ * **以当日链 `children` 为主出卡**，再补上"候选里有、链上没有"的候选（避免链不全时信息丢失）。
+ * 起因：弱归因日链上有 3 个板块、`sector-insight` 只给 1 个 `review_primary`，
+ * 只按候选出卡会让用户误以为"只分析了一个板块"。
+ * 调用方（traceability）此前已把候选过滤为 `review_primary`/`both`，本函数不再筛 source。
+ */
+export function buildPrimarySectorCandidates(
+  chain: AttributionChain | null | undefined,
+  candidates: SectorInsightCandidate[]
+): SectorInsightCandidate[] {
+  const rest = [...(candidates ?? [])]
+  const fromChain: SectorInsightCandidate[] = []
+  for (const child of chain?.children ?? []) {
+    const idx = rest.findIndex((c) => matchesChainChild(c, child))
+    if (idx >= 0) {
+      fromChain.push(rest[idx] as SectorInsightCandidate)
+      rest.splice(idx, 1)
+    } else {
+      fromChain.push(chainOnlyCandidate(child))
+    }
+  }
+  return [...fromChain, ...rest]
 }

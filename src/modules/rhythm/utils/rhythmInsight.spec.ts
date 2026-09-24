@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { toRhythmInsight } from './rhythmInsight'
+import { toRhythmInsight, type RhythmInsightCondition } from './rhythmInsight'
 import type { RhythmCard, RhythmBranch } from '@/shared/api/modules/agent'
 
 const source = readFileSync(new URL('./rhythmInsight.ts', import.meta.url), 'utf8')
@@ -21,22 +21,22 @@ test('title：非 conflict 拼接档位中文与仓位句；conflict 用背离�
   assert.equal(toRhythmInsight(conflict, 'after_close', '2026-09-02')?.title, '信号背离 · 仅区间与提示')
 })
 
-test('预判 structured 同时收 interval 与 enum（事件）分支；enum 用 indicator+value，透传 met', () => {
+test('预判 structured 同时收 interval 与 enum（事件）分支；enum 用 indicator+value，不再透传 met', () => {
   const interval = branch({})
   const eventBranch = branch({
     condition: { kind: 'enum', indicator: 'CPI 数据公布预期差', value: '超预期', label: '超预期' },
     conclusion: { direction: 'bullish', validity: 1, note: '结果待公布' },
     event_ref: { event_date: '2026-09-03', title: 'CPI 数据公布' },
     met: true,
-  })
+  } as Partial<RhythmBranch> & { met?: boolean | null })
   const card = { level: 'normal', position_band: { text: '建议仓位：五成~六成' }, conflict: false, branches: [interval, eventBranch] } as unknown as RhythmCard
   const out = toRhythmInsight(card, 'morning', '2026-09-02')
   assert.equal(out?.structured?.conditions.length, 2)
   assert.equal(out?.structured?.conditions[0].condition, '收盘站上 4050 压力位')
-  const ev = out?.structured?.conditions[1]
+  const ev = out?.structured?.conditions[1] as (RhythmInsightCondition & { met?: boolean | null }) | undefined
   assert.equal(ev?.condition, 'CPI 数据公布预期差超预期')
   assert.equal(ev?.direction, 'bullish')
-  assert.equal(ev?.met, true)
+  assert.equal(ev?.met, undefined)
 })
 
 test('括号阈值（放量（>xxx亿））→ anchor.threshold，主干保留', () => {
@@ -64,12 +64,32 @@ test('toCondition 透传 direction / positionAction / anchor（结构化仓位�
   assert.match(toCondition, /anchor:\s*b\.anchor\s*\?/)
 })
 
+test('time：主行 slot 标签（版本标注）+ timeNote 生成时刻灰字（上海时区恒真展示，v3 R-H）', () => {
+  const card = { level: 'normal', position_band: { text: '建议仓位：五成~六成' }, conflict: false, branches: [] } as unknown as RhythmCard
+  // 无 createdAt → 只有主行 slot 标签，无 timeNote
+  const noCreated = toRhythmInsight(card, 'midday', '2026-09-21')
+  assert.equal(noCreated?.time, '09-21 · 午间')
+  assert.equal(noCreated?.timeNote, undefined)
+  // createdAt 为 UTC ISO（PG timestamptz 序列化）→ 上海时区转换：04:30Z = 12:30 上海（生产漂移值恒真展示）
+  const withCreated = toRhythmInsight(card, 'midday', '2026-09-21', '2026-09-21T04:30:00.000Z')
+  assert.equal(withCreated?.time, '09-21 · 午间')
+  assert.equal(withCreated?.timeNote, '12:30 生成')
+  // 带偏移格式
+  assert.equal(toRhythmInsight(card, 'morning', '2026-09-21', '2026-09-21T01:00:00+08:00')?.timeNote, '01:00 生成')
+  // 非法 createdAt → 回退（无 timeNote）
+  assert.equal(toRhythmInsight(card, 'morning', '2026-09-21', 'not-a-date')?.timeNote, undefined)
+})
+
+test('RhythmInsightCard 接口含 timeNote 可选字段（无 pill 后的版本标注次行）', () => {
+  assert.match(source, /timeNote\?: string/)
+})
+
+test('toRhythmInsight 签名含 createdAt 第 4 参（B8：created_at 必须传进 mapper）', () => {
+  assert.match(source, /function toRhythmInsight\(\s*card: RhythmCard \| null \| undefined,\s*slot: string,\s*targetDate: string,\s*createdAt\?: string,/)
+})
+
 test('RhythmInsightCondition 接口含 direction / positionAction / anchor 字段', () => {
   assert.match(source, /direction\?: ['"]bullish['"] \| ['"]bearish['"] \| ['"]neutral['"]/)
   assert.match(source, /positionAction\?:/)
   assert.match(source, /anchor\?:/)
-})
-
-test('RhythmInsightCondition 含 met 字段', () => {
-  assert.match(source, /met\?: boolean \| null/)
 })

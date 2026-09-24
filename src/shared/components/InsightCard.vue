@@ -12,7 +12,16 @@
         <text class="wm-dot">·</text>
         <text class="wm-label">{{ typeWord }}</text>
       </view>
-      <text v-if="time" class="as-insight-card__time">{{ time }}</text>
+      <!-- 时间分组：主时间 + 次行灰字紧邻（v3 节奏大师；space-between 下需分组防主/次被推向两端） -->
+      <view v-if="time || timeNote" class="as-insight-card__time-group">
+        <text v-if="time" class="as-insight-card__time">{{ time }}</text>
+        <text v-if="timeNote" class="as-insight-card__time-note">{{ timeNote }}</text>
+      </view>
+    </view>
+
+    <!-- 板块名标签（2026-09-18 R17）：标题为溯源主句时，标明"这是哪个板块"（中性描边小标，非告警色） -->
+    <view v-if="titleTag" class="as-insight-card__name-tag">
+      <text class="as-insight-card__name-tag-text">{{ titleTag }}</text>
     </view>
 
     <!-- 结论标题（一句话） -->
@@ -68,13 +77,13 @@
       </view>
 
       <!-- 依据详情（本地展开：展示溯源全文 + 板块链阶段 stages；无内容不渲染入口） -->
-      <template v-if="traceDetailText || traceStages.length">
+      <template v-if="traceDetailText || stageRows.length">
         <view class="as-insight-card__more" @tap.stop="traceExpanded = !traceExpanded">
           <text class="as-insight-card__more-tx">{{ traceExpanded ? '收起' : '依据详情' }}</text>
           <view class="as-insight-card__more-chev" :class="{ 'as-insight-card__more-chev--open': traceExpanded }" />
         </view>
         <view v-if="traceExpanded" class="as-insight-card__detail">
-          <view v-for="(st, i) in traceStages" :key="i" class="as-insight-card__detail-st">
+          <view v-for="(st, i) in stageRows" :key="i" class="as-insight-card__detail-st">
             <text class="as-insight-card__detail-k">{{ st.name }}</text>
             <text class="as-insight-card__detail-v">{{ st.text }}</text>
           </view>
@@ -89,13 +98,13 @@
       <text class="as-insight-card__text">{{ trace }}</text>
 
       <!-- 依据详情（本地展开：展示溯源全文 + 板块链阶段 stages；无内容不渲染入口） -->
-      <template v-if="traceDetailText || traceStages.length">
+      <template v-if="traceDetailText || stageRows.length">
         <view class="as-insight-card__more" @tap.stop="traceExpanded = !traceExpanded">
           <text class="as-insight-card__more-tx">{{ traceExpanded ? '收起' : '依据详情' }}</text>
           <view class="as-insight-card__more-chev" :class="{ 'as-insight-card__more-chev--open': traceExpanded }" />
         </view>
         <view v-if="traceExpanded" class="as-insight-card__detail">
-          <view v-for="(st, i) in traceStages" :key="i" class="as-insight-card__detail-st">
+          <view v-for="(st, i) in stageRows" :key="i" class="as-insight-card__detail-st">
             <text class="as-insight-card__detail-k">{{ st.name }}</text>
             <text class="as-insight-card__detail-v">{{ st.text }}</text>
           </view>
@@ -153,6 +162,7 @@ const wmStyle = computed(() => ({
  * - 条件化形态（structured 传入）：溯源 → 通用条件化预判块（ConditionalForecastBlock，
  *   2026-09-02 抽取：大盘/板块/个股等一切有条件化预判的粒度共用同款分支 UI）。
  * 组件保持纯 UI：方向/置信/期段/条件全部经 props 结构化传入，不引业务。
+ * titleTag（2026-09-18 R17）：标题上方可选板块名标签（标题为溯源主句、看不出板块名时用）。
  */
 type InsightType = 'emotion' | 'fund' | 'event' | 'market' | 'trend'
 type InsightTheme = 'light' | 'dark'
@@ -265,12 +275,21 @@ const props = withDefaults(defineProps<{
   traceStructured?: InsightTraceStructured | null
   /** 溯源「依据详情」正文（可选；有值时溯源区显示「依据详情 ▾」入口并在卡片内展开） */
   traceDetail?: string
+  /**
+   * 板块原因链 3 段（触发 / 传导 / 结果）—— 显式传入，**两种溯源形态（结构化 traceStructured /
+   * 纯文本 trace）都能展示**；优先于 `traceStructured.stages`。
+   * 2026-09-18：原槽位只挂在 traceStructured 上，导致"未入链但已有板块溯源"（无 marketLink →
+   * 走文本形态）时原因链无处可放 → 提到顶层 prop。
+   */
+  traceStages?: Array<{ name: string; text: string }>
   /** 预判展示模式：full=全量分支（现状）；conclusion=只显示已成立分支（透传 CFB，spec §7） */
   displayMode?: 'full' | 'conclusion'
   /** 预判：后续走向（文本形态，structured 传入时忽略） */
   forecast?: string
   /** 标签词覆盖（如板块卡传 tag-text="板块洞见"，剥"洞见"后缀后显示"板块"）；缺省按 type 取短词 */
   tagText?: string
+  /** 标题上方的板块名标签（2026-09-18 R17：标题是溯源主句、看不出板块名时用；缺省不渲染） */
+  titleTag?: string
   /** 条件化预判结构化数据（传入则渲染期段切换的预判块） */
   structured?: InsightStructuredForecast | null
   /** 多要点行（优势/风险/建议等，渲染于分隔线后、溯源前；不依赖 trace/forecast/structured） */
@@ -278,6 +297,8 @@ const props = withDefaults(defineProps<{
   linePlacement?: 'before-trace' | 'after-trace'
   /** 时间，如 '08-21 · 09:10' */
   time?: string
+  /** 时间次行（生成时刻灰字，v3 节奏大师；缺省不渲染——加性，既有调用方零变化） */
+  timeNote?: string
   /** 主题：light 亮色列表卡 / dark 深蓝研报卡 */
   theme?: InsightTheme
   /** 行样式：banner 彩色实底（默认）/ plain 白底 + 语义色文字（无大面积重色底） */
@@ -291,14 +312,17 @@ const props = withDefaults(defineProps<{
   trace: '',
   traceStructured: null,
   traceDetail: '',
+  traceStages: () => [],
   displayMode: 'full',
   forecast: '',
   tagText: '',
+  titleTag: '',
   traceLabel: '',
   structured: null,
   lines: () => [],
   linePlacement: 'before-trace',
   time: '',
+  timeNote: '',
   theme: 'light',
   lineStyle: 'banner',
   showMeta: false,
@@ -333,8 +357,11 @@ const traceExpanded = ref(false)
 /** 依据详情正文：结构化 more 优先，其次 traceDetail prop */
 const traceDetailText = computed(() => props.traceStructured?.more?.trim() || props.traceDetail?.trim() || '')
 
-/** 板块链阶段（链式溯源 P3' 产出；无数据 → 不渲染阶段区） */
-const traceStages = computed(() => props.traceStructured?.stages ?? [])
+/** 板块链阶段（链式溯源 P3' 产出；无数据 → 不渲染阶段区）。
+ *  顶层 `traceStages` prop 优先（两种溯源形态都可用），其次 `traceStructured.stages`。 */
+const stageRows = computed(() =>
+  props.traceStages?.length ? props.traceStages : (props.traceStructured?.stages ?? [])
+)
 
 /** 板块链上事件节点（spec §7；无数据/旧数据缺省 → 不渲染事件区） */
 const traceEvents = computed(() => props.traceStructured?.events ?? [])
@@ -381,9 +408,21 @@ const handleClick = () => {
   justify-content: space-between;
 }
 
+/* 时间分组（透明包裹：不设 margin/justify，head 的 space-between 定位单元素分组 = 原 time 位置，既有调用方零变化） */
+.as-insight-card__time-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+}
+
 .as-insight-card__time {
   font-size: $font-size-xs;
   color: $ink-mute;
+}
+
+.as-insight-card__time-note {
+  font-size: $font-size-xs;
+  color: $ink-faint;
 }
 
 /* ===== 洞见字标标签（字标 PNG + 灰点 + 彩色类型词；2026-09-03 由瞳孔标签 InsightTag 换为洞见字标） ===== */
@@ -425,6 +464,24 @@ const handleClick = () => {
 .wm-tag--event   { --wm-color: #00a8d8; }
 .wm-tag--market  { --wm-color: #{$insight-market}; }
 .wm-tag--trend   { --wm-color: #{$insight-trend}; }
+
+/* ===== 板块名标签（标题上方；2026-09-18 R17） =====
+   中性描边小标：标题是溯源主句时标明"这是哪个板块"；与弱依据标记同族样式，
+   刻意不用告警色/涨跌色，底色/文字随主题变量切换（light/dark 通用）。 */
+.as-insight-card__name-tag {
+  align-self: flex-start;
+  padding: 2rpx 12rpx;
+  border: 1rpx solid var(--ins-weak-bd);
+  border-radius: $r-md;
+  background: var(--ins-fc-bg);
+}
+
+.as-insight-card__name-tag-text {
+  font-size: $font-size-xs;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--ins-card-tx);
+}
 
 /* ===== Title ===== */
 .as-insight-card__title {

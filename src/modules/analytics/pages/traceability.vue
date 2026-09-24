@@ -36,43 +36,33 @@
       <view v-else class="report-content">
         <MarketInsightCard :presentation="presentation" />
 
-        <!-- 大盘归因链（P1 chain-attribution）：大盘根 → 主驱动板块分支（relation 徽 + 一句话驱动卡 + 事件胶囊）；
-             链数据由本页拉取后受控传入（页面同时用它做主因卡排序/marketLink 匹配）；
-             链空/接口失败由组件内空态承接（无链日不报错，不阻断报告内容） -->
+        <!-- 今日驱动板块（P1 chain-attribution，2026-09-19 由「大盘归因链」更名 + 改洞见卡行语言）：
+             大盘行 → 驱动板块分支（key + 归因结论 + 关系徽 + 中台事件胶囊 + 依据详情 ▾）；
+             链数据由本页拉取后受控传入；链空/接口失败由组件内空态承接（无链日不报错，不阻断报告内容）。
+             2026-09-18：原「今日影响大盘的主要板块」区块已并入本视图（同一份链、同一过滤判据、信息重复），
+             其「归因较弱」/「全部板块 ›」迁到下方 chain-foot 行；同日**撤掉链分支上的「看该板块预判 →」入口**
+             （板块详情页仍可从板块四环页/风口页进入），并**只展示「中台」来源事件**（隐藏「检索」新闻条）。 -->
         <view class="chain-view-block">
-          <AttributionChainView :date="displayedDate" :chain="chain" :loading="chainLoading" />
+          <AttributionChainView
+            :date="displayedDate"
+            :chain="chain"
+            :loading="chainLoading"
+            :sector-stages="sectorStageMap"
+          />
+          <!-- 链级标记行：弱依据提示 + 全部板块入口（原挂在被合并区块的标题行上，随区块移除后保留于此） -->
+          <view v-if="chain" class="chain-foot">
+            <text v-if="chainWeak" class="chain-foot-weak">归因较弱</text>
+            <view class="chain-foot-more" @tap="goSectorLoop">
+              <text class="chain-foot-more-text">全部板块 ›</text>
+            </view>
+          </view>
         </view>
 
-        <!-- 今日影响大盘的主要板块（spec §7.1）：**仅当日链存在时渲染**（无链隐藏、不占位）；
-             排序 自驱动优先 → |pct| 降序；每卡只出溯源侧（trace-only，两轨分离 §2.1）：
-             角色徽 + 事件胶囊 + 驱动句 + 依据详情，预判内容只走「看该板块预判 →」入口 -->
-        <view v-if="chain && rankedCandidates.length" class="primary-sector-block">
-          <view class="primary-sector-head">
-            <view class="primary-sector-head-left">
-              <text class="primary-sector-title">今日影响大盘的主要板块</text>
-              <!-- 链级弱依据标记（root.evidence_weak=true：当日大盘未确认主因）中性灰小字，非告警色 -->
-              <text v-if="chainWeak" class="primary-sector-weak">归因较弱</text>
-            </view>
-            <view class="primary-sector-more" @tap="goSectorLoop">
-              <text class="primary-sector-more-text">全部板块 ›</text>
-            </view>
-          </view>
-          <view v-for="row in rankedCandidates" :key="row.candidate.ts_code" class="primary-sector-card">
-            <SectorInsightCard
-              :candidate="row.candidate"
-              :date="displayedDate"
-              display-mode="conclusion"
-              trace-only
-              :market-link="row.marketLink"
-              :sector-name="row.candidate.name"
-            />
-            <!-- 预判入口（溯源区附加链接）：点击跳该板块详情看完整预判；
-                 预判内容不进主因卡（溯源/预判两轨分离不变） -->
-            <view class="primary-sector-forecast-entry" @tap="goSectorDetail(row.candidate.name)">
-              <text class="primary-sector-forecast-entry-text">看该板块预判 →</text>
-            </view>
-          </view>
-        </view>
+        <!-- 2026-09-18：「今日影响大盘的主要板块」区块已移除 —— 与上方大盘归因链同一份链、同一过滤判据、
+             同一批板块，信息重复；其能力去向往下：
+             「归因较弱」/「全部板块 ›」→ 上方 chain-foot 行；
+             「今日暂无可确认的驱动板块」空态 → 不再需要（链树本身已过滤未确认节点，无分支即无卡）；
+             「看该板块预判 →」→ 同日**撤掉**（链分支不挂预判入口，板块详情页从板块四环页/风口页进入）。 -->
       </view>
 
       <!-- 日期切换（放在 footer 插槽，固定在底部不依赖 scroll-view 滚动） -->
@@ -96,10 +86,8 @@
 import { ref, computed, watch } from 'vue'
 import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
-import SectorInsightCard from '@/shared/components/SectorInsightCard.vue'
 import { LoadingState, EmptyState, Button, Card } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
-import type { SectorInsightCandidate } from '@/shared/api/modules/agent'
 import { predictionApi } from '@/shared/api/modules/prediction'
 import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
 import { traceDateCandidates } from '@/shared/utils/traceDate'
@@ -108,7 +96,7 @@ import { toMarketTracePresentation, type MarketTracePresentation } from '@/modul
 import MarketInsightCard from '@/modules/analytics/components/MarketInsightCard.vue'
 import AttributionChainView from '@/shared/components/AttributionChainView.vue'
 import { fetchAttributionChain, type AttributionChain } from '@/shared/api/modules/attributionChain'
-import { rankSectorCandidatesByChain } from '@/shared/utils/sectorInsight'
+import { toReasonStages, type ReasonStageRow } from '@/shared/utils/sectorInsight'
 
 const loading = ref(false)
 const error = ref(false)
@@ -203,9 +191,9 @@ function goPredictionHistory() {
   uni.navigateTo({ url: '/modules/analytics/pages/prediction-history' })
 }
 
-/* ===== 今日影响大盘的主要板块（链式溯源 P3'，2026-09-17 改造自主因板块区块） ===== */
+/* ===== 今日驱动板块（链式溯源 P3'，2026-09-19 命名；2026-09-18 起「今日影响大盘的主要板块」区块已并入本视图） ===== */
 
-/** 当日大盘归因链（页面持有：主因卡排序 + marketLink 匹配 + 链视图展示共用一份，避免重复请求/口径漂移） */
+/** 当日大盘归因链（页面持有：链视图展示 + 板块原因链索引的键空间） */
 const chain = ref<AttributionChain | null>(null)
 const chainLoading = ref(false)
 
@@ -220,35 +208,41 @@ async function loadChain(d: string) {
   }
 }
 
-/** 当日大盘复盘主因板块的聚合候选（source 含 review_primary）；空 → 整块不渲染 */
-const primarySectorCandidates = ref<SectorInsightCandidate[]>([])
-
-/** 主因卡列表：自驱动优先 → |pct| 降序（排序与 marketLink 匹配同源，spec §7.1） */
-const rankedCandidates = computed(() => rankSectorCandidatesByChain(primarySectorCandidates.value, chain.value))
-
-/** 链级弱依据（root.evidence_weak=true：当日大盘未确认主因，2026-09-17 R16）→ 区块标题旁中性灰「归因较弱」 */
+/** 链级弱依据（root.evidence_weak=true：当日大盘未确认主因，2026-09-17 R16）→ 链视图下方中性灰「归因较弱」 */
 const chainWeak = computed(() => chain.value?.root?.evidence_weak === true)
 
-/** 拉取主因板块研判：失败静默置空，不阻断原有报告内容 */
-async function loadPrimarySectorInsight(d: string) {
+/**
+ * 每板块原因链 3 段（2026-09-18）：**首屏拉一次 `sector-insight` 缓存**，链分支展开时零延迟读取
+ * （与板块详情/四环页同源同映射；不再用它出卡列表 —— 那个区块已并入链树）。
+ * 键同时给 `ts_code` 与板块名两种形态：链节点以 ts_code 为主，名称会在权威名↔复盘原始名之间漂移。
+ */
+const sectorStageMap = ref<Record<string, ReasonStageRow[]>>({})
+
+/** 拉取并索引每板块原因链：失败静默置空（分支展开入口不出现），不阻断报告内容 */
+async function loadSectorStages(d: string) {
   if (!d) return
   try {
     const res = await agentApi.getSectorInsight(d)
-    primarySectorCandidates.value = (res?.candidates ?? []).filter(
-      (c) => c.source === 'review_primary' || c.source === 'both'
-    )
+    const map: Record<string, ReasonStageRow[]> = {}
+    for (const c of res?.candidates ?? []) {
+      const rows = toReasonStages(c.trace?.stages)
+      if (!rows.length) continue
+      if (c.ts_code) map[c.ts_code] = rows
+      const name = (c.name ?? '').trim()
+      if (name) map[name] = rows
+    }
+    sectorStageMap.value = map
   } catch (err) {
-    console.error('主因板块研判加载失败:', err)
-    primarySectorCandidates.value = []
+    console.error('板块原因链加载失败:', err)
+    sectorStageMap.value = {}
   }
 }
 
-// 复盘报告实际展示日期确定后（成功展示/切日），并行拉取归因链与主因板块研判
-// （链是主因区块渲染的前置：无链 → 区块整体隐藏，见模板 v-if）
+// 复盘报告实际展示日期确定后（成功展示/切日）拉取归因链与每板块原因链
 watch(displayedDate, (d) => {
   if (d) {
     void loadChain(d)
-    void loadPrimarySectorInsight(d)
+    void loadSectorStages(d)
   }
 })
 
@@ -256,12 +250,6 @@ watch(displayedDate, (d) => {
 function goSectorLoop() {
   const q = displayedDate.value ? `?date=${encodeURIComponent(displayedDate.value)}` : ''
   uni.navigateTo({ url: `/modules/market/pages/sector-loop${q}` })
-}
-
-/** 主因卡预判入口：跳该板块详情页（入参沿用项目既有约定 ?name=<板块名>，见 sector-loop/leaders） */
-function goSectorDetail(name: string) {
-  if (!name) return
-  uni.navigateTo({ url: `/modules/market/pages/sector-detail?name=${encodeURIComponent(name)}` })
 }
 
 /** 跨 20:30 / 15:30 切日自动刷新定时器句柄 */
@@ -350,41 +338,21 @@ onUnload(stopRefreshTimer)
   font-weight: 500;
 }
 
-/* ===== 大盘归因链（水平内边距与 MarketInsightCard/主因板块对齐） ===== */
+/* ===== 大盘归因链（水平内边距与 MarketInsightCard 对齐） ===== */
 .chain-view-block {
   padding: $spacing-xs $spacing-base 0;
 }
 
-/* ===== 主因板块 · 板块研判（卡外小标题 + SectorInsightCard，水平内边距与 MarketInsightCard 对齐） ===== */
-.primary-sector-block {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
-  padding: $spacing-xs $spacing-base $spacing-base;
-}
-
-.primary-sector-head {
+/* 链级标记行：左「归因较弱」（弱依据，中性灰），右「全部板块 ›」入口
+   —— 2026-09-18 自被合并的「今日影响大盘的主要板块」区块标题行迁来 */
+.chain-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: $spacing-sm 0 $spacing-xs;
+  padding: $spacing-xs 0 0;
 }
 
-.primary-sector-head-left {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  min-width: 0;
-}
-
-.primary-sector-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: $text-color-title;
-}
-
-/* 链级弱依据标记：中性灰描边小字（2026-09-17 R16；弱化呈现，刻意不用告警色） */
-.primary-sector-weak {
+.chain-foot-weak {
   flex-shrink: 0;
   padding: 2rpx 10rpx;
   border: 2rpx solid $line-strong;
@@ -395,7 +363,8 @@ onUnload(stopRefreshTimer)
   color: $ink-mute;
 }
 
-.primary-sector-more {
+.chain-foot-more {
+  margin-left: auto;
   padding: 6rpx 16rpx;
   background: $primary-50;
   border-radius: $r-xs;
@@ -405,24 +374,7 @@ onUnload(stopRefreshTimer)
   }
 }
 
-.primary-sector-more-text {
-  font-size: $font-size-sm;
-  color: $primary;
-  font-weight: 500;
-}
-
-/* 主因卡预判入口（溯源区附加链接：右对齐纯文字，预判内容仍只在板块详情页） */
-.primary-sector-forecast-entry {
-  display: flex;
-  justify-content: flex-end;
-  padding: 8rpx 8rpx 0;
-
-  &:active {
-    opacity: 0.8;
-  }
-}
-
-.primary-sector-forecast-entry-text {
+.chain-foot-more-text {
   font-size: $font-size-sm;
   color: $primary;
   font-weight: 500;

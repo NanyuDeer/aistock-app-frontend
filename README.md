@@ -24,6 +24,13 @@ pnpm build:h5
 
 # TypeScript 类型检查
 npx tsc --noEmit
+
+# 前端单测（Vitest；失败集恒为 5 个既有文件，新增失败即回归）
+pnpm test
+
+# node:test 风格单测（采集器按 Vitest 白名单反向排除同因假失败）
+# 退出码：1 = 基线一致（仅剩 2 条已知真实失败，属预期）或采集器自检失败；2 = 基线漂移
+pnpm test:node
 ```
 
 ## 技术栈
