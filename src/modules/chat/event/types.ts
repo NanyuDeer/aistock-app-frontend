@@ -364,3 +364,61 @@ export interface FocusEventViewModel {
     url?: string
   }
 }
+
+// ==================== 重大事件时间线（GET /api/agent/event/timeline） ====================
+
+/** 时间线事件状态 — 与后端枚举一致 */
+export type EventTimelineStatus = 'scheduled' | 'upcoming' | 'ongoing' | 'occurred'
+
+/** 时间线事件项 */
+export interface EventTimelineItem {
+  /** 事件唯一标识 */
+  eventId: string
+  /** 事件标题 */
+  title: string
+  /** 事件摘要（可能为空串） */
+  summary: string
+  /** 事件开始时间（ISO 带时区字符串） */
+  eventStartTime: string
+  /** 事件结束时间（可能为 null） */
+  eventEndTime: string | null
+  /** 事件状态 */
+  eventStatus: EventTimelineStatus
+  /** 来源类型 */
+  sourceType: string
+  /** 时间来源 */
+  timeSource: string
+  /** 时间置信度 0-1（可能为 null） */
+  timeConfidence: number | null
+  /** 源事件 ID（可能为 null） */
+  sourceEventId: string | null
+  /** 后端算好的上海时区日期，**前端必须用它做日期分组键，禁止自行时区换算** */
+  date: string
+  /** 影响板块（已按 impactStrength 降序，展示层只取最核心 1 个紧跟标题文字末尾；可能为空 []，空则不渲染） */
+  impactSectors: string[]
+}
+
+/** 时间线查询参数（全部可选） */
+export interface EventTimelineQuery {
+  /** 起始日期 YYYY-MM-DD */
+  dateFrom?: string
+  /** 结束日期 YYYY-MM-DD */
+  dateTo?: string
+  /** 事件状态筛选 */
+  status?: EventTimelineStatus
+  /** 排序方向 asc|desc，默认 asc */
+  order?: 'asc' | 'desc'
+  /** 页码，默认 1 */
+  page?: number
+  /** 每页条数，默认 20，上限 100 */
+  pageSize?: number
+}
+
+/** 时间线 API 响应 */
+export interface EventTimelineResponse {
+  items: EventTimelineItem[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
