@@ -2,6 +2,27 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [xusiyun] 2026-09-25 — 重大事件时间轴页 + 事件卡原文入口 + 不可达域名过滤
+
+**开发者**: xusiyun
+
+### 新增
+
+- `modules/chat/pages/event/timeline.vue`：重大事件时间轴页（单时间轴、不区分历史/未来；标题完整可换行；核心影响板块 inline 紧跟标题文字末尾、只显示最核心 1 个、空则不渲染；左侧竖线自首个圆点起始）。
+- 时间线入口：`list.vue`（「重大事件」标题行右侧淡色入口「时间轴」+ calendar-line 图标）、`analytics/pages/index.vue`（洞见页「重大事件」卡片）。
+- `eventApi.ts` 新增 `getEventTimeline`（GET /api/agent/event/timeline，防御性归一 items）；`types.ts` 新增 `EventTimelineItem.impactSectors` 等类型；`pages.json` 注册 timeline 路由。
+
+### 修复
+
+- `eventService.ts`：GI 焦点事件 importance 恒 `major`——焦点事件即当日最大机会/最大风险，不依赖 `importance_level`（此前 rank=1 事件 level=notable 时卡片标题丢「重大」前缀）。
+- `EventItemCard.vue`：新增原文链接图标（links-line，与事件时间同行同色）；标题点击由「跳原文」改为「整卡进入事件详情」。
+
+### 改进
+
+- `eventAdapter.ts`：新增 `UNREACHABLE_DOMAINS`（youtube.com/youtu.be）过滤——国内不可访问的海外域名只显示来源名、不暴露链接入口，避免死链。
+
+---
+
 ## [changer] 2026-09-23 — 节奏大师 v3 极简展示（未来 3 事件 + 砍三时点 + 回退提示 + 时间行）
 
 **开发者**: 37588

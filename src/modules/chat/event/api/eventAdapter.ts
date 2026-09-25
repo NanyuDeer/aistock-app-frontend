@@ -178,23 +178,45 @@ const MEDIA_NAME_BY_DOMAIN: Readonly<Record<string, string>> = {
 }
 
 /**
+ * 国内网络无法直接访问的海外域名。
+ * 这类链接点击必然打不开（如 YouTube 视频），前端不应渲染链接入口造成死链；
+ * 来源名照常展示（2026-09-24）。
+ */
+const UNREACHABLE_DOMAINS: ReadonlySet<string> = new Set([
+  'youtube.com',
+  'youtu.be',
+])
+
+/** 解析 URL 的 hostname（小写、去 www. 前缀）；非 http(s) URL 返回 undefined */
+function domainOfUrl(source: string): string | undefined {
+  const match = source.match(/^https?:\/\/([^/?#]+)/i)
+  if (!match) return undefined
+  return match[1].toLowerCase().replace(/^www\./, '')
+}
+
+/** URL 是否指向国内不可访问的海外域名（命中则不应暴露链接入口） */
+function isUnreachableUrl(source: string): boolean {
+  const domain = domainOfUrl(source)
+  return domain !== undefined && UNREACHABLE_DOMAINS.has(domain)
+}
+
+/**
  * 从后端 source 字段构建 sourceInfo（来源展示信息）。
  *
  * 后端 event_meta.source 由 event_conduction 从 major_events.url 传入：
  * - 若为 URL，用标准 URL API 解析 hostname（小写并去掉 www. 前缀），
  *   命中 MEDIA_NAME_BY_DOMAIN 则显示中文媒体名，否则显示规范化域名；url 保留原始链接。
  * - 若非 URL，直接作为 name。
+ * - 命中 UNREACHABLE_DOMAINS（如 YouTube）：仅返回来源名，不暴露打不开的链接。
  */
 function buildSourceInfo(source: string): { name: string; url?: string } | undefined {
   if (!source) return undefined
   if (!/^https?:\/\//i.test(source)) return { name: source }
   // 使用正则替代 new URL()，兼容 App/小程序环境（无 URL 全局对象）
-  const match = source.match(/^https?:\/\/([^/?#]+)/i)
-  if (match) {
-    const domain = match[1].toLowerCase().replace(/^www\./, '')
-    return { name: MEDIA_NAME_BY_DOMAIN[domain] ?? domain, url: source }
-  }
-  return { name: source }
+  const domain = domainOfUrl(source)
+  if (!domain) return { name: source }
+  if (UNREACHABLE_DOMAINS.has(domain)) return { name: domain }
+  return { name: MEDIA_NAME_BY_DOMAIN[domain] ?? domain, url: source }
 }
 
 /**
@@ -202,6 +224,7 @@ function buildSourceInfo(source: string): { name: string; url?: string } | undef
  *
  * 新数据：后端返回真实 source_name（如"搜狐"）→ 直接展示，并保留原始链接供点击；
  * 旧数据：source_name 为空 → 回退到旧的 URL/domain 解析逻辑。
+ * 命中 UNREACHABLE_DOMAINS 的链接同样不暴露（2026-09-24，避免 YouTube 等死链）。
  */
 function buildSourceInfoWithName(
   sourceName: string | undefined,
@@ -209,7 +232,7 @@ function buildSourceInfoWithName(
 ): { name: string; url?: string } | undefined {
   if (sourceName) {
     const info: { name: string; url?: string } = { name: sourceName }
-    if (/^https?:\/\//i.test(source)) info.url = source
+    if (/^https?:\/\//i.test(source) && !isUnreachableUrl(source)) info.url = source
     return info
   }
   return buildSourceInfo(source)
