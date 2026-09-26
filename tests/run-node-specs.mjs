@@ -31,8 +31,9 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *  2026-09-22：Task 14 事件区分层折叠 + overflow 适配新增 3 条
  *    （RhythmCard.spec.ts 折叠 2 条 + RhythmCalendarPanel.spec.ts overflow「另有 N 条」1 条）。
  *  2026-09-26：首页时段洞见横条新增 getTradingTimeSlot 边界用例 1 条（tradingTime.spec.ts）。
+ *  2026-09-26：首页四宫格改名精确断言 + 时段横条接线用例新增 1 条（MorningContent.spec.ts）。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '260/260/0'
+const EXPECTED_BASELINE = '261/261/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {

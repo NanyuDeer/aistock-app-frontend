@@ -24,11 +24,18 @@ test('首页展示真实缺失来源，且零条 Brief 不显示为关键线索'
   assert.match(componentSource, /v-if="briefingClueCount > 0"/)
 })
 
-test('首页卡片替换为节奏大师（今日分析概览移至交易入口占位）', () => {
-  assert.match(componentSource, /节奏大师/)
+test('首页四宫格入口统一为「洞见」品牌词（风口/消息/市场/节奏洞见）', () => {
+  assert.match(componentSource, /<text class="feature-title">风口洞见<\/text>/)
+  assert.match(componentSource, /<text class="feature-title">消息洞见<\/text>/)
+  assert.match(componentSource, /<text class="feature-title">市场洞见<\/text>/)
+  assert.match(componentSource, /<text class="feature-title">节奏洞见<\/text>/)
+  // 旧标题节点已不存在（仅校验 title 节点，不影响其它文件对领域词的正常使用）
+  assert.doesNotMatch(componentSource, /<text class="feature-title">风口龙头<\/text>/)
+  assert.doesNotMatch(componentSource, /<text class="feature-title">事件传导<\/text>/)
+  assert.doesNotMatch(componentSource, /<text class="feature-title">节奏大师<\/text>/)
+  // 既有跳转/取数约束保持
   assert.match(componentSource, /modules\/rhythm\/pages\/index/)
   assert.match(componentSource, /getRhythmMasterCalendar/)
-  // 今日分析概览已从首页卡片移除
   assert.ok(!/今日分析概览/.test(componentSource))
 })
 
@@ -58,4 +65,21 @@ test('节奏卡 loadRhythmHistory 失败/空数据兜底为空数组（不显示
   const onShowBlock = componentSource.match(/onShow\(\(\) => \{[\s\S]*?\n\s*\}\)/)?.[0] ?? ''
   assert.match(onShowBlock, /loadRhythmHistory\(\)/)
   assert.doesNotMatch(onShowBlock, /loadRhythm\(\)/)
+})
+
+test('首页接入时段洞见横条：取数复用现有 ref，onShow 重算时段，navigate 分发到既有跳转', () => {
+  assert.match(componentSource, /import TimeSlotInsightBar from '\.\/TimeSlotInsightBar\.vue'/)
+  assert.match(componentSource, /getTradingTimeSlot/)
+  assert.match(componentSource, /const currentSlot = ref<TradingTimeSlot>/)
+  assert.match(componentSource, /:current-slot="currentSlot"/)
+  assert.match(componentSource, /@navigate="onBarNavigate"/)
+  assert.match(componentSource, /function onBarNavigate\(target: 'rhythm' \| 'sectors' \| 'events' \| 'trace'\)/)
+  // 横条插在 briefing-card 与 feature-grid 之间
+  const briefIdx = componentSource.indexOf('class="briefing-card"')
+  const barIdx = componentSource.indexOf('<TimeSlotInsightBar')
+  const gridIdx = componentSource.indexOf('class="feature-grid"')
+  assert.ok(briefIdx > -1 && barIdx > briefIdx && gridIdx > barIdx)
+  // onShow 内重算时段（与既有加载器并列）
+  const onShowBlock = componentSource.match(/onShow\(\(\) => \{[\s\S]*?\n\s*\}\)/)?.[0] ?? ''
+  assert.match(onShowBlock, /currentSlot\.value = getTradingTimeSlot\(\)/)
 })
