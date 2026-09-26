@@ -25,6 +25,26 @@
 - 观感/口径（分歧未物理消除，approved）：锚点(5日窗)与列表首条(全量)允许并存；卡片(high/medium)与面板(macro+delivery)口径不同定位不同。
 - 验证：node:test 基线 252→256/256/0 一致；vue-tsc 通过；H5 模块编译 200（修复 `<script setup>` 误 export 的 500）。
 
+## 2026-09-19 修复个股详情「AI 资讯洞见」AI 分析消失（研判/关键词不渲染）
+
+- **现象**：卡片只剩新闻列表，AI 分析（结论徽 + 研判依据关键词 + 风险提示关键词）整块消失。
+- **根因（浏览器取证）**：H5 预览未登录（token 为空）→ `GET/POST /api/cn/stocks/:symbol/analysis`（`requireLogin`）返回 401「未登录」→ `loadAiAnalysis` 双 catch 后置 `aiAnalysis.value = null` → 模板 `aiAnalysis.analysisDate`（`detail.vue:126`）空访问抛渲染错误，AI 区块渲染中断。另发现二次隐患：响应拦截器 `data ?? response.data` 在 `{code:0/200, data:null}` 时泄漏整个包装对象，`res?.data || res` 会把它当分析数据映射出空字段 → `v-else-if="aiAnalysis && aiAnalysis.conclusion"` 不成立 → 研判/关键词隐藏且不触发 POST 兜底。
+- **修复（`src/modules/favorites/pages/detail.vue`）**：
+  1. **模板空安全**：`aiAnalysis.analysisDate` → `aiAnalysis?.analysisDate`（2 处），`aiAnalysis=null` 不再抛渲染错误。
+  2. **深度解包**：新增 `unwrapAnalysisPayload()`（剥 1-3 层 `{code,message,data}` 包装，拦截器泄漏的包装对象不再被误当分析数据）。
+  3. **字段校验 + 兜底**：新增 `hasAnalysisFields()`（结论/核心逻辑任一存在才算有效）；`loadAiAnalysis` GET 解包后无字段（含 200+null 泄漏、401）→ **继续走 POST 触发生成**；最终无数据时置 `{}`（卡片只展示新闻），**不再置 `null`**（杜绝模板崩溃）。
+  4. `refreshAiAnalysis` 同步接入解包/校验，解包后无字段提示「刷新失败」而非「已刷新」。
+- **验证**：`npx vue-tsc --noEmit` 0 错误；生产接口 curl 取证 `{"code":401,"message":"未登录"}`（Express 标准包装，与本地代码同源）。
+- **说明**：AI 资讯洞见接口需要登录（`requireLogin`）；未登录时卡片按修复后降级为「仅新闻 + 无崩溃」。登录后 GET 有记录即展示，无记录会自动 POST 生成。
+- **跨端**：仅改 `aistock-app-frontend`（1 源文件 + 本记录）；web 端 `aistock-frontend` 是否有同款卡片待确认（已列入验收询问）。
+
+## 2026-09-19 板块预判页布局精简（去来源标签 / 溯源标题换行 / 分组标题去重）
+- `modules/market/pages/sector-loop.vue`：
+  - **去掉行内来源 tag**（「大盘主因」红标签）：删除 `sl-tag` 渲染 + `tagModel()` 函数 + `RowVM.tag` 字段 + `.sl-tag*` 样式（主因身份由 `sl-row--primary` 红描边体现，不再重复标注）。
+  - **溯源事件标题换行**：`.sl-trace` 由横排（key+正文同行）改**纵向布局**（key「溯源」独占一行，正文整行展示），长标题可读性更好。
+  - **分组标题去重**：「大盘溯源 · 主因板块」此前每个主因行都渲染 → 新增 `firstPrimaryIdx`，仅分组首个主因行显示一次；「风口板块（长线）」标题逻辑同步收紧（`!row.isPrimary && (idx === 0 || rows[idx-1].isPrimary)`），无主因行时也正常显示。
+- 验证：`npx vue-tsc --noEmit` 无 sector-loop 相关报错；HMR 生效。
+
 ## 2026-09-19 板块溯源/预判三处修复（① 溯源雷同、④ 去掉「待验证」、⑤ 溯源小卡对齐洞见卡）
 
 - **① 修「所有板块详情的溯源都是同一句大盘结论」**：`SectorInsightCard.traceStructured` 的渲染判据改为**真正入链**（有 `relation` 或该板块 `driver` 非空）。根因：`buildMarketLink` 在**未命中链节点时仍填 `chain.root.summary`**，而 2026-09-18 的链只覆盖 2 个板块（汽车芯片/国家大基金持股）→ 其余所有板块都显示同一句大盘结论。未入链 → 回退该板块自己的溯源文本（无则整块不渲染）。
@@ -91,7 +111,6 @@
 - **验收**：`npx vue-tsc --noEmit` **TSC_OK**；全量 `npx vitest run` → **477 passed / 4 failed**（4 条为**本次无关**的存量红：`AnalyticsCardLayout` 1 + `insight-detail` 1 + `AlertContent` 2；改动前基线 475 passed / 同 4 条 → **零新增失败**）。
 - **组件库归档（本轮**未做**，需你定）**：查证发现 ① app 的 `InsightCard.vue`（856 行）已**领先**组件库版本（800 行）——`titleTag` / `linePlacement` / `traceWord` 等 lib 都没有；② `SectorInsightCard.vue` 依赖 app 专属模块（`@/shared/api` 类型 + `@/shared/utils/sectorInsight`，后者又依赖 `expandConditionalBranches`），直接搬进 lib 会 type-check 不过，需先做依赖下沉或改成结构化 props；③ lib README 写明改动走「分支 → PR → review」流程（林晓研维护）。故**本轮未动 `aistock-component-lib`**，建议单独立项做"组件库回灌"（先把 app 领先的改动回灌，再归档 SectorInsightCard）。
 - **跨端**：仅改 `aistock-app-frontend`；`aistock-frontend`（web）无该页面 → 无需同步；app-api 已在 `24b53a5` 提供 `stages`（本轮 0 改动）；agent-py 0 改动。
->>>>>>> origin/master
 
 ## 2026-09-18 市场洞见页：删除「今日影响大盘的主要板块」区块，能力并入大盘归因链
 
