@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol" :scroll-top="detailScrollTop">
+  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol" :scroll-top="detailScrollTop" @scrolltolower="onDetailsScrollLower">
     <view class="page-detail" :class="{ 'page-detail--anchoring': anchorNavigating }">
     <view v-if="loading || anchorNavigating" class="loading">
       <text class="loading-text">加载中...</text>
@@ -207,6 +207,7 @@
           />
         </view>
 
+        <template v-if="revealedCounts.short >= 2">
         <!-- 资金流向 -->
         <view v-if="capitalFlowInfo" class="section-card">
           <view class="cf-section-head">
@@ -234,7 +235,10 @@
             <text class="ai-empty-text">暂无资金流数据</text>
           </view>
         </view>
+        </template>
+
         <!-- 交易数据 -->
+        <template v-if="revealedCounts.short >= 3">
         <view v-if="hasTradingData" class="section-card">
           <text class="section-title">交易数据</text>
 
@@ -349,6 +353,12 @@
             </view>
           </view>
         </view>
+        </template>
+
+        <!-- 触底加载反馈占位：滑到当前已加载片段底部时提示，触底后揭示下一片段 -->
+        <view v-if="revealedCounts.short < SEGMENT_COUNT.short" class="seg-loader">
+          <text class="seg-loader-text">正在加载...</text>
+        </view>
       </view>
 
       <!-- 5. 中线视图 -->
@@ -424,6 +434,7 @@
           </view>
         </view>
 
+        <template v-if="revealedCounts.mid >= 2">
         <!-- 财报分析 -->
         <view v-if="hasFinanceCardData" id="detail-anchor-performance-report" class="section-card">
           <view class="section-header">
@@ -484,7 +495,10 @@
           </view>
         </view>
 
+        </template>
+
         <!-- 业绩预测 -->
+        <template v-if="revealedCounts.mid >= 3">
         <view v-if="forecastLoading || hasForecastCardData || !forecastData" id="detail-anchor-forecast" class="section-card">
           <view class="section-header">
             <text class="section-title">业绩预测</text>
@@ -578,7 +592,12 @@
             </view>
           </view>
         </view>
+        </template>
 
+        <!-- 触底加载反馈占位 -->
+        <view v-if="revealedCounts.mid < SEGMENT_COUNT.mid" class="seg-loader">
+          <text class="seg-loader-text">正在加载...</text>
+        </view>
       </view>
 
       <!-- 6. 长线视图 -->
@@ -654,6 +673,7 @@
           </view>
         </view>
 
+        <template v-if="revealedCounts.long >= 2">
         <!-- 趋势股模型（四维）：仅当有真实趋势评分时展示 -->
         <view v-if="trendModel.hasModel" class="section-card tenx-card">
           <view class="section-header">
@@ -748,8 +768,10 @@
             </view>
           </view>
         </view>
+        </template>
 
         <!-- 行业政策 -->
+        <template v-if="revealedCounts.long >= 3">
         <view v-if="visiblePolicyList.length" class="section-card">
           <text class="section-title">行业政策</text>
           <view class="policy-list">
@@ -776,8 +798,10 @@
             </view>
           </view>
         </view>
+        </template>
 
         <!-- 年报对比 -->
+        <template v-if="revealedCounts.long >= 4">
         <view v-if="longMockData.annual.length" class="section-card">
           <text class="section-title">年报对比</text>
           <view class="annual-grid">
@@ -787,6 +811,12 @@
               <text :class="['annual-note', item.type]">{{ item.note }}</text>
             </view>
           </view>
+        </view>
+        </template>
+
+        <!-- 触底加载反馈占位 -->
+        <view v-if="revealedCounts.long < SEGMENT_COUNT.long" class="seg-loader">
+          <text class="seg-loader-text">正在加载...</text>
         </view>
       </view>
 
@@ -955,8 +985,48 @@ const viewTabs: { key: ViewKey; label: string; desc: string }[] = [
 ]
 const policyExpanded = ref(false)
 
+// 分块加载：每个 Tab 按片段序号 0..N 逐步挂载（抖音式：下滑触底再渲染下一片段）
+const SEGMENT_COUNT: Record<ViewKey, number> = { short: 3, mid: 3, long: 4 }
+const revealedCounts = ref<Record<ViewKey, number>>({ short: 1, mid: 1, long: 1 })
+// 懒加载保护：某 Tab 的 AI/预测数据仅首次进入该 Tab（或首次滑到对应片段）时拉取一次
+const tabLoaded = ref<Record<ViewKey, boolean>>({ short: true, mid: false, long: false })
+
+function revealNextSegment(key: ViewKey) {
+  if (revealedCounts.value[key] >= SEGMENT_COUNT[key]) return
+  revealedCounts.value[key] += 1
+}
+
 function selectActiveView(key: ViewKey) {
   activeView.value = key
+  // 切换到新 Tab：重置分块到首片段，并懒加载该 Tab 的 AI/预测数据（仅首次）
+  revealedCounts.value[key] = 1
+  void lazyLoadTab(key)
+}
+
+/** 滚动触底：依次揭示下一片段（抖音式：先看到占位再渲染内容） */
+function onDetailsScrollLower() {
+  const key = activeView.value
+  if (revealedCounts.value[key] >= SEGMENT_COUNT[key]) return
+  revealNextSegment(key)
+  void lazyLoadTab(key)
+}
+
+/** 懒加载指定 Tab 的 AI/预测数据（tabLoaded 保护：仅拉取一次） */
+async function lazyLoadTab(key: ViewKey) {
+  if (tabLoaded.value[key]) return
+  tabLoaded.value[key] = true
+  try {
+    if (key === 'mid') {
+      await loadMidLongAnalysis()
+      if (revealedCounts.value.mid >= 2) await loadForecast(false)
+    } else if (key === 'long') {
+      await loadMidLongAnalysis()
+    } else if (key === 'short') {
+      await loadForecast(false)
+    }
+  } catch (err) {
+    console.error('[StockDetail] lazy load tab error:', err)
+  }
 }
 
 function normalizeDetailAnchor(value: unknown): DetailAnchor | '' {
@@ -1870,6 +1940,9 @@ onLoad((options: any) => {
   detailAnchor.value = normalizeDetailAnchor(options?.anchor)
   if (detailAnchor.value) {
     activeView.value = viewForAnchor(detailAnchor.value)
+    // 锚点位于下方片段时直接展开对应片段，保证锚点定位可用
+    if (detailAnchor.value === 'forecast') revealedCounts.value.mid = Math.max(revealedCounts.value.mid, 3)
+    if (detailAnchor.value === 'performance-report') revealedCounts.value.mid = Math.max(revealedCounts.value.mid, 2)
     anchorNavigating.value = true
   }
   if (symbol.value) {
@@ -1941,12 +2014,12 @@ async function loadData() {
     })
 
     // 快速请求完成后立即启动后续异步任务（不等慢速请求）
+    // 注：loadMidLongAnalysis（中线/长线 AI 洞见）不再首屏拉取，改为切换到对应 Tab 时懒加载
     await fastTask
     const aiTask = loadAiAnalysis()
     const forecastTask = loadForecast(false)
     const trendTask = loadTrendScore()
     const industryTask = loadIndustryHealth()
-    loadMidLongAnalysis()
 
     // 只在需要锚定到特定区域时等待对应任务完成
     if (detailAnchor.value === 'forecast') {
@@ -2747,6 +2820,19 @@ function goChat() {
   flex-direction: column;
   gap: 16rpx;
   margin-bottom: 16rpx;
+}
+
+/* 触底加载反馈占位（抖音式：下滑到当前片段底部时提示，触底后揭示下一片段） */
+.seg-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx 0;
+  margin-top: 8rpx;
+}
+.seg-loader-text {
+  font-size: $font-size-sm;
+  color: $ink-soft;
 }
 
 /* AI 洞见卡片 */
