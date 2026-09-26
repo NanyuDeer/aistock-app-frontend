@@ -30,8 +30,9 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *    （rhythmInsight.spec.ts 时间显示 2 条 + index.spec.ts 时点判定/接线 2 条）。
  *  2026-09-22：Task 14 事件区分层折叠 + overflow 适配新增 3 条
  *    （RhythmCard.spec.ts 折叠 2 条 + RhythmCalendarPanel.spec.ts overflow「另有 N 条」1 条）。
+ *  2026-09-26：首页时段洞见横条新增 getTradingTimeSlot 边界用例 1 条（tradingTime.spec.ts）。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '259/259/0'
+const EXPECTED_BASELINE = '260/260/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {
