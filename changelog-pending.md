@@ -13,6 +13,7 @@
   - `pnpm test`（vitest 全量）→ 482 passed / 4 failed；4 条失败为**无关存量红**（`tests/AnalyticsCardLayout.test.ts`、`src/pages-sub-app/chat/cards/CardRenderer.spec.ts`、`src/modules/favorites/components/AlertContent.spec.ts` ×2、`src/modules/favorites/pages/insight-detail.spec.ts`），本分支未触及这些模块，已用「暂存无关改动后复跑」确证为存量红、**零新增**。
   - `pnpm type-check`（`vue-tsc --noEmit`）→ 0 错误。
 - **跨端**：仅改 `aistock-app-frontend`；web 端 `aistock-frontend` 无对等首页组件 → 无需同步；app-api / agent-py 无改动。
+- **终审跟进（M1）**：同步 `MorningContent.vue` 内旧卡名注释/日志（事件传导→消息洞见、节奏大师→节奏洞见），对齐计划 Task 3.3.2（仅注释，无功能变更）。
 
 ## 本批外部记录（2026-09-21 节奏大师：时点自动展示 + 生成时刻显示 + 事件日历放开 5 日）
 

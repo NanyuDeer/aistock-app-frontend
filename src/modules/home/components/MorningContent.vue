@@ -273,7 +273,7 @@ interface LeaderStockPreview {
   name: string
   tag: string
   tagType: 'buy' | 'sell' | 'wash' | 'up' | 'down' | 'date'
-  /** 预览行额外携带的跳转标识：事件传导行 → 事件 ID，跳转 AI 事件分析页用 */
+  /** 预览行额外携带的跳转标识：消息洞见行 → 事件 ID，跳转 AI 事件分析页用 */
   eventId?: string
 }
 
@@ -348,7 +348,7 @@ async function loadChainEvents() {
       }
     }
   } catch (error) {
-    console.error('首页事件传导数据加载失败:', error)
+    console.error('首页消息洞见数据加载失败:', error)
     // 失败时保持空状态，不显示假数据
   }
 }
@@ -357,7 +357,7 @@ const traceReports = ref<LeaderStockPreview[]>([])
 
 /**
  * 大盘溯源卡片：查询最近 3 个交易日的复盘报告状态。
- * 标签统一用日期（MM-DD），和事件传导卡片一致。
+ * 标签统一用日期（MM-DD），和消息洞见卡片一致。
  * 名称：当日已生成 → 现象快照摘要；待更新 → 规则提示文字。
  */
 async function loadTraceReports() {
@@ -509,7 +509,7 @@ function onBarNavigate(target: 'rhythm' | 'sectors' | 'events' | 'trace') {
 }
 
 function goTrackDetail() {
-  // 跳转到 AI 事件分析页（事件传导解析），携带 eventId
+  // 跳转到 AI 事件分析页（消息洞见解析），携带 eventId
   const eventId = topEvent.value.eventId
   if (!eventId) {
     uni.navigateTo({ url: '/modules/chat/pages/event/list' })
@@ -834,7 +834,7 @@ function goLogin() {
   color: $ink-mute;
 }
 
-/* 节奏大师卡片：近几日结论摘要行（建议仓位 + 档位色块最右，与其它功能卡"名称+Tag"同构） */
+/* 节奏洞见卡片：近几日结论摘要行（建议仓位 + 档位色块最右，与其它功能卡"名称+Tag"同构） */
 .rhythm-chip {
   flex: none;
   width: 40rpx;
