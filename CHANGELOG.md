@@ -2,6 +2,21 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [feat/home-insight-bar] 2026-09-26 — 首页「洞见」品牌统一 + 时段动态洞见横条
+
+**开发者**: Aria
+
+### 新增
+
+- 首页四宫格入口品牌词统一为「洞见」：风口龙头→**风口洞见**、事件传导→**消息洞见**、市场洞见保留、节奏大师→**节奏洞见**。
+- 新增时段动态洞见横条 `TimeSlotInsightBar`：位于早报卡与功能网格之间，按上海时间自动切换（<09:30 盘前 / 09:30–15:00 盘中 / ≥15:00 盘后），盘中只留 1 行、可点回看；复用首页既有数据源，不新增接口。
+
+### 改进
+
+- `src/shared/utils/tradingTime.ts` 新增纯函数 `getTradingTimeSlot()` 与 `type TradingTimeSlot`，供横条判定当前时段。
+
+---
+
 ## [xusiyun] 2026-09-25 — 重大事件时间轴页 + 事件卡原文入口 + 不可达域名过滤
 
 **开发者**: xusiyun
@@ -86,6 +101,20 @@
 ### 测试
 
 - 新增 `pickSlotByClock` 时段边界用例（08:30/12:30/16:05 三界）与 loadVersions 接线断言、`toRhythmInsight` createdAt 时间显示 2 例；node:test 基线 252→256。
+
+---
+
+## [feat/home-insight-bar] 2026-09-19 — 个股详情「AI 资讯洞见」AI 分析消失修复 + 板块预判页布局精简
+
+**开发者**: Aria
+
+### 修复
+
+- 个股详情「AI 资讯洞见」AI 分析（结论徽 + 研判依据关键词 + 风险提示关键词）整块消失：H5 未登录 → 401 → `aiAnalysis=null` → 模板 `aiAnalysis.analysisDate` 空访问抛渲染错误致 AI 区块中断。修复（`src/modules/favorites/pages/detail.vue`）：模板改 `aiAnalysis?.analysisDate` 空安全（2 处）；新增 `unwrapAnalysisPayload()`（剥 1–3 层 `{code,message,data}` 包装，避免拦截器泄漏的包装对象被误当分析数据）与 `hasAnalysisFields()` 字段校验；GET 解包后无字段（含 200+null 泄漏、401）→ 继续走 POST 触发生成；最终无数据置 `{}` 而非 `null`（只展示新闻、不再崩溃）；`refreshAiAnalysis` 同步接入解包/校验。
+
+### 改进
+
+- 板块预判页布局精简（`src/modules/market/pages/sector-loop.vue`）：去掉行内「大盘主因」来源 tag（主因身份由红描边体现，不再重复标注）；溯源事件标题由横排改纵向布局，长标题可读性更好；新增 `firstPrimaryIdx` 使「大盘溯源 · 主因板块」分组标题只渲染一次，并同步收紧「风口板块（长线）」标题逻辑。
 
 ---
 

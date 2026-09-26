@@ -123,11 +123,11 @@
           <view class="card-header">
             <text class="card-title">AI 资讯洞见</text>
             <view class="card-header-actions">
-              <text v-if="aiAnalysis.analysisDate && !isAiDateToday(aiAnalysis.analysisDate)" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
+              <text v-if="aiAnalysis?.analysisDate && !isAiDateToday(aiAnalysis.analysisDate)" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
               <view class="ai-history-btn" @tap="openHistoryDialog">
                 <text class="history-icon">历史</text>
               </view>
-              <view v-if="!aiLoading && !isAiDateToday(aiAnalysis.analysisDate)" class="ai-refresh-btn" @tap="refreshAiAnalysis">
+              <view v-if="!aiLoading && !isAiDateToday(aiAnalysis?.analysisDate)" class="ai-refresh-btn" @tap="refreshAiAnalysis">
                 <text class="refresh-icon">↻</text>
               </view>
             </view>
@@ -2191,34 +2191,63 @@ function closeHistoryDialog() {
   selectedHistoryRecord.value = null
 }
 
+/**
+ * 深度解包分析响应：拦截器已解包 {code,message,data}，但当 data 为 null 时会回退返回整个
+ * 包装对象（data ?? response.data）；这里再剥 1-3 层包装，避免把 {code,message,data}
+ * 误当分析数据，映射出空字段导致研判/关键词整块不渲染。
+ */
+function unwrapAnalysisPayload(input: unknown): any {
+  let cur: any = input
+  for (let depth = 0; depth < 3; depth++) {
+    if (
+      cur && typeof cur === 'object' && !Array.isArray(cur) &&
+      'data' in cur && ('code' in cur || 'message' in cur)
+    ) {
+      cur = cur.data
+    } else {
+      break
+    }
+  }
+  return cur
+}
+
+/** 判断解包后的响应是否含可渲染的分析内容（结论或核心逻辑任一存在即视为有效） */
+function hasAnalysisFields(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false
+  const p = payload as Record<string, unknown>
+  return Boolean(p['结论'] || p.conclusion || p['核心逻辑'] || p.core_logic)
+}
+
+/** 将后端分析对象（中文键，兼容英文键）映射为页面字段 */
+function mapAnalysisPayload(payload: any) {
+  return {
+    conclusion: payload?.['结论'] || payload?.conclusion || '',
+    coreLogic: payload?.['核心逻辑'] || payload?.core_logic || '',
+    riskWarning: payload?.['风险提示'] || payload?.risk_warning || '',
+    analysisDate: payload?.['分析时间'] || payload?.analysis_time || '',
+  }
+}
+
 async function loadAiAnalysis() {
   aiLoading.value = true
   aiAnalysis.value = {}
+  let payload: any = null
   try {
     const res: any = await stockApi.getStockAnalysis(symbol.value)
-    const data = res?.data || res
-    aiAnalysis.value = {
-      conclusion: data?.['结论'] || data?.conclusion || '',
-      coreLogic: data?.['核心逻辑'] || data?.core_logic || '',
-      riskWarning: data?.['风险提示'] || data?.risk_warning || '',
-      analysisDate: data?.['分析时间'] || data?.analysis_time || '',
-    }
+    payload = unwrapAnalysisPayload(res?.data || res)
   } catch {
+    // GET 无记录(404)/未登录(401)/失败 → POST 兜底触发生成
     try {
       const createRes: any = await stockApi.createStockAnalysis(symbol.value)
-      const data = createRes?.data || createRes
-      aiAnalysis.value = {
-        conclusion: data?.['结论'] || data?.conclusion || '',
-        coreLogic: data?.['核心逻辑'] || data?.core_logic || '',
-        riskWarning: data?.['风险提示'] || data?.risk_warning || '',
-        analysisDate: data?.['分析时间'] || data?.analysis_time || '',
-      }
+      payload = unwrapAnalysisPayload(createRes?.data || createRes)
     } catch {
-      aiAnalysis.value = null
+      payload = null
     }
-  } finally {
-    aiLoading.value = false
   }
+  // 解包后仍无分析字段（如 GET 返回 200+null、未登录 401）时置空对象，卡片仅展示新闻；
+  // 不置 null，避免模板 aiAnalysis.analysisDate 空访问导致渲染中断
+  aiAnalysis.value = payload && hasAnalysisFields(payload) ? mapAnalysisPayload(payload) : {}
+  aiLoading.value = false
 }
 
 async function refreshAiAnalysis() {
@@ -2227,14 +2256,13 @@ async function refreshAiAnalysis() {
   aiAnalysis.value = {}
   try {
     const res: any = await stockApi.createStockAnalysis(symbol.value)
-    const data = res?.data || res
-    aiAnalysis.value = {
-      conclusion: data?.['结论'] || data?.conclusion || '',
-      coreLogic: data?.['核心逻辑'] || data?.core_logic || '',
-      riskWarning: data?.['风险提示'] || data?.risk_warning || '',
-      analysisDate: data?.['分析时间'] || data?.analysis_time || '',
+    const payload = unwrapAnalysisPayload(res?.data || res)
+    if (payload && hasAnalysisFields(payload)) {
+      aiAnalysis.value = mapAnalysisPayload(payload)
+      uni.showToast({ title: '已刷新', icon: 'none' })
+    } else {
+      uni.showToast({ title: '刷新失败', icon: 'none' })
     }
-    uni.showToast({ title: '已刷新', icon: 'none' })
   } catch {
     uni.showToast({ title: '刷新失败', icon: 'none' })
   } finally {
