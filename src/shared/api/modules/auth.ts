@@ -22,6 +22,8 @@ export interface UserInfo {
   avatar_url?: string
   isVip?: boolean   // 2026-08-24 报告导出会员解锁
   is_vip?: boolean // 后端 /users/me 原始 snake_case 字段，fetchUserInfo 归一化为 isVip
+  /** 是否已设置密码（后端 /users/me 返回，2026-09-26） */
+  hasPassword?: boolean
   createdAt?: string
   created_at?: string
 }
@@ -96,6 +98,16 @@ export const authApi = {
   /** 账号密码登录（App/H5，保留兼容） */
   login(params: LoginParams) {
     return request.post('/auth/login', params)
+  },
+
+  /** 密码注册（注册即登录；账号已设密码时后端返回 409） */
+  register(account: string, password: string, code: string) {
+    return request.post<{ token: string; userInfo: UserInfo }>('/auth/register', { account, password, code })
+  },
+
+  /** 密码登录（账号维度节流；超限后端返回 429，仅提示不降级） */
+  passwordLogin(account: string, password: string) {
+    return request.post<{ token: string; userInfo: UserInfo }>('/auth/password/login', { account, password })
   },
 
   /** 获取微信扫码登录二维码 */

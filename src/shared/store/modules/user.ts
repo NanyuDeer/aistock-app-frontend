@@ -11,6 +11,8 @@ export const useUserStore = defineStore('user', () => {
   const token = ref<string>(storage.get(STORAGE_KEYS.TOKEN) || '')
   const userInfo = ref<UserInfo | null>(storage.get(STORAGE_KEYS.USER_INFO))
   const settings = ref<UserSettings>({})
+  /** 当前账号是否已设置密码（以后端 /users/me 的 hasPassword 为权威来源） */
+  const hasPassword = ref(false)
 
   const isLoggedIn = () => !!token.value || !!userInfo.value?.id
 
@@ -18,6 +20,7 @@ export const useUserStore = defineStore('user', () => {
     token.value = ''
     userInfo.value = null
     settings.value = {}
+    hasPassword.value = false
     storage.remove(STORAGE_KEYS.TOKEN)
     storage.remove(STORAGE_KEYS.USER_INFO)
     storage.remove(STORAGE_KEYS.FAVORITES)
@@ -88,6 +91,53 @@ export const useUserStore = defineStore('user', () => {
     return userInfo.value
   }
 
+  /** 标记当前账号已设置密码（注册 / 设置密码成功后调用） */
+  function markPasswordSet() {
+    hasPassword.value = true
+  }
+
+  /** 密码登录（账号维度节流；超限后端返回 429，异常向上抛由页面 toast 提示） */
+  async function passwordLogin(account: string, password: string) {
+    const result: any = await authApi.passwordLogin(account, password)
+    token.value = result.token
+    storage.set(STORAGE_KEYS.TOKEN, result.token)
+    if (result.userInfo) {
+      userInfo.value = {
+        id: result.userInfo.id,
+        openid: result.userInfo.openid || '',
+        phone: result.userInfo.phone || '',
+        email: result.userInfo.email || '',
+        nickname: result.userInfo.nickname || '',
+        avatar: result.userInfo.avatar || result.userInfo.avatar_url || '',
+      }
+      storage.set(STORAGE_KEYS.USER_INFO, userInfo.value)
+    }
+    hasPassword.value = true
+    await fetchUserInfo()
+    return userInfo.value
+  }
+
+  /** 密码注册（注册即登录；账号已设密码时后端返回 409） */
+  async function register(account: string, password: string, code: string) {
+    const result: any = await authApi.register(account, password, code)
+    token.value = result.token
+    storage.set(STORAGE_KEYS.TOKEN, result.token)
+    if (result.userInfo) {
+      userInfo.value = {
+        id: result.userInfo.id,
+        openid: result.userInfo.openid || '',
+        phone: result.userInfo.phone || '',
+        email: result.userInfo.email || '',
+        nickname: result.userInfo.nickname || '',
+        avatar: result.userInfo.avatar || result.userInfo.avatar_url || '',
+      }
+      storage.set(STORAGE_KEYS.USER_INFO, userInfo.value)
+    }
+    hasPassword.value = true
+    await fetchUserInfo()
+    return userInfo.value
+  }
+
   /** 扫码登录成功后，存储 token 并获取用户信息 */
   async function handleScanLoginSuccess(scanData?: { token?: string; openid?: string }) {
     try {
@@ -111,6 +161,8 @@ export const useUserStore = defineStore('user', () => {
       ...info,
       isVip: !!info.is_vip || !!info.isVip,
     }
+    // 服务端 hasPassword 为权威来源（存量账号补设密码后刷新即可感知）
+    hasPassword.value = !!info.hasPassword
     storage.set(STORAGE_KEYS.USER_INFO, userInfo.value)
     return userInfo.value
   }
@@ -162,6 +214,10 @@ export const useUserStore = defineStore('user', () => {
     wxLogin,
     smsLogin,
     emailLogin,
+    passwordLogin,
+    register,
+    hasPassword,
+    markPasswordSet,
     handleScanLoginSuccess,
     fetchUserInfo,
     restoreSession,

@@ -58,5 +58,7 @@ export const STORAGE_KEYS = {
   // 播报连续播放开关（持久化；true=连续排队，false/缺省=互斥）
   PODCAST_CONTINUOUS: 'podcast_continuous',
   // 恐贪页「波段操作节奏」入口卡摘要拉取日（YYYY-MM-DD，跨日刷新门控）
-  FG_RHYTHM_SUMMARY_DATE: 'fg_rhythm_summary_date'
+  FG_RHYTHM_SUMMARY_DATE: 'fg_rhythm_summary_date',
+  // 存量账号「首次设置密码」一次性引导已展示标记（2026-09-26）
+  PWD_HINT_SHOWN: 'pwd_hint_shown'
 } as const

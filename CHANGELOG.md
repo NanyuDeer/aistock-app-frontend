@@ -2,6 +2,27 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-26 — APP 前端接入密码登录 / 注册 + 首次设置密码（含防刷松绑）
+
+**开发者**: Aria
+
+### 新增
+
+- `src/shared/api/modules/auth.ts`：新增 `passwordLogin(account, password)` → `POST /api/auth/password/login`、`register(account, password, code)` → `POST /api/auth/register`（均返回 `{ token, userInfo }`）；`UserInfo` 新增 `hasPassword`。
+- `src/shared/store/modules/user.ts`：新增 `passwordLogin` / `register`（成功即写 token、组装 userInfo）与 `hasPassword` 状态（`clearSession` 重置为 false；以 `fetchUserInfo()` 返回的服务端 `hasPassword` 为权威）。
+- `src/modules/user/pages/login.vue`：新增「密码登录 / 注册」入口与表单（`showPasswordForm` / `passwordMode: 'login' | 'register'`）——登录模式仅账号 + 密码；注册模式按账号自动选择短信 / 邮箱验证码通道；409 弹「去登录」。
+- `src/modules/user/pages/account-security.vue`：新增「设置密码」`ListCell` 入口 + 内联表单（验证码发到已绑定身份、手机号优先，复用 `scenario='bind'` 模板；两次密码一致校验；走注册接口首次写入密码，409 按「已设置」置灰）。
+- `src/shared/utils/storage.ts`：新增 `PWD_HINT_SHOWN` 一次性标记键。
+
+### 改进
+
+- 删除「429 → 降级验证码登录」路径（含 `switchToCodeLogin`）；密码登录 429 仅提示「尝试过于频繁，请稍后再试」，不再引导降级。
+- 存量账号（`password_hash IS NULL`）支持首次设置密码：复用后端 `register` upsert（已设密码返回 409）；`/users/me` 返回 `hasPassword`（服务端权威），`userStore` 由 `fetchUserInfo()` 同步。
+- `login.vue` 密码表单文案改为「注册 / 首次设置密码」并新增存量账号说明行；登录成功且未设密码时一次性温和引导。
+- 文档：`AGENTS.md`（前端根）`auth.ts` 行、`src/modules/user/AGENTS.md` 同步密码登录 / 注册与设置密码说明。
+
+---
+
 ## [feat/home-insight-bar] 2026-09-26 — 首页「洞见」品牌统一 + 时段动态洞见横条
 
 **开发者**: Aria

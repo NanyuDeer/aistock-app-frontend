@@ -19,7 +19,7 @@
     <!-- 登录方式区域（统一模板：H5 / APP-PLUS / MP-WEIXIN 共用二维码 + 错误状态） -->
     <view class="login-body">
       <!-- 初始状态：登录方式选择 -->
-      <view v-if="!qrCodeUrl && !loginLoading && !errorMsg && !showEmailForm && !showSmsForm" class="login-methods">
+      <view v-if="!qrCodeUrl && !loginLoading && !errorMsg && !showEmailForm && !showSmsForm && !showPasswordForm" class="login-methods">
         <!-- #ifdef MP-WEIXIN -->
         <button @tap="handleWxLogin" class="btn-wx-login">
           <SvgIcon name="wechat" size="36rpx" color="#ffffff" />
@@ -52,6 +52,12 @@
         <button @click="showSmsForm = true" class="btn-email-login">
           <SvgIcon name="phone-line" size="36rpx" color="#0b5fff" />
           <text class="btn-text">手机号验证码登录</text>
+        </button>
+
+        <!-- 密码登录 / 注册入口（全平台） -->
+        <button @click="openPasswordForm" class="btn-email-login">
+          <SvgIcon name="key-line" size="36rpx" color="#0b5fff" />
+          <text class="btn-text">密码登录 / 注册</text>
         </button>
 
         <view class="login-tip">
@@ -140,6 +146,61 @@
         </view>
       </view>
 
+      <!-- 密码登录 / 注册表单（全平台） -->
+      <view v-else-if="showPasswordForm" class="email-form">
+        <text class="form-title">{{ passwordMode === 'login' ? '密码登录' : '注册 / 首次设置密码' }}</text>
+        <text v-if="passwordMode === 'register'" class="form-tip">已有账号（微信 / 验证码登录创建）尚未设置密码？也在这里设置。</text>
+        <view class="form-row">
+          <SvgIcon name="user-line" size="36rpx" color="#9ca3af" />
+          <Input
+            v-model="pwdAccount"
+            placeholder="请输入手机号或邮箱"
+            class="form-input"
+          />
+        </view>
+        <view v-if="passwordMode === 'register'" class="form-row">
+          <SvgIcon name="lock-line" size="36rpx" color="#9ca3af" />
+          <Input
+            v-model="pwdCode"
+            type="number"
+            :maxlength="6"
+            placeholder="请输入验证码"
+            class="form-input"
+          />
+          <Button
+            class="form-code-btn"
+            :disabled="countdown > 0 || !canSendPwdCode"
+            size="sm"
+            @click="handleSendPwdCode"
+          >
+            {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
+          </Button>
+        </view>
+        <view class="form-row">
+          <SvgIcon name="lock-line" size="36rpx" color="#9ca3af" />
+          <Input
+            v-model="pwdPassword"
+            type="password"
+            placeholder="请输入密码（至少 8 位，含字母和数字）"
+            class="form-input"
+          />
+        </view>
+        <view class="form-submit">
+          <Button block :loading="loginLoading" @click="handlePasswordSubmit">
+            {{ passwordMode === 'login' ? '登录' : '注册并登录' }}
+          </Button>
+        </view>
+        <view class="form-switch" @click="togglePasswordMode">
+          <text class="form-switch-text">
+            {{ passwordMode === 'login' ? '首次使用密码 / 注册账号' : '已有密码？去登录' }}
+          </text>
+        </view>
+        <view class="form-back" @click="closePasswordForm">
+          <SvgIcon name="arrow-left-line" size="28rpx" color="#4b5a7a" />
+          <text class="form-back-text">返回微信登录</text>
+        </view>
+      </view>
+
       <!-- 扫码登录中：显示二维码（全平台通用） -->
       <view v-else-if="qrCodeUrl && !loginLoading" class="qr-section">
         <text class="qr-title">微信扫一扫登录</text>
@@ -188,6 +249,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useUserStore } from '@/shared/store/modules/user'
 import { authApi } from '@/shared/api/modules/auth'
+import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import Input from '@/shared/components/Input.vue'
 import { LoadingState, Card, EmptyState, Button } from '@/shared/components'
@@ -215,6 +277,16 @@ let countdownTimer: ReturnType<typeof setInterval> | null = null
 const showSmsForm = ref(false)
 const phone = ref('')
 const isValidPhone = computed(() => /^1[3-9]\d{9}$/.test(phone.value))
+
+// 密码登录 / 首次设置密码状态（注册即登录；存量账号可通过此表单补设密码）
+const showPasswordForm = ref(false)
+const passwordMode = ref<'login' | 'register'>('login')
+const pwdAccount = ref('')
+const pwdPassword = ref('')
+const pwdCode = ref('')
+const pwdAccountIsEmail = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pwdAccount.value.trim()))
+const pwdAccountIsPhone = computed(() => /^1[3-9]\d{9}$/.test(pwdAccount.value.trim()))
+const canSendPwdCode = computed(() => pwdAccountIsPhone.value || pwdAccountIsEmail.value)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollCount = 0
@@ -342,8 +414,7 @@ async function handlePhoneLogin() {
     await userStore.smsLogin(phone.value, smsCode.value)
     loginLoading.value = false
     stopCountdown()
-    uni.showToast({ title: '登录成功', icon: 'success' })
-    setTimeout(() => goHome(), 500)
+    handleLoginOk()
   } catch (e: any) {
     loginLoading.value = false
     uni.showToast({ title: e?.data?.message || '登录失败，请重试', icon: 'none' })
@@ -385,12 +456,128 @@ async function handleEmailLogin() {
     await userStore.emailLogin(email.value, smsCode.value)
     loginLoading.value = false
     stopCountdown()
-    uni.showToast({ title: '登录成功', icon: 'success' })
-    setTimeout(() => goHome(), 500)
+    handleLoginOk()
   } catch (e: any) {
     loginLoading.value = false
     uni.showToast({ title: e?.data?.message || '登录失败，请重试', icon: 'none' })
   }
+}
+
+/** 打开密码登录入口（默认登录模式） */
+function openPasswordForm() {
+  passwordMode.value = 'login'
+  showPasswordForm.value = true
+}
+
+/** 关闭密码表单并清理状态 */
+function closePasswordForm() {
+  showPasswordForm.value = false
+  pwdAccount.value = ''
+  pwdPassword.value = ''
+  pwdCode.value = ''
+  stopCountdown()
+  countdown.value = 0
+}
+
+/** 登录 / 注册模式切换 */
+function togglePasswordMode() {
+  passwordMode.value = passwordMode.value === 'login' ? 'register' : 'login'
+  pwdCode.value = ''
+  pwdPassword.value = ''
+  stopCountdown()
+  countdown.value = 0
+}
+
+/** 注册模式发送验证码：按账号类型自动选择短信 / 邮箱通道 */
+async function handleSendPwdCode() {
+  const account = pwdAccount.value.trim()
+  if (!pwdAccountIsPhone.value && !pwdAccountIsEmail.value) {
+    uni.showToast({ title: '请输入正确的手机号或邮箱', icon: 'none' })
+    return
+  }
+  try {
+    if (pwdAccountIsPhone.value) {
+      await authApi.sendSmsCode(account)
+    } else {
+      await authApi.sendEmailCode(account)
+    }
+    uni.showToast({ title: pwdAccountIsPhone.value ? '验证码已发送，请查收短信' : '验证码已发送，请查收邮箱', icon: 'none' })
+    countdown.value = 60
+    stopCountdown()
+    countdownTimer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) stopCountdown()
+    }, 1000)
+  } catch (e: any) {
+    uni.showToast({ title: e?.data?.message || '发送失败，请稍后再试', icon: 'none' })
+  }
+}
+
+/** 密码登录 / 注册提交 */
+async function handlePasswordSubmit() {
+  const account = pwdAccount.value.trim()
+  if (!account) {
+    uni.showToast({ title: '请输入手机号或邮箱', icon: 'none' })
+    return
+  }
+  const mode = passwordMode.value
+  if (mode === 'register') {
+    if (!pwdCode.value) {
+      uni.showToast({ title: '请输入验证码', icon: 'none' })
+      return
+    }
+    if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(pwdPassword.value)) {
+      uni.showToast({ title: '密码至少 8 位且需包含字母和数字', icon: 'none' })
+      return
+    }
+  } else if (!pwdPassword.value) {
+    uni.showToast({ title: '请输入密码', icon: 'none' })
+    return
+  }
+
+  loginLoading.value = true
+  try {
+    if (mode === 'login') {
+      await userStore.passwordLogin(account, pwdPassword.value)
+    } else {
+      await userStore.register(account, pwdPassword.value, pwdCode.value)
+    }
+    loginLoading.value = false
+    stopCountdown()
+    handleLoginOk(mode === 'login' ? '登录成功' : '注册成功')
+  } catch (e: any) {
+    loginLoading.value = false
+    handlePasswordError(e)
+  }
+}
+
+/** 密码登录 / 注册错误处理：统一 toast，仅 409 引导去登录 */
+function handlePasswordError(e: any) {
+  const status = e?.statusCode || e?.status
+  const message = e?.data?.message || e?.message || '操作失败，请重试'
+
+  // 409：该账号已设置密码（重复注册），引导改为密码登录
+  if (status === 409) {
+    uni.showModal({
+      title: '提示',
+      content: message || '该账号已设置密码，请直接登录',
+      confirmText: '去登录',
+      cancelText: '取消',
+      success: (res) => {
+        if (res.confirm) {
+          passwordMode.value = 'login'
+          pwdPassword.value = ''
+          pwdCode.value = ''
+          stopCountdown()
+          countdown.value = 0
+        }
+      }
+    })
+    return
+  }
+
+  // 400 / 401 / 429 / 500：直接提示后端文案（429 不再降级为验证码登录）
+  uni.showToast({ title: message, icon: 'none' })
 }
 
 /** 扫码登录成功处理 */
@@ -401,8 +588,7 @@ async function handleLoginSuccess(scanData?: { token?: string; openid?: string }
   loginLoading.value = false
 
   if (success) {
-    uni.showToast({ title: '登录成功', icon: 'success' })
-    setTimeout(() => goHome(), 500)
+    handleLoginOk()
   } else {
     qrCodeUrl.value = ''
     scanStatus.value = 'waiting'
@@ -421,8 +607,7 @@ async function handleWxLogin() {
       try {
         await userStore.wxLogin(res.code)
         loginLoading.value = false
-        uni.showToast({ title: '登录成功', icon: 'success' })
-        setTimeout(() => goHome(), 500)
+        handleLoginOk()
       } catch (e: any) {
         loginLoading.value = false
         const msg = e?.data?.message || e?.errMsg || e?.message || '登录失败，请重试'
@@ -465,6 +650,27 @@ function handleRetry() {
   handleWxLogin()
   // #endif
   // #endif
+}
+
+/** 未设密码且已绑手机/邮箱时返回 true，并写入一次性标记（避免重复打扰） */
+function maybeHintSetPassword(): boolean {
+  const info = userStore.userInfo
+  const hasBinding = !!(info?.phone || info?.email)
+  if (!hasBinding || userStore.hasPassword) return false
+  if (storage.get(STORAGE_KEYS.PWD_HINT_SHOWN)) return false
+  storage.set(STORAGE_KEYS.PWD_HINT_SHOWN, true)
+  return true
+}
+
+/** 登录成功统一收尾：成功提示 + 未设密码时的一次性引导 + 延迟跳转 */
+function handleLoginOk(title = '登录成功') {
+  const needHint = maybeHintSetPassword()
+  if (needHint) {
+    uni.showToast({ title: '登录成功，可在「账号与安全」中设置密码', icon: 'none', duration: 2000 })
+  } else {
+    uni.showToast({ title, icon: 'success' })
+  }
+  setTimeout(() => goHome(), needHint ? 2000 : 500)
 }
 
 function goHome() {
@@ -620,6 +826,15 @@ function goBack() {
   text-align: center;
 }
 
+.form-tip {
+  display: block;
+  margin-bottom: 32rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #6b7280;
+  text-align: center;
+}
+
 .form-row {
   display: flex;
   align-items: center;
@@ -661,6 +876,18 @@ function goBack() {
   .form-back-text {
     font-size: 28rpx;
     color: #4b5a7a;
+  }
+}
+
+.form-switch {
+  margin-top: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .form-switch-text {
+    font-size: 28rpx;
+    color: $primary;
   }
 }
 
