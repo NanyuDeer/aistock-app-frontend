@@ -1,5 +1,19 @@
 # changelog-pending.md（待提交修改记录）
 
+## 2026-09-26 首页「洞见」品牌统一 + 时段动态洞见横条
+
+- **目标**：首页四宫格入口品牌词统一为「洞见」；在早报卡与功能网格之间新增一条随时段（盘前/盘中/盘后）自动切换的洞见横条。
+- **改动（仅 `aistock-app-frontend`）**：
+  1. `src/shared/utils/tradingTime.ts`：新增纯函数 `getTradingTimeSlot()`（按上海时间切分：<09:30 盘前 / 09:30–15:00 盘中 / ≥15:00 盘后）与 `type TradingTimeSlot`。
+  2. `src/modules/home/components/TimeSlotInsightBar.vue`：新增横条组件，复用首页既有 ref（`leaderSectors`/`chainEvents`/`traceReports`/`rhythmRows`），按 `currentSlot` 选取展示，通过 `emit('navigate', target)` 上抛；三段 tab（盘前/盘中/盘后）。
+  3. `src/modules/home/components/MorningContent.vue`：四宫格标题改名（风口龙头→**风口洞见**、事件传导→**消息洞见**、市场洞见保留、节奏大师→**节奏洞见**）；在早报卡与功能网格之间插入 `<TimeSlotInsightBar>`；`onShow` 重算 `currentSlot` 并自增 `barResetKey`；新增 `onBarNavigate()` 分发到既有 `goRhythm/goSectors/goEventChain/goTraceability`。
+- **规格来源**：`docs/superpowers/specs/2026-09-26-home-insight-brand-and-time-slot-bar-design.md`（用户逐项确认：复用现有数据 / 自定义横条样式 / 盘中只留 1 行 / 可点回看 / 用「洞见」文字不用图标）。
+- **验证**：
+  - `pnpm test:node` → 本机 `261/260/1`（恒多 1 条为**预先存在**的 CRLF 噪声：`src/modules/rhythm/pages/index.spec.ts` 正则含 `\{\n`，本仓库 `core.autocrlf=true` 且无 `.gitattributes` 致工作区 CRLF 永不匹配；`EXPECTED_BASELINE` 保持计划钦定 LF 真值 `261/261/0`，本机口径 = **零新增失败**）。
+  - `pnpm test`（vitest 全量）→ 482 passed / 4 failed；4 条失败为**无关存量红**（`tests/AnalyticsCardLayout.test.ts`、`src/pages-sub-app/chat/cards/CardRenderer.spec.ts`、`src/modules/favorites/components/AlertContent.spec.ts` ×2、`src/modules/favorites/pages/insight-detail.spec.ts`），本分支未触及这些模块，已用「暂存无关改动后复跑」确证为存量红、**零新增**。
+  - `pnpm type-check`（`vue-tsc --noEmit`）→ 0 错误。
+- **跨端**：仅改 `aistock-app-frontend`；web 端 `aistock-frontend` 无对等首页组件 → 无需同步；app-api / agent-py 无改动。
+
 ## 本批外部记录（2026-09-21 节奏大师：时点自动展示 + 生成时刻显示 + 事件日历放开 5 日）
 
 > 随 `changer` 提交（PR #136）。此段仅供本地留痕。
