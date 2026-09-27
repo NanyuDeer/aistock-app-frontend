@@ -9,6 +9,8 @@
 ## 组件
 - `components/DualHostPlayer.vue` - 双人对话播报播放器
 - `components/MorningCard.vue` - 晨报卡片
+- `components/MorningContent.vue` - 首页晨报内容容器（四宫格「洞见」入口 + 时段洞见横条）
+- `components/TimeSlotInsightBar.vue` - 时段（盘前/盘中/盘后）动态洞见横条
 
 ## Hooks
 （暂无模块专属 hooks）

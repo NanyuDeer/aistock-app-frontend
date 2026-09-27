@@ -1,11 +1,18 @@
 <template>
   <SubPageCard title="事件传导">
     <view class="event-list-content">
-      <!-- AI关注焦点区域 -->
-      <view v-if="focusEvents.length > 0" class="ai-focus-section">
-        <text class="section-title">重大事件</text>
+      <!-- AI关注焦点区域：标题行（含时间线入口图标）始终显示，卡片仅在有焦点事件时渲染 -->
+      <view class="ai-focus-section">
+        <!-- 标题行：重大事件（左）+ 时间轴入口（行最右，文字+淡色图标） -->
+        <view class="section-title-row" @tap="goToTimeline">
+          <text class="section-title">重大事件</text>
+          <view class="timeline-entry">
+            <text class="timeline-entry-text">时间轴</text>
+            <SvgIcon name="calendar-line" size="26rpx" color="#4b5a7a" />
+          </view>
+        </view>
         <!-- 固定左利好/右利空；单一时单卡全宽，不保留空白卡位 -->
-        <view :class="headlineCount === 1 ? 'headline-single' : 'headline-cards'">
+        <view v-if="focusEvents.length > 0" :class="headlineCount === 1 ? 'headline-single' : 'headline-cards'">
           <EventHeadlineCard
             v-if="positiveEvent"
             type="positive"
@@ -178,6 +185,13 @@ function goToDetail(event: EventItem) {
   })
 }
 
+/** 跳转重大事件时间线（按事件发生时间组织，含未来事件） */
+function goToTimeline() {
+  uni.navigateTo({
+    url: '/modules/chat/pages/event/timeline',
+  })
+}
+
 /** 点击事件标题 → 跨端跳转原文：H5 新标签打开，APP 内 web-view 打开；无链接友好提示 */
 function goToNews(event: EventItem) {
   const url = event.sourceInfo?.url
@@ -248,13 +262,36 @@ async function handleFollow(event: EventItem) {
   margin-bottom: 20rpx;
 }
 
+/* 标题行：重大事件（左）+ 时间轴入口（行最右，space-between 撑满整行） */
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10rpx;
+}
+
+.section-title-row:active {
+  opacity: 0.7;
+}
+
 .section-title {
   display: block;
   font-size: 28rpx;
   font-weight: 700;
   color: #1A1A1A;
-  margin-bottom: 10rpx;
   letter-spacing: 0.5rpx;
+}
+
+/* 时间轴入口：次要文字色（ink-soft #4b5a7a）+ 图标，紧贴行最右侧 */
+.timeline-entry {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.timeline-entry-text {
+  font-size: 24rpx;
+  color: #4b5a7a;
 }
 
 .headline-cards {

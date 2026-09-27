@@ -119,3 +119,14 @@ export function nextOpenTime(date: Date = new Date()): number {
   next.setHours(9, 30, 0, 0)
   return next.getTime()
 }
+
+export type TradingTimeSlot = 'pre' | 'intraday' | 'post'
+
+/** 盘中：09:30–15:00（含 09:30，不含 15:00）；<09:30 盘前；≥15:00 盘后。上海时间。 */
+export function getTradingTimeSlot(date: Date = new Date()): TradingTimeSlot {
+  const { hour, minute } = shanghaiDateTimeParts(date)
+  const minutes = hour * 60 + minute
+  if (minutes < 9 * 60 + 30) return 'pre'
+  if (minutes < 15 * 60) return 'intraday'
+  return 'post'
+}

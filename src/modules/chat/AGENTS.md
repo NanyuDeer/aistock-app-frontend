@@ -12,6 +12,7 @@ P0 身份鉴权（2026-08-11）：WS 握手改经 app-api 桥接（`createAgentW
 ## 页面
 - `pages/index.vue` - AI 对话主页面（主包，仅重定向到子包对话页）
 - `pages/agent-report.vue` - 今日分析概览页（双模式：无 intent 参数→概览模式显示各 Agent 简报卡片；有 intent 参数→详情模式显示单个 Agent 报告）
+- `pages/event/timeline.vue` - **重大事件时间线**（主包，注册于 `pages/event/list` 之后）：数据源 `GET /api/agent/event/timeline`；**单一时间轴（无未来/历史 tab，仿韭研公社排版）**，窗口 = 过去 30 天 ~ 未来 90 天升序；按接口返回的 `date`（上海时区 `YYYY-MM-DD`）分组，分组头显示 MM-DD + 周X + 「今天/明天」相对标签（**无「未来/已过去」冗余标签**）；事件行 = 标题（完整显示可换行）+ 核心影响板块（`impactSectors[0]`，inline 胶囊紧跟标题文字末尾，空则不渲染）+ 摘要（非空时）；**无状态徽标/来源/时间标签**；occurred 事件点击跳既有事件详情页 `modules/chat/pages/event/detail`，未发生事件就地展开并提示「事件尚未发生，暂无传导分析」；底部「加载更多」；**入口**：事件列表页 `pages/event/list.vue`「重大事件」标题行最右侧的淡色入口（「时间轴」文字 + calendar-line 图标，space-between 右对齐，标题行始终显示、入口恒可达）
 - **App 子包对话主页面** `../pages-sub-app/chat/index.vue` - 纯对话流（WS 流式 + HTTP 降级；含 force_deep「深度分析」按钮 `rerunDeep` 重发前一条 user 消息；单轮 token 用量进回复气泡 footer，与「深度分析」按钮同行、灰色弱化（P11，替代原底部 UsageBar）；标题旁「会话」入口 + onLoad 自动建会话 + 首次用户消息 fire-and-forget upsert，P9）
 - **App 子包会话列表页** `../pages-sub-app/chat/sessions.vue` - 会话列表（P9：新建/切换/删除 + 相对时间 + 当前高亮，仅登录时 onShow 拉 server 列表合并）
 

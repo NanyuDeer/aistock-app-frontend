@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol" :scroll-top="detailScrollTop">
+  <SubPageCard2 :title="quote?.name || '个股详情'" :subtitle="symbol" :scroll-top="detailScrollTop" @scrolltolower="onDetailsScrollLower">
     <view class="page-detail" :class="{ 'page-detail--anchoring': anchorNavigating }">
     <view v-if="loading || anchorNavigating" class="loading">
       <text class="loading-text">加载中...</text>
@@ -123,11 +123,11 @@
           <view class="card-header">
             <text class="card-title">AI 资讯洞见</text>
             <view class="card-header-actions">
-              <text v-if="aiAnalysis.analysisDate && !isAiDateToday(aiAnalysis.analysisDate)" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
+              <text v-if="aiAnalysis?.analysisDate && !isAiDateToday(aiAnalysis.analysisDate)" class="analysis-date">{{ formatAiDate(aiAnalysis.analysisDate) }}</text>
               <view class="ai-history-btn" @tap="openHistoryDialog">
                 <text class="history-icon">历史</text>
               </view>
-              <view v-if="!aiLoading && !isAiDateToday(aiAnalysis.analysisDate)" class="ai-refresh-btn" @tap="refreshAiAnalysis">
+              <view v-if="!aiLoading && !isAiDateToday(aiAnalysis?.analysisDate)" class="ai-refresh-btn" @tap="refreshAiAnalysis">
                 <text class="refresh-icon">↻</text>
               </view>
             </view>
@@ -207,6 +207,7 @@
           />
         </view>
 
+        <template v-if="revealedCounts.short >= 2">
         <!-- 资金流向 -->
         <view v-if="capitalFlowInfo" class="section-card">
           <view class="cf-section-head">
@@ -234,7 +235,10 @@
             <text class="ai-empty-text">暂无资金流数据</text>
           </view>
         </view>
+        </template>
+
         <!-- 交易数据 -->
+        <template v-if="revealedCounts.short >= 3">
         <view v-if="hasTradingData" class="section-card">
           <text class="section-title">交易数据</text>
 
@@ -349,6 +353,12 @@
             </view>
           </view>
         </view>
+        </template>
+
+        <!-- 触底加载反馈占位：滑到当前已加载片段底部时提示，触底后揭示下一片段 -->
+        <view v-if="revealedCounts.short < SEGMENT_COUNT.short" class="seg-loader">
+          <text class="seg-loader-text">正在加载...</text>
+        </view>
       </view>
 
       <!-- 5. 中线视图 -->
@@ -424,6 +434,7 @@
           </view>
         </view>
 
+        <template v-if="revealedCounts.mid >= 2">
         <!-- 财报分析 -->
         <view v-if="hasFinanceCardData" id="detail-anchor-performance-report" class="section-card">
           <view class="section-header">
@@ -484,7 +495,10 @@
           </view>
         </view>
 
+        </template>
+
         <!-- 业绩预测 -->
+        <template v-if="revealedCounts.mid >= 3">
         <view v-if="forecastLoading || hasForecastCardData || !forecastData" id="detail-anchor-forecast" class="section-card">
           <view class="section-header">
             <text class="section-title">业绩预测</text>
@@ -578,7 +592,12 @@
             </view>
           </view>
         </view>
+        </template>
 
+        <!-- 触底加载反馈占位 -->
+        <view v-if="revealedCounts.mid < SEGMENT_COUNT.mid" class="seg-loader">
+          <text class="seg-loader-text">正在加载...</text>
+        </view>
       </view>
 
       <!-- 6. 长线视图 -->
@@ -654,6 +673,7 @@
           </view>
         </view>
 
+        <template v-if="revealedCounts.long >= 2">
         <!-- 趋势股模型（四维）：仅当有真实趋势评分时展示 -->
         <view v-if="trendModel.hasModel" class="section-card tenx-card">
           <view class="section-header">
@@ -748,8 +768,10 @@
             </view>
           </view>
         </view>
+        </template>
 
         <!-- 行业政策 -->
+        <template v-if="revealedCounts.long >= 3">
         <view v-if="visiblePolicyList.length" class="section-card">
           <text class="section-title">行业政策</text>
           <view class="policy-list">
@@ -776,8 +798,10 @@
             </view>
           </view>
         </view>
+        </template>
 
         <!-- 年报对比 -->
+        <template v-if="revealedCounts.long >= 4">
         <view v-if="longMockData.annual.length" class="section-card">
           <text class="section-title">年报对比</text>
           <view class="annual-grid">
@@ -787,6 +811,12 @@
               <text :class="['annual-note', item.type]">{{ item.note }}</text>
             </view>
           </view>
+        </view>
+        </template>
+
+        <!-- 触底加载反馈占位 -->
+        <view v-if="revealedCounts.long < SEGMENT_COUNT.long" class="seg-loader">
+          <text class="seg-loader-text">正在加载...</text>
         </view>
       </view>
 
@@ -955,8 +985,48 @@ const viewTabs: { key: ViewKey; label: string; desc: string }[] = [
 ]
 const policyExpanded = ref(false)
 
+// 分块加载：每个 Tab 按片段序号 0..N 逐步挂载（抖音式：下滑触底再渲染下一片段）
+const SEGMENT_COUNT: Record<ViewKey, number> = { short: 3, mid: 3, long: 4 }
+const revealedCounts = ref<Record<ViewKey, number>>({ short: 1, mid: 1, long: 1 })
+// 懒加载保护：某 Tab 的 AI/预测数据仅首次进入该 Tab（或首次滑到对应片段）时拉取一次
+const tabLoaded = ref<Record<ViewKey, boolean>>({ short: true, mid: false, long: false })
+
+function revealNextSegment(key: ViewKey) {
+  if (revealedCounts.value[key] >= SEGMENT_COUNT[key]) return
+  revealedCounts.value[key] += 1
+}
+
 function selectActiveView(key: ViewKey) {
   activeView.value = key
+  // 切换到新 Tab：重置分块到首片段，并懒加载该 Tab 的 AI/预测数据（仅首次）
+  revealedCounts.value[key] = 1
+  void lazyLoadTab(key)
+}
+
+/** 滚动触底：依次揭示下一片段（抖音式：先看到占位再渲染内容） */
+function onDetailsScrollLower() {
+  const key = activeView.value
+  if (revealedCounts.value[key] >= SEGMENT_COUNT[key]) return
+  revealNextSegment(key)
+  void lazyLoadTab(key)
+}
+
+/** 懒加载指定 Tab 的 AI/预测数据（tabLoaded 保护：仅拉取一次） */
+async function lazyLoadTab(key: ViewKey) {
+  if (tabLoaded.value[key]) return
+  tabLoaded.value[key] = true
+  try {
+    if (key === 'mid') {
+      await loadMidLongAnalysis()
+      if (revealedCounts.value.mid >= 2) await loadForecast(false)
+    } else if (key === 'long') {
+      await loadMidLongAnalysis()
+    } else if (key === 'short') {
+      await loadForecast(false)
+    }
+  } catch (err) {
+    console.error('[StockDetail] lazy load tab error:', err)
+  }
 }
 
 function normalizeDetailAnchor(value: unknown): DetailAnchor | '' {
@@ -1870,6 +1940,9 @@ onLoad((options: any) => {
   detailAnchor.value = normalizeDetailAnchor(options?.anchor)
   if (detailAnchor.value) {
     activeView.value = viewForAnchor(detailAnchor.value)
+    // 锚点位于下方片段时直接展开对应片段，保证锚点定位可用
+    if (detailAnchor.value === 'forecast') revealedCounts.value.mid = Math.max(revealedCounts.value.mid, 3)
+    if (detailAnchor.value === 'performance-report') revealedCounts.value.mid = Math.max(revealedCounts.value.mid, 2)
     anchorNavigating.value = true
   }
   if (symbol.value) {
@@ -1941,12 +2014,12 @@ async function loadData() {
     })
 
     // 快速请求完成后立即启动后续异步任务（不等慢速请求）
+    // 注：loadMidLongAnalysis（中线/长线 AI 洞见）不再首屏拉取，改为切换到对应 Tab 时懒加载
     await fastTask
     const aiTask = loadAiAnalysis()
     const forecastTask = loadForecast(false)
     const trendTask = loadTrendScore()
     const industryTask = loadIndustryHealth()
-    loadMidLongAnalysis()
 
     // 只在需要锚定到特定区域时等待对应任务完成
     if (detailAnchor.value === 'forecast') {
@@ -2191,34 +2264,63 @@ function closeHistoryDialog() {
   selectedHistoryRecord.value = null
 }
 
+/**
+ * 深度解包分析响应：拦截器已解包 {code,message,data}，但当 data 为 null 时会回退返回整个
+ * 包装对象（data ?? response.data）；这里再剥 1-3 层包装，避免把 {code,message,data}
+ * 误当分析数据，映射出空字段导致研判/关键词整块不渲染。
+ */
+function unwrapAnalysisPayload(input: unknown): any {
+  let cur: any = input
+  for (let depth = 0; depth < 3; depth++) {
+    if (
+      cur && typeof cur === 'object' && !Array.isArray(cur) &&
+      'data' in cur && ('code' in cur || 'message' in cur)
+    ) {
+      cur = cur.data
+    } else {
+      break
+    }
+  }
+  return cur
+}
+
+/** 判断解包后的响应是否含可渲染的分析内容（结论或核心逻辑任一存在即视为有效） */
+function hasAnalysisFields(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false
+  const p = payload as Record<string, unknown>
+  return Boolean(p['结论'] || p.conclusion || p['核心逻辑'] || p.core_logic)
+}
+
+/** 将后端分析对象（中文键，兼容英文键）映射为页面字段 */
+function mapAnalysisPayload(payload: any) {
+  return {
+    conclusion: payload?.['结论'] || payload?.conclusion || '',
+    coreLogic: payload?.['核心逻辑'] || payload?.core_logic || '',
+    riskWarning: payload?.['风险提示'] || payload?.risk_warning || '',
+    analysisDate: payload?.['分析时间'] || payload?.analysis_time || '',
+  }
+}
+
 async function loadAiAnalysis() {
   aiLoading.value = true
   aiAnalysis.value = {}
+  let payload: any = null
   try {
     const res: any = await stockApi.getStockAnalysis(symbol.value)
-    const data = res?.data || res
-    aiAnalysis.value = {
-      conclusion: data?.['结论'] || data?.conclusion || '',
-      coreLogic: data?.['核心逻辑'] || data?.core_logic || '',
-      riskWarning: data?.['风险提示'] || data?.risk_warning || '',
-      analysisDate: data?.['分析时间'] || data?.analysis_time || '',
-    }
+    payload = unwrapAnalysisPayload(res?.data || res)
   } catch {
+    // GET 无记录(404)/未登录(401)/失败 → POST 兜底触发生成
     try {
       const createRes: any = await stockApi.createStockAnalysis(symbol.value)
-      const data = createRes?.data || createRes
-      aiAnalysis.value = {
-        conclusion: data?.['结论'] || data?.conclusion || '',
-        coreLogic: data?.['核心逻辑'] || data?.core_logic || '',
-        riskWarning: data?.['风险提示'] || data?.risk_warning || '',
-        analysisDate: data?.['分析时间'] || data?.analysis_time || '',
-      }
+      payload = unwrapAnalysisPayload(createRes?.data || createRes)
     } catch {
-      aiAnalysis.value = null
+      payload = null
     }
-  } finally {
-    aiLoading.value = false
   }
+  // 解包后仍无分析字段（如 GET 返回 200+null、未登录 401）时置空对象，卡片仅展示新闻；
+  // 不置 null，避免模板 aiAnalysis.analysisDate 空访问导致渲染中断
+  aiAnalysis.value = payload && hasAnalysisFields(payload) ? mapAnalysisPayload(payload) : {}
+  aiLoading.value = false
 }
 
 async function refreshAiAnalysis() {
@@ -2227,14 +2329,13 @@ async function refreshAiAnalysis() {
   aiAnalysis.value = {}
   try {
     const res: any = await stockApi.createStockAnalysis(symbol.value)
-    const data = res?.data || res
-    aiAnalysis.value = {
-      conclusion: data?.['结论'] || data?.conclusion || '',
-      coreLogic: data?.['核心逻辑'] || data?.core_logic || '',
-      riskWarning: data?.['风险提示'] || data?.risk_warning || '',
-      analysisDate: data?.['分析时间'] || data?.analysis_time || '',
+    const payload = unwrapAnalysisPayload(res?.data || res)
+    if (payload && hasAnalysisFields(payload)) {
+      aiAnalysis.value = mapAnalysisPayload(payload)
+      uni.showToast({ title: '已刷新', icon: 'none' })
+    } else {
+      uni.showToast({ title: '刷新失败', icon: 'none' })
     }
-    uni.showToast({ title: '已刷新', icon: 'none' })
   } catch {
     uni.showToast({ title: '刷新失败', icon: 'none' })
   } finally {
@@ -2747,6 +2848,19 @@ function goChat() {
   flex-direction: column;
   gap: 16rpx;
   margin-bottom: 16rpx;
+}
+
+/* 触底加载反馈占位（抖音式：下滑到当前片段底部时提示，触底后揭示下一片段） */
+.seg-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx 0;
+  margin-top: 8rpx;
+}
+.seg-loader-text {
+  font-size: $font-size-sm;
+  color: $ink-soft;
 }
 
 /* AI 洞见卡片 */

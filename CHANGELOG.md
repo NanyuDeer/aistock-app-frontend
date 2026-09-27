@@ -32,6 +32,61 @@
 
 - `modules/favorites/AGENTS.md`：新增 2026-09-25 / 2026-09-26 三批更新块、组件清单与详情页当前形态。
 
+## [master] 2026-09-26 — APP 前端接入密码登录 / 注册 + 首次设置密码（含防刷松绑）
+
+**开发者**: Aria
+
+### 新增
+
+- `src/shared/api/modules/auth.ts`：新增 `passwordLogin(account, password)` → `POST /api/auth/password/login`、`register(account, password, code)` → `POST /api/auth/register`（均返回 `{ token, userInfo }`）；`UserInfo` 新增 `hasPassword`。
+- `src/shared/store/modules/user.ts`：新增 `passwordLogin` / `register`（成功即写 token、组装 userInfo）与 `hasPassword` 状态（`clearSession` 重置为 false；以 `fetchUserInfo()` 返回的服务端 `hasPassword` 为权威）。
+- `src/modules/user/pages/login.vue`：新增「密码登录 / 注册」入口与表单（`showPasswordForm` / `passwordMode: 'login' | 'register'`）——登录模式仅账号 + 密码；注册模式按账号自动选择短信 / 邮箱验证码通道；409 弹「去登录」。
+- `src/modules/user/pages/account-security.vue`：新增「设置密码」`ListCell` 入口 + 内联表单（验证码发到已绑定身份、手机号优先，复用 `scenario='bind'` 模板；两次密码一致校验；走注册接口首次写入密码，409 按「已设置」置灰）。
+- `src/shared/utils/storage.ts`：新增 `PWD_HINT_SHOWN` 一次性标记键。
+
+### 改进
+
+- 删除「429 → 降级验证码登录」路径（含 `switchToCodeLogin`）；密码登录 429 仅提示「尝试过于频繁，请稍后再试」，不再引导降级。
+- 存量账号（`password_hash IS NULL`）支持首次设置密码：复用后端 `register` upsert（已设密码返回 409）；`/users/me` 返回 `hasPassword`（服务端权威），`userStore` 由 `fetchUserInfo()` 同步。
+- `login.vue` 密码表单文案改为「注册 / 首次设置密码」并新增存量账号说明行；登录成功且未设密码时一次性温和引导。
+- 文档：`AGENTS.md`（前端根）`auth.ts` 行、`src/modules/user/AGENTS.md` 同步密码登录 / 注册与设置密码说明。
+
+---
+
+## [feat/home-insight-bar] 2026-09-26 — 首页「洞见」品牌统一 + 时段动态洞见横条
+
+**开发者**: Aria
+
+### 新增
+
+- 首页四宫格入口品牌词统一为「洞见」：风口龙头→**风口洞见**、事件传导→**消息洞见**、市场洞见保留、节奏大师→**节奏洞见**。
+- 新增时段动态洞见横条 `TimeSlotInsightBar`：位于早报卡与功能网格之间，按上海时间自动切换（<09:30 盘前 / 09:30–15:00 盘中 / ≥15:00 盘后），盘中只留 1 行、可点回看；复用首页既有数据源，不新增接口。
+
+### 改进
+
+- `src/shared/utils/tradingTime.ts` 新增纯函数 `getTradingTimeSlot()` 与 `type TradingTimeSlot`，供横条判定当前时段。
+
+---
+
+## [xusiyun] 2026-09-25 — 重大事件时间轴页 + 事件卡原文入口 + 不可达域名过滤
+
+**开发者**: xusiyun
+
+### 新增
+
+- `modules/chat/pages/event/timeline.vue`：重大事件时间轴页（单时间轴、不区分历史/未来；标题完整可换行；核心影响板块 inline 紧跟标题文字末尾、只显示最核心 1 个、空则不渲染；左侧竖线自首个圆点起始）。
+- 时间线入口：`list.vue`（「重大事件」标题行右侧淡色入口「时间轴」+ calendar-line 图标）、`analytics/pages/index.vue`（洞见页「重大事件」卡片）。
+- `eventApi.ts` 新增 `getEventTimeline`（GET /api/agent/event/timeline，防御性归一 items）；`types.ts` 新增 `EventTimelineItem.impactSectors` 等类型；`pages.json` 注册 timeline 路由。
+
+### 修复
+
+- `eventService.ts`：GI 焦点事件 importance 恒 `major`——焦点事件即当日最大机会/最大风险，不依赖 `importance_level`（此前 rank=1 事件 level=notable 时卡片标题丢「重大」前缀）。
+- `EventItemCard.vue`：新增原文链接图标（links-line，与事件时间同行同色）；标题点击由「跳原文」改为「整卡进入事件详情」。
+
+### 改进
+
+- `eventAdapter.ts`：新增 `UNREACHABLE_DOMAINS`（youtube.com/youtu.be）过滤——国内不可访问的海外域名只显示来源名、不暴露链接入口，避免死链。
+
 ---
 
 ## [changer] 2026-09-23 — 节奏大师 v3 极简展示（未来 3 事件 + 砍三时点 + 回退提示 + 时间行）
@@ -97,6 +152,20 @@
 ### 测试
 
 - 新增 `pickSlotByClock` 时段边界用例（08:30/12:30/16:05 三界）与 loadVersions 接线断言、`toRhythmInsight` createdAt 时间显示 2 例；node:test 基线 252→256。
+
+---
+
+## [feat/home-insight-bar] 2026-09-19 — 个股详情「AI 资讯洞见」AI 分析消失修复 + 板块预判页布局精简
+
+**开发者**: Aria
+
+### 修复
+
+- 个股详情「AI 资讯洞见」AI 分析（结论徽 + 研判依据关键词 + 风险提示关键词）整块消失：H5 未登录 → 401 → `aiAnalysis=null` → 模板 `aiAnalysis.analysisDate` 空访问抛渲染错误致 AI 区块中断。修复（`src/modules/favorites/pages/detail.vue`）：模板改 `aiAnalysis?.analysisDate` 空安全（2 处）；新增 `unwrapAnalysisPayload()`（剥 1–3 层 `{code,message,data}` 包装，避免拦截器泄漏的包装对象被误当分析数据）与 `hasAnalysisFields()` 字段校验；GET 解包后无字段（含 200+null 泄漏、401）→ 继续走 POST 触发生成；最终无数据置 `{}` 而非 `null`（只展示新闻、不再崩溃）；`refreshAiAnalysis` 同步接入解包/校验。
+
+### 改进
+
+- 板块预判页布局精简（`src/modules/market/pages/sector-loop.vue`）：去掉行内「大盘主因」来源 tag（主因身份由红描边体现，不再重复标注）；溯源事件标题由横排改纵向布局，长标题可读性更好；新增 `firstPrimaryIdx` 使「大盘溯源 · 主因板块」分组标题只渲染一次，并同步收紧「风口板块（长线）」标题逻辑。
 
 ---
 

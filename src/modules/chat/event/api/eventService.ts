@@ -169,9 +169,10 @@ export async function getFocusEvents(): Promise<FocusEventViewModel[]> {
         giDir === 'bearish' ? 'negative' :
         'mixed'
 
-      const giLevel = event.globalImportanceLevel
-      const importance: 'major' | 'normal' =
-        giLevel === 'critical' || giLevel === 'important' ? 'major' : 'normal'
+      // GI 焦点事件（rank=1/2）即当日最大机会/最大风险，所在区域标题恒为「重大事件」，
+      // 统一按 major 展示；不再依赖 importance_level——notable 事件同样可能当选当日焦点，
+      // 否则卡片标题会丢「重大」前缀（2026-09-24 修复：rank=1 bullish 事件 level=notable 时只剩「机会」）。
+      const importance: 'major' = 'major'
 
       return {
         type: event.globalImportanceRank === 1
