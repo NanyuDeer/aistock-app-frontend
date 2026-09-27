@@ -73,24 +73,35 @@
         <text class="status-text">{{ analysis.unavailable?.message ?? '归因暂不可用' }}</text>
       </view>
 
-      <!-- ===== 一句话主因（精简版详情，完整归因见 PDF 报告） ===== -->
+      <!-- ===== 一句话主因（精简版详情；完整归因见下方流式报告） ===== -->
       <view v-if="oneLineCause" class="section main-cause-simple">
         <view class="main-title-row">
-          <text class="section-title">归因主因</text>
+          <text class="section-title">异动原因</text>
           <view class="title-right">
-            <text v-if="confidenceLevel" class="badge is-gold">{{ confidenceText(confidenceLevel) }}</text>
+            <text v-if="confidenceLevel === 'high'" class="badge is-gold">可信度高</text>
           </view>
         </view>
         <text class="one-line-text">{{ oneLineCause }}</text>
       </view>
 
-      <!-- ===== 完整报告下载（仅 completed 且有有效归因时可用） ===== -->
-      <view
-        v-if="canDownloadReport"
-        :class="['report-btn', { 'is-busy': reportBusy }]"
-        @tap="onDownloadReport"
-      >
-        <text class="report-btn-text">{{ reportBusy ? '正在生成报告…' : '生成完整洞察报告 PDF' }}</text>
+      <!-- ===== 完整报告（流式输出到按钮下方；仅 completed 且有有效归因时可用） ===== -->
+      <view v-if="reportAvailable" class="report-actions">
+        <view
+          :class="['report-btn', { 'is-busy': reportLoading }]"
+          @tap="onToggleReport"
+        >
+          <text class="report-btn-text">{{ reportButtonText }}</text>
+        </view>
+
+        <!-- 报告正文：按 block 类型渲染（六阶段因果链为纵向时间轴），见 InsightReportBody -->
+        <InsightReportBody
+          v-if="reportHeader || reportSections.length"
+          :header="reportHeader"
+          :sections="reportSections"
+          :loading="reportLoading"
+        />
+
+        <text v-if="reportError" class="report-error">{{ reportError }}</text>
       </view>
       <text v-else-if="analysis?.processing_status === 'completed'" class="report-hint">
         本次归因未产出完整报告
@@ -111,16 +122,34 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onUnload } from '@dcloudio/uni-app'
 import { stockTraceApi, type StockTraceEvent, type StockTraceAnalysisResponse } from '@/shared/api/modules/stockTrace'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import { downloadInsightReport } from '@/shared/utils/downloadInsightReport'
+import InsightReportBody from '@/modules/favorites/components/InsightReportBody.vue'
+import { useInsightReportSSE } from '@/modules/favorites/utils/useInsightReportSSE'
 
 const detail = ref<StockTraceEvent | null>(null)
 const analysis = ref<StockTraceAnalysisResponse | null>(null)
 const loading = ref(true)
 /** 加载失败原因（区分 401 未登录 / 404 非自选或不存在），用于替代误导性的"事件不存在"提示 */
 const loadError = ref('')
+
+/** 完整报告流式读取（点按钮后在按钮下方逐章节渲染，见 useInsightReportSSE） */
+const {
+  header: reportHeader,
+  sections: reportSections,
+  loading: reportLoading,
+  done: reportDone,
+  error: reportError,
+  start: startReport,
+  stop: stopReport,
+} = useInsightReportSSE()
+
+const reportButtonText = computed<string>(() => {
+  if (reportLoading.value) return '生成中…（点击停止）'
+  if (reportDone.value) return '重新生成完整报告'
+  return '生成完整洞察报告'
+})
 
 /** 涨跌方向：up → 红涨，down → 绿跌（与涨停雷达详情页一致） */
 const trendClass = computed(() => (detail.value?.direction === 'up' ? 'is-up' : 'is-down'))
@@ -156,7 +185,7 @@ const oneLineCause = computed<string>(() => {
   return String(verdict || detail.value?.primary_cause || '').trim()
 })
 
-/** 置信度等级（高/中/低）；level 与 score 皆缺时不显示徽标 */
+/** 置信度等级（high/medium/low）；仅 high 时展示「可信度高」徽标，medium/low 不展示 */
 const confidenceLevel = computed<string>(() => {
   const conf = artifact.value?.artifactJson.confidence
   if (!conf) return ''
@@ -166,29 +195,22 @@ const confidenceLevel = computed<string>(() => {
   return level ?? (score! >= 0.7 ? 'high' : score! >= 0.5 ? 'medium' : 'low')
 })
 
-/** 报告可下载：归因已完成且存在有效 artifact */
-const canDownloadReport = computed(() => analysis.value?.processing_status === 'completed' && !!artifact.value)
+/** 报告可用：归因已完成且存在有效 artifact */
+const reportAvailable = computed(() => analysis.value?.processing_status === 'completed' && !!artifact.value)
 
-const reportBusy = ref(false)
-async function onDownloadReport(): Promise<void> {
-  if (reportBusy.value || !detail.value) return
-  const eventId = detail.value.event_id
+/** 按钮点击：生成中→停止；否则开始/重新生成 */
+async function onToggleReport(): Promise<void> {
+  if (reportLoading.value) { stopReport(); return }
+  const eventId = detail.value?.event_id
   if (!eventId) {
     uni.showToast({ title: '该异动暂无完整归因', icon: 'none' })
     return
   }
-  reportBusy.value = true
-  try {
-    await downloadInsightReport(eventId)
-  } catch (err) {
-    uni.showToast({ title: (err as Error).message || '报告生成失败，请重试', icon: 'none' })
-  } finally {
-    reportBusy.value = false
-  }
+  await startReport(eventId)
 }
 
-const confidenceText = (l?: string): string =>
-  ({ high: '高置信', medium: '中置信', low: '低置信' }[l ?? ''] ?? l ?? '')
+// 离开页面即断开流，避免后台继续拉取
+onUnload(() => { stopReport() })
 
 const severityText = (s?: string): string =>
   ({ critical: '严重', high: '重要', medium: '中等' }[s ?? ''] ?? s ?? '')
@@ -216,6 +238,8 @@ onLoad(async (query) => {
   try {
     detail.value = await stockTraceApi.get(eventId)
     analysis.value = await stockTraceApi.getAnalysis(eventId)
+    // 从自选股异动页卡片「报告 ›」跳入时自动开始生成（?autostart=1）
+    if (query?.autostart === '1' && reportAvailable.value) void onToggleReport()
   } catch (err) {
     detail.value = null
     analysis.value = null
@@ -268,7 +292,7 @@ onLoad(async (query) => {
   color: $ink;
 }
 
-/* ===== 主因标题行：主因标题 + 右侧徽标组（置信度） ===== */
+/* ===== 主因标题行：主因标题 + 右侧徽标（仅高可信度时展示「可信度高」） ===== */
 .main-title-row {
   display: flex;
   align-items: center;
@@ -441,9 +465,10 @@ onLoad(async (query) => {
   font-size: $font-size-base; color: $ink; line-height: 1.6;
 }
 
-/* ===== 完整报告下载按钮 ===== */
+/* ===== 完整报告（流式输出到按钮下方） ===== */
+.report-actions { margin-top: $s-4; }
 .report-btn {
-  margin-top: $s-4; padding: $s-3; border-radius: $r-md;
+  padding: $s-3; border-radius: $r-md;
   background: $primary; text-align: center;
   /* #ifdef H5 */
   cursor: pointer;
@@ -452,4 +477,8 @@ onLoad(async (query) => {
 .report-btn.is-busy { background: $line; }
 .report-btn-text { font-size: $font-size-base; color: #ffffff; font-weight: 600; }
 .report-hint { display: block; margin-top: $s-3; font-size: $font-size-xs; color: $ink-soft; text-align: center; }
+
+/* 报告正文的样式随渲染逻辑一并下沉到 InsightReportBody.vue（按 block 类型分派） */
+
+.report-error { display: block; margin-top: $s-3; font-size: $font-size-sm; color: $down; text-align: center; }
 </style>
