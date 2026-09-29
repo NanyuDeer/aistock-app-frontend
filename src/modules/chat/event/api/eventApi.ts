@@ -5,7 +5,7 @@
  * 通过 eventAdapter 处理数据映射和降级逻辑。
  */
 
-import type { EventListResponse, EventListParams, EventDetailResponse, EventGraph, NewsArticle } from '../types'
+import type { EventListResponse, EventListParams, EventDetailResponse, EventGraph, NewsArticle, EventTimelineQuery, EventTimelineResponse } from '../types'
 import type { BackendEventListData, BackendEventDetailData } from './eventAdapter'
 import { adaptEventList, adaptEventDetail } from './eventAdapter'
 import request from '@/shared/api/request'
@@ -102,4 +102,33 @@ export async function watchEvent(eventId: string): Promise<void> {
 export async function getNewsArticle(newsId: string): Promise<NewsArticle> {
   // TODO: 需要后端新增新闻详情接口
   throw new Error(`新闻功能暂未实现: ${newsId}`)
+}
+
+/**
+ * 获取重大事件时间线（GET /api/agent/event/timeline）
+ *
+ * 公开接口，无需 token。
+ * 后端 data 层直接为 { items, total, page, pageSize, hasMore }。
+ * 只透传有值的参数，防御性归一写在 api 层。
+ *
+ * @param params - 查询参数（全部可选）
+ */
+export async function getEventTimeline(params: EventTimelineQuery = {}): Promise<EventTimelineResponse> {
+  const response = await request.get<EventTimelineResponse>('/agent/event/timeline', {
+    params: {
+      ...(params.dateFrom ? { dateFrom: params.dateFrom } : {}),
+      ...(params.dateTo ? { dateTo: params.dateTo } : {}),
+      ...(params.status ? { status: params.status } : {}),
+      ...(params.order ? { order: params.order } : {}),
+      page: params.page || 1,
+      pageSize: Math.min(params.pageSize || 20, 100),
+    },
+  })
+
+  // 防御性归一：后端可能返回 null/undefined items
+  if (!Array.isArray(response.items)) {
+    return { ...response, items: [] }
+  }
+
+  return response
 }

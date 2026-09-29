@@ -74,6 +74,23 @@
             <text class="insight-card-action insight-card-action--watchlist">查看详情 ›</text>
           </view>
         </Card>
+
+        <!-- 重大事件时间线卡片 -->
+        <Card clickable class="insight-card--timeline" @click="goTimeline">
+          <view class="insight-card-header">
+            <view class="insight-card-icon insight-card-icon--timeline">
+              <SvgIcon name="calendar-line" size="32rpx" color="#ffffff" />
+            </view>
+            <view class="insight-card-header-text">
+              <text class="insight-card-title">重大事件</text>
+              <text class="insight-card-desc">按事件发生时间组织，未来事件提前可见</text>
+            </view>
+            <text class="insight-card-more">›</text>
+          </view>
+          <view class="insight-card-footer">
+            <text class="insight-card-action insight-card-action--timeline">查看详情 ›</text>
+          </view>
+        </Card>
       </view>
     </PageCard>
 
@@ -124,6 +141,10 @@ function goTrendScore() {
 
 function goWatchlistInsight() {
   uni.navigateTo({ url: '/modules/favorites/pages/insight' })
+}
+
+function goTimeline() {
+  uni.navigateTo({ url: '/modules/chat/pages/event/timeline' })
 }
 
 // 与 insight.vue 保持一致的置信度文案
@@ -208,6 +229,23 @@ onShow(loadWatchlistPreview)
   }
 }
 
+/* 重大事件时间线 — 顶部紫色装饰条 */
+.insight-card--timeline {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 24rpx;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4rpx;
+    background: linear-gradient(90deg, #8B5CF6, #A78BFA);
+  }
+}
+
 /* ===== 卡片头部 ===== */
 .insight-card-header {
   display: flex;
@@ -239,6 +277,11 @@ onShow(loadWatchlistPreview)
 .insight-card-icon--watchlist {
   background: linear-gradient(135deg, $accent, $accent-deep);
   box-shadow: 0 4rpx 12rpx rgba(0, 184, 255, 0.3);
+}
+
+.insight-card-icon--timeline {
+  background: linear-gradient(135deg, #8B5CF6, #A78BFA);
+  box-shadow: 0 4rpx 12rpx rgba(139, 92, 246, 0.3);
 }
 
 .insight-card-header-text {
@@ -316,5 +359,10 @@ onShow(loadWatchlistPreview)
 .insight-card-action--watchlist {
   color: $accent;
   background: $accent-50;
+}
+
+.insight-card-action--timeline {
+  color: #8B5CF6;
+  background: #F5F3FF;
 }
 </style>

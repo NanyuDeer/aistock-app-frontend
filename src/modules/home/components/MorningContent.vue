@@ -61,11 +61,21 @@
         </view>
       </view>
 
+      <TimeSlotInsightBar
+        :key="barResetKey"
+        :leader-sectors="leaderSectors"
+        :chain-events="chainEvents"
+        :trace-reports="traceReports"
+        :rhythm-rows="rhythmRows"
+        :current-slot="currentSlot"
+        @navigate="onBarNavigate"
+      />
+
       <!-- 功能入口 2x2 网格 -->
       <view class="feature-grid">
         <Card class="feature-card" clickable @tap="goSectors">
           <view class="feature-header">
-            <text class="feature-title">风口龙头</text>
+            <text class="feature-title">风口洞见</text>
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">排行前三板块</text>
@@ -89,7 +99,7 @@
 
         <Card class="feature-card" clickable @tap="goEventChain">
           <view class="feature-header">
-            <text class="feature-title">事件传导</text>
+            <text class="feature-title">消息洞见</text>
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">产业链追踪</text>
@@ -122,7 +132,7 @@
 
         <Card class="feature-card" clickable @tap="goRhythm">
           <view class="feature-header">
-            <text class="feature-title">节奏大师</text>
+            <text class="feature-title">节奏洞见</text>
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">近 {{ HOME_RHYTHM_DAYS }} 日 · 收盘基准</text>
@@ -169,12 +179,13 @@ import { onShow } from '@dcloudio/uni-app'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import Card from '@/shared/components/Card.vue'
 import Tag from '@/shared/components/Tag.vue'
+import TimeSlotInsightBar from './TimeSlotInsightBar.vue'
 import { useBriefingCard } from '@/shared/utils/useBriefingCard'
 import { buildBriefingUrl } from '@/shared/utils/briefingNavigation'
 import { stockApi } from '@/shared/api/modules/stock'
 import { agentApi } from '@/shared/api/modules/agent'
 import { getEventList } from '@/modules/chat/event/api/eventApi'
-import { shanghaiDateString, addCalendarDays } from '@/shared/utils/tradingTime'
+import { shanghaiDateString, addCalendarDays, getTradingTimeSlot, type TradingTimeSlot } from '@/shared/utils/tradingTime'
 import { toMarketTraceViewModel } from '@/modules/analytics/utils/marketTraceReview'
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
 import { RHYTHM_LEVEL_COLORS, RHYTHM_GREY, levelShort, type RhythmLevelKey } from '@/shared/utils/rhythmColors'
@@ -262,7 +273,7 @@ interface LeaderStockPreview {
   name: string
   tag: string
   tagType: 'buy' | 'sell' | 'wash' | 'up' | 'down' | 'date'
-  /** 预览行额外携带的跳转标识：事件传导行 → 事件 ID，跳转 AI 事件分析页用 */
+  /** 预览行额外携带的跳转标识：消息洞见行 → 事件 ID，跳转 AI 事件分析页用 */
   eventId?: string
 }
 
@@ -313,13 +324,13 @@ const topEvent = ref({
 
 const chainEvents = ref<LeaderStockPreview[]>([])
 
-/** 事件传导卡片：从事件列表 API 获取最新3条事件作为预览 */
+/** 消息洞见卡片：从事件列表 API 获取最新3条事件作为预览 */
 async function loadChainEvents() {
   try {
     const res = await getEventList({ page: 1, pageSize: 5 })
     const events = res?.events ?? []
 
-    // 事件传导卡片：取最新3条事件
+    // 消息洞见卡片：取最新3条事件
     chainEvents.value = events.slice(0, 3).map(e => {
       // 标签：优先用 publishTime 的时间(HH:MM)，无时间则回退日期，否则标"新"
       const tag = e.publishTime
@@ -337,7 +348,7 @@ async function loadChainEvents() {
       }
     }
   } catch (error) {
-    console.error('首页事件传导数据加载失败:', error)
+    console.error('首页消息洞见数据加载失败:', error)
     // 失败时保持空状态，不显示假数据
   }
 }
@@ -346,7 +357,7 @@ const traceReports = ref<LeaderStockPreview[]>([])
 
 /**
  * 大盘溯源卡片：查询最近 3 个交易日的复盘报告状态。
- * 标签统一用日期（MM-DD），和事件传导卡片一致。
+ * 标签统一用日期（MM-DD），和消息洞见卡片一致。
  * 名称：当日已生成 → 现象快照摘要；待更新 → 规则提示文字。
  */
 async function loadTraceReports() {
@@ -379,7 +390,7 @@ async function loadTraceReports() {
   })
 }
 
-/** 首页节奏大师卡：近几日摘要（收盘基准档位 + 建议仓位），每行点入该日详情 */
+/** 首页节奏洞见卡：近几日摘要（收盘基准档位 + 建议仓位），每行点入该日详情 */
 const HOME_RHYTHM_DAYS = 3
 interface RhythmHistoryRow {
   date: string
@@ -389,6 +400,9 @@ interface RhythmHistoryRow {
   band: string
 }
 const rhythmRows = ref<RhythmHistoryRow[]>([])
+
+const currentSlot = ref<TradingTimeSlot>(getTradingTimeSlot())
+const barResetKey = ref(0)
 
 // 档位色板/短码唯一副本见 shared/utils/rhythmColors.ts
 
@@ -448,6 +462,8 @@ onShow(() => {
   loadRhythmHistory()
   loadChainEvents()
   loadTraceReports()
+  currentSlot.value = getTradingTimeSlot()
+  barResetKey.value += 1
 })
 
 function goChat() {
@@ -466,13 +482,13 @@ function goEventChain() {
   uni.navigateTo({ url: '/modules/chat/pages/event/list' })
 }
 
-/** 风口龙头卡片的预览板块行 → 板块/风口详情页（按板块名定位） */
+/** 风口洞见卡片的预览板块行 → 板块/风口详情页（按板块名定位） */
 function goSectorDetail(name: string) {
   if (!name) return
   uni.navigateTo({ url: `/modules/market/pages/sector-detail?name=${encodeURIComponent(name)}` })
 }
 
-/** 事件传导卡片的预览事件行 → AI 事件分析页（按事件 ID）；无 ID 回退事件列表 */
+/** 消息洞见卡片的预览事件行 → AI 事件分析页（按事件 ID）；无 ID 回退事件列表 */
 function goEventDetail(eventId?: string) {
   if (!eventId) {
     goEventChain()
@@ -485,8 +501,15 @@ function goTraceability() {
   uni.navigateTo({ url: '/modules/analytics/pages/traceability' })
 }
 
+function onBarNavigate(target: 'rhythm' | 'sectors' | 'events' | 'trace') {
+  if (target === 'rhythm') return goRhythm()
+  if (target === 'sectors') return goSectors()
+  if (target === 'events') return goEventChain()
+  return goTraceability()
+}
+
 function goTrackDetail() {
-  // 跳转到 AI 事件分析页（事件传导解析），携带 eventId
+  // 跳转到 AI 事件分析页（消息洞见解析），携带 eventId
   const eventId = topEvent.value.eventId
   if (!eventId) {
     uni.navigateTo({ url: '/modules/chat/pages/event/list' })
@@ -811,7 +834,7 @@ function goLogin() {
   color: $ink-mute;
 }
 
-/* 节奏大师卡片：近几日结论摘要行（建议仓位 + 档位色块最右，与其它功能卡"名称+Tag"同构） */
+/* 节奏洞见卡片：近几日结论摘要行（建议仓位 + 档位色块最右，与其它功能卡"名称+Tag"同构） */
 .rhythm-chip {
   flex: none;
   width: 40rpx;

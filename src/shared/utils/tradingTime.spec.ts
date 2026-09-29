@@ -3,6 +3,7 @@ import { test } from 'node:test'
 
 import {
   addCalendarDays,
+  getTradingTimeSlot,
   isTradingTime,
   shanghaiDateString,
   shanghaiDateTimeParts,
@@ -46,4 +47,13 @@ test('上海时间在 15:29 仍为晨报时段，15:30 切换为晚报时段', (
 test('纯日历日期加减不受设备时区影响且正确跨年', () => {
   assert.equal(addCalendarDays('2025-12-31', 1), '2026-01-01')
   assert.equal(addCalendarDays('2026-01-01', -1), '2025-12-31')
+})
+
+test('getTradingTimeSlot 按上海时间边界划分盘前/盘中/盘后', () => {
+  // UTC+8 换算：UTC 01:29=上海09:29 / 01:30=09:30 / 06:59=14:59 / 07:00=15:00 / 前一日16:00=00:00
+  assert.equal(getTradingTimeSlot(new Date('2026-07-24T01:29:00Z')), 'pre')
+  assert.equal(getTradingTimeSlot(new Date('2026-07-24T01:30:00Z')), 'intraday')
+  assert.equal(getTradingTimeSlot(new Date('2026-07-24T06:59:00Z')), 'intraday')
+  assert.equal(getTradingTimeSlot(new Date('2026-07-24T07:00:00Z')), 'post')
+  assert.equal(getTradingTimeSlot(new Date('2026-07-23T16:00:00Z')), 'pre')
 })

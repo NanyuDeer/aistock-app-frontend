@@ -10,13 +10,22 @@
           {{ sourceLabel }}
         </Tag>
         <text class="card-time">{{ formatDateTime(event.publishTime) }}</text>
+        <!-- 原文入口：链接图标，与事件时间同字号同色（22rpx / $ink-mute），点击打开原文 -->
+        <SvgIcon
+          v-if="event.sourceInfo?.url"
+          name="links-line"
+          size="22rpx"
+          color="#8a96b0"
+          class="card-link-icon"
+          @click.stop="$emit('view-news', event)"
+        />
       </view>
       <!-- 重要程度星级：由 chain 最大 impactStrength 映射；无有效评分时隐藏（不显示假评分） -->
       <Rate v-if="event.importance" :modelValue="event.importance" :readonly="true" type="gold" size="18rpx" :gap="2" />
     </view>
 
-    <!-- 事件标题（最多2行，点击跳转新闻） -->
-    <text class="card-title" @click.stop="$emit('view-news', event)">{{ event.title }}</text>
+    <!-- 事件标题（最多2行）：点击整卡进入详情（机会洞见） -->
+    <text class="card-title">{{ event.title }}</text>
 
     <!-- Top5 影响行业（排序后取前5，横向滑动查看完整名称，隐藏滚动条；空数据展示降级文案） -->
     <scroll-view scroll-x :show-scrollbar="false" class="card-top5">
@@ -79,6 +88,7 @@ import type { EventItem } from '../types'
 import { formatDateTime } from '@/shared/utils/datetime'
 import { Card, Button, Tag } from '@/shared/components'
 import Rate from '@/shared/components/Rate.vue'
+import SvgIcon from '@/shared/components/SvgIcon.vue'
 import wordmarkPng from '@/shared/components/insight-wordmark.png'
 
 /** AI 洞见徽标底图（洞见字标 PNG） */
@@ -184,6 +194,14 @@ const top5Industries = computed(() => {
   color: $ink-mute; /* 与来源/事件类型/洞见摘要同一灰阶 */
 }
 
+/* 原文链接图标：与左侧时间文本垂直居中对齐（覆写 SvgIcon 根节点 inline-flex 的默认对齐） */
+.card-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+}
+
 /* ========== 标题（最多2行，超出省略） ========== */
 .card-title {
   font-size: $font-size-md;
@@ -197,10 +215,6 @@ const top5Industries = computed(() => {
   margin-bottom: 12rpx;
   transition: color $t-fast;
   -webkit-tap-highlight-color: transparent;
-}
-
-.card-title:active {
-  color: $primary;
 }
 
 /* ========== AI 摘要（最多2行，超出省略） ========== */

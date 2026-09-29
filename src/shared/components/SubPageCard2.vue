@@ -34,6 +34,8 @@
         class="as-sub2__scroll"
         :scroll-into-view="scrollIntoView"
         :scroll-top="scrollTop"
+        :lower-threshold="100"
+        @scrolltolower="emits('scrolltolower', $event)"
       >
         <slot />
       </scroll-view>
@@ -76,6 +78,8 @@ onHide(() => { podcastStore.clearActivePage(pageKey) })
 onActivated(() => { podcastStore.setActivePage(pageKey) })
 onDeactivated(() => { podcastStore.clearActivePage(pageKey) })
 onMounted(() => { podcastStore.setActivePage(pageKey) })
+
+const emits = defineEmits<{ scrolltolower: [e: any] }>()
 
 const props = withDefaults(defineProps<{
   /** 主标题 */

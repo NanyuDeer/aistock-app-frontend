@@ -2,6 +2,110 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-09-26 — APP 前端接入密码登录 / 注册 + 首次设置密码（含防刷松绑）
+
+**开发者**: Aria
+
+### 新增
+
+- `src/shared/api/modules/auth.ts`：新增 `passwordLogin(account, password)` → `POST /api/auth/password/login`、`register(account, password, code)` → `POST /api/auth/register`（均返回 `{ token, userInfo }`）；`UserInfo` 新增 `hasPassword`。
+- `src/shared/store/modules/user.ts`：新增 `passwordLogin` / `register`（成功即写 token、组装 userInfo）与 `hasPassword` 状态（`clearSession` 重置为 false；以 `fetchUserInfo()` 返回的服务端 `hasPassword` 为权威）。
+- `src/modules/user/pages/login.vue`：新增「密码登录 / 注册」入口与表单（`showPasswordForm` / `passwordMode: 'login' | 'register'`）——登录模式仅账号 + 密码；注册模式按账号自动选择短信 / 邮箱验证码通道；409 弹「去登录」。
+- `src/modules/user/pages/account-security.vue`：新增「设置密码」`ListCell` 入口 + 内联表单（验证码发到已绑定身份、手机号优先，复用 `scenario='bind'` 模板；两次密码一致校验；走注册接口首次写入密码，409 按「已设置」置灰）。
+- `src/shared/utils/storage.ts`：新增 `PWD_HINT_SHOWN` 一次性标记键。
+
+### 改进
+
+- 删除「429 → 降级验证码登录」路径（含 `switchToCodeLogin`）；密码登录 429 仅提示「尝试过于频繁，请稍后再试」，不再引导降级。
+- 存量账号（`password_hash IS NULL`）支持首次设置密码：复用后端 `register` upsert（已设密码返回 409）；`/users/me` 返回 `hasPassword`（服务端权威），`userStore` 由 `fetchUserInfo()` 同步。
+- `login.vue` 密码表单文案改为「注册 / 首次设置密码」并新增存量账号说明行；登录成功且未设密码时一次性温和引导。
+- 文档：`AGENTS.md`（前端根）`auth.ts` 行、`src/modules/user/AGENTS.md` 同步密码登录 / 注册与设置密码说明。
+
+---
+
+## [feat/home-insight-bar] 2026-09-26 — 首页「洞见」品牌统一 + 时段动态洞见横条
+
+**开发者**: Aria
+
+### 新增
+
+- 首页四宫格入口品牌词统一为「洞见」：风口龙头→**风口洞见**、事件传导→**消息洞见**、市场洞见保留、节奏大师→**节奏洞见**。
+- 新增时段动态洞见横条 `TimeSlotInsightBar`：位于早报卡与功能网格之间，按上海时间自动切换（<09:30 盘前 / 09:30–15:00 盘中 / ≥15:00 盘后），盘中只留 1 行、可点回看；复用首页既有数据源，不新增接口。
+
+### 改进
+
+- `src/shared/utils/tradingTime.ts` 新增纯函数 `getTradingTimeSlot()` 与 `type TradingTimeSlot`，供横条判定当前时段。
+
+---
+
+## [xusiyun] 2026-09-25 — 重大事件时间轴页 + 事件卡原文入口 + 不可达域名过滤
+
+**开发者**: xusiyun
+
+### 新增
+
+- `modules/chat/pages/event/timeline.vue`：重大事件时间轴页（单时间轴、不区分历史/未来；标题完整可换行；核心影响板块 inline 紧跟标题文字末尾、只显示最核心 1 个、空则不渲染；左侧竖线自首个圆点起始）。
+- 时间线入口：`list.vue`（「重大事件」标题行右侧淡色入口「时间轴」+ calendar-line 图标）、`analytics/pages/index.vue`（洞见页「重大事件」卡片）。
+- `eventApi.ts` 新增 `getEventTimeline`（GET /api/agent/event/timeline，防御性归一 items）；`types.ts` 新增 `EventTimelineItem.impactSectors` 等类型；`pages.json` 注册 timeline 路由。
+
+### 修复
+
+- `eventService.ts`：GI 焦点事件 importance 恒 `major`——焦点事件即当日最大机会/最大风险，不依赖 `importance_level`（此前 rank=1 事件 level=notable 时卡片标题丢「重大」前缀）。
+- `EventItemCard.vue`：新增原文链接图标（links-line，与事件时间同行同色）；标题点击由「跳原文」改为「整卡进入事件详情」。
+
+### 改进
+
+- `eventAdapter.ts`：新增 `UNREACHABLE_DOMAINS`（youtube.com/youtu.be）过滤——国内不可访问的海外域名只显示来源名、不暴露链接入口，避免死链。
+
+---
+
+## [changer] 2026-09-23 — 节奏大师 v3 极简展示（未来 3 事件 + 砍三时点 + 回退提示 + 时间行）
+
+**开发者**: 37588
+
+### 新增
+
+- 事件区收敛为未来最近 3 个事件：`groupEventWindow` 纯函数（date≥targetDate 升序、跳过锚点同日期+标题重复）+ 锚点卡 + 「更远事件（共 N 条）」双向折叠；`event_window_near_end_date` 前端消费删除（后端字段保留，O1）。
+- 版本选取极简：删除三时点 pill（`pickSlotByClock`/`SLOT_ORDER`/`switchSlot`/`activeSlot` 全删），`pickVersion` 单版本选取——今日=created_at 最新、历史日=after_close 优先（缺失降级最新，时间行如实标注实际版本）。
+- 回退提示行三态：未来日「{日期} 节奏尚未生成，当前展示 X 数据」/ 无报告「非交易日/当日无报告，沿用前值（basis）」/ 正常无提示；`requestedDate`（用户点选日）与 `targetDate`（实际展示日，单一真源）分离。
+
+### 改进
+
+- 洞见卡时间行拆主/次：主行 `MM-DD · slot 标签`（无 pill 后的版本标注）+ 次行 `HH:MM 生成` 灰字（created_at 上海时区恒真展示，缺失/非法不渲染）；InsightCard 加性 `time-note` prop + 时间组容器（既有调用方零变化）。
+- 色彩三色收敛（R-I）：情绪周期 chip 中性化（删五态色）、事件 importance medium 去橙改中性灰（high 保留 $up 红）。
+- 空态有字（R-J）：主档位卡恒渲染，`position_band`/`score` 缺失显示「仓位建议暂缺」/「档位数据不足」占位，不留空白。
+- pageTitle 统一「节奏（date）」；onShow 重拉数据（收盘后回前台自动切新版，首个 onShow 跳过防双拉）。
+
+### 修复
+
+- 态 2「沿用前值」提示可达性：isFallback 重置移至 onPanelPick 入口（原成功分支无条件清除会被回退链递归触发，点非交易日/无报告日回退后提示永不可达）。
+- 洞见卡时间主/次行分组展示（time+timeNote 右侧紧邻，消除 head 容器 space-between 三元素割裂）。
+
+### 测试
+
+- node:test 基线 259→271（rhythmEventWindow +6 / RhythmCard −2+5 / rhythmInsight 改1增1 / index −2+4）；`npx vue-tsc --noEmit` 0 错误；vitest 存量红零新增。
+
+### 文档
+
+- `src/modules/rhythm/AGENTS.md` v3 描述同步（单一版本/pickVersion/事件区/时间行）；O2 根因落档（生产外部 cron UTC-8 触发节奏三档，服务器侧修复，前端代码零改动）。
+
+---
+
+## [changer] 2026-09-22 — 节奏大师·事件前瞻主体化（展示侧）
+
+**开发者**: 37588
+
+### 新增
+
+- 事件日历窗口放开：事件可展示至年度覆盖上限，不再截断在 5 个交易日。
+- 事件区近窗平铺 + 更远折叠：近 5 个交易日（后端下发近窗末日日期）完整平铺，更远事件折叠为「更远事件（共 M 条）」可展开；后端越年返回空时近窗全部平铺兜底。
+
+### 改进
+
+- 日历面板适配密集日折叠占位：不渲染无内容占位行，当日溢出显示「另有 N 条」。
+
+---
+
 ## [changer] 2026-09-21 — 节奏大师按时点自动展示 + 洞见卡显示生成时刻 + 事件日历放开 5 日限制
 
 **开发者**: 37588
@@ -18,6 +122,20 @@
 ### 测试
 
 - 新增 `pickSlotByClock` 时段边界用例（08:30/12:30/16:05 三界）与 loadVersions 接线断言、`toRhythmInsight` createdAt 时间显示 2 例；node:test 基线 252→256。
+
+---
+
+## [feat/home-insight-bar] 2026-09-19 — 个股详情「AI 资讯洞见」AI 分析消失修复 + 板块预判页布局精简
+
+**开发者**: Aria
+
+### 修复
+
+- 个股详情「AI 资讯洞见」AI 分析（结论徽 + 研判依据关键词 + 风险提示关键词）整块消失：H5 未登录 → 401 → `aiAnalysis=null` → 模板 `aiAnalysis.analysisDate` 空访问抛渲染错误致 AI 区块中断。修复（`src/modules/favorites/pages/detail.vue`）：模板改 `aiAnalysis?.analysisDate` 空安全（2 处）；新增 `unwrapAnalysisPayload()`（剥 1–3 层 `{code,message,data}` 包装，避免拦截器泄漏的包装对象被误当分析数据）与 `hasAnalysisFields()` 字段校验；GET 解包后无字段（含 200+null 泄漏、401）→ 继续走 POST 触发生成；最终无数据置 `{}` 而非 `null`（只展示新闻、不再崩溃）；`refreshAiAnalysis` 同步接入解包/校验。
+
+### 改进
+
+- 板块预判页布局精简（`src/modules/market/pages/sector-loop.vue`）：去掉行内「大盘主因」来源 tag（主因身份由红描边体现，不再重复标注）；溯源事件标题由横排改纵向布局，长标题可读性更好；新增 `firstPrimaryIdx` 使「大盘溯源 · 主因板块」分组标题只渲染一次，并同步收紧「风口板块（长线）」标题逻辑。
 
 ---
 
@@ -72,6 +190,187 @@
 
 - `AttributionChainView.mount.spec.ts` 原 4 例预判入口用例替换为 1 例「不挂预判入口」+ 3 例「隐藏检索来源新闻条」；`EventRefChip.mount.spec.ts` 链视图用例由「渲染 2 条（中台+检索）」改为「只渲染中台 1 条」；`traceability.mount.spec.ts` 删除预判跳转用例（余 9 例）。
 - `npx vue-tsc --noEmit` 0 错误；定向 3 spec 56 passed；全量 476 passed / 4 failed（4 条为存量红：`AnalyticsCardLayout` 1 + `insight-detail` 1 + `AlertContent` 2，零新增）。
+
+---
+
+## [master] 2026-09-18 — 板块原因链前端展示：触发/传导/结果三字段可展开，三处同源
+
+**开发者**: Aria
+
+### 新增
+
+- 板块溯源原因链（后端 4 段 `trace.stages`）前端展示为 3 字段（触发/传导/结果，丢弃现象段、保源序），`toReasonStages` 单点映射三处消费：板块详情卡（InsightCard 顶层 `traceStages` prop）、大盘归因链分支（`sectorStages` prop + 「溯源过程 ▾」展开）、板块预判页四环行。
+- `traceability.vue` 首屏拉一次 sector-insight 建 `sectorStageMap`（ts_code 与板块名双键抗命名漂移），失败静默不阻断。
+
+### 测试
+
+- AttributionChainView.mount.spec +4 例（无数据不出入口 / 展开 3 段 / 键三级降级 / 分支独立展开）；traceability.mount.spec 负向护栏改正向（首屏恰 1 次）+2 例。
+
+---
+
+## [master] 2026-09-18 — 市场洞见页：删除「今日影响大盘的主要板块」区块，能力并入大盘归因链
+
+**开发者**: Aria
+
+### 改进
+
+- 与大盘归因链读同一份链、显示同一批板块的主因区块删除，三个能力全部有去向：「看该板块预判 →」迁至链分支（select-sector 事件）、「归因较弱」+「全部板块 ›」并入链尾 chain-foot 行、空态取消（链树已过滤未确认节点）。
+- 页面少一次 sector-insight 接口往返；清掉 primary-sector-* 死代码与候选加载链路。
+
+### 测试
+
+- traceability.mount.spec 重写为 8 例（区块消失 / 不再请求 sector-insight / 跳转链路）；AttributionChainView.mount.spec +4 例（分支入口 / sector_std 权威名优先 / 空白回退原始名）。
+
+---
+
+## [master] 2026-09-18 — 「未确认驱动原因」否定词表扩表（与 agent-py 逐字对齐）
+
+**开发者**: Aria
+
+### 修复
+
+- `isUnconfirmedAttribution` 正则扩为与 agent-py `_NEGATIVE_SUMMARY_MARKERS` 逐字对齐的 15 词（未检索到/未找到/未确认/无法判断/暂无…），修复「未检索到可解释当日行情的独立触发事件」类否定句被当成驱动原因出卡；刻意不收「不足/没有/未出现」防误伤肯定归因句（如「未出现单一独立公告；催化来自…」）。
+
+### 测试
+
+- AttributionChainView.mount.spec +27 例（20 否定 × true + 6 易误伤样本 × false + 1 端到端 mount），TDD 先红（14 failed）后绿（29 passed）。
+
+---
+
+## [master] 2026-09-18 — 市场洞见主因区块改「以链 children 为准出卡」+ 未确认过滤 + 板块名标签（R17）
+
+**开发者**: Aria
+
+### 改进
+
+- 出卡口径改链优先：链 `children[]` 逐个出卡 + 补链外主因候选（链不全信息不丢），链上板块无候选时合成最小候选（`source='chain_only'`）；弱归因日与有数据日可区分（「链存在」门控 + 过滤后空态一行）。
+- 板块名标签：InsightCard 新增可选 `titleTag` prop（标题上方中性描边小标），主因卡标题为溯源主句时仍可辨板块。
+- 未确认驱动原因过滤：`isUnconfirmedAttribution` 单点口径（驱动句空白或命中否定词不展示，不看 events 综述），主因区块与归因链树同源生效。
+- 类型加性：`SectorInsightSource` 导出（含 `chain_only`）。
+
+### 测试
+
+- traceability.mount.spec +3 例（未确认过滤只出 1 卡 / chain_only 仍出卡 / 全未确认空态）。
+
+---
+
+## [master] 2026-09-17 — 溯源弱依据提示（R16 前端呈现）+ 角色徽匹配升级 ts_code/sector_std（R14）
+
+**开发者**: Aria
+
+### 新增
+
+- 弱归因日中性提示（不引入新色系）：链级「归因较弱」（`root.evidence_weak`）+ 板块级「依据较弱」/「无归因依据」（`extraction.weak`，文案单点 `extractionWeakLabel`），字段缺失/正常日零标记零变化。
+- 类型加性：attributionChain.ts 增 `evidence_weak`/`attribution_status`/`extraction`/`ts_code`/`sector_std`（全可选，老数据零影响）。
+
+### 修复
+
+- R14 匹配优先级升级：`ts_code`（去 `.TI`）→ `sector_std` → `sector` → 归一化，修复链上复盘原文名与候选 THS 权威名不匹配导致角色徽/驱动句不显示。
+
+### 测试
+
+- traceability.mount.spec +5 例、EventRefChip.mount.spec +2 例；组件库 InsightCard 副本同步（改动块 diff 0 行差异）。
+
+---
+
+## [master] 2026-09-17 — 到期未触发（condition_met=false）口径复核 + CFB mount 用例
+
+**开发者**: Aria
+
+### 改进
+
+- 复核确认 CFB 组件无需改动：折叠/过滤/「未命中」一律按「当期有无 `met === true`」收口，与 met 是 false 还是缺省无关——`false` 落库后仍是折叠态 + 「未命中」（需卡级 `verification=miss`），不会落空态文案。
+
+### 测试
+
+- ConditionalForecastBlock.mount.spec +1 例（`met:false` ×2 + `verification=miss` → 折叠入口 + 未命中 + 0 分支）。
+
+---
+
+## [master] 2026-09-17 — 市场洞见主因区块改造 + 链数据提升 + 链树事件胶囊（P3' Task 4.1/4.2）
+
+**开发者**: Aria
+
+### 新增
+
+- 「主因板块 · 板块研判」→「今日影响大盘的主要板块」：区块门控改「链存在 && 有候选」，卡列表按链排序（自驱动优先 → |pct| 降序，未入链排末尾）。
+- 链数据提升到页面：AttributionChainView 改受控 props（`chain`/`loading`/`mock`），移除组件内 fetch。
+- 两轨分离：SectorInsightCard 新增 `traceOnly`（只渲染溯源侧，不渲染 CFB 预判子卡、标题不回退预判综述）。
+- 链树事件胶囊：新建 EventRefChip（来源标记 中台/检索 + 摘要单行省略；URL 可点 emit select，跳转由 wrapper 执行），接入归因链分支与 InsightCard 溯源子卡。
+- 板块名匹配：`normalizeSectorName`（与 app-api 同口径）+ `findChainChild`（精确 → 归一化，不做包含匹配防「半导体」误连「半导体材料」）。
+
+### 测试
+
+- 新建 traceability.mount.spec（5 例）+ EventRefChip.mount.spec（8 例），登记 vitest 白名单（node:test 基线不变）。
+
+---
+
+## [master] 2026-09-17 — CFB 折叠/过滤按 displayMode 收口（修复节奏洞见卡零分支）+ mount 三态护栏
+
+**开发者**: Aria
+
+### 修复
+
+- 三态判定改造后 `displayMode` 不再驱动 UI → 节奏大师洞见卡（未传 display-mode）100% 折叠、核心分支默认不可见。修正：折叠/过滤/隐藏标注/「未命中」标签一律以 `displayMode === 'conclusion'` 收口，`full`（rhythm 等未传调用方）恢复全量分支直显。
+- 空态文案还原：sentence 形态恢复「该期暂无细分情景」原文案。
+
+### 测试
+
+- 新建 ConditionalForecastBlock.mount.spec（5 例三态护栏，full 模式回归经反向变异实测可捕获）。
+
+---
+
+## [master] 2026-09-17 — CFB 折叠态判定修正（按已成立分支判，不再依赖降级模式）+ 未命中标签去重
+
+**开发者**: Aria
+
+### 修复
+
+- 后端按决策 D1 只写 `condition_met=true` 不写 false → 旧口径 `hasMetData` 为假降级 `full`，折叠态在真实数据下不可达。修正：折叠判定改「当期无 `met===true` 且有条件分支」，未触发档收为一行入口「查看条件化预判 ▾」（本地展开铺开该档全部分支，切期段归零）。
+- 已触发只渲染已成立分支 + 末尾「另有 N 条条件未成立」；折叠态 `miss` 抑制头部同义 pill，只留入口行「未命中」。
+
+---
+
+## [master] 2026-09-17 — 洞见卡未触发折叠态 + 未命中标签 + 隐藏分支标注 + 主因卡预判入口
+
+**开发者**: Aria
+
+### 新增
+
+- CFB 未触发折叠态：当前档无 `met===true`、conclusion 生效且 tags 形态 → 分支区收为一行入口「查看条件化预判 ▾/收起条件化预判 ▴」；展开后铺开该档全部分支。
+- 折叠态卡级 `verification === 'miss'` → 入口旁中性灰「未命中」；已触发保留「条件成立」徽不折叠。
+- 隐藏分支纯标注：「另有 N 条条件未成立」（不可点开）。
+- 市场洞见主因卡后加「看该板块预判 →」入口（跳板块详情 `?name=`，溯源/预判两轨分离不变）。
+
+---
+
+## [master] 2026-09-16 — 洞见卡结论模式（只显示已验证结论）落地
+
+**开发者**: Aria
+
+### 新增
+
+- CFB 新增 `displayMode: 'full' | 'conclusion'`（默认 full 向后兼容）：结论模式只渲染 `met === true` 分支；`resolveDisplayMode` 降级口径——整块无布尔 met（后端未回填）自动降级 full 防全空态。
+- 纯函数 `selectVisibleConditions`/`hasMetData`/`resolveDisplayMode`（+8 条单测）。
+- InsightCard：溯源「依据详情」展开入口 + `traceStructured.stages` 预留 + displayMode 透传；板块粒度（sector-detail/sector-loop/traceability）接入 conclusion。
+
+### 修复
+
+- CFB 回灌 positionAction 仓位动作徽标至组件库 + 单档守卫（`horizonSegments.length > 1` + `activeHorizon` watchEffect）使既有红测转绿，node:test 基线 237→246。
+
+---
+
+## [master] 2026-09-16 — condition_met 两段判定：条件点亮中间态不再误标「已验证」
+
+**开发者**: Aria
+
+### 修复
+
+- 后端两段判定第①段只写 `condition_met=true` 不写 `result`，旧口径「entry 存在即 verified」把中间态误显「已验证 + 实际 --」。`predictionHistory.ts` 新增 `condition_met` 中间态分支（ConditionStage），组件显示「条件已成立 · 待验证」（pending 色），「实际 X」仅在 verified 渲染。
+
+### 测试
+
+- predictionHistory.spec +2 例（中间态 / 到期后转 verified）；新建 PredictionVerification.spec（3 例）登记 vitest 白名单；node:test 基线 246→248。
 
 ---
 

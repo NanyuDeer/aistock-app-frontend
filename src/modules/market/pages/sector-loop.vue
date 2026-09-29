@@ -81,8 +81,9 @@
         <!-- 卡片列表：大盘溯源·主因置顶分组；行内展开预判（复用共享条件化预判块格式） -->
         <view class="sl-list">
           <template v-for="(row, idx) in rows" :key="row.key">
-            <view v-if="row.isPrimary" class="sl-group-title">大盘溯源 · 主因板块</view>
-            <view v-else-if="idx > 0 && rows[idx - 1].isPrimary" class="sl-group-title">风口板块（长线）</view>
+            <!-- 分组标题只在分组首次出现时显示一次，避免多板块行重复 -->
+            <view v-if="row.isPrimary && idx === firstPrimaryIdx" class="sl-group-title">大盘溯源 · 主因板块</view>
+            <view v-else-if="!row.isPrimary && (idx === 0 || rows[idx - 1].isPrimary)" class="sl-group-title">风口板块（长线）</view>
 
             <view
               class="sl-row"
@@ -103,11 +104,8 @@
                   </view>
                 </view>
 
-                <!-- 第 2 行：来源 tag；验证/日期副文案靠卡片右侧 -->
+                <!-- 第 2 行：验证/日期副文案靠卡片右侧 -->
                 <view class="sl-row__subline">
-                  <view v-if="row.tag" class="sl-tag" :class="row.tag.cls">
-                    <text class="sl-tag__text">{{ row.tag.text }}</text>
-                  </view>
                   <text
                     v-if="row.pred?.sub"
                     :class="['sl-sub', 'sl-sub--right', row.pred.sub.cls]"
@@ -266,7 +264,6 @@ interface RowVM {
   key: string
   name: string
   source: SectorInsightCandidate['source']
-  tag: PillModel | null
   summary: string
   pct: PillModel | null
   pred: PredModel | null
@@ -292,13 +289,6 @@ function toggleStages(key: string): void {
   if (next.has(key)) next.delete(key)
   else next.add(key)
   expandedKeys.value = next
-}
-
-/** 来源 tag：wind_leader→风口(蓝) / review_primary→大盘主因(红) / both→风口 · 主因(红) */
-function tagModel(c: SectorInsightCandidate): PillModel | null {
-  if (c.source === 'wind_leader') return { text: '风口', cls: 'sl-tag--blue' }
-  if (c.source === 'review_primary') return { text: '大盘主因', cls: 'sl-tag--red' }
-  return { text: '风口 · 主因', cls: 'sl-tag--red' }
 }
 
 /** 当日行情：pct_change 存在才显示（红涨绿跌；0 灰） */
@@ -338,7 +328,6 @@ function buildRow(c: SectorInsightCandidate): RowVM {
     key: c.ts_code,
     name: c.name,
     source: c.source,
-    tag: tagModel(c),
     summary: c.trace?.summary ?? '',
     pct: pctModel(c),
     pred: predModel(c.prediction),
@@ -355,6 +344,9 @@ const rows = computed<RowVM[]>(() => {
   const list = (sectorInsight.value?.candidates ?? []).map(buildRow)
   return [...list.filter((r) => r.isPrimary), ...list.filter((r) => !r.isPrimary)]
 })
+
+/** 首个主因行的索引（分组标题只在首次出现时渲染，避免重复） */
+const firstPrimaryIdx = computed(() => rows.value.findIndex((r) => r.isPrimary))
 
 /** 主因候选（首个 review_primary/both）——归因链与"仅主因"行跳转共用 */
 const primaryRow = computed<RowVM | null>(() => {
@@ -713,29 +705,6 @@ onLoad(async (options) => {
   font-family: $font-mono;
 }
 
-.sl-tag {
-  align-self: flex-start;
-  flex-shrink: 0;
-  padding: 2rpx 12rpx;
-  border-radius: 8rpx;
-}
-
-.sl-tag--blue {
-  color: $primary;
-  background: rgba(11, 95, 255, 0.08);
-}
-
-.sl-tag--red {
-  color: $stock-up-color;
-  background: $up-bg;
-}
-
-.sl-tag__text {
-  font-size: $font-size-xs;
-  font-weight: 500;
-  line-height: 1.6;
-}
-
 .sl-row__subline {
   display: flex;
   align-items: center;
@@ -744,15 +713,16 @@ onLoad(async (options) => {
 }
 
 /* 溯源小卡（2026-09-19：样式对齐组件库 InsightCard 的溯源块 `__line--trace`——
-   冷雾蓝底 + 描边 + key 加粗字距 / 正文同款字级与色值；两处取值逐字一致，仅组件内不共享变量） */
+   冷雾蓝底 + 描边 + key 加粗字距 / 正文同款字级与色值；两处取值逐字一致，仅组件内不共享变量）
+   纵向布局：key「溯源」独占一行，事件标题正文换到下一行（长标题可整行展示） */
 .sl-trace {
   --ins-trace-bg: #f4f8fe;
   --ins-trace-bd: #dce7f8;
   --ins-trace-key: #4a6fbf;
   --ins-card-tx: #5e6673;
   display: flex;
-  align-items: flex-start;
-  gap: 10rpx;
+  flex-direction: column;
+  gap: 6rpx;
   padding: 16rpx 20rpx;
   border-radius: $r-md;
   background: var(--ins-trace-bg);

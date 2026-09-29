@@ -53,33 +53,59 @@ test('F2：主请求 getRhythmMaster 包 try/catch（网络错误不 unhandled r
   assert.match(loadVersions, /} catch \{/)
 })
 
-test('需求 2：pickSlotByClock 按上海时刻自动选中时点（固定 UTC+8，不依赖设备时区）', () => {
-  // 从源码提取纯函数体；将函数体内的 new Date() 替换为注入的 now()（stub 控制时刻），
-  // shanghaiDateTimeParts 也注入 stub（避免 import .vue 的依赖链）
-  const fn = pageSource.match(/function pickSlotByClock\(date\?: Date\): string \{\n([\s\S]*?)\n\}/)?.[1] ?? ''
-  assert.ok(fn, '应存在 pickSlotByClock 函数（stub 依赖后可直接执行；<script setup> 内不可 export，故不匹配 export 前缀）')
-  const body = fn.replace(/shanghaiDateTimeParts\(date \?\? new Date\(\)\)/, 'shanghaiDateTimeParts(now())')
-  const shanghaiDateTimeParts = (d: Date) => {
-    const sh = new Date(d.getTime() + 8 * 60 * 60 * 1000)
-    return { hour: sh.getUTCHours(), minute: sh.getUTCMinutes(), month: 1, day: 1, weekday: 1, year: 2026 }
-  }
-  const pick = new Function('shanghaiDateTimeParts', 'now', `${body}\nreturn pickSlotByClock()`)
-  const at = (iso: string) => pick(shanghaiDateTimeParts, () => new Date(iso))
-  // 上海时间边界：08:29 → after_close；08:30 → morning；12:29 → morning；12:30 → midday
-  // 16:04 → midday；16:05 → after_close（对齐 config 生成时刻 9:00/12:30/16:05）
-  assert.equal(at('2026-09-21T00:29:00Z'), 'after_close')
-  assert.equal(at('2026-09-21T00:30:00Z'), 'morning')
-  assert.equal(at('2026-09-21T04:29:00Z'), 'morning')
-  assert.equal(at('2026-09-21T04:30:00Z'), 'midday')
-  assert.equal(at('2026-09-21T08:04:00Z'), 'midday')
-  assert.equal(at('2026-09-21T08:05:00Z'), 'after_close')
-  // 午夜后（上海 00:00，UTC 前一日 16:00）→ after_close（weekday 未判定，恒按时刻）
-  assert.equal(at('2026-09-20T16:10:00Z'), 'after_close')
+test('v3 极简：pickVersion 今日取 created_at 最新；历史日 after_close 优先、缺失降级最新', () => {
+  // 从源码提取纯函数体执行（同既有 pickSlotByClock 断言模式：签名含 TS 类型注解，
+  // new Function 无法执行 TS，故只提取签名 { 之后到闭合 } 的函数体；参数经 new Function 形参注入）
+  const body = pageSource.match(
+    /function pickVersion\(\n\s*versions: RhythmMasterVersion\[\],\n\s*targetDate: string,\n\s*today: string,\n\s*\): RhythmMasterVersion \| undefined \{\n([\s\S]*?)\n\}/,
+  )?.[1] ?? ''
+  assert.ok(body, '应存在 pickVersion 纯函数（今日最新 / 历史收盘基准；签名与实现形状如下——参数 versions/targetDate/today）')
+  const pickVersion = new Function(
+    'versions', 'targetDate', 'today',
+    `${body}\nreturn pickVersion(versions, targetDate, today)`,
+  ) as (versions: Array<{ refresh_slot: string; created_at?: string }>, targetDate: string, today: string) => { refresh_slot: string } | undefined
+  const versions = [
+    { refresh_slot: 'morning', created_at: '2026-09-23T01:00:00Z' },
+    { refresh_slot: 'midday', created_at: '2026-09-23T04:30:00Z' },
+    { refresh_slot: 'after_close', created_at: '2026-09-22T00:05:00Z' },
+  ]
+  // 今日（09-23）：created_at 最新 = midday（04:30Z）
+  assert.equal(pickVersion(versions, '2026-09-23', '2026-09-23')?.refresh_slot, 'midday')
+  // 历史日（09-22）：after_close 优先（即便 created_at 更旧）
+  assert.equal(pickVersion(versions, '2026-09-22', '2026-09-23')?.refresh_slot, 'after_close')
+  // 历史日缺 after_close：降级 created_at 最新
+  const noClose = versions.filter((v) => v.refresh_slot !== 'after_close')
+  assert.equal(pickVersion(noClose, '2026-09-22', '2026-09-23')?.refresh_slot, 'midday')
+  // created_at 缺省视为最旧
+  const missing = [{ refresh_slot: 'morning' }, { refresh_slot: 'after_close', created_at: '2026-09-22T00:05:00Z' }]
+  assert.equal(pickVersion(missing, '2026-09-23', '2026-09-23')?.refresh_slot, 'after_close')
+  // 空版本 → undefined
+  assert.equal(pickVersion([], '2026-09-23', '2026-09-23'), undefined)
 })
 
-test('需求 2：loadVersions 成功后改走 selectSlotByClock（不再默认 list[0]=midday），含 onShow 重判定', () => {
-  assert.match(pageSource, /selectSlotByClock\(\)\s*\/\/\s*需求/)
-  assert.doesNotMatch(pageSource, /activeSlot\.value = list\[0\]\?\.refresh_slot/)
-  assert.match(pageSource, /onShow\(/)
-  assert.match(pageSource, /pickSlotByClock\(\)/)
+test('v3 极简：三时点 pill 与时钟自动选中已删除（无 slot 切换交互残留）', () => {
+  assert.doesNotMatch(pageSource, /pickSlotByClock/)
+  assert.doesNotMatch(pageSource, /selectSlotByClock/)
+  assert.doesNotMatch(pageSource, /switchSlot/)
+  assert.doesNotMatch(pageSource, /SLOT_ORDER/)
+  assert.doesNotMatch(pageSource, /activeSlot/)
+})
+
+test('v3 极简：requestedDate 分离 + 未来日/无报告提示三态（spec §4.3）', () => {
+  assert.match(pageSource, /requestedDate/)
+  assert.match(pageSource, /节奏尚未生成，当前展示/)
+  assert.match(pageSource, /非交易日\/当日无报告，沿用前值/)
+  assert.match(pageSource, /requestedDate\.value = date/)
+  // 态 2 可达性（审查修复）：isFallback 重置在 onPanelPick 入口（用户新一轮点选），
+  // loadVersions 内不清除——否则回退链递归成功会清掉刚置位的标志，点非交易日/无报告日回退后提示立即消失
+  const onPanelPickSrc = pageSource.match(/async function onPanelPick[\s\S]*?\n\}/)?.[0] ?? ''
+  assert.match(onPanelPickSrc, /isFallback\.value = false/)
+  const loadVersionsSrc = pageSource.match(/async function loadVersions[\s\S]*?\n\}/)?.[0] ?? ''
+  assert.doesNotMatch(loadVersionsSrc, /isFallback\.value = false/)
+})
+
+test('v3 极简：pageTitle 统一「节奏（date）」（删明日/今日 slot 语义错位）', () => {
+  assert.doesNotMatch(pageSource, /明日节奏/)
+  assert.doesNotMatch(pageSource, /今日节奏/)
+  assert.match(pageSource, /节奏（\$\{targetDate\.value\}）/)
 })

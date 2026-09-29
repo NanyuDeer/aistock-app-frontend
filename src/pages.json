@@ -353,6 +353,15 @@
       }
     },
     {
+      "path": "modules/chat/pages/event/timeline",
+      "style": {
+        "navigationBarTitleText": "重大事件",
+        "navigationStyle": "custom",
+        "disableScroll": true,
+        "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
+      }
+    },
+    {
       "path": "modules/chat/pages/event/detail",
       "style": {
         "navigationBarTitleText": "事件机会洞见",

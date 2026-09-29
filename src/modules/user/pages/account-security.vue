@@ -77,6 +77,24 @@
               <SvgIcon name="wechat" size="36rpx" color="#4b5a7a" />
             </template>
           </ListCell>
+          <ListCell
+            title="设置密码"
+            :description="userStore.hasPassword ? '已设置密码，可用于密码登录' : '设置后可用手机号 / 邮箱 + 密码登录'"
+            :clickable="!userStore.hasPassword"
+            :disabled="userStore.hasPassword"
+            :showArrow="!userStore.hasPassword"
+            :border="hasWechat"
+            @click="startSetPassword"
+          >
+            <template #prefix>
+              <SvgIcon name="key-line" size="36rpx" color="#4b5a7a" />
+            </template>
+            <template #value>
+              <Tag :type="userStore.hasPassword ? 'up' : 'gray'" size="sm">
+                {{ userStore.hasPassword ? '已设置' : '未设置' }}
+              </Tag>
+            </template>
+          </ListCell>
         </Card>
       </view>
 
@@ -122,6 +140,59 @@
             <view class="bind-form-actions">
               <Button block :loading="binding" @click="handleBind">确认绑定</Button>
               <Button type="ghost" block @click="cancelBind">取消</Button>
+            </view>
+          </view>
+        </Card>
+      </view>
+
+      <!-- 设置密码（内联展开）：用当前账户已绑定身份验证归属 -->
+      <view v-if="pwdFormVisible" class="section">
+        <Card>
+          <view class="bind-form">
+            <text class="bind-form-title">设置密码</text>
+            <view class="form-row">
+              <SvgIcon :name="pwdTarget?.kind === 'email' ? 'mail-line' : 'phone-line'" size="36rpx" color="#9ca3af" />
+              <text class="prove-identity">{{ pwdTargetDesc }}</text>
+            </view>
+            <view class="form-row">
+              <SvgIcon name="lock-line" size="36rpx" color="#9ca3af" />
+              <Input
+                v-model="pwdCode"
+                type="number"
+                :maxlength="6"
+                placeholder="请输入验证码"
+                class="form-input"
+              />
+              <Button
+                class="form-code-btn"
+                :disabled="countdown > 0 || !pwdTarget"
+                size="sm"
+                @click="handleSendPwdCode"
+              >
+                {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
+              </Button>
+            </view>
+            <view class="form-row">
+              <SvgIcon name="key-line" size="36rpx" color="#9ca3af" />
+              <Input
+                v-model="pwdPassword"
+                type="password"
+                placeholder="请输入密码（至少 8 位，含字母和数字）"
+                class="form-input"
+              />
+            </view>
+            <view class="form-row">
+              <SvgIcon name="key-line" size="36rpx" color="#9ca3af" />
+              <Input
+                v-model="pwdConfirm"
+                type="password"
+                placeholder="请再次输入密码"
+                class="form-input"
+              />
+            </view>
+            <view class="bind-form-actions">
+              <Button block :loading="pwdSetting" @click="handleSetPassword">确认设置</Button>
+              <Button type="ghost" block @click="cancelPwdForm">取消</Button>
             </view>
           </view>
         </Card>
@@ -363,6 +434,116 @@ async function handleBind() {
     binding.value = false
     // e.data.message（后端业务 message）优先，e.message 兜底；取不到再显示通用文案
     uni.showToast({ title: e?.data?.message || e?.message || '绑定失败，请重试', icon: 'none' })
+  }
+}
+
+// 设置密码表单状态：用当前账户已绑定身份做归属验证（后端仅支持"首次设置密码"）
+const pwdFormVisible = ref(false)
+const pwdCode = ref('')
+const pwdPassword = ref('')
+const pwdConfirm = ref('')
+const pwdSetting = ref(false)
+
+/** 用于验证归属的已绑定身份（手机号优先，其次邮箱） */
+const pwdTarget = computed<{ kind: 'phone' | 'email'; value: string } | null>(() => {
+  const phone = userStore.userInfo?.phone
+  const email = userStore.userInfo?.email
+  if (phone) return { kind: 'phone', value: phone }
+  if (email) return { kind: 'email', value: email }
+  return null
+})
+
+/** 脱敏展示验证身份；无绑定身份时给出引导 */
+const pwdTargetDesc = computed(() => {
+  const target = pwdTarget.value
+  if (!target) return '请先绑定手机号或邮箱'
+  return target.kind === 'phone' ? `验证身份：手机号 ${maskPhone(target.value)}` : `验证身份：邮箱 ${maskEmail(target.value)}`
+})
+
+/** 打开设置密码表单（已设置则忽略；无可用身份时提示先绑定） */
+function startSetPassword() {
+  if (userStore.hasPassword) return
+  if (!pwdTarget.value) {
+    uni.showToast({ title: '请先绑定手机号或邮箱', icon: 'none' })
+    return
+  }
+  pwdFormVisible.value = true
+}
+
+/** 关闭设置密码表单并清理状态 */
+function cancelPwdForm() {
+  pwdFormVisible.value = false
+  pwdCode.value = ''
+  pwdPassword.value = ''
+  pwdConfirm.value = ''
+  stopCountdown()
+}
+
+/** 设置密码：验证码发送到已绑定身份（复用绑定场景的短信模板） */
+async function handleSendPwdCode() {
+  const target = pwdTarget.value
+  if (!target) {
+    uni.showToast({ title: '请先绑定手机号或邮箱', icon: 'none' })
+    return
+  }
+  try {
+    if (target.kind === 'phone') {
+      await authApi.sendSmsCode(target.value, 'bind')
+      uni.showToast({ title: '验证码已发送，请查收短信', icon: 'none' })
+    } else {
+      await authApi.sendEmailCode(target.value)
+      uni.showToast({ title: '验证码已发送，请查收邮箱', icon: 'none' })
+    }
+    countdown.value = 60
+    stopCountdown()
+    countdownTimer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) stopCountdown()
+    }, 1000)
+  } catch (e: any) {
+    uni.showToast({ title: e?.data?.message || '发送失败，请稍后再试', icon: 'none' })
+  }
+}
+
+/** 确认设置密码：注册接口首次写入密码（账号已设密码时后端返回 409） */
+async function handleSetPassword() {
+  const target = pwdTarget.value
+  if (!target) {
+    uni.showToast({ title: '请先绑定手机号或邮箱', icon: 'none' })
+    return
+  }
+  if (!pwdCode.value) {
+    uni.showToast({ title: '请输入验证码', icon: 'none' })
+    return
+  }
+  if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(pwdPassword.value)) {
+    uni.showToast({ title: '密码至少 8 位且需包含字母和数字', icon: 'none' })
+    return
+  }
+  if (pwdPassword.value !== pwdConfirm.value) {
+    uni.showToast({ title: '两次输入的密码不一致', icon: 'none' })
+    return
+  }
+  pwdSetting.value = true
+  try {
+    await userStore.register(target.value, pwdPassword.value, pwdCode.value)
+    userStore.markPasswordSet()
+    pwdSetting.value = false
+    stopCountdown()
+    uni.showToast({ title: '密码设置成功', icon: 'success' })
+    cancelPwdForm()
+  } catch (e: any) {
+    pwdSetting.value = false
+    const status = e?.statusCode || e?.status
+    const message = e?.data?.message || e?.message || '设置失败，请重试'
+    // 409：账号已存在密码，按"已设置"处理并关闭表单，避免误报失败
+    if (status === 409) {
+      userStore.markPasswordSet()
+      cancelPwdForm()
+      uni.showToast({ title: message || '该账号已设置密码', icon: 'none' })
+      return
+    }
+    uni.showToast({ title: message, icon: 'none' })
   }
 }
 </script>

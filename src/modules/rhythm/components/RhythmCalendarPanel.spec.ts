@@ -43,3 +43,11 @@ test('selectedEvents 在交易日数据源未命中时回退自然日数据源�
   assert.ok(!source.includes('当日宏观事件'), '事件面板标题不得退回仅宏观口径')
   assert.ok(!source.includes('当日无宏观事件'), '事件面板空态不得退回仅宏观口径')
 })
+
+test('控制器裁决①：overflow 占位（无 title/importance）不渲染空白行，事件区显示「另有 N 条」', () => {
+  assert.match(source, /overflow/)
+  assert.match(source, /\.filter\(\(e\) => e\.title\)/)
+  assert.match(source, /selectedOverflow/)
+  assert.ok(source.includes('另有'), '事件区需有「另有 N 条」计数行')
+  assert.match(source, /v-else-if="selectedOverflow > 0"|v-if="selectedEvents\.length \|\| selectedOverflow > 0"/)
+})
