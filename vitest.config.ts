@@ -91,6 +91,7 @@ export default defineConfig({
       'src/modules/analytics/pages/traceability.mount.spec.ts',
       'src/modules/home/components/TimeSlotInsightBar.mount.spec.ts',
       'src/modules/market/utils/useAlertSSE.spec.ts',
+      'src/modules/market/components/AlertReasoningPanel.spec.ts',
     ],
   },
 })

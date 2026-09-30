@@ -1,5 +1,13 @@
 # 待提交修改记录
 
+## 2026-09-30 — Task 7：新增 `AlertReasoningPanel.vue`
+
+- `src/modules/market/components/AlertReasoningPanel.vue`：新增「AI 思考过程」单区可折叠面板，仅渲染 `reasoning` 帧聚合的 `ReasoningStep[]`；`steps` 为空时不渲染（避免"0 步"空头）；有 `streaming` 步骤时默认展开，否则折叠，点击头部 `@tap` 切换；`streaming` 步骤圆点带 `@keyframes pulse` 呼吸动画；节点中文映射 `alert_scan→多维分析`、`alert_master→汇聚研判`，未知节点回退原名；`mp-html` + `markdownToHtml` 渲染文本；样式走 design token（`$bg-card/$shadow-card/$r-md/$s-3/$line-soft/$ink-soft/$ink-mute/$primary/$font-size-*`），`SvgIcon` 颜色用令牌实值 `#8a96b0`(`$ink-mute`) / `#0b5fff`(`$primary`)。**本任务不做页面接入**（Task 8 范围）。
+- `src/modules/market/components/AlertReasoningPanel.spec.ts`：新增 vitest spec，5 例（空不渲染 / 标题步数 / streaming 默认展开 / 全 done 折叠+点击展开 / 节点中文映射）→ 5 pass / 0 fail。沿用 chat 侧 `ReasoningPanel.spec` 的 `vi.mock` 占位 `mp-html`（其 uni-app 版 SFC 含 uni 特有语法及 node.vue 多 script 块，无法在 vitest 的 @vue/compiler-sfc 下解析）。
+- `vitest.config.ts`：`test.include` 白名单登记 `src/modules/market/components/AlertReasoningPanel.spec.ts`。
+- **验证**：`npx vitest run src/modules/market/components/AlertReasoningPanel.spec.ts` 5 passed；`npx vue-tsc --noEmit` exit 0。
+- **依赖**：Task 6 `useAlertSSE` 已暴露 `reasoningSteps: Ref<ReasoningStep[]>`，本次消费 `ReasoningStep` 类型（`@/shared/api/modules/agent`），未改动 `useAlertSSE.ts` 与 `alert-analysis.vue`（Task 6 / 8 范围）。
+
 ## 2026-09-30 — Task 6：`useAlertSSE` 支持 reasoning / preview + 超时 120s
 
 - `src/modules/market/utils/useAlertSSE.ts`：新增 `reasoningSteps`（按 `node` 聚合的 `ReasoningStep[]`）与 `preview`（`AlertDisplayReport | null`）两个响应式状态；`AlertSSEEvent` 新增 `node?` / `chunk?` 字段；`handleEvent` 新增 `reasoning`（按 node 聚合、文本累加并标 `streaming`）与 `preview` 分支；`done` 把仍在 `streaming` 的步骤收尾为 `done`+补 `endAt`，`error` 收尾为 `failed`+补 `endAt`；`start()` 重置 `reasoningSteps` 与 `preview`；超时 `60_000 → 120_000`（对齐后端 LLM 请求超时 600s）。复用 `@/shared/api/modules/agent` 的 `ReasoningStep` 类型，与 chat 侧结构一致。
