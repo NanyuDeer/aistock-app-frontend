@@ -1,6 +1,6 @@
 <template>
   <view v-if="steps.length > 0" class="alert-reasoning-panel">
-    <view class="arp-think-header" @tap="expanded = !expanded">
+    <view class="arp-think-header" @tap="toggleExpanded">
       <SvgIcon name="lightbulb-flash-line" size="28rpx" :color="primaryColor" />
       <text class="arp-title">AI 思考过程</text>
       <text class="arp-stats">{{ steps.length }} 步</text>
@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 import { markdownToHtml } from '@/shared/utils/markdown'
@@ -27,8 +27,24 @@ import type { ReasoningStep } from '@/shared/api/modules/agent'
 
 const props = defineProps<{ steps: ReasoningStep[] }>()
 
-// 有 streaming 步骤时默认展开（实时解说可见），否则折叠（与 chat 的 ReasoningPanel 同语义）
+// 有 streaming 步骤时默认展开（实时解说可见），否则折叠（与 chat 的 ReasoningPanel 同语义）。
+// 需在 props 后续变化时仍保持"出现 streaming 即自动展开"，同时尊重用户手动折叠。
 const expanded = ref(props.steps.some(s => s.status === 'streaming'))
+// 用户是否手动操作过展开/折叠：一旦手动操作，就不再被 streaming 自动改写（用户操作优先）
+let userToggled = false
+
+function toggleExpanded(): void {
+  userToggled = true
+  expanded.value = !expanded.value
+}
+
+// 真实链路里 steps 初值为 []，随 reasoning 帧流式增长——首个 streaming 步骤到达后自动展开
+watch(
+  () => props.steps.some(s => s.status === 'streaming'),
+  (hasStreaming) => {
+    if (!userToggled && hasStreaming) expanded.value = true
+  },
+)
 
 // SvgIcon 的 color prop 是运行时字符串，无法引用 SCSS 变量；用令牌实值映射
 const inkMute = '#8a96b0' // $ink-mute
@@ -61,8 +77,8 @@ function nodeLabel(node: string): string {
   padding-bottom: 8rpx;
   border-bottom: 1rpx solid $line-soft;
 }
-.arp-title { flex: 1; font-size: 24rpx; color: $ink-soft; }
-.arp-stats { font-size: 22rpx; color: $ink-mute; }
+.arp-title { flex: 1; font-size: $font-size-sm; color: $ink-soft; }
+.arp-stats { font-size: $font-size-xs; color: $ink-mute; }
 .arp-think-body { margin-top: 8rpx; }
 .arp-step { padding: 8rpx 0; border-top: 1rpx dashed $line-soft; }
 .arp-step:first-child { border-top: none; }
@@ -73,9 +89,9 @@ function nodeLabel(node: string): string {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
-.arp-step-node { font-size: 22rpx; color: $ink-soft; font-weight: 600; }
+.arp-step-node { font-size: $font-size-xs; color: $ink-soft; font-weight: 600; }
 :deep(.arp-step-text) {
-  font-size: 24rpx;
+  font-size: $font-size-sm;
   color: $ink-soft;
   line-height: 1.5;
   word-break: keep-all;
