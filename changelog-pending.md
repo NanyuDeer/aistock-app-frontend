@@ -1,10 +1,28 @@
 # 待提交修改记录
 
+## 2026-09-30 — Task 9：H5 端到端实测结果（控制器执行，真实浏览器 + 真实 LLM）
+
+页面：`http://localhost:5173/h5/modules/market/pages/alert-analysis?symbol=600519`（**注意 H5 为 history 路由 + `base:/h5/`，必须用路径形式，`#/...` 会落到首页**）。服务：agent-py `:8000`（新代码，`SCHEDULER_ENABLED=false` 等已禁用）、app-api `:3000`、H5 `:5173`。
+
+| 待验证项 | 结果 |
+|---|---|
+| ① 「AI 思考过程 · N 步」出现且流式中默认展开、圆点有动画 | ✅ T+20~29s 首次出现，**1 步 → 2 步**，`.arp-think-body` 未点击即展开（高度 590→674px）；T+38s 类名为 `arp-step streaming`，T+89.2s 变 `arp-step done` |
+| ② 解说文本**逐字出现**而非一次刷出 | ✅ 面板文字由约 **190 字增长到 781 字**；措辞含「已用约8秒」「此刻已推进约四十秒」等随时间推进才成立的表述 |
+| ③ 长等待期**持续有新解说**（心跳） | ✅ 汇聚研判段在 T+38s→T+84.1s 由 479 字增至 581 字，且出现多段不同措辞的推进说明 |
+| ④ 「一句话速览」**早于**详细分析出现 | ✅ T+29.5s 速览已显示「段永平晒单买入，主力净流入7.4亿推升茅台」，同一时刻页面**完全没有**「详细分析」区块 |
+| ⑤ 完成后详情正常渲染 | ✅ T+152.6s 变「完成」；详细分析（四板块）/相关股票/风险提示四区块齐全 |
+| ⑥ 面板位置 | ✅ 位于「分析进度」区块上方（面板 y≈203px vs 进度标题 y≈927px） |
+| 三步节点中文映射 | ✅ 「多维分析」「汇聚研判」 |
+
+- **后端帧序另经直连核实**（`curl -N` 经 app-api 反代，`symbol=000001`，截取 22s）：`tool_start(sub_agents)` → `reasoning(node=alert_scan)` 逐字流出 → `tool_end(sub_agents)` → `tool_start(master)` → **`preview`（速览三件套）** → `: ping` 心跳，与设计契约一致。
+- **未覆盖/不可确认**：截图工具本次连续超时（4 次 60s timeout），未取得截图；圆点闪烁仅由 `streaming→done` 类名变化推断；未验证「重新分析」按钮行为（按只读要求未点击）。
+- **顺带发现（非本特性引入）**：图谱发散子 Agent 调用 `GET http://localhost:3000/internal/graph/{概念}` 返回 **502**（`node_api_http_error`），该子 Agent 降级为错误文本、主流程不受影响；本次改动未触碰图谱工具与 app-api，属既有问题，待后续排查。
+
 ## 2026-09-30 — Task 9：AI 异动解读特性文档同步（思考面板 / useAlertSSE / 速览）
 
 - `src/modules/market/AGENTS.md`：`pages/alert-analysis.vue` 条目补充速览三件套（`summary`/`impact`/`keywords`）为 **preview 优先、result 兜底**、`details`/`stocks`/`risks` 仍只取 `result`、面板置于「分析进度」上方；`components/` 列表新增 `AlertReasoningPanel.vue`；`Hooks` 新增 `useAlertSSE.ts` 条目（`reasoningSteps`/`preview` + 超时 120s）。
 - `changelog-pending.md`：顺带修正 Task 7 条目 `AlertReasoningPanel.spec.ts` 例数（修复 commit 已扩到 7 例）——「5 例/5 pass」修正为「7 例/7 pass」（spec 实测 7 个 `it()`，含 props 后续新增 streaming 自动展开、用户手动折叠不被抢展开）。
-- **未验证事项如实标注**：H5 端到端浏览器实测由控制器单独执行（本任务为纯文档，不起服务、不跑浏览器），本文档不声称"已验证"。
+- **验证状态**：H5 端到端浏览器实测已由控制器单独执行并通过，结果见本文档顶部「Task 9：H5 端到端实测结果」条目（本条目仅记录文档改动，当时尚未实测）。
 - 关联后端：aistock-agent-py（Task 1–5）`GET /api/agent/briefing/alert` 已推送 `reasoning`/`preview` 帧且 `result.display_report` 为合并后 6 字段。
 
 ## 2026-09-30 — Task 8：`alert-analysis.vue` 接入思考面板与 preview 速览
