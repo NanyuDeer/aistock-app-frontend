@@ -90,4 +90,20 @@ describe('alert-analysis 速览数据源', () => {
     await flushPromises()
     expect(w.text()).toContain('最终结论')
   })
+
+  it('preview 与 result 同时存在时 preview 优先（P0 优先级锁定）', async () => {
+    // 合并前必修 E：若实现是 result ?? preview 这种写反的优先级，页面会显示 result
+    // 的 summary（'最终结论'），'速览结论' 不可能出现在页面任何位置 → 本断言必失败，
+    // 从而锁定 preview 优先这一 P0 行为。两个 summary 文案互不相同以保证可区分。
+    previewRef.value = { summary: '速览结论', impact: '利好', keywords: ['涨价'] }
+    resultRef.value = {
+      displayReport: { summary: '最终结论', impact: '利空', keywords: ['跌价'], details: '## 详情' },
+      podcastBrief: '', raw: '',
+    }
+    const w = mount(AlertAnalysis)
+    await flushPromises()
+    expect(w.text()).toContain('速览结论')
+    // 反向佐证：此时不应显示 result 的 summary（保证断言确由 preview 贡献而非两者都可）
+    expect(w.text()).not.toContain('最终结论')
+  })
 })
