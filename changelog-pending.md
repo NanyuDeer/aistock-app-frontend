@@ -1,5 +1,18 @@
 # 待提交修改记录
 
+## 2026-09-30 — Task 8：`alert-analysis.vue` 接入思考面板与 preview 速览
+
+- `src/modules/market/pages/alert-analysis.vue`：「AI 异动解读」详情页接入 Task 6/7 产物。
+  - 模板在「分析进度」区块**上方**插入 `<AlertReasoningPanel :steps="reasoningSteps" />`（等待期可见、流式解说，`reasoningSteps` 为空时不渲染）。
+  - `<script setup>`：import 追加 `AlertReasoningPanel`；解构 `useAlertSSE()` 追加 `reasoningSteps, preview`。
+  - 速览三件套数据源改为 **preview 优先、缓存路径回退 result**（`preview ?? result`）：`summary`、`displayKeywords`、`impactLabel`（impactBadgeType 改用 `impactLabel.value` 判定）。live 路径 preview 先到即先渲染；命中缓存路径 preview 为 null，自然回退 result。
+  - `details` / `stocks` / `risks` **仍只读 `result`**（职责不重叠，不与 preview 混淆）。
+  - 「一句话速览」卡片 `v-if="summary || loading"` 与 `v-else` 加载分支保持既有结构不变（preview 先到，loading 分支实际被即时填充覆盖）。
+  - **未改动** `useAlertSSE.ts` / `AlertReasoningPanel.vue`（Task 6/7 范围）。
+- `src/modules/market/pages/alert-analysis.spec.ts`：新增 vitest spec，2 例（preview 到达即渲染一句话速览 result 尚未到；result 到达时以 result 为准）→ 2 passed / 0 fail。mock `useAlertSSE` + `@dcloudio/uni-app` + `mp-html` + `SubPageCard2`/`SvgIcon`/`@/shared/components` barrel/podcast store（沿用仓库既有页面 spec 惯例，见文件内逐条注释）。
+- `vitest.config.ts`：`test.include` 白名单登记 `src/modules/market/pages/alert-analysis.spec.ts`。
+- **验证**：改前 `npx vitest run src/modules/market/pages/alert-analysis.spec.ts` 1 failed( RED，preview 用例找不到「速览结论」，因旧实现 summary 只读 result ) / 1 passed；改后 **2 passed**；`npx vue-tsc --noEmit` exit 0。
+
 ## 2026-09-30 — Task 7：新增 `AlertReasoningPanel.vue`
 
 - `src/modules/market/components/AlertReasoningPanel.vue`：新增「AI 思考过程」单区可折叠面板，仅渲染 `reasoning` 帧聚合的 `ReasoningStep[]`；`steps` 为空时不渲染（避免"0 步"空头）；有 `streaming` 步骤时默认展开，否则折叠，点击头部 `@tap` 切换；`streaming` 步骤圆点带 `@keyframes pulse` 呼吸动画；节点中文映射 `alert_scan→多维分析`、`alert_master→汇聚研判`，未知节点回退原名；`mp-html` + `markdownToHtml` 渲染文本；样式走 design token（`$bg-card/$shadow-card/$r-md/$s-3/$line-soft/$ink-soft/$ink-mute/$primary/$font-size-*`），`SvgIcon` 颜色用令牌实值 `#8a96b0`(`$ink-mute`) / `#0b5fff`(`$primary`)。**本任务不做页面接入**（Task 8 范围）。

@@ -54,6 +54,9 @@
           </view>
         </Card>
 
+        <!-- AI 思考过程（2026-09-30：等待期可见，流式解说） -->
+        <AlertReasoningPanel :steps="reasoningSteps" />
+
         <!-- 分析进度 -->
         <view v-if="toolSteps.length" class="analysis-tools-section">
           <text class="section-label">分析进度</text>
@@ -124,6 +127,7 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useAlertSSE } from '@/modules/market/utils/useAlertSSE'
+import AlertReasoningPanel from '@/modules/market/components/AlertReasoningPanel.vue'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
@@ -136,7 +140,7 @@ const cycle = ref('')
 
 const podcastStore = usePodcastStore()
 
-const { content, toolSteps, loading, error, done, result, start, stop, loadFromCache } = useAlertSSE()
+const { content, toolSteps, reasoningSteps, preview, loading, error, done, result, start, stop, loadFromCache } = useAlertSSE()
 
 const cycleLabel = computed(() => {
   switch (cycle.value) {
@@ -147,25 +151,22 @@ const cycleLabel = computed(() => {
   }
 })
 
-/** 结构化展示字段（来自 result 事件） */
-const summary = computed(() => result.value?.displayReport?.summary || '')
+/** 结构化展示字段：速览三件套来自 preview（先到），缓存路径回退 result（职责不重叠） */
+const summary = computed(() => preview.value?.summary || result.value?.displayReport?.summary || '')
 const details = computed(() => result.value?.displayReport?.details || '')
 const detailsHtml = computed(() => (details.value ? markdownToHtml(details.value) : ''))
 const stocks = computed(() => result.value?.displayReport?.stocks || [])
 const risks = computed(() => result.value?.displayReport?.risks || [])
-const displayKeywords = computed(() => result.value?.displayReport?.keywords || [])
+const displayKeywords = computed(() => preview.value?.keywords || result.value?.displayReport?.keywords || [])
 const podcastBrief = computed(() => result.value?.podcastBrief || '')
 const rawContent = computed(() => result.value?.raw || content.value)
 const rawHtml = computed(() => (rawContent.value ? markdownToHtml(rawContent.value) : ''))
 
-/** impact 映射为 Badge/Tag 类型 */
-const impactLabel = computed(() => {
-  const impact = result.value?.displayReport?.impact || ''
-  return impact
-})
+/** impact 映射为 Badge/Tag 类型（preview 先到，result 缓存兜底） */
+const impactLabel = computed(() => preview.value?.impact || result.value?.displayReport?.impact || '')
 
 const impactBadgeType = computed<'up' | 'down' | 'neutral' | ''>(() => {
-  const impact = result.value?.displayReport?.impact || ''
+  const impact = impactLabel.value
   if (impact.includes('利好')) return 'up'
   if (impact.includes('利空')) return 'down'
   if (impact.includes('中性')) return 'neutral'
