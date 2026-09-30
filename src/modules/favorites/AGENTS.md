@@ -150,3 +150,20 @@
 - 移除：Segmented[全部|预判|溯源]、buildInsightCards 聚合卡渲染、情报折叠、卡片级"预判区/溯源区/AI解读"按钮、intel 并行拉取（该数据仅个股情报块需要，个股情报块自身加载不动）。洞察块只拉 movements。
 - `isUnattributableMovement` 仍从 `insightCards.ts` 导入复用，`insightCards.ts`/`insight.vue`/`monitor.vue`/详情页不动。（**时点说明**：该结论为 2026-09-04 时点；`insight.vue` 已于 **2026-09-24** 做模板统一改造，现状见上文「自选股洞察列表页」章节。）
 - 个股情报块（intel module-card）保持阶段3改造不动（Segmented[全部|利好|利空] + ListCell 预览 + AI解读跳 alert-analysis）。
+
+## 低置信度归因不展示异动卡片（2026-09-30）
+
+- **产品口径**：归因置信度为 **`low` 的异动不展示卡片**；`medium`/`high` 照常展示。判定在展示层，机器枚举值来自 app-api 列表接口新增的 `confidence_level` 字段。
+- **改动（单点）**：`components/insightCards.ts` 的 `isUnattributableMovement` 在 `analysis_status === 'unavailable'` 判据之后、`!== 'completed'` 之前新增 `if (m.confidence_level === 'low') return true`；`TraceEventLike` 新增 `confidence_level?: 'low' | 'medium' | 'high' | null`。三处消费者（`pages/monitor.vue` / `pages/insight.vue` / `components/AlertContent.vue`）均复用该过滤函数，**逻辑单点改动即三处生效**，调用点未动。
+- **降级保护（关键）**：字段**缺失**（app-api 未升级）或 **`null`**（无归因结果）时一律**不隐藏**。理由：若写成"非 `high` 即隐藏"，在 app-api 未发布该字段时会**误杀全部卡片**（`undefined !== 'high'` 恒真）。因此判据只能是 `=== 'low'`，且两仓发布顺序不敏感。
+- **口径边界**：`low` 与既有"无有效结论"（`analysis_status === 'unavailable'` / `movement_view.status ∈ {insufficient, not_applicable}` / 主因命中 `INVALID_CAUSE_HINTS`）是**独立判据**——`low` 也会被单独隐藏，即便它有主因短语。
+- 测试：`components/insightCards.spec.ts` 新增 describe「isUnattributableMovement 低置信不展示口径」5 例（low→隐藏 / medium→展示 / high→展示 / 缺失→不隐藏 / null→不隐藏）→ 54 pass / 0 fail；`npx vue-tsc --noEmit` exit 0。
+- H5 实测（mxfff 账号）：监控页与洞察列表页各 **6 张**（改前 10 张），保留项均为 medium、隐藏项均为 low，无「归因中」、无 09-30 卡片，符合预期。
+
+## 宿迁联盛 2026-09-24 归因硬失败事故（2026-09-27 定位并处置，前端最终零改动）
+- **现象**：宿迁联盛 09-24 异动卡片恒显示「归因中」，且同日同股聚合（`dedupeDailyMovements` 取最新）把它选为"最新"，**遮盖了 09:55 那条已有的有效结论**。
+- **根因（跨仓契约不匹配）**：Node 侧 `buildTriggerEvent` 把涨停标记以 `isLimitUp` 写进冻结的 `stock_trace_snapshots.trigger_event_json`，而 agent-py 侧 `TriggerEvent` 是 `extra="forbid"` 且未声明该字段 → `StockTraceSnapshot.model_validate` 抛 `ValidationError`；该调用位于 worker 内层 try **之外**，被外层 `except Exception` 兜成**具误导性**的 `LLM_OR_DEPENDENCY_UNAVAILABLE` → 3 次**确定性秒失败**进 `dead_letter`、**从未产出 result**。修复落在 agent-py（`TriggerEvent` 声明 `is_limit_up`），**前端无代码改动**。
+- **本次临时措施（已回退）**：定位当天曾在 `insightCards.ts` 加过 `SUPPRESSED_EVENT_IDS` + `isVisibleMovement` 硬编码隐藏该日两条事件，供"修契约需部署周期"期间先不展示。**归因用修复后的代码代跑成功（result `completed`）后已整体回退**，代码回到 `.filter(m => !isUnattributableMovement(m))`。
+- **最终可见性**：恢复出的主因是「证据不足，异动原因未明」（快照缺 `article_context`，无新闻/公告支撑）→ 命中既有「无结论不展示」规则（`hasNoUsableCause` 的 `证据不足` 提示词）→ **该日两条都按正常规则不展示**，卡片保持隐藏，但原因从"归因卡住"变为"归因完成但无有效结论"。
+- **尚未闭环（agent-py 侧）**：`TriggerEvent` 的修复**仍未部署到生产**；且 app-api 侧 `buildTriggerEvent` 的 `isLimitUp` 是**无条件**写入（`Boolean(...)`），**先发 app-api 会把"1 条卡住"放大成"每条新事件归因全挂"** —— 发布顺序必须 agent-py 先、app-api 后。
+- **已知未处理（另一处独立缺陷）**：`dead_letter` 的 job 在 `listUserEvents` 的 `analysis_status` 派生里仍落 `processing`（该 CASE 只看 `stock_trace_results`，无 result 即与"仍在归因"不可区分）→ 任何"归因 job 永久失败"的事件都会长期显示「归因中」。属 app-api 侧口径问题，待后续按需处理。

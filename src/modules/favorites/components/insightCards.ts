@@ -18,6 +18,11 @@ export interface TraceEventLike {
   window_end_at?: string | null
   analysis_status: string
   primary_cause?: string | null
+  /**
+   * 归因置信度（low/medium/high）。低置信的归因不展示卡片（2026-09-30 口径）。
+   * 字段缺失（老 app-api 未升级）或 null（无归因结果）时**不隐藏**，避免误杀全部卡片。
+   */
+  confidence_level?: 'low' | 'medium' | 'high' | null
   /** 涨停文章命中标记（强时效来源） */
   is_limit_up?: boolean
   /** 归因视图（含 status/confidence/primaryCandidate 等），缺省表示历史数据无此字段 */
@@ -64,6 +69,9 @@ function hasNoUsableCause(cause?: string | null): boolean {
 
 export function isUnattributableMovement(m: TraceEventLike): boolean {
   if (m.analysis_status === 'unavailable') return true
+  // 低置信归因不展示（2026-09-30）：判据用机器枚举值；字段缺失/null 时**不隐藏**
+  // （app-api 未升级时列表不带该字段，若按"非 high 即隐藏"会把卡片全部误杀）
+  if (m.confidence_level === 'low') return true
   if (m.analysis_status !== 'completed') return false
   if (m.movement_view) {
     const status = m.movement_view.status

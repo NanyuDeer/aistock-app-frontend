@@ -19,6 +19,8 @@ export interface StockTraceEvent {
   analysis_status: 'pending' | 'processing' | 'completed' | 'unavailable'
   /** 简短主因短语（LLM 生成），列表/卡片展示用；无归因结果为 null */
   primary_cause?: string | null
+  /** 归因置信度（与 primary_cause 同源：effective artifact 的结果）；无归因结果为 null */
+  confidence_level?: 'low' | 'medium' | 'high' | null
   /** 涨停文章命中标记（强时效来源） */
   is_limit_up?: boolean
   read_at?: string | null

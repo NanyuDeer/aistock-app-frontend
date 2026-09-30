@@ -78,6 +78,54 @@ describe('isUnattributableMovement 无法归因判定', () => {
   })
 })
 
+// ---- 低置信不展示（2026-09-30）：低置信归因的异动卡片不展示 ----
+
+describe('isUnattributableMovement 低置信不展示口径', () => {
+  it('confidence_level = low → 不展示（即使主因文案可用）', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'A',
+      analysis_status: 'completed',
+      primary_cause: '板块联动走弱',
+      confidence_level: 'low',
+    }))).toBe(true)
+  })
+
+  it('confidence_level = medium → 展示', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'B',
+      analysis_status: 'completed',
+      primary_cause: '板块联动走弱',
+      confidence_level: 'medium',
+    }))).toBe(false)
+  })
+
+  it('confidence_level = high → 展示', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'C',
+      analysis_status: 'completed',
+      primary_cause: '板块联动走弱',
+      confidence_level: 'high',
+    }))).toBe(false)
+  })
+
+  it('confidence_level 缺失（app-api 未升级）→ 不隐藏（避免误杀全部卡片）', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'D',
+      analysis_status: 'completed',
+      primary_cause: '板块联动走弱',
+    }))).toBe(false)
+  })
+
+  it('confidence_level = null（无归因结果）→ 不隐藏', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'E',
+      analysis_status: 'completed',
+      primary_cause: '板块联动走弱',
+      confidence_level: null,
+    }))).toBe(false)
+  })
+})
+
 // ---- 同日同股聚合（2026-09-13）：同一交易日同股多条异动只保留最新一条 ----
 
 describe('dedupeDailyMovements 同日同股聚合', () => {
