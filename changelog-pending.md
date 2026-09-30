@@ -1,5 +1,13 @@
 # 待提交修改记录
 
+## 2026-09-30 — Task 6：`useAlertSSE` 支持 reasoning / preview + 超时 120s
+
+- `src/modules/market/utils/useAlertSSE.ts`：新增 `reasoningSteps`（按 `node` 聚合的 `ReasoningStep[]`）与 `preview`（`AlertDisplayReport | null`）两个响应式状态；`AlertSSEEvent` 新增 `node?` / `chunk?` 字段；`handleEvent` 新增 `reasoning`（按 node 聚合、文本累加并标 `streaming`）与 `preview` 分支；`done` 把仍在 `streaming` 的步骤收尾为 `done`+补 `endAt`，`error` 收尾为 `failed`+补 `endAt`；`start()` 重置 `reasoningSteps` 与 `preview`；超时 `60_000 → 120_000`（对齐后端 LLM 请求超时 600s）。复用 `@/shared/api/modules/agent` 的 `ReasoningStep` 类型，与 chat 侧结构一致。
+- `src/modules/market/utils/useAlertSSE.spec.ts`：新增 vitest spec，6 例（reasoning 按 node 聚合文本累加 / 两个阶段两个步骤 / preview 写入 / done 收尾 done+endAt / error 收尾 failed / start 重置）→ 6 pass / 0 fail。
+- `vitest.config.ts`：`test.include` 白名单登记 `src/modules/market/utils/useAlertSSE.spec.ts`。
+- **验证**：`npx vitest run src/modules/market/utils/useAlertSSE.spec.ts` 6 passed；`npx tsc --noEmit` exit 0。
+- **依赖**：后端 aistock-agent-py（Task 1–5）`GET /api/agent/briefing/alert` 已推送 `reasoning` / `preview` 帧且 `result.display_report` 为合并后 6 字段；本任务不依赖 `raw` 内容语义。
+
 ## 2026-09-30 — 低置信度归因不展示异动卡片
 
 - `src/modules/favorites/components/insightCards.ts`：`TraceEventLike` 新增可选字段 `confidence_level?: 'low' | 'medium' | 'high' | null`；`isUnattributableMovement` 在 `analysis_status === 'unavailable'` 判据之后、`!== 'completed'` 之前新增 `if (m.confidence_level === 'low') return true`。**降级保护**：字段缺失（老 app-api 未升级）或 `null`（无归因结果）时**不隐藏** —— 若按"非 high 即隐藏"会把卡片全部误杀。
