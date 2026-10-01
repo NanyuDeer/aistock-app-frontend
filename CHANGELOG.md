@@ -2,6 +2,39 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [xusiyun] 2026-10-02 — 重大事件时间线历史段换源（事件传导 ≥4 星非纯行情 + GI 加粗 + 行业红涨绿跌）
+
+**开发者**: xusiyun
+
+### 新增
+
+- `modules/chat/event/constants.ts`：纯行情判据 `MARKET_PHENOMENON_PATTERN` / `DRIVING_CAUSE_PATTERN` + `isPureMarketEvent(title)`——**现象词命中且原因词全不命中**才判纯行情（原因词豁免防误杀「广汽拟收购一汽丰田50%股权 复牌一字涨停」；对齐后端 `is_driving_event` 口径，仅看标题）。
+- `modules/chat/event/types.ts`：`TimelineRow` 统一行视图模型（两源合并后的展示行）。
+- `modules/chat/event/api/eventService.ts`：`buildTimelineHistoryRows(items, today)`（纯函数：≥4 星 + 非纯行情 + date ≤ 今天）、`getTimelineHistoryRows()`（翻页拉 `/agent/event/list`，判停=整页出窗 / `hasMore=false` / 5 页上限，失败降级返回 `[]`）、`getEntityRows()`（实体源行）。
+- `modules/chat/event/api/eventService.spec.ts`：21 用例（准入/映射/纯行情豁免/判停含 min-max 判别性用例/异常降级）；`vitest.config.ts` 白名单注册（不注册会被静默跳过）。
+
+### 改进
+
+- `modules/chat/pages/event/timeline.vue` 双源合并：**历史段**（date ≤ 今天）= 事件传导列表「≥4 星且非纯行情」，按传导时间 `publishTime` 前 10 位分组；**未来段**（date > 今天）= 实体接口 `/api/agent/event/timeline`（industry 取 `impactSectors[0]`，无方向 → 灰）。
+- 历史行：GI 事件（`globalImportanceRank` 非空）标题加粗（700）；行业胶囊按 `chain_summary[0].direction` 着色（bullish 红 `--ev-negative` / bearish 绿 `--ev-positive` / neutral 与无方向灰），**三种均无底色**；**不渲染摘要行**（去掉「XX行业受益，短期景气改善」这类 conclusion）。
+- 点击：历史行恒跳事件详情（此类事件必有传导报告，不再 404）；未来行就地展开（原行为）。底部计数改用实际展示条数（`items.length`）。
+
+### 文档
+
+- `AGENTS.md`（模块表 + API 表）、`modules/chat/AGENTS.md`：同步时间线双源口径与渲染规则。
+
+### 测试
+
+- `vue-tsc --noEmit` 退出 0；`vitest run eventService.spec.ts` **21 passed**；判停分支经**变异验证**（改回旧 min 规则该用例即失败）。
+- 全量 `pnpm test` 另有 4 个**既有基线失败**（AnalyticsCardLayout / AlertContent / insight-detail / CardRenderer），与本次无关（不引用本次文件）。
+
+### 说明
+
+- 零后端改动；未同步 Web 端（Web 无时间轴页）。
+- 已知限制：传导报告 **7 天 TTL**，历史段实际可回溯约 7 天；未来事件无传导 chain、无方向数据，故未来行行业标签恒灰。
+
+---
+
 ## [master] 2026-09-26 — APP 前端接入密码登录 / 注册 + 首次设置密码（含防刷松绑）
 
 **开发者**: Aria

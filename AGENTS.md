@@ -30,7 +30,7 @@ AiStock App 前端，基于 uni-app + Vue 3 + TypeScript，一套代码覆盖 Ap
 |------|------|---------|-----------------|
 | 首页 | `modules/home` | 早点听、市场概览、长线风口、异动捕手 | [home/AGENTS.md](./src/modules/home/AGENTS.md) |
 | 自选股 | `modules/favorites` | 自选股列表、特别提醒、股票详情、搜索、异动监控 | [favorites/AGENTS.md](./src/modules/favorites/AGENTS.md) |
-| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示、会话管理（P9 多会话）、深度分析报告详情页（批次 2，2026-08-13：`pages/chat-report-detail.vue`，对话内深度卡跳转查看完整报告）、**追问面板（回答后底部建议追问 + 输入框，questions 结构化下发，2026-08-26）**、**重大事件时间线（`pages/event/timeline.vue`：未来/历史双 tab，按接口 `date` 上海时区分组，2026-09-24）** | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
+| AI 对话 | `modules/chat` | 聊天页、Skill 按钮、流式对话、分析报告展示、会话管理（P9 多会话）、深度分析报告详情页（批次 2，2026-08-13：`pages/chat-report-detail.vue`，对话内深度卡跳转查看完整报告）、**追问面板（回答后底部建议追问 + 输入框，questions 结构化下发，2026-08-26）**、**重大事件时间线（`pages/event/timeline.vue`：单一时间轴不分 tab；**历史段**=事件传导列表「≥4 星且非纯行情」按传导时间 `publishTime` 分组、**未来段**=实体接口 `/api/agent/event/timeline`（date > 今天），双源合并，2026-10-02）** | [chat/AGENTS.md](./src/modules/chat/AGENTS.md) |
 | 行情 | `modules/market` | 龙头股、重磅消息、板块标签、异动捕手、长线风口 | [market/AGENTS.md](./src/modules/market/AGENTS.md) |
 | 业绩分析 | `modules/analytics` | 业绩预测、业绩报告列表、财报详情 | — |
 | 用户 | `modules/user` | 个人中心、登录设置、更新日志 | [user/AGENTS.md](./src/modules/user/AGENTS.md) |
@@ -314,7 +314,7 @@ import Card from '@/shared/components/Card.vue'
 | `auth.ts` | 认证（登录、用户信息）。2026-09-26 新增密码登录/注册：`passwordLogin(account, password)` → `POST /api/auth/password/login`（仅**账号维度**节流，同账号 15 分钟内失败达 10 次才 429，仅提示不降级）、`register(account, password, code)` → `POST /api/auth/register`（注册即登录；存量未设密码账号可**补设密码**；已设密码返回 409）。`UserInfo` 含 `hasPassword`（`/users/me` 权威字段，`fetchUserInfo()` 同步） | `/api/auth/*` |
 | `briefing.ts` | 早晚报结构化（BriefingItem/BriefingSummary 类型 + 降级解析适配器） | `/api/briefing/*` |
 | `event.ts` | 事件传导链 | `/api/event-chain/*` |
-| `modules/chat/event/api/eventApi.ts`（模块内，未提升至 shared 层） | 事件传导模块 API 封装：`getEventList`/`getEventDetail` 与 **`getEventTimeline(params)` → `GET /api/agent/event/timeline`（重大事件时间线：query 全部可选 `dateFrom`/`dateTo`/`status`/`order`/`page`/`pageSize`；类型 `EventTimelineQuery`/`EventTimelineResponse`/`EventTimelineItem`，`EventTimelineItem.date` 为后端算好的上海时区 `YYYY-MM-DD` 分组键）** | `/api/agent/event/timeline` |
+| `modules/chat/event/api/eventApi.ts`（模块内，未提升至 shared 层） | 事件传导模块 API 封装：`getEventList`/`getEventDetail` 与 **`getEventTimeline(params)` → `GET /api/agent/event/timeline`（重大事件时间线：query 全部可选 `dateFrom`/`dateTo`/`status`/`order`/`page`/`pageSize`；类型 `EventTimelineQuery`/`EventTimelineResponse`/`EventTimelineItem`，`EventTimelineItem.date` 为后端算好的上海时区 `YYYY-MM-DD` 分组键）**；**时间线历史段**另经模块内 `eventService.getTimelineHistoryRows()` 读 `/agent/event/list`（≥4 星 + 非纯行情，前端词表判据，零后端改动，2026-10-02） | `/api/agent/event/timeline` |
 | `news.ts` | 新闻资讯 | `/api/news/*` |
 | `portfolio.ts` | 持仓管理 | `/api/portfolio/*` |
 | `prediction.ts` | 历史预测跟踪（B2.1：列表+统计/详情） | `/api/predictions`、`/api/predictions/:id` |
