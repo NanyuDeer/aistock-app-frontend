@@ -8,9 +8,13 @@ export default defineConfig({
       template: {
         // uni-app uses custom elements like <view>, <text>, <scroll-view> etc.
         // Treat them as custom elements in tests rather than unknown components.
+        // 注意：仅小写 'switch' 是 uni-app 原生组件；大写 <Switch> 是组件库 Switch.vue
+        // （FloatingPodcast.vue 有同款说明），不能进白名单，否则测试里会被当原生标签、
+        // 与生产环境的组件解析不一致（组件不渲染、@change 收不到布尔值）。
+        // 'block' 是 uni-app 内置虚拟容器（非组件），进白名单可消除 "Failed to resolve component: block" 噪声。
         compilerOptions: {
           isCustomElement: (tag: string) =>
-            ['view', 'text', 'image', 'scroll-view', 'swiper', 'swiper-item', 'icon', 'switch', 'Switch'].includes(tag),
+            ['view', 'text', 'image', 'scroll-view', 'swiper', 'swiper-item', 'icon', 'switch', 'block'].includes(tag),
         },
       },
     }),
@@ -35,6 +39,7 @@ export default defineConfig({
     // 避免 node:test 侧出现「Vitest 被 CommonJS require」的同因假失败。
     include: [
       'tests/**/*.test.ts',
+      'src/modules/favorites/utils/useInsightReportSSE.spec.ts',
       'src/shared/utils/useChatStream.spec.ts',
       'src/shared/utils/useChatStream.http.spec.ts',
       'src/shared/utils/chatSuggestions.spec.ts',
@@ -64,9 +69,12 @@ export default defineConfig({
       'src/shared/utils/middayReport.spec.ts',
       'src/modules/favorites/components/InsightDetailLayout.spec.ts',
       'src/modules/favorites/pages/monitor.spec.ts',
+      'src/modules/favorites/pages/insight.mount.spec.ts',
       'src/modules/favorites/pages/insight-detail.spec.ts',
+      'src/modules/favorites/pages/insight-detail-move.spec.ts',
       'src/modules/favorites/components/AlertContent.spec.ts',
       'src/modules/favorites/components/insightCards.spec.ts',
+      'src/modules/favorites/components/InsightReportBody.spec.ts',
       'src/modules/favorites/components/MiniKLine.spec.ts',
       'src/shared/components/ConfirmSheet.spec.ts',
       'src/pages-sub-app/chat/index.scroll.spec.ts',

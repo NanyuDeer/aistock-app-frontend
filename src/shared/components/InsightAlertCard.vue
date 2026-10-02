@@ -44,6 +44,10 @@
         </view>
         <text class="insight-alert-card__time">{{ time }}</text>
       </view>
+
+      <view v-if="reportable" class="insight-alert-card__report" @tap.stop="emit('report')">
+        <text class="insight-alert-card__report-text">洞察报告</text>
+      </view>
     </view>
   </view>
 </template>
@@ -61,15 +65,20 @@ interface Props {
   confidence?: 'high' | 'medium' | 'low' | 'unconfirmed'
   compact?: boolean
   clickable?: boolean
+  reportable?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   confidence: undefined,
   compact: false,
   clickable: false,
+  reportable: false,
 })
 
-const emit = defineEmits<{ click: [event: Event] }>()
+const emit = defineEmits<{
+  (e: 'click', event: Event): void
+  (e: 'report'): void
+}>()
 
 const confidenceLabel = computed(() => {
   switch (props.confidence) {
@@ -277,5 +286,21 @@ function onClick(event: Event) {
   .insight-alert-card__footer {
     margin-top: 8rpx;
   }
+}
+
+.insight-alert-card__report {
+  margin-top: 12rpx;
+  padding: 10rpx 0;
+  border-radius: 12rpx;
+  background: rgba($primary, 0.1);
+  text-align: center;
+  /* #ifdef H5 */
+  cursor: pointer;
+  /* #endif */
+}
+.insight-alert-card__report-text {
+  font-size: 24rpx;
+  color: $primary;
+  font-weight: 500;
 }
 </style>

@@ -56,18 +56,6 @@
         </view>
       </view>
 
-      <!-- ===== 洞见卡：主因结论作一句话 + 主链作溯源 + forecast summary 作预判 ===== -->
-      <InsightCard
-        v-if="insightData.content"
-        type="event"
-        :title="insightData.content"
-        :trace="insightData.trace"
-        :forecast="insightData.forecast"
-        :time="insightData.time"
-        theme="light"
-        class="insight-in-page"
-      />
-
       <!-- ===== 归因状态 ===== -->
       <view
         v-if="analysis && analysis.processing_status === 'processing'"
@@ -85,120 +73,39 @@
         <text class="status-text">{{ analysis.unavailable?.message ?? '归因暂不可用' }}</text>
       </view>
 
-      <!-- ===== 归因结果（completed） ===== -->
-      <template v-if="artifact && analysis?.processing_status === 'completed'">
-        <!-- 主因：蓝色结论横幅（含置信度）+ 聚焦因果链 + 元信息 -->
-        <view v-if="primaryCause" class="section main-cause">
-          <!-- 标题行：主因 + 右侧徽标组（归类标签 + 置信度 + 已确认） -->
-          <view class="main-title-row">
-            <text class="section-title main-title">支撑性主因</text>
-            <view class="title-right">
-              <text class="cat-badge">{{ layerText(primaryCause.layer) }}</text>
-              <text v-if="confidence" class="badge is-gold">{{ confidenceText(confidence.level) }}</text>
-              <text v-if="isConfirmed" class="badge is-confirmed">已确认</text>
-            </view>
-          </view>
-
-          <view class="conclusion-banner">
-            <text class="banner-label">归因结论</text>
-            <text class="banner-text">{{ primaryCause.verdict }}</text>
-          </view>
-
-          <!-- 聚焦因果链：主链节点自顶向下，起点/终点高亮 -->
-          <view v-for="ch in primaryChains" :key="ch.chainId" class="focus-chain">
-            <view v-for="(n, i) in ch.nodes" :key="n.nodeId" class="fc-item">
-              <view class="fc-rail">
-                <view :class="['fc-dot', { 'is-pri': i <= 1 || i === ch.nodes.length - 1 }]" />
-                <view v-if="i < ch.nodes.length - 1" class="fc-line" />
-              </view>
-              <view class="fc-body">
-                <text class="fc-label" :class="{ 'is-pri': i <= 1 || i === ch.nodes.length - 1 }">{{ stageText(n.stage) }}</text>
-                <text class="fc-text">{{ n.claim }}</text>
-              </view>
-            </view>
-          </view>
-
-          <view class="main-meta">
-            <text :class="['main-tag', `is-${primaryCause.status}`]">{{ layerText(primaryCause.layer) }} · {{ statusText(primaryCause.status) }}</text>
-            <text class="main-ev">{{ evidenceCountLabel }}</text>
+      <!-- ===== 一句话主因（精简版详情；完整归因见下方流式报告） ===== -->
+      <view v-if="oneLineCause" class="section main-cause-simple">
+        <view class="main-title-row">
+          <text class="section-title">异动原因</text>
+          <view class="title-right">
+            <text v-if="confidenceLevel === 'high'" class="badge is-gold">可信度高</text>
           </view>
         </view>
-
-        <!-- 候选归因：卡片列表（主因外的支撑性/偏弱候选） -->
-        <view v-if="candidateCards.length" class="section">
-          <text class="section-title">候选归因</text>
-          <view class="cand-list">
-            <view v-for="c in candidateCards" :key="c.layer" class="cand-card">
-              <view class="cand-header">
-                <text class="cand-label">{{ layerText(c.layer) }}</text>
-                <text :class="['cand-tag', `is-${c.status}`]">{{ statusText(c.status) }}</text>
-              </view>
-              <text v-if="c.verdict" class="cand-text">{{ c.verdict }}</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- 未解问题：待验证 -->
-        <view v-if="unresolvedQuestions.length" class="section question-card">
-          <text class="section-title">未解问题</text>
-          <view v-for="q in unresolvedQuestions" :key="q" class="risk-item">
-            <text class="risk-dot">·</text>
-            <text class="risk-text">{{ q }}</text>
-          </view>
-        </view>
-
-        <!-- 证据清单（默认收起，点击标题展开） -->
-        <view v-if="evidenceList.length" class="section">
-          <view class="section-title row" @tap="eviOpen = !eviOpen">
-            <text>证据清单（{{ evidenceList.length }}）</text>
-            <view :class="['evi-arrow', { 'is-open': eviOpen }]"></view>
-          </view>
-          <view v-show="eviOpen" class="evi-body">
-            <view
-              v-for="(evi, i) in evidenceList"
-              :key="evi.source_id || i"
-              class="evidence-item"
-            >
-              <view class="evi-head">
-                <text class="evi-title">{{ evi.title }}</text>
-                <text :class="['evi-level', 'level-' + evi.source_level]">{{ evi.source_level }}</text>
-              </view>
-              <text class="evi-excerpt">{{ evidenceExcerpt(evi) }}</text>
-              <text class="evi-meta">{{ kindText(evi.kind) }} · {{ evi.occurred_at ? fmtTime(evi.occurred_at) : '' }}</text>
-            </view>
-          </view>
-        </view>
-      </template>
-
-      <!-- ===== 预判区（独立于归因状态，forecastSlot 存在即渲染）：完整 conditions 列表 ===== -->
-      <view v-if="forecastSlot" class="section forecast-area">
-        <text class="section-title">预判条件</text>
-        <view v-for="(cond, i) in forecastSlot.conditions" :key="i" class="forecast-item">
-          <view class="forecast-header">
-            <text class="forecast-index">条件 {{ i + 1 }}</text>
-          </view>
-          <view class="forecast-body">
-            <view class="forecast-row">
-              <text class="forecast-label">条件</text>
-              <text class="forecast-value">{{ cond.condition }}</text>
-            </view>
-            <view class="forecast-row">
-              <text class="forecast-label">预判</text>
-              <text class="forecast-value">{{ cond.scenario }}</text>
-            </view>
-            <view v-if="cond.anchor" class="forecast-row">
-              <text class="forecast-label">锚点</text>
-              <text class="forecast-value">
-                {{ [cond.anchor.metric, cond.anchor.threshold, cond.anchor.direction].filter(Boolean).join(' · ') }}
-              </text>
-            </view>
-          </view>
-        </view>
-        <!-- 预判 slot 标识：展示当前预判来源（close 收盘 / midday 午盘） -->
-        <text class="forecast-slot-label">
-          {{ slotLabel }}
-        </text>
+        <text class="one-line-text">{{ oneLineCause }}</text>
       </view>
+
+      <!-- ===== 完整报告（流式输出到按钮下方；仅 completed 且有有效归因时可用） ===== -->
+      <view v-if="reportAvailable" class="report-actions">
+        <view
+          :class="['report-btn', { 'is-busy': reportLoading }]"
+          @tap="onToggleReport"
+        >
+          <text class="report-btn-text">{{ reportButtonText }}</text>
+        </view>
+
+        <!-- 报告正文：按 block 类型渲染（六阶段因果链为纵向时间轴），见 InsightReportBody -->
+        <InsightReportBody
+          v-if="reportHeader || reportSections.length"
+          :header="reportHeader"
+          :sections="reportSections"
+          :loading="reportLoading"
+        />
+
+        <text v-if="reportError" class="report-error">{{ reportError }}</text>
+      </view>
+      <text v-else-if="analysis?.processing_status === 'completed'" class="report-hint">
+        本次归因未产出完整报告
+      </text>
 
       <!-- 归因完成但结果不可用 -->
       <view
@@ -215,12 +122,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
-import { stockTraceApi, type StockTraceEvent, type StockTraceAnalysisResponse, type TraceChain, type TraceEvidence } from '@/shared/api/modules/stockTrace'
+import { onLoad, onUnload } from '@dcloudio/uni-app'
+import { stockTraceApi, type StockTraceEvent, type StockTraceAnalysisResponse } from '@/shared/api/modules/stockTrace'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import InsightCard from '@/shared/components/InsightCard.vue'
-import type { ForecastSlotPayload } from '@/modules/favorites/components/insightCards'
-import { parseForecastSlot } from '@/modules/favorites/components/insightCards'
+import InsightReportBody from '@/modules/favorites/components/InsightReportBody.vue'
+import { useInsightReportSSE } from '@/modules/favorites/utils/useInsightReportSSE'
 
 const detail = ref<StockTraceEvent | null>(null)
 const analysis = ref<StockTraceAnalysisResponse | null>(null)
@@ -228,8 +134,22 @@ const loading = ref(true)
 /** 加载失败原因（区分 401 未登录 / 404 非自选或不存在），用于替代误导性的"事件不存在"提示 */
 const loadError = ref('')
 
-/** 证据清单是否展开（默认收起） */
-const eviOpen = ref(false)
+/** 完整报告流式读取（点按钮后在按钮下方逐章节渲染，见 useInsightReportSSE） */
+const {
+  header: reportHeader,
+  sections: reportSections,
+  loading: reportLoading,
+  done: reportDone,
+  error: reportError,
+  start: startReport,
+  stop: stopReport,
+} = useInsightReportSSE()
+
+const reportButtonText = computed<string>(() => {
+  if (reportLoading.value) return '生成中…（点击停止）'
+  if (reportDone.value) return '重新生成完整报告'
+  return '生成完整洞察报告'
+})
 
 /** 涨跌方向：up → 红涨，down → 绿跌（与涨停雷达详情页一致） */
 const trendClass = computed(() => (detail.value?.direction === 'up' ? 'is-up' : 'is-down'))
@@ -257,151 +177,43 @@ function fmtAmount(price?: number, pct?: number): string {
 
 const artifact = computed(() => analysis.value?.artifact)
 
-/**
- * 候选归因（五层）：取 artifactJson.candidates，只保留支撑性（supported）与偏弱（weak）。
- * 证据不足（insufficient）/反向排除（rejected）的维度不展示（2026-08-25 决策）；主因候选排到最前。
- */
-const allCandidates = computed(() => {
-  const art = artifact.value
-  const candidates = art?.artifactJson.candidates ?? []
-  if (!candidates.length) return []
-  const primaryChainId = art?.artifactJson.primary_chain_id
-  const primaryCandidateId = art?.artifactJson.chains?.find((ch) => ch.chainId === primaryChainId)?.candidateId
-  const primary = candidates.find((c) => c.candidateId === primaryCandidateId)
-  const rest = candidates.filter((c) => c.candidateId !== primaryCandidateId)
-  return [primary, ...rest]
-    .filter((c): c is NonNullable<typeof c> => !!c)
-    .filter((c) => c.status === 'supported' || c.status === 'weak')
+/** 一句话主因：优先 artifact 主因候选 verdict → 详情 primary_cause；无结论返回空串 */
+const oneLineCause = computed<string>(() => {
+  const verdict = artifact.value?.artifactJson.candidates
+    ?.find((c) => c.candidateId === artifact.value?.artifactJson.chains
+      ?.find((ch) => ch.chainId === artifact.value?.artifactJson.primary_chain_id)?.candidateId)?.verdict
+  return String(verdict || detail.value?.primary_cause || '').trim()
 })
 
-/** 主因链（备选链信息由归因候选全量覆盖，统一不展示） */
-const primaryChains = computed<TraceChain[]>(() => {
-  return artifact.value?.artifactJson.chains?.filter((ch) => ch.role === 'primary') ?? []
-})
-
-/** 证据清单（过滤系统生成的触发事实/行情事实条目，不展示） */
-const evidenceList = computed<TraceEvidence[]>(() => {
-  return (artifact.value?.artifactJson.evidence_index ?? []).filter(
-    (evi) => evi.kind !== 'trigger_fact' && evi.kind !== 'quote_fact'
-  )
-})
-
-/** 归因置信度：取 artifactJson.confidence，缺失时按分数回退等级 */
-const confidence = computed<{ score: number; level: string } | null>(() => {
+/** 置信度等级（high/medium/low）；仅 high 时展示「可信度高」徽标，medium/low 不展示 */
+const confidenceLevel = computed<string>(() => {
   const conf = artifact.value?.artifactJson.confidence
-  if (!conf || conf.score == null) return null
-  const level = conf.level ?? (conf.score >= 0.7 ? 'high' : conf.score >= 0.5 ? 'medium' : 'low')
-  return { score: conf.score, level }
+  if (!conf) return ''
+  const level = conf.level
+  const score = conf.score
+  if (level == null && score == null) return ''
+  return level ?? (score! >= 0.7 ? 'high' : score! >= 0.5 ? 'medium' : 'low')
 })
 
-/** 主因聚焦层：归因候选首项（allCandidates 已把主因候选排到最前） */
-const primaryCause = computed(() => allCandidates.value[0] ?? null)
+/** 报告可用：归因已完成且存在有效 artifact */
+const reportAvailable = computed(() => analysis.value?.processing_status === 'completed' && !!artifact.value)
 
-/** 候选归因列表：除主因外的支撑性/偏弱候选卡片 */
-const candidateCards = computed(() => allCandidates.value.slice(1))
-
-/** 待验证问题（收尾区块；建议追踪已按 2026-08-25 决策移除） */
-const unresolvedQuestions = computed<string[]>(() => artifact.value?.artifactJson.unresolved_questions ?? [])
-
-/**
- * 预判 slot（close??midday）：从详情事件 forecast 字段解析为结构化 payload，
- * 供洞见卡预判 summary 与预判区 conditions 列表渲染。
- * 复用 insightCards 导出的 parseForecastSlot。
- * 无 forecast 或解析失败返回 null，对应区块不渲染。
- */
-const forecastSlot = computed<ForecastSlotPayload | null>(() => {
-  return parseForecastSlot(detail.value?.forecast)
-})
-
-/** 当前展示的预判 slot 名（close 收盘 / midday 午盘），用于预判区底部标识 */
-const slotLabel = computed(() => {
-  const slot = forecastSlot.value?.slot
-  if (slot === 'close') return '基于收盘预判'
-  if (slot === 'midday') return '基于午盘预判'
-  return ''
-})
-
-/**
- * 洞见卡数据：主因结论作一句话标题、主链声明作「溯源」。
- * 预判 summary 取真实 forecast slot 的 summary（close??midday），不再恒空兜底。
- * InsightCard 对空 forecast 不渲染该行，有值则展示一行金底横幅。
- */
-const insightData = computed(() => {
-  const cause = primaryCause.value
-  if (!cause?.verdict) return { content: '', trace: '', forecast: '', time: '' }
-  const chain = primaryChains.value[0]
-  const trace = chain?.nodes?.map(n => n.claim).filter(Boolean).join(' → ') || ''
-  return {
-    content: cause.verdict,
-    trace,
-    forecast: forecastSlot.value?.summary ?? '',
-    time: detail.value?.triggered_at ? fmtTime(detail.value.triggered_at).slice(5) : '',
+/** 按钮点击：生成中→停止；否则开始/重新生成 */
+async function onToggleReport(): Promise<void> {
+  if (reportLoading.value) { stopReport(); return }
+  const eventId = detail.value?.event_id
+  if (!eventId) {
+    uni.showToast({ title: '该异动暂无完整归因', icon: 'none' })
+    return
   }
-})
+  await startReport(eventId)
+}
 
-/** 主因卡头部右侧：证据条数 + 归因状态 */
-const evidenceCountLabel = computed(() => {
-  const acc = artifact.value?.artifactJson.attribution_status
-  const count = allCandidates.value?.[0]?.supportingEvidenceIds?.length ?? evidenceList.value.length
-  return `证据 ${count} 条 ${acc === 'confirmed' ? '· 已确认' : ''}`
-})
-
-/** 归因是否已确认：用于主因卡片 hero-meta 徽标展示 */
-const isConfirmed = computed(() => artifact.value?.artifactJson.attribution_status === 'confirmed')
-
-const layerText = (l?: string): string =>
-  ({ company: '公司', sector: '板块', market: '市场', capital: '资金', technical: '技术' }[l ?? ''] ?? l ?? '')
-
-const statusText = (s?: string): string =>
-  ({ supported: '支撑', weak: '偏弱', rejected: '排除', insufficient: '证据不足' }[s ?? ''] ?? s ?? '')
-
-const confidenceText = (l?: string): string =>
-  ({ high: '高置信', medium: '中置信', low: '低置信' }[l ?? ''] ?? l ?? '')
-
-const stageText = (s?: string): string =>
-  ({
-    structural_root: '结构根源',
-    trigger: '触发',
-    transmission: '传导',
-    exposure: '暴露',
-    repricing: '重新定价',
-    observable_result: '可见结果',
-  }[s ?? ''] ?? s ?? '')
+// 离开页面即断开流，避免后台继续拉取
+onUnload(() => { stopReport() })
 
 const severityText = (s?: string): string =>
   ({ critical: '严重', high: '重要', medium: '中等' }[s ?? ''] ?? s ?? '')
-
-const kindText = (k?: string): string =>
-  ({
-    trigger_fact: '触发事实',
-    quote_fact: '行情事实',
-    sector_fact: '板块事实',
-    market_fact: '市场事实',
-    announcement: '公告',
-    news: '新闻',
-    capital_fact: '资金事实',
-    technical_fact: '技术事实',
-  }[k ?? ''] ?? k ?? '')
-
-/**
- * 系统生成的证据摘要（market_fact / sector_fact）由 Node 采集器写入英文固定模板
- * （StockTraceSnapshotService），此处转中文展示；非模板条目原样返回。
- * trigger_fact / quote_fact 条目已在 evidenceList 中过滤，不在此处理。
- */
-function evidenceExcerpt(evi: TraceEvidence): string {
-  const text = evi.content_excerpt
-  if (evi.kind === 'market_fact') {
-    // 模板：上证指数 change -2.40%.
-    const m = String(text).match(/change\s+([-+]?[\d.]+%)\.?\s*$/)
-    if (m) return `涨跌幅 ${m[1]}`
-  }
-  if (evi.kind === 'sector_fact') {
-    // 模板：Board latest daily change -1.53% on 20260819.
-    const m = String(text).match(/Board latest daily change\s+([-+]?[\d.]+%)\s+on\s+(\d{4})(\d{2})(\d{2})\.?\s*$/)
-    if (m) return `板块最新日涨跌幅 ${m[1]}（${m[3]}-${m[4]}）`
-  }
-  return evi.content_excerpt
-}
 
 const fmtTime = (t: string): string => {
   if (!t) return '--'
@@ -426,6 +238,8 @@ onLoad(async (query) => {
   try {
     detail.value = await stockTraceApi.get(eventId)
     analysis.value = await stockTraceApi.getAnalysis(eventId)
+    // 从自选股异动页卡片「报告 ›」跳入时自动开始生成（?autostart=1）
+    if (query?.autostart === '1' && reportAvailable.value) void onToggleReport()
   } catch (err) {
     detail.value = null
     analysis.value = null
@@ -450,10 +264,6 @@ onLoad(async (query) => {
 .page-insight-detail {
   padding: $s-3;
   background: $bg-page;
-}
-
-.insight-in-page {
-  margin-bottom: $s-3;
 }
 
 .state-wrap {
@@ -482,7 +292,7 @@ onLoad(async (query) => {
   color: $ink;
 }
 
-/* ===== 主因标题行：主因标题 + 右侧徽标组（归类标签 + 置信度 + 已确认） ===== */
+/* ===== 主因标题行：主因标题 + 右侧徽标（仅高可信度时展示「可信度高」） ===== */
 .main-title-row {
   display: flex;
   align-items: center;
@@ -490,24 +300,12 @@ onLoad(async (query) => {
   gap: $s-2;
   margin-bottom: $s-2;
 }
-.main-title {
-  margin-bottom: 0;
-  flex-shrink: 0;
-}
 .title-right {
   display: flex;
   align-items: center;
   gap: $s-2;
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-.cat-badge {
-  font-size: $font-size-xs;
-  font-weight: 500;
-  color: $primary;
-  background: $primary-50;
-  padding: 2rpx 12rpx;
-  border-radius: $r-sm;
 }
 .badge {
   display: inline-block;
@@ -518,7 +316,6 @@ onLoad(async (query) => {
   line-height: 1.6;
   flex-shrink: 0;
   &.is-gold { color: $warning; background: $warning-bg; }
-  &.is-confirmed { color: $down; background: $down-bg; }
 }
 
 /* ===== 报价头（对齐涨停雷达页：标签入名称行 + 指标上色 + 最左开盘） ===== */
@@ -660,236 +457,28 @@ onLoad(async (query) => {
   font-size: $font-size-sm;
 }
 
-/* ===== 主因：结论横幅（含置信度）+ 聚焦因果链 ===== */
-.conclusion-banner {
-  margin-bottom: $s-3;
-  padding: $s-3 $s-4;
-  background: $primary;
-  border-radius: $r-lg;
-  box-shadow: 0 4rpx 12rpx rgba(11, 95, 255, 0.2);
+/* ===== 一句话主因（精简版） ===== */
+.main-cause-simple {
+  display: flex; flex-direction: column; gap: $s-2;
 }
-.banner-label {
-  display: block;
-  margin-bottom: 4rpx;
-  font-size: $font-size-xs;
-  color: rgba(255, 255, 255, 0.8);
-  letter-spacing: 2rpx;
-}
-.banner-text {
-  display: block;
-  font-size: $font-size-base;
-  font-weight: 600;
-  color: $white;
-  line-height: 1.5;
+.one-line-text {
+  font-size: $font-size-base; color: $ink; line-height: 1.6;
 }
 
-.focus-chain { display: flex; flex-direction: column; }
-.fc-item { position: relative; display: flex; }
-.fc-rail { position: relative; width: 32rpx; flex-shrink: 0; }
-.fc-dot {
-  width: 20rpx; height: 20rpx; border-radius: $r-full;
-  background: $ink-mute;
-  box-shadow: 0 0 0 6rpx rgba(11, 95, 255, 0.15);
-  position: absolute; top: 8rpx; left: 50%; transform: translateX(-50%);
-  &.is-pri { background: $primary; }
-}
-.fc-line {
-  position: absolute; top: 28rpx; bottom: 0; left: 50%; transform: translateX(-50%);
-  width: 2rpx; background: $line-soft;
-}
-.fc-body { flex: 1; padding-bottom: $s-3; }
-.fc-label {
-  display: block; font-size: $font-size-xs; color: $ink-soft; font-weight: 600; margin-bottom: 4rpx;
-  &.is-pri { color: $primary; }
-}
-.fc-text { display: block; font-size: $font-size-sm; color: $ink; line-height: 1.5; }
-
-.main-meta { display: flex; align-items: center; gap: $s-2; margin-top: $s-2; }
-.main-tag {
-  font-size: $font-size-xs; color: $primary; background: $primary-50;
-  padding: 2rpx 12rpx; border-radius: $r-sm;
-  &.is-weak { color: $warning; background: $warning-bg; }
-  &.is-rejected, &.is-insufficient { color: $ink-soft; background: $bg-soft; }
-}
-.main-ev { margin-left: auto; font-size: $font-size-xs; color: $ink-soft; }
-
-/* ===== 候选解释：卡片列表 ===== */
-.cand-list { display: flex; flex-direction: column; gap: $s-2; }
-.cand-card { padding: $s-3; background: $bg-soft; border-radius: $r-md; }
-.cand-header { display: flex; align-items: center; gap: $s-2; margin-bottom: $s-1; }
-.cand-label { font-size: $font-size-sm; font-weight: 600; color: $ink; flex: 1; }
-.cand-tag {
-  font-size: $font-size-xs; color: $primary; background: $primary-50;
-  padding: 2rpx 12rpx; border-radius: $r-sm; flex-shrink: 0;
-  &.is-weak { color: $warning; background: $warning-bg; }
-  &.is-rejected { color: $white; background: $ink-mute; }
-  &.is-insufficient { color: $ink-soft; background: $bg-soft; }
-}
-.cand-text { display: block; font-size: $font-size-xs; color: $ink-soft; line-height: 1.5; }
-
-/* ===== 未解问题 ===== */
-.question-card { background: $primary-50; border: 2rpx solid $primary-100; }
-.risk-item { display: flex; align-items: flex-start; gap: $s-1; margin-top: $s-1; }
-.risk-item:first-child { margin-top: 0; }
-.risk-dot { color: $primary; font-size: $font-size-base; line-height: 1.4; }
-.risk-text { flex: 1; color: $ink; font-size: $font-size-sm; line-height: 1.5; }
-.suggest-block { margin-top: $s-3; padding-top: $s-2; border-top: 2rpx solid $primary-100; }
-.suggest-label { display: block; font-size: $font-size-xs; color: $ink-soft; margin-bottom: $s-1; }
-.suggest-chips { display: flex; flex-wrap: wrap; gap: $s-1; }
-.suggest-chip { font-size: $font-size-xs; color: $primary; background: $white; padding: 4rpx 16rpx; border-radius: $r-full; }
-
-/* ===== 预判区：conditions 卡片列表 ===== */
-.forecast-area {
-  background: $gold-soft-bg;
-  border: 2rpx solid $gold-soft-border;
-}
-
-.forecast-item {
-  margin-bottom: $s-2;
-  padding: $s-2 $s-3;
-  background: $bg-card;
-  border-radius: $r-md;
-  border: 2rpx solid $line-soft;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-
-.forecast-header {
-  margin-bottom: $s-1;
-}
-
-.forecast-index {
-  font-size: $font-size-xs;
-  font-weight: 600;
-  color: $ink-mute;
-}
-
-.forecast-body {
-  display: flex;
-  flex-direction: column;
-  gap: $s-1;
-}
-
-.forecast-row {
-  display: flex;
-  align-items: flex-start;
-  gap: $s-2;
-}
-
-.forecast-label {
-  flex-shrink: 0;
-  font-size: $font-size-xs;
-  font-weight: 500;
-  color: $ink-soft;
-  min-width: 8rpx;
-  &::after {
-    content: '：';
-  }
-}
-
-.forecast-value {
-  flex: 1;
-  font-size: $font-size-sm;
-  color: $ink;
-  line-height: 1.5;
-}
-
-.forecast-slot-label {
-  display: block;
-  margin-top: $s-2;
-  text-align: right;
-  font-size: $font-size-xs;
-  color: $ink-mute;
-}
-
-/* ===== 证据清单（默认收起，点击标题展开） ===== */
-.section-title.row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* ===== 完整报告（流式输出到按钮下方） ===== */
+.report-actions { margin-top: $s-4; }
+.report-btn {
+  padding: $s-3; border-radius: $r-md;
+  background: $primary; text-align: center;
+  /* #ifdef H5 */
   cursor: pointer;
-  user-select: none;
+  /* #endif */
 }
+.report-btn.is-busy { background: $line; }
+.report-btn-text { font-size: $font-size-base; color: #ffffff; font-weight: 600; }
+.report-hint { display: block; margin-top: $s-3; font-size: $font-size-xs; color: $ink-soft; text-align: center; }
 
-.evi-arrow {
-  width: 16rpx;
-  height: 16rpx;
-  border-right: 4rpx solid $ink-mute;
-  border-bottom: 4rpx solid $ink-mute;
-  transform: rotate(45deg);
-  transition: transform 0.2s ease;
-  flex-shrink: 0;
-  &.is-open {
-    transform: rotate(225deg);
-  }
-}
+/* 报告正文的样式随渲染逻辑一并下沉到 InsightReportBody.vue（按 block 类型分派） */
 
-.evidence-item {
-  padding: $s-2 0;
-  border-bottom: 2rpx solid $line-soft;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.evi-head {
-  display: flex;
-  align-items: center;
-  gap: $s-2;
-  margin-bottom: 4rpx;
-}
-
-.evi-title {
-  flex: 1;
-  font-size: $font-size-sm;
-  font-weight: 500;
-  color: $ink;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.evi-level {
-  padding: 0 8rpx;
-  border-radius: $r-xs;
-  font-size: $font-size-xs;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.level-A {
-  color: $primary;
-  background: $primary-50;
-}
-
-.level-B {
-  color: $down;
-  background: $down-bg;
-}
-
-.level-C {
-  color: $warning;
-  background: $warning-bg;
-}
-
-.level-D {
-  color: $ink-mute;
-  background: $bg-soft;
-}
-
-.evi-excerpt {
-  display: block;
-  font-size: $font-size-sm;
-  color: $ink-soft;
-  line-height: 1.5;
-  margin-bottom: 4rpx;
-}
-
-.evi-meta {
-  font-size: $font-size-xs;
-  color: $ink-mute;
-}
+.report-error { display: block; margin-top: $s-3; font-size: $font-size-sm; color: $down; text-align: center; }
 </style>

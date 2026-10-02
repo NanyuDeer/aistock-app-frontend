@@ -2,6 +2,36 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [junliang] 2026-09-26 — 完整洞察报告改流式结构化输出（移除 PDF）+ App 端双通道 + 洞察详情页展示调整
+
+**开发者**: 李俊良
+
+### 新增
+
+- `modules/favorites/utils/useInsightReportSSE.ts`：完整洞察报告流式读取 composable。**双通道按运行时能力探测**——H5 走 `fetch + ReadableStream`，App / 小程序走 `uni.request({ enableChunked: true }) + requestTask.onChunkReceived`；`fetch` 拿到响应但无 `body` 时回退分块通道。抽出共用纯函数 `createReportStreamDecoder`（`data: {...}\n\n` 分帧、`TextDecoder({stream:true})` 跨块续解、半帧缓存、累计 `rawText`）；`setCancel(cb)` 统一取消（`AbortController.abort` / `requestTask.abort`）；`active` 标志阻断 `stop()` 之后的迟到响应改写界面状态。**刻意不用条件编译 `#ifdef`**：vitest 下条件编译不会被裁剪，两条分支会同时执行、无法分端写测试。
+- `modules/favorites/components/InsightReportBody.vue`：报告正文按 `block.type` 分派渲染 6 类 block（`kv` / `verdict` / `candidates` / `chain` / `evidence` / `list`）。六阶段因果链为**纵向时间轴**（序号圆点 + 竖线 + 节点卡，末节点不画线）；非 `established` 阶段走中性灰阶弱化（不用告警色）；空节渲染「暂缺」。
+- 测试护栏：`pages/insight-detail-move.spec.ts`（**该页首个 spec**，标题 + 置信度徽标 4 例）、`components/InsightReportBody.spec.ts`（13 例）、`pages/insight.mount.spec.ts`（7 例）；`utils/useInsightReportSSE.spec.ts` 由 9 例增至 **25 例**。
+
+### 变更
+
+- 完整洞察报告**移除 PDF 下载链路**（删除 `shared/utils/downloadInsightReport.ts` 及其 spec），改为在洞察详情页点击按钮后在按钮下方**逐章节流式输出**；`insight-detail-move.vue` 的报告区下沉为 `<InsightReportBody>`（页面只留按钮/错误/提示）。
+- 洞察详情页展示调整：主因卡标题「归因主因」→**「异动原因」**；置信度徽标**仅 `confidence.level === 'high'` 时显示「可信度高」**，中/低不再显示。
+- `pages/monitor.vue` / `pages/insight.vue`：报告入口改为跳详情页并带 `autostart=1`（列表页不展开长报告）；`shared/utils/insightNavigation.ts` 新增第三参 `query`。
+- `vitest.config.ts`：白名单登记新增 spec、移除已删除的 `downloadInsightReport.spec.ts`。
+
+### 修复
+
+- **报告流式读取的跨端可用性**：此前只有 H5 通道（直接用 `fetch + ReadableStream`、无平台守护），而 App 端 WebView 可能不支持 `ReadableStream` → 补齐 chunked 通道并加运行时探测。
+
+### 测试
+
+- 先红后绿：标题改名 RED 实测 `expected '归因主因' to be '异动原因'`；相关 spec 合计 **42 passed**；`npx vue-tsc --noEmit` **0 错误**。
+- H5 实测（浏览器自动化，线上真实数据）：双通道 fetch 通道回归（6 节 / 6 链节点 / 0 报错）、维度三表格渲染、标题改名走**真实入口路径**（自选股异动页点卡片跳详情页）。
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增 2026-09-25 / 2026-09-26 三批更新块、组件清单与详情页当前形态。
+
 ## [master] 2026-09-26 — APP 前端接入密码登录 / 注册 + 首次设置密码（含防刷松绑）
 
 **开发者**: Aria

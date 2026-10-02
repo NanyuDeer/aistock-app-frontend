@@ -145,7 +145,7 @@
                   <view class="o3-m"><text :class="['o3-v', movementDetail.direction === 'up' ? 'is-up' : 'is-down']">{{ fmtAmount(movementDetail.latest_price, movementDetail.change_pct) }}</text><text class="o3-l">触发</text></view>
                 </view>
               </view>
-              <InsightCard v-if="movementInsightCard.content" type="event" :title="movementInsightCard.content" :trace="movementInsightCard.trace" :forecast="movementInsightCard.forecast" :time="movementInsightCard.time" theme="light" class="insight-in-page" />
+              <InsightCard v-if="movementInsightCard.content" type="event" :title="movementInsightCard.content" :trace="movementInsightCard.trace" :forecast="''" :time="movementInsightCard.time" theme="light" class="insight-in-page" />
               <PriceMovementAnalysisContent :detail="movementDetail" :analysis="movementAnalysis" />
             </view>
           </template>
@@ -273,7 +273,6 @@ import LoadingState from '@/shared/components/LoadingState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import ForecastProfitChart from '@/modules/favorites/components/ForecastProfitChart.vue'
 import PriceMovementAnalysisContent from '@/modules/favorites/components/PriceMovementAnalysisContent.vue'
-import { parseForecastSlot } from '@/modules/favorites/components/insightCards'
 import AiAnalysis from '@/modules/analytics/components/ai-analysis.vue'
 import { stockApi, type ForecastData } from '@/shared/api/modules/stock'
 import { stockTraceApi, type StockTraceAnalysisResponse, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
@@ -615,7 +614,6 @@ const movementInsightCard = computed(() => {
   return {
     content: cause?.verdict || '',
     trace,
-    forecast: parseForecastSlot(detail?.forecast)?.summary || '',
     time: detail?.triggered_at ? formatTime(detail.triggered_at).slice(5) : '',
   }
 })

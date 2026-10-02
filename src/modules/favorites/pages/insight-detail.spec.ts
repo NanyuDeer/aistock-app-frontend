@@ -70,13 +70,14 @@ describe('insight-detail.vue 洞察详情页', () => {
     expect(wrapper.find('.state').text()).toContain('加载中')
   })
 
-  it('接口成功 → 渲染报价头、主因判定卡、归因明细、证据时间线与来源', async () => {
+  it('接口成功 → 渲染报价头、主因卡、候选归因、证据时间线与来源', async () => {
     insightApiMock.getInsightDetail.mockResolvedValue(testDetail)
     const wrapper = mount(insightDetail)
     await flushPromises()
     expect(wrapper.find('.quote').exists()).toBe(true)
     expect(wrapper.find('.hero-card').exists()).toBe(true)
-    expect(wrapper.find('.rows .row').exists()).toBe(true)
+    // 候选归因（次因）现为卡片列表（旧「.rows .row」布局已于方案 A 改版中移除）
+    expect(wrapper.find('.cand-list .cand-card').exists()).toBe(true)
     expect(wrapper.find('.timeline .tl-item').exists()).toBe(true)
     expect(wrapper.find('.source .src').text()).toContain('原始来源标题')
     expect(wrapper.find('.state').exists()).toBe(false)
