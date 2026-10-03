@@ -18,8 +18,8 @@
 
     <!-- 登录方式区域（统一模板：H5 / APP-PLUS / MP-WEIXIN 共用二维码 + 错误状态） -->
     <view class="login-body">
-      <!-- 初始状态：登录方式选择 -->
-      <view v-if="!qrCodeUrl && !loginLoading && !errorMsg && !showEmailForm && !showSmsForm && !showPasswordForm" class="login-methods">
+      <!-- 其他方式登录：微信 / 邮箱验证码 / 手机号验证码（点击「其他方式登录」后展开） -->
+      <view v-if="showOtherMethods && !qrCodeUrl && !loginLoading && !errorMsg && !showEmailForm && !showSmsForm && !showPasswordForm" class="login-methods">
         <!-- #ifdef MP-WEIXIN -->
         <button @tap="handleWxLogin" class="btn-wx-login">
           <SvgIcon name="wechat" size="36rpx" color="#ffffff" />
@@ -54,11 +54,21 @@
           <text class="btn-text">手机号验证码登录</text>
         </button>
 
-        <!-- 密码登录 / 注册入口（全平台） -->
+        <!-- 小程序仍以微信一键登录优先，密码登录由该按钮进入 -->
+        <!-- #ifdef MP-WEIXIN -->
         <button @click="openPasswordForm" class="btn-email-login">
           <SvgIcon name="key-line" size="36rpx" color="#0b5fff" />
           <text class="btn-text">密码登录 / 注册</text>
         </button>
+        <!-- #endif -->
+
+        <!-- H5 / App：由密码表单展开本列表后返回密码登录 -->
+        <!-- #ifndef MP-WEIXIN -->
+        <view class="form-back" @click="closeOtherMethods">
+          <SvgIcon name="arrow-left-line" size="28rpx" color="#4b5a7a" />
+          <text class="form-back-text">返回密码登录</text>
+        </view>
+        <!-- #endif -->
 
         <view class="login-tip">
           <text class="tip-text">登录后可同步自选股、接收异动提醒</text>
@@ -102,7 +112,7 @@
         </view>
         <view class="form-back" @click="showEmailForm = false">
           <SvgIcon name="arrow-left-line" size="28rpx" color="#4b5a7a" />
-          <text class="form-back-text">返回微信登录</text>
+          <text class="form-back-text">返回其他方式登录</text>
         </view>
       </view>
 
@@ -142,7 +152,7 @@
         </view>
         <view class="form-back" @click="showSmsForm = false">
           <SvgIcon name="arrow-left-line" size="28rpx" color="#4b5a7a" />
-          <text class="form-back-text">返回微信登录</text>
+          <text class="form-back-text">返回其他方式登录</text>
         </view>
       </view>
 
@@ -185,19 +195,16 @@
             class="form-input"
           />
         </view>
+        <!-- 密码框右下方：去注册 / 去登录 -->
+        <view class="form-assist">
+          <text class="form-assist-link" @click="togglePasswordMode">
+            {{ passwordMode === 'login' ? '还没有账号？去注册' : '已有账号？去登录' }}
+          </text>
+        </view>
         <view class="form-submit">
           <Button block :loading="loginLoading" @click="handlePasswordSubmit">
             {{ passwordMode === 'login' ? '登录' : '注册并登录' }}
           </Button>
-        </view>
-        <view class="form-switch" @click="togglePasswordMode">
-          <text class="form-switch-text">
-            {{ passwordMode === 'login' ? '首次使用密码 / 注册账号' : '已有密码？去登录' }}
-          </text>
-        </view>
-        <view class="form-back" @click="closePasswordForm">
-          <SvgIcon name="arrow-left-line" size="28rpx" color="#4b5a7a" />
-          <text class="form-back-text">返回微信登录</text>
         </view>
       </view>
 
@@ -235,6 +242,15 @@
 
       <!-- 登录验证中 -->
       <LoadingState v-else text="登录中..." />
+
+      <!-- 页面最下方：其他方式登录入口（仅在密码登录视图展示，点击后才展开其他方式） -->
+      <view
+        v-if="showPasswordForm && !loginLoading && !qrCodeUrl && !errorMsg"
+        class="other-login-entry"
+        @click="openOtherMethods"
+      >
+        <text class="other-login-text">其他方式登录</text>
+      </view>
     </view>
 
     <!-- 底部协议 -->
@@ -253,6 +269,7 @@ import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import Input from '@/shared/components/Input.vue'
 import { LoadingState, Card, EmptyState, Button } from '@/shared/components'
+import { isMp } from '@/shared/utils/platform'
 
 const userStore = useUserStore()
 
@@ -279,7 +296,8 @@ const phone = ref('')
 const isValidPhone = computed(() => /^1[3-9]\d{9}$/.test(phone.value))
 
 // 密码登录 / 首次设置密码状态（注册即登录；存量账号可通过此表单补设密码）
-const showPasswordForm = ref(false)
+// 默认视图：H5 / App 进入即显示密码登录；小程序保持微信一键登录优先
+const showPasswordForm = ref(!isMp)
 const passwordMode = ref<'login' | 'register'>('login')
 const pwdAccount = ref('')
 const pwdPassword = ref('')
@@ -287,6 +305,9 @@ const pwdCode = ref('')
 const pwdAccountIsEmail = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pwdAccount.value.trim()))
 const pwdAccountIsPhone = computed(() => /^1[3-9]\d{9}$/.test(pwdAccount.value.trim()))
 const canSendPwdCode = computed(() => pwdAccountIsPhone.value || pwdAccountIsEmail.value)
+
+// 其他登录方式列表（微信 / 邮箱验证码 / 手机号验证码）展开态
+const showOtherMethods = ref(isMp)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollCount = 0
@@ -467,16 +488,21 @@ async function handleEmailLogin() {
 function openPasswordForm() {
   passwordMode.value = 'login'
   showPasswordForm.value = true
+  showOtherMethods.value = false
 }
 
-/** 关闭密码表单并清理状态 */
-function closePasswordForm() {
+/** 展开「其他方式登录」列表（微信 / 邮箱验证码 / 手机号验证码） */
+function openOtherMethods() {
+  errorMsg.value = ''
   showPasswordForm.value = false
-  pwdAccount.value = ''
-  pwdPassword.value = ''
-  pwdCode.value = ''
-  stopCountdown()
-  countdown.value = 0
+  showOtherMethods.value = true
+}
+
+/** 从「其他方式登录」返回密码登录 */
+function closeOtherMethods() {
+  showOtherMethods.value = false
+  showPasswordForm.value = true
+  passwordMode.value = 'login'
 }
 
 /** 登录 / 注册模式切换 */
@@ -718,8 +744,8 @@ function goBack() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 120rpx;
-  padding-bottom: 80rpx;
+  padding-top: 48rpx;
+  padding-bottom: 40rpx;
 }
 
 .logo-wrap {
@@ -879,20 +905,33 @@ function goBack() {
   }
 }
 
-.form-switch {
-  margin-top: 32rpx;
+/* 密码框右下方：去注册 / 去登录 */
+.form-assist {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
+  margin-top: -8rpx;
 
-  .form-switch-text {
-    font-size: 28rpx;
+  .form-assist-link {
+    font-size: 26rpx;
     color: $primary;
   }
 }
 
 .skip-wrap {
   margin-top: 48rpx;
+}
+
+/* 页面最下方：其他方式登录入口（margin-top:auto 推到登录区底部） */
+.other-login-entry {
+  margin-top: auto;
+  padding: 40rpx 0 16rpx;
+  display: flex;
+  justify-content: center;
+
+  .other-login-text {
+    font-size: 28rpx;
+    color: $primary;
+  }
 }
 
 /* ===== 二维码区域 ===== */

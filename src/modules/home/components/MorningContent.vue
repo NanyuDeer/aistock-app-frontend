@@ -61,38 +61,18 @@
         </view>
       </view>
 
-      <TimeSlotInsightBar
-        :key="barResetKey"
-        :leader-sectors="leaderSectors"
-        :chain-events="chainEvents"
-        :trace-reports="traceReports"
-        :rhythm-rows="rhythmRows"
-        :current-slot="currentSlot"
-        @navigate="onBarNavigate"
-      />
-
       <!-- 功能入口 2x2 网格 -->
       <view class="feature-grid">
-        <Card class="feature-card" clickable @tap="goSectors">
+        <Card class="feature-card" clickable @tap="goTraceability">
           <view class="feature-header">
-            <text class="feature-title">风口洞见</text>
+            <text class="feature-title">市场洞见</text>
             <text class="feature-more">›</text>
           </view>
-          <text class="feature-sub">排行前三板块</text>
+          <text class="feature-sub">市场异动溯源分析</text>
           <view class="feature-list">
-            <template v-if="leaderSectors.length">
-              <view
-                v-for="(item, idx) in leaderSectors.slice(0, 3)"
-                :key="idx"
-                class="feature-item"
-                @tap.stop="goSectorDetail(item.name)"
-              >
-                <text class="item-name">No.{{ idx + 1 }} {{ item.name }}</text>
-                <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
-              </view>
-            </template>
-            <view v-else class="feature-item">
-              <text class="item-name placeholder">加载中...</text>
+            <view v-for="(item, idx) in traceReports" :key="idx" class="feature-item">
+              <text class="item-name">{{ item.name }}</text>
+              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
             </view>
           </view>
         </Card>
@@ -116,16 +96,26 @@
           </view>
         </Card>
 
-        <Card class="feature-card" clickable @tap="goTraceability">
+        <Card class="feature-card" clickable @tap="goSectors">
           <view class="feature-header">
-            <text class="feature-title">市场洞见</text>
+            <text class="feature-title">风口洞见</text>
             <text class="feature-more">›</text>
           </view>
-          <text class="feature-sub">市场异动溯源分析</text>
+          <text class="feature-sub">排行前三板块</text>
           <view class="feature-list">
-            <view v-for="(item, idx) in traceReports" :key="idx" class="feature-item">
-              <text class="item-name">{{ item.name }}</text>
-              <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
+            <template v-if="leaderSectors.length">
+              <view
+                v-for="(item, idx) in leaderSectors.slice(0, 3)"
+                :key="idx"
+                class="feature-item"
+                @tap.stop="goSectorDetail(item.name)"
+              >
+                <text class="item-name">No.{{ idx + 1 }} {{ item.name }}</text>
+                <Tag :type="itemTagType(item.tagType)" size="sm">{{ item.tag }}</Tag>
+              </view>
+            </template>
+            <view v-else class="feature-item">
+              <text class="item-name placeholder">加载中...</text>
             </view>
           </view>
         </Card>
@@ -153,7 +143,7 @@
         </Card>
       </view>
 
-      <!-- 重磅事件跟踪 -->
+      <!-- 重磅事件跟踪：置于功能网格下方、洞见横条上方 -->
       <Card class="track-card" clickable @tap="goTrackDetail">
         <view class="track-header">
           <text class="track-title">重磅事件跟踪</text>
@@ -168,6 +158,17 @@
           <text class="track-tip">点击查看资讯详情</text>
         </view>
       </Card>
+
+      <!-- 洞见横条：置于重磅事件跟踪下方 -->
+      <TimeSlotInsightBar
+        :key="barResetKey"
+        :leader-sectors="leaderSectors"
+        :chain-events="chainEvents"
+        :trace-reports="traceReports"
+        :rhythm-rows="rhythmRows"
+        :current-slot="currentSlot"
+        @navigate="onBarNavigate"
+      />
 
     </view>
   </view>
@@ -275,6 +276,8 @@ interface LeaderStockPreview {
   tagType: 'buy' | 'sell' | 'wash' | 'up' | 'down' | 'date'
   /** 预览行额外携带的跳转标识：消息洞见行 → 事件 ID，跳转 AI 事件分析页用 */
   eventId?: string
+  /** 风口行的一句话预判（AI 推导，单行截断展示） */
+  hint?: string
 }
 
 const leaderSectors = ref<LeaderStockPreview[]>([])
@@ -283,6 +286,16 @@ function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
   const num = Number(value)
   return Number.isFinite(num) ? num : null
+}
+
+// 从风口板块 AI 推导中提取一句话预判：优先短线热度归因，回退长线逻辑/持续性归因
+function sectorHint(sector: WindLeaderSector): string {
+  const raw = sector.ai_analysis
+  if (typeof raw === 'string') return raw.trim()
+  if (raw && typeof raw === 'object') {
+    return (raw.short_reason || raw.long_reason || raw.persistence_reason || '').trim()
+  }
+  return ''
 }
 
 // 从风口板块中提取排行前 N 的板块预览（按 score 降序）
@@ -300,7 +313,7 @@ function extractSectorPreview(sectors: WindLeaderSector[], maxCount: number): Le
       const tagType: LeaderStockPreview['tagType'] = changePct === null
         ? 'wash'
         : changePct > 0 ? 'up' : changePct < 0 ? 'down' : 'wash'
-      return { name: sector.name, tag, tagType }
+      return { name: sector.name, tag, tagType, hint: sectorHint(sector) }
     })
 }
 
@@ -762,8 +775,10 @@ function goLogin() {
 }
 
 /* Card 作为 feature-card 容器；覆写内边距使 2x2 网格更紧凑（复合选择器提升优先级） */
+/* min-width:0 防止超长内容（如市场洞见溯源结论）把该格横向撑宽，保持两列等宽 */
 .feature-card.as-card {
   padding: $s-2;
+  min-width: 0;
 }
 
 /* 首页白色卡片：与今日专属卡片一致的按压动效（覆盖 Card 默认 scale(0.995)，加阴影变化） */
@@ -862,8 +877,10 @@ function goLogin() {
 }
 
 /* ===== 重磅事件跟踪 ===== */
+/* 位于洞见横条与功能网格之间：需下边距与下方网格分隔 */
 .track-card.as-card {
   padding: $s-2;
+  margin-bottom: $s-2;
 }
 
 .track-header {
