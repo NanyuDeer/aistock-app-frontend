@@ -2,6 +2,92 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-10-03 — 0.1.4 版本发布
+
+**开发者**: 项目组
+
+### 发布说明（App 更新文案）
+
+- 新增「重大事件时间线」页：历史重大事件传导梳理 + 未来事件前瞻，关键事件加粗、行业红涨绿跌
+- 完整洞察报告改为流式结构化输出（移除 PDF 下载），详情页逐章节渲染，异动原因展示更清晰
+- 新增密码登录 / 注册与首次设置密码，账号安全体系更完善
+- 首页洞见品牌统一 + 新增时段动态洞见横条（风口 / 消息 / 市场 / 节奏四模块切换）
+- 个股详情页分块加载：首屏不再被长内容阻塞，慢接口独立超时，业绩预测有数据必展示
+- 节奏大师改版：洞见卡时间主次分组、事件区分层折叠、可折叠双模式日历面板
+- 恐贪指数页优化：温度计绿-黄-红三段、新增波段操作节奏入口卡、建议卡数据驱动
+- 市场洞见与板块原因链三段（触发 / 传导 / 结果）可展开，市场洞见 / 板块详情 / 板块四环三处同源
+
+### 版本号
+
+- `versionName` 0.1.3 → **0.1.4**；`versionCode` 103 → **104**（manifest.json）
+
+---
+
+## [junliang] 2026-09-26 — 完整洞察报告改流式结构化输出（移除 PDF）+ App 端双通道 + 洞察详情页展示调整
+
+**开发者**: 李俊良
+
+### 新增
+
+- `modules/favorites/utils/useInsightReportSSE.ts`：完整洞察报告流式读取 composable。**双通道按运行时能力探测**——H5 走 `fetch + ReadableStream`，App / 小程序走 `uni.request({ enableChunked: true }) + requestTask.onChunkReceived`；`fetch` 拿到响应但无 `body` 时回退分块通道。抽出共用纯函数 `createReportStreamDecoder`（`data: {...}\n\n` 分帧、`TextDecoder({stream:true})` 跨块续解、半帧缓存、累计 `rawText`）；`setCancel(cb)` 统一取消（`AbortController.abort` / `requestTask.abort`）；`active` 标志阻断 `stop()` 之后的迟到响应改写界面状态。**刻意不用条件编译 `#ifdef`**：vitest 下条件编译不会被裁剪，两条分支会同时执行、无法分端写测试。
+- `modules/favorites/components/InsightReportBody.vue`：报告正文按 `block.type` 分派渲染 6 类 block（`kv` / `verdict` / `candidates` / `chain` / `evidence` / `list`）。六阶段因果链为**纵向时间轴**（序号圆点 + 竖线 + 节点卡，末节点不画线）；非 `established` 阶段走中性灰阶弱化（不用告警色）；空节渲染「暂缺」。
+- 测试护栏：`pages/insight-detail-move.spec.ts`（**该页首个 spec**，标题 + 置信度徽标 4 例）、`components/InsightReportBody.spec.ts`（13 例）、`pages/insight.mount.spec.ts`（7 例）；`utils/useInsightReportSSE.spec.ts` 由 9 例增至 **25 例**。
+
+### 变更
+
+- 完整洞察报告**移除 PDF 下载链路**（删除 `shared/utils/downloadInsightReport.ts` 及其 spec），改为在洞察详情页点击按钮后在按钮下方**逐章节流式输出**；`insight-detail-move.vue` 的报告区下沉为 `<InsightReportBody>`（页面只留按钮/错误/提示）。
+- 洞察详情页展示调整：主因卡标题「归因主因」→**「异动原因」**；置信度徽标**仅 `confidence.level === 'high'` 时显示「可信度高」**，中/低不再显示。
+- `pages/monitor.vue` / `pages/insight.vue`：报告入口改为跳详情页并带 `autostart=1`（列表页不展开长报告）；`shared/utils/insightNavigation.ts` 新增第三参 `query`。
+- `vitest.config.ts`：白名单登记新增 spec、移除已删除的 `downloadInsightReport.spec.ts`。
+
+### 修复
+
+- **报告流式读取的跨端可用性**：此前只有 H5 通道（直接用 `fetch + ReadableStream`、无平台守护），而 App 端 WebView 可能不支持 `ReadableStream` → 补齐 chunked 通道并加运行时探测。
+
+### 测试
+
+- 先红后绿：标题改名 RED 实测 `expected '归因主因' to be '异动原因'`；相关 spec 合计 **42 passed**；`npx vue-tsc --noEmit` **0 错误**。
+- H5 实测（浏览器自动化，线上真实数据）：双通道 fetch 通道回归（6 节 / 6 链节点 / 0 报错）、维度三表格渲染、标题改名走**真实入口路径**（自选股异动页点卡片跳详情页）。
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增 2026-09-25 / 2026-09-26 三批更新块、组件清单与详情页当前形态。
+
+---
+
+## [xusiyun] 2026-10-02 — 重大事件时间线历史段换源（事件传导 ≥4 星非纯行情 + GI 加粗 + 行业红涨绿跌）
+
+**开发者**: xusiyun
+
+### 新增
+
+- `modules/chat/event/constants.ts`：纯行情判据 `MARKET_PHENOMENON_PATTERN` / `DRIVING_CAUSE_PATTERN` + `isPureMarketEvent(title)`——**现象词命中且原因词全不命中**才判纯行情（原因词豁免防误杀「广汽拟收购一汽丰田50%股权 复牌一字涨停」；对齐后端 `is_driving_event` 口径，仅看标题）。
+- `modules/chat/event/types.ts`：`TimelineRow` 统一行视图模型（两源合并后的展示行）。
+- `modules/chat/event/api/eventService.ts`：`buildTimelineHistoryRows(items, today)`（纯函数：≥4 星 + 非纯行情 + date ≤ 今天）、`getTimelineHistoryRows()`（翻页拉 `/agent/event/list`，判停=整页出窗 / `hasMore=false` / 5 页上限，失败降级返回 `[]`）、`getEntityRows()`（实体源行）。
+- `modules/chat/event/api/eventService.spec.ts`：21 用例（准入/映射/纯行情豁免/判停含 min-max 判别性用例/异常降级）；`vitest.config.ts` 白名单注册（不注册会被静默跳过）。
+
+### 改进
+
+- `modules/chat/pages/event/timeline.vue` 双源合并：**历史段**（date ≤ 今天）= 事件传导列表「≥4 星且非纯行情」，按传导时间 `publishTime` 前 10 位分组；**未来段**（date > 今天）= 实体接口 `/api/agent/event/timeline`（industry 取 `impactSectors[0]`，无方向 → 灰）。
+- 历史行：GI 事件（`globalImportanceRank` 非空）标题加粗（700）；行业胶囊按 `chain_summary[0].direction` 着色（bullish 红 `--ev-negative` / bearish 绿 `--ev-positive` / neutral 与无方向灰），**三种均无底色**；**不渲染摘要行**（去掉「XX行业受益，短期景气改善」这类 conclusion）。
+- 点击：历史行恒跳事件详情（此类事件必有传导报告，不再 404）；未来行就地展开（原行为）。底部计数改用实际展示条数（`items.length`）。
+
+### 文档
+
+- `AGENTS.md`（模块表 + API 表）、`modules/chat/AGENTS.md`：同步时间线双源口径与渲染规则。
+
+### 测试
+
+- `vue-tsc --noEmit` 退出 0；`vitest run eventService.spec.ts` **21 passed**；判停分支经**变异验证**（改回旧 min 规则该用例即失败）。
+- 全量 `pnpm test` 另有 4 个**既有基线失败**（AnalyticsCardLayout / AlertContent / insight-detail / CardRenderer），与本次无关（不引用本次文件）。
+
+### 说明
+
+- 零后端改动；未同步 Web 端（Web 无时间轴页）。
+- 已知限制：传导报告 **7 天 TTL**，历史段实际可回溯约 7 天；未来事件无传导 chain、无方向数据，故未来行行业标签恒灰。
+
+---
+
 ## [master] 2026-09-26 — APP 前端接入密码登录 / 注册 + 首次设置密码（含防刷松绑）
 
 **开发者**: Aria

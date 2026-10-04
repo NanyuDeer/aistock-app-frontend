@@ -54,16 +54,24 @@
             >
               <!-- 第一行：标题（完整显示，核心影响板块紧跟标题文字末尾） -->
               <view class="item-top">
-                <text class="title">{{ event.title }}</text>
-                <!-- 影响板块：只显示最核心 1 个（后端 impactSectors 已按 impactStrength 降序，首个即最核心）；空则不渲染（方案 A） -->
-                <text v-if="topSector(event)" class="sector-tag">{{ topSector(event) }}</text>
+                <!-- 重大事件（五星 importance===5 或 GI 进当日双榜单）→ 红色渐变胶囊「重大」+ 白色实心火焰（2026-10-01 用户验收定稿：
+                     红胶囊底与事件传导重大卡片 .panel-top 同款渐变，胶囊内白色火焰 + 白色文字） -->
+                <view v-if="isMajorEvent(event)" class="major-badge" aria-label="重大事件">
+                  <SvgIcon name="fire-fill" size="26rpx" color="#ffffff" class="major-badge__flame" />
+                  <text class="major-badge__text">重大</text>
+                </view>
+                <text class="title" :class="{ 'title--major': isMajorEvent(event) }">{{ event.title }}</text>
+                <!-- 影响板块：历史行取 chain_summary[0] 最核心 1 个，按方向着色（A 股红涨绿跌：bullish=红/bearish=绿/neutral=灰）、无底色；无行业则不渲染 -->
+                <!-- 未来行使链方向数据（实体源只给板块名、无 bullish/bearish）→ sectorDirection=null → 回退中性灰；
+                     即用户口径"红涨绿跌"只对历史段生效，未来行唯一只能是灰（无方向即是灰） -->
+                <text v-if="event.sectorName" class="sector-tag" :class="event.sectorDirection === 'bullish' || event.sectorDirection === 'bearish' ? 'sector-tag--' + event.sectorDirection : 'sector-tag--neutral'">{{ event.sectorName }}</text>
               </view>
 
-              <!-- 摘要（非空时渲染） -->
+              <!-- 摘要（历史行 summary 恒空串 → 不渲染；仅未来行非空时渲染） -->
               <text v-if="event.summary" class="summary">{{ event.summary }}</text>
 
-              <!-- 展开区域（未来事件点击后展开） -->
-              <view v-if="expandedId === event.eventId && event.eventStatus !== 'occurred'" class="event-expand">
+              <!-- 展开区域（未来行点击就地展开；历史行恒跳详情，不会走到此处） -->
+              <view v-if="expandedId === event.eventId && event.isFuture" class="event-expand">
                 <text class="expand-text">事件尚未发生，暂无传导分析</text>
               </view>
             </view>
@@ -78,8 +86,10 @@
           <view v-else-if="hasMore" class="load-more-btn" @tap="loadMore">
             <text class="load-more-text">加载更多</text>
           </view>
+          <!-- 已加载全部：展示实际已加载条数（items.length，含历史段+未来段真实行）；
+     total/hasMore 仍只服务实体源"加载更多"，与底部展示数无关（total 只含实体源且含被 date>today 过滤掉的 occurred 行，会误导） -->
           <view v-else-if="items.length > 0" class="load-more-btn">
-            <text class="load-more-text done-text">— 已加载全部 {{ total }} 条事件 —</text>
+            <text class="load-more-text done-text">— 已加载全部 {{ items.length }} 条事件 —</text>
           </view>
         </view>
       </template>
@@ -93,12 +103,17 @@
  *
  * 仿韭研公社 /timeline 排版：左侧竖向时间线（竖线 + 蓝色圆点节点）+ 日期分组头 + 无边框紧凑事件行。
  * 单一时间轴，不区分未来/历史 Tab。窗口覆盖 [今天-30, 今天+90]，日期升序。
- * 已发生事件跳转详情页，未来事件就地展开。
- * 接口：GET /api/agent/event/timeline
+ * 数据源双轨：
+ *  - 历史段（date ≤ 今天）：事件传导列表（getTimelineHistoryRows，星级 ≥4 且非纯行情，date 按传导时间 publishTime 前 10 位分组）
+ *  - 未来段（date > 今天）：GET /api/agent/event/timeline 实体源（scheduled/upcoming/ongoing 原样展示）
+ * 重大事件（五星 importance===5 或 GI 进当日双榜单）标题前置「重大」胶囊徽标 + 加粗、
+ * 行业方向胶囊红绿灰着色（无底色）只作用于传导历史段。
+ * 历史行点击恒跳详情（这类事件必有传导报告），未来行就地展开。
  */
 import { computed, onMounted, ref } from 'vue'
-import type { EventTimelineItem, EventTimelineQuery } from '@/modules/chat/event/types'
+import type { EventTimelineQuery, TimelineRow } from '@/modules/chat/event/types'
 import { getEventTimeline } from '@/modules/chat/event/api/eventApi'
+import { getEntityRows, getTimelineHistoryRows } from '@/modules/chat/event/api/eventService'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
@@ -127,7 +142,8 @@ function dateStrOf(d: Date): string {
 }
 
 // ========== 状态 ==========
-const items = ref<EventTimelineItem[]>([])
+// 统一行视图（TimelineRow）：历史段来自传导源、未来段来自实体源，合并后统一分组渲染
+const items = ref<TimelineRow[]>([])
 const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref<string | null>(null)
@@ -137,14 +153,24 @@ const page = ref(1)
 const pageSize = 20
 const expandedId = ref<string | null>(null)
 
+/**
+ * 重大事件判定（2026-10-01 用户验收）：五星（importance===5，最高星级）或
+ * GI 事件（进了当日双榜单）→ 显示「重大」胶囊徽标 + 标题加粗。
+ * 未来行恒无星级且 isGi=false → 不触发。
+ */
+function isMajorEvent(event: TimelineRow): boolean {
+  return event.importance === 5 || event.isGi
+}
+
 // ========== 计算属性 ==========
 const isEmpty = computed(() => !loading.value && !error.value && items.value.length === 0)
 
 /**
- * 按 date 分组，组间升序（旧 → 新），组内按 eventStartTime 升序
+ * 按 date 分组，组间升序（旧 → 新），组内按 eventStartTime 升序。
+ * 统一行视图：未来行 eventStartTime=事件开始时间，历史行 eventStartTime=publishTime（同日顺序稳定）。
  */
 const groupedItems = computed(() => {
-  const groups = new Map<string, EventTimelineItem[]>()
+  const groups = new Map<string, TimelineRow[]>()
   for (const item of items.value) {
     const list = groups.get(item.date) || []
     list.push(item)
@@ -189,10 +215,19 @@ async function refresh() {
   items.value = []
 
   try {
-    const res = await getEventTimeline(timelineQuery(1))
-    items.value = res.items
-    total.value = res.total
-    hasMore.value = res.hasMore
+    // 并行拉取两源：实体源（窗口分页）+ 事件传导历史源（星级 ≥4 且非纯行情，一次拉完）
+    const [timelineRes, historyRows] = await Promise.all([
+      getEventTimeline(timelineQuery(1)),
+      getTimelineHistoryRows({ earliestDate: pastStr }),
+    ])
+
+    // 合并规则：实体行只保留 date > 今天，历史段完全交给传导源（传导源已过滤 date ≤ 今天）
+    const entityRows = getEntityRows(timelineRes.items).filter((r) => r.date > todayStr)
+    items.value = [...historyRows, ...entityRows]
+
+    // 底部「加载更多」只作用于实体源
+    total.value = timelineRes.total
+    hasMore.value = timelineRes.hasMore
     page.value = 1
   } catch (e: unknown) {
     error.value = (e as Error).message || '加载失败，请稍后重试'
@@ -209,9 +244,11 @@ async function loadMore() {
   try {
     const nextPage = page.value + 1
     const res = await getEventTimeline(timelineQuery(nextPage))
+    // 加载更多只作用于实体源的未来段（历史段已由传导源一次拉完）
+    const newEntityRows = getEntityRows(res.items).filter((r) => r.date > todayStr)
     // 去重：已加载的 eventId 不重复添加
     const existingIds = new Set(items.value.map(i => i.eventId))
-    const newItems = res.items.filter(i => !existingIds.has(i.eventId))
+    const newItems = newEntityRows.filter(i => !existingIds.has(i.eventId))
     items.value = [...items.value, ...newItems]
     total.value = res.total
     hasMore.value = res.hasMore
@@ -223,31 +260,22 @@ async function loadMore() {
   }
 }
 
-/** 事件点击处理 */
-function handleEventClick(event: EventTimelineItem) {
-  // 已发生事件 → 跳转详情页
-  if (event.eventStatus === 'occurred') {
+/** 事件点击处理：历史行（isFuture=false）必跳详情；未来行就地展开 */
+function handleEventClick(event: TimelineRow) {
+  // 历史行（≥4 星且非纯行情的过去事件）必有传导报告 → 恒跳详情页
+  if (!event.isFuture) {
     uni.navigateTo({
       url: `/modules/chat/pages/event/detail?id=${event.eventId}`,
     })
     return
   }
 
-  // 未发生事件 → 就地展开/收起
+  // 未来行 → 就地展开/收起
   if (expandedId.value === event.eventId) {
     expandedId.value = null
   } else {
     expandedId.value = event.eventId
   }
-}
-
-/**
- * 影响板块：只返回最核心 1 个（后端 impactSectors 已按 impactStrength 降序，首个即最核心）。
- * impactSectors 可能缺失（旧数据）→ 防御为 null（整块不渲染）
- */
-function topSector(event: EventTimelineItem): string | null {
-  const sectors = event.impactSectors ?? []
-  return sectors.length > 0 ? sectors[0] : null
 }
 
 /** 格式化日期分组显示：韭研风格 MM-DD */
@@ -383,13 +411,45 @@ onMounted(() => {
 
 .title {
   display: inline;
-  font-size: 30rpx;
-  font-weight: 500;
-  color: var(--ev-text-primary);
+  font-size: 28rpx; /* 对齐事件传导页标题 $font-size-md（2026-10-01 用户要求字体大小一致） */
+  font-weight: 600; /* 对齐事件传导页 .card-title 字重（2026-10-01） */
+  color: var(--ev-text-primary); /* 普通事件标题用普通黑（2026-10-01 用户口径） */
   line-height: 40rpx;
   /* 标题完整显示（可换行）；行业标签紧跟文字末尾 */
   white-space: normal;
   word-break: break-all;
+}
+
+/* 重大事件（五星 importance===5 或 GI 进当日双榜单）：标题比普通事件更粗更黑（2026-10-01 用户口径） */
+.title--major {
+  font-weight: 700;
+  color: #000000;
+}
+
+/* 重大事件红色渐变胶囊「重大」+ 白色实心火焰（2026-10-01 用户验收定稿）：
+   胶囊底与事件传导重大卡片 .panel-top 同款红渐变 linear-gradient(180deg, #e22c2c, #d81f1f)，
+   胶囊内白色火焰（SvgIcon fire-fill 单色白）+ 白色文字。 */
+.major-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  vertical-align: middle;
+  margin-right: 8rpx;
+  padding: 0 12rpx;
+  border-radius: 8rpx;
+  background: linear-gradient(180deg, #e22c2c, #d81f1f);
+}
+
+.major-badge__flame {
+  flex-shrink: 0;
+}
+
+.major-badge__text {
+  font-size: 20rpx;
+  color: #ffffff;
+  font-weight: 600;
+  line-height: 34rpx;
+  white-space: nowrap;
 }
 
 /* 核心影响板块标签（紧跟标题文字末尾，inline 胶囊） */
@@ -401,14 +461,27 @@ onMounted(() => {
   line-height: 34rpx;
   padding: 0 12rpx;
   border-radius: 8rpx;
-  background: var(--ev-accent-soft);
-  color: var(--ev-accent);
   white-space: nowrap;
+}
+
+/* 行业方向着色（A 股红涨绿跌，必须用 global.scss 的 --ev-* 变量，禁止硬编码色值）。
+   注意：三种方向都【无底色】（inline 胶囊只靠字色区分），不设 background。 */
+.sector-tag--bullish {
+  color: var(--ev-negative);
+}
+
+.sector-tag--bearish {
+  color: var(--ev-positive);
+}
+
+/* neutral 默认灰色字（--ev-text-muted） */
+.sector-tag--neutral {
+  color: var(--ev-text-muted);
 }
 
 .summary {
   font-size: 24rpx;
-  color: var(--ev-text-secondary);
+  color: var(--ev-text-muted); /* 对齐事件传导页洞见摘要灰阶 $ink-mute（2026-10-01） */
   line-height: 1.5;
   margin-top: 8rpx;
   display: -webkit-box;

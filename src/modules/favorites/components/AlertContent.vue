@@ -83,7 +83,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { useUserStore } from '@/shared/store/modules/user'
-import { isUnattributableMovement } from './insightCards'
+import { isUnattributableMovement, dedupeDailyMovements } from './insightCards'
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -153,7 +153,8 @@ async function loadCaptureList() {
   // 2026-08-30 链路合并：涨停雷达事件已并入 stock-trace（movements），列表只消费 movements
   try {
     const page = await stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] }))
-    const attributable = (page.items ?? []).filter((m) => !isUnattributableMovement(m))
+    // 2026-09-13：同日同股多次异动只保留最新一条（先过滤不可归因 → 取当日最近一条有效归因）
+    const attributable = dedupeDailyMovements((page.items ?? []).filter((m) => !isUnattributableMovement(m)))
     captureList.value = attributable.map(fromMovement).sort((a, b) => b.sortTime - a.sortTime)
   } catch {
     captureList.value = []

@@ -127,14 +127,25 @@ function sortByChangePct(items: HotBurstSignal[]): HotBurstSignal[] {
   })
 }
 
+function dedupeBySymbol(items: HotBurstSignal[]): HotBurstSignal[] {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const symbol = item.symbol?.trim()
+    if (!symbol) return true
+    if (seen.has(symbol)) return false
+    seen.add(symbol)
+    return true
+  })
+}
+
 async function loadData() {
   const cached = readHomeCache()
   if (cached) {
-    signals.value = sortByChangePct(cached)
+    signals.value = dedupeBySymbol(sortByChangePct(cached))
     return
   }
   try {
-    signals.value = sortByChangePct(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 2 }))
+    signals.value = dedupeBySymbol(sortByChangePct(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 2 })))
   } catch {
     signals.value = []
   }

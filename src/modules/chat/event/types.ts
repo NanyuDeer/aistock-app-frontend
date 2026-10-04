@@ -422,3 +422,36 @@ export interface EventTimelineResponse {
   pageSize: number
   hasMore: boolean
 }
+
+// ==================== 时间线统一行视图模型 ====================
+
+/**
+ * 时间线统一行视图模型 —— 实体源（GET /timeline，未来段）与事件传导历史源
+ * （GET /agent/event/list，历史段）合并后的展示行。两源合并后由页面按 date 分组。
+ *
+ * 历史段（date ≤ 今天）：事件传导列表中 **重要性 ≥4 且非纯行情** 的事件；
+ * 实体源只保留未来段（date > 今天）。分组/排序在页面按 `date` + `eventStartTime.localeCompare`。
+ */
+export interface TimelineRow {
+  /** 事件唯一标识（点击跳详情用） */
+  eventId: string
+  /** 日期分组键 YYYY-MM-DD（历史行 = publishTime 前 10 位；未来行 = 后端 date） */
+  date: string
+  /** 组内排序时间（完整时间戳，保证同日顺序稳定）：历史行填 publishTime，未来行用 eventStartTime */
+  eventStartTime: string
+  /** 事件标题 */
+  title: string
+  /** 摘要（历史行恒为空串 → 页面不渲染摘要；未来行保留原摘要） */
+  summary: string
+  /** 展示的最核心行业名（chain_summary[0].industry）；缺失 → null（不渲染胶囊） */
+  sectorName: string | null
+  /** 行业方向（chain_summary[0].direction 归一）；缺失 → null */
+  sectorDirection: 'bullish' | 'bearish' | 'neutral' | null
+  /** 是否进了当日 GI 双榜单（globalImportanceRank != null → 历史行标题加粗；未来行恒 false） */
+  isGi: boolean
+  /** 事件星级（1~5，由传导 chain 最大 impactStrength 映射；历史行保留，未来行恒 null）——
+   * importance===5 或 isGi → 时间线「重大」徽标 + 标题加粗 */
+  importance: number | null
+  /** 是否为未来行（未来行就地展开；历史行点击恒跳详情页） */
+  isFuture: boolean
+}

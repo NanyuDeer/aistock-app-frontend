@@ -21,7 +21,8 @@
  * - 异常处理：详情接口失败时返回原对象
  */
 
-import type { EventItem, FocusEventViewModel } from '../types'
+import type { EventItem, EventTimelineItem, FocusEventViewModel, TimelineRow } from '../types'
+import { isPureMarketEvent } from '../constants'
 import { getEventList, getEventDetail } from './eventApi'
 
 // ==================== AI 今日精选相关类型 ====================
@@ -295,4 +296,192 @@ function chunk<T>(array: T[], size: number): T[][] {
     chunks.push(array.slice(i, i + size))
   }
   return chunks
+}
+
+// ==================== 时间线历史段（事件传导源） ====================
+
+/**
+ * 本地 Date → YYYY-MM-DD（缺省"今天"用，供历史源过滤 `date <= 今天`）。
+ * 注意：进入本服务的只有事件传导事件，无后端上海时区日期，
+ * 历史段上界"今天"用本地日期足够（历史段是过去事件，时区偏差可接受）。
+ */
+function localTodayStr(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * publishTime → 日期分组键 YYYY-MM-DD。
+ * 后端可能给 ISO 带时区（"2026-09-29T15:06:07.939323+08:00"）或纯日期（"2026-09-29"），
+ * 统一取字符串前 10 位即可健壮兼容两种格式。
+ */
+function publishDateOf(publishTime: string): string {
+  const s = (publishTime ?? '').trim()
+  // 长度不足 10（异常数据）原样返回，避免 slice 后变成非法短串
+  return s.length >= 10 ? s.slice(0, 10) : s
+}
+
+/** 取最核心行业（chain_summary[0].industry + direction 归一）；缺失 → null（页面不渲染胶囊） */
+function sectorOf(item: EventItem): { name: string; direction: 'bullish' | 'bearish' | 'neutral' } | null {
+  const first = item.chain_summary?.[0]
+  if (!first || !first.industry?.trim()) return null
+  // direction 归一：仅 bullish/bearish 采用，其余（mixed/缺失/非法）视为 neutral，与 adapter 口径一致
+  const direction: 'bullish' | 'bearish' | 'neutral' =
+    first.direction === 'bullish' || first.direction === 'bearish' ? first.direction : 'neutral'
+  return { name: first.industry, direction }
+}
+
+/**
+ * 从事件传导列表项构建历史段时间线行（纯函数，供 getTimelineHistoryRows 复用与单测）。
+ *
+ * 准入：**同时满足** ① importance >= 4（星级 1~5，由 chain 最大 impactStrength 映射，adapter 已算好，前端不重写）,
+ *              ② 非纯行情（isPureMarketEvent(title)===false，现象词命中且无原因词则剔除）。
+ * importance 缺失或 <4 → 剔除；纯行情 → 剔除；date > today → 剔除。
+ *
+ * 字段口径：
+ * - date = publishTime 前 10 位（后端 publishTime 为带 +08:00 的上海时间字符串，**前端禁止自行时区换算**）
+ * - eventStartTime = publishTime（页面按它做同日组内排序）
+ * - summary 恒空串（历史行不渲染摘要行）
+ * - sectorName/sectorDirection = chain_summary[0]（#1 核心行业）
+ * - isGi = globalImportanceRank 有值
+ * - isFuture = false
+ *
+ * @param items - 事件传导列表项（已按 eventId 去重）
+ * @param today - 历史段右边界 YYYY-MM-DD（date ≤ today 才收录）
+ */
+export function buildTimelineHistoryRows(items: EventItem[], today: string): TimelineRow[] {
+  const rows: TimelineRow[] = []
+
+  for (const item of items) {
+    if (!item || !item.eventId) continue
+
+    // ① 重要性 ≥4（undefined / <4 剔除）
+    const importance = item.importance
+    if (typeof importance !== 'number' || importance < 4) continue
+
+    // ② 非纯行情（现象词命中且无原因词 → 剔除；讲清原因必须放行）
+    if (isPureMarketEvent(item.title)) continue
+
+    const date = publishDateOf(item.publishTime)
+    // publishTime 缺失/异常（长度 <10）→ 跳过，避免在时间轴顶部形成空日期分组
+    // （formatDateDisplay('')/短串会得到空标题；这类坏数据不应产生一行）
+    if (date.length < 10) continue
+    // 历史段上界：date ≤ 今天
+    if (date > today) continue
+
+    const sector = sectorOf(item)
+    rows.push({
+      eventId: item.eventId,
+      date,
+      eventStartTime: item.publishTime,
+      title: item.title,
+      // 历史行恒无摘要（用户明确不要"XX行业受益"这类 conclusion）
+      summary: '',
+      sectorName: sector?.name ?? null,
+      sectorDirection: sector?.direction ?? null,
+      // 进了当日 GI 双榜单（rank 非空）→ 历史行标题加粗
+      isGi: item.globalImportanceRank != null,
+      // 星级保留（1~5）：importance===5（最高星）→ 时间线「重大」徽标
+      importance: typeof item.importance === 'number' ? item.importance : null,
+      isFuture: false,
+    })
+  }
+
+  return rows
+}
+
+/**
+ * 翻页拉取事件传导历史源行：星级 ≥4 且非纯行情，date ∈ [earliestDate, 今天]。
+ *
+ * 排序口径：后端 /api/agent/event/list 实为 `ORDER BY created_at DESC`（去重 `DISTINCT ON (user_id) ... created_at DESC`），
+ * 与前端 publishTime 只是【近似】——upsert 会刷新 created_at，旧事件可能前移，故不能假设列表严格按 publishTime 降序。
+ *
+ * 停止条件（任一满足即停止）：
+ * 1. 本页最新（max）publishTime 前 10 位 < earliestDate —— 整页已出窗；
+ *    必须用 max 而非 min：若用 min，错序的旧事件会把整页误判为"已出窗"而提前 break，静默漏掉窗内事件
+ * 2. hasMore === false
+ * 3. 达到 maxPages（防御上限）
+ *
+ * 说明：报告 7 天 TTL，通常 2 页（每页 100 条）足够，maxPages=5 只是防御上限。
+ *
+ * 异常处理：getEventList 抛错 → 返回 []（历史段失败不能让整个时间轴白屏）。
+ *
+ * @param opts.earliestDate - 历史段左边界 YYYY-MM-DD（页面传过去 30 天，即今天-30）
+ * @param opts.maxPages - 最多翻页数（防御）
+ * @param opts.pageSize - 每页条数（列表接口上限 100）
+ * @param opts.today - 历史段右边界（缺省本地今天，测试可注入保证确定性）
+ */
+export async function getTimelineHistoryRows(opts: {
+  earliestDate: string
+  maxPages?: number
+  pageSize?: number
+  today?: string
+}): Promise<TimelineRow[]> {
+  const earliestDate = opts.earliestDate
+  const maxPages = opts.maxPages ?? 5
+  const pageSize = opts.pageSize ?? 100
+  const todayStr = opts.today ?? localTodayStr()
+
+  // 先按 eventId 去重收集原始事件（列表源可能跨页重复再过滤）
+  const seen = new Set<string>()
+  const deduped: EventItem[] = []
+
+  try {
+    for (let page = 1; page <= maxPages; page++) {
+      const res = await getEventList({ page, pageSize })
+      const events = res.events ?? []
+
+      // 本页最新日期（判停）：后端以 created_at DESC 排序，与 publishTime 仅近似，
+      // 故只能用「本页最新日仍早于下界 → 整页已出窗」判停；绝不能用最旧（错序会提前 break、静默漏行）
+      let pageNewest: string | null = null
+      for (const ev of events) {
+        const d = publishDateOf(ev.publishTime)
+        if (pageNewest === null || d > pageNewest) pageNewest = d
+        // 收集仍在下界内的项（星级/纯行情等准入由下方纯函数再过滤）
+        if (d < earliestDate) continue
+        // 上界防御（超过今天不收录，交由纯函数分支但这里提前跳过）
+        if (d > todayStr) continue
+        if (!seen.has(ev.eventId)) {
+          seen.add(ev.eventId)
+          deduped.push(ev)
+        }
+      }
+
+      // 停判：整页已出窗（本页最新日仍早于下界）或显式 hasMore=false
+      if (pageNewest === null || pageNewest < earliestDate) break
+      if (res.hasMore === false) break
+    }
+  } catch (err) {
+    // 历史源失败仅告警并返回空，避免整条时间轴因历史段白屏
+    console.warn('[eventService] 时间线历史段拉取失败，返回空', err)
+    return []
+  }
+
+  return buildTimelineHistoryRows(deduped, todayStr)
+}
+
+/**
+ * 实体源行（未来段）：EventTimelineItem → TimelineRow（isFuture=true）。
+ * 实体源（GET /timeline）无 GI 排名与行业方向信息，故 isGi=false、sectorDirection=null
+ * （sectorName 仍取 `impactSectors[0]`，保持未来行"有行业名"的原有展示）；
+ * 摘要保留（未来行展示摘要），标题加粗只在传导历史段生效。
+ */
+export function getEntityRows(items: EventTimelineItem[]): TimelineRow[] {
+  return items.map((it) => ({
+    eventId: it.eventId,
+    date: it.date,
+    eventStartTime: it.eventStartTime,
+    title: it.title,
+    // 未来行保留原摘要（页面按非空才渲染）
+    summary: it.summary || '',
+    // 未来行胶囊：实体源只给板块名（KG 预计算 impact_sectors 名字列），无传导 chain、无方向
+    sectorName: it.impactSectors?.[0] ?? null,
+    // 未来事件无方向数据：实体源只给行业名，不区分 bullish/bearish，
+    // 故恒 null → 页面按「无方向」fallback 到中性灰（用户口径"红涨绿跌"只对历史段生效）
+    sectorDirection: null,
+    isGi: false,
+    // 未来行无传导报告 → 无星级（恒 null，不触发「重大」徽标）
+    importance: null,
+    isFuture: true,
+  }))
 }
