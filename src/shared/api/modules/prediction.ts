@@ -85,6 +85,14 @@ export interface PredictionStats {
   verifiedHorizonCount: number
   hitCount: number
   missCount: number
+  /** Task 5 迭代看板指标（后端新增；旧响应可能缺失，故全部可选） */
+  long_excluded?: boolean
+  settled_ratio?: number | null
+  flat_rate?: number | null
+  flat_count?: number
+  directional_count?: number
+  /** long 档命中率单列（仅展示，不进迭代判读；无样本时 hitRate=null） */
+  long?: { n: number; hits: number; hitRate: number | null }
 }
 
 export interface PredictionListResponse {
