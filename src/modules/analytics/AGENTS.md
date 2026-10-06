@@ -17,7 +17,7 @@
 ## 组件
 
 - `components/TrendKLineChart.vue`：趋势评分专用 K 线图，支持 H5、App 和小程序画布。
-- `components/MarketTracePrediction.vue`：影响持续性预判卡片（B2 预测能力，样式对齐同页 `MarketTracePredictionValidation.vue`）。**2026-09-02 通用化**：条件化预判区改嵌共享 `ConditionalForecastBlock`（从 InsightCard structured 抽取，大盘/板块/个股一切有条件化预判共用同款分支 UI）；大盘专属的状态/归因摘要/期段明细/演化路径/风险保留。prediction-detail 与市场洞见展开复用本组件。
+- `components/MarketTracePrediction.vue`：影响持续性预判卡片（B2 预测能力，样式对齐同页 `MarketTracePredictionValidation.vue`）。**2026-09-02 通用化**：条件化预判区改嵌共享 `ConditionalForecastBlock`（从 InsightCard structured 抽取，大盘/板块/个股一切有条件化预判共用同款分支 UI）。**2026-10-06 档位行统一**：大盘自写的 `horizon-item` 期段明细平铺块已**删除**——档位明细改由共享块**统一渲染**（同一张卡内档位信息只出现一次）；卡片仅保留状态/归因摘要/演化路径/风险。prediction-detail 与市场洞见展开复用本组件。共享块 `shared/components/ConditionalForecastBlock.vue` 的**档位区已由「Tab 切换」改为「平铺所有档」**（每档一行 `.as-insight-card__horizon-row`，不再有 `.as-insight-card__seg-item` 档位 Tab）；`StructuredHorizon` 新增**可选**字段 `metricProjection` / `target` / `phase`，走**方案 B 字段驱动**——有值才渲染、无值整行跳过（不兜底、不留空占位）；其中板块的 `metricProjection` 由后端透传原始 LLM 文案（前端不改写）。
 - `components/MarketInsightCard.vue`：市场洞见卡片（简短的 InsightCard + 现象/溯源/预判三块展开详情，付费墙预留）。
 - `components/PredictionVerification.vue`：预测验证结果组件（B2.1），逐档位渲染到期日/结果徽标/实际涨跌幅/验证时间/reason。
 - `KLineChart` 已提升至 `shared/components/`（`shared/components/KLineChart.vue`），此处引用共享组件。
