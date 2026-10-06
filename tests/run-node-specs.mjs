@@ -37,10 +37,12 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *  2026-09-26：首页时段洞见横条新增 getTradingTimeSlot 边界用例 1 条（tradingTime.spec.ts）。
  *  2026-09-26：首页四宫格改名精确断言 + 时段横条接线用例新增 1 条（MorningContent.spec.ts）。
  *  2026-10-06：Task 6「二级页首屏快评」新增 3 条 spec（stockInfo.spec.ts：命中信封 / 命中裸对象 / 无数据）。
- *    ⚠ 已知残余失败 3（均非本次改动引入）：2 条为既有（MorningContent「时段洞见横条」顺序断言、
- *    rhythm pickVersion 签名断言），1 条由工作区在途未提交改动引入（RhythmCard「仓位文案」断言）。
+ *    ⚠ 已知残余失败 2（均非本次改动引入）：MorningContent「时段洞见横条」顺序断言、
+ *    rhythm pickVersion 签名断言。本常量按**仓库提交态**取值；若工作区另有在途未提交改动
+ *    引入新失败（曾观测到 RhythmCard「仓位文案」1 条），哨兵会如实报基线漂移（exit 2）——
+ *    那是在途改动的真实告警，**不得通过改本常量掩盖**。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '280/277/3'
+const EXPECTED_BASELINE = '280/278/2'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {
