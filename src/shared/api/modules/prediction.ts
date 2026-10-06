@@ -71,9 +71,36 @@ export interface PredictionRecord {
     evolution_steps?: Array<{ label: string; text: string }>
     risks?: Array<{ factor: string; invalidation: string }>
     evidence_ids?: unknown
+    /** 越年近似档位名列表（P2 裁决；缺省/空 = 全精确档） */
+    due_dates_approximate?: string[]
   }
   due_dates: Partial<Record<PredictionHorizonKey, string>>
   verification: Partial<Record<string, PredictionVerificationEntry>>
+}
+
+/** 迭代看板子桶（§8-3 方向/档位下钻；字段与后端 publicRouter 对应） */
+export interface PredictionSubBucket {
+  n: number
+  hits: number
+  hitRate: number | null
+  sufficientSample: boolean
+  flat_rate: number | null
+  flat_count: number
+  directional_count: number
+}
+
+/** 方向桶：bullish / bearish / neutral 各一桶（各带 flat_rate） */
+export interface PredictionDirectionBuckets {
+  bullish: PredictionSubBucket
+  bearish: PredictionSubBucket
+  neutral: PredictionSubBucket
+}
+
+/** 档位桶：short / mid / long；long 单列并标注不参与迭代判读 */
+export interface PredictionHorizonBuckets {
+  short: PredictionSubBucket
+  mid: PredictionSubBucket
+  long: PredictionSubBucket & { iteration_board: boolean }
 }
 
 export interface PredictionStats {
@@ -93,6 +120,9 @@ export interface PredictionStats {
   directional_count?: number
   /** long 档命中率单列（仅展示，不进迭代判读；无样本时 hitRate=null） */
   long?: { n: number; hits: number; hitRate: number | null }
+  /** §8-3 方向桶 × 档位桶（后端新增；旧响应可能缺失，故可选；展示留待后续 UI 任务） */
+  directionBuckets?: PredictionDirectionBuckets
+  horizonBuckets?: PredictionHorizonBuckets
 }
 
 export interface PredictionListResponse {

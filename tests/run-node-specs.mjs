@@ -42,8 +42,10 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *    （RhythmCard「仓位文案」断言，需单独定位修复）。
  *    本常量按**仓库提交态**取值；若工作区另有在途未提交改动引入新失败，哨兵会如实报
  *    基线漂移（exit 2）——**不得通过改本常量掩盖**。
+ *  2026-10-06：预判验证口径重构终评修复新增 1 条
+ *    （predictionHistory.spec.ts 的 computeStats 对齐 4.0 口径：旧版本/approximate 剔除 + long 单列）。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '280/277/3'
+const EXPECTED_BASELINE = '281/278/3'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {
