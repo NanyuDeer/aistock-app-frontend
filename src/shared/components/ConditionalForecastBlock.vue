@@ -7,7 +7,7 @@
     </view>
 
     <!-- 档位区（2026-10-06 三粒度档位行统一）：平铺所有档（替代原 Tab 切换）——
-         每档一行，字段驱动：方向 / 基准·label / 置信 / remaining / metricProjection，各自 v-if（无值整行跳过该字段，不兜底） -->
+         每档一行，字段驱动：方向 / 基准·label / 置信 / target / phase / remaining / metricProjection，各自 v-if（无值整行跳过该字段，不兜底） -->
     <view class="as-insight-card__ph">
       <view
         v-for="(h, idx) in flatHorizons"
@@ -20,6 +20,9 @@
         </text>
         <text v-if="h.label" class="as-insight-card__ph-tt">基准 · {{ h.label }}</text>
         <text v-if="h.confidence" class="as-insight-card__conf">置信 {{ confText(h.confidence) }}</text>
+        <!-- 大盘粒度既有信息（target/phase）：字段驱动，板块不传即整行不渲染 -->
+        <text v-if="h.target" class="as-insight-card__horizon-target">{{ h.target }}</text>
+        <text v-if="h.phase" class="as-insight-card__horizon-phase">{{ phaseText(h.phase) }}</text>
         <text v-if="h.remaining" class="as-insight-card__remain">{{ h.remaining }}</text>
         <text v-if="h.metricProjection" class="as-insight-card__horizon-projection">{{ h.metricProjection }}</text>
       </view>
@@ -166,6 +169,8 @@ type HorizonKey = 'short' | 'mid' | 'long'
 type Direction = 'bullish' | 'bearish' | 'neutral'
 type Confidence = 'high' | 'medium' | 'low'
 type Verification = 'pending' | 'hit' | 'miss'
+/** 影响生命周期阶段（大盘溯源模型透传；板块无此语义） */
+type HorizonPhase = 'building' | 'peaking' | 'decaying' | 'returning'
 
 interface StructuredHorizon {
   horizon: HorizonKey
@@ -179,6 +184,10 @@ interface StructuredHorizon {
   confidence?: Confidence
   /** 该档口径说明（板块/大盘共用；缺失即不渲染，不兜底） */
   metricProjection?: string
+  /** 目标位（大盘粒度透传，板块不传；缺失即不渲染，不兜底） */
+  target?: string
+  /** 影响生命周期阶段（大盘粒度透传，板块不传；英文枚举经 phaseText 映射为中文展示） */
+  phase?: HorizonPhase
 }
 
 interface StructuredCondition {
@@ -411,6 +420,17 @@ function confText(c: Confidence): string {
   return map[c]
 }
 
+/** 影响生命周期阶段枚举 → 中文（纯展示映射；本组件是 StructuredHorizon 的 owner，故映射收在此处） */
+function phaseText(p: HorizonPhase): string {
+  const map: Record<HorizonPhase, string> = {
+    building: '影响形成',
+    peaking: '影响高峰',
+    decaying: '影响衰减',
+    returning: '回归常态',
+  }
+  return map[p]
+}
+
 function dirClass(d: Direction): string {
   return d === 'bullish'
     ? 'as-insight-card__dir--up'
@@ -561,6 +581,21 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   font-size: 20rpx;
   color: $ink-faint;
   line-height: 1.5;
+}
+
+/* 目标位（大盘粒度透传；板块不传即不渲染） */
+.as-insight-card__horizon-target {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: $ink;
+}
+
+/* 影响阶段（大盘溯源模型透传；板块不传即不渲染） */
+.as-insight-card__horizon-phase {
+  flex-shrink: 0;
+  font-size: 20rpx;
+  color: $ink-faint;
 }
 
 .as-insight-card__ph-tt {
