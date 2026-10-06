@@ -14,6 +14,8 @@ export interface SectorStructuredForecast {
     label?: string
     direction?: 'bullish' | 'bearish' | 'neutral'
     confidence?: 'high' | 'medium' | 'low'
+    /** 该档口径说明（板块粒度 LLM 生成；缺失即不渲染，不兜底） */
+    metricProjection?: string
   }>
   conditions?: Array<{
     horizon: 'short' | 'mid' | 'long'
@@ -45,7 +47,9 @@ export function sectorPredictionToStructured(p: SectorInsightPrediction | null |
         remaining: h.remaining,
         label: h.label ?? undefined,
         direction: h.direction,
-        confidence: h.confidence
+        confidence: h.confidence,
+        // 字段驱动：无值即 undefined（共享块 v-if 不渲染），不在此拼装/编造口径文案
+        metricProjection: h.metric_projection ?? undefined
       })) ?? [],
     conditions:
       (p.conditions ?? []).flatMap(expandConditionalBranches).map((c) => ({

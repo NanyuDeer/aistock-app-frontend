@@ -46,6 +46,7 @@ export default defineConfig({
       'src/shared/utils/parseMarkdownSections.spec.ts',
       'src/shared/utils/scrollFollow.spec.ts',
       'src/shared/utils/sessionUsageMerge.spec.ts',
+      'src/shared/utils/sectorInsight.spec.ts',
       'src/shared/utils/eveningBriefCards.spec.ts',
       'src/shared/utils/speechInput.spec.ts',
       'src/shared/utils/traceDate.spec.ts',

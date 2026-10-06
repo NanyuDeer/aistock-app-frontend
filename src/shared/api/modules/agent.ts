@@ -599,6 +599,8 @@ export interface SectorInsightHorizon {
   label?: string
   direction?: SectorDirection
   confidence?: SectorConfidence
+  /** 该档口径说明（LLM 生成；缺失即不渲染，不兜底拼装） */
+  metric_projection?: string
 }
 
 export interface SectorInsightCondition {
