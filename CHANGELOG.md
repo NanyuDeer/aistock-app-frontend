@@ -2,6 +2,27 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-10-06 — 市场洞见溯源展示口径改造 + 首页时段动态洞见卡
+
+**开发者**: Aria
+
+### 新增
+
+- `modules/home/components/DynamicInsightCard.vue`：首页「时段动态洞见卡」（时段驱动头条焦点区 + 3 条跨模块次要焦点 + 四入口条带；盘后头条市场↔节奏每 5s 轮播，`onUnmounted` 清理定时器）+ `DynamicInsightCard.mount.spec.ts`（9 例）；`MorningContent.vue` 在「今日专属播报卡」与四宫格之间接入（不删改既有节点），并为消息行补 `hint`/`sectors`；`vitest.config.ts` 白名单登记新 spec。
+
+### 改进
+
+- **市场洞见「溯源」展示口径**：`analytics/utils/marketTraceReview.ts` 新增 `alternativeChainId`；`analytics/utils/marketInsightBrief.ts` 在 `primaryCause` 为 null 时取指定/首个 weak 候选，输出 **「可能主因（待验证）：<conclusion>」**，替代此前恒显示的「证据不足，主因待验证」（仅改展示，不动后端归因语义）。
+- `modules/home/AGENTS.md`：补充 `DynamicInsightCard.vue` 组件说明。
+- `modules/user/pages/profile.vue`：「关于洞见」版本号文案 0.1.3 → **0.1.4**（跟随已发布的 0.1.4 包）。
+
+### 测试
+
+- `marketInsightBrief.spec.ts` 新增 4 例（13/13 通过）、`DynamicInsightCard.mount.spec.ts` 9 例；`vue-tsc --noEmit` exit 0。
+- 跨端：`aistock-frontend`（Web）无 `marketInsightBrief` / 该洞见卡链路，无需同步。
+
+---
+
 ## [master] 2026-10-03 — 0.1.4 版本发布
 
 **开发者**: 项目组

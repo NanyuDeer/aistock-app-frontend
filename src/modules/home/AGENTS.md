@@ -11,6 +11,7 @@
 - `components/MorningCard.vue` - 晨报卡片
 - `components/MorningContent.vue` - 首页晨报内容容器（四宫格「洞见」入口 + 时段洞见横条）
 - `components/TimeSlotInsightBar.vue` - 时段（盘前/盘中/盘后）动态洞见横条
+- `components/DynamicInsightCard.vue` - 时段动态洞见卡（方案D：头条焦点 + 3条跨模块次要 + 四入口条带）；时段徽标实心主色底且模块标签同行（无顶部横条，徽标前带洞见字标），洞见卡同款渐变分隔线，小字详情＝洞见一句话结论，各模块带独有内容（风口序号+涨跌幅 / 消息影响板块↑红↓绿 / 市场日期+更新时间 / 节奏档位色标+基准日）；盘后头条市场↔节奏每5s轮播；置于四宫格上方，暂不替换既有卡片
 
 ## Hooks
 （暂无模块专属 hooks）
