@@ -113,7 +113,11 @@
 - `components/StockCardList.vue` - 股票列表
 - `components/KLineChart.vue` - K 线图
 - `components/MiniKLine.vue` - 迷你 K 线（多股同列宫格用；分时/五日为折线，日/周/月为蜡烛+成交量；App + H5 走 renderjs 视图层 `createElementNS` 构建真实 SVG，小程序回退到占位"--"）
+- `components/PolicyList.vue` - 行业政策列表（2026-10-06 新增）：每条 = 利好标签 + 正文（折叠 2 行截断）+ 本条末尾自带的「展开/收起」按钮；**同时只展开一条**（点另一条自动收起前一条）；仅超长条目（>42 字）渲染按钮。替代原先的全局「查看完整」+ 只显示前 2 条
 - `components/StockDetailTable.vue` - 股票详情表格
+- `components/ForecastFinancialChart.vue` - 业绩预测财务图（2026-10-06 新增，对齐 Web 端个股详情页）：上下两块——「规模与成长」（净利润+营业收入堆叠柱 / 净利润增长率折线，双轴）与「成长与估值」（营业收入增长率 / 净资产收益率 / 市盈率，双轴）；数据源为 `forecastData.detailIndicators`；纯 CSS/DOM 实现（折线用 `transform: rotate` 细线段），不依赖 canvas / SVG / renderjs，全端可用。详情页与推送弹窗（`shared/components/NotificationInsightModal.vue`）共用
+- ~~`components/ForecastGrowthChart.vue`~~ - 年度预测增长率图，**已于 2026-10-06 删除**：其数据（净利润 + 净利润增长率）与 `ForecastFinancialChart` 的「规模与成长」块重复，故整体移除（组件、测试、vitest 白名单、两处调用与视图模型一并清理）
+- ~~`components/ForecastProfitChart.vue`~~ - 旧单序列净利润柱图，**已于 2026-10-06 删除**（详情页与推送弹窗均改用上面两个组件，删除前已 grep 确认无任何引用）
 
 ## Hooks
 - `utils/useInsightReportSSE.ts`（**2026-09-25 新增，2026-09-26 改为双通道**）— 完整洞察报告流式读取。消费 `GET /api/cn/favorites/movements/:eventId/report/stream`，**按运行时能力择一通道**（`pickReportStreamChannel()`，不用条件编译）：H5 走 `fetch + ReadableStream`，App / 小程序走 `uni.request({ enableChunked: true }) + onChunkReceived`；fetch 拿到响应但无 `body` 时回退到 chunked。两条通道共用 `createReportStreamDecoder(handle)`（`data: {...}\n\n` 分帧、`TextDecoder({stream:true})` 跨块续解、半帧缓存、累计 `rawText`）。**不用 `EventSource`**：无法设置 `Authorization` 头，而该端点需 JWT。返回 `{ header, sections, loading, done, error, start(eventId), stop() }`；`sections` 逐条追加（`[...sections, section]` 触发响应式）；60s 超时后中止并置 `error='请求超时，请稍后重试'`；非 200 时读 JSON 的 `message` 作错误文案；单帧 JSON 解析失败忽略不中断；取消统一走 `setCancel(cb)`（`AbortController` / `requestTask.abort`）；`stop()` 用 `active` 标志阻断迟到响应改写状态。

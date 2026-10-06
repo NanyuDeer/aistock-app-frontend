@@ -124,6 +124,59 @@ describe('DynamicInsightCard', () => {
     expect(wrapper.find('.dyn-sec').text()).not.toContain('半导体')
   })
 
+  it('次卡尾部标签与四宫格一致：风口/市场用组件库 Tag，节奏用档位色块', () => {
+    // 盘中头条为消息，次要为 风口(+2.10% up) / 市场(09-19 neutral) / 节奏(档位)
+    const wrapper = mount(DynamicInsightCard, { props: { ...baseProps, currentSlot: 'intraday' } })
+    const tags = wrapper.findAll('.dyn-sec__row .as-tag')
+    expect(tags).toHaveLength(2)
+    expect(tags[0].classes()).toContain('as-tag--sm')
+    expect(tags[0].classes()).toContain('as-tag--up')
+    expect(tags[1].classes()).toContain('as-tag--neutral')
+    // 节奏行改用档位色块（对齐四宫格「节奏洞见」卡的 .rhythm-chip）
+    const chips = wrapper.findAll('.dyn-sec__row .dyn-sec__rhythm')
+    expect(chips).toHaveLength(1)
+    expect(chips[0].attributes('style')).toContain('background')
+    // 不再使用纯文字标签
+    expect(wrapper.find('.dyn-sec__badge').exists()).toBe(false)
+  })
+
+  it('市场头条：标题用现象摘要（洞见卡的「一句话结论」），小字详情用溯源句', () => {
+    const wrapper = mount(DynamicInsightCard, {
+      props: {
+        ...baseProps,
+        traceReports: [{
+          name: '今日概念板块集中异动',
+          tag: '09-19',
+          tagType: 'date',
+          hint: '产业政策：注册制改革推进改善市场供给结构',
+        }],
+        currentSlot: 'post',
+      },
+    })
+    expect(wrapper.find('.dyn-focus__title').text()).toBe('今日概念板块集中异动')
+    expect(wrapper.find('.dyn-focus__hint').text()).toBe('产业政策：注册制改革推进改善市场供给结构')
+  })
+
+  it('节奏行的小字详情取传入结论，不再回退兜底文案', async () => {
+    const wrapper = mount(DynamicInsightCard, {
+      props: {
+        ...baseProps,
+        rhythmRows: [{
+          band: '五成~六成',
+          basis_date: '2026-09-25',
+          date: '2026-09-24',
+          level: 'normal',
+          hint: '常温 · 建议仓位五成~六成',
+        }],
+        currentSlot: 'post',
+      },
+    })
+    vi.advanceTimersByTime(5000)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.dyn-card__module').text()).toBe('节奏')
+    expect(wrapper.find('.dyn-focus__hint').text()).toBe('常温 · 建议仓位五成~六成')
+  })
+
   it('四入口条带：4 项、数量徽标、当前时段模块高亮', () => {
     const wrapper = mount(DynamicInsightCard, { props: { ...baseProps, currentSlot: 'pre' } })
     const items = wrapper.findAll('.dyn-strip__item')
@@ -149,12 +202,12 @@ describe('DynamicInsightCard', () => {
     expect(wrapper.emitted('navigate')?.[2]).toEqual(['rhythm'])
   })
 
-  it('C 式整宽头条布局：无左侧主视觉图标；查看详情为蓝色文字链接而非按钮', () => {
+  it('C 式整宽头条布局：无左侧主视觉图标；详情为蓝色文字链接而非按钮', () => {
     const wrapper = mount(DynamicInsightCard, { props: { ...baseProps, currentSlot: 'pre' } })
     expect(wrapper.find('.dyn-focus__visual').exists()).toBe(false)
     expect(wrapper.find('.dyn-focus__cta').exists()).toBe(false)
     const link = wrapper.find('.dyn-focus__link')
-    expect(link.text()).toContain('查看详情')
+    expect(link.text()).toBe('详情 →')
     expect(link.classes()).toContain('dyn-focus__link')
     expect(wrapper.find('.dyn-focus__foot').find('.dyn-focus__badge').exists()).toBe(true)
     expect(wrapper.find('.dyn-focus__foot').find('.dyn-focus__link').exists()).toBe(true)

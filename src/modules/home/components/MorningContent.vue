@@ -198,9 +198,10 @@ import { stockApi } from '@/shared/api/modules/stock'
 import { agentApi } from '@/shared/api/modules/agent'
 import { getEventList } from '@/modules/chat/event/api/eventApi'
 import { shanghaiDateString, shanghaiDateTimeParts, addCalendarDays, getTradingTimeSlot, type TradingTimeSlot } from '@/shared/utils/tradingTime'
-import { toMarketTraceViewModel } from '@/modules/analytics/utils/marketTraceReview'
+import { toMarketTraceViewModel, toMarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
+import { toMarketInsightBrief } from '@/modules/analytics/utils/marketInsightBrief'
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
-import { RHYTHM_LEVEL_COLORS, RHYTHM_GREY, levelShort, type RhythmLevelKey } from '@/shared/utils/rhythmColors'
+import { RHYTHM_LEVEL_COLORS, RHYTHM_GREY, levelShort, levelLabel, type RhythmLevelKey } from '@/shared/utils/rhythmColors'
 import { formatBandText } from '@/shared/utils/rhythmBand'
 
 const {
@@ -287,7 +288,7 @@ interface LeaderStockPreview {
   tagType: 'buy' | 'sell' | 'wash' | 'up' | 'down' | 'date'
   /** 预览行额外携带的跳转标识：消息洞见行 → 事件 ID，跳转 AI 事件分析页用 */
   eventId?: string
-  /** 小字详情：洞见一句话结论（风口 AI 预判 / 消息结论 / 市场溯源详情） */
+  /** 小字详情：洞见一句话结论（风口 AI 预判 / 消息结论 / 市场溯源句 / 节奏档位+仓位） */
   hint?: string
   /** 风口：排行序号（榜首 = 1） */
   rank?: number
@@ -421,12 +422,13 @@ async function loadTraceReports() {
     const name = isToday
       ? (summary || '市场异动溯源分析')
       : '每日收盘后生成异动溯源'
+    // 小字详情＝洞见卡「溯源」里显示的那句话（`主因分类：结论`；无主因日给「可能主因（待验证）」等兜底）
+    const trace = record ? (toMarketInsightBrief(toMarketTracePresentation(record, d))?.trace || '') : ''
     return {
       name,
       tag: d.slice(5), // MM-DD
       tagType: 'date' as const,
-      // 小字详情＝溯源结论（details 优先，回退现象摘要）
-      hint: vm?.details || summary || '',
+      hint: trace || vm?.details || summary || '',
       // 独有内容：报告更新时间（上海时区 HH:MM）
       updatedAt: formatUpdatedAt(vm?.generatedAt),
     }
@@ -450,6 +452,8 @@ interface RhythmHistoryRow {
   score: number | null
   basis_date: string | null
   band: string
+  /** 洞见一句话结论（档位中文 + 建议仓位） */
+  hint?: string
 }
 const rhythmRows = ref<RhythmHistoryRow[]>([])
 
@@ -464,13 +468,19 @@ async function loadRhythmHistory() {
     const res = await agentApi.getRhythmMasterCalendar(HOME_RHYTHM_DAYS)
     const days = res?.days ?? []
     // 接口"最近在前"（降序）→ 卡片顶部为最新日期
-    rhythmRows.value = days.map((d) => ({
-      date: d.date,
-      level: d.level,
-      score: d.score,
-      basis_date: d.basis_date,
-      band: formatBandText(d.position_band?.text),
-    }))
+    rhythmRows.value = days.map((d) => {
+      const band = formatBandText(d.position_band?.text)
+      const label = levelLabel(d.level)
+      return {
+        date: d.date,
+        level: d.level,
+        score: d.score,
+        basis_date: d.basis_date,
+        band,
+        // 小字详情＝洞见一句话结论：档位 + 建议仓位（无仓位语义时只给档位，不伪造）
+        hint: band ? `${label} · 建议仓位${band}` : label,
+      }
+    })
   } catch {
     rhythmRows.value = []
   }

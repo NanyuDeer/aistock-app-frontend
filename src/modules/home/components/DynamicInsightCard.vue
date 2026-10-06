@@ -49,7 +49,7 @@
             <text v-if="head.basisDate" class="dyn-uniq__chip">{{ head.basisDate }} 基准</text>
           </template>
         </view>
-        <text class="dyn-focus__link">查看详情 →</text>
+        <text class="dyn-focus__link">详情 →</text>
       </view>
     </view>
 
@@ -66,7 +66,15 @@
       >
         <text class="dyn-sec__chip">{{ moduleLabel(it.module) }}</text>
         <text class="dyn-sec__title">{{ it.name }}</text>
-        <text v-if="it.badge" class="dyn-sec__badge" :class="toneClass(it.badgeTone)">{{ it.badge }}</text>
+        <!-- 尾部标签与四宫格同款：风口/市场用组件库 Tag；节奏用档位色块 -->
+        <view
+          v-if="it.badge && it.module === 'rhythm'"
+          class="dyn-sec__rhythm"
+          :style="{ background: rhythmColor(it.level) }"
+        >
+          <text class="dyn-sec__rhythm-text">{{ it.badge }}</text>
+        </view>
+        <Tag v-else-if="it.badge" class="dyn-sec__tag" :type="it.badgeTone" size="sm">{{ it.badge }}</Tag>
       </view>
       <view v-if="!secondary.length" class="dyn-sec__empty">暂无洞见</view>
     </view>
@@ -96,6 +104,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import Tag from '@/shared/components/Tag.vue'
 import { getTradingTimeSlot, type TradingTimeSlot } from '@/shared/utils/tradingTime'
 import { levelShort, isRhythmLevelKey, RHYTHM_LEVEL_COLORS, RHYTHM_GREY } from '@/shared/utils/rhythmColors'
 import wordmarkPng from '@/shared/components/insight-wordmark.png'
@@ -132,6 +141,8 @@ interface RhythmRow {
   level?: string | null
   band: string
   basis_date: string | null
+  /** 洞见一句话结论（档位 + 建议仓位） */
+  hint?: string
 }
 
 interface Props {
@@ -232,6 +243,7 @@ const pools = computed<Record<ModuleKey, FocusItem[]>>(() => ({
     name: r.band || (r.basis_date ? '沿用前值' : '无报告'),
     badge: levelShort(r.level) || '沿',
     badgeTone: 'neutral' as const,
+    hint: r.hint,
     level: r.level,
     basisDate: r.basis_date,
   })),
@@ -500,7 +512,7 @@ function toneClass(tone: Tone): string {
   color: $white;
 }
 
-/* 查看详情：蓝色可点击文字（非按钮） */
+/* 详情：蓝色可点击文字（非按钮） */
 .dyn-focus__link {
   font-size: $font-size-sm;
   font-weight: 500;
@@ -547,10 +559,25 @@ function toneClass(tone: Tone): string {
   text-overflow: ellipsis;
 }
 
-.dyn-sec__badge {
+.dyn-sec__tag {
   flex: none;
-  font-size: $font-size-xs;
-  font-weight: 600;
+}
+
+/* 节奏行：档位色块（形状/字号对齐四宫格「节奏洞见」卡的 .rhythm-chip） */
+.dyn-sec__rhythm {
+  flex: none;
+  width: 40rpx;
+  height: 34rpx;
+  border-radius: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dyn-sec__rhythm-text {
+  color: $white;
+  font-size: 18rpx;
+  line-height: 1;
 }
 
 .dyn-sec__empty {
@@ -612,19 +639,6 @@ function toneClass(tone: Tone): string {
 
 .dyn-strip__count {
   font-size: $font-size-xs;
-  color: $ink-mute;
-}
-
-/* ===== 次要行数据 chip 语义色（纯文字，不带底色） ===== */
-.dyn-sec__badge.is-up {
-  color: $up;
-}
-
-.dyn-sec__badge.is-down {
-  color: $down;
-}
-
-.dyn-sec__badge.is-neutral {
   color: $ink-mute;
 }
 </style>

@@ -41,30 +41,7 @@
 
           <template v-if="notification.category === 'forecast'">
             <view v-if="forecastData" class="ni-section ni-forecast-section">
-              <ForecastProfitChart v-if="forecastChartItems.length" :items="forecastChartItems" :visible="visible" />
-              <view v-if="forecastYearRows.length" class="ni-forecast-year-panel">
-                <view class="ni-forecast-year-head">
-                  <text class="ni-forecast-year-title">年度预测</text>
-                  <text class="ni-forecast-year-unit">净利润 / 增长率</text>
-                </view>
-                <view class="ni-forecast-year-list">
-                  <view v-for="row in forecastYearRows" :key="row.year" class="ni-forecast-year-item">
-                    <view class="ni-forecast-year-main">
-                      <view>
-                        <text class="ni-forecast-year-label">{{ row.year }}</text>
-                        <text :class="['ni-forecast-year-kind', row.kindClass]">{{ row.kindText }}</text>
-                      </view>
-                      <view class="ni-forecast-year-right">
-                        <text class="ni-forecast-year-value">{{ row.netProfit }}</text>
-                        <text :class="['ni-forecast-year-growth', row.growthClass]">{{ row.growthText }}</text>
-                      </view>
-                    </view>
-                    <view class="ni-forecast-progress-track">
-                      <view :class="['ni-forecast-progress-fill', row.kindClass]" :style="{ width: `${row.progress}%` }" />
-                    </view>
-                  </view>
-                </view>
-              </view>
+              <ForecastFinancialChart v-if="forecastData.detailIndicators?.length" :detail-rows="forecastData.detailIndicators" />
               <view v-if="forecastData.detailIndicators?.length" class="ni-forecast-toggle" @tap="forecastDetailExpanded = !forecastDetailExpanded">
                 <text>{{ forecastDetailExpanded ? '收起详细指标' : '查看详细指标' }}</text>
                 <text class="ni-forecast-toggle__icon">{{ forecastDetailExpanded ? '−' : '+' }}</text>
@@ -271,7 +248,7 @@ import { computed, ref, watch } from 'vue'
 import InsightCard from '@/shared/components/InsightCard.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import ForecastProfitChart from '@/modules/favorites/components/ForecastProfitChart.vue'
+import ForecastFinancialChart from '@/modules/favorites/components/ForecastFinancialChart.vue'
 import PriceMovementAnalysisContent from '@/modules/favorites/components/PriceMovementAnalysisContent.vue'
 import AiAnalysis from '@/modules/analytics/components/ai-analysis.vue'
 import { stockApi, type ForecastData } from '@/shared/api/modules/stock'
@@ -490,13 +467,6 @@ function buildForecastChartSource(): Array<{ year: string; netProfit: any; kind?
     .sort((a, b) => Number(a.year) - Number(b.year) || (a.kind === 'actual' ? -1 : 1))
 }
 
-const forecastChartItems = computed(() => buildForecastChartSource()
-  .map(item => {
-    const value = parseForecastProfit(item.netProfit)
-    return value == null ? null : { year: item.year, value, label: String(item.netProfit), kind: item.kind }
-  })
-  .filter(Boolean) as Array<{ year: string; value: number; label: string; kind?: 'actual' | 'forecast' }>)
-
 const forecastSummaryLines = computed(() => {
   const value = forecastData.value?.netProfitYoy
   if (value == null || !Number.isFinite(Number(value))) return []
@@ -506,27 +476,6 @@ const forecastSummaryLines = computed(() => {
     text: `${numeric >= 0 ? '+' : ''}${numeric}%`,
     tone: numeric >= 0 ? 'positive' as const : 'risk' as const,
   }]
-})
-
-const forecastYearRows = computed(() => {
-  const rows = Array.isArray(forecastData.value?.predictions) ? forecastData.value.predictions : []
-  const parsed = rows.slice(0, 3).map(item => {
-    const value = parseForecastProfit(item.netProfit)
-    const growth = item.growth
-    const growthNumber = typeof growth === 'number' ? growth : Number(String(growth).replace('%', ''))
-    const hasGrowth = Number.isFinite(growthNumber)
-    return {
-      year: String(item.year || ''),
-      netProfit: item.netProfit || '--',
-      value: value ?? 0,
-      kindClass: !hasGrowth ? 'is-forecast' : growthNumber >= 0 ? 'is-actual' : 'is-forecast',
-      kindText: !hasGrowth ? '预测' : growthNumber >= 0 ? '改善' : '承压',
-      growthText: !hasGrowth ? '--' : `${growthNumber >= 0 ? '+' : ''}${growthNumber}%`,
-      growthClass: !hasGrowth ? '' : growthNumber >= 0 ? 'is-up' : 'is-down',
-    }
-  })
-  const max = Math.max(...parsed.map(item => Math.abs(item.value)), 0.01)
-  return parsed.map(item => ({ ...item, progress: Math.max(18, Math.round((Math.abs(item.value) / max) * 100)) }))
 })
 
 const forecastDetailYearKeys = computed<string[]>(() => {
@@ -818,25 +767,6 @@ function valueClass(row: FinanceTableRow, periodKey: string) {
 .ni-metric-value { font-size: $font-size-xl; font-weight: 700; }
 .is-up { color: $up; }
 .is-down { color: $down; }
-.ni-forecast-year-panel { margin-bottom: $s-3; padding: 20rpx; border-radius: 12rpx; background: $bg-soft; }
-.ni-forecast-year-head, .ni-forecast-year-main { display: flex; align-items: center; justify-content: space-between; gap: $s-2; }
-.ni-forecast-year-head { margin-bottom: 18rpx; }
-.ni-forecast-year-title { font-size: 26rpx; font-weight: 600; color: $ink-soft; }
-.ni-forecast-year-unit { font-size: 22rpx; color: $ink-mute; }
-.ni-forecast-year-list { display: flex; flex-direction: column; gap: 14rpx; }
-.ni-forecast-year-item { padding: 16rpx; border: 1rpx solid $line-soft; border-radius: 12rpx; background: $bg-card; }
-.ni-forecast-year-main { margin-bottom: 12rpx; }
-.ni-forecast-year-label { display: block; font-size: 26rpx; font-weight: 600; color: $ink-soft; }
-.ni-forecast-year-kind { display: block; margin-top: 2rpx; font-size: 21rpx; color: $ink-mute; }
-.ni-forecast-year-kind.is-actual { color: $primary; }
-.ni-forecast-year-kind.is-forecast { color: $warning; }
-.ni-forecast-year-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; }
-.ni-forecast-year-value { font-size: 28rpx; font-weight: 800; color: $ink; }
-.ni-forecast-year-growth { font-size: 22rpx; font-weight: 700; }
-.ni-forecast-progress-track { height: 16rpx; overflow: hidden; border-radius: $r-full; background: $line; }
-.ni-forecast-progress-fill { height: 100%; min-width: 18rpx; border-radius: $r-full; }
-.ni-forecast-progress-fill.is-actual { background: linear-gradient(90deg, $primary, $primary-light); }
-.ni-forecast-progress-fill.is-forecast { background: linear-gradient(90deg, $warning, $warning-light); }
 .ni-forecast-toggle { display: flex; align-items: center; justify-content: space-between; gap: $s-2; padding: 16rpx 18rpx; margin-top: 14rpx; border: 1rpx solid $line-soft; border-radius: 12rpx; background: $bg-soft; color: $ink-soft; font-size: 24rpx; font-weight: 600; }
 .ni-forecast-toggle__icon { flex-shrink: 0; width: 32rpx; height: 32rpx; border-radius: $r-full; background: $primary-50; color: $primary; font-size: 24rpx; line-height: 32rpx; text-align: center; font-weight: 700; }
 .ni-list { display: flex; flex-direction: column; gap: $s-2; margin-top: $s-2; }

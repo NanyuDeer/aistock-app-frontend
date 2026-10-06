@@ -77,6 +77,8 @@ export default defineConfig({
       'src/modules/favorites/components/insightCards.spec.ts',
       'src/modules/favorites/components/InsightReportBody.spec.ts',
       'src/modules/favorites/components/MiniKLine.spec.ts',
+      'src/modules/favorites/components/ForecastFinancialChart.mount.spec.ts',
+      'src/modules/favorites/components/PolicyList.mount.spec.ts',
       'src/shared/components/ConfirmSheet.spec.ts',
       'src/pages-sub-app/chat/index.scroll.spec.ts',
       'src/modules/chat/pages/chat-report-detail.spec.ts',

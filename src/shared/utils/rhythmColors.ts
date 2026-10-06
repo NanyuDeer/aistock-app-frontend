@@ -14,6 +14,11 @@ export const RHYTHM_LEVEL_SHORT: Record<RhythmLevelKey, string> = {
   ice: '冰', low: '低', normal: '常', active: '活', euphoria: '亢',
 }
 
+/** 档位中文全名（与 rhythm 模块 rhythmInsight 的 LEVEL_LABEL 同口径：冰点/低迷/常温/活跃/亢奋） */
+export const RHYTHM_LEVEL_LABEL: Record<RhythmLevelKey, string> = {
+  ice: '冰点', low: '低迷', normal: '常温', active: '活跃', euphoria: '亢奋',
+}
+
 /** 无档位（灰格/行缺失/沿用前值） */
 export const RHYTHM_GREY = '#eceef1'
 
@@ -29,4 +34,9 @@ export function isRhythmLevelKey(v: string | null | undefined): v is RhythmLevel
 /** 档位短码（未知档位如实回退首字母，不伪造）——所有读取点唯一入口 */
 export function levelShort(level: string | null | undefined): string {
   return isRhythmLevelKey(level) ? RHYTHM_LEVEL_SHORT[level] : (level ?? '').slice(0, 1)
+}
+
+/** 档位中文全名（未知档位如实回退短码，不伪造） */
+export function levelLabel(level: string | null | undefined): string {
+  return isRhythmLevelKey(level) ? RHYTHM_LEVEL_LABEL[level] : levelShort(level)
 }
