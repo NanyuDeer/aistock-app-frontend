@@ -13,6 +13,8 @@
   - 底部"加载中.../没有更多"轻量文案（`.load-more-tip`，走 design token）。
 - `monitor.vue` WS（`#ifdef APP-PLUS`）：`movement.created`/`movement.updated` 改为按 `event_id` **浅合并 upsert 进 `rawItems`** 后统一重派生，替代原先直接改 `alerts`；`movement_updated` 部分字段 payload 不清空既有 `primary_cause`/`confidence_level`，`movement_view.status === 'confirmed'` 时补 `analysis_status='completed'` 以放行「报告 ›」入口（沿用原 `applyMovementUpdate` 语义，避免翻页重派生冲掉 WS 卡）。
 - 测试：`monitor.spec.ts` / `insight.mount.spec.ts` 各新增 6/5 例（可见 `visible_only`、首屏+触底跨页同组只出一张卡、`nextCursor===null` 不再请求、加载失败不推进 cursor 再次触底用旧 cursor 重试、`onShow` 重置不叠加旧行；monitor 另加 WS 浅合并保留 `primary_cause`）。SubPageCard2 桩加 `stub-scroll-trigger`（emit `scrolltolower`）、`@dcloudio/uni-app` onShow 加回调登记以再次触发。相关 spec **66 passed**；`npx vue-tsc --noEmit` exit 0。
+- **复查后收尾（commit `265e970`）**：`upsertEventById` 下沉到 `components/insightCards.ts`（消除两页字节级重复的本地 `upsertRaw`）；首屏请求**前**同步复位 `rawItems/cursor/hasMore/loadingMore`（原先在 `await` 之后复位，在途 `loadMore` 会读到旧 cursor → 关掉该竞态窗口）；`loadMore` 的 `catch` 加 `console.warn`（原先静默吞错，线上分页失败不可观测）；`insightCards.spec.ts` 补 `upsertEventById` 三例（追加/已存在更新且保位置/不改输入）、`monitor.spec.ts` 补跨页同 `event_id` 去重断言 → 相关 3 spec **65 passed**，`vue-tsc` exit 0。
+- **端到端实测（浏览器，mxfff）**：两页首屏 14 张 → 连续触底 14 → 24 → 37 → 47 → **60** 后出现「没有更多」；第 2 页起请求 URL 带 `cursor=2026-09-21T01:41:49.027Z|mv:688203:…`（复合键）与 `visible_only=1`；「归因失败回退」未被破坏（海正生材仍显示「主因：科创板走弱拖累个股」）。
 - **遗留（既有，非本次引入）**：`tests/AnalyticsCardLayout.test.ts` 1 例失败（只读 `analytics/pages/reports.vue` 布局，与本次改动无关）。
 
 ## 2026-10-06 — 归因失败：前端 `failed` 展示（B）+ 失败回退（C）

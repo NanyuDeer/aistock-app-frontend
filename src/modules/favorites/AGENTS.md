@@ -61,6 +61,16 @@
 > - 预判区（forecast）已随后端迁移 022 全部移除：`detail.forecast` 不再可用，`ForecastSlotPayload`/`parseForecastSlot` 类型和工具函数已删除。
 > - 预判 Tab 与 `hasForecast` 筛选已从洞察列表移除。
 
+> **2026-10-07 更新（自选股异动 / 洞察列表两页 cursor 翻页 + `visible_only` 过滤前置）**：两页原先均固定 `stockTraceApi.list(20)` 只取第 1 页且**不翻页**（后端 `nextCursor` 无人消费）；而后端是「先 LIMIT 20、前端再过滤 + 同日同股去重」→ 被隐藏的行**白占窗口**，较早的有效异动可能取不到（实测 mxfff：50 条里 27 条是 `low`）。
+> - **`stockTraceApi.list(limit, cursor?, options?)`**：`options.visibleOnly === true` 时 params 追加 `visible_only: 1`。**opt-in 非默认**：`AlertContent.vue`（首页特别提醒，取前 6 条）刻意不传，行为与改动前一致。
+> - **`monitor.vue` / `insight.vue`**：新增 `rawItems / cursor / hasMore / loadingMore`；首屏（`onShow`）**在请求前同步复位**这四个状态（否则 `loadMore` 在飞行途中触达 `onShow` 时会读到旧 cursor 并发请求）；触底经 **`<SubPageCard2 @scrolltolower>`** 加载下一页 —— **不是 `onReachBottom`**：两页被 `SubPageCard2` 包裹、滚动发生在**内层 `<scroll-view>`**，页面级 `onReachBottom` 不会触发（先例：`detail.vue`、`NotificationDropdown.vue`）。
+> - **`hasMore` 以 `nextCursor` 为准**（不得用 `items.length < limit`）；请求失败**不推进 cursor**、不置 `hasMore=false`（下次触底用同一 cursor 重试），并 `console.warn` 以便观测。
+> - **必须对累积 `rawItems` 整体重派生**（`filter(isUnattributableMovement) → dedupeDailyMovements → map/sort`）：同一 (股, 上海交易日) 的两条可能跨页边界，只派生本页会让较早那条"复活"成第二张卡。
+> - **`upsertEventById(prev, incoming)`（`components/insightCards.ts`，两页共享）**：按 `event_id` **浅合并** —— 已存在则保留原位置并用 incoming 覆盖同名字段，不存在则追加。既避免跨页重复事件渲染成多卡，又避免整体覆盖丢掉 `primary_cause`/`confidence_level`（WS 的 `movement.updated` 是部分字段 payload）。`monitor.vue` 的 WS 分支（`#ifdef APP-PLUS`）也改走它。
+> - 后端配套（app-api `stock-trace/AGENTS.md`）：`GET /api/cn/favorites/movements` 新增可选 `visible_only`；`nextCursor` 改**复合键** `"<first_triggered_at ISO>|<event_id>"`，排序加 `event_id DESC` tiebreaker（否则同毫秒事件跨页会漏行）。
+> - 实测（mxfff）：两页首屏 14 张，连续触底 14 → 24 → 37 → 47 → 60 后出现「没有更多」；第 2 页起请求带 `cursor=` 与 `visible_only=1`。
+> - **残留（已知）**：中文提示词规则（`hasNoUsableCause` 的 6 条提示词）与**同日同股去重**仍未下沉到 SQL → 窗口仍会被少量占用（去重：同日同股多条只出 1 张卡，但占多行）。
+
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。
 - 展示优先级（`AlertContent.vue` 的 `fromMovement()`、`monitor.vue` 的 `movementToAlertItem()`、`insight.vue` 价格异动映射三处一致）：
