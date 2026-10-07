@@ -240,13 +240,14 @@ describe('dedupeDailyMovements 失败回退（failed）', () => {
     expect(items[0].event_id).toBe('mv:failed:new')
   })
 
-  // failed 不参与与其他 failed 的"最新"竞争 → 偶数次 failed 也不会让某一方"胜出"遮住对方
-  it('中间混有 failed 时不因 failed 优先于有效归因', () => {
+  // 隔离「failed 不以时间取胜」：failed 更新（时间更大）但非 failed 更旧，仍取 completed。
+  // 此前写法让 completed 同时「更新且非 failed」，两条判据同向、恒真，无法验证 failed 不以时间取胜。
+  it('最新 failed（时间更大）+ 当日有 completed（更旧）→ 仍取 completed', () => {
     const items = dedupeDailyMovements([
-      makeMovement({ symbol: '688203', event_id: 'mv:completed:newest', triggered_at: '2026-09-04T08:00:00Z', analysis_status: 'completed', primary_cause: '科创板块走弱' }),
-      makeMovement({ symbol: '688203', event_id: 'mv:failed:mid', triggered_at: '2026-09-04T06:00:00Z', analysis_status: 'failed' }),
+      makeMovement({ symbol: '688203', event_id: 'mv:failed:newest', triggered_at: '2026-09-04T08:00:00Z', analysis_status: 'failed' }),
+      makeMovement({ symbol: '688203', event_id: 'mv:completed:older', triggered_at: '2026-09-04T06:00:00Z', analysis_status: 'completed', primary_cause: '科创板块走弱' }),
     ])
     expect(items).toHaveLength(1)
-    expect(items[0].event_id).toBe('mv:completed:newest')
+    expect(items[0].event_id).toBe('mv:completed:older')
   })
 })

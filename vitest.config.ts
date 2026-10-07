@@ -75,6 +75,7 @@ export default defineConfig({
       'src/modules/favorites/components/AlertContent.spec.ts',
       'src/modules/favorites/components/insightCards.spec.ts',
       'src/modules/favorites/components/InsightReportBody.spec.ts',
+      'src/modules/favorites/components/PriceMovementAnalysisContent.spec.ts',
       'src/modules/favorites/components/MiniKLine.spec.ts',
       'src/shared/components/ConfirmSheet.spec.ts',
       'src/pages-sub-app/chat/index.scroll.spec.ts',

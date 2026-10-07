@@ -37,6 +37,8 @@
       </view>
     </template>
     <view v-else-if="analysis?.processing_status === 'completed'" class="pm-section pm-status is-unavailable"><text>归因已完成，但结果暂不可用</text></view>
+    <!-- 归因失败（dead_letter；显示失败而非静默/落入未匹配分支）。弹窗实时 getAnalysis 拉取，历史重开时 job 已 dead_letter 即返回 failed（见 NotificationInsightModal） -->
+    <view v-else-if="analysis?.processing_status === 'failed'" class="pm-section pm-status is-failed"><text>归因失败</text></view>
   </view>
 </template>
 
@@ -85,7 +87,7 @@ function evidenceExcerpt(evidence: TraceEvidence): string {
 @use '@/shared/styles/variables.scss' as *;
 .pm-analysis { display: flex; flex-direction: column; gap: $s-3; }
 .pm-section { padding: $s-3; border: 2rpx solid $line; border-radius: $r-md; background: $bg-card; }
-.pm-status { display: flex; align-items: center; gap: $s-2; font-size: $font-size-sm; }.pm-status.is-processing { color: $primary; }.pm-status.is-unavailable { color: $ink-mute; }
+.pm-status { display: flex; align-items: center; gap: $s-2; font-size: $font-size-sm; }.pm-status.is-processing { color: $primary; }.pm-status.is-unavailable { color: $ink-mute; }.pm-status.is-failed { color: $warning; }
 .pm-title { display: flex; justify-content: space-between; margin-bottom: $s-2; color: $ink; font-size: $font-size-base; font-weight: 600; }.pm-title-row { display: flex; align-items: center; justify-content: space-between; gap: $s-2; margin-bottom: $s-2; }.pm-title-row .pm-title { margin: 0; }.pm-title-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: $s-2; }
 .pm-tag { padding: 2rpx 12rpx; border-radius: $r-sm; color: $primary; background: $primary-50; font-size: $font-size-xs; }.pm-tag.is-gold, .pm-tag.is-weak { color: $warning; background: $warning-bg; }.pm-tag.is-confirmed { color: $down; background: $down-bg; }
 .pm-conclusion { margin-bottom: $s-3; padding: $s-3 $s-4; border-radius: $r-lg; background: $primary; }.pm-conclusion-label { display: block; margin-bottom: 4rpx; color: rgba(255,255,255,.8); font-size: $font-size-xs; }.pm-conclusion-text { display: block; color: $white; font-size: $font-size-base; font-weight: 600; line-height: 1.5; }
