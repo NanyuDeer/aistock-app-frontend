@@ -124,6 +124,16 @@ describe('isUnattributableMovement 低置信不展示口径', () => {
       confidence_level: null,
     }))).toBe(false)
   })
+
+  // 归因失败可见性（2026-10-06，失败状态契约）：failed **必须保持不被隐藏**。
+  // 否则"当日全失败"时整组会在 filter(isUnattributableMovement) 处消失，
+  // 用户看不到「归因失败」，与"全失败才展示失败"的口径相悖。
+  it('analysis_status = failed → 不隐藏（全失败时「归因失败」必须可见）', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'F',
+      analysis_status: 'failed',
+    }))).toBe(false)
+  })
 })
 
 // ---- 同日同股聚合（2026-09-13）：同一交易日同股多条异动只保留最新一条 ----
@@ -204,5 +214,39 @@ describe('dedupeDailyMovements 同日同股聚合', () => {
 
   it('空数组返回空数组', () => {
     expect(dedupeDailyMovements([])).toEqual([])
+  })
+})
+
+// ---- 失败回退（2026-10-06，页面契约）：最新 failed 回退到当日有效归因 ----
+
+describe('dedupeDailyMovements 失败回退（failed）', () => {
+  // ① 最新 failed + 当日有 completed → 取 completed（失败不遮住有效归因）
+  it('最新 failed + 当日有 completed → 取 completed', () => {
+    const items = dedupeDailyMovements([
+      makeMovement({ symbol: '688203', event_id: 'mv:failed:latest', triggered_at: '2026-09-04T07:00:00Z', analysis_status: 'failed' }),
+      makeMovement({ symbol: '688203', event_id: 'mv:completed:early', triggered_at: '2026-09-04T01:00:00Z', analysis_status: 'completed', primary_cause: '板块联动走弱' }),
+    ])
+    expect(items).toHaveLength(1)
+    expect(items[0].event_id).toBe('mv:completed:early')
+  })
+
+  // ② 全 failed → 取其中最新 failed（让「归因失败」可见）
+  it('当日全 failed → 取其中最新 failed', () => {
+    const items = dedupeDailyMovements([
+      makeMovement({ symbol: '688203', event_id: 'mv:failed:old', triggered_at: '2026-09-04T01:00:00Z', analysis_status: 'failed' }),
+      makeMovement({ symbol: '688203', event_id: 'mv:failed:new', triggered_at: '2026-09-04T07:00:00Z', analysis_status: 'failed' }),
+    ])
+    expect(items).toHaveLength(1)
+    expect(items[0].event_id).toBe('mv:failed:new')
+  })
+
+  // failed 不参与与其他 failed 的"最新"竞争 → 偶数次 failed 也不会让某一方"胜出"遮住对方
+  it('中间混有 failed 时不因 failed 优先于有效归因', () => {
+    const items = dedupeDailyMovements([
+      makeMovement({ symbol: '688203', event_id: 'mv:completed:newest', triggered_at: '2026-09-04T08:00:00Z', analysis_status: 'completed', primary_cause: '科创板块走弱' }),
+      makeMovement({ symbol: '688203', event_id: 'mv:failed:mid', triggered_at: '2026-09-04T06:00:00Z', analysis_status: 'failed' }),
+    ])
+    expect(items).toHaveLength(1)
+    expect(items[0].event_id).toBe('mv:completed:newest')
   })
 })

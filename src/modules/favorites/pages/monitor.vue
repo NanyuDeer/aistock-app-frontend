@@ -184,6 +184,7 @@ function movementToAlertItem(m: StockTraceEvent): AlertItem {
   else if (m.movement_view?.primaryCandidate?.verdict) causeText = `主因：${m.movement_view.primaryCandidate.verdict}`
   else if (m.analysis_status === 'completed') causeText = '归因完成'
   else if (m.analysis_status === 'processing') causeText = '归因中'
+  else if (m.analysis_status === 'failed') causeText = '归因失败'
   // 最近触发时间优先（长窗口事件按 window_end_at 展示最新异动）
   const recent = m.window_end_at || m.triggered_at
   return {

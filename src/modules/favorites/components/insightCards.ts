@@ -92,18 +92,30 @@ function shanghaiDayKey(iso: string): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
+/** 归因失败判定（2026-10-06 新增枚举，前端新契约）：仅正向等值判断 */
+function isFailedMovement(m: TraceEventLike): boolean {
+  return m.analysis_status === 'failed'
+}
+
 /**
  * 同日同股聚合：同一交易日、同一只股票的多次异动只保留"最新一条"（不分涨跌方向）。
  *
  * 背景：同一交易日可能因多次打点/多触发源（涨停雷达文章、午盘 11:30、尾盘 15:05）
  * 或方向来回，产生同股同日多张异动卡片；展示层收敛为当日一张卡，展示最新异动归因。
  *
- * 组合用法（"最新 + 失败回退"）：先 filter(isUnattributableMovement) 再调用本函数——
- * 不可用项已剔除，取最新即"当日最近一条有效归因"；若当日全部不可用则整组消失（与过滤口径一致）。
+ * 组合用法（"最新 + 失败回退"）：调用方先 filter(isUnattributableMovement) 再调用本函数。
+ * - `isUnattributableMovement` 负责剔除"无有效结论"的项（unavailable / 证据不足 / 低置信），
+ *   但**刻意不隐藏 `failed`**——否则"当日全失败"时整组会消失，用户看不到「归因失败」。
+ * - 本函数在组内选"最新"时**跳过 `analysis_status === 'failed'` 的项**：当日有有效归因时，
+ *   回退显示该有效归因；**仅当整组皆 failed 时才保留其中最新那条**（让「归因失败」可见）。
+ *   这保证失败只在其是"当日唯一/全部"时才被看到，不再遮住当日已有的有效归因。
+ *   （monitor.vue / insight.vue / AlertContent.vue 三处消费者按同一契约接入。）
  *
  * 说明：
  * - 分组键 = symbol（剥 SH/SZ/BJ 前缀）+ 上海交易日（activityAt 转 UTC+8 取日期）
  * - 最新判定口径与组内活动时间一致：window_end_at ?? triggered_at 的时间更大者
+ * - 优先级：非 failed > failed；同级内取活动时间新者。非法状态一律按非 failed 对待——
+ *   用正向 `=== 'failed'` 判定，未来新增枚举值不会被误判为失败。
  * - 不修改输入；输出顺序沿用各分组"首次出现"顺序（接口已按时间倒序，输出近似倒序）
  */
 export function dedupeDailyMovements<T extends TraceEventLike>(items: T[]): T[] {
@@ -112,7 +124,16 @@ export function dedupeDailyMovements<T extends TraceEventLike>(items: T[]): T[] 
     const at = movementActivityAt(item)
     const key = `${normalizeSymbol(item.symbol)}@${shanghaiDayKey(at)}`
     const prev = latestByKey.get(key)
-    if (!prev || safeDateParse(at) > safeDateParse(movementActivityAt(prev))) {
+    // 非 failed 优先于 failed；同为非 failed（或同为 failed）时取活动时间新者
+    const prevFailed = prev ? isFailedMovement(prev) : false
+    const itemFailed = isFailedMovement(item)
+    const prevPreferred = !prevFailed ? 1 : 0
+    const itemPreferred = !itemFailed ? 1 : 0
+    const replace =
+      !prev ||
+      itemPreferred > prevPreferred ||
+      (itemPreferred === prevPreferred && safeDateParse(at) > safeDateParse(movementActivityAt(prev)))
+    if (replace) {
       // Map.set 对已存在 key 不改变插入顺序 → 保留该组首次出现的位置
       latestByKey.set(key, item)
     }

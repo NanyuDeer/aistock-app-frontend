@@ -18,7 +18,7 @@
 >
 > **2026-09-04 更新（最终语义）**：`pages/monitor.vue`（自选股异动）已移除老雷达数据源 `watchlistInsightApi.getInsights`（存量 watchlist_insight_events 08-30 起停用，含 8 月初远古涨停雷达事件），监控页统一只消费 `stockTraceApi.list`。后端 `StockTraceService.listUserEvents` 可见性下界改为**当前持仓期**（JOIN ON `e.first_triggered_at >= us.created_at`）：老自选全历史 + 今日新触发照常，新加入股只显示加入后触发/仍活跃的异动；同时新增**加入即打点**（`UserController.addFavorites` 交易时段内对新加入 symbol 调 `PriceTriggerDetector.detectSymbols`，命中即 `immediateEnqueue` 归因）。
 >
-> **2026-09-13 更新（同日同股聚合）**：同一交易日同一只股票的多次异动只展示 **1 张卡片**（打点/落库照常，仅展示收敛）。纯函数 `dedupeDailyMovements(items)`（`components/insightCards.ts`）：分组键 = symbol（剥 SH/SZ/BJ 前缀）+ **上海交易日**（`triggered_at` 经 UTC+8 取日期），组内取 `window_end_at ?? triggered_at` 最新一条。**组合口径（最新 + 失败回退）**：调用方先 `filter(isUnattributableMovement)` 再 `dedupeDailyMovements` —— 不可用项已剔除，取最新即"当日最近一条有效归因"。三处统一接入：`pages/monitor.vue`、`components/AlertContent.vue`（首页洞察块）、`pages/insight.vue`（洞察列表）。
+> **2026-09-13 更新（同日同股聚合）**：同一交易日同一只股票的多次异动只展示 **1 张卡片**（打点/落库照常，仅展示收敛）。纯函数 `dedupeDailyMovements(items)`（`components/insightCards.ts`）：分组键 = symbol（剥 SH/SZ/BJ 前缀）+ **上海交易日**（`triggered_at` 经 UTC+8 取日期），组内取 `window_end_at ?? triggered_at` 最新一条。**组合口径（最新 + 失败回退）**：调用方先 `filter(isUnattributableMovement)` 再 `dedupeDailyMovements` —— 不可用项已剔除，取最新即"当日最近一条有效归因"。**2026-10-06 起**：组内选"最新"时**跳过 `analysis_status === 'failed'`**——当日有有效归因则回退显示它，全组皆 failed 才保留最新那条（让「归因失败」可见）；`failed` 不被 `isUnattributableMovement` 隐藏（否则全失败时整组消失）。三处统一接入：`pages/monitor.vue`、`components/AlertContent.vue`（首页洞察块）、`pages/insight.vue`（洞察列表）。
 > **2026-09-25 更新（洞察报告 PDF → SSE 流式输出）**：完整洞察报告**彻底移除 PDF 链路**，改为在详情页点击后在按钮下方**逐章节流式输出**。
 > - 新增 `modules/favorites/utils/useInsightReportSSE.ts`：用 **`fetch + ReadableStream`**（**不用 `EventSource`**——`EventSource` 无法设置 `Authorization` 头，而 `report/stream` 端点是 JWT 鉴权；项目既有 `useAlertSSE` 能用 `EventSource` 是因为 `/agent/briefing/alert` 不校验登录）。用 fetch 的额外好处：能直接读 HTTP 状态码，前置错误（401/404/409/502）走真实状态码 + JSON。暴露 `header` / `sections`（逐条追加）/ `loading` / `done` / `error` / `start(eventId)` / `stop()`；60s 超时 + `AbortController`；按 `data: {...}\n\n` 分帧，单帧 JSON 解析失败忽略。配套 spec 7 例。
 > - `insight-detail-move.vue`：底部 `downloadInsightReport` 下载按钮替换为**「生成完整洞察报告」按钮 + 按钮下方流式渲染区**（页眉 + 逐章节列表）。生成中按钮文案「生成中…（点击停止）」可中断，完成后变「重新生成完整报告」；`onLoad` 参数 `autostart=1` 时自动开始生成；`onUnload` 调 `stop()` 中止。
@@ -66,7 +66,7 @@
 - 展示优先级（`AlertContent.vue` 的 `fromMovement()`、`monitor.vue` 的 `movementToAlertItem()`、`insight.vue` 价格异动映射三处一致）：
   1. `primary_cause` 存在 → `主因：${primary_cause}`
   2. 否则 `movement_view.primaryCandidate.verdict` 存在 → `主因：${verdict}`
-  3. 否则按 `analysis_status` 兜底：`completed` → `归因完成` / `processing` → `归因中` / `unavailable` → `待归因`
+  3. 否则按 `analysis_status` 兜底：`completed` → `归因完成` / `processing` → `归因中` / `failed` → `归因失败` / `unavailable` → `待归因`
 
 ## 自选股洞察列表页（pages/insight.vue，2026-09-24 模板统一）
 - **目标**：该页模板统一到「个股情报」页（`modules/market/pages/event-catcher.vue`），页面风格与洞察/异动/节奏等他页一致。
@@ -146,7 +146,7 @@
 ## 首页 AlertContent 自选股洞察（2026-09-04 还原为旧预览 ListCell 形态）
 - `AlertContent.vue` 自选股洞察块还原为旧预览 ListCell 形态：`module-header`（标题"自选股洞察"+箭头，点跳 `/modules/favorites/pages/monitor` 自选股异动页）+ `ListCell` 列表（`CAPTURE_ROW_COUNT=6`）。行字段：`title=stock_name`、前缀 `Tag` 用方向（up/down, 红绿, 文案"涨/跌"）、`description=主因或状态 · MM-DD 时间`。点击行进 `insight-detail-move?event_id=`。
 - 数据源：`stockTraceApi.list(20)` → `.filter(m => !isUnattributableMovement(m))`（保留无法归因不展示）→ 取前 6 条（含空行占位至 6）。
-- 主因三段式兜底：`primary_cause` → `movement_view.primaryCandidate.verdict` → `analysis_status`（completed→归因完成 / processing→归因中 / 其他→待归因）。
+- 主因三段式兜底：`primary_cause` → `movement_view.primaryCandidate.verdict` → `analysis_status`（completed→归因完成 / processing→归因中 / failed→归因失败 / 其他→待归因）。
 - 移除：Segmented[全部|预判|溯源]、buildInsightCards 聚合卡渲染、情报折叠、卡片级"预判区/溯源区/AI解读"按钮、intel 并行拉取（该数据仅个股情报块需要，个股情报块自身加载不动）。洞察块只拉 movements。
 - `isUnattributableMovement` 仍从 `insightCards.ts` 导入复用，`insightCards.ts`/`insight.vue`/`monitor.vue`/详情页不动。（**时点说明**：该结论为 2026-09-04 时点；`insight.vue` 已于 **2026-09-24** 做模板统一改造，现状见上文「自选股洞察列表页」章节。）
 - 个股情报块（intel module-card）保持阶段3改造不动（Segmented[全部|利好|利空] + ListCell 预览 + AI解读跳 alert-analysis）。

@@ -120,6 +120,7 @@ function fromMovement(m: StockTraceEvent): InsightListItem {
   else if (m.movement_view?.primaryCandidate?.verdict) causeText = `主因：${m.movement_view.primaryCandidate.verdict}`
   else if (m.analysis_status === 'completed') causeText = '归因完成'
   else if (m.analysis_status === 'processing') causeText = '归因中'
+  else if (m.analysis_status === 'failed') causeText = '归因失败'
   // 最近触发时间优先：长窗口事件（连续涨停合并）按 window_end_at 展示最新异动日期，
   // 避免始终停留在首次触发日期（如 8/10 锚定的近岸显示 08-10 而非 08-21）
   const recent = m.window_end_at || m.triggered_at

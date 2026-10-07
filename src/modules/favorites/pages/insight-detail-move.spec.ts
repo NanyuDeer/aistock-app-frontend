@@ -97,3 +97,38 @@ describe('insight-detail-move.vue 主因卡（异动原因）标题与置信度�
     expect(wrapper.find('.main-title-row .badge').exists()).toBe(false)
   })
 })
+
+// ---- 归因失败状态（2026-10-06）：processing_status === 'failed' 须渲染「归因失败」，而非静默 ----
+describe('insight-detail-move.vue 归因失败状态展示', () => {
+  beforeEach(() => {
+    stockTraceMock.get.mockReset()
+    stockTraceMock.getAnalysis.mockReset()
+    stockTraceMock.get.mockResolvedValue(event)
+  })
+
+  it('processing_status = failed → 渲染「归因失败」状态块', async () => {
+    stockTraceMock.getAnalysis.mockResolvedValue({
+      event_id: 'mv:TEST',
+      trigger_revision: 1,
+      processing_status: 'failed',
+      artifact: null,
+    })
+    const wrapper = mount(insightDetailMove)
+    await flushPromises()
+    const status = wrapper.find('.section.status-failed')
+    expect(status.exists()).toBe(true)
+    expect(status.find('.status-text').text()).toBe('归因失败')
+  })
+
+  it('processing_status = failed 时不挂报告入口（非 completed）', async () => {
+    stockTraceMock.getAnalysis.mockResolvedValue({
+      event_id: 'mv:TEST',
+      trigger_revision: 1,
+      processing_status: 'failed',
+      artifact: null,
+    })
+    const wrapper = mount(insightDetailMove)
+    await flushPromises()
+    expect(wrapper.find('.report-actions').exists()).toBe(false)
+  })
+})

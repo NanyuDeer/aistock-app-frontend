@@ -1,5 +1,16 @@
 # 待提交修改记录
 
+## 2026-10-06 — 归因失败：前端 `failed` 展示（B）+ 失败回退（C）
+
+跨仓计划：`aistock-agent-py/docs/superpowers/plans/2026-10-06-stock-trace-attribution-failure-observability.md` Task 2。根因：`analysis_status` 新增第 4 个值 `failed`（app-api 由死信 job `dead_letter` 派生）；此前失败被派生为 `processing` → 卡片永久「归因中」，且因`dedupeDailyMovements` 取最新而遮住当日已有有效归因。
+
+- `src/shared/api/modules/stockTrace.ts`：`StockTraceEvent.analysis_status` 与 `StockTraceAnalysisResponse.processing_status` 联合各补 `'failed'`。
+- `src/modules/favorites/components/insightCards.ts`：`dedupeDailyMovements` 组内选"最新"时**跳过 `failed`（非 failed 优先于 failed；全组皆 failed 才保留最新那条，让「归因失败」可见）**；更新函数注释，明确与 `filter(isUnattributableMovement)` + `dedupeDailyMovements` 的「最新 + 失败回退」契约。**`isUnattributableMovement` 不改**——`failed` 保持不被隐藏（否则全失败时整组消失）。判定一律正向 `=== 'failed'`，禁反向。
+- 三处列表卡片文案新增 `failed` → 「归因失败」（正向等值）：`pages/monitor.vue` `movementToAlertItem`、`pages/insight.vue` `fromMovement`、`components/AlertContent.vue` `fromMovement`。
+- `pages/insight-detail-move.vue`：状态区块新增 `processing_status === 'failed'` → 「归因失败」（`.status-failed`，琥珀 `$warning`；此前会整段静默）。
+- 测试：`components/insightCards.spec.ts` 新增 failed 可见性 1 例 + 失败回退 3 例（最新 failed + 当日有 completed → 取 completed；全 failed → 取最新 failed；mixed 不因 failed 胜出）；`pages/insight-detail-move.spec.ts` 新增 failed 状态渲染 + 无报告入口 2 例 → 相关 4 spec **62 + 2 = 64 passed**，`npx vue-tsc --noEmit` exit 0。
+- **关联后端（不在本仓）**：app-api Task 1 派生 `failed`，agent-py Task 3 上报 `last_error_detail`。发布顺序：migration024 + 前端先行（加性），app-api 激活派生，agent-py 上报明细。
+
 ## 2026-09-30 — Task 9：H5 端到端实测结果（控制器执行，真实浏览器 + 真实 LLM）
 
 页面：`http://localhost:5173/h5/modules/market/pages/alert-analysis?symbol=600519`（**注意 H5 为 history 路由 + `base:/h5/`，必须用路径形式，`#/...` 会落到首页**）。服务：agent-py `:8000`（新代码，`SCHEDULER_ENABLED=false` 等已禁用）、app-api `:3000`、H5 `:5173`。
