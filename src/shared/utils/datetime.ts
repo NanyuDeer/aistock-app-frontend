@@ -77,6 +77,14 @@ export function shanghaiDateKeyDaysAgo(days: number): string {
 }
 
 /**
+ * 「最近两周洞察/异动」的下界回看天数 = 13，而非 14。
+ * 因为 `shanghaiDateKeyDaysAgo(days)` 返回的是「今天往前 days 天」，而查询语义是
+ * `trading_date >= since` 的**含今天**窗口：`since = 今天 - 13` 正好覆盖「今天 + 之前 13 天」
+ * = 共 14 个自然日。若误写成 14 会多回看一天（窗口变 15 天）。
+ */
+export const TWO_WEEK_WINDOW_DAYS = 13
+
+/**
  * 格式化"伪UTC上海时钟"时间字符串。
  * 后端部分字段（如 earnings_forecast.update_time）由 formatToChinaTimeWithMs 生成上海时钟，
  * 但以 UTC 标记存入数据库，导致前端拿到形如 `2026-07-25T00:00:14.176Z` 的字符串——

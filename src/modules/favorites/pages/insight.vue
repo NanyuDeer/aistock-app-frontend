@@ -70,7 +70,7 @@ import LoadingState from '@/shared/components/LoadingState.vue'
 import Segmented from '@/shared/components/Segmented.vue'
 import Tag from '@/shared/components/Tag.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import { formatTime, shanghaiDateKeyDaysAgo } from '@/shared/utils/datetime'
+import { formatTime, shanghaiDateKeyDaysAgo, TWO_WEEK_WINDOW_DAYS } from '@/shared/utils/datetime'
 import { isUnattributableMovement, dedupeDailyMovements, upsertEventById } from '@/modules/favorites/components/insightCards'
 
 /** 统一展示模型：价格异动（stocktrace 链路） */
@@ -171,7 +171,7 @@ async function fetchInsights() {
   loadingMore.value = false
   try {
     // 2026-09-02 链路合并：涨停雷达事件已并入 stock-trace（movements），列表只消费 movements
-    const page = await stockTraceApi.list(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) }).catch(() => ({ items: [] as StockTraceEvent[], nextCursor: null as string | null }))
+    const page = await stockTraceApi.list(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(TWO_WEEK_WINDOW_DAYS) }).catch(() => ({ items: [] as StockTraceEvent[], nextCursor: null as string | null }))
     rawItems.value = page.items
     cursor.value = page.nextCursor
     hasMore.value = !!page.nextCursor
@@ -187,7 +187,7 @@ async function loadMore() {
   if (!hasMore.value || loadingMore.value) return
   loadingMore.value = true
   try {
-    const page = await stockTraceApi.list(20, cursor.value ?? undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
+    const page = await stockTraceApi.list(20, cursor.value ?? undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(TWO_WEEK_WINDOW_DAYS) })
     rawItems.value = upsertEventById(rawItems.value, page.items)
     cursor.value = page.nextCursor
     hasMore.value = !!page.nextCursor

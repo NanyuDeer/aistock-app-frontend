@@ -129,6 +129,8 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     wsHandlers.onOpen = null
     wsHandlers.onMessage = null
     vi.mocked(uni.navigateTo).mockClear()
+    // 逐用例清零 since 入参 mock，保证后续 toHaveBeenCalledWith(13) 是针对本次挂载/触底的调用（非跨用例累积）
+    vi.mocked(shanghaiDateKeyDaysAgo).mockClear()
     stockTraceApiMock.list.mockResolvedValue({ items: [], nextCursor: null })
     onShowHandlers.length = 0
   })
@@ -344,6 +346,8 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     stockTraceApiMock.list.mockResolvedValue({ items: [], nextCursor: null })
     const wrapper = mount(monitor)
     await flushPromises()
+    // 区分力断言：since 下界必须是 13（第 14 个自然日含今天），若页面误写成 (14)/(99) 将变红
+    expect(shanghaiDateKeyDaysAgo).toHaveBeenCalledWith(13)
     expect(stockTraceApiMock.list).toHaveBeenCalledWith(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
   })
 
@@ -366,6 +370,7 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     await wrapper.find('.stub-scroll-trigger').trigger('click')
     await flushPromises()
     // 触底请求同样带 since（两周下界）
+    expect(shanghaiDateKeyDaysAgo).toHaveBeenCalledWith(13)
     expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, '2026-09-18T01:00:00.000Z|mv:p1', { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
     // 跨页同 (股, 日) 只出一张卡（对整体 rawItems 重派生，取较新的 mv:p2）
     expect(wrapper.findAll('.as-card').length).toBe(1)
