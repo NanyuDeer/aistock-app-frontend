@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import CardRenderer from './CardRenderer.vue'
 import MarketSnapshotCard from './MarketSnapshotCard.vue'
@@ -7,6 +7,19 @@ import CapitalFlowCard from './CapitalFlowCard.vue'
 import DeepAnalysisCard from './DeepAnalysisCard.vue'
 import ComparisonCard from './ComparisonCard.vue'
 import type { ChatCard } from '@/shared/api/modules/agent'
+
+// mp-html 桩（存量环境问题的测试内规避，同目录 DeepAnalysisCard.spec.ts）：
+// 真实包内 node/node.vue 含 <script module="handler" lang="wxs">（WXS 模块）+ <script>，
+// 非 uni-app 的 vite vue 插件编译该 SFC 时报 "Single file component can contain only
+// one <script> element"，导致本文件（经 DeepAnalysisCard.vue 间接引入）整份采集失败。
+// 仅测试环境替换为 v-html 桩，不改业务代码、不削弱任何断言。
+vi.mock('mp-html/dist/uni-app/components/mp-html/mp-html', () => ({
+  default: {
+    name: 'mp-html',
+    props: ['content'],
+    template: '<view class="mp-html-stub" v-html="content"></view>',
+  },
+}))
 
 describe('CardRenderer', () => {
   const cards: ChatCard[] = [

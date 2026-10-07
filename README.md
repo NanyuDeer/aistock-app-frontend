@@ -22,15 +22,18 @@ pnpm dev:mp-weixin
 # H5 构建
 pnpm build:h5
 
-# TypeScript 类型检查
-npx tsc --noEmit
+# TypeScript 类型检查（vue-tsc，含 .vue 模板；等价于 pnpm run type-check）
+pnpm type-check
 
-# 前端单测（Vitest；失败集恒为 5 个既有文件，新增失败即回归）
+# 前端单测（Vitest；当前全绿，新增失败即回归）
 pnpm test
 
 # node:test 风格单测（采集器按 Vitest 白名单反向排除同因假失败）
-# 退出码：1 = 基线一致（仅剩 2 条已知真实失败，属预期）或采集器自检失败；2 = 基线漂移
+# 退出码：0 = 与基线一致（当前基线 284/284/0，全绿）；1 = 采集器自检失败；2 = 基线漂移
 pnpm test:node
+
+# CI 门禁（GitHub Actions）：装依赖(lock) → 类型检查 → 三套单测 → H5 构建
+# 定义见 .github/workflows/ci.yml
 ```
 
 ## 技术栈

@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-const pageSource = readFileSync(new URL('./index.vue', import.meta.url), 'utf8')
+// 归一化换行：本文件的断言含跨行正则（如 pickVersion 的多行签名提取）。
+// 仓库未提交 .gitattributes 且本机常带 core.autocrlf=true → git 内为 LF、Windows 工作区为
+// CRLF，`\(\n` 之类的模式会漏匹配，出现「Windows 失败 / CI(Linux) 通过」的口径分裂。
+// 归一化只是消除换行差异，断言强度不变。
+const pageSource = readFileSync(new URL('./index.vue', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
 
 test('loadVersions 解包行为：拦截器已解包 {code,data} 信封，直接取 .versions（mock getRhythmMaster 返回 {date, versions}）', () => {
   // 从源码提取解包行并模拟执行：响应拦截器（request.ts）code===0 时 return data，
