@@ -240,13 +240,20 @@ describe('dedupeDailyMovements 失败回退（failed）', () => {
     expect(items[0].event_id).toBe('mv:failed:new')
   })
 
-  // 隔离「failed 不以时间取胜」：failed 更新（时间更大）但非 failed 更旧，仍取 completed。
-  // 此前写法让 completed 同时「更新且非 failed」，两条判据同向、恒真，无法验证 failed 不以时间取胜。
-  it('最新 failed（时间更大）+ 当日有 completed（更旧）→ 仍取 completed', () => {
-    const items = dedupeDailyMovements([
-      makeMovement({ symbol: '688203', event_id: 'mv:failed:newest', triggered_at: '2026-09-04T08:00:00Z', analysis_status: 'failed' }),
-      makeMovement({ symbol: '688203', event_id: 'mv:completed:older', triggered_at: '2026-09-04T06:00:00Z', analysis_status: 'completed', primary_cause: '科创板块走弱' }),
-    ])
+  // ③ 交互用例：同一交易日、同股混排 unavailable / failed / completed。
+  // 关键在「unavailable 是当日最新非 failed」，它在 dedupe 内部本应胜出，但会先被
+  // isUnattributableMovement 过滤剔除；failed 是当日最新、但被 dedupe 的「跳过 failed」跳过。
+  // 二者共同作用，最终仍取到较早的 completed —— 这锁住「失败回退」×「不可归因过滤」的交互。
+  // 注意与①不同：①只有 failed+completed 两态历时竞争；③额外引入 unavailable 这枚「会被过滤的
+  // 最新项」，若不过滤它或不去重跳过 failed，本用例都会得到非 completed，真正区分于①。
+  it('unavailable + failed + completed 混排 → 仍取 completed（失败回退 × 不可归因过滤 交互）', () => {
+    const items = dedupeDailyMovements(
+      [
+        makeMovement({ symbol: '688203', event_id: 'mv:unavailable:newest', triggered_at: '2026-09-04T07:00:00Z', analysis_status: 'unavailable' }),
+        makeMovement({ symbol: '688203', event_id: 'mv:failed:newest', triggered_at: '2026-09-04T08:00:00Z', analysis_status: 'failed' }),
+        makeMovement({ symbol: '688203', event_id: 'mv:completed:older', triggered_at: '2026-09-04T06:00:00Z', analysis_status: 'completed', primary_cause: '科创板块走弱' }),
+      ].filter((x) => !isUnattributableMovement(x)),
+    )
     expect(items).toHaveLength(1)
     expect(items[0].event_id).toBe('mv:completed:older')
   })
