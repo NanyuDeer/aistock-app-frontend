@@ -1,39 +1,6 @@
 <template>
   <view class="alert-content">
     <view class="content-wrap">
-      <!-- 自选股洞察模块：预览自选股价格异动的归因结果，点击进入异动监控/洞察详情 -->
-      <view class="alert-module">
-        <view class="module-card">
-          <view class="module-decor"></view>
-          <view class="module-header" @tap="goAlertCatcher">
-            <view class="module-icon">
-              <SvgIcon name="radar-line" size="32rpx" color="#0b5fff" />
-            </view>
-            <view class="module-header-text">
-              <text class="module-title">自选股洞察</text>
-            </view>
-            <text class="module-arrow">›</text>
-          </view>
-          <view class="capture-list">
-            <template v-if="captureList.length">
-              <ListCell
-                v-for="(item, idx) in captureRows"
-                :key="idx"
-                :title="item?.stock_name || '\u3000'"
-                :description="item ? `${item.detailText} · ${item.dateText}` : '\u3000'"
-                :clickable="!!item"
-                @click="item && goTrace(item.event_id)"
-              >
-                <template #prefix>
-                  <Tag v-if="item" :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
-                </template>
-              </ListCell>
-            </template>
-            <EmptyState v-if="!captureList.length" title="暂无异动数据" />
-          </view>
-        </view>
-      </view>
-
       <!-- 个股情报模块（原StockMonitor，原异动捕手改名） -->
       <view class="alert-module">
         <view class="module-card">
@@ -66,6 +33,39 @@
               </ListCell>
             </template>
             <EmptyState v-if="!filteredIntelList.length" title="暂无情报数据" />
+          </view>
+        </view>
+      </view>
+
+      <!-- 自选股洞察模块：预览自选股价格异动的归因结果，点击进入异动监控/洞察详情 -->
+      <view class="alert-module">
+        <view class="module-card">
+          <view class="module-decor"></view>
+          <view class="module-header" @tap="goAlertCatcher">
+            <view class="module-icon">
+              <SvgIcon name="radar-line" size="32rpx" color="#0b5fff" />
+            </view>
+            <view class="module-header-text">
+              <text class="module-title">自选股洞察</text>
+            </view>
+            <text class="module-arrow">›</text>
+          </view>
+          <view class="capture-list">
+            <template v-if="captureList.length">
+              <ListCell
+                v-for="(item, idx) in captureRows"
+                :key="idx"
+                :title="item?.stock_name || '\u3000'"
+                :description="item ? `${item.detailText} · ${item.dateText}` : '\u3000'"
+                :clickable="!!item"
+                @click="item && goTrace(item.event_id)"
+              >
+                <template #prefix>
+                  <Tag v-if="item" :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
+                </template>
+              </ListCell>
+            </template>
+            <EmptyState v-if="!captureList.length" title="暂无异动数据" />
           </view>
         </view>
       </view>

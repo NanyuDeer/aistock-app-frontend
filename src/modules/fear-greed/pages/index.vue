@@ -170,17 +170,6 @@
           <text class="fg-card__title">投资建议</text>
           <view class="fg-card__body">
             <view class="fg-badge" :style="badgeStyle">{{ zone.label }}</view>
-            <!-- 仓位建议条 -->
-            <view class="fg-position">
-              <view class="fg-position__header">
-                <text class="fg-position__label">建议总仓位</text>
-                <text class="fg-position__value">{{ positionRange.min }}% - {{ positionRange.max }}%</text>
-              </view>
-              <view class="fg-position__bar">
-                <view class="fg-position__track" />
-                <view class="fg-position__fill" :style="positionBarStyle" />
-              </view>
-            </view>
             <!-- 配置方向标签 -->
             <view class="fg-sectors">
               <text class="fg-sectors__label">配置方向<text class="fg-sectors__hint">（点击查看解释）</text></text>
@@ -288,8 +277,8 @@ const ZONES: ZoneDef[] = [
     actions: ['分批建仓，控制节奏', '设好止损，严守纪律', '等待放量企稳信号'],
   },
   {
-    min: 20, max: 45, label: '寒冷', subLabel: '恐惧', color: '#FF9500',
-    start: '#FF9500', end: '#FFB84D', pulseColor: 'rgba(255, 149, 0, 0)', isExtreme: false,
+    min: 20, max: 45, label: '寒冷', subLabel: '恐惧', color: '#2E7D32',
+    start: '#2E7D32', end: '#5BA363', pulseColor: 'rgba(46, 125, 50, 0)', isExtreme: false,
     advice: '市场情绪偏谨慎，建议控制仓位，优先配置业绩确定性高的防御性板块，耐心等待情绪修复。',
     summary: '市场情绪偏谨慎，投资者信心不足、交易活跃度偏低',
     positionMin: 30, positionMax: 50,
@@ -314,8 +303,8 @@ const ZONES: ZoneDef[] = [
     actions: ['维持现有仓位', '多看少动，等待方向', '关注新催化剂出现'],
   },
   {
-    min: 55, max: 80, label: '温热', subLabel: '贪婪', color: '#34C759',
-    start: '#34C759', end: '#6AE07A', pulseColor: 'rgba(52, 199, 89, 0)', isExtreme: false,
+    min: 55, max: 80, label: '温热', subLabel: '贪婪', color: '#FF5252',
+    start: '#FF5252', end: '#FF8080', pulseColor: 'rgba(255, 82, 82, 0)', isExtreme: false,
     advice: '市场情绪偏乐观，赚钱效应显现。建议注意追高风险，可考虑逢高分批止盈，锁定已有收益。',
     summary: '市场情绪升温，资金参与意愿增强，赚钱效应显现',
     positionMin: 40, positionMax: 60,
@@ -560,11 +549,7 @@ const movingAverages = computed(() => {
 /** 均线值对应的颜色（绿<20冰点 / 橙<45 / 黄<55 / 绿<80 / 红≥80沸点） */
 function maColor(v: number | null): string {
   if (v == null) return '#999'
-  if (v < 20) return '#00C853'
-  if (v < 45) return '#FF9500'
-  if (v < 55) return '#FFCC00'
-  if (v < 80) return '#34C759'
-  return '#FF3B30'
+  return '#333333'
 }
 
 /**

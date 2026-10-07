@@ -32,6 +32,16 @@
           </view>
         </view>
 
+        <!-- long 档（120 交易日）半年才产出一个样本，不计入迭代判读（Task 5）：
+             仅在有 long 数据或确实排除了 long 时显示，避免无 long 档的页面武断常显 -->
+        <view v-if="showLongNote" class="stats-note">
+          <text class="stats-note-text">long 档样本积累中，不参与迭代判读</text>
+          <!-- long 命中率单列展示（仅呈现，不进迭代判读）：让 long 档命中率用户可见 -->
+          <text v-if="hasLongSample" class="stats-note-text">
+            long 档命中率：{{ longHitRateText }}（{{ stats.long.hits }}/{{ stats.long.n }}）
+          </text>
+        </view>
+
         <!-- 状态筛选 -->
         <view class="filter-tabs">
           <view
@@ -88,7 +98,7 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { LoadingState, EmptyState, Button } from '@/shared/components'
-import { predictionApi, type PredictionRecord, type PredictionHorizonKey } from '@/shared/api/modules/prediction'
+import { predictionApi, type PredictionRecord, type PredictionHorizonKey, type PredictionStats } from '@/shared/api/modules/prediction'
 import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import {
   HORIZON_ORDER,
@@ -110,13 +120,27 @@ type FilterValue = (typeof FILTER_TABS)[number]['value']
 const loading = ref(false)
 const error = ref(false)
 const list = ref<PredictionRecord[]>([])
-const stats = ref<PredictionStatsView>({ total: 0, pendingCount: 0, verifiedCount: 0, skippedCount: 0, hitRate: null })
+// 后端 stats 含 long 单列 / 迭代看板指标（可选字段）；后端缺 stats 时用 PredictionStatsView 兜底
+const stats = ref<PredictionStatsView & Partial<PredictionStats>>({ total: 0, pendingCount: 0, verifiedCount: 0, skippedCount: 0, hitRate: null, long: { n: 0, hits: 0, hitRate: null } })
 const activeFilter = ref<FilterValue>('all')
 const today = shanghaiDateString()
+
+/** 是否存在 long 档已结算样本（用于决定是否展示 long 命中率行） */
+const hasLongSample = computed(() => (stats.value.long?.n ?? 0) > 0)
+
+/** long 提示仅在「有 long 数据或确实排除了 long」时显示（避免无 long 档页面武断常显） */
+const showLongNote = computed(() => Boolean(stats.value.long_excluded) || hasLongSample.value)
 
 const hitRateText = computed(() => {
   const rate = stats.value.hitRate
   return rate === null ? '暂无' : `${Math.round(rate * 100)}%`
+})
+
+/** long 档命中率文案（无样本/命中率缺失 → 暂无） */
+const longHitRateText = computed(() => {
+  const long = stats.value.long
+  if (!long || long.n === 0 || long.hitRate === null) return '暂无'
+  return `${Math.round(long.hitRate * 100)}%`
 })
 
 function isVerified(record: PredictionRecord): boolean {
@@ -137,7 +161,8 @@ async function loadData() {
     const data = await predictionApi.list({ status: activeFilter.value, source_type: 'market_trace' })
     list.value = data?.items ?? []
     if (data?.stats) {
-      stats.value = data.stats
+      // 后端 stats 的 long 为可选（旧响应可能缺失）→ 补零值保证 PredictionStatsView 的 long 必填约束
+      stats.value = { ...data.stats, long: data.stats.long ?? { n: 0, hits: 0, hitRate: null } }
     } else {
       // 后端未返回 stats（旧版本）时按当前页兜底估算
       stats.value = computeStats(list.value, today)
@@ -216,6 +241,16 @@ onShow(() => {
 .stat-label {
   font-size: $font-size-xs;
   color: $text-color-secondary;
+}
+
+.stats-note {
+  padding: 0 $spacing-base $spacing-sm;
+}
+
+.stats-note-text {
+  display: block;
+  font-size: $font-size-xs;
+  color: $text-color-tertiary;
 }
 
 .filter-tabs {

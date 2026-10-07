@@ -722,19 +722,21 @@ const handleClick = () => {
   border-radius: $r-sm;
   background: $bg-soft;
 
+  /* 标签宽度随文字自适应（原固定 128rpx 会把正文推得过右）；字号对齐溯源/预判行的 key */
   .as-insight-card__key {
     display: block;
-    flex: 0 0 128rpx;
-    font-size: $font-size-xs;
+    flex: 0 0 auto;
+    font-size: $font-size-sm;
     color: $ink;
     margin-bottom: 0;
     white-space: nowrap;
   }
 
+  /* 正文字号对齐溯源/预判行的正文 */
   .as-insight-card__text {
     flex: 1;
     min-width: 0;
-    font-size: $font-size-xs;
+    font-size: $font-size-sm;
     line-height: 1.6;
     color: $ink-soft;
   }
