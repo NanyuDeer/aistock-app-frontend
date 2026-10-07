@@ -98,7 +98,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { useAppStore } from '@/shared/store/modules/app'
 import { getMarketStatus } from '@/shared/utils/tradingTime'
-import { formatTime } from '@/shared/utils/datetime'
+import { formatTime, shanghaiDateKeyDaysAgo } from '@/shared/utils/datetime'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import Badge from '@/shared/components/Badge.vue'
@@ -245,7 +245,7 @@ async function fetchAlerts() {
   hasMore.value = false
   loadingMore.value = false
   try {
-    const page = await stockTraceApi.list(20, undefined, { visibleOnly: true }).catch(() => ({ items: [] as StockTraceEvent[], nextCursor: null as string | null }))
+    const page = await stockTraceApi.list(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) }).catch(() => ({ items: [] as StockTraceEvent[], nextCursor: null as string | null }))
     rawItems.value = page.items
     cursor.value = page.nextCursor
     hasMore.value = !!page.nextCursor
@@ -261,7 +261,7 @@ async function loadMore() {
   if (!hasMore.value || loadingMore.value) return
   loadingMore.value = true
   try {
-    const page = await stockTraceApi.list(20, cursor.value ?? undefined, { visibleOnly: true })
+    const page = await stockTraceApi.list(20, cursor.value ?? undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
     rawItems.value = upsertEventById(rawItems.value, page.items)
     cursor.value = page.nextCursor
     hasMore.value = !!page.nextCursor

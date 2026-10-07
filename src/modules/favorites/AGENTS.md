@@ -71,6 +71,11 @@
 > - 实测（mxfff）：两页首屏 14 张，连续触底 14 → 24 → 37 → 47 → 60 后出现「没有更多」；第 2 页起请求带 `cursor=` 与 `visible_only=1`。
 > - **残留（已知）**：中文提示词规则（`hasNoUsableCause` 的 6 条提示词）与**同日同股去重**仍未下沉到 SQL → 窗口仍会被少量占用（去重：同日同股多条只出 1 张卡，但占多行）。
 
+> **2026-10-07（同日第二笔）**：两页异动/洞察列表收敛到「最近 14 个自然日」——由**前端计算窗口起点、后端 SQL 做时间下界**（`aistock-agent-py/docs/superpowers/plans/2026-10-07-movements-two-week-window.md` Task 2）。
+> - `stockTraceApi.list(limit, cursor?, options?: { visibleOnly?: boolean; since?: string })`：`options.since`（`YYYY-MM-DD`）存在时 params 追加 `since`（与 `visible_only` 同为**opt-in 非默认**；首页 `AlertContent.vue` 不传，走全量降级）。
+> - 新 helper `shared/utils/datetime.ts::shanghaiDateKeyDaysAgo(days)`：`YYYY-MM-DD`，按 **UTC+8 固定偏移**（中国无夏令时、不依赖本机时区），`since = shanghaiDateKeyDaysAgo(13)` = 今天-13 = 最近 14 个自然日含今天。
+> - `monitor.vue` / `insight.vue` 首屏与 `loadMore` 均传 `{ visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) }`；**无客户端过滤**——后端按 `trading_date >= since`，越界返回空页 + `nextCursor=null` → 自然「没有更多」；老 app-api 忽略该参数 → 优雅降级"显示全部"。
+
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。
 - 展示优先级（`AlertContent.vue` 的 `fromMovement()`、`monitor.vue` 的 `movementToAlertItem()`、`insight.vue` 价格异动映射三处一致）：

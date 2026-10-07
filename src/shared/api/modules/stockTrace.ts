@@ -123,13 +123,15 @@ export interface StockTraceEventPage {
 }
 
 export const stockTraceApi = {
-  list(limit = 20, cursor?: string, options?: { visibleOnly?: boolean }) {
+  list(limit = 20, cursor?: string, options?: { visibleOnly?: boolean; since?: string }) {
     return request.get<StockTraceEventPage>('/cn/favorites/movements', {
       params: {
         limit,
         ...(cursor ? { cursor } : {}),
         // opt-in：仅当调用方显式传 visibleOnly 才追加 visible_only（首页 AlertContent 不传，行为不变）
         ...(options?.visibleOnly ? { visible_only: 1 } : {}),
+        // opt-in：仅当调用方显式传 since（YYYY-MM-DD）才追加日期下界；老 app-api 忽略该参数时优雅降级为"显示全部"
+        ...(options?.since ? { since: options.since } : {}),
       },
     })
   },

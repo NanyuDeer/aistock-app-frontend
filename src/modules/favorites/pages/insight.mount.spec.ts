@@ -5,6 +5,12 @@ import { mount, flushPromises } from '@vue/test-utils'
 const stockTraceApiMock = vi.hoisted(() => ({ list: vi.fn() }))
 vi.mock('@/shared/api/modules/stockTrace', () => ({ stockTraceApi: stockTraceApiMock }))
 
+// 仅 mock shanghaiDateKeyDaysAgo（返回固定串，避免断言依赖当日/本机时区漂移）；formatTime 等保持原样
+vi.mock('@/shared/utils/datetime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/shared/utils/datetime')>()
+  return { ...actual, shanghaiDateKeyDaysAgo: vi.fn(() => '2026-09-23') }
+})
+
 // SubPageCard2 桩：避免 GlobalChatBar / FloatingPodcast 等副作用；
 // 额外暴露 stub-scroll-trigger（触发即 emit scrolltolower），供触底分页用例驱动
 vi.mock('@/shared/components/SubPageCard2.vue', () => ({
@@ -33,6 +39,7 @@ vi.mock('@dcloudio/uni-app', () => ({
 }))
 
 import insight from './insight.vue'
+import { shanghaiDateKeyDaysAgo } from '@/shared/utils/datetime'
 
 /** 构造一条 stocktrace 价格异动 */
 function movement(over: Record<string, unknown> = {}) {
@@ -152,11 +159,11 @@ describe('insight.vue 自选股洞察列表页（对齐个股情报模板）', (
 
   // ===== cursor 翻页 =====
 
-  it('首屏 list 调用带 visible_only：true + cursor 未定义', async () => {
+  it('首屏 list 调用带 visible_only：true + since：shanghaiDateKeyDaysAgo(13) + cursor 未定义', async () => {
     stockTraceApiMock.list.mockResolvedValue({ items: [], nextCursor: null })
     const wrapper = mount(insight)
     await flushPromises()
-    expect(stockTraceApiMock.list).toHaveBeenCalledWith(20, undefined, { visibleOnly: true })
+    expect(stockTraceApiMock.list).toHaveBeenCalledWith(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
   })
 
   it('分页主路径：首屏 1 页 → 触底追加第 2 页 → 跨页同 (股, 上海交易日) 只出一张卡（保留较新）', async () => {
@@ -176,7 +183,8 @@ describe('insight.vue 自选股洞察列表页（对齐个股情报模板）', (
     // 触底 → 追加载第 2 页，用第 1 页的 nextCursor
     await wrapper.find('.stub-scroll-trigger').trigger('click')
     await flushPromises()
-    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, '2026-09-18T01:00:00.000Z|mv:p1', { visibleOnly: true })
+    // 触底请求同样带 since（两周下界）
+    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, '2026-09-18T01:00:00.000Z|mv:p1', { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
     // 跨页同 (股, 日) 只出一张卡（对整体 rawItems 重派生，取较新的 mv:p2）
     expect(wrapper.findAll('.as-card').length).toBe(1)
     expect(wrapper.find('.stock-move').text()).toBe('+9.9%')
@@ -207,7 +215,7 @@ describe('insight.vue 自选股洞察列表页（对齐个股情报模板）', (
     // 第二次触底：仍用旧 cursor 'c1' 重试 → 成功追加
     await wrapper.find('.stub-scroll-trigger').trigger('click')
     await flushPromises()
-    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, 'c1', { visibleOnly: true })
+    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, 'c1', { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
     expect(wrapper.findAll('.as-card').length).toBe(2)
   })
 
@@ -226,7 +234,7 @@ describe('insight.vue 自选股洞察列表页（对齐个股情报模板）', (
     // 再次 onShow：整表重拉并重置 cursor/rawItems，仅剩第 1 页 mv:a，不叠加旧行
     onShowHandlers.at(-1)?.()
     await flushPromises()
-    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, undefined, { visibleOnly: true })
+    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
     expect(wrapper.findAll('.as-card').length).toBe(1)
     expect(wrapper.find('.stock-name').text()).toBe('贵州茅台')
   })

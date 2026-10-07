@@ -6,6 +6,12 @@ import { createPinia, setActivePinia } from 'pinia'
 const stockTraceApiMock = vi.hoisted(() => ({ list: vi.fn() }))
 vi.mock('@/shared/api/modules/stockTrace', () => ({ stockTraceApi: stockTraceApiMock }))
 
+// 仅 mock shanghaiDateKeyDaysAgo（返回固定串，避免断言依赖当日/本机时区漂移）；formatTime 等保持原样
+vi.mock('@/shared/utils/datetime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/shared/utils/datetime')>()
+  return { ...actual, shanghaiDateKeyDaysAgo: vi.fn(() => '2026-09-23') }
+})
+
 // mock favorites store：stocks 置空、fetchFavorites no-op，
 // 隔离 refreshQuotes / uni.showToast 等真实 store 副作用
 const favoritesStoreMock = vi.hoisted(() => ({
@@ -73,6 +79,7 @@ vi.mock('@dcloudio/uni-app', () => ({
 }))
 
 import monitor from './monitor.vue'
+import { shanghaiDateKeyDaysAgo } from '@/shared/utils/datetime'
 
 /** 构造一条 stocktrace 价格异动 */
 function movement(over: Record<string, unknown> = {}) {
@@ -333,11 +340,11 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
 
   // ===== cursor 翻页（路径 B：分页主流程 + 失败重试 + onShow 重置 + visible_only）=====
 
-  it('首屏 list 调用带 visible_only：true + cursor 未定义', async () => {
+  it('首屏 list 调用带 visible_only：true + since：shanghaiDateKeyDaysAgo(13) + cursor 未定义', async () => {
     stockTraceApiMock.list.mockResolvedValue({ items: [], nextCursor: null })
     const wrapper = mount(monitor)
     await flushPromises()
-    expect(stockTraceApiMock.list).toHaveBeenCalledWith(20, undefined, { visibleOnly: true })
+    expect(stockTraceApiMock.list).toHaveBeenCalledWith(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
   })
 
   it('分页主路径：首屏 1 页 → 触底追加第 2 页 → 跨页同 (股, 上海交易日) 只出一张卡（保留较新）', async () => {
@@ -358,7 +365,8 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     // 触底 → 追加载第 2 页，用第 1 页的 nextCursor
     await wrapper.find('.stub-scroll-trigger').trigger('click')
     await flushPromises()
-    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, '2026-09-18T01:00:00.000Z|mv:p1', { visibleOnly: true })
+    // 触底请求同样带 since（两周下界）
+    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, '2026-09-18T01:00:00.000Z|mv:p1', { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
     // 跨页同 (股, 日) 只出一张卡（对整体 rawItems 重派生，取较新的 mv:p2）
     expect(wrapper.findAll('.as-card').length).toBe(1)
     expect(wrapper.find('.stock-move').text()).toBe('+9.9%')
@@ -406,7 +414,7 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     // 第二次触底：仍用旧 cursor 'c1' 重试 → 成功追加
     await wrapper.find('.stub-scroll-trigger').trigger('click')
     await flushPromises()
-    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, 'c1', { visibleOnly: true })
+    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, 'c1', { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
     expect(wrapper.findAll('.as-card').length).toBe(2)
   })
 
@@ -425,7 +433,7 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     // 再次 onShow：整表重拉并重置 cursor/rawItems，仅剩第 1 页 mv:a，不叠加旧行
     onShowHandlers.at(-1)?.()
     await flushPromises()
-    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, undefined, { visibleOnly: true })
+    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
     expect(wrapper.findAll('.as-card').length).toBe(1)
     expect(wrapper.find('.stock-name').text()).toBe('中国平安')
   })

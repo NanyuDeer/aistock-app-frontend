@@ -1,5 +1,19 @@
 # 待提交修改记录
 
+## 2026-10-07 — 自选股异动/洞察列表：最近 14 个自然日窗口（`since` opt-in，前端）
+
+跨仓计划：`aistock-agent-py/docs/superpowers/plans/2026-10-07-movements-two-week-window.md` Task 2。用户要求"两页异动只显示最近两周以内"。**口径**：最近 14 个自然日（上海日期含今天）→ `since = 今天 - 13 天`；后端前置于 commit `94e03f9`（`stock_trace_events.trading_date >= since`，非法值忽略）。
+
+- `src/shared/utils/datetime.ts`：新增 `shanghaiDateKeyDaysAgo(days: number): string` → 返回 `YYYY-MM-DD`。按 **UTC+8 固定偏移**计算（中国无夏令时，**不依赖运行环境本地时区**，对齐 `insightCards.ts::shanghaiDayKey` 写法）：`Date.now()+8h` 后用 UTC getter 取上海年月日，再以「上海日期的 UTC 午夜」为基准减 `days*24h`，跨月/跨年由 Date 内部处理。
+- `src/shared/api/modules/stockTrace.ts`：`list(limit, cursor?, options?: { visibleOnly?: boolean; since?: string })`——`options.since`（`YYYY-MM-DD`）存在时 params 追加 `since`（与 `visible_only` 同为**显式传入才生效**的 opt-in，非默认）。老 app-api 忽略该参数时优雅降级为"显示全部"（与 `visible_only` 同一策略）。
+- `src/modules/favorites/pages/monitor.vue` / `pages/insight.vue`：首屏（`onShow`）与触底 `loadMore` 的调用均改为 `list(20, cursor, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })`。**不做客户端日期过滤**——后端已兜底；越界后返回空页 + `nextCursor === null` → 自然显示「没有更多」。
+- **`AlertContent.vue` 不改**（首页特别提醒，仍 `list(20)` 不带 options，`since` 为 opt-in 不受影响）。
+- 测试（先红后绿）：
+  - `datetime.spec.ts`（node:test）新增 `shanghaiDateKeyDaysAgo` 三例，用固定时钟（`Date.now` 打桩绝对 UTC 时刻）隔离运行环境时区/当日漂移：`days=0` 取上海今日（含跨 UTC 午夜但未跨上海日、UTC 16:00=上海次日 00:00 两边界）；`days=13` 跨年（上海 2026-01-05 → `2025-12-23`）；月末跨 2 月（上海 2026-03-01 → `days=1` 得 `2026-02-28`、`days=13` 得 `2026-02-16`）。
+  - `monitor.spec.ts` / `insight.mount.spec.ts`：mock `shanghaiDateKeyDaysAgo` 固定返回 `'2026-09-23'`，断言首屏与触底 `list` 第三个参数 `since: shanghaiDateKeyDaysAgo(13)`；既有分页/跨页去重/`visible_only`/`onShow` 重置/失败重试等用例同步更新期望 `{ visibleOnly: true, since }`，**未放宽**。
+  - 相关 vitest spec 全绿（monitor 21 + insight 12 + AlertContent/insightCards 40）；`datetime.spec.ts` 4 pass；`npx vue-tsc --noEmit` exit 0。
+- **`run-node-specs.mjs` 基线更新**：`EXPECTED_BASELINE` `273/273/0 → 276/275/1`——+3 为 datetime 新用例；"-1 fail" 为**与本任务无关的存量失败**（rhythm `index.spec.ts` 的 pickVersion 源码正则在 CRLF 行尾下不匹配，已在本任务改动前的 HEAD 实测 `273/272/1`，非本次引入）。
+
 ## 2026-10-07 — 自选股异动/洞察列表：cursor 分页 + visible_only 过滤接前端（A）
 
 跨仓计划：`aistock-agent-py/docs/superpowers/plans/2026-10-07-movements-pagination-and-visible-filter.md` Task 2。两页此前固定 `list(20)` 取第 1 页且不翻页（`nextCursor` 无人消费）；现接后端前置完成的 `visible_only`（commit `272ccbe`）并支持触底翻页。
