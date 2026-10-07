@@ -18,7 +18,7 @@
 >
 > **2026-09-04 更新（最终语义）**：`pages/monitor.vue`（自选股异动）已移除老雷达数据源 `watchlistInsightApi.getInsights`（存量 watchlist_insight_events 08-30 起停用，含 8 月初远古涨停雷达事件），监控页统一只消费 `stockTraceApi.list`。后端 `StockTraceService.listUserEvents` 可见性下界改为**当前持仓期**（JOIN ON `e.first_triggered_at >= us.created_at`）：老自选全历史 + 今日新触发照常，新加入股只显示加入后触发/仍活跃的异动；同时新增**加入即打点**（`UserController.addFavorites` 交易时段内对新加入 symbol 调 `PriceTriggerDetector.detectSymbols`，命中即 `immediateEnqueue` 归因）。
 >
-> **2026-09-13 更新（同日同股聚合）**：同一交易日同一只股票的多次异动只展示 **1 张卡片**（打点/落库照常，仅展示收敛）。纯函数 `dedupeDailyMovements(items)`（`components/insightCards.ts`）：分组键 = symbol（剥 SH/SZ/BJ 前缀）+ **上海交易日**（`triggered_at` 经 UTC+8 取日期），组内取 `window_end_at ?? triggered_at` 最新一条。**组合口径（最新 + 失败回退）**：调用方先 `filter(isUnattributableMovement)` 再 `dedupeDailyMovements` —— 不可用项已剔除，取最新即"当日最近一条有效归因"。三处统一接入：`pages/monitor.vue`、`components/AlertContent.vue`（首页洞察块）、`pages/insight.vue`（洞察列表）。
+> **2026-09-13 更新（同日同股聚合）**：同一交易日同一只股票的多次异动只展示 **1 张卡片**（打点/落库照常，仅展示收敛）。纯函数 `dedupeDailyMovements(items)`（`components/insightCards.ts`）：分组键 = symbol（剥 SH/SZ/BJ 前缀）+ **上海交易日**（`triggered_at` 经 UTC+8 取日期），组内取 `window_end_at ?? triggered_at` 最新一条。**组合口径（最新 + 失败回退）**：调用方先 `filter(isUnattributableMovement)` 再 `dedupeDailyMovements` —— 不可用项已剔除，取最新即"当日最近一条有效归因"。**2026-10-06 起**：组内选"最新"时**跳过 `analysis_status === 'failed'`**——当日有有效归因则回退显示它，全组皆 failed 才保留最新那条（让「归因失败」可见）；`failed` 不被 `isUnattributableMovement` 隐藏（否则全失败时整组消失）。三处统一接入：`pages/monitor.vue`、`components/AlertContent.vue`（首页洞察块）、`pages/insight.vue`（洞察列表）。
 > **2026-09-25 更新（洞察报告 PDF → SSE 流式输出）**：完整洞察报告**彻底移除 PDF 链路**，改为在详情页点击后在按钮下方**逐章节流式输出**。
 > - 新增 `modules/favorites/utils/useInsightReportSSE.ts`：用 **`fetch + ReadableStream`**（**不用 `EventSource`**——`EventSource` 无法设置 `Authorization` 头，而 `report/stream` 端点是 JWT 鉴权；项目既有 `useAlertSSE` 能用 `EventSource` 是因为 `/agent/briefing/alert` 不校验登录）。用 fetch 的额外好处：能直接读 HTTP 状态码，前置错误（401/404/409/502）走真实状态码 + JSON。暴露 `header` / `sections`（逐条追加）/ `loading` / `done` / `error` / `start(eventId)` / `stop()`；60s 超时 + `AbortController`；按 `data: {...}\n\n` 分帧，单帧 JSON 解析失败忽略。配套 spec 7 例。
 > - `insight-detail-move.vue`：底部 `downloadInsightReport` 下载按钮替换为**「生成完整洞察报告」按钮 + 按钮下方流式渲染区**（页眉 + 逐章节列表）。生成中按钮文案「生成中…（点击停止）」可中断，完成后变「重新生成完整报告」；`onLoad` 参数 `autostart=1` 时自动开始生成；`onUnload` 调 `stop()` 中止。
@@ -61,12 +61,29 @@
 > - 预判区（forecast）已随后端迁移 022 全部移除：`detail.forecast` 不再可用，`ForecastSlotPayload`/`parseForecastSlot` 类型和工具函数已删除。
 > - 预判 Tab 与 `hasForecast` 筛选已从洞察列表移除。
 
+> **2026-10-07 更新（自选股异动 / 洞察列表两页 cursor 翻页 + `visible_only` 过滤前置）**：两页原先均固定 `stockTraceApi.list(20)` 只取第 1 页且**不翻页**（后端 `nextCursor` 无人消费）；而后端是「先 LIMIT 20、前端再过滤 + 同日同股去重」→ 被隐藏的行**白占窗口**，较早的有效异动可能取不到（实测 mxfff：50 条里 27 条是 `low`）。
+> - **`stockTraceApi.list(limit, cursor?, options?)`**：`options.visibleOnly === true` 时 params 追加 `visible_only: 1`。**opt-in 非默认**：`AlertContent.vue`（首页特别提醒，取前 6 条）刻意不传，行为与改动前一致。
+> - **`monitor.vue` / `insight.vue`**：新增 `rawItems / cursor / hasMore / loadingMore`；首屏（`onShow`）**在请求前同步复位**这四个状态（否则 `loadMore` 在飞行途中触达 `onShow` 时会读到旧 cursor 并发请求）；触底经 **`<SubPageCard2 @scrolltolower>`** 加载下一页 —— **不是 `onReachBottom`**：两页被 `SubPageCard2` 包裹、滚动发生在**内层 `<scroll-view>`**，页面级 `onReachBottom` 不会触发（先例：`detail.vue`、`NotificationDropdown.vue`）。
+> - **`hasMore` 以 `nextCursor` 为准**（不得用 `items.length < limit`）；请求失败**不推进 cursor**、不置 `hasMore=false`（下次触底用同一 cursor 重试），并 `console.warn` 以便观测。
+> - **必须对累积 `rawItems` 整体重派生**（`filter(isUnattributableMovement) → dedupeDailyMovements → map/sort`）：同一 (股, 上海交易日) 的两条可能跨页边界，只派生本页会让较早那条"复活"成第二张卡。
+> - **`upsertEventById(prev, incoming)`（`components/insightCards.ts`，两页共享）**：按 `event_id` **浅合并** —— 已存在则保留原位置并用 incoming 覆盖同名字段，不存在则追加。既避免跨页重复事件渲染成多卡，又避免整体覆盖丢掉 `primary_cause`/`confidence_level`（WS 的 `movement.updated` 是部分字段 payload）。`monitor.vue` 的 WS 分支（`#ifdef APP-PLUS`）也改走它。
+> - 后端配套（app-api `stock-trace/AGENTS.md`）：`GET /api/cn/favorites/movements` 新增可选 `visible_only`；`nextCursor` 改**复合键** `"<first_triggered_at ISO>|<event_id>"`，排序加 `event_id DESC` tiebreaker（否则同毫秒事件跨页会漏行）。
+> - 实测（mxfff）：两页首屏 14 张，连续触底 14 → 24 → 37 → 47 → 60 后出现「没有更多」；第 2 页起请求带 `cursor=` 与 `visible_only=1`。
+> - **残留（已知）**：中文提示词规则（`hasNoUsableCause` 的 6 条提示词）与**同日同股去重**仍未下沉到 SQL → 窗口仍会被少量占用（去重：同日同股多条只出 1 张卡，但占多行）。
+
+> **2026-10-07（同日第二笔）**：两页异动/洞察列表收敛到「最近 14 个自然日」——由**前端计算窗口起点、后端 SQL 做时间下界**（`aistock-agent-py/docs/superpowers/plans/2026-10-07-movements-two-week-window.md` Task 2）。
+> - `stockTraceApi.list(limit, cursor?, options?: { visibleOnly?: boolean; since?: string })`：`options.since`（`YYYY-MM-DD`）存在时 params 追加 `since`（与 `visible_only` 同为**opt-in 非默认**；首页 `AlertContent.vue` 不传，走全量降级）。
+> - 新 helper `shared/utils/datetime.ts::shanghaiDateKeyDaysAgo(days)`：`YYYY-MM-DD`，按 **UTC+8 固定偏移**（中国无夏令时、不依赖本机时区），`since = shanghaiDateKeyDaysAgo(13)` = 今天-13 = 最近 14 个自然日含今天。
+> - `monitor.vue` / `insight.vue` 首屏与 `loadMore` 均传 `{ visibleOnly: true, since: shanghaiDateKeyDaysAgo(TWO_WEEK_WINDOW_DAYS) }`；**无客户端过滤**——后端按 `trading_date >= since`，越界返回空页 + `nextCursor=null` → 自然「没有更多」；老 app-api 忽略该参数 → 优雅降级"显示全部"。
+>   - ⚠️ `TWO_WEEK_WINDOW_DAYS = 13`（定义在 `shared/utils/datetime.ts`，附「为何是 13 而非 14」注释）：**"含今天共 14 个自然日" 等价于"回退 13 天"**；写成 `14` 会多算一天（今天 10-07 → 正确 `since = 2026-09-24`）。浏览器实测请求即为 `since=2026-09-24`。
+>   - 实测（mxfff）：同日两页卡片由改动前的 ~60 张收敛到 **8 张**（日期范围 09-24 → 09-30，**无早于 09-24 的卡片**），首屏即「没有更多」。
+
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。
 - 展示优先级（`AlertContent.vue` 的 `fromMovement()`、`monitor.vue` 的 `movementToAlertItem()`、`insight.vue` 价格异动映射三处一致）：
   1. `primary_cause` 存在 → `主因：${primary_cause}`
   2. 否则 `movement_view.primaryCandidate.verdict` 存在 → `主因：${verdict}`
-  3. 否则按 `analysis_status` 兜底：`completed` → `归因完成` / `processing` → `归因中` / `unavailable` → `待归因`
+  3. 否则按 `analysis_status` 兜底：`completed` → `归因完成` / `processing` → `归因中` / `failed` → `归因失败` / `unavailable` → `待归因`
 
 ## 自选股洞察列表页（pages/insight.vue，2026-09-24 模板统一）
 - **目标**：该页模板统一到「个股情报」页（`modules/market/pages/event-catcher.vue`），页面风格与洞察/异动/节奏等他页一致。
@@ -150,7 +167,24 @@
 ## 首页 AlertContent 自选股洞察（2026-09-04 还原为旧预览 ListCell 形态）
 - `AlertContent.vue` 自选股洞察块还原为旧预览 ListCell 形态：`module-header`（标题"自选股洞察"+箭头，点跳 `/modules/favorites/pages/monitor` 自选股异动页）+ `ListCell` 列表（`CAPTURE_ROW_COUNT=6`）。行字段：`title=stock_name`、前缀 `Tag` 用方向（up/down, 红绿, 文案"涨/跌"）、`description=主因或状态 · MM-DD 时间`。点击行进 `insight-detail-move?event_id=`。
 - 数据源：`stockTraceApi.list(20)` → `.filter(m => !isUnattributableMovement(m))`（保留无法归因不展示）→ 取前 6 条（含空行占位至 6）。
-- 主因三段式兜底：`primary_cause` → `movement_view.primaryCandidate.verdict` → `analysis_status`（completed→归因完成 / processing→归因中 / 其他→待归因）。
+- 主因三段式兜底：`primary_cause` → `movement_view.primaryCandidate.verdict` → `analysis_status`（completed→归因完成 / processing→归因中 / failed→归因失败 / 其他→待归因）。
 - 移除：Segmented[全部|预判|溯源]、buildInsightCards 聚合卡渲染、情报折叠、卡片级"预判区/溯源区/AI解读"按钮、intel 并行拉取（该数据仅个股情报块需要，个股情报块自身加载不动）。洞察块只拉 movements。
 - `isUnattributableMovement` 仍从 `insightCards.ts` 导入复用，`insightCards.ts`/`insight.vue`/`monitor.vue`/详情页不动。（**时点说明**：该结论为 2026-09-04 时点；`insight.vue` 已于 **2026-09-24** 做模板统一改造，现状见上文「自选股洞察列表页」章节。）
 - 个股情报块（intel module-card）保持阶段3改造不动（Segmented[全部|利好|利空] + ListCell 预览 + AI解读跳 alert-analysis）。
+
+## 低置信度归因不展示异动卡片（2026-09-30）
+
+- **产品口径**：归因置信度为 **`low` 的异动不展示卡片**；`medium`/`high` 照常展示。判定在展示层，机器枚举值来自 app-api 列表接口新增的 `confidence_level` 字段。
+- **改动（单点）**：`components/insightCards.ts` 的 `isUnattributableMovement` 在 `analysis_status === 'unavailable'` 判据之后、`!== 'completed'` 之前新增 `if (m.confidence_level === 'low') return true`；`TraceEventLike` 新增 `confidence_level?: 'low' | 'medium' | 'high' | null`。三处消费者（`pages/monitor.vue` / `pages/insight.vue` / `components/AlertContent.vue`）均复用该过滤函数，**逻辑单点改动即三处生效**，调用点未动。
+- **降级保护（关键）**：字段**缺失**（app-api 未升级）或 **`null`**（无归因结果）时一律**不隐藏**。理由：若写成"非 `high` 即隐藏"，在 app-api 未发布该字段时会**误杀全部卡片**（`undefined !== 'high'` 恒真）。因此判据只能是 `=== 'low'`，且两仓发布顺序不敏感。
+- **口径边界**：`low` 与既有"无有效结论"（`analysis_status === 'unavailable'` / `movement_view.status ∈ {insufficient, not_applicable}` / 主因命中 `INVALID_CAUSE_HINTS`）是**独立判据**——`low` 也会被单独隐藏，即便它有主因短语。
+- 测试：`components/insightCards.spec.ts` 新增 describe「isUnattributableMovement 低置信不展示口径」5 例（low→隐藏 / medium→展示 / high→展示 / 缺失→不隐藏 / null→不隐藏）→ 54 pass / 0 fail；`npx vue-tsc --noEmit` exit 0。
+- H5 实测（mxfff 账号）：监控页与洞察列表页各 **6 张**（改前 10 张），保留项均为 medium、隐藏项均为 low，无「归因中」、无 09-30 卡片，符合预期。
+
+## 宿迁联盛 2026-09-24 归因硬失败事故（2026-09-27 定位并处置，前端最终零改动）
+- **现象**：宿迁联盛 09-24 异动卡片恒显示「归因中」，且同日同股聚合（`dedupeDailyMovements` 取最新）把它选为"最新"，**遮盖了 09:55 那条已有的有效结论**。
+- **根因（跨仓契约不匹配）**：Node 侧 `buildTriggerEvent` 把涨停标记以 `isLimitUp` 写进冻结的 `stock_trace_snapshots.trigger_event_json`，而 agent-py 侧 `TriggerEvent` 是 `extra="forbid"` 且未声明该字段 → `StockTraceSnapshot.model_validate` 抛 `ValidationError`；该调用位于 worker 内层 try **之外**，被外层 `except Exception` 兜成**具误导性**的 `LLM_OR_DEPENDENCY_UNAVAILABLE` → 3 次**确定性秒失败**进 `dead_letter`、**从未产出 result**。修复落在 agent-py（`TriggerEvent` 声明 `is_limit_up`），**前端无代码改动**。
+- **本次临时措施（已回退）**：定位当天曾在 `insightCards.ts` 加过 `SUPPRESSED_EVENT_IDS` + `isVisibleMovement` 硬编码隐藏该日两条事件，供"修契约需部署周期"期间先不展示。**归因用修复后的代码代跑成功（result `completed`）后已整体回退**，代码回到 `.filter(m => !isUnattributableMovement(m))`。
+- **最终可见性**：恢复出的主因是「证据不足，异动原因未明」（快照缺 `article_context`，无新闻/公告支撑）→ 命中既有「无结论不展示」规则（`hasNoUsableCause` 的 `证据不足` 提示词）→ **该日两条都按正常规则不展示**，卡片保持隐藏，但原因从"归因卡住"变为"归因完成但无有效结论"。
+- **尚未闭环（agent-py 侧）**：`TriggerEvent` 的修复**仍未部署到生产**；且 app-api 侧 `buildTriggerEvent` 的 `isLimitUp` 是**无条件**写入（`Boolean(...)`），**先发 app-api 会把"1 条卡住"放大成"每条新事件归因全挂"** —— 发布顺序必须 agent-py 先、app-api 后。
+- **已知未处理（另一处独立缺陷）**：`dead_letter` 的 job 在 `listUserEvents` 的 `analysis_status` 派生里仍落 `processing`（该 CASE 只看 `stock_trace_results`，无 result 即与"仍在归因"不可区分）→ 任何"归因 job 永久失败"的事件都会长期显示「归因中」。属 app-api 侧口径问题，待后续按需处理。

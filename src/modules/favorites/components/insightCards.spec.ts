@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isUnattributableMovement, dedupeDailyMovements } from './insightCards'
+import { isUnattributableMovement, dedupeDailyMovements, upsertEventById } from './insightCards'
 import type { TraceEventLike } from './insightCards'
 
 // ---- 测试数据工厂 ----
@@ -75,6 +75,64 @@ describe('isUnattributableMovement 无法归因判定', () => {
       analysis_status: 'unavailable',
       primary_cause: '有值但不应出现',
     }))).toBe(true)
+  })
+})
+
+// ---- 低置信不展示（2026-09-30）：低置信归因的异动卡片不展示 ----
+
+describe('isUnattributableMovement 低置信不展示口径', () => {
+  it('confidence_level = low → 不展示（即使主因文案可用）', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'A',
+      analysis_status: 'completed',
+      primary_cause: '板块联动走弱',
+      confidence_level: 'low',
+    }))).toBe(true)
+  })
+
+  it('confidence_level = medium → 展示', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'B',
+      analysis_status: 'completed',
+      primary_cause: '板块联动走弱',
+      confidence_level: 'medium',
+    }))).toBe(false)
+  })
+
+  it('confidence_level = high → 展示', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'C',
+      analysis_status: 'completed',
+      primary_cause: '板块联动走弱',
+      confidence_level: 'high',
+    }))).toBe(false)
+  })
+
+  it('confidence_level 缺失（app-api 未升级）→ 不隐藏（避免误杀全部卡片）', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'D',
+      analysis_status: 'completed',
+      primary_cause: '板块联动走弱',
+    }))).toBe(false)
+  })
+
+  it('confidence_level = null（无归因结果）→ 不隐藏', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'E',
+      analysis_status: 'completed',
+      primary_cause: '板块联动走弱',
+      confidence_level: null,
+    }))).toBe(false)
+  })
+
+  // 归因失败可见性（2026-10-06，失败状态契约）：failed **必须保持不被隐藏**。
+  // 否则"当日全失败"时整组会在 filter(isUnattributableMovement) 处消失，
+  // 用户看不到「归因失败」，与"全失败才展示失败"的口径相悖。
+  it('analysis_status = failed → 不隐藏（全失败时「归因失败」必须可见）', () => {
+    expect(isUnattributableMovement(makeMovement({
+      symbol: 'F',
+      analysis_status: 'failed',
+    }))).toBe(false)
   })
 })
 
@@ -156,5 +214,73 @@ describe('dedupeDailyMovements 同日同股聚合', () => {
 
   it('空数组返回空数组', () => {
     expect(dedupeDailyMovements([])).toEqual([])
+  })
+})
+
+// ---- 失败回退（2026-10-06，页面契约）：最新 failed 回退到当日有效归因 ----
+
+describe('dedupeDailyMovements 失败回退（failed）', () => {
+  // ① 最新 failed + 当日有 completed → 取 completed（失败不遮住有效归因）
+  it('最新 failed + 当日有 completed → 取 completed', () => {
+    const items = dedupeDailyMovements([
+      makeMovement({ symbol: '688203', event_id: 'mv:failed:latest', triggered_at: '2026-09-04T07:00:00Z', analysis_status: 'failed' }),
+      makeMovement({ symbol: '688203', event_id: 'mv:completed:early', triggered_at: '2026-09-04T01:00:00Z', analysis_status: 'completed', primary_cause: '板块联动走弱' }),
+    ])
+    expect(items).toHaveLength(1)
+    expect(items[0].event_id).toBe('mv:completed:early')
+  })
+
+  // ② 全 failed → 取其中最新 failed（让「归因失败」可见）
+  it('当日全 failed → 取其中最新 failed', () => {
+    const items = dedupeDailyMovements([
+      makeMovement({ symbol: '688203', event_id: 'mv:failed:old', triggered_at: '2026-09-04T01:00:00Z', analysis_status: 'failed' }),
+      makeMovement({ symbol: '688203', event_id: 'mv:failed:new', triggered_at: '2026-09-04T07:00:00Z', analysis_status: 'failed' }),
+    ])
+    expect(items).toHaveLength(1)
+    expect(items[0].event_id).toBe('mv:failed:new')
+  })
+
+  // ③ 交互用例：同一交易日、同股混排 unavailable / failed / completed。
+  // 关键在「unavailable 是当日最新非 failed」，它在 dedupe 内部本应胜出，但会先被
+  // isUnattributableMovement 过滤剔除；failed 是当日最新、但被 dedupe 的「跳过 failed」跳过。
+  // 二者共同作用，最终仍取到较早的 completed —— 这锁住「失败回退」×「不可归因过滤」的交互。
+  // 注意与①不同：①只有 failed+completed 两态历时竞争；③额外引入 unavailable 这枚「会被过滤的
+  // 最新项」，若不过滤它或不去重跳过 failed，本用例都会得到非 completed，真正区分于①。
+  it('unavailable + failed + completed 混排 → 仍取 completed（失败回退 × 不可归因过滤 交互）', () => {
+    const items = dedupeDailyMovements(
+      [
+        makeMovement({ symbol: '688203', event_id: 'mv:unavailable:newest', triggered_at: '2026-09-04T07:00:00Z', analysis_status: 'unavailable' }),
+        makeMovement({ symbol: '688203', event_id: 'mv:failed:newest', triggered_at: '2026-09-04T08:00:00Z', analysis_status: 'failed' }),
+        makeMovement({ symbol: '688203', event_id: 'mv:completed:older', triggered_at: '2026-09-04T06:00:00Z', analysis_status: 'completed', primary_cause: '科创板块走弱' }),
+      ].filter((x) => !isUnattributableMovement(x)),
+    )
+    expect(items).toHaveLength(1)
+    expect(items[0].event_id).toBe('mv:completed:older')
+  })
+})
+
+// ---- upsertEventById（2026-10-07，monitor.vue / insight.vue 共享的分页/推送合并）----
+
+describe('upsertEventById 按 event_id 浅合并', () => {
+  it('键不存在 → 追加到末尾', () => {
+    const prev = [{ event_id: 'a', n: 1 }, { event_id: 'b', n: 2 }]
+    const next = upsertEventById(prev, [{ event_id: 'c', n: 3 }])
+    expect(next.map((e) => e.event_id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('键已存在 → 浅合并更新，且不改变原位置', () => {
+    const prev = [{ event_id: 'a', n: 1 }, { event_id: 'b', n: 2 }]
+    const next = upsertEventById(prev, [{ event_id: 'b', n: 9 }])
+    // 保留原位置（b 仍排第 2）
+    expect(next.map((e) => e.event_id)).toEqual(['a', 'b'])
+    // incoming 覆盖同名字段，其余保留
+    expect(next[1]).toEqual({ event_id: 'b', n: 9 })
+  })
+
+  it('不修改输入的 prev 数组及其元素', () => {
+    const prev = [{ event_id: 'a', n: 1 }]
+    const clone = { event_id: 'a', n: 1 }
+    upsertEventById(prev, [{ event_id: 'a', n: 9 }, { event_id: 'b', n: 2 }])
+    expect(prev).toEqual([clone])
   })
 })

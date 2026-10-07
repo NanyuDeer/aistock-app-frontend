@@ -37,7 +37,7 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *  2026-09-26：首页时段洞见横条新增 getTradingTimeSlot 边界用例 1 条（tradingTime.spec.ts）。
  *  2026-09-26：首页四宫格改名精确断言 + 时段横条接线用例新增 1 条（MorningContent.spec.ts）。
  *  2026-10-06：Task 6「二级页首屏快评」新增 3 条 spec（stockInfo.spec.ts：命中信封 / 命中裸对象 / 无数据）。
- *    ⚠ 已知残余失败 3：2 条为既有（MorningContent「时段洞见横条」顺序断言、
+ *    ⚠ 已知残余失败：2 条为既有（MorningContent「时段洞见横条」顺序断言、
  *    rhythm pickVersion 签名断言），1 条随 `16d3658`（feat(favorites,home) 组件重构）一并提交
  *    （RhythmCard「仓位文案」断言，需单独定位修复）。
  *    本常量按**仓库提交态**取值；若工作区另有在途未提交改动引入新失败，哨兵会如实报
@@ -48,8 +48,10 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *    navigate 分发由 `DynamicInsightCard` 承接），`MorningContent.spec.ts` 对应断言由「接入横条 + 顺序」
  *    改为「横条已下线 + 洞见卡承接」，该条转绿 → 已知残余失败 3 → 2
  *    （剩余：rhythm `pickVersion` 签名断言、RhythmCard「仓位文案」断言）。
+ *  2026-10-07：datetime.spec.ts 新增 shanghaiDateKeyDaysAgo 三组固定时钟用例（+3 条，跨年/跨月/固定 UTC+8）。
+ *    → 采集总数 281 → 284；已知残余失败仍为 2（rhythm `pickVersion` 签名断言、RhythmCard「仓位文案」断言）。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '281/279/2'
+const EXPECTED_BASELINE = '284/282/2'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {

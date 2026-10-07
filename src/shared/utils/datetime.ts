@@ -60,6 +60,31 @@ export function formatShanghaiDateTime(t?: string | Date): string {
 }
 
 /**
+ * 取「当前时刻的上海日期」往前 `days` 个自然日的 `YYYY-MM-DD`。
+ * 中国无夏令时，按 **UTC+8 固定偏移**计算（等价 insightCards.ts::shanghaiDayKey 的既有写法），
+ * **不依赖运行环境的本地时区**：先对 `Date.now()` 加 8h 后用 UTC getter 取上海年月日，
+ * 再以「上海日期的 UTC 午夜」为基准减 `days * 24h`（无夏令时 ⇒ 每 24h 恰为一个自然日，
+ * 跨月/跨年由 Date 内部处理）。供「最近两周洞察/异动」下界 `since = shanghaiDateKeyDaysAgo(13)` 使用。
+ */
+export function shanghaiDateKeyDaysAgo(days: number): string {
+  const shanghaiNow = new Date(Date.now() + 8 * 60 * 60 * 1000)
+  const y = shanghaiNow.getUTCFullYear()
+  const mo = shanghaiNow.getUTCMonth()
+  const d = shanghaiNow.getUTCDate()
+  // 用「上海日期的 UTC 午夜」做基准减 days 天，可纯按 UTC getter 输出、与运行环境时区无关
+  const target = new Date(Date.UTC(y, mo, d) - days * 24 * 60 * 60 * 1000 + 8 * 60 * 60 * 1000)
+  return `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, '0')}-${String(target.getUTCDate()).padStart(2, '0')}`
+}
+
+/**
+ * 「最近两周洞察/异动」的下界回看天数 = 13，而非 14。
+ * 因为 `shanghaiDateKeyDaysAgo(days)` 返回的是「今天往前 days 天」，而查询语义是
+ * `trading_date >= since` 的**含今天**窗口：`since = 今天 - 13` 正好覆盖「今天 + 之前 13 天」
+ * = 共 14 个自然日。若误写成 14 会多回看一天（窗口变 15 天）。
+ */
+export const TWO_WEEK_WINDOW_DAYS = 13
+
+/**
  * 格式化"伪UTC上海时钟"时间字符串。
  * 后端部分字段（如 earnings_forecast.update_time）由 formatToChinaTimeWithMs 生成上海时钟，
  * 但以 UTC 标记存入数据库，导致前端拿到形如 `2026-07-25T00:00:14.176Z` 的字符串——

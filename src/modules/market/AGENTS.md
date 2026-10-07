@@ -5,7 +5,7 @@
 
 ## 页面
 - `pages/event-catcher.vue` - 异动捕手
-- `pages/alert-analysis.vue` - AI 异动解读
+- `pages/alert-analysis.vue` - AI 异动解读（2026-09-30：接入 `AlertReasoningPanel` 思考面板 + preview 速览——速览三件套 `summary`/`impact`/`keywords` 数据源改为 **preview 优先、result 兜底**（`preview ?? result`），使一句话速览在 quick 模型返回时即先渲染；`details`/`stocks`/`risks` **仍只取 `result`**（职责不重叠，不与 preview 混淆）。面板置于「分析进度」区块上方，等待期可见流式解说）
 - `pages/hot-burst.vue` - 机构调研热门股
 - `pages/leaders.vue` - 长线风口（概览入口页：泡泡图 + 板块入口卡片列表，点击板块跳转详情；长线/短线两档切换，龙头股行分档展示——长线档取 `long_leader`（趋势龙头，trend_scores 评分最高）、短线档取 `leading_stock_info`（短线领涨），跨板块去重）
 - `pages/sector-detail.vue` - 板块详情子页面（板块统计、龙头股、AI 分析、主线/上游/下游个股列表）；板块详情页含近120日板块K线图（KLineChart + getBoardKline）；AI 分析区"层级流向图" App + H5 走 renderjs 视图层 DOM 注入 SVG（v-html 在 App webview 不渲染切题注入的 svg）；AI 分析卡之后嵌入**板块洞见卡**（SectorInsightCard，2026-09-02：按最近交易日拉 agentApi.getSectorInsight 匹配当前板块渲染 InsightCard 条件化预判，无记录严格占位；**2026-09-18：自动获得「依据详情 ▾」里的板块原因链 3 段**——`SectorInsightCard` 统一把 `candidate.trace.stages` 映射后传 `InsightCard` 顶层 `traceStages`，本页 0 改动）
@@ -17,9 +17,10 @@
 - `components/NewsSlider.vue` - 资讯快讯滚动
 - `components/EventCard.vue` - 事件卡片
 - `components/EventChainGraph.vue` - 事件传导图
+- `components/AlertReasoningPanel.vue` - AI 思考过程面板（2026-09-30：消费 `ReasoningStep[]`，仅渲染 `reasoning` 帧；`steps` 为空不渲染；有 `streaming` 步骤默认展开；节点中文映射 `alert_scan→多维分析`、`alert_master→汇聚研判`；`mp-html` 渲染；样式走 design token）
 
 ## Hooks
-（暂无模块专属 hooks）
+- `utils/useAlertSSE.ts` - AI 异动解读 SSE 读取（2026-09-30：新增 `reasoningSteps`（按 `node` 聚合的 `ReasoningStep[]`）与 `preview`（`AlertDisplayReport | null`）两个响应式状态；`handleEvent` 新增 `reasoning`（按 node 聚合、文本累加标 `streaming`）与 `preview` 分支；`done` 收尾 streaming→done+endAt、`error` 收尾 failed+endAt；`start()` 重置两者；**超时 60s → 120s** 对齐后端 LLM 请求超时 600s）
 
 ## 对外暴露的接口
 - 其他模块通过 navigateTo 跳转到异动捕手或长线风口页面

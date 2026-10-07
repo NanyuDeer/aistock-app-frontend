@@ -144,6 +144,7 @@ function fromMovement(m: StockTraceEvent): CaptureItem {
   else if (m.movement_view?.primaryCandidate?.verdict) detailText = `主因：${m.movement_view.primaryCandidate.verdict}`
   else if (m.analysis_status === 'completed') detailText = '归因完成'
   else if (m.analysis_status === 'processing') detailText = '归因中'
+  else if (m.analysis_status === 'failed') detailText = '归因失败'
   return {
     event_id: m.event_id,
     event_type: 'price',

@@ -57,6 +57,133 @@
 
 ---
 
+## [junliang] 2026-10-07 — 自选股异动/洞察列表：cursor 翻页 + `visible_only` 过滤前置 + 最近 14 个自然日窗口
+
+**开发者**: yueqili778-arch
+
+### 新增
+
+- `modules/favorites/components/insightCards.ts::upsertEventById(prev, incoming)`：两页共享的按 `event_id` **浅合并**（已存在保留原位置、incoming 覆盖同名字段），替代 `monitor.vue` / `insight.vue` 各自逐字重复的本地 `upsertRaw`。
+- `shared/utils/datetime.ts::shanghaiDateKeyDaysAgo(days)`：返回 `YYYY-MM-DD`，按 **UTC+8 固定偏移 + UTC getter** 计算（中国无夏令时；不依赖运行环境本地时区）。
+- `TWO_WEEK_WINDOW_DAYS = 13` 常量（"含今天共 14 个自然日" ⇒ 回退 13 天；写成 `14` 会多算一天）。
+- 底部"加载中… / 没有更多"轻量文案（`.load-more-tip`，走 design token）。
+
+### 变更
+
+- `shared/api/modules/stockTrace.ts::list(limit, cursor?, options?: { visibleOnly?: boolean; since?: string })`：两个参数**均为 opt-in 非默认** —— 首页 `AlertContent.vue` 不传，行为与改动前一致。
+- `pages/monitor.vue` / `pages/insight.vue` 接入分页：新增 `rawItems / cursor / hasMore / loadingMore`。
+  - **触底走 `<SubPageCard2 @scrolltolower>`，不是 `onReachBottom`** —— 两页被 `SubPageCard2` 包裹、滚动发生在**内层 `<scroll-view>`**，页面级 `onReachBottom` **不会触发**（仓库零先例）。
+  - `onShow` **在请求前同步复位**四个状态（关掉"在途 `loadMore` 读到旧 `cursor`/`hasMore` 并发请求"的竞态）。
+  - `hasMore` **以 `nextCursor` 为准**（不用 `items.length < limit`）；请求失败**不推进 cursor**、不置 `hasMore=false`（下次触底用同一 cursor 重试）并 `console.warn`。
+  - **必须对累积 `rawItems` 整体重派生**（`filter(isUnattributableMovement) → dedupeDailyMovements → map/sort`）：同一 (股, 上海交易日) 的两条可能跨页边界，只派生本页会让较早那条"复活"成第二张卡。
+- `monitor.vue` WS（`#ifdef APP-PLUS`）：`movement.created` / `movement.updated` 改为按 `event_id` **浅合并 upsert 进 `rawItems`** 后统一重派生（`updated` 是部分字段 payload，整体覆盖会丢 `primary_cause`/`confidence_level`）。
+- 两页请求带 `since = shanghaiDateKeyDaysAgo(TWO_WEEK_WINDOW_DAYS)`（收敛到最近两周）；**不做客户端日期过滤** —— 后端按 `trading_date >= since`，越界返回空页 + `nextCursor=null` → 自然显示「没有更多」。
+
+### 修复
+
+- 两个列表页原先固定 `list(20)` 只取第 1 页且**不翻页**（后端 `nextCursor` 无人消费）→ 20 条窗口之外的异动**永远取不到**；现支持触底翻页。
+- 卡片数由改动前的 ~60 张收敛到 **8 张**（09-24 → 09-30，无早于窗口的卡片）。
+
+### 测试
+
+- `npx vitest run` 相关 5 spec **74 passed**；`npx vue-tsc --noEmit` **exit 0**。
+- 浏览器端到端（mxfff）：两页首屏 8 张 → 触底到「没有更多」；请求 URL 带 `visible_only=1&since=2026-09-24`（改动前可翻到 60 张、最早到 09-07）。
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增 2026-10-07 两条（翻页 + 过滤前置 / 两周窗口），含"为何是 13 而非 14""`onReachBottom` 不触发""失败回退口径"等易错点。
+
+## [junliang] 2026-10-06 — 归因失败（`failed`）展示 + 同日同股失败回退
+
+**开发者**: yueqili778-arch
+
+### 新增
+
+- **5 处**「归因失败」文案映射：`pages/monitor.vue`、`pages/insight.vue`、`components/AlertContent.vue`、`pages/insight-detail-move.vue`、`components/PriceMovementAnalysisContent.vue`（`analysis_status` / `processing_status` 为 `failed` 时展示「归因失败」，而非落到默认「待归因」或永久「归因中」）。
+
+### 变更
+
+- `shared/api/modules/stockTrace.ts`：`analysis_status` 与 `processing_status` 联合类型各补 `'failed'`。
+- `insightCards.ts::dedupeDailyMovements`：组内挑"最新一条"时**跳过 `failed`**（非 failed 恒优先），**全组皆 `failed` 才保留其中最新那条**（让「归因失败」可见）—— 兑现原先注释承诺的"失败回退"。`isUnattributableMovement` **刻意不改**（`failed` 保持**不被隐藏**，否则全失败时整组消失）。
+- 状态→文案一律**正向等值判断**（`=== 'failed'`），**禁止**反向判定（`!== 'completed'` 之类会在将来新增枚举时误判）。
+
+### 修复
+
+- **最新一条失败会遮住当日已有的有效归因**：原 `isUnattributableMovement` 的 `if (analysis_status !== 'completed') return false` 刻意保留"进行中"项，导致**失败项也不被过滤**、又因是最新而胜出 → 卡片永久「归因中」。现失败项在去重时被跳过，卡片**回退显示**当日有效归因；当日全失败时才显示「归因失败」。
+- **推送弹窗静默点**：`PriceMovementAnalysisContent.vue` 对 `failed` 原本**无任何分支命中 → 整段静默**（该组件挂载时实时调 `stockTraceApi.getAnalysis`，且通知可事后重开，`failed` 确实可达），已补分支。
+
+### 测试
+
+- 相关 spec **74 passed**；`npx vue-tsc --noEmit` exit 0。
+- 浏览器实测：海正生材 688203 卡片由「归因中」变为**回退显示**「主因：科创板走弱拖累个股」。
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增「归因失败展示 + 失败回退」条目。
+
+## [junliang] 2026-09-30 — AI 异动解读：思考过程流式面板 + 速览提前（Task 6–9 + H5 端到端）
+
+**开发者**: yueqili778-arch
+
+### 新增
+
+- `modules/market/components/AlertReasoningPanel.vue`：「AI 思考过程」单区可折叠面板。`steps` 为空不渲染（避免"0 步"空头）；有 `streaming` 步骤时默认展开、否则折叠；`streaming` 圆点呼吸动画（`@keyframes pulse`）；节点中文映射 `alert_scan → 多维分析` / `alert_master → 汇聚研判`（未知节点回退原名）；文本经 `mp-html` + `markdownToHtml` 渲染；样式全走 design token。
+- 新增 spec：`useAlertSSE.spec.ts`（6 例）、`AlertReasoningPanel.spec.ts`（7 例）、`alert-analysis.spec.ts`（3 例），均登记 `vitest.config.ts` 白名单。
+
+### 变更
+
+- `modules/market/utils/useAlertSSE.ts`：消费后端新增的两类帧 —— `reasoning`（`node` **恒为阶段名**，同一阶段的启动解说与心跳**共用同一 node**，前端按 `node` **聚合为同一步骤、文本累加**，不是每 chunk 新建一步）与 `preview`（速览三件套）；`reasoningSteps` 复用既有 `ReasoningStep` 类型；`start()` 重置 `reasoningSteps` 与 `preview`；**超时 60s → 120s**。
+- `modules/market/pages/alert-analysis.vue`：在「分析进度」区块**上方**接入面板；速览三件套改取 **`preview ?? result`**（live 路径 preview 先到即先渲染；命中缓存时 `preview` 为 null 自然回退 `result`）；`details` / `stocks` / `risks` **仍只取 `result`**（职责不重叠）。
+
+### 修复
+
+- `AlertReasoningPanel` 的 `expanded` 原先只在 setup 时求值 → 真实链路（`steps` 从 `[]` 随 `reasoning` 帧流式增长）下会**以折叠态出现**，与"有 streaming 步骤默认展开"的意图相悖；已改 `watch` + `userToggled`（用户手动折叠后不被抢展开）。
+- 4 处硬编码字号（22/24rpx）改为 design token（`$font-size-xs` / `$font-size-sm`，取值逐一相等、视觉零变化）。
+- `onerror` 连接级失败时 `reasoningSteps` 不收尾（stuck 在 `streaming`）——已记录为已知项（error 态下面板本就不渲染，无可见影响）。
+
+### 测试
+
+- `npx vitest run` 相关 spec 全绿；`npx vue-tsc --noEmit` exit 0。
+- **H5 端到端（真实浏览器 + 真实 LLM）**：思考面板流式中默认展开（1 步 → 2 步）、解说由 190 字流式增长到 781 字（心跳生效）、**「一句话速览」T+29.5s 早于「详细分析」出现**、T+152.6s 完成后四区块齐全、面板位于「分析进度」上方、`streaming → done` 类名正确收尾。
+
+### 文档
+
+- `modules/market/AGENTS.md`：`alert-analysis.vue` 速览数据源改为 preview 优先 + 新增组件 + `useAlertSSE` 条目。
+
+## [junliang] 2026-09-30 — 低置信度归因不展示异动卡片
+
+**开发者**: yueqili778-arch
+
+### 变更
+
+- `modules/favorites/components/insightCards.ts`：`TraceEventLike` 增可选 `confidence_level`；`isUnattributableMovement` 在 `analysis_status === 'unavailable'` 之后、`!== 'completed'` 之前新增 `if (m.confidence_level === 'low') return true`。**降级保护**：字段缺失（老 app-api 未升级）或 `null`（无归因结果）时**不隐藏** —— 若按"非 high 即隐藏"会把卡片**全部误杀**。
+- `shared/api/modules/stockTrace.ts`：`StockTraceEvent` 增 `confidence_level`（与 app-api 列表字段对齐）。
+- **生效范围三处统一**：`pages/monitor.vue` / `pages/insight.vue` / `components/AlertContent.vue` 共用同一过滤函数，单点改动即三处生效。
+
+### 测试
+
+- `insightCards.spec.ts` 新增 5 例（low 隐藏 / medium 展示 / high 展示 / 字段缺失不隐藏 / null 不隐藏）→ 54 pass。
+- H5 实测（mxfff）：监控页与洞察列表页各 **6 张**（改前 10 张），保留均为 medium 归因、已隐藏均为 low、无「归因中」。
+- **涨跌幅口径已核实（非缺陷）**：黄河旋风 600172 09-29 显示 -8%，因该日 `window_end_at` 最新的 -9.70% 那条为 `low` 被隐藏、同日去重取次新的 -8.00%（medium）→ 属新口径下的正确结果。
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增「低置信不展示」章节。
+
+## [junliang] 2026-09-27 — 宿迁联盛 2026-09-24 归因硬失败事故（前端最终仅文档改动）
+
+**开发者**: yueqili778-arch
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增「宿迁联盛 2026-09-24 归因硬失败事故（2026-09-27 定位并处置，前端最终零改动）」章节（现象 / 跨仓契约根因 / 临时措施已回退 / 最终可见性 / 发布顺序约束 / 另一处独立缺陷）。
+
+### 说明
+
+- **代码零改动**：定位当天曾在 `insightCards.ts` 加 `SUPPRESSED_EVENT_IDS` 硬编码隐藏该日两条事件；用修复后的代码代跑归因成功（`completed`）后**已整体回退**，三处消费者与 spec 均回到改动前状态。
+- **最终可见性**：恢复出的主因是「证据不足，异动原因未明」→ 命中既有「无结论不展示」规则 → 该日两条仍不展示，但原因已从"归因卡住"变为"归因完成但无有效结论"。
+- 数据层：未改任何表结构；仅经 app-api 的 `/internal/stock-trace/results/external` 新增 1 条真实 result + artifact，并把该 job 由 `dead_letter` 置为 `completed`（等价于生产重投产出）。
+
 ## [master] 2026-10-06 — 节奏 AGENTS.md 更正：`met` 点亮/置灰当前未接线
 
 **开发者**: Aria
