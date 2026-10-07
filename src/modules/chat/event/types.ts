@@ -454,4 +454,8 @@ export interface TimelineRow {
   importance: number | null
   /** 是否为未来行（未来行就地展开；历史行点击恒跳详情页） */
   isFuture: boolean
+  /** 是否为「自选股预计披露财报」行（展示「财报」徽标；点击跳个股详情，不展开） */
+  isDisclosure?: boolean
+  /** 财报行专用：个股代码（点击跳个股详情用） */
+  stockSymbol?: string
 }

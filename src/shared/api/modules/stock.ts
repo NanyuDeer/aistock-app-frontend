@@ -151,6 +151,24 @@ export interface FavoriteStock {
   addedAt?: string | null
 }
 
+/** 自选股财报披露计划项（GET /cn/stocks/disclosure-schedule） */
+export interface DisclosureScheduleItem {
+  /** 6 位股票代码 */
+  symbol: string
+  /** 报告期 YYYYMMDD */
+  reportPeriod: string
+  /** 报告期中文标签，如「2026三季报」 */
+  reportPeriodLabel: string
+  /** 预计披露日期 YYYY-MM-DD */
+  preDate: string
+  /** 距今天数（0=今天） */
+  daysUntil: number
+}
+
+export interface DisclosureScheduleResponse {
+  items: DisclosureScheduleItem[]
+}
+
 // ---- 股票列表搜索接口类型 ----
 export interface StockListItem {
   symbol: string
@@ -750,6 +768,11 @@ export const stockApi = {
     reportPeriod?: string; sortBy?: string; sortOrder?: 'asc' | 'desc'; reportType?: string; page?: number; pageSize?: number
   }) {
     return request.get('/cn/stocks/performance-reports/ranking', { params })
+  },
+
+  /** 获取自选股财报披露计划（预计披露日，来自 Tushare disclosure_date.pre_date） */
+  getDisclosureSchedule(params: { symbols: string; days?: number }) {
+    return request.get<DisclosureScheduleResponse>('/cn/stocks/disclosure-schedule', { params })
   },
 }
 
