@@ -568,7 +568,7 @@ export const stockApi = {
   },
 
   /** 获取机构调研热门股历史记录，供 App 的近时段展示使用。 */
-  getHotBurstHistory(params: { days: number; min_resonance: number; limit?: number; offset?: number }) {
+  getHotBurstHistory(params: { days?: number; trading_days?: number; min_resonance: number; limit?: number; offset?: number }) {
     return request
       .get<HotBurstHistoryResponse>('/cn/institution-research/history', { params })
       .then((result) => normalizeHotBurstHistory(result.records))
