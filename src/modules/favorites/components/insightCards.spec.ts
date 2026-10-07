@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isUnattributableMovement, dedupeDailyMovements } from './insightCards'
+import { isUnattributableMovement, dedupeDailyMovements, upsertEventById } from './insightCards'
 import type { TraceEventLike } from './insightCards'
 
 // ---- 测试数据工厂 ----
@@ -256,5 +256,31 @@ describe('dedupeDailyMovements 失败回退（failed）', () => {
     )
     expect(items).toHaveLength(1)
     expect(items[0].event_id).toBe('mv:completed:older')
+  })
+})
+
+// ---- upsertEventById（2026-10-07，monitor.vue / insight.vue 共享的分页/推送合并）----
+
+describe('upsertEventById 按 event_id 浅合并', () => {
+  it('键不存在 → 追加到末尾', () => {
+    const prev = [{ event_id: 'a', n: 1 }, { event_id: 'b', n: 2 }]
+    const next = upsertEventById(prev, [{ event_id: 'c', n: 3 }])
+    expect(next.map((e) => e.event_id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('键已存在 → 浅合并更新，且不改变原位置', () => {
+    const prev = [{ event_id: 'a', n: 1 }, { event_id: 'b', n: 2 }]
+    const next = upsertEventById(prev, [{ event_id: 'b', n: 9 }])
+    // 保留原位置（b 仍排第 2）
+    expect(next.map((e) => e.event_id)).toEqual(['a', 'b'])
+    // incoming 覆盖同名字段，其余保留
+    expect(next[1]).toEqual({ event_id: 'b', n: 9 })
+  })
+
+  it('不修改输入的 prev 数组及其元素', () => {
+    const prev = [{ event_id: 'a', n: 1 }]
+    const clone = { event_id: 'a', n: 1 }
+    upsertEventById(prev, [{ event_id: 'a', n: 9 }, { event_id: 'b', n: 2 }])
+    expect(prev).toEqual([clone])
   })
 })

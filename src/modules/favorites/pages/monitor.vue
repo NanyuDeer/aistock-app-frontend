@@ -113,7 +113,7 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { WS_BASE_URL } from '@/shared/utils/constants'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
-import { isUnattributableMovement, dedupeDailyMovements } from '@/modules/favorites/components/insightCards'
+import { isUnattributableMovement, dedupeDailyMovements, upsertEventById } from '@/modules/favorites/components/insightCards'
 
 /** 统一展示模型：与自选股洞察列表页（insight.vue）同款三段式卡片入参 */
 interface AlertItem {
@@ -238,29 +238,22 @@ function isPriceMovementPayload(data: unknown): data is StockTraceEvent {
 /** 首屏/重置加载：清空分页状态并拉第 1 页（onShow 每次整表重拉，必须一并重置 cursor/rawItems/hasMore） */
 async function fetchAlerts() {
   loading.value = true
+  // 请求前同步复位分页状态：若 loadMore 仍在飞行途中触达 onShow，旧 cursor/hasMore 会被同帧读到
+  // 并发请求；在 await 之前复位可彻底关掉该竞态窗口（正常路径本就整表替换，无感知差异）。
+  rawItems.value = []
+  cursor.value = null
+  hasMore.value = false
+  loadingMore.value = false
   try {
     const page = await stockTraceApi.list(20, undefined, { visibleOnly: true }).catch(() => ({ items: [] as StockTraceEvent[], nextCursor: null as string | null }))
     rawItems.value = page.items
     cursor.value = page.nextCursor
     hasMore.value = !!page.nextCursor
   } catch {
-    // API 失败时展示空状态
-    rawItems.value = []
-    cursor.value = null
-    hasMore.value = false
+    // list 已在链上 .catch 兜底为空页，正常不会走到这里；状态已在请求前复位，无需重复置空
   } finally {
     loading.value = false
   }
-}
-
-/** 按 event_id upsert：已存在的行浅合并（WS 部分字段 payload 不得整体覆盖，避免丢 primary_cause/confidence_level） */
-function upsertRaw(prev: StockTraceEvent[], incoming: StockTraceEvent[]): StockTraceEvent[] {
-  const byId = new Map(prev.map(e => [e.event_id, e]))
-  for (const next of incoming) {
-    const existing = byId.get(next.event_id)
-    byId.set(next.event_id, existing ? { ...existing, ...next } : next)
-  }
-  return Array.from(byId.values())
 }
 
 /** 触底加载：失败不推进 cursor、不置 hasMore=false，下次触底用旧 cursor 重试；loadingMore 防重入 */
@@ -269,11 +262,12 @@ async function loadMore() {
   loadingMore.value = true
   try {
     const page = await stockTraceApi.list(20, cursor.value ?? undefined, { visibleOnly: true })
-    rawItems.value = upsertRaw(rawItems.value, page.items)
+    rawItems.value = upsertEventById(rawItems.value, page.items)
     cursor.value = page.nextCursor
     hasMore.value = !!page.nextCursor
-  } catch {
-    // 请求失败：保持 cursor/hasMore 现状，等待下次触底重试
+  } catch (err) {
+    // 请求失败：保持 cursor/hasMore 现状，等待下次触底重试；记录以便线上分页失败可观测
+    console.warn('[monitor] loadMore failed:', err)
   } finally {
     loadingMore.value = false
   }
@@ -310,7 +304,7 @@ function subscribeAlerts() {
         // ① 新建异动：外壳 type='alert'，内层 data.type='movement.created' → upsert 进 rawItems 统一重派生
         if (msg.type === 'alert') {
           if (!isPriceMovementPayload(msg.data)) return
-          rawItems.value = upsertRaw(rawItems.value, [msg.data])
+          rawItems.value = upsertEventById(rawItems.value, [msg.data])
           return
         }
         // ② 二次推送（严重度升级 / 主因确认）：外壳 type='movement.updated'，部分字段 payload 浅合并进 rawItems
@@ -321,7 +315,7 @@ function subscribeAlerts() {
           const update: StockTraceEvent = { ...data }
           // 主因确认（a_grade_major_cause）意味着归因已完成 → 派生模型据此放行「报告 ›」入口
           if (data.movement_view?.status === 'confirmed') update.analysis_status = 'completed'
-          rawItems.value = upsertRaw(rawItems.value, [update])
+          rawItems.value = upsertEventById(rawItems.value, [update])
           return
         }
       } catch {}

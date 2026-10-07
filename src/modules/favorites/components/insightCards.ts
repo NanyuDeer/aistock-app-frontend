@@ -1,7 +1,8 @@
 /**
  * 自选股洞察——工具函数（纯函数，无 .vue/组件/运行环境依赖）
  *
- * 提供 isUnattributableMovement（无法归因判定）和 dedupeDailyMovements（同日同股聚合）。
+ * 提供 isUnattributableMovement（无法归因判定）、dedupeDailyMovements（同日同股聚合）
+ * 和 upsertEventById（按 event_id 浅合并分页/推送数据）。
  * 不依赖 .vue、不 import 组件、不走网络；纯 TS 逻辑，可被 vitest 单测锁定。
  */
 
@@ -139,4 +140,27 @@ export function dedupeDailyMovements<T extends TraceEventLike>(items: T[]): T[] 
     }
   }
   return [...latestByKey.values()]
+}
+
+/**
+ * 按 event_id upsert 合并分页/推送数据（monitor.vue 与 insight.vue 共享）。
+ *
+ * 为什么需要 upsert（而非简单 concat / 整体替换）：
+ * - cursor 翻页会反复拉取列表，同一 event_id 可能跨多页重复出现；WS 的
+ *   movement.created / movement.updated 也会就地上报同一条事件。若简单 concat，
+ *   跨页重复的事件会渲染成多张卡片。
+ * - 若整体覆盖，又会丢掉"已存在行里未随 incoming 回来"的部分字段（如
+ *   primary_cause / confidence_level）。因此以 event_id 为键做**浅合并**：
+ *   - 键已存在 → 保留原位置，产出 `{ ...existing, ...next }`（incoming 覆盖既有同名字段，其余保留）
+ *   - 键不存在 → 追加到末尾
+ *
+ * 不修改输入；返回新数组。行为与被替换的两页本地实现逐字一致。
+ */
+export function upsertEventById<T extends { event_id: string }>(prev: T[], incoming: T[]): T[] {
+  const byId = new Map(prev.map((e) => [e.event_id, e]))
+  for (const next of incoming) {
+    const existing = byId.get(next.event_id)
+    byId.set(next.event_id, existing ? { ...existing, ...next } : next)
+  }
+  return Array.from(byId.values())
 }

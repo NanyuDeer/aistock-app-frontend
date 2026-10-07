@@ -71,7 +71,7 @@ import Segmented from '@/shared/components/Segmented.vue'
 import Tag from '@/shared/components/Tag.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { formatTime } from '@/shared/utils/datetime'
-import { isUnattributableMovement, dedupeDailyMovements } from '@/modules/favorites/components/insightCards'
+import { isUnattributableMovement, dedupeDailyMovements, upsertEventById } from '@/modules/favorites/components/insightCards'
 
 /** 统一展示模型：价格异动（stocktrace 链路） */
 interface InsightListItem {
@@ -163,6 +163,12 @@ function goDetail(eventId: string) {
 /** 首屏/重置加载：清空分页状态并拉第 1 页（onShow 每次整表重拉，必须一并重置 cursor/rawItems/hasMore） */
 async function fetchInsights() {
   loading.value = true
+  // 请求前同步复位分页状态：若 loadMore 仍在飞行途中触达 onShow，旧 cursor/hasMore 会被同帧读到
+  // 并发请求；在 await 之前复位可彻底关掉该竞态窗口（正常路径本就整表替换，无感知差异）。
+  rawItems.value = []
+  cursor.value = null
+  hasMore.value = false
+  loadingMore.value = false
   try {
     // 2026-09-02 链路合并：涨停雷达事件已并入 stock-trace（movements），列表只消费 movements
     const page = await stockTraceApi.list(20, undefined, { visibleOnly: true }).catch(() => ({ items: [] as StockTraceEvent[], nextCursor: null as string | null }))
@@ -170,23 +176,10 @@ async function fetchInsights() {
     cursor.value = page.nextCursor
     hasMore.value = !!page.nextCursor
   } catch {
-    // API 失败时显示空状态
-    rawItems.value = []
-    cursor.value = null
-    hasMore.value = false
+    // list 已在链上 .catch 兜底为空页，正常不会走到这里；状态已在请求前复位，无需重复置空
   } finally {
     loading.value = false
   }
-}
-
-/** 按 event_id upsert：已存在的行浅合并（新页数据覆盖旧字段，其余保留） */
-function upsertRaw(prev: StockTraceEvent[], incoming: StockTraceEvent[]): StockTraceEvent[] {
-  const byId = new Map(prev.map(e => [e.event_id, e]))
-  for (const next of incoming) {
-    const existing = byId.get(next.event_id)
-    byId.set(next.event_id, existing ? { ...existing, ...next } : next)
-  }
-  return Array.from(byId.values())
 }
 
 /** 触底加载：失败不推进 cursor、不置 hasMore=false，下次触底用旧 cursor 重试；loadingMore 防重入 */
@@ -195,11 +188,12 @@ async function loadMore() {
   loadingMore.value = true
   try {
     const page = await stockTraceApi.list(20, cursor.value ?? undefined, { visibleOnly: true })
-    rawItems.value = upsertRaw(rawItems.value, page.items)
+    rawItems.value = upsertEventById(rawItems.value, page.items)
     cursor.value = page.nextCursor
     hasMore.value = !!page.nextCursor
-  } catch {
-    // 请求失败：保持 cursor/hasMore 现状，等待下次触底重试
+  } catch (err) {
+    // 请求失败：保持 cursor/hasMore 现状，等待下次触底重试；记录以便线上分页失败可观测
+    console.warn('[insight] loadMore failed:', err)
   } finally {
     loadingMore.value = false
   }

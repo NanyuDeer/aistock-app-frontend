@@ -373,6 +373,23 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     expect(stockTraceApiMock.list).toHaveBeenCalledTimes(1)
   })
 
+  // 边界：同一 event_id 跨两页 → 只保留一条（upsert 去重，而非 dedupe）。
+  // 用跨日构造（09-18 / 09-19）：dedupeDailyMovements 按 (股, 上海交易日) 分组，跨日**不会**合并；
+  // 若仍只渲染 1 张卡，说明是 upsertEventById 按 event_id 去重 + 保留首屏位置 + 新页字段覆盖在起作用。
+  it('同一 event_id 跨两页只保留一条（upsert 去重，位置保留、内容更新）', async () => {
+    stockTraceApiMock.list
+      .mockResolvedValueOnce({ items: [movement({ event_id: 'mv:dup', change_pct: 8.5, triggered_at: '2026-09-18T01:00:00.000Z' })], nextCursor: 'c1' })
+      .mockResolvedValueOnce({ items: [movement({ event_id: 'mv:dup', change_pct: 9.9, triggered_at: '2026-09-19T01:00:00.000Z' })], nextCursor: null })
+    const wrapper = mount(monitor)
+    await flushPromises()
+    expect(wrapper.findAll('.as-card').length).toBe(1)
+    await wrapper.find('.stub-scroll-trigger').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('.as-card').length).toBe(1)
+    // 位置保留（仍为首条），内容被第 2 页覆盖
+    expect(wrapper.find('.stock-move').text()).toBe('+9.9%')
+  })
+
   it('加载失败不推进 cursor（再次触底用旧 cursor 重试）', async () => {
     stockTraceApiMock.list
       .mockResolvedValueOnce({ items: [movement({ event_id: 'mv:a' })], nextCursor: 'c1' })
