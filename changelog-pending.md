@@ -1,5 +1,20 @@
 # 待提交修改记录
 
+## 2026-10-07 — 自选股异动/洞察列表：cursor 分页 + visible_only 过滤接前端（A）
+
+跨仓计划：`aistock-agent-py/docs/superpowers/plans/2026-10-07-movements-pagination-and-visible-filter.md` Task 2。两页此前固定 `list(20)` 取第 1 页且不翻页（`nextCursor` 无人消费）；现接后端前置完成的 `visible_only`（commit `272ccbe`）并支持触底翻页。
+
+- `src/shared/api/modules/stockTrace.ts`：`list(limit, cursor?, options?: { visibleOnly?: boolean })`，`options.visibleOnly === true` 时 params 追加 `visible_only: 1`。**opt-in 非默认**——首页 `AlertContent.vue` 仍调 `list(20)`（不传 options），行为与改动前一致。
+- `src/modules/favorites/pages/monitor.vue` / `pages/insight.vue`：
+  - 新增 `rawItems` / `cursor` / `hasMore` / `loadingMore`；`hasMore` 以 `nextCursor` 为准（不用 `items.length < limit`）。
+  - **触底事件走 `<SubPageCard2 @scrolltolower>`**（SubPageCard2 内层 `<scroll-view>` 已 `@scrolltolower` 透传、`lower-threshold=100`；页面级 `onReachBottom` 不触发）。触底 `!hasMore || loadingMore` 直接返回 → `list(20, cursor, { visibleOnly: true })` → 按 `event_id` upsert 合并 → 更新 cursor/hasMore → 重派生；失败**不推进 cursor**、不置 `hasMore=false`。
+  - `onShow` 整表重拉时**重置** `cursor`/`rawItems`/`hasMore`。
+  - **必须对整体 `rawItems` 重派生**（`filter(isUnattributableMovement) → dedupeDailyMovements → map → sort`），跨页同 (股, 上海交易日) 只出一张卡（map/sort 去重规则未改动）。
+  - 底部"加载中.../没有更多"轻量文案（`.load-more-tip`，走 design token）。
+- `monitor.vue` WS（`#ifdef APP-PLUS`）：`movement.created`/`movement.updated` 改为按 `event_id` **浅合并 upsert 进 `rawItems`** 后统一重派生，替代原先直接改 `alerts`；`movement_updated` 部分字段 payload 不清空既有 `primary_cause`/`confidence_level`，`movement_view.status === 'confirmed'` 时补 `analysis_status='completed'` 以放行「报告 ›」入口（沿用原 `applyMovementUpdate` 语义，避免翻页重派生冲掉 WS 卡）。
+- 测试：`monitor.spec.ts` / `insight.mount.spec.ts` 各新增 6/5 例（可见 `visible_only`、首屏+触底跨页同组只出一张卡、`nextCursor===null` 不再请求、加载失败不推进 cursor 再次触底用旧 cursor 重试、`onShow` 重置不叠加旧行；monitor 另加 WS 浅合并保留 `primary_cause`）。SubPageCard2 桩加 `stub-scroll-trigger`（emit `scrolltolower`）、`@dcloudio/uni-app` onShow 加回调登记以再次触发。相关 spec **66 passed**；`npx vue-tsc --noEmit` exit 0。
+- **遗留（既有，非本次引入）**：`tests/AnalyticsCardLayout.test.ts` 1 例失败（只读 `analytics/pages/reports.vue` 布局，与本次改动无关）。
+
 ## 2026-10-06 — 归因失败：前端 `failed` 展示（B）+ 失败回退（C）
 
 跨仓计划：`aistock-agent-py/docs/superpowers/plans/2026-10-06-stock-trace-attribution-failure-observability.md` Task 2。根因：`analysis_status` 新增第 4 个值 `failed`（app-api 由死信 job `dead_letter` 派生）；此前失败被派生为 `processing` → 卡片永久「归因中」，且因`dedupeDailyMovements` 取最新而遮住当日已有有效归因。

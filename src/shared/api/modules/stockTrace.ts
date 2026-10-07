@@ -123,9 +123,14 @@ export interface StockTraceEventPage {
 }
 
 export const stockTraceApi = {
-  list(limit = 20, cursor?: string) {
+  list(limit = 20, cursor?: string, options?: { visibleOnly?: boolean }) {
     return request.get<StockTraceEventPage>('/cn/favorites/movements', {
-      params: { limit, ...(cursor ? { cursor } : {}) },
+      params: {
+        limit,
+        ...(cursor ? { cursor } : {}),
+        // opt-in：仅当调用方显式传 visibleOnly 才追加 visible_only（首页 AlertContent 不传，行为不变）
+        ...(options?.visibleOnly ? { visible_only: 1 } : {}),
+      },
     })
   },
   get(eventId: string) {

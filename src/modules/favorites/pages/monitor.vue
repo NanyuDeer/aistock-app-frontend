@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 title="自选股异动" subtitle="AI 实时盯盘 · 盘中异动推送">
+  <SubPageCard2 title="自选股异动" subtitle="AI 实时盯盘 · 盘中异动推送" @scrolltolower="loadMore">
     <view class="page-monitor">
 
     <!-- 订阅状态 -->
@@ -72,6 +72,10 @@
             </view>
           </view>
         </Card>
+        <!-- 触底分页轻量文案（复用 design token） -->
+        <view v-if="loadingMore || !hasMore" class="load-more-tip">
+          <text>{{ loadingMore ? '加载中...' : '没有更多' }}</text>
+        </view>
       </view>
 
       <EmptyState v-else :title="alertEnabled ? '暂无异动提醒' : '异动监控已关闭'" :description="alertEnabled ? '盘中如有异动将实时推送' : '点击上方开关开启监控'" />
@@ -106,7 +110,7 @@ import Tag from '@/shared/components/Tag.vue'
 // 逐文件引入（barrel `@/shared/components` 会连带编译 KLineChart.vue 的 renderjs 双 script，
 // vitest 下编译失败；单文件引入是 AGENTS 4.8 的 ✅ 示例写法）
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import { stockTraceApi, type MovementViewV2, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
+import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { WS_BASE_URL } from '@/shared/utils/constants'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 import { isUnattributableMovement, dedupeDailyMovements } from '@/modules/favorites/components/insightCards'
@@ -146,13 +150,26 @@ const favoritesStore = useFavoritesStore()
 const appStore = useAppStore()
 
 const loading = ref(false)
-const alerts = ref<AlertItem[]>([])
+// 分页累积的原始行（API 分页 + WS 事件），渲染前统一重派生（跨页同股同日去重依赖整体 rawItems）
+const rawItems = ref<StockTraceEvent[]>([])
+/** nextCursor（后端复合键，不透明字符串）；以它判定 hasMore，不得用 items.length 推断 */
+const cursor = ref<string | null>(null)
+const hasMore = ref(false)
+/** 触底防重入 */
+const loadingMore = ref(false)
 const wsConnected = ref(false)
 const detecting = ref(false)
 let wsTask: UniApp.SocketTask | null = null
 
 const subscribedSymbols = computed(() => favoritesStore.stocks.map(s => s.symbol))
 const alertEnabled = computed(() => appStore.config.alertEnabled)
+
+/** 统一重派生：rawItems → 过滤不可归因 → 同日同股去重 → map → 倒序（排序/去重规则保持现状） */
+const alerts = computed<AlertItem[]>(() =>
+  dedupeDailyMovements(rawItems.value.filter((m) => !isUnattributableMovement(m)))
+    .map(movementToAlertItem)
+    .sort((a, b) => b.sortTime - a.sortTime),
+)
 
 const filteredAlerts = computed(() =>
   activeDir.value === 'all'
@@ -214,41 +231,51 @@ function isPriceMovementPayload(data: unknown): data is StockTraceEvent {
 }
 
 /**
- * 二次推送就地更新（`movement.updated`）：
- * - `severity_upgraded`：刷新涨跌幅
- * - `a_grade_major_cause`：刷新主因正文；`status === 'confirmed'` 时同时放出「报告 ›」入口
- *   （主因确认意味着归因已完成，与 `reportable = analysis_status === 'completed'` 同义）
+ * 二次推送就地上报（`movement.updated`）改为「按 event_id 浅合并进 rawItems」——
+ * upsert 后统一重派生，避免翻页重派生把 WS 推来的卡片冲掉；payload 部分字段浅合并不会清空既有 primary_cause/confidence_level。
  */
-function applyMovementUpdate(current: AlertItem, data: Record<string, unknown>): AlertItem {
-  const next: AlertItem = { ...current }
-  if (typeof data.change_pct === 'number') next.changePct = data.change_pct
-  const view = data.movement_view as MovementViewV2 | undefined
-  if (view) {
-    const verdict = view.primaryCandidate?.verdict
-    if (verdict) next.causeText = `主因：${verdict}`
-    if (view.status === 'confirmed') next.reportable = true
-  }
-  return next
-}
 
+/** 首屏/重置加载：清空分页状态并拉第 1 页（onShow 每次整表重拉，必须一并重置 cursor/rawItems/hasMore） */
 async function fetchAlerts() {
   loading.value = true
   try {
-    // 2026-09-04：监控页统一只消费 movements（可见性下界 = 持仓期，见后端 listUserEvents），
-    // 老涨停雷达（watchlist_insight_events 存量，08-30 起停用）不再作为列表数据源。
-    const page = await stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] }))
-    // 按事件时间倒序：最新异动优先展示
-    // 无法归因的异动（unavailable/证据不足）不展示（与自选股洞察一致）
-    // 2026-09-13：同一交易日同股多次异动只保留最新一条（打点照常，展示收敛为当日一张卡；
-    // 因不可归因项已先过滤，取最新即"当日最近一条有效归因"，即失败时自动回退）
-    alerts.value = dedupeDailyMovements(page.items.filter((m) => !isUnattributableMovement(m)))
-      .map(movementToAlertItem)
-      .sort((a, b) => b.sortTime - a.sortTime)
+    const page = await stockTraceApi.list(20, undefined, { visibleOnly: true }).catch(() => ({ items: [] as StockTraceEvent[], nextCursor: null as string | null }))
+    rawItems.value = page.items
+    cursor.value = page.nextCursor
+    hasMore.value = !!page.nextCursor
   } catch {
     // API 失败时展示空状态
-    alerts.value = []
+    rawItems.value = []
+    cursor.value = null
+    hasMore.value = false
   } finally {
     loading.value = false
+  }
+}
+
+/** 按 event_id upsert：已存在的行浅合并（WS 部分字段 payload 不得整体覆盖，避免丢 primary_cause/confidence_level） */
+function upsertRaw(prev: StockTraceEvent[], incoming: StockTraceEvent[]): StockTraceEvent[] {
+  const byId = new Map(prev.map(e => [e.event_id, e]))
+  for (const next of incoming) {
+    const existing = byId.get(next.event_id)
+    byId.set(next.event_id, existing ? { ...existing, ...next } : next)
+  }
+  return Array.from(byId.values())
+}
+
+/** 触底加载：失败不推进 cursor、不置 hasMore=false，下次触底用旧 cursor 重试；loadingMore 防重入 */
+async function loadMore() {
+  if (!hasMore.value || loadingMore.value) return
+  loadingMore.value = true
+  try {
+    const page = await stockTraceApi.list(20, cursor.value ?? undefined, { visibleOnly: true })
+    rawItems.value = upsertRaw(rawItems.value, page.items)
+    cursor.value = page.nextCursor
+    hasMore.value = !!page.nextCursor
+  } catch {
+    // 请求失败：保持 cursor/hasMore 现状，等待下次触底重试
+  } finally {
+    loadingMore.value = false
   }
 }
 
@@ -280,19 +307,21 @@ function subscribeAlerts() {
     wsTask.onMessage((res) => {
       try {
         const msg = JSON.parse(res.data as string) as { type?: string; data?: unknown }
-        // ① 新建异动：外壳 type='alert'，内层 data.type='movement.created'
+        // ① 新建异动：外壳 type='alert'，内层 data.type='movement.created' → upsert 进 rawItems 统一重派生
         if (msg.type === 'alert') {
           if (!isPriceMovementPayload(msg.data)) return
-          alerts.value.unshift(movementToAlertItem(msg.data))
+          rawItems.value = upsertRaw(rawItems.value, [msg.data])
           return
         }
-        // ② 二次推送（严重度升级 / 主因确认）：外壳 type='movement.updated'，按 event_id 就地更新
+        // ② 二次推送（严重度升级 / 主因确认）：外壳 type='movement.updated'，部分字段 payload 浅合并进 rawItems
         if (msg.type === 'movement.updated') {
-          const data = msg.data as Record<string, unknown> | undefined
+          const data = msg.data as StockTraceEvent | undefined
           const eventId = typeof data?.event_id === 'string' ? data.event_id : ''
           if (!data || !eventId) return
-          const idx = alerts.value.findIndex((alert) => alert.eventId === eventId)
-          if (idx >= 0) alerts.value[idx] = applyMovementUpdate(alerts.value[idx], data)
+          const update: StockTraceEvent = { ...data }
+          // 主因确认（a_grade_major_cause）意味着归因已完成 → 派生模型据此放行「报告 ›」入口
+          if (data.movement_view?.status === 'confirmed') update.analysis_status = 'completed'
+          rawItems.value = upsertRaw(rawItems.value, [update])
           return
         }
       } catch {}
@@ -366,6 +395,14 @@ onUnmounted(() => disconnectWs())
 }
 
 .alert-list { display: flex; flex-direction: column; gap: $s-2; }
+
+/* 触底分页轻量文案（复用 design token，不新增样式体系） */
+.load-more-tip {
+  padding: $s-3 0;
+  text-align: center;
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
 
 /* ===== 卡片行（三段式，与 insight.vue 完全同款） ===== */
 .event-top {

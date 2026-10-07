@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 title="自选股洞察">
+  <SubPageCard2 title="自选股洞察" @scrolltolower="loadMore">
     <view class="page-insight">
       <!-- 方向筛选：对齐个股情报页（event-catcher）的顶部筛选栏 -->
       <view class="filter-bar">
@@ -45,6 +45,10 @@
             <text class="meta-time">{{ item.timeText }}</text>
           </view>
         </Card>
+        <!-- 触底分页轻量文案（复用 design token） -->
+        <view v-if="loadingMore || !hasMore" class="load-more-tip">
+          <text>{{ loadingMore ? '加载中...' : '没有更多' }}</text>
+        </view>
       </view>
 
       <!-- 空态 -->
@@ -97,8 +101,21 @@ const dirTabs = [
 ]
 const activeDir = ref('all')
 
-const insights = ref<InsightListItem[]>([])
+// 分页累积的原始行，渲染前统一重派生（跨页同股同日去重依赖整体 rawItems）
+const rawItems = ref<StockTraceEvent[]>([])
+/** nextCursor（后端复合键，不透明字符串）；以它判定 hasMore，不得用 items.length 推断 */
+const cursor = ref<string | null>(null)
+const hasMore = ref(false)
+/** 触底防重入 */
+const loadingMore = ref(false)
 const loading = ref(false)
+
+/** 统一重派生：rawItems → 过滤不可归因 → 同日同股去重 → map → 倒序（排序/去重规则保持现状） */
+const insights = computed<InsightListItem[]>(() =>
+  dedupeDailyMovements(rawItems.value.filter((m) => !isUnattributableMovement(m)))
+    .map(fromMovement)
+    .sort((a, b) => b.sortTime - a.sortTime),
+)
 
 const filteredInsights = computed(() =>
   activeDir.value === 'all'
@@ -143,21 +160,53 @@ function goDetail(eventId: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/insight-detail-move?event_id=${encodeURIComponent(eventId)}` })
 }
 
-onShow(async () => {
+/** 首屏/重置加载：清空分页状态并拉第 1 页（onShow 每次整表重拉，必须一并重置 cursor/rawItems/hasMore） */
+async function fetchInsights() {
   loading.value = true
   try {
     // 2026-09-02 链路合并：涨停雷达事件已并入 stock-trace（movements），列表只消费 movements
-    const page = await stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] }))
-    // 2026-09-13：同日同股多次异动只保留最新一条（先过滤不可归因 → 取当日最近一条有效归因）
-    insights.value = dedupeDailyMovements(page.items.filter((m) => !isUnattributableMovement(m)))
-      .map(fromMovement)
-      .sort((a, b) => b.sortTime - a.sortTime)
+    const page = await stockTraceApi.list(20, undefined, { visibleOnly: true }).catch(() => ({ items: [] as StockTraceEvent[], nextCursor: null as string | null }))
+    rawItems.value = page.items
+    cursor.value = page.nextCursor
+    hasMore.value = !!page.nextCursor
   } catch {
     // API 失败时显示空状态
-    insights.value = []
+    rawItems.value = []
+    cursor.value = null
+    hasMore.value = false
   } finally {
     loading.value = false
   }
+}
+
+/** 按 event_id upsert：已存在的行浅合并（新页数据覆盖旧字段，其余保留） */
+function upsertRaw(prev: StockTraceEvent[], incoming: StockTraceEvent[]): StockTraceEvent[] {
+  const byId = new Map(prev.map(e => [e.event_id, e]))
+  for (const next of incoming) {
+    const existing = byId.get(next.event_id)
+    byId.set(next.event_id, existing ? { ...existing, ...next } : next)
+  }
+  return Array.from(byId.values())
+}
+
+/** 触底加载：失败不推进 cursor、不置 hasMore=false，下次触底用旧 cursor 重试；loadingMore 防重入 */
+async function loadMore() {
+  if (!hasMore.value || loadingMore.value) return
+  loadingMore.value = true
+  try {
+    const page = await stockTraceApi.list(20, cursor.value ?? undefined, { visibleOnly: true })
+    rawItems.value = upsertRaw(rawItems.value, page.items)
+    cursor.value = page.nextCursor
+    hasMore.value = !!page.nextCursor
+  } catch {
+    // 请求失败：保持 cursor/hasMore 现状，等待下次触底重试
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+onShow(() => {
+  void fetchInsights()
 })
 </script>
 
@@ -183,6 +232,14 @@ onShow(async () => {
   display: flex;
   flex-direction: column;
   gap: $s-2;
+}
+
+/* 触底分页轻量文案（复用 design token，不新增样式体系） */
+.load-more-tip {
+  padding: $s-3 0;
+  text-align: center;
+  font-size: $font-size-xs;
+  color: $ink-mute;
 }
 
 /* ===== 卡片行（对齐 event-catcher 的三段式） ===== */
