@@ -42,6 +42,9 @@ test('午间报不消费广播型字段：无 broadcast_midday、音频仅经 co
 })
 
 test('午间报无音频时隐藏音频条只展示文字（空态用 hasAnyContent 守卫）', () => {
+  // 午间报不产生播报（后端不回填 content.audio_path），音频条按 audioPath/items 守卫 =>
+  // 无音频时整条隐藏；页面空态另由 hasAnyContent 守卫
+  assert.match(source, /v-if="audioPath \|\| items\.length"/)
   assert.match(source, /hasAnyContent/)
   assert.match(source, /empty-state/)
 })

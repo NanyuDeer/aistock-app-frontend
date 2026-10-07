@@ -32,7 +32,10 @@
                 </template>
               </ListCell>
             </template>
-            <EmptyState v-if="!filteredIntelList.length" title="暂无情报数据" />
+            <!-- 空态：沿用原 EmptyState 样式（白底 + 图标 + 文案），高度对齐固定 3 行 -->
+            <view v-else class="list-empty">
+              <EmptyState title="暂无情报数据" />
+            </view>
           </view>
         </view>
       </view>
@@ -65,7 +68,10 @@
                 </template>
               </ListCell>
             </template>
-            <EmptyState v-if="!captureList.length" title="暂无异动数据" />
+            <!-- 空态：沿用原 EmptyState 样式（白底 + 图标 + 文案），高度对齐固定 3 行 -->
+            <view v-else class="list-empty">
+              <EmptyState title="暂无异动数据" />
+            </view>
           </view>
         </view>
       </view>
@@ -215,24 +221,24 @@ const filteredIntelList = computed(() => {
   return nonNeutral.filter(item => item.sentiment === intelSubTab.value)
 })
 
-/** 首页预览最多显示4条，其余进入详情页查看 */
-const MAX_PREVIEW = 4
+/** 首页预览固定行数：个股情报与自选股洞察均为 3 行，多余进详情页查看 */
+const INTEL_ROW_COUNT = 3
 
 /**
- * 个股情报列表固定渲染 4 行：数据不足时空行占位，
- * 卡片纵向长度不随数据量变化（与异动捕手列表一致）
+ * 个股情报列表固定渲染 3 行：数据不足时空行占位，
+ * 卡片纵向长度不随数据量变化（一条都没有时同样占满 3 行高度）
  */
 const intelRows = computed<Array<IntelItem | null>>(() => {
-  const rows: Array<IntelItem | null> = filteredIntelList.value.slice(0, MAX_PREVIEW)
-  while (rows.length < MAX_PREVIEW) rows.push(null)
+  const rows: Array<IntelItem | null> = filteredIntelList.value.slice(0, INTEL_ROW_COUNT)
+  while (rows.length < INTEL_ROW_COUNT) rows.push(null)
   return rows
 })
 
 /**
- * 异动捕手列表固定渲染 4 行：数据不足时空行占位，
+ * 自选股洞察列表固定渲染 3 行：数据不足时空行占位，
  * 卡片纵向长度不随数据量变化（避免只有 1 条资讯时卡片变矮）
  */
-const CAPTURE_ROW_COUNT = 4
+const CAPTURE_ROW_COUNT = 3
 const captureRows = computed<Array<CaptureItem | null>>(() => {
   const rows: Array<CaptureItem | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
   while (rows.length < CAPTURE_ROW_COUNT) rows.push(null)
@@ -427,6 +433,21 @@ watch(
 .capture-list :deep(.as-list-cell__prefix),
 .intel-list :deep(.as-list-cell__prefix) {
   margin-right: $s-2;
+}
+
+/* 空态：沿用 EmptyState 原样式（白底 + 图标 + 文案），高度精确对齐固定 3 行
+   （3 × ListCell min-height 104rpx = 312rpx）。EmptyState 自带 padding $s-10 + 120rpx 图标，
+   自然高度约 367rpx 会把空态撑得比 3 行还高，故在空态容器内抹掉其内边距，由 flex 居中 */
+.list-empty {
+  min-height: 312rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $bg-card;
+
+  :deep(.as-empty) {
+    padding: 0;
+  }
 }
 
 .capture-list :deep(.as-list-cell__right),

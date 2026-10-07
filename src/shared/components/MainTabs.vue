@@ -13,7 +13,7 @@
     <view class="as-main-tabs__nav">
       <NotificationDropdown />
       <view class="as-main-tabs__avatar" @tap="goProfile">
-        <SvgIcon name="bear-smile-line" size="30rpx" color="#ffffff" />
+        <SvgIcon name="user-smile-line" size="30rpx" color="#ffffff" />
       </view>
     </view>
 

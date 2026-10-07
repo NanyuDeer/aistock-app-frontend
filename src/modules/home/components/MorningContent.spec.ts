@@ -67,18 +67,22 @@ test('节奏卡 loadRhythmHistory 失败/空数据兜底为空数组（不显示
   assert.doesNotMatch(onShowBlock, /loadRhythm\(\)/)
 })
 
-test('首页接入时段洞见横条：取数复用现有 ref，onShow 重算时段，navigate 分发到既有跳转', () => {
-  assert.match(componentSource, /import TimeSlotInsightBar from '\.\/TimeSlotInsightBar\.vue'/)
+test('首页时段洞见横条已下线：不再引入组件，时段仍由 DynamicInsightCard 消费', () => {
+  // 横条组件已从首页移除（2026-10-06），其取数 ref 与 navigate 分发由 DynamicInsightCard 继续使用
+  assert.doesNotMatch(componentSource, /import TimeSlotInsightBar from '\.\/TimeSlotInsightBar\.vue'/)
+  assert.doesNotMatch(componentSource, /<TimeSlotInsightBar/)
+  assert.doesNotMatch(componentSource, /barResetKey/)
+  assert.match(componentSource, /import DynamicInsightCard from '\.\/DynamicInsightCard\.vue'/)
   assert.match(componentSource, /getTradingTimeSlot/)
   assert.match(componentSource, /const currentSlot = ref<TradingTimeSlot>/)
   assert.match(componentSource, /:current-slot="currentSlot"/)
   assert.match(componentSource, /@navigate="onBarNavigate"/)
   assert.match(componentSource, /function onBarNavigate\(target: 'rhythm' \| 'sectors' \| 'events' \| 'trace'\)/)
-  // 横条插在 briefing-card 与 feature-grid 之间
+  // 洞见卡插在 briefing-card 与 feature-grid 之间
   const briefIdx = componentSource.indexOf('class="briefing-card"')
-  const barIdx = componentSource.indexOf('<TimeSlotInsightBar')
+  const cardIdx = componentSource.indexOf('<DynamicInsightCard')
   const gridIdx = componentSource.indexOf('class="feature-grid"')
-  assert.ok(briefIdx > -1 && barIdx > briefIdx && gridIdx > barIdx)
+  assert.ok(briefIdx > -1 && cardIdx > briefIdx && gridIdx > cardIdx)
   // onShow 内重算时段（与既有加载器并列）
   const onShowBlock = componentSource.match(/onShow\(\(\) => \{[\s\S]*?\n\s*\}\)/)?.[0] ?? ''
   assert.match(onShowBlock, /currentSlot\.value = getTradingTimeSlot\(\)/)

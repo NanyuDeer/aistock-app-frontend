@@ -11,11 +11,30 @@
               class="avatar-img"
               mode="aspectFill"
             />
-            <SvgIcon v-else name="bear-smile-line" size="56rpx" color="#ffffff" />
+            <SvgIcon v-else name="user-smile-line" size="56rpx" color="#ffffff" />
           </view>
           <view class="user-detail">
-            <text v-if="isLoggedIn" class="user-name">{{ userInfo?.nickname || '未设置昵称' }}</text>
-            <text v-else class="user-name login-prompt" @tap="goLogin">点击登录</text>
+            <view class="nickname-row">
+              <input
+                v-if="editingNickname"
+                v-model="nicknameDraft"
+                class="nickname-input"
+                type="text"
+                maxlength="12"
+                placeholder="请输入昵称"
+                placeholder-class="nickname-placeholder"
+                confirm-type="done"
+                @confirm="saveNickname"
+              />
+              <text v-else-if="isLoggedIn" class="user-name">{{ nicknameDisplay }}</text>
+              <text v-else class="user-name login-prompt" @tap="goLogin">点击登录</text>
+              <!-- 更改昵称入口：登录后展示，编辑态下变「保存」 -->
+              <text
+                v-if="isLoggedIn"
+                class="nickname-edit"
+                @tap.stop="editingNickname ? saveNickname() : startEditNickname()"
+              >{{ editingNickname ? '保存' : '更改昵称' }}</text>
+            </view>
             <text v-if="isLoggedIn && userInfo?.createdAt" class="user-since">
               加入于 {{ formatJoinDate(userInfo.createdAt) }}
             </text>
@@ -144,7 +163,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { authApi, type UserSettings } from '@/shared/api/modules/auth'
-import { deleteUserProfile } from '@/shared/api/modules/profile'
+import { deleteUserProfile, getUserProfile, updateUserProfile } from '@/shared/api/modules/profile'
 import { checkAppUpdate } from '@/shared/utils/useAppUpdate'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
@@ -189,8 +208,101 @@ function handleModalConfirm() {
 
 onShow(async () => {
   if (!isLoggedIn.value) return
-  await Promise.all([loadSettings(), favoritesStore.fetchFavorites({ silent: true })])
+  await Promise.all([loadSettings(), loadNickname(), favoritesStore.fetchFavorites({ silent: true })])
 })
+
+/** 默认昵称前缀（首次进入自动分配：用户 + 5 位随机字母数字，如 用户A7k2Q） */
+const NICKNAME_PREFIX = '用户'
+const NICKNAME_SUFFIX_LEN = 5
+const NICKNAME_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
+/** 昵称本地镜像结构：带 uid 归属，换账号时不会被上一账号的昵称串号 */
+interface NicknameCache { uid: string; nickname: string }
+
+function currentUid(): string {
+  return String(userInfo.value?.id ?? userInfo.value?.openid ?? '')
+}
+
+/** 读取本地镜像：仅当归属当前用户时采用（首帧即可拿到上次展示过的昵称） */
+function readCachedNickname(): string {
+  const cached = storage.get<NicknameCache>(STORAGE_KEYS.PROFILE_NICKNAME)
+  if (!cached || typeof cached !== 'object') return ''
+  return cached.uid && cached.uid === currentUid() ? (cached.nickname || '') : ''
+}
+
+function writeCachedNickname(value: string) {
+  if (!value) return
+  storage.set(STORAGE_KEYS.PROFILE_NICKNAME, { uid: currentUid(), nickname: value } as NicknameCache)
+}
+
+// 首帧取值优先级：本地镜像（上次实际展示的值）→ 登录态带回的昵称。
+// 直接取镜像可避免「先空/先旧值，接口返回后再替换」造成的闪烁。
+const nickname = ref(readCachedNickname() || (userInfo.value?.nickname || '').trim())
+/** 是否已完成昵称加载：未完成时不渲染「未设置昵称」占位，避免加载中先闪占位文案 */
+const nicknameLoaded = ref(false)
+const nicknameDraft = ref('')
+const editingNickname = ref(false)
+
+/** 展示用昵称：加载中留空（只等真值），加载完成仍为空才回退占位文案 */
+const nicknameDisplay = computed(() => nickname.value || (nicknameLoaded.value ? '未设置昵称' : ''))
+
+function generateNickname(): string {
+  let suffix = ''
+  for (let i = 0; i < NICKNAME_SUFFIX_LEN; i++) {
+    suffix += NICKNAME_CHARS[Math.floor(Math.random() * NICKNAME_CHARS.length)]
+  }
+  return NICKNAME_PREFIX + suffix
+}
+
+/**
+ * 读取昵称（画像接口为准，回退 /users/me 的昵称）。
+ * 两者都为空视为首次进入：自动分配默认昵称并落库，避免「未设置昵称」空态。
+ */
+async function loadNickname() {
+  try {
+    const profile = await getUserProfile()
+    const existing = (profile?.nickname || userInfo.value?.nickname || '').trim()
+    if (existing) {
+      nickname.value = existing
+      return
+    }
+    const generated = generateNickname()
+    nickname.value = generated
+    await updateUserProfile({ nickname: generated })
+  } catch {
+    // 失败时如实回退已登录态带回的昵称，不伪造
+    nickname.value = (userInfo.value?.nickname || '').trim()
+  } finally {
+    // 加载结束才允许占位文案出现（成功路径已有真值，等价于不显示占位）
+    nicknameLoaded.value = true
+    writeCachedNickname(nickname.value)
+  }
+}
+
+function startEditNickname() {
+  nicknameDraft.value = nickname.value
+  editingNickname.value = true
+}
+
+/** 保存昵称：乐观更新，失败回滚（后端对昵称做非空 + 长度校验） */
+async function saveNickname() {
+  const value = nicknameDraft.value.trim()
+  if (!value) {
+    uni.showToast({ title: '昵称不能为空', icon: 'none' })
+    return
+  }
+  const previous = nickname.value
+  nickname.value = value
+  editingNickname.value = false
+  try {
+    await updateUserProfile({ nickname: value })
+    writeCachedNickname(value)
+    uni.showToast({ title: '昵称已更新', icon: 'success' })
+  } catch {
+    nickname.value = previous
+    uni.showToast({ title: '保存失败，请重试', icon: 'none' })
+  }
+}
 
 async function loadSettings() {
   try {
@@ -372,6 +484,41 @@ function formatDate(dateStr: string): string {
   display: flex;
   flex-direction: column;
   gap: 4rpx;
+}
+
+/* 昵称行：名称 + 右侧「更改昵称」入口（头像卡为深色底，用半透明白描边保证可读） */
+.nickname-row {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+  min-width: 0;
+  /* 昵称加载完成前该行无文案，固定行高避免文字出现时跳动 */
+  min-height: 42rpx;
+}
+
+.nickname-input {
+  flex: 1;
+  min-width: 0;
+  height: 48rpx;
+  padding: 0 $s-2;
+  border: 1rpx solid rgba(255, 255, 255, 0.5);
+  border-radius: $r-xs;
+  color: #ffffff;
+  font-size: $font-size-md;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.nickname-placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.nickname-edit {
+  flex: none;
+  padding: 2rpx $s-2;
+  border: 1rpx solid rgba(255, 255, 255, 0.5);
+  border-radius: $r-full;
+  color: #ffffff;
+  font-size: $font-size-xs;
 }
 
 .user-name {

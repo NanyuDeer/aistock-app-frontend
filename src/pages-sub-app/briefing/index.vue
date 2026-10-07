@@ -15,6 +15,7 @@
         </view>
 
         <!-- 音频入口条（点击进入播报详情页） -->
+        <!-- 午间报不产生播报（后端不回填 content.audio_path），故无音频时整条隐藏，只展示文字结论 -->
         <view
           v-if="audioPath || items.length"
           class="audio-bar"

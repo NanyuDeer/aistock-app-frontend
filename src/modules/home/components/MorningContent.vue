@@ -169,17 +169,6 @@
         </view>
       </Card>
 
-      <!-- 洞见横条：置于重磅事件跟踪下方 -->
-      <TimeSlotInsightBar
-        :key="barResetKey"
-        :leader-sectors="leaderSectors"
-        :chain-events="chainEvents"
-        :trace-reports="traceReports"
-        :rhythm-rows="rhythmRows"
-        :current-slot="currentSlot"
-        @navigate="onBarNavigate"
-      />
-
     </view>
   </view>
 </template>
@@ -190,7 +179,6 @@ import { onShow } from '@dcloudio/uni-app'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import Card from '@/shared/components/Card.vue'
 import Tag from '@/shared/components/Tag.vue'
-import TimeSlotInsightBar from './TimeSlotInsightBar.vue'
 import DynamicInsightCard from './DynamicInsightCard.vue'
 import { useBriefingCard } from '@/shared/utils/useBriefingCard'
 import { buildBriefingUrl } from '@/shared/utils/briefingNavigation'
@@ -458,7 +446,6 @@ interface RhythmHistoryRow {
 const rhythmRows = ref<RhythmHistoryRow[]>([])
 
 const currentSlot = ref<TradingTimeSlot>(getTradingTimeSlot())
-const barResetKey = ref(0)
 
 // 档位色板/短码唯一副本见 shared/utils/rhythmColors.ts
 
@@ -525,7 +512,6 @@ onShow(() => {
   loadChainEvents()
   loadTraceReports()
   currentSlot.value = getTradingTimeSlot()
-  barResetKey.value += 1
 })
 
 function goChat() {

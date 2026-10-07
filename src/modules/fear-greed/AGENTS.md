@@ -42,5 +42,6 @@
 - 恐贪指数统一为 0-100；情绪分档用沸点/冰点生活化表述（冰点 0-20 / 寒冷 20-45 / 常温 45-55 / 温热 55-80 / 沸点 80-100），避免专业术语。
 - 温度档静态常量（`ZONES`）仅作 UI 元数据（色/标签/仓位锚点）与 fallback；**投资建议/操作要点/配置方向标签走 `utils/fgAdvice.ts` 主路径**（`buildAdvice` / `buildActions` / `buildSectorTags`，输入为当前指数 + 指标 + 后端板块榜，板块不可用时回退 `ZONES` 静态档位内容）；药丸按钮分档定义在 `FearGreedIndex.vue` 内常量维护，改动需同步。
 - 当前情绪仪表盘与历史走势均为内联 SVG（data URI）：仪表盘为半圆表盘（`gaugeImgSrc`，刻度 + 指针 + 冰点/常温/沸点标签），走势图为折线图（`historyChartSrc`，含 20/80 分割线、5-20-60 日均线数值、交互热区 + tooltip）；**不引入 ECharts**。
+- 走势图 tooltip 契约（2026-10-06）：**仅交互时显示**——`v-if="activeDayIdx !== null && activeDayData"` + 容器 `@mouseleave="clearDay"`，未 hover/tap 时不常驻（`effectiveDayIdx` 仍默认回落最新日，仅用于十字线渲染）；**宽度固定 200rpx**（`.fg-chart__tooltip` 不用 `max-width`，否则靠右时绝对定位可用宽度被压缩会变窄），靠边仅靠 `--right`(translateX(-100%)) / `--left`(translateX(0)) 改锚点。
 - 情绪配色：冰点绿 `#00C853`（低吸机会）、沸点红 `#FF3B30`（过热风险），遵循 A 股"绿=机会/红=风险"直觉，勿用国际"冰红沸绿"。
 - 页面必须兼容 H5 预览；后端未启动时页面展示加载/错误态。

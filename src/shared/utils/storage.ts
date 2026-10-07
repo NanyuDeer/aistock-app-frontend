@@ -60,5 +60,7 @@ export const STORAGE_KEYS = {
   // 恐贪页「波段操作节奏」入口卡摘要拉取日（YYYY-MM-DD，跨日刷新门控）
   FG_RHYTHM_SUMMARY_DATE: 'fg_rhythm_summary_date',
   // 存量账号「首次设置密码」一次性引导已展示标记（2026-09-26）
-  PWD_HINT_SHOWN: 'pwd_hint_shown'
+  PWD_HINT_SHOWN: 'pwd_hint_shown',
+  // 我的页昵称本地镜像（{ uid, nickname }）：首帧同步渲染，避免进页面时昵称由空/旧值切换造成闪烁
+  PROFILE_NICKNAME: 'profile_nickname'
 } as const

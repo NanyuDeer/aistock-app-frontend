@@ -3,7 +3,7 @@
     <!-- 一期为模拟数据；后续由选股 Agent 返回同结构的推荐结果。 -->
     <view v-for="item in recommendations" :key="item.symbol" class="ai-pick-row" @tap="openDetail(item.symbol)">
       <view class="ai-pick-main">
-        <view class="stock-line"><view class="stock-name">{{ item.name }}</view><view class="stock-price" :class="item.change.startsWith('-') ? 'is-down' : 'is-up'">{{ item.price }}</view><view class="stock-change" :class="item.change.startsWith('-') ? 'is-down' : 'is-up'">{{ item.change }}</view><view :class="['favorite-button', { added: favoritesStore.isFavorite(item.symbol), disabled: favoritesStore.isPending(item.symbol) }]" @tap.stop="addFavorite(item)"><text>{{ favoritesStore.isFavorite(item.symbol) ? '✓' : '＋' }}</text></view></view>
+        <view class="stock-line"><view class="stock-name">{{ item.name }}</view><view class="stock-price" :class="item.change.startsWith('-') ? 'is-down' : 'is-up'">{{ item.price }}</view><view class="stock-change" :class="item.change.startsWith('-') ? 'is-down' : 'is-up'">{{ item.change }}</view><view :class="['favorite-button', { added: favoritesStore.isFavorite(item.symbol), disabled: favoritesStore.isPending(item.symbol) }]" @tap.stop="toggleFavorite(item)"><text>{{ favoritesStore.isFavorite(item.symbol) ? '✓' : '＋' }}</text></view></view>
         <view class="reason-line"><view class="reason-label">推荐理由</view><view class="reason-text">{{ item.reason }}</view></view>
       </view>
       <svg class="mini-chart" viewBox="0 0 120 64" preserveAspectRatio="none"><polyline :points="item.chart" fill="none" :stroke="item.change.startsWith('-') ? '#22a65a' : '#ff4057'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><line x1="0" y1="62" x2="120" y2="62" stroke="#edf0f5" stroke-width="1" /></svg>
@@ -23,7 +23,17 @@ const recommendations: Recommendation[] = [
   { symbol: '002648', name: '卫星化学', price: '18.52', change: '-2.40%', reason: '盈利预期改善，机构关注度提升', chart: '2,25 14,28 26,38 40,45 56,44 70,42 82,17 96,24 108,21 118,23' },
 ]
 function openDetail(symbol: string) { uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` }) }
-async function addFavorite(item: Recommendation) { if (favoritesStore.isFavorite(item.symbol) || favoritesStore.isPending(item.symbol)) return; const added = await favoritesStore.add(item.symbol, item.name); if (added) uni.showToast({ title: '已加入自选', icon: 'success' }) }
+async function toggleFavorite(item: Recommendation) {
+  if (favoritesStore.isPending(item.symbol)) return
+  // 已自选 → 取消；未自选 → 加入（同一按钮双向切换）
+  if (favoritesStore.isFavorite(item.symbol)) {
+    const removed = await favoritesStore.remove(item.symbol)
+    if (removed) uni.showToast({ title: '已移除自选', icon: 'none' })
+    return
+  }
+  const added = await favoritesStore.add(item.symbol, item.name)
+  if (added) uni.showToast({ title: '已加入自选', icon: 'success' })
+}
 </script>
 
 <style lang="scss" scoped>

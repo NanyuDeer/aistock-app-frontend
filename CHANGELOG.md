@@ -2,6 +2,38 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-10-06 — 首页/选股页视觉统一、昵称分配与图表交互修复
+
+**开发者**: Aria
+
+### 改进
+
+- **选股页三 Tab 视觉统一**（`TrendStockInsightContent` / `HotBurstInsightContent` / `ForecastInsightContent`）：卡片外壳统一为白底 + `1rpx solid $line` + `$r-lg` + `$shadow-sm` + `$s-3` 内边距，列表间距 `$s-2`；名称统一 `$font-size-md`/600；股票代码统一纯文本 + `$ink-mute`；行业标签统一自绘灰底（机构调研股由组件库 `Tag` 改为同款，并移到代码旁，对齐趋势股结构）；涨跌色统一 `$up`/`$down`；清除 `#f43f5e`/`#22c55e`/`#9ca3af`/`#f0f2f5` 等硬编码与旧别名。趋势股评分/等级缩小（38→32rpx、56→44rpx），业绩预测文案「净利润预测」→「净利预测」
+- **三 Tab 列表上方 meta 行等高**：统一 `margin:$s-2 0` + `min-height:44rpx`（总高 76rpx），修掉首张卡上边缘错位
+- **首页时段洞见横条下线**：`MorningContent.vue` 移除 `TimeSlotInsightBar` 引用/import/`barResetKey`；**删除死代码** `TimeSlotInsightBar.vue` 与其挂载 spec，同步移除 vitest 白名单条目；`currentSlot` / `onBarNavigate` 等由 `DynamicInsightCard` 继续消费
+- **首页个股情报 / 自选股洞察固定 3 行**（`INTEL_ROW_COUNT` / `CAPTURE_ROW_COUNT` = 3），空态沿用 `EmptyState`（白底 + 图标 + 文案）并由 `.list-empty` 精确撑到 3 行高度
+- **「我的」昵称**：首次进入自动分配 `用户` + 5 位随机字母数字并落库（复用后端 `GET/PUT /api/user/profile`）；昵称行右侧新增「更改昵称」入口（就地切换输入框，乐观更新 + 失败回滚）
+- **时段洞见卡四入口条带去掉数量徽标**（原「风口 3条」）
+
+### 修复
+
+- **恐贪指数页历史走势图 tooltip**：①鼠标不在图表上不再常驻（加 `activeDayIdx !== null` 门控与容器 `@mouseleave`）；②固定 `width:200rpx` + 调整靠边锚点，修掉靠右时标签被挤压变窄
+- **进入「我的」昵称闪烁**：首帧无值（空→接口返回后出现）或先显示 `/users/me` 旧值。改为新增 `STORAGE_KEYS.PROFILE_NICKNAME` 本地镜像（`{ uid, nickname }`，按 uid 校验防串号）首帧同步读取 + `nicknameLoaded` 门闩 + 行高固定
+- **StockContent.spec 既有失败**：陈旧用例（组件早已移除 `.stock-search`）改写为当前 Tab 行为断言，并补全 `@/shared/components` 桩缺失的 `EmptyState` 导出
+
+### 文档
+
+- `src/modules/home/AGENTS.md`：补记 `StockContent.vue` / `AiPickContent.vue` 职责与自选双向切换契约；移除已删除的 `TimeSlotInsightBar` 条目
+- `src/modules/fear-greed/AGENTS.md`：补记走势图 tooltip 契约（仅交互时显示 + 固定宽度）
+- `tests/run-node-specs.mjs`：`EXPECTED_BASELINE` `281/278/3` → `281/279/2`（横条 spec 转绿），并更新已知残余失败说明
+
+### 说明
+
+- 午间报无播报卡片经排查确认为**预期行为**（后端不回填 `content.audio_path`，且午间报不消费广播条目），产品决定不新增播报卡片，仅补注释说明
+- 头像图标 `bear-smile-line` → `user-smile-line`（MainTabs / PageCard / profile / login 共 4 处）
+
+---
+
 ## [master] 2026-10-06 — 节奏 AGENTS.md 更正：`met` 点亮/置灰当前未接线
 
 **开发者**: Aria

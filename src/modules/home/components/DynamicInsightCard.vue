@@ -95,7 +95,6 @@
           <view v-if="m.key === headModule" class="dyn-strip__dot" :style="{ background: slotColor }"></view>
         </view>
         <text class="dyn-strip__label" :class="{ 'dyn-strip__label--active': m.key === headModule }">{{ m.label }}</text>
-        <text class="dyn-strip__count">{{ countOf(m.key) }}</text>
       </view>
     </view>
   </view>
@@ -311,11 +310,6 @@ const secondary = computed<FocusItem[]>(() =>
 
 function moduleLabel(key: ModuleKey): string {
   return MODULES.find(m => m.key === key)?.label ?? ''
-}
-
-function countOf(key: ModuleKey): string {
-  const n = pools.value[key].length
-  return n > 0 ? `${n}条` : '—'
 }
 
 function toneClass(tone: Tone): string {
@@ -635,10 +629,5 @@ function toneClass(tone: Tone): string {
 .dyn-strip__label--active {
   color: $ink;
   font-weight: 600;
-}
-
-.dyn-strip__count {
-  font-size: $font-size-xs;
-  color: $ink-mute;
 }
 </style>
