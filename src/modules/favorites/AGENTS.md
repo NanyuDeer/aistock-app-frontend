@@ -74,7 +74,9 @@
 > **2026-10-07（同日第二笔）**：两页异动/洞察列表收敛到「最近 14 个自然日」——由**前端计算窗口起点、后端 SQL 做时间下界**（`aistock-agent-py/docs/superpowers/plans/2026-10-07-movements-two-week-window.md` Task 2）。
 > - `stockTraceApi.list(limit, cursor?, options?: { visibleOnly?: boolean; since?: string })`：`options.since`（`YYYY-MM-DD`）存在时 params 追加 `since`（与 `visible_only` 同为**opt-in 非默认**；首页 `AlertContent.vue` 不传，走全量降级）。
 > - 新 helper `shared/utils/datetime.ts::shanghaiDateKeyDaysAgo(days)`：`YYYY-MM-DD`，按 **UTC+8 固定偏移**（中国无夏令时、不依赖本机时区），`since = shanghaiDateKeyDaysAgo(13)` = 今天-13 = 最近 14 个自然日含今天。
-> - `monitor.vue` / `insight.vue` 首屏与 `loadMore` 均传 `{ visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) }`；**无客户端过滤**——后端按 `trading_date >= since`，越界返回空页 + `nextCursor=null` → 自然「没有更多」；老 app-api 忽略该参数 → 优雅降级"显示全部"。
+> - `monitor.vue` / `insight.vue` 首屏与 `loadMore` 均传 `{ visibleOnly: true, since: shanghaiDateKeyDaysAgo(TWO_WEEK_WINDOW_DAYS) }`；**无客户端过滤**——后端按 `trading_date >= since`，越界返回空页 + `nextCursor=null` → 自然「没有更多」；老 app-api 忽略该参数 → 优雅降级"显示全部"。
+>   - ⚠️ `TWO_WEEK_WINDOW_DAYS = 13`（定义在 `shared/utils/datetime.ts`，附「为何是 13 而非 14」注释）：**"含今天共 14 个自然日" 等价于"回退 13 天"**；写成 `14` 会多算一天（今天 10-07 → 正确 `since = 2026-09-24`）。浏览器实测请求即为 `since=2026-09-24`。
+>   - 实测（mxfff）：同日两页卡片由改动前的 ~60 张收敛到 **8 张**（日期范围 09-24 → 09-30，**无早于 09-24 的卡片**），首屏即「没有更多」。
 
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。
