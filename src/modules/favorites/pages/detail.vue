@@ -526,38 +526,10 @@
                 {{ forecastData.netProfitYoy >= 0 ? '+' : '' }}{{ forecastData.netProfitYoy }}%
               </text>
             </view>
-            <ForecastProfitChart
-              v-if="forecastChartItems.length"
-              :items="forecastChartItems"
-              :visible="activeView === 'mid'"
+            <ForecastFinancialChart
+              v-if="forecastData.detailIndicators && forecastData.detailIndicators.length"
+              :detail-rows="forecastData.detailIndicators"
             />
-            <view v-if="forecastYearRows.length" class="forecast-year-panel">
-              <view class="forecast-year-head">
-                <text class="forecast-year-title">年度预测</text>
-                <text class="forecast-year-unit">净利润 / 增长率</text>
-              </view>
-              <view class="forecast-year-list">
-                <view v-for="row in forecastYearRows" :key="row.year" class="forecast-year-item">
-                  <view class="forecast-year-main">
-                    <view class="forecast-year-left">
-                      <text class="forecast-year-label">{{ row.year }}</text>
-                      <text :class="['forecast-year-kind', row.kindClass]">{{ row.kindText }}</text>
-                    </view>
-                    <view class="forecast-year-right">
-                      <text class="forecast-year-value">{{ row.netProfit }}</text>
-                      <text :class="['forecast-year-growth', row.growthClass]">{{ row.growthText }}</text>
-                    </view>
-                  </view>
-                  <view class="forecast-progress-track">
-                    <view
-                      class="forecast-progress-fill"
-                      :class="row.kindClass"
-                      :style="{ width: `${row.progress}%` }"
-                    ></view>
-                  </view>
-                </view>
-              </view>
-            </view>
             <view
               v-if="forecastData.detailIndicators && forecastData.detailIndicators.length"
               class="forecast-detail-toggle"
@@ -772,17 +744,10 @@
 
         <!-- 行业政策 -->
         <template v-if="revealedCounts.long >= 3">
-        <view v-if="visiblePolicyList.length" class="section-card">
+        <view v-if="longMockData.policies.length" class="section-card">
           <text class="section-title">行业政策</text>
-          <view class="policy-list">
-            <view v-for="(policy, idx) in visiblePolicyList" :key="idx" class="policy-item">
-              <text v-if="policy.tag" :class="['policy-tag', policy.type]">{{ policy.tag }}</text>
-              <text :class="['policy-text', { 'is-collapsed': !policyExpanded }]">{{ policy.text }}</text>
-            </view>
-          </view>
-          <view v-if="policyNeedsExpand" class="news-toggle" @tap="policyExpanded = !policyExpanded">
-            <text class="news-toggle-text">{{ policyExpanded ? '收起' : '查看完整' }}</text>
-          </view>
+          <!-- 逐条展开：每条末尾自带展开按钮，点击只展开该条 -->
+          <PolicyList :policies="longMockData.policies" />
         </view>
 
         <!-- 公司护城河 -->
@@ -925,7 +890,8 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import InsightCard from '@/shared/components/InsightCard.vue'
 import KLineChart from '@/modules/favorites/components/KLineChart.vue'
-import ForecastProfitChart from '@/modules/favorites/components/ForecastProfitChart.vue'
+import ForecastFinancialChart from '@/modules/favorites/components/ForecastFinancialChart.vue'
+import PolicyList from '@/modules/favorites/components/PolicyList.vue'
 import CapitalFlowCharts from '@/modules/favorites/components/CapitalFlowCharts.vue'
 import { useStockAiAnalysis, extractTagsFromText, extractTagsFromArray } from '@/modules/favorites/composables/useStockAiAnalysis'
 
@@ -983,7 +949,6 @@ const viewTabs: { key: ViewKey; label: string; desc: string }[] = [
   { key: 'mid', label: '中线', desc: '月/季' },
   { key: 'long', label: '长线', desc: '年' }
 ]
-const policyExpanded = ref(false)
 
 // 分块加载：每个 Tab 按片段序号 0..N 逐步挂载（抖音式：下滑触底再渲染下一片段）
 const SEGMENT_COUNT: Record<ViewKey, number> = { short: 3, mid: 3, long: 4 }
@@ -1163,14 +1128,7 @@ const hasForecastCardData = computed(() => Boolean(
   || (Array.isArray(forecastData.value?.predictions) && forecastData.value.predictions.length)
   || (Array.isArray(forecastData.value?.detailIndicators) && forecastData.value.detailIndicators.length)
   || forecastChartItems.value.length
-  || forecastYearRows.value.length
 ))
-const visiblePolicyList = computed(() => policyExpanded.value ? longMockData.value.policies : longMockData.value.policies.slice(0, 2))
-const policyNeedsExpand = computed(() => (
-  longMockData.value.policies.length > 2
-  || longMockData.value.policies.some((policy: any) => String(policy.text || '').length > 42)
-))
-
 // 资金流向归一化（对齐网页端 capitalFlowInfo）
 const capitalFlowInfo = computed(() => {
   const source = capitalFlow.value
@@ -1222,40 +1180,6 @@ const forecastChartItems = computed(() => {
     ...item,
     height: Math.max(14, Math.round((Math.abs(item.value) / max) * 100)),
   }))
-})
-
-const forecastYearRows = computed(() => {
-  // 与图表同源：优先预测明细，缺净利润值时回退到详表净利润行
-  const source = buildForecastChartSource()
-  if (!source.length) return []
-  const detailRows = Array.isArray(forecastData.value?.detailIndicators) ? forecastData.value.detailIndicators : []
-  const growthRow = detailRows.find((r: any) => String(r['预测指标'] || r.indicator || '').includes('净利润增长率'))
-  const getGrowth = (year: string): number | string => {
-    if (!growthRow) return '--'
-    const raw = growthRow[`预测${year}-平均`] || growthRow[`预测${year}`] || growthRow[`${year}-实际值`] || '--'
-    const num = parseFloat(String(raw).replace('%', '').replace(/,/g, ''))
-    return Number.isNaN(num) ? '--' : num
-  }
-  const parsed = source
-    .map((item: any) => {
-      const value = parseForecastProfit(item.netProfit)
-      const growth = item.growth != null ? item.growth : getGrowth(String(item.year || ''))
-      return {
-        year: String(item.year || ''),
-        netProfit: item.netProfit || '--',
-        growth,
-        value: value ?? 0,
-        kindClass: growth === '--' || growth == null ? 'is-forecast' : growth >= 0 ? 'is-actual' : 'is-forecast',
-        kindText: growth === '--' || growth == null ? '预测' : growth >= 0 ? '改善' : '承压',
-        growthText: growth === '--' || growth == null ? '--' : `${growth >= 0 ? '+' : ''}${growth}%`,
-        growthClass: growth === '--' || growth == null ? '' : `${growth >= 0 ? 'up' : 'down'}`,
-      }
-    })
-  const max = Math.max(...parsed.map((item: any) => Math.abs(item.value)), 0.01)
-  return parsed.map((item: any) => ({
-    ...item,
-    progress: Math.max(18, Math.round((Math.abs(item.value) / max) * 100)),
-  })).filter((item: any) => item.year)
 })
 
 const forecastYearKeys = computed(() => {
@@ -3661,62 +3585,7 @@ function goChat() {
   border-radius: 999rpx;
 }
 
-/* 行业政策 */
-.policy-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-}
-
-.policy-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 14rpx;
-  padding: 16rpx 0;
-  border-bottom: 1rpx solid $line-soft;
-
-  &:last-child { border-bottom: none; }
-}
-
-.policy-tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  min-width: 56rpx;
-  height: 34rpx;
-  padding: 0 10rpx;
-  border-radius: 8rpx;
-  font-size: 22rpx;
-  line-height: 1;
-  font-weight: 700;
-
-  &.is-good {
-    background: $up-soft;
-    color: $up;
-  }
-
-  &.is-neutral {
-    background: $bg-deep;
-    color: $ink-mute;
-  }
-}
-
-.policy-text {
-  flex: 1;
-  min-width: 0;
-  font-size: 26rpx;
-  color: $ink-soft;
-  line-height: 1.65;
-
-  &.is-collapsed {
-    display: -webkit-box;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
-}
+/* 行业政策：列表渲染与「逐条展开」已下沉到 components/PolicyList.vue */
 
 /* 公司护城�?*/
 .moat-grid {
@@ -4201,95 +4070,6 @@ function goChat() {
   &.down { color: $down; }
 }
 
-.forecast-year-panel {
-  padding: 20rpx;
-  background: $bg-soft;
-  border-radius: 12rpx;
-  margin-bottom: 16rpx;
-}
-
-.forecast-year-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18rpx;
-}
-
-.forecast-year-title {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: $ink-soft;
-}
-
-.forecast-year-unit {
-  font-size: 22rpx;
-  color: $ink-mute;
-}
-
-.forecast-year-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14rpx;
-}
-
-.forecast-year-item {
-  padding: 16rpx;
-  background: $bg-card;
-  border-radius: 12rpx;
-  border: 1rpx solid $line-soft;
-}
-
-.forecast-year-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-  margin-bottom: 12rpx;
-}
-
-.forecast-year-left {
-  min-width: 0;
-}
-
-.forecast-year-right {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4rpx;
-}
-
-.forecast-year-label {
-  display: block;
-  font-size: 26rpx;
-  color: $ink-soft;
-  font-weight: 600;
-}
-
-.forecast-year-kind {
-  display: block;
-  margin-top: 2rpx;
-  font-size: 21rpx;
-  color: $ink-mute;
-
-  &.is-actual { color: $primary; }
-  &.is-forecast { color: $warning; }
-}
-
-.forecast-year-value {
-  font-size: 28rpx;
-  color: $ink;
-  font-weight: 800;
-}
-
-.forecast-year-growth {
-  font-size: 22rpx;
-  font-weight: 700;
-
-  &.up { color: $up; }
-  &.down { color: $down; }
-}
-
 .forecast-detail-toggle {
   display: flex;
   align-items: center;
@@ -4319,27 +4099,6 @@ function goChat() {
   line-height: 32rpx;
   text-align: center;
   font-weight: 700;
-}
-
-.forecast-progress-track {
-  height: 16rpx;
-  background: $line;
-  border-radius: 999rpx;
-  overflow: hidden;
-}
-
-.forecast-progress-fill {
-  height: 100%;
-  min-width: 18rpx;
-  border-radius: 999rpx;
-
-  &.is-actual {
-    background: linear-gradient(90deg, $primary, $primary-light);
-  }
-
-  &.is-forecast {
-    background: linear-gradient(90deg, $warning, $warning-light);
-  }
 }
 
 .forecast-list-header {

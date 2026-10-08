@@ -11,6 +11,7 @@ function makePresentation(overrides: Partial<MarketTracePresentation> = {}): Mar
     generatedAt: '',
     snapshotId: '',
     attributionStatus: 'confirmed',
+    alternativeChainId: null,
     confidence: 'high',
     isFallback: false,
     pendingRisks: { openQuestions: [], missingEvidence: [] },
@@ -103,4 +104,51 @@ test('toMarketInsightDetail: 无主因时 trace 为 null，无预判时 forecast
 
 test('toMarketInsightDetail: null 输入返回 null', () => {
   assert.equal(toMarketInsightDetail(null), null)
+})
+
+// —— 无主因日（hypothesis/not_applicable）的 weak 候选展示 ——
+
+test('toMarketInsightBrief: 无主因但有被 alternativeChainId 指定的候选时展示「可能主因（待验证）」', () => {
+  const brief = toMarketInsightBrief(makePresentation({
+    attributionStatus: 'hypothesis',
+    primaryCause: null,
+    alternativeChainId: 'a2',
+    alternatives: [
+      { categoryId: 'a1', categoryLabel: '资金面', conclusion: '资金面结论文本', transmission: '', supportingEvidence: [], counterEvidence: [] },
+      { categoryId: 'a2', categoryLabel: '产业技术供应', conclusion: '算力芯片产业链减持公告扎堆，压制半导体板块', transmission: '', supportingEvidence: [], counterEvidence: [] },
+    ],
+  }))
+  assert.ok(brief)
+  assert.equal(brief!.trace, '可能主因（待验证）：算力芯片产业链减持公告扎堆，压制半导体板块')
+})
+
+test('toMarketInsightBrief: 无 alternativeChainId 时回退 alternatives[0]', () => {
+  const brief = toMarketInsightBrief(makePresentation({
+    primaryCause: null,
+    alternativeChainId: null,
+    alternatives: [
+      { categoryId: 'a1', categoryLabel: '资金面', conclusion: '资金面结论文本', transmission: '', supportingEvidence: [], counterEvidence: [] },
+    ],
+  }))
+  assert.equal(brief!.trace, '可能主因（待验证）：资金面结论文本')
+})
+
+test('toMarketInsightBrief: alternatives 为空时仍兜底「证据不足，主因待验证」', () => {
+  const brief = toMarketInsightBrief(makePresentation({
+    primaryCause: null,
+    alternativeChainId: 'a2',
+    alternatives: [],
+  }))
+  assert.equal(brief!.trace, '证据不足，主因待验证')
+})
+
+test('toMarketInsightBrief: 指定候选 conclusion 为空时退化为 categoryLabel', () => {
+  const brief = toMarketInsightBrief(makePresentation({
+    primaryCause: null,
+    alternativeChainId: 'a2',
+    alternatives: [
+      { categoryId: 'a2', categoryLabel: '产业技术供应', conclusion: '', transmission: '', supportingEvidence: [], counterEvidence: [] },
+    ],
+  }))
+  assert.equal(brief!.trace, '可能主因（待验证）：产业技术供应')
 })

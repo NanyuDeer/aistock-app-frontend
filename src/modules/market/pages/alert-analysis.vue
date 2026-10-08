@@ -40,6 +40,19 @@
           >{{ kw }}</Tag>
         </view>
 
+        <!-- 快评：抓取时已生成的一句话结论（先于 AI 解读展示） -->
+        <Card v-if="brief" class="brief-section">
+          <view class="brief-header">
+            <SvgIcon name="flashlight-line" size="24rpx" color="#0b5fff" />
+            <text class="brief-title">快评 · 抓取时生成</text>
+            <text class="brief-time">{{ brief.published_at || '' }}</text>
+          </view>
+          <view class="brief-impact-row">
+            <Tag :type="briefImpactType" size="sm">{{ brief.ai_impact }} · {{ brief.ai_horizon }}</Tag>
+          </view>
+          <view class="brief-body"><text class="brief-text">{{ brief.ai_summary }}</text></view>
+        </Card>
+
         <!-- 一句话速览 -->
         <Card v-if="summary || loading" class="summary-section">
           <view class="summary-header">
@@ -53,6 +66,9 @@
             <text class="summary-loading-text">正在提取核心结论...</text>
           </view>
         </Card>
+
+        <!-- AI 思考过程（2026-09-30：等待期可见，流式解说） -->
+        <AlertReasoningPanel :steps="reasoningSteps" />
 
         <!-- 分析进度 -->
         <view v-if="toolSteps.length" class="analysis-tools-section">
@@ -124,6 +140,8 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useAlertSSE } from '@/modules/market/utils/useAlertSSE'
+import AlertReasoningPanel from '@/modules/market/components/AlertReasoningPanel.vue'
+import { getLatestJudgement, type StockInfoJudgementBrief } from '@/shared/api/modules/stockInfo'
 import { markdownToHtml } from '@/shared/utils/markdown'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
@@ -134,9 +152,13 @@ import mpHtml from 'mp-html/dist/uni-app/components/mp-html/mp-html'
 const symbol = ref('')
 const cycle = ref('')
 
+/** 抓取时已生成的一句话结论（快评），进页立即拉取展示，不等 SSE */
+const brief = ref<StockInfoJudgementBrief | null>(null)
+const briefLoading = ref(false)
+
 const podcastStore = usePodcastStore()
 
-const { content, toolSteps, loading, error, done, result, start, stop, loadFromCache } = useAlertSSE()
+const { content, toolSteps, reasoningSteps, preview, loading, error, done, result, start, stop, loadFromCache } = useAlertSSE()
 
 const cycleLabel = computed(() => {
   switch (cycle.value) {
@@ -147,29 +169,34 @@ const cycleLabel = computed(() => {
   }
 })
 
-/** 结构化展示字段（来自 result 事件） */
-const summary = computed(() => result.value?.displayReport?.summary || '')
+/** 结构化展示字段：速览三件套来自 preview（先到），缓存路径回退 result（职责不重叠） */
+const summary = computed(() => preview.value?.summary || result.value?.displayReport?.summary || '')
 const details = computed(() => result.value?.displayReport?.details || '')
 const detailsHtml = computed(() => (details.value ? markdownToHtml(details.value) : ''))
 const stocks = computed(() => result.value?.displayReport?.stocks || [])
 const risks = computed(() => result.value?.displayReport?.risks || [])
-const displayKeywords = computed(() => result.value?.displayReport?.keywords || [])
+const displayKeywords = computed(() => preview.value?.keywords || result.value?.displayReport?.keywords || [])
 const podcastBrief = computed(() => result.value?.podcastBrief || '')
 const rawContent = computed(() => result.value?.raw || content.value)
 const rawHtml = computed(() => (rawContent.value ? markdownToHtml(rawContent.value) : ''))
 
-/** impact 映射为 Badge/Tag 类型 */
-const impactLabel = computed(() => {
-  const impact = result.value?.displayReport?.impact || ''
-  return impact
-})
+/** impact 映射为 Badge/Tag 类型（preview 先到，result 缓存兜底） */
+const impactLabel = computed(() => preview.value?.impact || result.value?.displayReport?.impact || '')
 
 const impactBadgeType = computed<'up' | 'down' | 'neutral' | ''>(() => {
-  const impact = result.value?.displayReport?.impact || ''
+  const impact = impactLabel.value
   if (impact.includes('利好')) return 'up'
   if (impact.includes('利空')) return 'down'
   if (impact.includes('中性')) return 'neutral'
   return ''
+})
+
+/** 快评 impact 映射为 Tag 类型（照 impactBadgeType 写法：利好→up、利空→down、其余→neutral） */
+const briefImpactType = computed<'up' | 'down' | 'neutral'>(() => {
+  const impact = brief.value?.ai_impact || ''
+  if (impact.includes('利好')) return 'up'
+  if (impact.includes('利空')) return 'down'
+  return 'neutral'
 })
 
 /** 播报缓存键：alert_{symbol}_{date} */
@@ -204,6 +231,19 @@ function goStock(code: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${code}` })
 }
 
+/** 抓取时已生成的一句话结论：进页立即拉取并展示，不等待 SSE。 */
+async function loadBrief() {
+  if (!symbol.value) return
+  briefLoading.value = true
+  try {
+    brief.value = await getLatestJudgement(symbol.value)
+  } catch {
+    brief.value = null // 降级：快评缺失不影响页面其它部分
+  } finally {
+    briefLoading.value = false
+  }
+}
+
 /** 进入页面：先查当日缓存，命中直接展示，未命中才 SSE 流式分析 */
 async function begin() {
   loading.value = true
@@ -232,6 +272,8 @@ onLoad((options: any) => {
   symbol.value = options?.symbol || ''
   cycle.value = options?.cycle || ''
   if (symbol.value) {
+    // 快评与 SSE 分析并行发起，互不阻塞：快评先渲染，AI 解读完成后在其下方并列展示
+    void loadBrief()
     begin()
   }
 })
@@ -298,6 +340,31 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 10rpx;
   margin-bottom: $s-3;
+}
+
+/* 快评：抓取时已生成的一句话结论（左侧蓝边与下方 AI 解读白卡区分） */
+.brief-section {
+  margin-bottom: $s-3;
+  border-left: 6rpx solid #0b5fff;
+}
+
+.brief-header {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 10rpx;
+}
+
+.brief-title { font-size: 24rpx; font-weight: 600; color: #0b5fff; }
+
+.brief-time { font-size: 22rpx; color: $ink-mute; margin-left: 8rpx; }
+
+.brief-impact-row { margin-bottom: 10rpx; }
+
+.brief-text {
+  font-size: 32rpx;
+  color: $ink;
+  line-height: 1.6;
 }
 
 /* 一句话速览 */

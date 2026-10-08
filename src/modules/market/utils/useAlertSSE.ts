@@ -6,12 +6,14 @@
  *
  * 事件流：
  * - tool_start / tool_end：子 Agent 执行进度
+ * - reasoning：AI 思考过程分片（node 恒为阶段名，按 node 聚合）
+ * - preview：速览帧（先于 result 到达）
  * - llm_start：Master 开始生成
  * - result：携带解析后的 display_report + podcast_brief（结构化，不再吐原始 JSON token）
  * - done / error
  */
 import { ref } from 'vue'
-import { agentApi, type AlertReportRecord } from '@/shared/api/modules/agent'
+import { agentApi, type AlertReportRecord, type ReasoningStep } from '@/shared/api/modules/agent'
 
 export interface AlertDisplayReport {
   summary?: string
@@ -27,6 +29,9 @@ export interface AlertSSEEvent {
   content?: string
   label?: string
   message?: string
+  /** reasoning 帧：节点名（alert_scan / alert_master）与文本分片 */
+  node?: string
+  chunk?: string
   display_report?: AlertDisplayReport
   podcast_brief?: string
   raw?: string
@@ -52,6 +57,10 @@ export function useAlertSSE() {
   const done = ref(false)
   /** result 事件携带的结构化结果（done 前由后端解析后发送） */
   const result = ref<AlertResult | null>(null)
+  /** AI 思考过程（按 node 聚合，与 chat 的 ReasoningStep 结构一致） */
+  const reasoningSteps = ref<ReasoningStep[]>([])
+  /** 速览帧（先于 result 到达，用于首屏提前渲染） */
+  const preview = ref<AlertDisplayReport | null>(null)
 
   let eventSource: EventSource | null = null
   let timeoutTimer: ReturnType<typeof setTimeout> | null = null
@@ -71,6 +80,23 @@ export function useAlertSSE() {
       }
       case 'llm_start':
         break
+      case 'reasoning': {
+        const node = evt.node || ''
+        const chunk = evt.chunk || ''
+        if (!node || !chunk) break
+        const steps = [...reasoningSteps.value]
+        const idx = steps.findIndex(s => s.node === node)
+        if (idx >= 0) {
+          steps[idx] = { ...steps[idx], text: steps[idx].text + chunk, status: 'streaming' }
+        } else {
+          steps.push({ node, text: chunk, status: 'streaming', startAt: Date.now() })
+        }
+        reasoningSteps.value = steps
+        break
+      }
+      case 'preview':
+        preview.value = evt.display_report || null
+        break
       case 'text':
         // 兜底：如果后端仍发 text 事件（如旧版兼容），累加到 content
         if (evt.content) content.value += evt.content
@@ -87,11 +113,15 @@ export function useAlertSSE() {
       case 'done':
         done.value = true
         loading.value = false
+        reasoningSteps.value = reasoningSteps.value.map(s =>
+          s.status === 'streaming' ? { ...s, status: 'done', endAt: Date.now() } : s)
         eventSource?.close()
         break
       case 'error':
         error.value = evt.message || '分析出错，请稍后重试'
         loading.value = false
+        reasoningSteps.value = reasoningSteps.value.map(s =>
+          s.status === 'streaming' ? { ...s, status: 'failed', endAt: Date.now() } : s)
         eventSource?.close()
         break
     }
@@ -103,6 +133,8 @@ export function useAlertSSE() {
     error.value = ''
     done.value = false
     result.value = null
+    reasoningSteps.value = []
+    preview.value = null
     loading.value = true
 
     const url = agentApi.getAlertBriefingUrl(symbol, cycle)
@@ -114,7 +146,7 @@ export function useAlertSSE() {
         loading.value = false
         eventSource?.close()
       }
-    }, 60_000)
+    }, 120_000)
 
     eventSource.onmessage = (event: MessageEvent) => {
       if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null }
@@ -163,5 +195,5 @@ export function useAlertSSE() {
     return false
   }
 
-  return { content, toolSteps, loading, error, done, result, start, stop, loadFromCache }
+  return { content, toolSteps, reasoningSteps, preview, loading, error, done, result, start, stop, loadFromCache }
 }

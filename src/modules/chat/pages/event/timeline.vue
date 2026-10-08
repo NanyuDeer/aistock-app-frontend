@@ -60,6 +60,10 @@
                   <SvgIcon name="fire-fill" size="26rpx" color="#ffffff" class="major-badge__flame" />
                   <text class="major-badge__text">重大</text>
                 </view>
+                <!-- 自选股预计披露财报行：蓝色「财报」胶囊徽标（与「重大」胶囊同位，二者互斥） -->
+                <view v-if="event.isDisclosure" class="report-badge" aria-label="财报披露">
+                  <text class="report-badge__text">财报</text>
+                </view>
                 <text class="title" :class="{ 'title--major': isMajorEvent(event) }">{{ event.title }}</text>
                 <!-- 影响板块：历史行取 chain_summary[0] 最核心 1 个，按方向着色（A 股红涨绿跌：bullish=红/bearish=绿/neutral=灰）、无底色；无行业则不渲染 -->
                 <!-- 未来行使链方向数据（实体源只给板块名、无 bullish/bearish）→ sectorDirection=null → 回退中性灰；
@@ -114,6 +118,7 @@ import { computed, onMounted, ref } from 'vue'
 import type { EventTimelineQuery, TimelineRow } from '@/modules/chat/event/types'
 import { getEventTimeline } from '@/modules/chat/event/api/eventApi'
 import { getEntityRows, getTimelineHistoryRows } from '@/modules/chat/event/api/eventService'
+import { stockApi } from '@/shared/api/modules/stock'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 
@@ -204,6 +209,59 @@ function timelineQuery(pageNum: number): EventTimelineQuery {
   }
 }
 
+/** 提取 6 位裸码（与后端 normalizeStockSymbol 同口径，用于自选股名映射对齐）。 */
+function bareSymbol(raw: string): string {
+  const m = String(raw || '').match(/\d{6}/)
+  return m ? m[0] : ''
+}
+
+/**
+ * 拉取「自选股预计披露财报」行（任务二）。
+ *
+ * 未登录 / 无自选股 / 接口异常时一律降级为空数组（不阻断时间线主体）：
+ * 时间线是公开页，不该因自选股缺失而报错或空屏。
+ * 披露日期来自 Tushare disclosure_date.pre_date（服务端按报告期缓存 12h）。
+ */
+async function loadWatchlistDisclosureRows(): Promise<TimelineRow[]> {
+  try {
+    // 公开页（时间线无 token 依赖）：未登录直接跳过，避免无谓的 401 请求
+    if (!uni.getStorageSync('token')) return []
+
+    const favorites = await stockApi.getFavorites()
+    const symbols = favorites.map((f) => f.symbol).filter(Boolean)
+    if (symbols.length === 0) return []
+
+    const nameBySymbol = new Map<string, string>()
+    for (const f of favorites) {
+      const bare = bareSymbol(f.symbol)
+      if (bare && f.name) nameBySymbol.set(bare, f.name)
+    }
+
+    const res = await stockApi.getDisclosureSchedule({ symbols: symbols.join(','), days: 90 })
+    const list = Array.isArray(res?.items) ? res.items : []
+    return list.map((item): TimelineRow => {
+      const name = nameBySymbol.get(item.symbol) || item.symbol
+      return {
+        eventId: `DISC-${item.symbol}-${item.reportPeriod}`,
+        date: item.preDate,
+        eventStartTime: `${item.preDate}T00:00:00+08:00`,
+        title: `${name} 预计披露${item.reportPeriodLabel}`,
+        summary: '',
+        sectorName: null,
+        sectorDirection: null,
+        isGi: false,
+        importance: null,
+        isFuture: true,
+        isDisclosure: true,
+        stockSymbol: item.symbol,
+      }
+    })
+  } catch {
+    // 未登录（401）/ 网络异常 → 静默降级，不影响事件时间线
+    return []
+  }
+}
+
 /** 刷新（首次加载 / 重试） */
 async function refresh() {
   // 并发去重：uni-app H5 dev 下页面可能被挂载两次（KeepAlive 重建），
@@ -215,15 +273,17 @@ async function refresh() {
   items.value = []
 
   try {
-    // 并行拉取两源：实体源（窗口分页）+ 事件传导历史源（星级 ≥4 且非纯行情，一次拉完）
-    const [timelineRes, historyRows] = await Promise.all([
+    // 并行拉取三源：实体源（窗口分页）+ 事件传导历史源（星级 ≥4 且非纯行情，一次拉完）
+    // + 自选股财报披露源（无自选股/未登录 → 空数组）
+    const [timelineRes, historyRows, disclosureRows] = await Promise.all([
       getEventTimeline(timelineQuery(1)),
       getTimelineHistoryRows({ earliestDate: pastStr }),
+      loadWatchlistDisclosureRows(),
     ])
 
     // 合并规则：实体行只保留 date > 今天，历史段完全交给传导源（传导源已过滤 date ≤ 今天）
     const entityRows = getEntityRows(timelineRes.items).filter((r) => r.date > todayStr)
-    items.value = [...historyRows, ...entityRows]
+    items.value = [...historyRows, ...entityRows, ...disclosureRows]
 
     // 底部「加载更多」只作用于实体源
     total.value = timelineRes.total
@@ -260,8 +320,18 @@ async function loadMore() {
   }
 }
 
-/** 事件点击处理：历史行（isFuture=false）必跳详情；未来行就地展开 */
+/** 事件点击处理：财报行跳个股详情；历史行（isFuture=false）必跳详情；未来行就地展开 */
 function handleEventClick(event: TimelineRow) {
+  // 自选股财报披露行 → 跳个股详情页（无传导报告，不查事件详情）
+  if (event.isDisclosure) {
+    if (event.stockSymbol) {
+      uni.navigateTo({
+        url: `/modules/favorites/pages/detail?symbol=${event.stockSymbol}`,
+      })
+    }
+    return
+  }
+
   // 历史行（≥4 星且非纯行情的过去事件）必有传导报告 → 恒跳详情页
   if (!event.isFuture) {
     uni.navigateTo({
@@ -445,6 +515,25 @@ onMounted(() => {
 }
 
 .major-badge__text {
+  font-size: 20rpx;
+  color: #ffffff;
+  font-weight: 600;
+  line-height: 34rpx;
+  white-space: nowrap;
+}
+
+/* 自选股财报披露行蓝色胶囊「财报」（主题色实心，与红色「重大」胶囊同位互斥） */
+.report-badge {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-right: 8rpx;
+  padding: 0 12rpx;
+  border-radius: 8rpx;
+  background: var(--ev-accent);
+}
+
+.report-badge__text {
   font-size: 20rpx;
   color: #ffffff;
   font-weight: 600;

@@ -24,9 +24,17 @@ export function toMarketInsightBrief(
 ): MarketInsightBrief | null {
   if (!p) return null
   const title = (p.phenomenon.summary || p.phenomenon.kindLabel || '当日市场行情综述').trim()
-  const trace = p.primaryCause
-    ? `${p.primaryCause.categoryLabel}：${p.primaryCause.conclusion}`.trim()
-    : '证据不足，主因待验证'
+  let trace: string
+  if (p.primaryCause) {
+    trace = `${p.primaryCause.categoryLabel}：${p.primaryCause.conclusion}`.trim()
+  } else {
+    // 无主因日（attribution_status 多为 hypothesis/not_applicable）：优先展示
+    // market_trace.trace.alternative_chain_id 指定的 weak 候选，标注为「可能主因（待验证）」，
+    // 避免每天一刀切「证据不足」看起来像功能未工作；取不到候选或结论不可用时仍退回原文案。
+    const alt = p.alternatives.find((a) => a.categoryId === p.alternativeChainId) ?? p.alternatives[0]
+    const body = alt ? (alt.conclusion.trim() || alt.categoryLabel.trim()) : ''
+    trace = body ? `可能主因（待验证）：${body}` : '证据不足，主因待验证'
+  }
   const forecast = p.prediction
     ? (p.prediction.attributionSummary?.trim() || '见展开详情')
     : '暂无预判'

@@ -197,6 +197,9 @@ export interface MarketTracePresentation {
   generatedAt: string
   snapshotId: string
   attributionStatus: MarketTraceAttributionStatus
+  // 被 market_trace.trace.alternative_chain_id 指定的「最强 weak 候选」id；
+  // hypothesis/not_applicable 日 primary_chain_id 为 null 时，供展示层兜底展示为「可能主因（待验证）」。
+  alternativeChainId: string | null
   confidence: MarketTraceConfidence | null
   isFallback: boolean
 
@@ -525,6 +528,7 @@ export function toMarketTracePresentation(
     generatedAt: record.created_at || asString(snapshot.captured_at) || '',
     snapshotId: asString(record.content.snapshot_id) || asString(snapshot.snapshot_id),
     attributionStatus: trace.attribution_status ?? 'not_applicable',
+    alternativeChainId: alternativeId,
     confidence: trace.confidence ?? null,
     isFallback: record.report_date !== requestedDate,
     pendingRisks: {

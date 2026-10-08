@@ -15,26 +15,15 @@
       </view>
 
       <!-- 条件化预判：大盘/板块/个股一切有条件化预判统一用 ConditionalForecastBlock
-           （2026-09-02 从 InsightCard structured 抽取的通用预判块；2.0 旧记录为空数组不渲染）
-           prediction-detail 需长句原文 → 强制 sentence 模式（tags 模式供洞见/列表等简洁场景） -->
+           （2026-09-02 从 InsightCard structured 抽取的通用预判块）
+           prediction-detail 需长句原文 → 强制 sentence 模式（tags 模式供洞见/列表等简洁场景）
+           渲染门槛 =「有条件 或 有档位」：条件退役后新记录 conditions 恒为 []，若仍只判 conditions
+           则档位区永远不渲染；档位行由共享块平铺渲染（Task 9 收敛后不再有自写平铺块） -->
       <ConditionalForecastBlock
-        v-if="prediction.conditions.length > 0"
+        v-if="prediction.conditions.length > 0 || prediction.horizons.length > 0"
         :structured="condStructured"
         condition-display="sentence"
       />
-
-      <view v-for="(h, idx) in prediction.horizons" :key="`h-${idx}`" class="horizon-item">
-        <view class="horizon-head">
-          <view class="tag horizon-tag">{{ horizonLabel(h.horizon) }}</view>
-          <view class="tag direction-tag" :class="directionClass(h.direction)">{{ directionText(h.direction) }}</view>
-          <view class="tag confidence-tag" :class="confidenceClass(h.confidence)">置信{{ confidenceText(h.confidence) }}</view>
-        </view>
-        <view class="horizon-meta">
-          <text class="meta-target">{{ h.target }}</text>
-          <text class="meta-project">{{ h.metricProjection }}</text>
-        </view>
-        <view class="horizon-phase">{{ phaseText(h.phase) }} · {{ h.remainingEstimate }}</view>
-      </view>
 
       <view v-if="prediction.evolutionSteps.length > 0 || prediction.evolutionNarrative" class="narrative-block">
         <text class="narrative-label">演化路径</text>
@@ -124,12 +113,17 @@ const condStructured = computed(() => {
   const p = props.prediction
   if (!p) return null
   return {
+    // 空串一律归一为 undefined：共享块按「方案 B · 字段驱动」渲染（无值整行跳过、不留空占位）。
+    // metricProjection / target / phase 是自写平铺块删除后必须由共享块承接的大盘既有信息。
     horizons: p.horizons.map((h) => ({
       horizon: h.horizon,
       remaining: h.remainingEstimate || undefined,
       label: h.label || undefined,
       direction: h.direction,
-      confidence: h.confidence
+      confidence: h.confidence,
+      metricProjection: h.metricProjection || undefined,
+      target: h.target || undefined,
+      phase: h.phase
     })),
     conditions: p.conditions.flatMap((c) => {
       // anchor.horizon 缺失时默认挂 short（沿用旧分组语义）；anchor 阈值/指标缺失则不渲染 chip
@@ -150,54 +144,6 @@ const condStructured = computed(() => {
   }
 })
 
-function horizonLabel(horizon: string): string {
-  const map: Record<string, string> = {
-    short: '短线(1-5交易日)',
-    mid: '中线(1-4周)',
-    long: '长线(1-6月)',
-  }
-  return map[horizon] || horizon
-}
-
-function phaseText(phase: string): string {
-  const map: Record<string, string> = {
-    building: '影响形成',
-    peaking: '影响高峰',
-    decaying: '影响衰减',
-    returning: '回归常态',
-  }
-  return map[phase] || phase
-}
-
-function directionText(direction: string): string {
-  const map: Record<string, string> = {
-    bullish: '看多',
-    bearish: '看空',
-    neutral: '中性',
-  }
-  return map[direction] || direction
-}
-
-function directionClass(direction: string): string {
-  if (direction === 'bullish') return 'direction-bullish'
-  if (direction === 'bearish') return 'direction-bearish'
-  return 'direction-neutral'
-}
-
-function confidenceClass(confidence: string): string {
-  if (confidence === 'high') return 'confidence-high'
-  if (confidence === 'medium') return 'confidence-medium'
-  return 'confidence-low'
-}
-
-function confidenceText(confidence: string): string {
-  const map: Record<string, string> = {
-    high: '高',
-    medium: '中',
-    low: '低',
-  }
-  return map[confidence] || confidence
-}
 </script>
 
 <style lang="scss" scoped>
@@ -249,93 +195,6 @@ function confidenceText(confidence: string): string {
 .summary-text {
   font-size: 28rpx;
   color: $text-color-title;
-}
-
-.horizon-item {
-  padding: $spacing-sm 0;
-  border-top: 2rpx solid $line;
-}
-
-.horizon-head {
-  display: flex;
-  align-items: center;
-  gap: $spacing-xs;
-  flex-wrap: wrap;
-  margin-bottom: $spacing-xs;
-}
-
-/* 气泡标签：对齐个股详情 research-tag（圆角胶囊、浅底深字） */
-.tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 6rpx 20rpx;
-  border-radius: 28rpx;
-  font-size: 24rpx;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-.horizon-tag {
-  background: $primary-50;
-  color: $primary;
-  border: 1rpx solid $primary-100;
-}
-
-/* 方向：A 股红涨绿跌；中性用品牌蓝 */
-.direction-tag { border: 1rpx solid transparent; }
-.direction-bullish {
-  background: $up-bg;
-  color: $up;
-  border-color: rgba(229, 77, 94, 0.25);
-}
-.direction-bearish {
-  background: $down-bg;
-  color: $down;
-  border-color: rgba(24, 160, 88, 0.25);
-}
-.direction-neutral {
-  background: $primary-50;
-  color: $primary;
-  border-color: $primary-100;
-}
-
-/* 置信度：高/中/低 三档 */
-.confidence-tag { border: 1rpx solid transparent; }
-.confidence-high {
-  background: $up-bg;
-  color: $up;
-  border-color: rgba(229, 77, 94, 0.25);
-}
-.confidence-medium {
-  background: $warning-bg;
-  color: $warning;
-  border-color: rgba(240, 160, 32, 0.25);
-}
-.confidence-low {
-  background: $bg-soft;
-  color: $text-color-tertiary;
-  border-color: $line;
-}
-
-.horizon-meta {
-  font-size: 24rpx;
-  color: $text-color-secondary;
-}
-
-.meta-target {
-  font-weight: 500;
-  color: $text-color-title;
-  margin-right: $spacing-xs;
-}
-
-.meta-project {
-  color: $text-color-secondary;
-}
-
-.horizon-phase {
-  margin-top: $spacing-xs;
-  font-size: 24rpx;
-  color: $text-color-tertiary;
 }
 
 .narrative-block {

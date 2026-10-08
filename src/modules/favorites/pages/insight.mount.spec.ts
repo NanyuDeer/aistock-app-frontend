@@ -5,9 +5,21 @@ import { mount, flushPromises } from '@vue/test-utils'
 const stockTraceApiMock = vi.hoisted(() => ({ list: vi.fn() }))
 vi.mock('@/shared/api/modules/stockTrace', () => ({ stockTraceApi: stockTraceApiMock }))
 
-// SubPageCard2 桩：避免 GlobalChatBar / FloatingPodcast 等副作用
+// 仅 mock shanghaiDateKeyDaysAgo（返回固定串，避免断言依赖当日/本机时区漂移）；formatTime 等保持原样
+vi.mock('@/shared/utils/datetime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/shared/utils/datetime')>()
+  return { ...actual, shanghaiDateKeyDaysAgo: vi.fn(() => '2026-09-23') }
+})
+
+// SubPageCard2 桩：避免 GlobalChatBar / FloatingPodcast 等副作用；
+// 额外暴露 stub-scroll-trigger（触发即 emit scrolltolower），供触底分页用例驱动
 vi.mock('@/shared/components/SubPageCard2.vue', () => ({
-  default: { name: 'SubPageCard2', props: ['title', 'subtitle'], template: '<view class="subpage-stub"><slot /></view>' },
+  default: {
+    name: 'SubPageCard2',
+    props: ['title', 'subtitle'],
+    emits: ['scrolltolower'],
+    template: '<view class="subpage-stub"><slot /><view class="stub-scroll-trigger" @click="$emit(\'scrolltolower\')" /></view>',
+  },
 }))
 
 // SvgIcon 桩（EmptyState 内部引用）
@@ -17,14 +29,17 @@ vi.mock('@/shared/components/SvgIcon.vue', () => ({
 
 vi.stubGlobal('uni', { navigateTo: vi.fn() })
 
-// vitest 下 injectHook 不可用，onShow 同步触发
+// vitest 下 injectHook 不可用，onShow 同步触发；同时登记回调以便用例内再次触发（onShow 重置测试）
+const onShowHandlers = vi.hoisted(() => [] as Array<() => void>)
 vi.mock('@dcloudio/uni-app', () => ({
   onShow: (cb: () => void) => {
+    onShowHandlers.push(cb)
     cb()
   },
 }))
 
 import insight from './insight.vue'
+import { shanghaiDateKeyDaysAgo } from '@/shared/utils/datetime'
 
 /** 构造一条 stocktrace 价格异动 */
 function movement(over: Record<string, unknown> = {}) {
@@ -52,7 +67,10 @@ describe('insight.vue 自选股洞察列表页（对齐个股情报模板）', (
   beforeEach(() => {
     stockTraceApiMock.list.mockReset()
     vi.mocked(uni.navigateTo).mockClear()
+    // 逐用例清零 since 入参 mock，保证后续 toHaveBeenCalledWith(13) 是针对本次挂载/触底的调用（非跨用例累积）
+    vi.mocked(shanghaiDateKeyDaysAgo).mockClear()
     stockTraceApiMock.list.mockResolvedValue({ items: [], nextCursor: null })
+    onShowHandlers.length = 0
   })
 
   it('渲染顶部筛选栏：全部 / 上涨 / 下跌（对齐个股情报页的 filter-bar）', async () => {
@@ -139,5 +157,90 @@ describe('insight.vue 自选股洞察列表页（对齐个股情报模板）', (
     await flushPromises()
     expect(wrapper.findAll('.as-card').length).toBe(0)
     expect(wrapper.text()).toContain('暂无自选股洞察')
+  })
+
+  // ===== cursor 翻页 =====
+
+  it('首屏 list 调用带 visible_only：true + since：shanghaiDateKeyDaysAgo(13) + cursor 未定义', async () => {
+    stockTraceApiMock.list.mockResolvedValue({ items: [], nextCursor: null })
+    const wrapper = mount(insight)
+    await flushPromises()
+    // 区分力断言：since 下界必须是 13（第 14 个自然日含今天），若页面误写成 (14)/(99) 将变红
+    expect(shanghaiDateKeyDaysAgo).toHaveBeenCalledWith(13)
+    expect(stockTraceApiMock.list).toHaveBeenCalledWith(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
+  })
+
+  it('分页主路径：首屏 1 页 → 触底追加第 2 页 → 跨页同 (股, 上海交易日) 只出一张卡（保留较新）', async () => {
+    stockTraceApiMock.list
+      .mockResolvedValueOnce({
+        items: [movement({ event_id: 'mv:p1', change_pct: 8.5, triggered_at: '2026-09-18T01:00:00.000Z' })],
+        nextCursor: '2026-09-18T01:00:00.000Z|mv:p1',
+      })
+      .mockResolvedValueOnce({
+        items: [movement({ event_id: 'mv:p2', change_pct: 9.9, triggered_at: '2026-09-18T05:00:00.000Z' })],
+        nextCursor: null,
+      })
+    const wrapper = mount(insight)
+    await flushPromises()
+    expect(wrapper.findAll('.as-card').length).toBe(1)
+    expect(wrapper.find('.stock-move').text()).toBe('+8.5%')
+    // 触底 → 追加载第 2 页，用第 1 页的 nextCursor
+    await wrapper.find('.stub-scroll-trigger').trigger('click')
+    await flushPromises()
+    // 触底请求同样带 since（两周下界）
+    expect(shanghaiDateKeyDaysAgo).toHaveBeenCalledWith(13)
+    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, '2026-09-18T01:00:00.000Z|mv:p1', { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
+    // 跨页同 (股, 日) 只出一张卡（对整体 rawItems 重派生，取较新的 mv:p2）
+    expect(wrapper.findAll('.as-card').length).toBe(1)
+    expect(wrapper.find('.stock-move').text()).toBe('+9.9%')
+  })
+
+  it('nextCursor === null → 触底不再请求（hasMore=false）', async () => {
+    stockTraceApiMock.list.mockResolvedValue({ items: [movement()], nextCursor: null })
+    const wrapper = mount(insight)
+    await flushPromises()
+    await wrapper.find('.stub-scroll-trigger').trigger('click')
+    await flushPromises()
+    expect(stockTraceApiMock.list).toHaveBeenCalledTimes(1)
+  })
+
+  it('加载失败不推进 cursor（再次触底用旧 cursor 重试）', async () => {
+    stockTraceApiMock.list
+      .mockResolvedValueOnce({ items: [movement({ event_id: 'mv:a' })], nextCursor: 'c1' })
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ items: [movement({ event_id: 'mv:b', symbol: '000001', stock_name: '平安银行' })], nextCursor: null })
+    const wrapper = mount(insight)
+    await flushPromises()
+    expect(stockTraceApiMock.list).toHaveBeenCalledTimes(1)
+    // 第一次触底：请求失败，不推进 cursor、不追加行
+    await wrapper.find('.stub-scroll-trigger').trigger('click')
+    await flushPromises()
+    expect(stockTraceApiMock.list).toHaveBeenCalledTimes(2)
+    expect(wrapper.findAll('.as-card').length).toBe(1)
+    // 第二次触底：仍用旧 cursor 'c1' 重试 → 成功追加
+    await wrapper.find('.stub-scroll-trigger').trigger('click')
+    await flushPromises()
+    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, 'c1', { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
+    expect(wrapper.findAll('.as-card').length).toBe(2)
+  })
+
+  it('onShow 重置：累积后再次 onShow 重置为第 1 页（不叠加旧行）', async () => {
+    stockTraceApiMock.list
+      .mockResolvedValueOnce({ items: [movement({ event_id: 'mv:a' })], nextCursor: 'c2' })
+      .mockResolvedValueOnce({ items: [movement({ event_id: 'mv:b', symbol: '000001', stock_name: '平安银行' })], nextCursor: null })
+      .mockResolvedValueOnce({ items: [movement({ event_id: 'mv:a' })], nextCursor: 'c2' })
+    const wrapper = mount(insight)
+    await flushPromises()
+    expect(wrapper.findAll('.as-card').length).toBe(1)
+    // 触底累积到 2 条
+    await wrapper.find('.stub-scroll-trigger').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('.as-card').length).toBe(2)
+    // 再次 onShow：整表重拉并重置 cursor/rawItems，仅剩第 1 页 mv:a，不叠加旧行
+    onShowHandlers.at(-1)?.()
+    await flushPromises()
+    expect(stockTraceApiMock.list).toHaveBeenLastCalledWith(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(13) })
+    expect(wrapper.findAll('.as-card').length).toBe(1)
+    expect(wrapper.find('.stock-name').text()).toBe('贵州茅台')
   })
 })

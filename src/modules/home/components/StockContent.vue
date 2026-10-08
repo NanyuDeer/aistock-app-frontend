@@ -27,7 +27,8 @@ import HotBurstInsightContent from './HotBurstInsightContent.vue'
 import ForecastInsightContent from './ForecastInsightContent.vue'
 import AiPickContent from './AiPickContent.vue'
 type TabKey = 'ai' | 'trend' | 'hot' | 'forecast'
-const tabs: Array<{ key: TabKey; label: string }> = [{ key: 'ai', label: 'AI帮我选' }, { key: 'trend', label: '趋势股洞见' }, { key: 'hot', label: '机构热门洞见' }, { key: 'forecast', label: '业绩预测洞见' }]
+// Tab 处于「选股」页内，标题已表明场景，故三个子 Tab 不再重复「洞见」后缀
+const tabs: Array<{ key: TabKey; label: string }> = [{ key: 'ai', label: 'AI帮我选' }, { key: 'trend', label: '趋势股' }, { key: 'hot', label: '机构热门股' }, { key: 'forecast', label: '业绩预测' }]
 const activeTab = ref<TabKey>('ai')
 </script>
 

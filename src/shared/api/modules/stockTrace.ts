@@ -16,9 +16,11 @@ export interface StockTraceEvent {
   threshold_pct: number
   severity: 'medium' | 'high' | 'critical'
   rule_version: string
-  analysis_status: 'pending' | 'processing' | 'completed' | 'unavailable'
+  analysis_status: 'pending' | 'processing' | 'completed' | 'unavailable' | 'failed'
   /** 简短主因短语（LLM 生成），列表/卡片展示用；无归因结果为 null */
   primary_cause?: string | null
+  /** 归因置信度（与 primary_cause 同源：effective artifact 的结果）；无归因结果为 null */
+  confidence_level?: 'low' | 'medium' | 'high' | null
   /** 涨停文章命中标记（强时效来源） */
   is_limit_up?: boolean
   read_at?: string | null
@@ -104,7 +106,7 @@ export interface StockTraceArtifactContent {
 export interface StockTraceAnalysisResponse {
   event_id: string
   trigger_revision: number
-  processing_status: 'processing' | 'completed' | 'unavailable'
+  processing_status: 'processing' | 'completed' | 'unavailable' | 'failed'
   artifact: StockTraceArtifact | null
   unavailable?: TraceUnavailableView
 }
@@ -121,9 +123,16 @@ export interface StockTraceEventPage {
 }
 
 export const stockTraceApi = {
-  list(limit = 20, cursor?: string) {
+  list(limit = 20, cursor?: string, options?: { visibleOnly?: boolean; since?: string }) {
     return request.get<StockTraceEventPage>('/cn/favorites/movements', {
-      params: { limit, ...(cursor ? { cursor } : {}) },
+      params: {
+        limit,
+        ...(cursor ? { cursor } : {}),
+        // opt-in：仅当调用方显式传 visibleOnly 才追加 visible_only（首页 AlertContent 不传，行为不变）
+        ...(options?.visibleOnly ? { visible_only: 1 } : {}),
+        // opt-in：仅当调用方显式传 since（YYYY-MM-DD）才追加日期下界；老 app-api 忽略该参数时优雅降级为"显示全部"
+        ...(options?.since ? { since: options.since } : {}),
+      },
     })
   },
   get(eventId: string) {

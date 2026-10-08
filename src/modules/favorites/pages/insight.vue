@@ -1,5 +1,5 @@
 <template>
-  <SubPageCard2 title="自选股洞察">
+  <SubPageCard2 title="自选股洞察" @scrolltolower="loadMore">
     <view class="page-insight">
       <!-- 方向筛选：对齐个股情报页（event-catcher）的顶部筛选栏 -->
       <view class="filter-bar">
@@ -45,6 +45,10 @@
             <text class="meta-time">{{ item.timeText }}</text>
           </view>
         </Card>
+        <!-- 触底分页轻量文案（复用 design token） -->
+        <view v-if="loadingMore || !hasMore" class="load-more-tip">
+          <text>{{ loadingMore ? '加载中...' : '没有更多' }}</text>
+        </view>
       </view>
 
       <!-- 空态 -->
@@ -66,8 +70,8 @@ import LoadingState from '@/shared/components/LoadingState.vue'
 import Segmented from '@/shared/components/Segmented.vue'
 import Tag from '@/shared/components/Tag.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
-import { formatTime } from '@/shared/utils/datetime'
-import { isUnattributableMovement, dedupeDailyMovements } from '@/modules/favorites/components/insightCards'
+import { formatTime, shanghaiDateKeyDaysAgo, TWO_WEEK_WINDOW_DAYS } from '@/shared/utils/datetime'
+import { isUnattributableMovement, dedupeDailyMovements, upsertEventById } from '@/modules/favorites/components/insightCards'
 
 /** 统一展示模型：价格异动（stocktrace 链路） */
 interface InsightListItem {
@@ -97,8 +101,21 @@ const dirTabs = [
 ]
 const activeDir = ref('all')
 
-const insights = ref<InsightListItem[]>([])
+// 分页累积的原始行，渲染前统一重派生（跨页同股同日去重依赖整体 rawItems）
+const rawItems = ref<StockTraceEvent[]>([])
+/** nextCursor（后端复合键，不透明字符串）；以它判定 hasMore，不得用 items.length 推断 */
+const cursor = ref<string | null>(null)
+const hasMore = ref(false)
+/** 触底防重入 */
+const loadingMore = ref(false)
 const loading = ref(false)
+
+/** 统一重派生：rawItems → 过滤不可归因 → 同日同股去重 → map → 倒序（排序/去重规则保持现状） */
+const insights = computed<InsightListItem[]>(() =>
+  dedupeDailyMovements(rawItems.value.filter((m) => !isUnattributableMovement(m)))
+    .map(fromMovement)
+    .sort((a, b) => b.sortTime - a.sortTime),
+)
 
 const filteredInsights = computed(() =>
   activeDir.value === 'all'
@@ -120,6 +137,7 @@ function fromMovement(m: StockTraceEvent): InsightListItem {
   else if (m.movement_view?.primaryCandidate?.verdict) causeText = `主因：${m.movement_view.primaryCandidate.verdict}`
   else if (m.analysis_status === 'completed') causeText = '归因完成'
   else if (m.analysis_status === 'processing') causeText = '归因中'
+  else if (m.analysis_status === 'failed') causeText = '归因失败'
   // 最近触发时间优先：长窗口事件（连续涨停合并）按 window_end_at 展示最新异动日期，
   // 避免始终停留在首次触发日期（如 8/10 锚定的近岸显示 08-10 而非 08-21）
   const recent = m.window_end_at || m.triggered_at
@@ -142,21 +160,47 @@ function goDetail(eventId: string) {
   uni.navigateTo({ url: `/modules/favorites/pages/insight-detail-move?event_id=${encodeURIComponent(eventId)}` })
 }
 
-onShow(async () => {
+/** 首屏/重置加载：清空分页状态并拉第 1 页（onShow 每次整表重拉，必须一并重置 cursor/rawItems/hasMore） */
+async function fetchInsights() {
   loading.value = true
+  // 请求前同步复位分页状态：若 loadMore 仍在飞行途中触达 onShow，旧 cursor/hasMore 会被同帧读到
+  // 并发请求；在 await 之前复位可彻底关掉该竞态窗口（正常路径本就整表替换，无感知差异）。
+  rawItems.value = []
+  cursor.value = null
+  hasMore.value = false
+  loadingMore.value = false
   try {
     // 2026-09-02 链路合并：涨停雷达事件已并入 stock-trace（movements），列表只消费 movements
-    const page = await stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] }))
-    // 2026-09-13：同日同股多次异动只保留最新一条（先过滤不可归因 → 取当日最近一条有效归因）
-    insights.value = dedupeDailyMovements(page.items.filter((m) => !isUnattributableMovement(m)))
-      .map(fromMovement)
-      .sort((a, b) => b.sortTime - a.sortTime)
+    const page = await stockTraceApi.list(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(TWO_WEEK_WINDOW_DAYS) }).catch(() => ({ items: [] as StockTraceEvent[], nextCursor: null as string | null }))
+    rawItems.value = page.items
+    cursor.value = page.nextCursor
+    hasMore.value = !!page.nextCursor
   } catch {
-    // API 失败时显示空状态
-    insights.value = []
+    // list 已在链上 .catch 兜底为空页，正常不会走到这里；状态已在请求前复位，无需重复置空
   } finally {
     loading.value = false
   }
+}
+
+/** 触底加载：失败不推进 cursor、不置 hasMore=false，下次触底用旧 cursor 重试；loadingMore 防重入 */
+async function loadMore() {
+  if (!hasMore.value || loadingMore.value) return
+  loadingMore.value = true
+  try {
+    const page = await stockTraceApi.list(20, cursor.value ?? undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(TWO_WEEK_WINDOW_DAYS) })
+    rawItems.value = upsertEventById(rawItems.value, page.items)
+    cursor.value = page.nextCursor
+    hasMore.value = !!page.nextCursor
+  } catch (err) {
+    // 请求失败：保持 cursor/hasMore 现状，等待下次触底重试；记录以便线上分页失败可观测
+    console.warn('[insight] loadMore failed:', err)
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+onShow(() => {
+  void fetchInsights()
 })
 </script>
 
@@ -182,6 +226,14 @@ onShow(async () => {
   display: flex;
   flex-direction: column;
   gap: $s-2;
+}
+
+/* 触底分页轻量文案（复用 design token，不新增样式体系） */
+.load-more-tip {
+  padding: $s-3 0;
+  text-align: center;
+  font-size: $font-size-xs;
+  color: $ink-mute;
 }
 
 /* ===== 卡片行（对齐 event-catcher 的三段式） ===== */

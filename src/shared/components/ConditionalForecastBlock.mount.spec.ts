@@ -118,3 +118,28 @@ describe('ConditionalForecastBlock 折叠/过滤按 displayMode 收口', () => {
     }
   })
 })
+
+describe('ConditionalForecastBlock 档位区平铺（2026-10-06 三粒度档位行统一）', () => {
+  it('档位区平铺渲染所有档（不再 Tab 切换），并按字段驱动渲染 metric_projection', () => {
+    const wrapper = mount(ConditionalForecastBlock, {
+      props: {
+        structured: {
+          horizons: [
+            { horizon: 'short', direction: 'bullish', confidence: 'high', metricProjection: '到期窗口累计同向即命中' },
+            { horizon: 'mid', direction: 'bearish', confidence: 'medium' },
+          ],
+          conditions: [],
+        },
+        displayMode: 'full',
+      },
+    })
+    expect(wrapper.findAll('.as-insight-card__seg-item')).toHaveLength(0) // 不再有档位 Tab
+    expect(wrapper.findAll('.as-insight-card__horizon-row')).toHaveLength(2) // 两档都渲染
+    expect(wrapper.text()).toContain('到期窗口累计同向即命中')
+    // 平铺后每行仍需自带档位名（Tab 已删除，否则丢失短/中/长语义）
+    expect(wrapper.text()).toContain('短期')
+    expect(wrapper.text()).toContain('中期')
+    // 方案 B：没有 metricProjection 的那档不出现空占位
+    expect(wrapper.findAll('.as-insight-card__horizon-projection')).toHaveLength(1)
+  })
+})

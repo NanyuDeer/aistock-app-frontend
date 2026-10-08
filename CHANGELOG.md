@@ -2,6 +2,399 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-10-07 — 0.1.5 版本发布
+
+**开发者**: 项目组
+
+### 发布说明（App 更新文案）
+
+- 市场洞见溯源优化：无确认主因时改为展示「可能主因（待验证）」及具体结论，不再显示笼统的「证据不足」
+- 首页新增「时段动态洞见卡」：时段头条焦点 + 3 条跨模块次要焦点 + 四入口条带，盘后头条自动轮播
+- 异动详情页新增「一句话快评」与「AI 推理过程」面板：进页先看抓取结论，可展开查看 AI 逐步推理
+- 自选股「异动监控 / 洞察」列表收敛为最近两周，并支持翻页加载更早记录
+- 低置信度归因不再展示异动卡片；归因失败时自动回退展示有效归因，避免空白
+- 重大事件时间线接入自选股预计财报披露行，事件与财报节点一屏可见
+- 报告详情页核心财务指标新增科目解释气泡，并合并指标分类列，查看更直观
+- 个股详情页财务 / 政策组件重构；预判历史页新增长周期命中率，预判卡统一共享区间行
+- 选股页三 Tab（趋势股 / 热门爆发 / 业绩预测）视觉统一：卡片样式、股票代码、行业标签与涨跌色完全对齐
+- 「我的」新增昵称：首次进入自动分配，并支持随时修改；恐贪指数页走势图提示框修复（仅悬浮显示、靠右不再被挤压）
+
+### 版本号
+
+- `versionName` 0.1.4 → **0.1.5**；`versionCode` 104 → **105**（manifest.json）
+- `src/modules/user/pages/profile.vue`：「关于洞见」版本号 0.1.4 → **0.1.5**（与 manifest 保持同步）
+- Web 端 `aistock-frontend/public/download/version.json`：同步 0.1.5 / 105 / `aistock-0.1.5.apk` / releaseDate 2026-10-07 / 新更新文案
+- 打包基线：PR #145（feat/analysis-frontend）、#146（junliang，自选股翻页/两周窗口、AI 异动解读推理面板、财报披露行、财务指标气泡）合并于 2026-10-07 23:50–23:52，早于打包时间，所得 8 条用户可见改动已并入上方更新文案
+
+---
+
+## [master] 2026-10-06 — 首页/选股页视觉统一、昵称分配与图表交互修复
+
+**开发者**: Aria
+
+### 改进
+
+- **选股页三 Tab 视觉统一**（`TrendStockInsightContent` / `HotBurstInsightContent` / `ForecastInsightContent`）：卡片外壳统一为白底 + `1rpx solid $line` + `$r-lg` + `$shadow-sm` + `$s-3` 内边距，列表间距 `$s-2`；名称统一 `$font-size-md`/600；股票代码统一纯文本 + `$ink-mute`；行业标签统一自绘灰底（机构调研股由组件库 `Tag` 改为同款，并移到代码旁，对齐趋势股结构）；涨跌色统一 `$up`/`$down`；清除 `#f43f5e`/`#22c55e`/`#9ca3af`/`#f0f2f5` 等硬编码与旧别名。趋势股评分/等级缩小（38→32rpx、56→44rpx），业绩预测文案「净利润预测」→「净利预测」
+- **三 Tab 列表上方 meta 行等高**：统一 `margin:$s-2 0` + `min-height:44rpx`（总高 76rpx），修掉首张卡上边缘错位
+- **首页时段洞见横条下线**：`MorningContent.vue` 移除 `TimeSlotInsightBar` 引用/import/`barResetKey`；**删除死代码** `TimeSlotInsightBar.vue` 与其挂载 spec，同步移除 vitest 白名单条目；`currentSlot` / `onBarNavigate` 等由 `DynamicInsightCard` 继续消费
+- **首页个股情报 / 自选股洞察固定 3 行**（`INTEL_ROW_COUNT` / `CAPTURE_ROW_COUNT` = 3），空态沿用 `EmptyState`（白底 + 图标 + 文案）并由 `.list-empty` 精确撑到 3 行高度
+- **「我的」昵称**：首次进入自动分配 `用户` + 5 位随机字母数字并落库（复用后端 `GET/PUT /api/user/profile`）；昵称行右侧新增「更改昵称」入口（就地切换输入框，乐观更新 + 失败回滚）
+- **时段洞见卡四入口条带去掉数量徽标**（原「风口 3条」）
+
+### 修复
+
+- **恐贪指数页历史走势图 tooltip**：①鼠标不在图表上不再常驻（加 `activeDayIdx !== null` 门控与容器 `@mouseleave`）；②固定 `width:200rpx` + 调整靠边锚点，修掉靠右时标签被挤压变窄
+- **进入「我的」昵称闪烁**：首帧无值（空→接口返回后出现）或先显示 `/users/me` 旧值。改为新增 `STORAGE_KEYS.PROFILE_NICKNAME` 本地镜像（`{ uid, nickname }`，按 uid 校验防串号）首帧同步读取 + `nicknameLoaded` 门闩 + 行高固定
+- **StockContent.spec 既有失败**：陈旧用例（组件早已移除 `.stock-search`）改写为当前 Tab 行为断言，并补全 `@/shared/components` 桩缺失的 `EmptyState` 导出
+
+### 文档
+
+- `src/modules/home/AGENTS.md`：补记 `StockContent.vue` / `AiPickContent.vue` 职责与自选双向切换契约；移除已删除的 `TimeSlotInsightBar` 条目
+- `src/modules/fear-greed/AGENTS.md`：补记走势图 tooltip 契约（仅交互时显示 + 固定宽度）
+- `tests/run-node-specs.mjs`：`EXPECTED_BASELINE` `281/278/3` → `281/279/2`（横条 spec 转绿），并更新已知残余失败说明
+
+### 说明
+
+- 午间报无播报卡片经排查确认为**预期行为**（后端不回填 `content.audio_path`，且午间报不消费广播条目），产品决定不新增播报卡片，仅补注释说明
+- 头像图标 `bear-smile-line` → `user-smile-line`（MainTabs / PageCard / profile / login 共 4 处）
+
+---
+
+## [junliang] 2026-10-07 — 自选股异动/洞察列表：cursor 翻页 + `visible_only` 过滤前置 + 最近 14 个自然日窗口
+
+**开发者**: yueqili778-arch
+
+### 新增
+
+- `modules/favorites/components/insightCards.ts::upsertEventById(prev, incoming)`：两页共享的按 `event_id` **浅合并**（已存在保留原位置、incoming 覆盖同名字段），替代 `monitor.vue` / `insight.vue` 各自逐字重复的本地 `upsertRaw`。
+- `shared/utils/datetime.ts::shanghaiDateKeyDaysAgo(days)`：返回 `YYYY-MM-DD`，按 **UTC+8 固定偏移 + UTC getter** 计算（中国无夏令时；不依赖运行环境本地时区）。
+- `TWO_WEEK_WINDOW_DAYS = 13` 常量（"含今天共 14 个自然日" ⇒ 回退 13 天；写成 `14` 会多算一天）。
+- 底部"加载中… / 没有更多"轻量文案（`.load-more-tip`，走 design token）。
+
+### 变更
+
+- `shared/api/modules/stockTrace.ts::list(limit, cursor?, options?: { visibleOnly?: boolean; since?: string })`：两个参数**均为 opt-in 非默认** —— 首页 `AlertContent.vue` 不传，行为与改动前一致。
+- `pages/monitor.vue` / `pages/insight.vue` 接入分页：新增 `rawItems / cursor / hasMore / loadingMore`。
+  - **触底走 `<SubPageCard2 @scrolltolower>`，不是 `onReachBottom`** —— 两页被 `SubPageCard2` 包裹、滚动发生在**内层 `<scroll-view>`**，页面级 `onReachBottom` **不会触发**（仓库零先例）。
+  - `onShow` **在请求前同步复位**四个状态（关掉"在途 `loadMore` 读到旧 `cursor`/`hasMore` 并发请求"的竞态）。
+  - `hasMore` **以 `nextCursor` 为准**（不用 `items.length < limit`）；请求失败**不推进 cursor**、不置 `hasMore=false`（下次触底用同一 cursor 重试）并 `console.warn`。
+  - **必须对累积 `rawItems` 整体重派生**（`filter(isUnattributableMovement) → dedupeDailyMovements → map/sort`）：同一 (股, 上海交易日) 的两条可能跨页边界，只派生本页会让较早那条"复活"成第二张卡。
+- `monitor.vue` WS（`#ifdef APP-PLUS`）：`movement.created` / `movement.updated` 改为按 `event_id` **浅合并 upsert 进 `rawItems`** 后统一重派生（`updated` 是部分字段 payload，整体覆盖会丢 `primary_cause`/`confidence_level`）。
+- 两页请求带 `since = shanghaiDateKeyDaysAgo(TWO_WEEK_WINDOW_DAYS)`（收敛到最近两周）；**不做客户端日期过滤** —— 后端按 `trading_date >= since`，越界返回空页 + `nextCursor=null` → 自然显示「没有更多」。
+
+### 修复
+
+- 两个列表页原先固定 `list(20)` 只取第 1 页且**不翻页**（后端 `nextCursor` 无人消费）→ 20 条窗口之外的异动**永远取不到**；现支持触底翻页。
+- 卡片数由改动前的 ~60 张收敛到 **8 张**（09-24 → 09-30，无早于窗口的卡片）。
+
+### 测试
+
+- `npx vitest run` 相关 5 spec **74 passed**；`npx vue-tsc --noEmit` **exit 0**。
+- 浏览器端到端（mxfff）：两页首屏 8 张 → 触底到「没有更多」；请求 URL 带 `visible_only=1&since=2026-09-24`（改动前可翻到 60 张、最早到 09-07）。
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增 2026-10-07 两条（翻页 + 过滤前置 / 两周窗口），含"为何是 13 而非 14""`onReachBottom` 不触发""失败回退口径"等易错点。
+
+## [junliang] 2026-10-06 — 归因失败（`failed`）展示 + 同日同股失败回退
+
+**开发者**: yueqili778-arch
+
+### 新增
+
+- **5 处**「归因失败」文案映射：`pages/monitor.vue`、`pages/insight.vue`、`components/AlertContent.vue`、`pages/insight-detail-move.vue`、`components/PriceMovementAnalysisContent.vue`（`analysis_status` / `processing_status` 为 `failed` 时展示「归因失败」，而非落到默认「待归因」或永久「归因中」）。
+
+### 变更
+
+- `shared/api/modules/stockTrace.ts`：`analysis_status` 与 `processing_status` 联合类型各补 `'failed'`。
+- `insightCards.ts::dedupeDailyMovements`：组内挑"最新一条"时**跳过 `failed`**（非 failed 恒优先），**全组皆 `failed` 才保留其中最新那条**（让「归因失败」可见）—— 兑现原先注释承诺的"失败回退"。`isUnattributableMovement` **刻意不改**（`failed` 保持**不被隐藏**，否则全失败时整组消失）。
+- 状态→文案一律**正向等值判断**（`=== 'failed'`），**禁止**反向判定（`!== 'completed'` 之类会在将来新增枚举时误判）。
+
+### 修复
+
+- **最新一条失败会遮住当日已有的有效归因**：原 `isUnattributableMovement` 的 `if (analysis_status !== 'completed') return false` 刻意保留"进行中"项，导致**失败项也不被过滤**、又因是最新而胜出 → 卡片永久「归因中」。现失败项在去重时被跳过，卡片**回退显示**当日有效归因；当日全失败时才显示「归因失败」。
+- **推送弹窗静默点**：`PriceMovementAnalysisContent.vue` 对 `failed` 原本**无任何分支命中 → 整段静默**（该组件挂载时实时调 `stockTraceApi.getAnalysis`，且通知可事后重开，`failed` 确实可达），已补分支。
+
+### 测试
+
+- 相关 spec **74 passed**；`npx vue-tsc --noEmit` exit 0。
+- 浏览器实测：海正生材 688203 卡片由「归因中」变为**回退显示**「主因：科创板走弱拖累个股」。
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增「归因失败展示 + 失败回退」条目。
+
+## [junliang] 2026-09-30 — AI 异动解读：思考过程流式面板 + 速览提前（Task 6–9 + H5 端到端）
+
+**开发者**: yueqili778-arch
+
+### 新增
+
+- `modules/market/components/AlertReasoningPanel.vue`：「AI 思考过程」单区可折叠面板。`steps` 为空不渲染（避免"0 步"空头）；有 `streaming` 步骤时默认展开、否则折叠；`streaming` 圆点呼吸动画（`@keyframes pulse`）；节点中文映射 `alert_scan → 多维分析` / `alert_master → 汇聚研判`（未知节点回退原名）；文本经 `mp-html` + `markdownToHtml` 渲染；样式全走 design token。
+- 新增 spec：`useAlertSSE.spec.ts`（6 例）、`AlertReasoningPanel.spec.ts`（7 例）、`alert-analysis.spec.ts`（3 例），均登记 `vitest.config.ts` 白名单。
+
+### 变更
+
+- `modules/market/utils/useAlertSSE.ts`：消费后端新增的两类帧 —— `reasoning`（`node` **恒为阶段名**，同一阶段的启动解说与心跳**共用同一 node**，前端按 `node` **聚合为同一步骤、文本累加**，不是每 chunk 新建一步）与 `preview`（速览三件套）；`reasoningSteps` 复用既有 `ReasoningStep` 类型；`start()` 重置 `reasoningSteps` 与 `preview`；**超时 60s → 120s**。
+- `modules/market/pages/alert-analysis.vue`：在「分析进度」区块**上方**接入面板；速览三件套改取 **`preview ?? result`**（live 路径 preview 先到即先渲染；命中缓存时 `preview` 为 null 自然回退 `result`）；`details` / `stocks` / `risks` **仍只取 `result`**（职责不重叠）。
+
+### 修复
+
+- `AlertReasoningPanel` 的 `expanded` 原先只在 setup 时求值 → 真实链路（`steps` 从 `[]` 随 `reasoning` 帧流式增长）下会**以折叠态出现**，与"有 streaming 步骤默认展开"的意图相悖；已改 `watch` + `userToggled`（用户手动折叠后不被抢展开）。
+- 4 处硬编码字号（22/24rpx）改为 design token（`$font-size-xs` / `$font-size-sm`，取值逐一相等、视觉零变化）。
+- `onerror` 连接级失败时 `reasoningSteps` 不收尾（stuck 在 `streaming`）——已记录为已知项（error 态下面板本就不渲染，无可见影响）。
+
+### 测试
+
+- `npx vitest run` 相关 spec 全绿；`npx vue-tsc --noEmit` exit 0。
+- **H5 端到端（真实浏览器 + 真实 LLM）**：思考面板流式中默认展开（1 步 → 2 步）、解说由 190 字流式增长到 781 字（心跳生效）、**「一句话速览」T+29.5s 早于「详细分析」出现**、T+152.6s 完成后四区块齐全、面板位于「分析进度」上方、`streaming → done` 类名正确收尾。
+
+### 文档
+
+- `modules/market/AGENTS.md`：`alert-analysis.vue` 速览数据源改为 preview 优先 + 新增组件 + `useAlertSSE` 条目。
+
+## [junliang] 2026-09-30 — 低置信度归因不展示异动卡片
+
+**开发者**: yueqili778-arch
+
+### 变更
+
+- `modules/favorites/components/insightCards.ts`：`TraceEventLike` 增可选 `confidence_level`；`isUnattributableMovement` 在 `analysis_status === 'unavailable'` 之后、`!== 'completed'` 之前新增 `if (m.confidence_level === 'low') return true`。**降级保护**：字段缺失（老 app-api 未升级）或 `null`（无归因结果）时**不隐藏** —— 若按"非 high 即隐藏"会把卡片**全部误杀**。
+- `shared/api/modules/stockTrace.ts`：`StockTraceEvent` 增 `confidence_level`（与 app-api 列表字段对齐）。
+- **生效范围三处统一**：`pages/monitor.vue` / `pages/insight.vue` / `components/AlertContent.vue` 共用同一过滤函数，单点改动即三处生效。
+
+### 测试
+
+- `insightCards.spec.ts` 新增 5 例（low 隐藏 / medium 展示 / high 展示 / 字段缺失不隐藏 / null 不隐藏）→ 54 pass。
+- H5 实测（mxfff）：监控页与洞察列表页各 **6 张**（改前 10 张），保留均为 medium 归因、已隐藏均为 low、无「归因中」。
+- **涨跌幅口径已核实（非缺陷）**：黄河旋风 600172 09-29 显示 -8%，因该日 `window_end_at` 最新的 -9.70% 那条为 `low` 被隐藏、同日去重取次新的 -8.00%（medium）→ 属新口径下的正确结果。
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增「低置信不展示」章节。
+
+## [junliang] 2026-09-27 — 宿迁联盛 2026-09-24 归因硬失败事故（前端最终仅文档改动）
+
+**开发者**: yueqili778-arch
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增「宿迁联盛 2026-09-24 归因硬失败事故（2026-09-27 定位并处置，前端最终零改动）」章节（现象 / 跨仓契约根因 / 临时措施已回退 / 最终可见性 / 发布顺序约束 / 另一处独立缺陷）。
+
+### 说明
+
+- **代码零改动**：定位当天曾在 `insightCards.ts` 加 `SUPPRESSED_EVENT_IDS` 硬编码隐藏该日两条事件；用修复后的代码代跑归因成功（`completed`）后**已整体回退**，三处消费者与 spec 均回到改动前状态。
+- **最终可见性**：恢复出的主因是「证据不足，异动原因未明」→ 命中既有「无结论不展示」规则 → 该日两条仍不展示，但原因已从"归因卡住"变为"归因完成但无有效结论"。
+- 数据层：未改任何表结构；仅经 app-api 的 `/internal/stock-trace/results/external` 新增 1 条真实 result + artifact，并把该 job 由 `dead_letter` 置为 `completed`（等价于生产重投产出）。
+
+## [master] 2026-10-06 — 节奏 AGENTS.md 更正：`met` 点亮/置灰当前未接线
+
+**开发者**: Aria
+
+### 文档
+
+- `src/modules/rhythm/AGENTS.md`：`met`（事件分支公布后标记）一条原以「现行」口吻描述点亮/置灰回填逻辑，但节奏报告引擎（`rhythm_engine.py`）明述「点亮/置灰**当前未接线**」，实际产出的分支**不含 `met` 键**。已在契约描述下补「当前状态（2026-10-06 核实）」说明：该字段为设计契约、尚未接线，前端须按可选值兼容、不得假定存在；接线属节奏自身待办。
+
+### 说明
+
+- 纯文档更正，无代码改动。此前在「预判验证口径与条件分支退役」改造中已核查确认：条件退役不影响节奏链路（`branches` 未动）。
+
+---
+
+## [master] 2026-10-06 — Task 10：板块 horizon `metric_projection` 前端接线
+
+**开发者**: Aria
+
+### 新增
+
+- `src/shared/api/modules/agent.ts`：`SectorInsightHorizon` 补可选 `metric_projection?: string`。
+- `src/shared/utils/sectorInsight.ts`：`SectorStructuredForecast.horizons[]` 补 `metricProjection?`；`sectorPredictionToStructured` 映射透传 `metricProjection: h.metric_projection ?? undefined`（方案 B 字段驱动：无值即 undefined，共享块 `v-if` 不渲染、不兜底拼装）。板块侧不传 `target`/`phase`。
+- `src/shared/utils/sectorInsight.spec.ts`（新增，vitest 风格）+2：透传为 `metricProjection`、缺失为 `undefined`；`vitest.config.ts` 白名单注册以被 `npx vitest run` 采集。
+
+### 验证
+
+- `npx vitest run` → 582 passed / 4 既有失败（另有 1 既有 suite 采集失败 CardRenderer.spec.ts，均与本次无关）；`npx vue-tsc --noEmit` exit 0。
+
+---
+
+## [master] 2026-10-06 — 首页洞见卡：次卡标签对齐四宫格 + 市场/节奏改用真实结论
+
+**开发者**: Aria
+
+### 改进
+
+- `src/modules/home/components/DynamicInsightCard.vue`：
+  - **次卡尾部标签**与四宫格统一：风口/市场用组件库 `Tag`（`size="sm"` + 语义 `type`，原为纯文字）；**节奏行改用档位色块** `.dyn-sec__rhythm`（40×34rpx / 圆角 8rpx / 白色 18rpx 文字，对齐四宫格「节奏洞见」卡的 `.rhythm-chip`）
+  - `RhythmRow` 新增 `hint?` 并透传到小字详情
+- `src/modules/home/components/MorningContent.vue`：
+  - **市场**：头条标题仍是**现象摘要**（即 `InsightCard.title` 口径的「一句话结论」，取自 `display_report.summary`）；小字详情改为**洞见卡「溯源」里显示的那句话** = `toMarketInsightBrief(toMarketTracePresentation(record, d)).trace`（`{主因分类}：{结论}`；无主因日给「可能主因（待验证）…」/「证据不足，主因待验证」），取不到再回退溯源详情 → 现象摘要
+  - **节奏**：小字详情由兜底文案「档位与建议仓位」改为**真实结论**「{档位中文} · 建议仓位{仓位}」（无仓位语义时只给档位，不伪造）
+- `src/shared/utils/rhythmColors.ts`（档位色板/短码唯一副本）：新增 `RHYTHM_LEVEL_LABEL` 与 `levelLabel()`（档位中文全名：冰点/低迷/常温/活跃/亢奋，未知档位如实回退短码），与 rhythm 模块 `rhythmInsight.LEVEL_LABEL` 同口径
+
+### 测试
+
+- `src/modules/home/components/DynamicInsightCard.mount.spec.ts`：12 例（含：市场头条标题=现象摘要、小字详情=传入的溯源句；节奏行详情取传入结论、不回退兜底文案）
+
+---
+
+## [master] 2026-10-06 — 首页次卡尾部标签对齐四宫格卡片
+
+**开发者**: Aria
+
+### 改进
+
+- `src/modules/home/components/DynamicInsightCard.vue`：次要焦点行尾部的标签由**纯文字**（`.dyn-sec__badge`，中性态为灰字、无底色）改为**组件库 `Tag`**（`size="sm"` + 业务语义 `type`），与四宫格卡片（`MorningContent.vue` 的 `<Tag :type="itemTagType(...)" size="sm">`）完全一致
+  - `badgeTone` 的取值恰好就是 Tag 支持的 `up / down / neutral`，直接透传导出，无需额外映射
+  - 删除失效的 `.dyn-sec__badge` 纯文字样式（含末尾的语义色块规则），新增 `.dyn-sec__tag { flex: none }` 保证标签不被标题压缩；`toneClass` 仍由头条 badge 使用，未删
+
+### 测试
+
+- `src/modules/home/components/DynamicInsightCard.mount.spec.ts`：新增用例——次卡尾部标签为组件库 Tag（`as-tag--sm` + 语义 type），且不再出现 `.dyn-sec__badge`
+
+---
+
+## [master] 2026-10-06 — 首页时段动态洞见卡：头条链接文案简化
+
+**开发者**: Aria
+
+### 改进
+
+- `src/modules/home/components/DynamicInsightCard.vue`：头条底部蓝色文字链由「查看详情 →」改为「**详情 →**」（样式与点击行为不变，仍 emit `navigate`）；同步更新该处 CSS 注释
+
+### 测试
+
+- `src/modules/home/components/DynamicInsightCard.mount.spec.ts`：布局用例断言由 `toContain('查看详情')` 收紧为 `toBe('详情 →')`，锁定文案
+
+---
+
+## [master] 2026-10-06 — 洞见卡「多要点行」标签宽度与字号收口
+
+**开发者**: Aria
+
+### 改进
+
+- `src/shared/components/InsightCard.vue`（`.as-insight-card__line--point`，即「重点 / 机会 / 风险」这类多要点行）：
+  - 标签宽度由固定 `flex: 0 0 128rpx` 改为**随文字自适应** `flex: 0 0 auto`（保留 `white-space: nowrap`）——原先 2 字标签只占约 24rpx 文字宽却预留 128rpx，把正文整体推右
+  - 标签字号 `$font-size-xs`(22rpx) → **`$font-size-sm`(24rpx)**，与「溯源 / 预判」行的 key 一致
+  - 正文字号 `$font-size-xs`(22rpx) → **`$font-size-sm`(24rpx)**，与「溯源 / 预判」行的正文一致
+  - 影响面：所有用 `lines` 渲染多要点行的洞见卡（个股详情「综合洞见」的重点/机会/风险、`modules/analytics/pages/report-detail.vue`）；`--trace` / `--forecast` 行不受影响
+  - 纯样式改动，无行为变更；由挂载 InsightCard 的既有用例验证 SCSS 可编译，`vue-tsc --noEmit` exit 0
+
+---
+
+## [master] 2026-10-06 — 个股详情「行业政策」改为逐条展开
+
+**开发者**: Aria
+
+### 新增
+
+- `src/modules/favorites/components/PolicyList.vue`（新增）：行业政策列表 + **逐条展开**
+  - 每条 = 利好标签 + 正文（折叠时 2 行截断）+ **本条末尾自带的「展开 / 收起」按钮**（`▾` 展开后旋转 180°）
+  - 展开态为**同时只展开一条**（`expandedIndex`）：点某条只展开该条，点另一条会自动收起前一条；再点同一条即收起
+  - 仅当正文超过 42 字（对应 CSS 的 2 行 clamp）才渲染该条的展开按钮，短条目不带按钮
+  - 原页面 `.policy-list/.policy-item/.policy-tag/.policy-text` 样式一并下沉到本组件
+- `src/modules/favorites/components/PolicyList.mount.spec.ts`（新增，6 例）：渲染全部条目 / 仅超长条目带展开按钮 / 点某条只展开该条 / 再次点击收起 / 无全局「查看完整」按钮 / **同时只能展开一条（开第二条自动收起第一条）**
+- `vitest.config.ts`：白名单登记新 spec
+
+### 改进
+
+- `src/modules/favorites/pages/detail.vue`（行业政策区块）：
+  - **删除全局「查看完整」按钮**及其 `policyExpanded` / `policyNeedsExpand` / `visiblePolicyList` 三个状态（原逻辑：折叠时只渲染前 2 条、点「查看完整」才显示全部）
+  - 改为渲染**全部**政策条目：`<PolicyList :policies="longMockData.policies" />`，卡片显隐条件由 `visiblePolicyList.length` 改为 `longMockData.policies.length`
+  - 保留 `.news-toggle` / `.news-toggle-text` 样式（资讯列表的「查看全部 N 条」仍在用）
+
+### 说明
+
+- **后端链路（本次调研结论，未改代码）**：政策条目并非独立政策库或专门爬虫，而是 app-api `TrendScoreService.calcTrackDim`（行业赛道景气维度）里 `policyItems: extractPolicyItems(newsItems)` 用**关键词匹配个股新闻标题**得到的；无 LLM 参与
+
+---
+
+## [master] 2026-10-06 — 个股详情页「业绩预测」图表对齐 Web
+
+**开发者**: Aria
+
+### 新增
+
+- `src/modules/favorites/components/ForecastFinancialChart.vue`（新增）：业绩预测财务图（6 序列 / 上下两块）
+  - 数据源为现有 `forecastData.detailIndicators`（后端 `业绩预测详表_详细指标预测`），**零后端改动**
+  - 块 1「规模与成长」：净利润 + 营业收入(剩余) 堆叠柱（左轴亿元）+ 净利润增长率折线（右轴 %）
+  - 块 2「成长与估值」：营业收入增长率 / 净资产收益率（左轴 %）+ 市盈率（右轴 倍）
+  - 年份轴：取「YYYY-实际值」/「预测YYYY-平均」列升序；**同年两者并存时取实际值列**（不产生重复年份）
+  - 单位归一：值含「万」折算为亿（与 Web 口径一致）
+  - 预测年标注：预测段起点虚线分隔 + 预测段折线虚线 + 末点空心 + 图例下方「{年} 为预测」小标
+  - 缺数据：整条序列缺失则该序列与图例项都不渲染；单年份缺点则折线断开；块内无序列则该块不渲染；两块皆空则组件不渲染
+  - 渲染方式：**纯 CSS/DOM**（沿用原业绩图技法），折线用「起点 + `transform: rotate` 细线段」实现；绘图区用 `padding-top: 60%` 锁宽高比，角度按 `高/宽 = 5/7` 在构建期精确换算，跨设备一致；**不引入 echarts / canvas / renderjs**
+- `src/modules/favorites/components/ForecastFinancialChart.mount.spec.ts`（新增，10 例）：两块图例项数 / 年份轴升序且同年去重 / 堆叠柱归一 / 「万」折算为亿（左轴最大刻度 100）/ 缺点断线与不画点 / 预测年标注 / 缺序列不渲染 / 缺整块不渲染 / 折线段角度与长度几何 / 全空不渲染
+- `vitest.config.ts`：白名单登记新 spec
+- 设计文档：`docs/superpowers/specs/2026-10-06-stock-detail-forecast-chart-design.md`
+
+### 改进
+
+- `src/modules/favorites/pages/detail.vue`：业绩预测区块的图表调用点由 `<ForecastProfitChart :items :visible>` 换为 `<ForecastFinancialChart :detail-rows="forecastData.detailIndicators">`；**其余全部保留**（更新时间、摘要、净利润同比、年度预测 panel、详细指标折叠表、刷新按钮、空态文案）
+- **续：画布尺寸调整 + 弹窗同步 + 「年度预测」改图表**
+  - `components/ForecastFinancialChart.vue`（画布尺寸收口）：绘图区比例 `padding-top` 60% → **46%**（不再偏高）；左右留白 8% → **12%**（刻度文字不再贴卡片边缘）；标题下间距 10rpx → 16rpx、两块间距 20rpx → 28rpx
+  - `src/shared/components/NotificationInsightModal.vue`（推送弹窗业绩预测区同步换新图）：图表由 `ForecastProfitChart` 换为 `ForecastFinancialChart`；「年度预测」列表换为 `ForecastGrowthChart`；删除随之失去引用的 `forecastChartItems`、年度预测行的 `kindClass/kindText/growthText/growthClass/progress/value` 字段与 `.ni-forecast-year-*` / `.ni-forecast-progress-*` 样式
+  - `components/ForecastGrowthChart.vue`（新增，替代「年度预测」列表，方案 B）：
+    - 净利润增长率柱状图：同比增长红（`$up`）/ 同比下降绿（`$down`），零基线在 0 值处，正柱向上、负柱向下
+    - 柱上/柱下显示带符号的增长率（如 `+25%` / `-5%`）；柱下注脚为「年份 · 净利润额」
+    - 绘图区垂直范围留白：值域映射到 **8%~92%**（上下各留 8%），保证最高柱/最低柱的数值标签仍有落脚空间；网格线与刻度同高
+    - 数值标签规避重叠：正柱标签贴柱顶向上生长（`bottom` 定位），负柱标签贴柱底向下生长（`top` 定位）
+    - 数据源为调用方既有的年度预测行（`{ year, netProfit, growth }`），保持原有 `predictions` 优先、详表兜底口径不变
+    - **重要数据事实（本轮修正）**：`ForecastPrediction` 只有 `year / netProfit / growth`，**没有 `kind` 字段**，且 `predictions` 来自后端「预测年报净利润」，**各行均为机构预测年**。因此该图**不区分实际值/预测值**（方案图上原拟的「实际/预测」标注无数据支撑，已去掉）；预测年的标注由上方业绩预测财务图的预测段承担
+  - `src/modules/favorites/pages/detail.vue`：图表尺寸与年度预测换图同上；删除失效的 `.forecast-year-*` / `.forecast-progress-*` 样式与年度预测行中已无消费方的视图模型字段
+  - `components/ForecastGrowthChart.mount.spec.ts`（新增，8 例）：柱数按年份顺序 / 正负配色 / 柱高按含 0 基线归一且负柱挂零线下方 / 带符号增长率文本 / 年份与净利润额 / 缺增长率不画柱 / 字符串百分比解析 / 空数据不渲染
+  - **`components/ForecastProfitChart.vue` 已于本轮删除**（detail.vue 与弹窗均已换新图；删除前 grep 全仓确认无任何引用，`dist/` 产物除外）
+- **续 2：图表标题排版与刻度间距收口**——`components/ForecastFinancialChart.vue` + `components/ForecastGrowthChart.vue`（三个图表统一）：
+  - 图表「标题」与「单位」由同一行改为**分行**（标题在上 `$font-size-sm`、单位在下 `$font-size-xs` 作副标题），`.ffc__block-head` / `.fgc__head` 由 `row + space-between` 改为 `column + flex-start`
+  - 纵坐标刻度数值与坐标轴的距离由 8rpx 增至 **16rpx**（`.ffc__tick--left` 的 `margin-right`、`.ffc__tick--right` 的 `margin-left`、`.fgc__tick` 的 `margin-right`），数值不再贴轴
+
+### 修复
+
+- **续 3：补「成长与估值」横坐标 + 移除「年度预测」图表**
+  - `components/ForecastFinancialChart.vue`（缺陷修复）：**「成长与估值」块缺横坐标年份轴**——该块 `columns` 为空（无柱状序列），而年份行原先遍历 `columns`，导致整行年份不渲染。现新增与柱状序列解耦的 `yearAxis` 字段，年份行改遍历 `yearAxis`，两块都有年份刻度
+  - **移除「年度预测」图表（含组件在所有页面的调用）**——其数据（净利润 + 净利润增长率）与块 1「规模与成长」重复（块 1 已含净利润堆叠柱与净利润增长率折线）：
+    - `src/modules/favorites/pages/detail.vue`：移除 `<ForecastGrowthChart>` 调用与 import；删除已无消费方的 `forecastYearRows` 视图模型，并从 `hasForecastCardData` 去掉 `forecastYearRows.value.length`（`predictions.length` 已在同处单独判定）
+    - `src/shared/components/NotificationInsightModal.vue`：移除 `<ForecastGrowthChart>` 调用与 import；删除已无消费方的 `forecastYearRows` 视图模型
+    - `components/ForecastGrowthChart.vue`、其 9 例挂载测试与 `vitest.config.ts` 白名单条目**已删除**（删前 grep 全仓确认仅剩文档提及；主图图例下方的「{年} 为预测」小标按确认**保留**）
+  - `components/ForecastFinancialChart.mount.spec.ts`：新增「横坐标年份轴在两块都渲染」用例（12 例）
+
+### 说明
+
+- 主条目当时的备注：**未删除** `components/ForecastProfitChart.vue`——它当时仍是 `shared/components/NotificationInsightModal.vue`（推送弹窗业绩预测区）的消费方，删不删待确认（后续「续」中弹窗换图后已确认删除）。
+
+---
+
+## [master] 2026-10-06 — 首页特别提醒：个股情报 / 自选股洞察 卡片位置调换
+
+**开发者**: Aria
+
+### 改进
+
+- `src/modules/favorites/components/AlertContent.vue`：模板中两个 `alert-module` 块顺序对调，现为「个股情报」在上、「自选股洞察」在下（原顺序相反）；数据加载与交互逻辑不变
+
+---
+
+## [master] 2026-10-06 — 市场洞见溯源展示口径改造 + 首页时段动态洞见卡
+
+**开发者**: Aria
+
+### 新增
+
+- `modules/home/components/DynamicInsightCard.vue`：首页「时段动态洞见卡」（时段驱动头条焦点区 + 3 条跨模块次要焦点 + 四入口条带；盘后头条市场↔节奏每 5s 轮播，`onUnmounted` 清理定时器）+ `DynamicInsightCard.mount.spec.ts`（9 例）；`MorningContent.vue` 在「今日专属播报卡」与四宫格之间接入（不删改既有节点），并为消息行补 `hint`/`sectors`；`vitest.config.ts` 白名单登记新 spec。
+
+### 改进
+
+- **市场洞见「溯源」展示口径**：`analytics/utils/marketTraceReview.ts` 新增 `alternativeChainId`；`analytics/utils/marketInsightBrief.ts` 在 `primaryCause` 为 null 时取指定/首个 weak 候选，输出 **「可能主因（待验证）：<conclusion>」**，替代此前恒显示的「证据不足，主因待验证」（仅改展示，不动后端归因语义）。
+- `modules/home/AGENTS.md`：补充 `DynamicInsightCard.vue` 组件说明。
+- `modules/user/pages/profile.vue`：「关于洞见」版本号文案 0.1.3 → **0.1.4**（跟随已发布的 0.1.4 包）。
+
+### 测试
+
+- `marketInsightBrief.spec.ts` 新增 4 例（13/13 通过）、`DynamicInsightCard.mount.spec.ts` 9 例；`vue-tsc --noEmit` exit 0。
+- 跨端：`aistock-frontend`（Web）无 `marketInsightBrief` / 该洞见卡链路，无需同步。
+
+---
+
 ## [master] 2026-10-03 — 0.1.4 版本发布
 
 **开发者**: 项目组

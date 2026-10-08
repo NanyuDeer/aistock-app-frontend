@@ -13,7 +13,7 @@
       <!-- 统计概览 -->
       <view v-if="signals.length" class="stats-bar">
         <text class="stats-text">共 {{ signals.length }} 只热门股</text>
-        <text class="stats-time">近三天</text>
+        <text class="stats-time">近 3 个交易日</text>
       </view>
 
       <!-- 热门股列表 -->
@@ -145,7 +145,7 @@ async function loadData() {
     return
   }
   try {
-    signals.value = dedupeBySymbol(sortByChangePct(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 2 })))
+    signals.value = dedupeBySymbol(sortByChangePct(await stockApi.getHotBurstHistory({ trading_days: 3, min_resonance: 2 })))
   } catch {
     signals.value = []
   }

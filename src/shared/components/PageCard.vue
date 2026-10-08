@@ -8,7 +8,7 @@
     <!-- 透明导航区域：小熊头像在右侧，作为"我的"页面入口 -->
     <view class="as-page-wrapper__nav">
       <view class="as-page-wrapper__avatar" @tap="goProfile">
-        <SvgIcon name="bear-smile-line" size="30rpx" color="#ffffff" />
+        <SvgIcon name="user-smile-line" size="30rpx" color="#ffffff" />
       </view>
     </view>
 

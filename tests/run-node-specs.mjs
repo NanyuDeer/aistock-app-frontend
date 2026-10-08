@@ -36,8 +36,30 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  * 2026-09-23：v3 极简页面改造（-2 时点判定旧断言 +4 pickVersion/提示行/pageTitle 新断言）。
  *  2026-09-26：首页时段洞见横条新增 getTradingTimeSlot 边界用例 1 条（tradingTime.spec.ts）。
  *  2026-09-26：首页四宫格改名精确断言 + 时段横条接线用例新增 1 条（MorningContent.spec.ts）。
+ *  2026-10-06：Task 6「二级页首屏快评」新增 3 条 spec（stockInfo.spec.ts：命中信封 / 命中裸对象 / 无数据）。
+ *    ⚠ 已知残余失败：2 条为既有（MorningContent「时段洞见横条」顺序断言、
+ *    rhythm pickVersion 签名断言），1 条随 `16d3658`（feat(favorites,home) 组件重构）一并提交
+ *    （RhythmCard「仓位文案」断言，需单独定位修复）。
+ *    本常量按**仓库提交态**取值；若工作区另有在途未提交改动引入新失败，哨兵会如实报
+ *    基线漂移（exit 2）——**不得通过改本常量掩盖**。
+ *  2026-10-06：预判验证口径重构终评修复新增 1 条
+ *    （predictionHistory.spec.ts 的 computeStats 对齐 4.0 口径：旧版本/approximate 剔除 + long 单列）。
+ *  2026-10-06：首页时段洞见横条下线（`TimeSlotInsightBar` 从 `MorningContent.vue` 移除，时段与
+ *    navigate 分发由 `DynamicInsightCard` 承接），`MorningContent.spec.ts` 对应断言由「接入横条 + 顺序」
+ *    改为「横条已下线 + 洞见卡承接」，该条转绿 → 已知残余失败 3 → 2
+ *    （剩余：rhythm `pickVersion` 签名断言、RhythmCard「仓位文案」断言）。
+ *  2026-10-07：datetime.spec.ts 新增 shanghaiDateKeyDaysAgo 三组固定时钟用例（+3 条，跨年/跨月/固定 UTC+8）。
+ *    → 采集总数 281 → 284；已知残余失败仍为 2（rhythm `pickVersion` 签名断言、RhythmCard「仓位文案」断言）。
+ *  2026-10-08（接入 CI 门禁时清零）：上面记录的 2 条残余失败已逐条定位修复——
+ *    ① `pickVersion` 签名断言（src/modules/rhythm/pages/index.spec.ts）：断言用跨行正则提取多行签名，
+ *       而本机 core.autocrlf=true 使工作区为 CRLF、git 内为 LF（无 .gitattributes），`\(\n` 漏匹配
+ *       → 该 spec 读源码后先归一化换行（CI 为 LF，此前属“仅 Windows 误报”的口径分裂）；
+ *    ② 「节奏卡改近几日摘要」断言（src/modules/home/components/MorningContent.spec.ts）：提交 16d36581
+ *       首页重构把内联 `band: formatBandText(...)` 改为局部常量 `const band = ...`（并新增 hint 消费），
+ *       断言已同步到新形状。
+ *    → 实测 284/284/0，已知残余失败清零；本常量随之为全绿基线。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '273/273/0'
+const EXPECTED_BASELINE = '284/284/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {

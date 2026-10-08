@@ -1,7 +1,8 @@
 /**
  * 自选股洞察——工具函数（纯函数，无 .vue/组件/运行环境依赖）
  *
- * 提供 isUnattributableMovement（无法归因判定）和 dedupeDailyMovements（同日同股聚合）。
+ * 提供 isUnattributableMovement（无法归因判定）、dedupeDailyMovements（同日同股聚合）
+ * 和 upsertEventById（按 event_id 浅合并分页/推送数据）。
  * 不依赖 .vue、不 import 组件、不走网络；纯 TS 逻辑，可被 vitest 单测锁定。
  */
 
@@ -18,6 +19,11 @@ export interface TraceEventLike {
   window_end_at?: string | null
   analysis_status: string
   primary_cause?: string | null
+  /**
+   * 归因置信度（low/medium/high）。低置信的归因不展示卡片（2026-09-30 口径）。
+   * 字段缺失（老 app-api 未升级）或 null（无归因结果）时**不隐藏**，避免误杀全部卡片。
+   */
+  confidence_level?: 'low' | 'medium' | 'high' | null
   /** 涨停文章命中标记（强时效来源） */
   is_limit_up?: boolean
   /** 归因视图（含 status/confidence/primaryCandidate 等），缺省表示历史数据无此字段 */
@@ -64,6 +70,9 @@ function hasNoUsableCause(cause?: string | null): boolean {
 
 export function isUnattributableMovement(m: TraceEventLike): boolean {
   if (m.analysis_status === 'unavailable') return true
+  // 低置信归因不展示（2026-09-30）：判据用机器枚举值；字段缺失/null 时**不隐藏**
+  // （app-api 未升级时列表不带该字段，若按"非 high 即隐藏"会把卡片全部误杀）
+  if (m.confidence_level === 'low') return true
   if (m.analysis_status !== 'completed') return false
   if (m.movement_view) {
     const status = m.movement_view.status
@@ -84,18 +93,30 @@ function shanghaiDayKey(iso: string): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
+/** 归因失败判定（2026-10-06 新增枚举，前端新契约）：仅正向等值判断 */
+function isFailedMovement(m: TraceEventLike): boolean {
+  return m.analysis_status === 'failed'
+}
+
 /**
  * 同日同股聚合：同一交易日、同一只股票的多次异动只保留"最新一条"（不分涨跌方向）。
  *
  * 背景：同一交易日可能因多次打点/多触发源（涨停雷达文章、午盘 11:30、尾盘 15:05）
  * 或方向来回，产生同股同日多张异动卡片；展示层收敛为当日一张卡，展示最新异动归因。
  *
- * 组合用法（"最新 + 失败回退"）：先 filter(isUnattributableMovement) 再调用本函数——
- * 不可用项已剔除，取最新即"当日最近一条有效归因"；若当日全部不可用则整组消失（与过滤口径一致）。
+ * 组合用法（"最新 + 失败回退"）：调用方先 filter(isUnattributableMovement) 再调用本函数。
+ * - `isUnattributableMovement` 负责剔除"无有效结论"的项（unavailable / 证据不足 / 低置信），
+ *   但**刻意不隐藏 `failed`**——否则"当日全失败"时整组会消失，用户看不到「归因失败」。
+ * - 本函数在组内选"最新"时**跳过 `analysis_status === 'failed'` 的项**：当日有有效归因时，
+ *   回退显示该有效归因；**仅当整组皆 failed 时才保留其中最新那条**（让「归因失败」可见）。
+ *   这保证失败只在其是"当日唯一/全部"时才被看到，不再遮住当日已有的有效归因。
+ *   （monitor.vue / insight.vue / AlertContent.vue 三处消费者按同一契约接入。）
  *
  * 说明：
  * - 分组键 = symbol（剥 SH/SZ/BJ 前缀）+ 上海交易日（activityAt 转 UTC+8 取日期）
  * - 最新判定口径与组内活动时间一致：window_end_at ?? triggered_at 的时间更大者
+ * - 优先级：非 failed > failed；同级内取活动时间新者。非法状态一律按非 failed 对待——
+ *   用正向 `=== 'failed'` 判定，未来新增枚举值不会被误判为失败。
  * - 不修改输入；输出顺序沿用各分组"首次出现"顺序（接口已按时间倒序，输出近似倒序）
  */
 export function dedupeDailyMovements<T extends TraceEventLike>(items: T[]): T[] {
@@ -104,10 +125,42 @@ export function dedupeDailyMovements<T extends TraceEventLike>(items: T[]): T[] 
     const at = movementActivityAt(item)
     const key = `${normalizeSymbol(item.symbol)}@${shanghaiDayKey(at)}`
     const prev = latestByKey.get(key)
-    if (!prev || safeDateParse(at) > safeDateParse(movementActivityAt(prev))) {
+    // 非 failed 优先于 failed；同为非 failed（或同为 failed）时取活动时间新者
+    const prevFailed = prev ? isFailedMovement(prev) : false
+    const itemFailed = isFailedMovement(item)
+    const prevPreferred = !prevFailed ? 1 : 0
+    const itemPreferred = !itemFailed ? 1 : 0
+    const replace =
+      !prev ||
+      itemPreferred > prevPreferred ||
+      (itemPreferred === prevPreferred && safeDateParse(at) > safeDateParse(movementActivityAt(prev)))
+    if (replace) {
       // Map.set 对已存在 key 不改变插入顺序 → 保留该组首次出现的位置
       latestByKey.set(key, item)
     }
   }
   return [...latestByKey.values()]
+}
+
+/**
+ * 按 event_id upsert 合并分页/推送数据（monitor.vue 与 insight.vue 共享）。
+ *
+ * 为什么需要 upsert（而非简单 concat / 整体替换）：
+ * - cursor 翻页会反复拉取列表，同一 event_id 可能跨多页重复出现；WS 的
+ *   movement.created / movement.updated 也会就地上报同一条事件。若简单 concat，
+ *   跨页重复的事件会渲染成多张卡片。
+ * - 若整体覆盖，又会丢掉"已存在行里未随 incoming 回来"的部分字段（如
+ *   primary_cause / confidence_level）。因此以 event_id 为键做**浅合并**：
+ *   - 键已存在 → 保留原位置，产出 `{ ...existing, ...next }`（incoming 覆盖既有同名字段，其余保留）
+ *   - 键不存在 → 追加到末尾
+ *
+ * 不修改输入；返回新数组。行为与被替换的两页本地实现逐字一致。
+ */
+export function upsertEventById<T extends { event_id: string }>(prev: T[], incoming: T[]): T[] {
+  const byId = new Map(prev.map((e) => [e.event_id, e]))
+  for (const next of incoming) {
+    const existing = byId.get(next.event_id)
+    byId.set(next.event_id, existing ? { ...existing, ...next } : next)
+  }
+  return Array.from(byId.values())
 }

@@ -73,6 +73,15 @@
         <text class="status-text">{{ analysis.unavailable?.message ?? '归因暂不可用' }}</text>
       </view>
 
+      <!-- 归因失败（dead_letter；显示失败而非静默/误判为处理中） -->
+      <view
+        v-else-if="analysis && analysis.processing_status === 'failed'"
+        class="section status-failed"
+      >
+        <text class="status-icon">--</text>
+        <text class="status-text">归因失败</text>
+      </view>
+
       <!-- ===== 一句话主因（精简版详情；完整归因见下方流式报告） ===== -->
       <view v-if="oneLineCause" class="section main-cause-simple">
         <view class="main-title-row">
@@ -449,6 +458,13 @@ onLoad(async (query) => {
   align-items: center;
   gap: $s-2;
   color: $ink-mute;
+}
+/* 归因失败（dead_letter）：琥珀色中性告警，区别于"处理中"/"暂不可用" */
+.status-failed {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+  color: $warning;
 }
 .status-icon {
   font-size: $font-size-base;

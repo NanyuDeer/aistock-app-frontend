@@ -1,33 +1,30 @@
 <template>
-  <!-- 条件化预判块（结构化传入）：期段切换 + 每期基准方向 + 该期互斥条件情景（分支点亮/置灰） -->
+  <!-- 条件化预判块（结构化传入）：档位区平铺所有档（每档基准方向）+ 互斥条件情景（分支点亮/置灰） -->
   <view v-if="structured" class="as-insight-card__fc">
     <view class="as-insight-card__fc-head">
       <text class="as-insight-card__fc-key">预判</text>
       <text v-if="verifyText" class="as-insight-card__verify" :class="verifyClass">{{ verifyText }}</text>
     </view>
 
-    <!-- 期段切换（仅多档时展示：单档不显孤 Tab） -->
-    <view v-if="horizonSegments.length > 1" class="as-insight-card__seg">
-      <view
-        v-for="seg in horizonSegments"
-        :key="seg"
-        class="as-insight-card__seg-item"
-        :class="{ 'as-insight-card__seg-item--on': activeHorizon === seg }"
-        @tap.stop="setActiveHorizon(seg)"
-      >
-        <text>{{ horizonLabel(seg) }}</text>
-      </view>
-    </view>
-
-    <!-- 当前期内容：基准方向 + 该期条件情景 -->
+    <!-- 档位区（2026-10-06 三粒度档位行统一）：平铺所有档（替代原 Tab 切换）——
+         每档一行，字段驱动：方向 / 基准·label / 置信 / target / phase / remaining / metricProjection，各自 v-if（无值整行跳过该字段，不兜底） -->
     <view class="as-insight-card__ph">
-      <view v-if="activeBase" class="as-insight-card__ph-head">
-        <text v-if="activeBase.direction" class="as-insight-card__dir" :class="dirClass(activeBase.direction)">
-          {{ dirText(activeBase.direction) }}
+      <view
+        v-for="(h, idx) in flatHorizons"
+        :key="`${h.horizon}-${idx}`"
+        class="as-insight-card__horizon-row"
+      >
+        <text class="as-insight-card__horizon-name">{{ horizonLabel(h.horizon) }}</text>
+        <text v-if="h.direction" class="as-insight-card__dir" :class="dirClass(h.direction)">
+          {{ dirText(h.direction) }}
         </text>
-        <text v-if="activeBase.label" class="as-insight-card__ph-tt">基准 · {{ activeBase.label }}</text>
-        <text v-if="activeBase.confidence" class="as-insight-card__conf">置信 {{ confText(activeBase.confidence) }}</text>
-        <text v-if="activeBase.remaining" class="as-insight-card__remain">{{ activeBase.remaining }}</text>
+        <text v-if="h.label" class="as-insight-card__ph-tt">基准 · {{ h.label }}</text>
+        <text v-if="h.confidence" class="as-insight-card__conf">置信 {{ confText(h.confidence) }}</text>
+        <!-- 大盘粒度既有信息（target/phase）：字段驱动，板块不传即整行不渲染 -->
+        <text v-if="h.target" class="as-insight-card__horizon-target">{{ h.target }}</text>
+        <text v-if="h.phase" class="as-insight-card__horizon-phase">{{ phaseText(h.phase) }}</text>
+        <text v-if="h.remaining" class="as-insight-card__remain">{{ h.remaining }}</text>
+        <text v-if="h.metricProjection" class="as-insight-card__horizon-projection">{{ h.metricProjection }}</text>
       </view>
 
       <view v-if="renderedConditions.length" class="as-insight-card__sc-list">
@@ -146,9 +143,9 @@
         <text class="as-insight-card__sc-fold-tx">{{ branchesExpanded ? '收起条件化预判 ▴' : '查看条件化预判 ▾' }}</text>
       </view>
 
-      <!-- 空态（无基准行且无分支）：sentence 形态恢复改造前原文案「该期暂无细分情景」；
+      <!-- 空态（无档位行且无分支）：sentence 形态恢复改造前原文案「该期暂无细分情景」；
            tags 形态（结论模式）用结论空态文案（其「该档无已成立分支」状态已由上方折叠入口承接） -->
-      <view v-else-if="!activeBase && !renderedConditions.length" class="as-insight-card__sc-empty">
+      <view v-else-if="!flatHorizons.length && !renderedConditions.length" class="as-insight-card__sc-empty">
         <text>{{ conditionDisplay === 'sentence' ? '该期暂无细分情景' : '条件未成立 · 暂无已验证结论' }}</text>
       </view>
     </view>
@@ -156,7 +153,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref } from 'vue'
 
 import { selectVisibleConditions } from '@/shared/utils/conditionalForecast'
 
@@ -172,6 +169,8 @@ type HorizonKey = 'short' | 'mid' | 'long'
 type Direction = 'bullish' | 'bearish' | 'neutral'
 type Confidence = 'high' | 'medium' | 'low'
 type Verification = 'pending' | 'hit' | 'miss'
+/** 影响生命周期阶段（大盘溯源模型透传；板块无此语义） */
+type HorizonPhase = 'building' | 'peaking' | 'decaying' | 'returning'
 
 interface StructuredHorizon {
   horizon: HorizonKey
@@ -183,6 +182,12 @@ interface StructuredHorizon {
   direction?: Direction
   /** 该期基准置信度 */
   confidence?: Confidence
+  /** 该档口径说明（板块/大盘共用；缺失即不渲染，不兜底） */
+  metricProjection?: string
+  /** 目标位（大盘粒度透传，板块不传；缺失即不渲染，不兜底） */
+  target?: string
+  /** 影响生命周期阶段（大盘粒度透传，板块不传；英文枚举经 phaseText 映射为中文展示） */
+  phase?: HorizonPhase
 }
 
 interface StructuredCondition {
@@ -287,40 +292,15 @@ function toggleScenario(horizon: HorizonKey, idx: number) {
   expandedScenarios.value = next
 }
 
-// ===== 期段状态 =====
-const HORIZON_ORDER: HorizonKey[] = ['short', 'mid', 'long']
-const activeHorizon = ref<HorizonKey>('short')
+// ===== 档位区（2026-10-06：由 Tab 切换改平铺所有档） =====
+/** 平铺展示的档位行（保源序；字段驱动：行内可选字段缺失即不渲染，不兜底） */
+const flatHorizons = computed<StructuredHorizon[]>(() => props.structured?.horizons ?? [])
 
-/** 展示期段：horizons ∪ conditions 中实际出现的档位（保序；空则全部不展示） */
-const horizonSegments = computed<HorizonKey[]>(() => {
-  const data = props.structured
-  if (!data) return []
-  const keys = new Set<HorizonKey>()
-  for (const h of data.horizons ?? []) keys.add(h.horizon)
-  for (const c of data.conditions ?? []) keys.add(c.horizon)
-  if (!keys.size) return []
-  return HORIZON_ORDER.filter((k) => keys.has(k))
-})
-
-/** 档位切换后校正：data 不含当前档（或首次拿到数据）时回到首个可见档 */
-watchEffect(() => {
-  const segs = horizonSegments.value
-  if (segs.length > 0 && !segs.includes(activeHorizon.value)) {
-    activeHorizon.value = segs[0]
-  }
-})
-
-/** 当前期内的基准方向（horizons 匹配当期） */
-const activeBase = computed<StructuredHorizon | undefined>(() => {
-  const data = props.structured
-  if (!data) return undefined
-  return (data.horizons ?? []).find((h) => h.horizon === activeHorizon.value)
-})
-
-/** 当前档内的条件（按 horizon 归组） */
-const inHorizonConditions = computed(() =>
-  (props.structured?.conditions ?? []).filter((c) => c.horizon === activeHorizon.value)
-)
+/**
+ * 展示的条件分支源：平铺后不再有「当前档」概念 → 取全部条件（不再按 horizon 筛选）。
+ * 平铺是「三粒度共用一套档位行」的前提（spec §4.8）；条件区自身的渲染与点亮逻辑不变。
+ */
+const allConditions = computed(() => props.structured?.conditions ?? [])
 
 /**
  * 该档**已成立分支**（`met === true`）= 结论模式下应渲染的分支集合。
@@ -328,23 +308,23 @@ const inHorizonConditions = computed(() =>
  * 故 `lit` 为空 ⟺ 该档未触发（与有无 met 数据无关）。
  */
 const litConditions = computed(() =>
-  selectVisibleConditions(inHorizonConditions.value, 'conclusion')
+  selectVisibleConditions(allConditions.value, 'conclusion')
 )
 
-/** 折叠入口开关（本地展开，仅作用于当前档；归零见 setActiveHorizon） */
+/** 折叠入口开关（本地展开） */
 const branchesExpanded = ref(false)
 
 /**
  * 未触发折叠态（spec：未触发 → 折叠态）：
  * 仅结论模式生效（`displayMode === 'conclusion'`）——full 调用方（如节奏大师洞见卡）恒全量直显，不被本折叠收口。
  * 该档无已成立分支（`lit` 为空）+ tags 形态；sentence 形态（预测详情页整句原文）不参与折叠，保持原位直显。
- * `inHorizonConditions.length > 0` 守卫：该档本就没有条件分支时无从折叠（否则会渲染出点开后空无一物的入口）。
+ * `allConditions.length > 0` 守卫：本卡本就没有条件分支时无从折叠（否则会渲染出点开后空无一物的入口）。
  */
 const isFoldedUnmet = computed<boolean>(() =>
   props.displayMode === 'conclusion' &&
   props.conditionDisplay !== 'sentence' &&
   litConditions.value.length === 0 &&
-  inHorizonConditions.value.length > 0
+  allConditions.value.length > 0
 )
 
 /**
@@ -355,10 +335,10 @@ const isFoldedUnmet = computed<boolean>(() =>
  * - 已触发：只渲染已成立分支（`lit`）。
  */
 const renderedConditions = computed<StructuredCondition[]>(() => {
-  if (props.displayMode !== 'conclusion') return inHorizonConditions.value
-  if (props.conditionDisplay === 'sentence') return inHorizonConditions.value
+  if (props.displayMode !== 'conclusion') return allConditions.value
+  if (props.conditionDisplay === 'sentence') return allConditions.value
   if (!isFoldedUnmet.value) return litConditions.value
-  return branchesExpanded.value ? inHorizonConditions.value : []
+  return branchesExpanded.value ? allConditions.value : []
 })
 
 /** 折叠入口点击（本地展开/收起） */
@@ -366,9 +346,9 @@ function toggleBranches() {
   branchesExpanded.value = !branchesExpanded.value
 }
 
-/** 已触发档被过滤掉的分支数（该档全部条件 − 已成立分支），即隐藏分支数 */
+/** 已触发档被过滤掉的分支数（本卡全部条件 − 已成立分支），即隐藏分支数 */
 const hiddenConditionCount = computed(
-  () => inHorizonConditions.value.length - litConditions.value.length
+  () => allConditions.value.length - litConditions.value.length
 )
 
 /**
@@ -440,20 +420,23 @@ function confText(c: Confidence): string {
   return map[c]
 }
 
+/** 影响生命周期阶段枚举 → 中文（纯展示映射；本组件是 StructuredHorizon 的 owner，故映射收在此处） */
+function phaseText(p: HorizonPhase): string {
+  const map: Record<HorizonPhase, string> = {
+    building: '影响形成',
+    peaking: '影响高峰',
+    decaying: '影响衰减',
+    returning: '回归常态',
+  }
+  return map[p]
+}
+
 function dirClass(d: Direction): string {
   return d === 'bullish'
     ? 'as-insight-card__dir--up'
     : d === 'bearish'
       ? 'as-insight-card__dir--down'
       : 'as-insight-card__dir--mid'
-}
-
-/** 期段点击切换（方法化：避免模板内联赋值在跨端编译下的边界问题） */
-const setActiveHorizon = (seg: HorizonKey) => {
-  if (activeHorizon.value === seg) return
-  activeHorizon.value = seg
-  expandedScenarios.value = new Set() // 切期段重置展开态
-  branchesExpanded.value = false // 折叠入口同样按档归零（避免换档后误展）
 }
 
 /**
@@ -566,46 +549,53 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   border: 1rpx solid $line;
 }
 
-/* 期段切换 */
-.as-insight-card__seg {
-  display: flex;
-  background: $white;
-  border: 1rpx solid $line;
-  border-radius: $r-sm;
-  padding: 3rpx;
-  margin: 0 4rpx;
-}
-
-.as-insight-card__seg-item {
-  flex: 1;
-  text-align: center;
-  font-size: 24rpx;
-  font-weight: 600;
-  color: $ink-mute;
-  padding: 6rpx 0;
-  border-radius: $r-xs;
-  transition: background $t-fast, color $t-fast;
-}
-
-.as-insight-card__seg-item--on {
-  background: #edf2ff;
-  color: #2455e6;
-  font-weight: 700;
-}
-
-/* 当前期内容 */
+/* 档位区（2026-10-06 平铺）：每档一行，字段驱动 */
 .as-insight-card__ph {
   display: flex;
   flex-direction: column;
   gap: $s-1;
 }
 
-.as-insight-card__ph-head {
+.as-insight-card__horizon-row {
   display: flex;
   align-items: center;
   gap: $s-1;
   flex-wrap: wrap;
   padding: 0 6rpx;
+}
+
+/* 档位名色块（沿用原 Tab 选中态蓝，平铺后每行自带档位语义） */
+.as-insight-card__horizon-name {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #2455e6;
+  background: #edf2ff;
+  border-radius: $r-xs;
+  padding: 2rpx 12rpx;
+}
+
+/* 该档口径说明（板块/大盘共用；独占一行，缺失整行不渲染） */
+.as-insight-card__horizon-projection {
+  flex-basis: 100%;
+  font-size: 20rpx;
+  color: $ink-faint;
+  line-height: 1.5;
+}
+
+/* 目标位（大盘粒度透传；板块不传即不渲染） */
+.as-insight-card__horizon-target {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: $ink;
+}
+
+/* 影响阶段（大盘溯源模型透传；板块不传即不渲染） */
+.as-insight-card__horizon-phase {
+  flex-shrink: 0;
+  font-size: 20rpx;
+  color: $ink-faint;
 }
 
 .as-insight-card__ph-tt {

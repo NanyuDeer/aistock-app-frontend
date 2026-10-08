@@ -59,15 +59,16 @@ test('overallStatus：三档全验证（含 insufficient）→ verified', () => 
 })
 
 test('computeStats：命中率口径 hit/(hit+miss)，insufficient 不计', () => {
-  const hit = baseRecord({ id: 1, verification: { short: { horizon: 'short', result: 'hit', actual: '+1.2%', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' } } })
-  const miss = baseRecord({ id: 2, verification: { short: { horizon: 'short', result: 'miss', actual: '-0.5%', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' } } })
-  const insufficient = baseRecord({ id: 3, verification: { short: { horizon: 'short', result: 'insufficient', actual: '', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' } } })
+  const hit = baseRecord({ id: 1, verification: { short: { horizon: 'short', result: 'hit', methodology_version: '4.0', actual: '+1.2%', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' } } })
+  const miss = baseRecord({ id: 2, verification: { short: { horizon: 'short', result: 'miss', methodology_version: '4.0', actual: '-0.5%', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' } } })
+  const insufficient = baseRecord({ id: 3, verification: { short: { horizon: 'short', result: 'insufficient', methodology_version: '4.0', actual: '', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' } } })
   const stats = computeStats([hit, miss, insufficient], TODAY)
   assert.equal(stats.total, 3)
   assert.equal(stats.hitRate, 0.5)
   assert.equal(stats.pendingCount, 3)
   assert.equal(stats.verifiedCount, 0)
   assert.equal(stats.skippedCount, 0)
+  assert.deepEqual(stats.long, { n: 0, hits: 0, hitRate: null })
 })
 
 test('computeStats：skipped 记录单独计数，不计 pending/verified', () => {
@@ -76,9 +77,9 @@ test('computeStats：skipped 记录单独计数，不计 pending/verified', () =
   const verified = baseRecord({
     id: 3,
     verification: {
-      short: { horizon: 'short', result: 'hit', actual: '+1.2%', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' },
-      mid: { horizon: 'mid', result: 'hit', actual: '+0.8%', reason: 'x', verified_at: '2026-09-08T08:00:00.000Z' },
-      long: { horizon: 'long', result: 'hit', actual: '+2.0%', reason: 'x', verified_at: '2027-01-05T08:00:00.000Z' },
+      short: { horizon: 'short', result: 'hit', methodology_version: '4.0', actual: '+1.2%', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' },
+      mid: { horizon: 'mid', result: 'hit', methodology_version: '4.0', actual: '+0.8%', reason: 'x', verified_at: '2026-09-08T08:00:00.000Z' },
+      long: { horizon: 'long', result: 'hit', methodology_version: '4.0', actual: '+2.0%', reason: 'x', verified_at: '2027-01-05T08:00:00.000Z' },
     },
   })
   const stats = computeStats([skipped, pending, verified], TODAY)
@@ -87,6 +88,32 @@ test('computeStats：skipped 记录单独计数，不计 pending/verified', () =
   assert.equal(stats.pendingCount, 1)
   assert.equal(stats.verifiedCount, 1)
   assert.equal(stats.hitRate, 1)
+  // long 档不计入命中率，单列展示（§4.7）
+  assert.deepEqual(stats.long, { n: 1, hits: 1, hitRate: 1 })
+})
+
+test('computeStats：口径对齐 4.0——旧版本 / approximate 剔除，long 单列不计入命中率', () => {
+  const entry = (result: 'hit' | 'miss', methodology_version: string) =>
+    ({ horizon: 'short', result, methodology_version, actual: 'x', reason: 'x', verified_at: '2026-08-15T08:00:00.000Z' }) as const
+  const hit = baseRecord({ id: 1, verification: { short: entry('hit', '4.0') } })
+  const miss = baseRecord({ id: 2, verification: { short: entry('miss', '4.0') } })
+  // 旧版本 → 剔除
+  const oldVersion = baseRecord({ id: 3, verification: { short: entry('hit', '3.0') } })
+  // 越年近似档 → 剔除
+  const approximate = baseRecord({
+    id: 4,
+    prediction: { prediction_status: 'confirmed', due_dates_approximate: ['short'] },
+    verification: { short: entry('miss', '4.0') },
+  })
+  // long 档 → 单列，不计入命中率
+  const long = baseRecord({
+    id: 5,
+    verification: { long: { horizon: 'long', result: 'hit', methodology_version: '4.0', actual: '+8%', reason: 'x', verified_at: '2027-01-05T08:00:00.000Z' } },
+  })
+  const stats = computeStats([hit, miss, oldVersion, approximate, long], TODAY)
+  // 仅 4.0 非近似 non-long 进命中率：1 hit / (1 hit + 1 miss) = 0.5
+  assert.equal(stats.hitRate, 0.5)
+  assert.deepEqual(stats.long, { n: 1, hits: 1, hitRate: 1 })
 })
 
 // ===== Spec A §4.3：conditionStage — condition 验证按 c{i} key 读取 =====
