@@ -58,6 +58,10 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *       首页重构把内联 `band: formatBandText(...)` 改为局部常量 `const band = ...`（并新增 hint 消费），
  *       断言已同步到新形状。
  *    → 实测 284/284/0，已知残余失败清零；本常量随之为全绿基线。
+ *  2026-10-08（CI 首跑红→绿）：CI（ubuntu-latest）上报「期望 284/284/0、实际 ?/?/?」——**非回归**，
+ *    而是 node:test 的**默认报告器随环境变化**：stdout 非 TTY 时回落 TAP（输出 `# tests N`），
+ *    而下面的 metric() 按 spec 报告器的 `ℹ tests N` 解析 → 三个指标全取不到 → 误判漂移并 exit 2。
+ *    已用 `--test-reporter=spec` 显式锁定报告器（见下方 spawnSync），本地与 CI 输出一致。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
 const EXPECTED_BASELINE = '284/284/0'
 
@@ -125,7 +129,11 @@ console.log(
   `[node-specs] 采集 ${toRun.length} 个 node:test spec（按 vitest 白名单排除 ${excludedAbs.size} 个 vitest 风格 spec）`,
 )
 
-const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', ...toRun], {
+// --test-reporter=spec：显式锁定 spec 报告器。node:test 的默认报告器随环境变化
+// （stdout 非 TTY 时回落 TAP，Node 22 = `# tests N`，而 spec 报告器是 `ℹ tests N`），
+// 下面的 metric() 按 `ℹ` 解析 → 不锁定会在 CI 上取到 '?'、被误判为「基线漂移」并 exit 2
+// （2026-10-08 CI 实测：期望 284/284/0、实际 ?/?/?）。
+const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', '--test-reporter=spec', ...toRun], {
   cwd: REPO,
   encoding: 'utf8',
 })

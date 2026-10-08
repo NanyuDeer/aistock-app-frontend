@@ -2,6 +2,22 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-10-08 — CI 门禁首跑红转绿：锁定 node:test 报告器
+
+**开发者**: Aria
+
+### 修复（测试基建，产品代码零改动）
+
+- **现象**：新增 CI（`.github/workflows/ci.yml`）首跑时 `类型检查` / `Vitest 单测` 均过，唯 `node:test 单测（含基线哨兵）` 报
+  `✖ 基线漂移：期望 284/284/0，实际 ?/?/?` 并 `exit 2`——但同一份日志显示 `# pass 284` / `# fail 0`（测试实际全绿）。
+- **根因**：`tests/run-node-specs.mjs` 按 `^ℹ (tests|pass|fail) (\d+)` 解析 node:test 汇总，而 node:test 的**默认报告器随环境变化**：
+  stdout 非 TTY（CI runner）时回落 **TAP**，输出 `# tests N`，取不到 `ℹ` 前缀 → 三指标全为 `?` → 误判漂移。本地 Node 25 默认 spec 报告器，恰好能匹配，故此前未暴露。
+- **修法**：`spawnSync` 显式加 `--test-reporter=spec` 锁定报告器（不动判定口径、不动基线常量）。
+- **验证**：本地强制 `--test-reporter=tap` 复现 `# tests`（旧解析得 `?`）、强制 spec 得 `ℹ`；`npm run test:node` → `期望 284/284/0，实际 284/284/0`（exit 0）；
+  `test:vite-config` 2/2 通过、`build:h5` 构建通过。最终判据取 CI 二次运行。
+
+---
+
 ## [master] 2026-10-07 — 0.1.5 版本发布
 
 **开发者**: 项目组
