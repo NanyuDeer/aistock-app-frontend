@@ -58,7 +58,7 @@ interface TabItem {
 const tabs: TabItem[] = [
   { id: 'morning', name: '早点听', icon: 'broadcast-line', path: '/modules/home/pages/index' },
   { id: 'stock', name: '选股', icon: 'bar-chart-line', path: '/modules/home/pages/index?tab=stock' },
-  { id: 'alert', name: '提醒', icon: 'bell-line', path: '/modules/favorites/pages/index' },
+  { id: 'alert', name: '提醒', icon: 'bell-line', path: '/modules/home/pages/index?tab=alert' },
 ]
 
 /** Tab 栏 bottom 定位值（px）= GlobalChatBar 高度（含安全区补偿） */
@@ -74,11 +74,13 @@ const activeTabId = computed(() => {
     const currentPage = pages[pages.length - 1]
     const route = currentPage?.route || ''
 
-    // 首页 → 默认激活 morning tab，如果 URL 带 tab=stock 则激活 stock tab
+    // 首页（含「提醒」Tab）→ 默认 morning，URL 带 tab 时按 tab 激活
     if (route.includes('home/pages/index')) {
       const page = currentPage as unknown as { $page?: { options?: Record<string, string> }; options?: Record<string, string> }
       const options = page?.$page?.options || page?.options || {}
-      return options.tab === 'stock' ? 'stock' : 'morning'
+      if (options.tab === 'stock') return 'stock'
+      if (options.tab === 'alert') return 'alert'
+      return 'morning'
     }
     // 选股相关页面 → 激活 stock tab
     if (route.includes('analytics/pages/index')) return 'stock'
@@ -86,8 +88,6 @@ const activeTabId = computed(() => {
     if (route.includes('analytics/pages/trend-score')) return 'stock'
     if (route.includes('analytics/pages/forecast')) return 'stock'
     if (route.includes('analytics/pages/reports')) return 'stock'
-    // 提醒页 → 激活 alert tab
-    if (route.includes('favorites/pages/index')) return 'alert'
 
   } catch (_) { /* ignore */ }
 

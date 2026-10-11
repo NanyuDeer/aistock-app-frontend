@@ -2,6 +2,41 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-10-11 — App 使用体验走查整改：交易日历对齐 + 盘中刷新补齐 + 一致性清理
+
+**开发者**: Aria
+
+### 修复
+
+- **交易日判定接入后端日历**：新增前端只读日历缓存 `shared/utils/tradingCalendar.ts`，`tradingTime.isTradingDay/isTradingTime` 改为优先读后端 `trading_calendar`（窗口内可识别法定节假日），仅在未加载/超出窗口时降级为「周一~周五」；App 启动与回前台拉取一次（含跨天刷新与在途去重）。修复此前节假日被误判为交易日、导致盘中轮询空转与行情状态文案错误的问题。
+- **日期口径统一为上海时区**：`trend-score.vue` / `trend-score-report.vue` / `hot-burst-report.vue` / `hot-burst.vue` 共 4 处 `new Date().toISOString()` 改用 `shanghaiDateString()`，修复凌晨 0:00–8:00 取到前一天的问题。
+- **晚报空态文案错配**：`pages-sub-app/briefing/index.vue` 的 `emptyHint` 补齐 `evening` 分支（原晚报错误显示「请在 9:10 后查看」）。
+- **「立即检测」名实不符**：自选股异动页改为**真正调用** `stockTraceApi.detect()` 后再刷新列表（原实现只刷新列表，不触发后端检测）。
+- **「关注事件」假可用**：`eventApi` 的 `followEvent`/`unfollowEvent`/`watchEvent` 由静默成功改为**显式抛错**，`useEventFollow` 提示「关注功能开发中」，不再让列表/传导页乐观置为「已关注」。
+- **恐贪指数入口写死值**：首页 `FearGreedIndex` 去掉写死的默认指数 `12`，未拉到数据时显示 `--`（不再用假数值冒充真实档位）。
+
+### 改进
+
+- **自选列表盘中自动刷新**：默认视图（未开分时模式）在交易时段内每 60s 原地刷新行情，不再要求先手动切到分时模式。
+- **选股子 Tab 切换刷新**：四个子 Tab 仍用 `v-show` 保活，但切换时主动调用子组件 `refresh()`，修复「上午进过选股页、下午切回来仍是上午快照」。
+- **「提醒」Tab 切换刷新 + 盘中轮询**：由 `MainTabs` 下传 `active`，切到该 Tab 立即刷新、盘中每 60s 轮询（原仅 `onMounted` 拉一次）。
+- **H5/小程序异动实时性**：无 WebSocket 通道时盘中用 60s 轮询（只合并第 1 页、不截断已翻页内容），与 App 端 WS 行为对齐。
+- **生成时刻文案口径统一**：晨报 9:10 / 午间报 12:05 / 晚报 15:30，`MorningContent` 与 `useBriefingCard` 一致。
+
+### 重构 / 清理
+
+- **「提醒」Tab 双实现收敛**：删除孤儿 mock 页 `modules/favorites/pages/index.vue`（「特别提醒」堆叠卡，整页写死、无任何 UI 入口）及其 `pages.json` 路由；`AppBottomBar` 的 alert 路径改指 `/modules/home/pages/index?tab=alert` 并同步路由识别；`favorites/AGENTS.md` 记录归属。
+- **路由标题统一**：`event-catcher` 导航标题「自选股情报」→「个股情报」（与页面内标题、首页入口一致）。
+- **删除首页死代码**：`MorningContent.vue` 移除无引用的 `goChat` / `goSearch` / `goStockDetail` / `goLogin`。
+- **删除写死字段**：自选列表移除恒为 `false` 的 `margin` / `specialAlert` 字段及其「融 / 特别提醒」标签与样式。
+
+### 验证
+
+- `npx vue-tsc --noEmit` exit 0。
+- 全量 `npx vitest run`：**66 文件 / 630 用例全绿**（含同步更新的 `monitor.spec.ts` 的 `detect` mock）。
+
+---
+
 ## [master] 2026-10-08 — CI 门禁首跑红转绿：锁定 node:test 报告器
 
 **开发者**: Aria

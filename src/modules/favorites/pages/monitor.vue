@@ -97,7 +97,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { useAppStore } from '@/shared/store/modules/app'
-import { getMarketStatus } from '@/shared/utils/tradingTime'
+import { getMarketStatus, isTradingTime } from '@/shared/utils/tradingTime'
 import { formatTime, shanghaiDateKeyDaysAgo, TWO_WEEK_WINDOW_DAYS } from '@/shared/utils/datetime'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
@@ -112,6 +112,7 @@ import Tag from '@/shared/components/Tag.vue'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { WS_BASE_URL } from '@/shared/utils/constants'
+import { isApp } from '@/shared/utils/platform'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
 import { isUnattributableMovement, dedupeDailyMovements, upsertEventById } from '@/modules/favorites/components/insightCards'
 
@@ -185,6 +186,8 @@ function onAlertToggle(next: boolean) {
   } else {
     disconnectWs()
   }
+  // 开关切换后同步 H5 轮询（开→盘中轮询，关→停止）
+  syncH5Polling()
 }
 
 function fmtDateMMDD(t?: string): string {
@@ -273,15 +276,56 @@ async function loadMore() {
   }
 }
 
-/** 手动触发检测：洞察数据由后端 cron 周期采集，此处仅刷新列表 */
+/**
+ * 手动触发检测：先让后端真正执行一次打点检测（POST /cn/favorites/movements/detect），
+ * 再刷新列表。原实现只刷新列表、按钮文案却叫「立即检测」，名实不符。
+ */
 async function handleDetect() {
   if (detecting.value) return
   detecting.value = true
   try {
-    fetchAlerts()
+    await stockTraceApi.detect().catch((err) => {
+      console.warn('[monitor] detect failed:', err)
+    })
+    await fetchAlerts()
   } finally {
     detecting.value = false
   }
+}
+
+/**
+ * 轮询/增量刷新：只拉第 1 页并与已有 rawItems 浅合并，**不重置分页状态**，
+ * 避免把用户已翻出的后续页截断（与 loadMore 的 upsert 合并口径一致）。
+ */
+async function refreshFirstPage() {
+  try {
+    const page = await stockTraceApi.list(20, undefined, { visibleOnly: true, since: shanghaiDateKeyDaysAgo(TWO_WEEK_WINDOW_DAYS) })
+    rawItems.value = upsertEventById(rawItems.value, page.items)
+  } catch {
+    // 单次轮询失败忽略，保留既有列表
+  }
+}
+
+/**
+ * H5/小程序无 WebSocket 实时通道（WS 仅 App 支持）→ 盘中用 60s 轮询替代，
+ * 使「盘中异动推送」在三端体验一致。
+ */
+let h5PollTimer: ReturnType<typeof setInterval> | null = null
+
+function stopH5Polling() {
+  if (h5PollTimer) {
+    clearInterval(h5PollTimer)
+    h5PollTimer = null
+  }
+}
+
+function syncH5Polling() {
+  stopH5Polling()
+  if (isApp) return // App 端已有 WS 实时通道（movement.created/updated），无需轮询
+  if (!alertEnabled.value || !isTradingTime()) return
+  h5PollTimer = setInterval(() => {
+    if (isTradingTime()) void refreshFirstPage()
+  }, 60 * 1000)
 }
 
 function subscribeAlerts() {
@@ -348,13 +392,18 @@ function onReport(eventId: string): void {
 onShow(() => {
   favoritesStore.fetchFavorites()
   fetchAlerts()
+  // H5/小程序：盘中启动轮询替代 WS（App 端由 syncH5Polling 内部直接跳过）
+  syncH5Polling()
 })
 
 onMounted(() => {
   if (alertEnabled.value) subscribeAlerts()
 })
 
-onUnmounted(() => disconnectWs())
+onUnmounted(() => {
+  disconnectWs()
+  stopH5Polling()
+})
 </script>
 
 <style lang="scss" scoped>

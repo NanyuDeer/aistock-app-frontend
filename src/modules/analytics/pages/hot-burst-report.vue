@@ -70,6 +70,7 @@ import { computed, onUnmounted, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { agentApi } from '@/shared/api/modules/agent'
 import { formatDateTime } from '@/shared/utils/datetime'
+import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { LoadingState, EmptyState, Tag, Card } from '@/shared/components'
@@ -384,7 +385,8 @@ async function loadReport() {
 }
 
 onLoad((options) => {
-  date.value = options?.date || new Date().toISOString().split('T')[0]
+  // 必须用上海自然日：toISOString 是 UTC，凌晨 0:00–8:00 会取到前一天
+  date.value = options?.date || shanghaiDateString()
   loadReport()
 })
 

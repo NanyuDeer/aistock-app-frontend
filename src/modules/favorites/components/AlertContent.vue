@@ -80,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted, watch } from 'vue'
 import Segmented from '@/shared/components/Segmented.vue'
 import ListCell from '@/shared/components/ListCell.vue'
 import Tag from '@/shared/components/Tag.vue'
@@ -89,7 +89,11 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { useUserStore } from '@/shared/store/modules/user'
+import { isTradingTime } from '@/shared/utils/tradingTime'
 import { isUnattributableMovement, dedupeDailyMovements } from './insightCards'
+
+/** 是否处于前台可见的「提醒」Tab（由 MainTabs 传入，用于控制盘中轮询） */
+const props = withDefaults(defineProps<{ active?: boolean }>(), { active: false })
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -299,9 +303,55 @@ defineExpose({
 })
 
 onMounted(() => {
+  refreshAll()
+})
+
+/* ===== 盘中自动刷新 =====
+ * MainTabs 用 v-show 保活三个 Tab，切 Tab 不触发页面级 onShow，
+ * 原实现只在 onMounted 拉一次 → 盘中切回「提醒」看到的仍是首次挂载的快照。
+ * 这里：切到本 Tab 立即刷新一次；盘中（交易时段内）每 60s 轮询一次。
+ */
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+/** 区分首次 activated（首屏由 onMounted 负责），避免重复拉取 */
+let hasActivated = false
+
+function refreshAll() {
   void loadCaptureList()
   void loadIntelList()
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+}
+
+function syncAutoRefresh() {
+  stopAutoRefresh()
+  if (!props.active || !isTradingTime()) return
+  refreshTimer = setInterval(() => {
+    if (props.active && isTradingTime()) refreshAll()
+  }, 60 * 1000)
+}
+
+// 切到「提醒」Tab：立即刷新并启动/停止盘中轮询
+watch(
+  () => props.active,
+  (active) => {
+    if (active) refreshAll()
+    syncAutoRefresh()
+  },
+)
+
+// 页面级显隐（回到首页 / 离开首页）：非首次激活时刷新一次并重置轮询
+onActivated(() => {
+  if (hasActivated) refreshAll()
+  hasActivated = true
+  syncAutoRefresh()
 })
+onDeactivated(stopAutoRefresh)
+onUnmounted(stopAutoRefresh)
 
 // 登录/登出后，个股情报数据源会在全市场与自选股之间切换，需重新加载
 watch(

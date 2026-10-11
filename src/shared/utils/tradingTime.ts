@@ -2,6 +2,8 @@
  * 交易时间相关工具
  */
 
+import { checkTradingDay } from './tradingCalendar'
+
 /**
  * 获取上海自然日的 YYYY-MM-DD 字符串。
  *
@@ -47,10 +49,18 @@ export function addCalendarDays(dateString: string, delta: number): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
 }
 
-/** 判断当前是否为交易日（周末非交易日） */
+/**
+ * 判断当前是否为交易日。
+ *
+ * 唯一事实源是后端 `trading_calendar` 表（见 tradingCalendar.ts 的缓存）：
+ * 缓存命中时以后端日历为准（可识别法定节假日）；未加载或超出缓存窗口时
+ * 降级为「周一~周五」判定（与后端降级策略一致，绝不静默当作交易日）。
+ */
 export function isTradingDay(date: Date = new Date()): boolean {
   const { weekday } = shanghaiDateTimeParts(date)
-  return weekday !== 0 && weekday !== 6
+  if (weekday === 0 || weekday === 6) return false
+  const known = checkTradingDay(shanghaiDateString(date))
+  return known === null ? true : known
 }
 
 /**
@@ -94,7 +104,7 @@ export function getMarketStatus(date: Date = new Date()): string {
 
 /**
  * 计算下次开盘时间（毫秒时间戳）
- * 仅交易日判断，不含节假日
+ * 交易日判定委托 isTradingDay（后端日历窗口内可识别节假日，窗口外降级为周一~周五）
  */
 export function nextOpenTime(date: Date = new Date()): number {
   const d = new Date(date)

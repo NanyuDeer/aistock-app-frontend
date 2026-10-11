@@ -6,7 +6,7 @@
     <!-- "恐贪"前缀 -->
     <text class="fgi-btn__prefix">恐贪</text>
     <!-- 数值 -->
-    <text class="fgi-btn__value" :style="{ color: range.color }">{{ Math.round(indexValue) }}</text>
+    <text class="fgi-btn__value" :style="{ color: range.color }">{{ indexValue == null ? '--' : Math.round(indexValue) }}</text>
     <!-- 标签 -->
     <text class="fgi-btn__label">{{ range.label }}</text>
     <!-- 右箭头：暗示可点击跳转 -->
@@ -41,12 +41,16 @@ const RANGES: RangeDef[] = [
   { min: 80, max: 100, label: '沸点', color: '#FF3B30', start: '#FF3B30', end: '#FF6B60', advice: '市场过热，谨防回调风险', isExtreme: true },
 ]
 
-/** 指数数值（0-100），页面挂载时从恐贪指数服务拉取真实值；失败时保留默认值 */
-const indexValue = ref(12)
+/** 未加载/拉取失败时的中性档（灰 + 占位文案）：不用任何真实档位冒充，避免展示假数值 */
+const NEUTRAL_RANGE: RangeDef = { min: 0, max: 0, label: '--', color: '#9ca3af', start: '#9ca3af', end: '#9ca3af', advice: '', isExtreme: false }
+
+/** 指数数值（0-100）；未拉到数据时为 null（显示 --，不再用写死的 12 冒充真实值） */
+const indexValue = ref<number | null>(null)
 
 /** 当前分档（颜色 / 状态 / 建议） */
 const range = computed<RangeDef>(() => {
   const v = indexValue.value
+  if (v == null) return NEUTRAL_RANGE
   return RANGES.find((r) => v >= r.min && v < r.max) ?? RANGES[RANGES.length - 1]
 })
 

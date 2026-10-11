@@ -251,10 +251,11 @@ const briefingClueCount = computed(() => {
 function getBriefingDesc(): string {
   switch (briefingStatus.value) {
     case 'empty':
+      // 生成时刻口径统一（晨报 9:10 / 午间报 12:05 / 晚报 15:30），与 useBriefingCard 一致
       if (briefingType.value === 'midday') return '午间报生成中，12:05后查看'
       return briefingType.value === 'morning'
-        ? '晨报生成中，9:00后查看'
-        : '晚报生成中，收盘后查看'
+        ? '晨报生成中，9:10后查看'
+        : '晚报生成中，15:30后查看'
     case 'error':
       return '暂不可用，点击查看'
     case 'loading':
@@ -514,10 +515,6 @@ onShow(() => {
   currentSlot.value = getTradingTimeSlot()
 })
 
-function goChat() {
-  uni.navigateTo({ url: '/pages-sub-app/chat/index' })
-}
-
 function goBriefing() {
   uni.navigateTo({ url: buildBriefingUrl(briefingType.value, briefingDate.value) })
 }
@@ -564,18 +561,6 @@ function goTrackDetail() {
     return
   }
   uni.navigateTo({ url: `/modules/chat/pages/event/detail?id=${eventId}` })
-}
-
-function goSearch() {
-  uni.navigateTo({ url: '/modules/favorites/pages/search' })
-}
-
-function goStockDetail(symbol: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
-}
-
-function goLogin() {
-  uni.navigateTo({ url: '/modules/user/pages/login' })
 }
 </script>
 
