@@ -181,13 +181,13 @@ interface Bubble {
   fontSize: number
 }
 
-// ===== 长线/短线风口两档切换（无"全部"档；both 同时归属两档） =====
+// ===== 短线/长线风口两档切换（无"全部"档；both 同时归属两档；默认展示短线） =====
 const CYCLE_OPTIONS = [
-  { label: '长线风口榜', value: 'long' },
   { label: '短线风口榜', value: 'short' },
+  { label: '长线风口榜', value: 'long' },
 ]
 
-const activeCycle = ref<'long' | 'short'>('long')
+const activeCycle = ref<'long' | 'short'>('short')
 
 /** 当前档位展示的板块：统一先按上榜次数降序、再按该档位持续时间（影响天数）降序，各取 top8。
  * 长线上榜次数=近120日 frequency、短线=近20日 freq20；持续时间=长线 long_term_days / 短线 short_term_days。
@@ -454,7 +454,7 @@ async function loadData() {
   } catch {
     sectors.value = []
     updateTime.value = ''
-    errorMessage.value = '长线风口数据加载失败'
+    errorMessage.value = '风口数据加载失败'
   } finally {
     loading.value = false
   }
