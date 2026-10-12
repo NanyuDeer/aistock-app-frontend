@@ -337,12 +337,12 @@ async function loadLeaderSectors() {
     const res: any = await stockApi.getWindLeaders(20)
     const data = res?.data ?? res
     const sectors: WindLeaderSector[] = data?.hot_sectors ?? []
-    // 短线榜口径（复刻后端 applyDualRankings.shortBoard）：cycle 为 short/both，先按近10日上榜次数 freq20 降序，
+    // 短线榜口径（复刻后端 applyDualRankings.shortBoard）：cycle 为 short/both，先按近10日上榜次数 freq10 降序，
     // 同值再按短线热度 short_heat 降序；这样得到的才是真正的短线榜前 3，而非长线榜里"既长又短"的子集。
     const shortSectors = sectors
       .filter(s => s.cycle === 'short' || s.cycle === 'both')
       .sort((a, b) => {
-        const freqDiff = Number(b.freq20 ?? 0) - Number(a.freq20 ?? 0)
+        const freqDiff = Number(b.freq10 ?? 0) - Number(a.freq10 ?? 0)
         if (freqDiff !== 0) return freqDiff
         return sectorShortHeat(b) - sectorShortHeat(a)
       })

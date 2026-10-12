@@ -2,6 +2,18 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-10-12 — 风口龙头上榜次数字段改名 freq20→freq10、frequency→freq120
+
+**开发者**: Aria
+
+### 变更
+
+- 随后端字段改名同步：短线 `freq20` → `freq10`（口径一直是「最近 10 个交易日」，名字为历史误命名）、长线 `frequency` → `freq120`（近 120 个交易日）。
+- 涉及：`modules/market/pages/leaders.vue`（榜单排序 + `boardCount`）、`modules/home/components/MorningContent.vue`（短线榜排序）、`modules/market/pages/sector-detail.vue`（「近120日上榜 N 次」徽标）、`shared/api/modules/stock.ts`（类型）。
+- 修正注释中「近20日」等过时表述为「近10交易日」。
+
+---
+
 ## [master] 2026-10-11 — App 使用体验走查整改：交易日历对齐 + 盘中刷新补齐 + 一致性清理
 
 **开发者**: Aria
