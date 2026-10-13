@@ -84,6 +84,7 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import { useReportPodcast } from '@/shared/utils/useReportPodcast'
+import { shanghaiDateString } from '@/shared/utils/tradingTime'
 
 const { loadPodcast, openPodcast } = useReportPodcast('trend_score')
 
@@ -132,7 +133,8 @@ function openDetail(stock: TrendScoreListItem) {
 }
 
 function goAgentReport() {
-  const today = new Date().toISOString().split('T')[0]
+  // 上海自然日（toISOString 为 UTC，凌晨会取到前一天）
+  const today = shanghaiDateString()
   uni.navigateTo({
     url: `/modules/analytics/pages/trend-score-report?date=${today}`
   })

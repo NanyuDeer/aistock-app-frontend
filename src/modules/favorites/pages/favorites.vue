@@ -130,8 +130,6 @@
                 <text class="stock-name">{{ stock.name }}</text>
                 <view class="stock-tags">
                   <text class="stock-code">{{ stock.symbol }}</text>
-                  <text v-if="stock.margin" class="tag-margin">融</text>
-                  <text v-if="stock.specialAlert" class="tag-alert">特别提醒</text>
                   <!-- Phase 4-2：问 AI → 跳转对话页并预填单股问句（.stop 避免触发行点击进详情） -->
                   <text class="ask-ai-btn" @tap.stop="askAi(stock)">问 AI</text>
                 </view>
@@ -235,8 +233,6 @@ interface StockItem {
   price: number
   changePercent: number
   changeAmount: number
-  margin: boolean
-  specialAlert: boolean
 }
 
 /* ===== 统一确认弹窗状态（替换原生 uni.showModal，样式对齐版本更新弹窗） ===== */
@@ -357,6 +353,25 @@ function syncMinuteRefresh() {
 // 开启/关闭 fenshiMode 时同步实时刷新逻辑；页面重新 onShow（返回自选页）也需恢复定时器
 watch(fenshiMode, () => syncMinuteRefresh())
 
+/* ===== 盘中数字行情自动刷新：默认视图（未开分时模式）也刷新最新价/涨跌幅 ===== */
+let quoteRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+/**
+ * 盘中每 60s 原地刷新自选股行情（refreshQuotes 只覆盖价格字段，不重排列表）。
+ * 原实现只有开启分时模式才轮询 → 默认视图的涨跌幅会停留在"上次进入页面"的快照，
+ * 与"盘中盯自选"的核心诉求不符。非交易时段不轮询，避免无谓请求。
+ */
+function syncQuoteRefresh() {
+  if (quoteRefreshTimer) {
+    clearInterval(quoteRefreshTimer)
+    quoteRefreshTimer = null
+  }
+  if (!isTradingTime()) return
+  quoteRefreshTimer = setInterval(() => {
+    if (isTradingTime()) void favoritesStore.refreshQuotes()
+  }, 60 * 1000)
+}
+
 const stocks = computed<StockItem[]>(() => {
   const list = favoritesStore.stocks
   return list.map((stock) => ({
@@ -365,8 +380,6 @@ const stocks = computed<StockItem[]>(() => {
     price: stock.price || 0,
     changePercent: stock.changePercent || 0,
     changeAmount: calculateChangeAmount(stock.price || 0, stock.changePercent || 0),
-    margin: false,
-    specialAlert: false,
   }))
 })
 
@@ -530,6 +543,8 @@ onShow(() => {
 
   // 返回自选页时若处于分时模式，恢复盘中实时刷新定时器
   syncMinuteRefresh()
+  // 默认视图也恢复盘中行情轮询（不再要求先开分时模式）
+  syncQuoteRefresh()
 })
 
 // 组件卸载时清理盘中轮询定时器，避免内存泄漏
@@ -537,6 +552,10 @@ onUnmounted(() => {
   if (minuteRefreshTimer) {
     clearInterval(minuteRefreshTimer)
     minuteRefreshTimer = null
+  }
+  if (quoteRefreshTimer) {
+    clearInterval(quoteRefreshTimer)
+    quoteRefreshTimer = null
   }
 })
 
@@ -895,22 +914,6 @@ function goSearch() {
 .stock-code {
   font-size: 22rpx;
   color: #9ca3af;
-}
-
-.tag-margin {
-  font-size: 18rpx;
-  color: #f59f0b;
-  background: rgba(245, 159, 11, 0.1);
-  padding: 1rpx 6rpx;
-  border-radius: 4rpx;
-}
-
-.tag-alert {
-  font-size: 18rpx;
-  color: #f43f5e;
-  background: rgba(244, 63, 94, 0.1);
-  padding: 1rpx 6rpx;
-  border-radius: 4rpx;
 }
 
 /* Phase 4-2：问 AI 入口（与 tag 同尺寸 pill，主色区分，可点按） */

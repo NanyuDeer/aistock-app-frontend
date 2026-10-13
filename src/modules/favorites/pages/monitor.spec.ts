@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 // mock stocktrace API（页面唯一数据源）
-const stockTraceApiMock = vi.hoisted(() => ({ list: vi.fn() }))
+const stockTraceApiMock = vi.hoisted(() => ({ list: vi.fn(), detect: vi.fn() }))
 vi.mock('@/shared/api/modules/stockTrace', () => ({ stockTraceApi: stockTraceApiMock }))
 
 // 仅 mock shanghaiDateKeyDaysAgo（返回固定串，避免断言依赖当日/本机时区漂移）；formatTime 等保持原样
@@ -122,6 +122,7 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
   beforeEach(() => {
     setActivePinia(createPinia())
     stockTraceApiMock.list.mockReset()
+    stockTraceApiMock.detect.mockReset()
     favoritesStoreMock.fetchFavorites.mockReset()
     favoritesStoreMock.stocks = []
     appStoreMock.config.alertEnabled = false
@@ -132,6 +133,7 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     // 逐用例清零 since 入参 mock，保证后续 toHaveBeenCalledWith(13) 是针对本次挂载/触底的调用（非跨用例累积）
     vi.mocked(shanghaiDateKeyDaysAgo).mockClear()
     stockTraceApiMock.list.mockResolvedValue({ items: [], nextCursor: null })
+    stockTraceApiMock.detect.mockResolvedValue({ triggered: false })
     onShowHandlers.length = 0
   })
 

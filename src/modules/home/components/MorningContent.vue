@@ -251,10 +251,11 @@ const briefingClueCount = computed(() => {
 function getBriefingDesc(): string {
   switch (briefingStatus.value) {
     case 'empty':
+      // 生成时刻口径统一（晨报 9:10 / 午间报 12:05 / 晚报 15:30），与 useBriefingCard 一致
       if (briefingType.value === 'midday') return '午间报生成中，12:05后查看'
       return briefingType.value === 'morning'
-        ? '晨报生成中，9:00后查看'
-        : '晚报生成中，收盘后查看'
+        ? '晨报生成中，9:10后查看'
+        : '晚报生成中，15:30后查看'
     case 'error':
       return '暂不可用，点击查看'
     case 'loading':
@@ -269,7 +270,8 @@ function goBriefingDetail() {
   uni.navigateTo({ url: `/pages-sub-app/briefing/index?type=${briefingType.value}` })
 }
 
-// 长线风口：从后端 API 获取风口板块数据，提取排行前3的板块在首页预览
+// 短线风口：后端 /cn/wind-leaders 只返回一份 hot_sectors（applyDualRankings 双榜合并，长线榜在前、短线榜在后），
+// limit 会截断数组前 N 项，小 limit 只能取到长线榜；故取控制器上限 20 再按后端短线榜口径重建排行前 3
 interface LeaderStockPreview {
   name: string
   tag: string
@@ -304,12 +306,10 @@ function sectorHint(sector: WindLeaderSector): string {
   return ''
 }
 
-// 从风口板块中提取排行前 N 的板块预览（按 score 降序）
+// 从风口板块中提取前 N 个板块预览；保留调用方传入的顺序（榜单排序由调用方按后端口径完成，此处不再重排）
 function extractSectorPreview(sectors: WindLeaderSector[], maxCount: number): LeaderStockPreview[] {
   return sectors
     .filter(s => s && s.name)
-    .slice()
-    .sort((a, b) => (toFiniteNumber(b.score) ?? 0) - (toFiniteNumber(a.score) ?? 0))
     .slice(0, maxCount)
     .map((sector, index) => {
       const changePct = toFiniteNumber(sector.today_change)
@@ -323,14 +323,32 @@ function extractSectorPreview(sectors: WindLeaderSector[], maxCount: number): Le
     })
 }
 
+/** 取板块短线热度（short_heat 存于 ai_analysis；缺省 0），用于复刻后端短线榜排序的次级键 */
+function sectorShortHeat(sector: WindLeaderSector): number {
+  const raw = sector.ai_analysis
+  if (raw && typeof raw === 'object') return Number(raw.short_heat ?? 0)
+  return 0
+}
+
 async function loadLeaderSectors() {
   try {
-    const res: any = await stockApi.getWindLeaders(8)
+    // 后端只返回一份 hot_sectors（applyDualRankings 双榜合并：长线榜在前、短线榜在后），且 limit 只截取数组前 N 项；
+    // 取控制器上限 20，保证长线榜之后的短线榜板块也在列，再按后端短线榜口径重建排序取前 3。
+    const res: any = await stockApi.getWindLeaders(20)
     const data = res?.data ?? res
     const sectors: WindLeaderSector[] = data?.hot_sectors ?? []
-    leaderSectors.value = extractSectorPreview(sectors, 3)
+    // 短线榜口径（复刻后端 applyDualRankings.shortBoard）：cycle 为 short/both，先按近10日上榜次数 freq10 降序，
+    // 同值再按短线热度 short_heat 降序；这样得到的才是真正的短线榜前 3，而非长线榜里"既长又短"的子集。
+    const shortSectors = sectors
+      .filter(s => s.cycle === 'short' || s.cycle === 'both')
+      .sort((a, b) => {
+        const freqDiff = Number(b.freq10 ?? 0) - Number(a.freq10 ?? 0)
+        if (freqDiff !== 0) return freqDiff
+        return sectorShortHeat(b) - sectorShortHeat(a)
+      })
+    leaderSectors.value = extractSectorPreview(shortSectors, 3)
   } catch (error) {
-    console.error('首页长线风口数据加载失败:', error)
+    console.error('首页短线风口数据加载失败:', error)
     leaderSectors.value = []
   }
 }
@@ -514,10 +532,6 @@ onShow(() => {
   currentSlot.value = getTradingTimeSlot()
 })
 
-function goChat() {
-  uni.navigateTo({ url: '/pages-sub-app/chat/index' })
-}
-
 function goBriefing() {
   uni.navigateTo({ url: buildBriefingUrl(briefingType.value, briefingDate.value) })
 }
@@ -564,18 +578,6 @@ function goTrackDetail() {
     return
   }
   uni.navigateTo({ url: `/modules/chat/pages/event/detail?id=${eventId}` })
-}
-
-function goSearch() {
-  uni.navigateTo({ url: '/modules/favorites/pages/search' })
-}
-
-function goStockDetail(symbol: string) {
-  uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` })
-}
-
-function goLogin() {
-  uni.navigateTo({ url: '/modules/user/pages/login' })
 }
 </script>
 

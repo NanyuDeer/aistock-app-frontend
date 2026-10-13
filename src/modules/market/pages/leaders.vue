@@ -181,27 +181,27 @@ interface Bubble {
   fontSize: number
 }
 
-// ===== 长线/短线风口两档切换（无"全部"档；both 同时归属两档） =====
+// ===== 短线/长线风口两档切换（无"全部"档；both 同时归属两档；默认展示短线） =====
 const CYCLE_OPTIONS = [
-  { label: '长线风口榜', value: 'long' },
   { label: '短线风口榜', value: 'short' },
+  { label: '长线风口榜', value: 'long' },
 ]
 
-const activeCycle = ref<'long' | 'short'>('long')
+const activeCycle = ref<'long' | 'short'>('short')
 
 /** 当前档位展示的板块：统一先按上榜次数降序、再按该档位持续时间（影响天数）降序，各取 top8。
- * 长线上榜次数=近120日 frequency、短线=近20日 freq20；持续时间=长线 long_term_days / 短线 short_term_days。
+ * 长线上榜次数=近120交易日 freq120、短线=近10交易日 freq10；持续时间=长线 long_term_days / 短线 short_term_days。
  * 先过滤掉该档位天数为 0 的板块（另一链被裁剪或长短线均不成立的板块），
  * 宁少勿滥，避免短线档塞满 0 天补位板块。 */
 const displaySectors = computed(() =>
   [...sectors.value]
     .filter(s => getSectorDays(s, activeCycle.value) > 0)
     .sort((a, b) => {
-      // 上榜次数（长线 frequency / 短线 freq20）降序优先
+      // 上榜次数（长线 freq120 / 短线 freq10）降序优先
       const freqDiff =
         activeCycle.value === 'short'
-          ? Number(b.freq20 ?? 0) - Number(a.freq20 ?? 0)
-          : Number(b.frequency ?? 0) - Number(a.frequency ?? 0)
+          ? Number(b.freq10 ?? 0) - Number(a.freq10 ?? 0)
+          : Number(b.freq120 ?? 0) - Number(a.freq120 ?? 0)
       if (freqDiff !== 0) return freqDiff
       // 上榜次数相同时按该档持续时间（影响天数）降序
       return getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value)
@@ -454,7 +454,7 @@ async function loadData() {
   } catch {
     sectors.value = []
     updateTime.value = ''
-    errorMessage.value = '长线风口数据加载失败'
+    errorMessage.value = '风口数据加载失败'
   } finally {
     loading.value = false
   }
@@ -505,9 +505,9 @@ function formatAmount(val?: number | null): string {
 }
 
 // ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
-/** 上榜次数：短线档显示近10日 freq20，长线档显示近120日 frequency */
+/** 上榜次数：短线档显示近10日 freq10，长线档显示近120日 freq120 */
 function boardCount(s: WindLeaderSector): number {
-  return activeCycle.value === 'short' ? Number(s.freq20 ?? 0) : Number(s.frequency ?? 0)
+  return activeCycle.value === 'short' ? Number(s.freq10 ?? 0) : Number(s.freq120 ?? 0)
 }
 
 /** 短线热度阶段标签（heat_stage：启动期/发酵期/高潮期/衰退期），高潮期用 warning 色、其余品牌色 */

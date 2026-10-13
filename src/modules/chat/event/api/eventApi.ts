@@ -59,37 +59,39 @@ export async function getEventGraph(eventId: string): Promise<EventGraph> {
 /**
  * 关注事件
  *
- * 注意：功能暂未实现，后端需要新增接口。
+ * 后端关注接口尚未提供。**显式抛错**而非静默 resolve——原实现静默成功会让
+ * 调用方（useEventFollow → 列表/传导页）乐观地把按钮置为「已关注」，
+ * 造成「看起来能用、实际未落库」的假象。
  *
  * @param eventId - 事件ID
  */
 export async function followEvent(eventId: string): Promise<void> {
-  // TODO: 需要后端新增关注接口
-  console.warn('[eventApi] followEvent 功能暂未实现:', eventId)
+  console.warn('[eventApi] followEvent 后端接口未实现:', eventId)
+  throw new Error('关注功能暂未上线')
 }
 
 /**
  * 取消关注事件
  *
- * 注意：功能暂未实现，后端需要新增接口。
+ * 同上：后端未实现，显式失败避免 UI 假成功。
  *
  * @param eventId - 事件ID
  */
 export async function unfollowEvent(eventId: string): Promise<void> {
-  // TODO: 需要后端新增取消关注接口
-  console.warn('[eventApi] unfollowEvent 功能暂未实现:', eventId)
+  console.warn('[eventApi] unfollowEvent 后端接口未实现:', eventId)
+  throw new Error('关注功能暂未上线')
 }
 
 /**
  * 设置事件盯盘
  *
- * 注意：功能暂未实现，后端需要新增接口。
+ * 同上：后端未实现，显式失败避免 UI 假成功。
  *
  * @param eventId - 事件ID
  */
 export async function watchEvent(eventId: string): Promise<void> {
-  // TODO: 需要后端新增盯盘接口
-  console.warn('[eventApi] watchEvent 功能暂未实现:', eventId)
+  console.warn('[eventApi] watchEvent 后端接口未实现:', eventId)
+  throw new Error('盯盘功能暂未上线')
 }
 
 /**

@@ -33,7 +33,7 @@
         <!-- Tab 内容（v-show 保持组件状态，切换不销毁） -->
         <MorningContent v-show="activeTab === 'morning'" />
         <StockContent v-show="activeTab === 'stock'" />
-        <AlertContent v-show="activeTab === 'alert'" ref="alertContentRef" />
+        <AlertContent v-show="activeTab === 'alert'" ref="alertContentRef" :active="activeTab === 'alert'" />
       </scroll-view>
     </view>
 

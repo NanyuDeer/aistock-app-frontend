@@ -306,8 +306,8 @@ export interface WindLeaderSector {
   type?: string
   /** 短线风口 / 长线风口 / 长线+短线风口 / 均不成立（AI 八字段推导），缺省按 short 兼容存量 */
   cycle?: 'short' | 'long' | 'both' | 'none'
-  frequency?: number | string
-  freq20?: number
+  freq120?: number | string
+  freq10?: number
   freq_delta?: number
   avg_change?: number
   today_change?: number
