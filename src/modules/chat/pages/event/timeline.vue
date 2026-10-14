@@ -388,16 +388,16 @@ onMounted(() => {
   padding: 0 32rpx 40rpx;
 }
 
-/* ===== 时间线列表（左侧竖线 + 内容缩进） ===== */
+/* ===== 时间线列表（左侧竖线 + 内容缩进；2026-10-02 左移 36rpx 居中：缩进 132→96、竖线 100→64、圆点 -40→-32） ===== */
 .timeline-list {
   position: relative;
-  padding-left: 132rpx;
+  padding-left: 96rpx;
 }
 
 /* 竖向时间线：贯穿整列 */
 .tl-line {
   position: absolute;
-  left: 100rpx;
+  left: 64rpx;
   /* 竖线从首个圆点中心开始（首个 .time-header 高 48rpx，圆点 top:50% → 中心在 24rpx），
      避免圆点上方残留一段线看起来像被截断 */
   top: 24rpx;
@@ -420,7 +420,9 @@ onMounted(() => {
   margin-bottom: 16rpx;
 }
 
-/* 圆点节点：8px 圆形，居中于竖线（竖线 left:100rpx → 相对缩进 132rpx 的内容区为 -40rpx） */
+/* 圆点节点：8px 圆形，居中于竖线。竖线 left:64rpx（宽 2rpx，中心 65rpx）；
+   圆点相对内容区（padding-left 96rpx）偏移 -40rpx → 左缘 56rpx、中心 64rpx ≈ 竖线中心（2026-10-02 修正，
+   此前 -32rpx 使圆点中心落在竖线右侧） */
 .tl-dot {
   position: absolute;
   left: -40rpx;
