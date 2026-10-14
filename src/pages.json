@@ -98,19 +98,9 @@
       }
     },
     {
-      "path": "modules/favorites/pages/index",
-      "style": {
-        "navigationBarTitleText": "特别提醒",
-        "navigationStyle": "custom",
-        "enablePullDownRefresh": false,
-        "disableScroll": true,
-        "app-plus": { "bounce": "none" }
-      }
-    },
-    {
       "path": "modules/market/pages/event-catcher",
       "style": {
-        "navigationBarTitleText": "自选股情报",
+        "navigationBarTitleText": "个股情报",
         "navigationStyle": "custom",
         "disableScroll": true,
         "app-plus": { "bounce": "none", "animationType": "slide-in-right", "animationDuration": 250 }
