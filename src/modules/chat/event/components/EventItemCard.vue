@@ -28,6 +28,9 @@
     <!-- 事件标题（最多2行）：点击整卡进入详情（机会洞见） -->
     <text class="card-title">{{ event.title }}</text>
 
+    <!-- 事件影响存活度小标（标题下方单独一行；no_observation / 无数据不渲染） -->
+    <VitalityBadge :vitality="event.impactVitality" class="card-vitality" />
+
     <!-- Top5 影响行业（排序后取前5，横向滑动查看完整名称，隐藏滚动条；空数据展示降级文案） -->
     <scroll-view scroll-x :show-scrollbar="false" class="card-top5">
       <!-- uni-app scroll-view 内部有 .uni-scroll-view-content 包裹层，
@@ -90,6 +93,7 @@ import { formatDateTime } from '@/shared/utils/datetime'
 import { Card, Button, Tag } from '@/shared/components'
 import Rate from '@/shared/components/Rate.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import VitalityBadge from './VitalityBadge.vue'
 import wordmarkPng from '@/shared/components/insight-wordmark.png'
 
 /** AI 洞见徽标底图（洞见字标 PNG） */
@@ -236,6 +240,11 @@ const top5Industries = computed(() => {
   margin-bottom: 12rpx;
   transition: color $t-fast;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* 事件影响存活度小标：标题下方单独一行（紧接标题，与 Top5 行业保持 12rpx 间距） */
+.card-vitality {
+  margin-bottom: 12rpx;
 }
 
 /* ========== AI 摘要（最多2行，超出省略） ========== */
