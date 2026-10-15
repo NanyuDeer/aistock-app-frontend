@@ -5,6 +5,8 @@
       <view class="hero-card">
         <view class="hero-bar"></view>
         <text class="hero-title">{{ detail.event.title }}</text>
+        <!-- 事件影响存活度小标（标题下方单独一行；no_observation / 无数据不渲染） -->
+        <VitalityBadge :vitality="detail.event.impactVitality" class="hero-vitality" />
         <view class="hero-meta">
           <text class="meta-label">来源：</text>
           <text
@@ -104,6 +106,7 @@ import AiTransmissionAnalysis from './transmission/AiTransmissionAnalysis.vue'
 import InvestmentSummaryCard from './InvestmentSummaryCard.vue'
 import InvestmentLogicHeader from './InvestmentLogicHeader.vue'
 import HistoryTimeline from './HistoryTimeline.vue'
+import VitalityBadge from './VitalityBadge.vue'
 
 interface Props { detail?: EventDetailResponse | null }
 const props = defineProps<Props>()
@@ -278,6 +281,10 @@ watch(currentStep, async (stepId) => {
   font-weight: 700;
   color: $ink;
   line-height: 1.4;
+  margin-bottom: 12rpx;
+}
+/* 事件影响存活度小标：标题下方单独一行，与来源元信息保持 12rpx 间距 */
+.hero-vitality {
   margin-bottom: 12rpx;
 }
 .hero-meta {

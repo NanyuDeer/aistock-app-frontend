@@ -23,6 +23,8 @@ P0 身份鉴权（2026-08-11）：WS 握手改经 app-api 桥接（`createAgentW
 - `../pages-sub-app/chat/cards/SectionCard.vue` - 分节区块卡片（改进 14 新增：单组件 + 语义变体 conclusion/points/notes/risk/other，按 markdown 二级/三级标题分节渲染）
 - `../pages-sub-app/chat/cards/MarketSnapshotCard.vue` / `StockSnapshotCard.vue` / `CapitalFlowCard.vue` / `DeepAnalysisCard.vue` / `ComparisonCard.vue` - 5 类展示卡片（行情快照/个股快照/资金流向/深度分析/对比，纯展示，P11 新增）
 - 通用气泡/流式文本组件位于 `shared/components/`（`ChatBubble.vue`/`StreamingText.vue`）；skillResult 卡片与 SkillButton 已随 P3/P6 删除
+- `pages/event/components/FavoriteRelatedCard.vue` - **自选股相关事件收折卡片**（事件传导列表页 `pages/event/list.vue` 顶部，默认收起 3 条、展开上限 20、空态不渲染）：数据流在 `pages/event/favoriteRelated.ts` —— 调 `GET /api/cn/favorites/industry-aliases` 取自选股行业别名集合（本地缓存 `fav_industry_aliases`，TTL 24h），与事件 `chain_summary[].industry`（两侧都过 `stripRoman` 去「Ⅲ/Ⅱ/Ⅰ」后缀）求交，命中即渲染「影响板块：X → 你的自选股：Y（Z）」，胶囊跳个股详情；未登录 / 无自选股 / 接口失败一律静默返回空数组（不阻断主列表）
+- `pages/event/components/VitalityBadge.vue` - **事件影响存活度小标**（`EventItemCard.vue` 列表卡片标题下方单独一行 + `AiEventReport.vue` 详情 hero 标题下方各渲染一处）：消费后端 `impactVitality: {score, status, statDate} | null` 标注，`isVitalityVisible` 仅放行 alive/fading/expired 三档（文案 alive=影响持续中 / fading=影响减弱 / expired=影响消退，定义在 `event/constants.ts`），no_observation / 无数据不渲染；语义色避开红涨绿跌（alive=蓝 / fading=琥珀 / expired=浅灰），纯标注不改卡片排序与列表过滤
 
 ## Hooks
 - 使用 `shared/utils/useChatStream.ts`（对话流主 hook：WS 为主、HTTP 降级；`send(content, { forceDeep })`；DONE 写 `execSteps`/`lastDeepReport`；P3-fix 起订阅 reasoning 事件按节点聚合 `reasoningSteps`）

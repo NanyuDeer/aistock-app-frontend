@@ -55,6 +55,28 @@ export interface AffectedIndustry {
   reason: string
 }
 
+// ==================== 事件影响存活度（Impact Vitality） ====================
+
+/**
+ * 存活度分档（与后端 EventImpactVitalityService.ImpactStatus 一致）：
+ * - alive/fading/expired：有可观测行业且能算分
+ * - no_observation：行业映射不到板块 / 无观测日（vitality=null，前端不渲染）
+ */
+export type ImpactVitalityStatus = 'alive' | 'fading' | 'expired' | 'no_observation'
+
+/**
+ * 事件影响存活度（后端 annotation-only 标注：只标注、不排序、不过滤）。
+ * score=null 表示 no_observation；无数据时后端返回 null（前端整个不渲染）。
+ */
+export interface ImpactVitality {
+  /** 存活度得分 0-1；no_observation 时为 null */
+  score: number | null
+  /** 分档 */
+  status: ImpactVitalityStatus
+  /** 计算统计日 YYYY-MM-DD */
+  statDate: string
+}
+
 /** 事件列表项 */
 export interface EventItem {
   /** 事件唯一标识 */
@@ -94,6 +116,8 @@ export interface EventItem {
   globalImportanceDirection?: string | null
   /** Global Importance 级别（critical/important/notable，无则 null） */
   globalImportanceLevel?: string | null
+  /** 事件影响存活度（后端 annotation-only 标注；无数据时为 null，前端不渲染） */
+  impactVitality?: ImpactVitality | null
 }
 
 /** 事件列表 API 响应 */

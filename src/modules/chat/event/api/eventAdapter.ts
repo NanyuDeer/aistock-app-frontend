@@ -27,6 +27,7 @@ import type {
   GraphNodeType,
   EventType,  // 用于 historyEvents 类型断言
   MarketSentiment,  // 用于 direction → sentiment 转换
+  ImpactVitality,  // 事件影响存活度（annotation-only 标注）
 } from '../types'
 import { EVENT_TYPES } from '../constants'
 
@@ -60,6 +61,8 @@ export interface BackendEventListData {
       impactStrength: number
       reason?: string
     }>
+    /** 事件影响存活度（后端 annotation-only 标注；无数据为 null） */
+    impactVitality?: ImpactVitality | null
   }>
   total: number
   page: number
@@ -80,6 +83,8 @@ export interface BackendEventDetailData {
     impactStrength: number
     reason?: string
   }>
+  /** 顶层事件影响存活度（后端 annotation-only 标注；无数据为 null） */
+  impactVitality?: ImpactVitality | null
   content: {
     eventId: string
     title: string
@@ -306,6 +311,8 @@ function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventI
     globalImportanceRank: backendEvent.globalImportanceRank,
     globalImportanceDirection: backendEvent.globalImportanceDirection,
     globalImportanceLevel: backendEvent.globalImportanceLevel,
+    // 事件影响存活度（annotation-only 标注；无数据 null → 前端不渲染）
+    impactVitality: backendEvent.impactVitality ?? null,
   }
 }
 
@@ -355,6 +362,8 @@ export function adaptEventDetail(backend: BackendEventDetailData): EventDetailRe
       affectedIndustries,
       aiSummary: analysis.event_understanding?.summary || '',
       isFollowed: false,      // 功能暂不实现
+      // 事件影响存活度（annotation-only 标注；无数据 null → 前端不渲染）
+      impactVitality: backend.impactVitality ?? null,
     },
 
     // AI 分析模块（直接映射）
