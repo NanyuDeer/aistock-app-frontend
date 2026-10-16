@@ -15,6 +15,7 @@
         </view>
 
         <!-- 音频入口条（点击进入播报详情页） -->
+        <!-- 午间报不产生播报（后端不回填 content.audio_path），故无音频时整条隐藏，只展示文字结论 -->
         <view
           v-if="audioPath || items.length"
           class="audio-bar"
@@ -410,7 +411,11 @@ const emptyText = computed(() => {
 })
 
 const emptyHint = computed(() => {
-  return broadcastType.value === 'midday' ? '请在 12:05 后查看' : '请在 9:10 后查看'
+  // 与生成时刻对齐（见 useBriefingCard.briefingTypeAtShanghaiTime）：
+  // 晨报 9:10 / 午间报 12:05 / 晚报 15:30 后生成。原实现晚报错误地走了晨报文案。
+  if (broadcastType.value === 'midday') return '请在 12:05 后查看'
+  if (broadcastType.value === 'evening') return '请在 15:30 后查看'
+  return '请在 9:10 后查看'
 })
 
 /** 头条条目（isHeadline=true） */

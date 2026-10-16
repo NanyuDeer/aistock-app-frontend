@@ -177,11 +177,13 @@ describe('DynamicInsightCard', () => {
     expect(wrapper.find('.dyn-focus__hint').text()).toBe('常温 · 建议仓位五成~六成')
   })
 
-  it('四入口条带：4 项、数量徽标、当前时段模块高亮', () => {
+  it('四入口条带：4 项、仅图标 + 模块名（无数量徽标）、当前时段模块高亮', () => {
     const wrapper = mount(DynamicInsightCard, { props: { ...baseProps, currentSlot: 'pre' } })
     const items = wrapper.findAll('.dyn-strip__item')
     expect(items).toHaveLength(4)
-    expect(wrapper.findAll('.dyn-strip__count').map(t => t.text())).toEqual(['3条', '2条', '1条', '1条'])
+    // 数量徽标已下线（2026-10-06）：条带只保留图标 + 模块名
+    expect(wrapper.findAll('.dyn-strip__count')).toHaveLength(0)
+    expect(items.map(t => t.text())).toEqual(['风口', '消息', '市场', '节奏'])
     const active = wrapper.findAll('.dyn-strip__item--active')
     expect(active).toHaveLength(1)
     expect(active[0].text()).toContain('风口')

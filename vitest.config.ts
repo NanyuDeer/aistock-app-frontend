@@ -95,11 +95,11 @@ export default defineConfig({
       'src/shared/components/EventRefChip.mount.spec.ts',
       'src/shared/components/AttributionChainView.mount.spec.ts',
       'src/modules/analytics/pages/traceability.mount.spec.ts',
-      'src/modules/home/components/TimeSlotInsightBar.mount.spec.ts',
       'src/modules/market/utils/useAlertSSE.spec.ts',
       'src/modules/market/components/AlertReasoningPanel.spec.ts',
       'src/modules/market/pages/alert-analysis.spec.ts',
       'src/modules/home/components/DynamicInsightCard.mount.spec.ts',
+      'src/modules/home/components/AiPickContent.mount.spec.ts',
     ],
   },
 })

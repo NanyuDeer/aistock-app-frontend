@@ -32,7 +32,10 @@
                 </template>
               </ListCell>
             </template>
-            <EmptyState v-if="!filteredIntelList.length" title="暂无情报数据" />
+            <!-- 空态：沿用原 EmptyState 样式（白底 + 图标 + 文案），高度对齐固定 3 行 -->
+            <view v-else class="list-empty">
+              <EmptyState title="暂无情报数据" />
+            </view>
           </view>
         </view>
       </view>
@@ -65,7 +68,10 @@
                 </template>
               </ListCell>
             </template>
-            <EmptyState v-if="!captureList.length" title="暂无异动数据" />
+            <!-- 空态：沿用原 EmptyState 样式（白底 + 图标 + 文案），高度对齐固定 3 行 -->
+            <view v-else class="list-empty">
+              <EmptyState title="暂无异动数据" />
+            </view>
           </view>
         </view>
       </view>
@@ -74,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted, watch } from 'vue'
 import Segmented from '@/shared/components/Segmented.vue'
 import ListCell from '@/shared/components/ListCell.vue'
 import Tag from '@/shared/components/Tag.vue'
@@ -83,7 +89,11 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
 import { useUserStore } from '@/shared/store/modules/user'
+import { isTradingTime } from '@/shared/utils/tradingTime'
 import { isUnattributableMovement, dedupeDailyMovements } from './insightCards'
+
+/** 是否处于前台可见的「提醒」Tab（由 MainTabs 传入，用于控制盘中轮询） */
+const props = withDefaults(defineProps<{ active?: boolean }>(), { active: false })
 
 // 情报来源类型
 type SourceType = 'announce' | 'research' | 'news'
@@ -216,24 +226,24 @@ const filteredIntelList = computed(() => {
   return nonNeutral.filter(item => item.sentiment === intelSubTab.value)
 })
 
-/** 首页预览最多显示4条，其余进入详情页查看 */
-const MAX_PREVIEW = 4
+/** 首页预览固定行数：个股情报与自选股洞察均为 3 行，多余进详情页查看 */
+const INTEL_ROW_COUNT = 3
 
 /**
- * 个股情报列表固定渲染 4 行：数据不足时空行占位，
- * 卡片纵向长度不随数据量变化（与异动捕手列表一致）
+ * 个股情报列表固定渲染 3 行：数据不足时空行占位，
+ * 卡片纵向长度不随数据量变化（一条都没有时同样占满 3 行高度）
  */
 const intelRows = computed<Array<IntelItem | null>>(() => {
-  const rows: Array<IntelItem | null> = filteredIntelList.value.slice(0, MAX_PREVIEW)
-  while (rows.length < MAX_PREVIEW) rows.push(null)
+  const rows: Array<IntelItem | null> = filteredIntelList.value.slice(0, INTEL_ROW_COUNT)
+  while (rows.length < INTEL_ROW_COUNT) rows.push(null)
   return rows
 })
 
 /**
- * 异动捕手列表固定渲染 4 行：数据不足时空行占位，
+ * 自选股洞察列表固定渲染 3 行：数据不足时空行占位，
  * 卡片纵向长度不随数据量变化（避免只有 1 条资讯时卡片变矮）
  */
-const CAPTURE_ROW_COUNT = 4
+const CAPTURE_ROW_COUNT = 3
 const captureRows = computed<Array<CaptureItem | null>>(() => {
   const rows: Array<CaptureItem | null> = captureList.value.slice(0, CAPTURE_ROW_COUNT)
   while (rows.length < CAPTURE_ROW_COUNT) rows.push(null)
@@ -293,9 +303,55 @@ defineExpose({
 })
 
 onMounted(() => {
+  refreshAll()
+})
+
+/* ===== 盘中自动刷新 =====
+ * MainTabs 用 v-show 保活三个 Tab，切 Tab 不触发页面级 onShow，
+ * 原实现只在 onMounted 拉一次 → 盘中切回「提醒」看到的仍是首次挂载的快照。
+ * 这里：切到本 Tab 立即刷新一次；盘中（交易时段内）每 60s 轮询一次。
+ */
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+/** 区分首次 activated（首屏由 onMounted 负责），避免重复拉取 */
+let hasActivated = false
+
+function refreshAll() {
   void loadCaptureList()
   void loadIntelList()
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+}
+
+function syncAutoRefresh() {
+  stopAutoRefresh()
+  if (!props.active || !isTradingTime()) return
+  refreshTimer = setInterval(() => {
+    if (props.active && isTradingTime()) refreshAll()
+  }, 60 * 1000)
+}
+
+// 切到「提醒」Tab：立即刷新并启动/停止盘中轮询
+watch(
+  () => props.active,
+  (active) => {
+    if (active) refreshAll()
+    syncAutoRefresh()
+  },
+)
+
+// 页面级显隐（回到首页 / 离开首页）：非首次激活时刷新一次并重置轮询
+onActivated(() => {
+  if (hasActivated) refreshAll()
+  hasActivated = true
+  syncAutoRefresh()
 })
+onDeactivated(stopAutoRefresh)
+onUnmounted(stopAutoRefresh)
 
 // 登录/登出后，个股情报数据源会在全市场与自选股之间切换，需重新加载
 watch(
@@ -428,6 +484,21 @@ watch(
 .capture-list :deep(.as-list-cell__prefix),
 .intel-list :deep(.as-list-cell__prefix) {
   margin-right: $s-2;
+}
+
+/* 空态：沿用 EmptyState 原样式（白底 + 图标 + 文案），高度精确对齐固定 3 行
+   （3 × ListCell min-height 104rpx = 312rpx）。EmptyState 自带 padding $s-10 + 120rpx 图标，
+   自然高度约 367rpx 会把空态撑得比 3 行还高，故在空态容器内抹掉其内边距，由 flex 居中 */
+.list-empty {
+  min-height: 312rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $bg-card;
+
+  :deep(.as-empty) {
+    padding: 0;
+  }
 }
 
 .capture-list :deep(.as-list-cell__right),

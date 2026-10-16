@@ -13,7 +13,7 @@
     <view class="as-main-tabs__nav">
       <NotificationDropdown />
       <view class="as-main-tabs__avatar" @tap="goProfile">
-        <SvgIcon name="bear-smile-line" size="30rpx" color="#ffffff" />
+        <SvgIcon name="user-smile-line" size="30rpx" color="#ffffff" />
       </view>
     </view>
 
@@ -33,7 +33,7 @@
         <!-- Tab 内容（v-show 保持组件状态，切换不销毁） -->
         <MorningContent v-show="activeTab === 'morning'" />
         <StockContent v-show="activeTab === 'stock'" />
-        <AlertContent v-show="activeTab === 'alert'" ref="alertContentRef" />
+        <AlertContent v-show="activeTab === 'alert'" ref="alertContentRef" :active="activeTab === 'alert'" />
       </scroll-view>
     </view>
 

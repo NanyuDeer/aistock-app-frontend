@@ -1,6 +1,9 @@
 <template>
   <SubPageCard title="事件传导">
     <view class="event-list-content">
+      <!-- 自选股相关事件卡片：rows 为空时不渲染 -->
+      <FavoriteRelatedCard :rows="favoriteRelatedRows" />
+
       <!-- AI关注焦点区域：标题行（含时间线入口图标）始终显示，卡片仅在有焦点事件时渲染 -->
       <view class="ai-focus-section">
         <!-- 标题行：重大事件（左）+ 时间轴入口（行最右，文字+淡色图标） -->
@@ -109,11 +112,14 @@ import type { FocusEventViewModel } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
 import { getFocusEvents } from '@/modules/chat/event/api/eventService'
+import { loadFavoriteRelatedEvents } from '@/modules/chat/event/favoriteRelated'
+import type { RelatedEventRow } from '@/modules/chat/event/favoriteRelated'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import Segmented from '@/shared/components/Segmented.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
+import FavoriteRelatedCard from '@/modules/chat/event/components/FavoriteRelatedCard.vue'
 import { EVENT_TYPES } from '@/modules/chat/event/constants'
 
 // ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
@@ -121,6 +127,14 @@ const tabItems = [{ label: '全部', value: '全部' }, ...EVENT_TYPES.map(v => 
 
 // ========== 重大事件（基于 Global Importance 排序，由 eventService 提供） ==========
 const focusEvents = ref<FocusEventViewModel[]>([])
+
+// ========== 自选股相关事件（独立拉取，不干扰主列表分页） ==========
+const favoriteRelatedRows = ref<RelatedEventRow[]>([])
+
+/** 加载自选股相关事件：未登录 / 无自选股 / 无相关事件时为空数组（卡片不渲染） */
+async function loadFavoriteRelated() {
+  favoriteRelatedRows.value = await loadFavoriteRelatedEvents()
+}
 
 /** 左卡 = 利好事件（positive），右卡 = 利空事件（negative）；忽略 mixed */
 const positiveEvent = computed(() => focusEvents.value.find(e => e.direction === 'positive') ?? null)
@@ -162,6 +176,7 @@ const { toggleFollow } = useEventFollow()
 onMounted(() => {
   refresh()
   loadFocusEvents()
+  loadFavoriteRelated()
 })
 
 // ========== 事件处理 ==========

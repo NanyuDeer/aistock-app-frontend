@@ -1,10 +1,14 @@
 # Favorites 模块 - 自选股
 
 ## 功能范围
-自选股模块管理用户关注的股票，包括自选股列表、个股详情、搜索、异动监控和特别提醒。
+自选股模块管理用户关注的股票，包括自选股列表、个股详情、搜索、异动监控和自选股洞察。
 
 ## 页面
-- `pages/index.vue` - 特别提醒（堆叠卡片式异动时间线）
+> **「提醒」Tab 的归属（2026-10-11 收敛）**：首页底部「提醒」Tab 由 `src/shared/components/MainTabs.vue` 内嵌的
+> `components/AlertContent.vue`（个股情报 + 自选股洞察预览）承载，**不是**独立路由页。
+> 原先的 `pages/index.vue`（「特别提醒」堆叠卡片，整页写死 mock、无任何 UI 入口）已连同其
+> pages.json 路由一并删除，避免"两套提醒实现"并存；如需堆叠卡交互请基于 `AlertContent.vue` 重建。
+
 - `pages/favorites.vue` - 自选股列表（含编辑态：批量删除 + 拖拽排序）
 - `pages/favorites-grid.vue` - 多股同列（2 列宫格卡片，每格含迷你 K 线 + 名称/最新价/涨跌幅/涨跌额，顶部周期切换）
 - `pages/detail.vue` - 个股详情页
@@ -163,7 +167,7 @@
 - 多股同列（favorites-grid）：表头网格图标进入，行情复用 favoritesStore，K 线按周期全部加载 + 前端 Map 缓存
   （`klineCache` 以 `${period}:${symbol}` 为 key，切回周期不重新请求）；默认日K，顶部切换分时/五日/日K/周K/月K
 - 分时/五日走分钟级 K 线（klt=1），`getKLine` 会自动带 `startDate`（分时近 3 自然日、五日近 9 自然日）避免拉全量历史分钟数据
-- 特别提醒页面使用堆叠卡片手势交互
+- 「提醒」Tab 由 `MainTabs.vue` 内嵌的 `AlertContent.vue` 承载（原堆叠卡「特别提醒」页已删除，见上）
 - **子页面滚动容器（2026-08-19）**：H5 预览包装固定 `#app` 高度并 `overflow: hidden`，页面原生滚动被禁用。`insight.vue` / `insight-detail.vue` / `insight-detail-move.vue` 必须用 `SubPageCard2`（自带白色导航栏 + scroll-view）包裹（对应 pages.json `navigationStyle: "custom"`），否则长内容被裁剪、底部不可达。新增/改造子页面沿用此模式。
 
 ## 首页 AlertContent 自选股洞察（2026-09-04 还原为旧预览 ListCell 形态）

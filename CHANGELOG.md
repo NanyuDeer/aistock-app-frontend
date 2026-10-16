@@ -24,6 +24,149 @@
 
 - `modules/favorites/AGENTS.md`：新增「立即检测」按钮 2026-10-15 修复说明，护栏用例数由 21 更新为 22。
 
+## [xusiyun] 2026-10-15 — 事件影响存活度小标 + 自选股相关事件卡片
+
+**开发者**: xusiyun
+
+### 新增
+
+- 新增 `src/modules/chat/event/components/VitalityBadge.vue`：事件影响存活度小标（标题下方单独一行；alive=影响持续中 / fading=影响减弱 / expired=影响消退，no_observation 或无数据不渲染）。
+- 新增 `src/modules/chat/event/components/FavoriteRelatedCard.vue` + `src/modules/chat/event/favoriteRelated.ts`：列表页顶部「自选股相关事件」收折卡片（默认收起 3 条 / 展开上限 20，空态不渲染；别名缓存 `fav_industry_aliases` TTL 24h）。
+- 新增 `stockApi.getFavoriteIndustryAliases`（`shared/api/modules/stock.ts`，加性）。
+
+### 改进
+
+- `event/types.ts` / `event/constants.ts` / `event/api/eventAdapter.ts`：新增 `impactVitality` 类型、`VITALITY_LABELS` 与 `isVitalityVisible` 三档放行，并透传后端 `impactVitality` 标注。
+- `event/components/EventItemCard.vue`（列表卡片）与 `AiEventReport.vue`（详情 Hero）接入存活度小标。
+- `pages/event/list.vue`：接入自选股相关事件卡片，独立拉取不干扰主列表分页，未登录/无自选股/失败静默返回空。
+
+### 验证
+
+- `npx vue-tsc --noEmit` EXIT=0。
+
+---
+
+## [master] 2026-10-12 — 风口龙头上榜次数字段改名 freq20→freq10、frequency→freq120
+
+**开发者**: Aria
+
+### 变更
+
+- 随后端字段改名同步：短线 `freq20` → `freq10`（口径一直是「最近 10 个交易日」，名字为历史误命名）、长线 `frequency` → `freq120`（近 120 个交易日）。
+- 涉及：`modules/market/pages/leaders.vue`（榜单排序 + `boardCount`）、`modules/home/components/MorningContent.vue`（短线榜排序）、`modules/market/pages/sector-detail.vue`（「近120日上榜 N 次」徽标）、`shared/api/modules/stock.ts`（类型）。
+- 修正注释中「近20日」等过时表述为「近10交易日」。
+
+---
+
+## [master] 2026-10-11 — App 使用体验走查整改：交易日历对齐 + 盘中刷新补齐 + 一致性清理
+
+**开发者**: Aria
+
+### 修复
+
+- **交易日判定接入后端日历**：新增前端只读日历缓存 `shared/utils/tradingCalendar.ts`，`tradingTime.isTradingDay/isTradingTime` 改为优先读后端 `trading_calendar`（窗口内可识别法定节假日），仅在未加载/超出窗口时降级为「周一~周五」；App 启动与回前台拉取一次（含跨天刷新与在途去重）。修复此前节假日被误判为交易日、导致盘中轮询空转与行情状态文案错误的问题。
+- **日期口径统一为上海时区**：`trend-score.vue` / `trend-score-report.vue` / `hot-burst-report.vue` / `hot-burst.vue` 共 4 处 `new Date().toISOString()` 改用 `shanghaiDateString()`，修复凌晨 0:00–8:00 取到前一天的问题。
+- **晚报空态文案错配**：`pages-sub-app/briefing/index.vue` 的 `emptyHint` 补齐 `evening` 分支（原晚报错误显示「请在 9:10 后查看」）。
+- **「立即检测」名实不符**：自选股异动页改为**真正调用** `stockTraceApi.detect()` 后再刷新列表（原实现只刷新列表，不触发后端检测）。
+- **「关注事件」假可用**：`eventApi` 的 `followEvent`/`unfollowEvent`/`watchEvent` 由静默成功改为**显式抛错**，`useEventFollow` 提示「关注功能开发中」，不再让列表/传导页乐观置为「已关注」。
+- **恐贪指数入口写死值**：首页 `FearGreedIndex` 去掉写死的默认指数 `12`，未拉到数据时显示 `--`（不再用假数值冒充真实档位）。
+
+### 改进
+
+- **自选列表盘中自动刷新**：默认视图（未开分时模式）在交易时段内每 60s 原地刷新行情，不再要求先手动切到分时模式。
+- **选股子 Tab 切换刷新**：四个子 Tab 仍用 `v-show` 保活，但切换时主动调用子组件 `refresh()`，修复「上午进过选股页、下午切回来仍是上午快照」。
+- **「提醒」Tab 切换刷新 + 盘中轮询**：由 `MainTabs` 下传 `active`，切到该 Tab 立即刷新、盘中每 60s 轮询（原仅 `onMounted` 拉一次）。
+- **H5/小程序异动实时性**：无 WebSocket 通道时盘中用 60s 轮询（只合并第 1 页、不截断已翻页内容），与 App 端 WS 行为对齐。
+- **生成时刻文案口径统一**：晨报 9:10 / 午间报 12:05 / 晚报 15:30，`MorningContent` 与 `useBriefingCard` 一致。
+
+### 重构 / 清理
+
+- **「提醒」Tab 双实现收敛**：删除孤儿 mock 页 `modules/favorites/pages/index.vue`（「特别提醒」堆叠卡，整页写死、无任何 UI 入口）及其 `pages.json` 路由；`AppBottomBar` 的 alert 路径改指 `/modules/home/pages/index?tab=alert` 并同步路由识别；`favorites/AGENTS.md` 记录归属。
+- **路由标题统一**：`event-catcher` 导航标题「自选股情报」→「个股情报」（与页面内标题、首页入口一致）。
+- **删除首页死代码**：`MorningContent.vue` 移除无引用的 `goChat` / `goSearch` / `goStockDetail` / `goLogin`。
+- **删除写死字段**：自选列表移除恒为 `false` 的 `margin` / `specialAlert` 字段及其「融 / 特别提醒」标签与样式。
+
+### 验证
+
+- `npx vue-tsc --noEmit` exit 0。
+- 全量 `npx vitest run`：**66 文件 / 630 用例全绿**（含同步更新的 `monitor.spec.ts` 的 `detect` mock）。
+
+---
+
+## [master] 2026-10-08 — CI 门禁首跑红转绿：锁定 node:test 报告器
+
+**开发者**: Aria
+
+### 修复（测试基建，产品代码零改动）
+
+- **现象**：新增 CI（`.github/workflows/ci.yml`）首跑时 `类型检查` / `Vitest 单测` 均过，唯 `node:test 单测（含基线哨兵）` 报
+  `✖ 基线漂移：期望 284/284/0，实际 ?/?/?` 并 `exit 2`——但同一份日志显示 `# pass 284` / `# fail 0`（测试实际全绿）。
+- **根因**：`tests/run-node-specs.mjs` 按 `^ℹ (tests|pass|fail) (\d+)` 解析 node:test 汇总，而 node:test 的**默认报告器随环境变化**：
+  stdout 非 TTY（CI runner）时回落 **TAP**，输出 `# tests N`，取不到 `ℹ` 前缀 → 三指标全为 `?` → 误判漂移。本地 Node 25 默认 spec 报告器，恰好能匹配，故此前未暴露。
+- **修法**：`spawnSync` 显式加 `--test-reporter=spec` 锁定报告器（不动判定口径、不动基线常量）。
+- **验证**：本地强制 `--test-reporter=tap` 复现 `# tests`（旧解析得 `?`）、强制 spec 得 `ℹ`；`npm run test:node` → `期望 284/284/0，实际 284/284/0`（exit 0）；
+  `test:vite-config` 2/2 通过、`build:h5` 构建通过。最终判据取 CI 二次运行。
+
+---
+
+## [master] 2026-10-07 — 0.1.5 版本发布
+
+**开发者**: 项目组
+
+### 发布说明（App 更新文案）
+
+- 市场洞见溯源优化：无确认主因时改为展示「可能主因（待验证）」及具体结论，不再显示笼统的「证据不足」
+- 首页新增「时段动态洞见卡」：时段头条焦点 + 3 条跨模块次要焦点 + 四入口条带，盘后头条自动轮播
+- 异动详情页新增「一句话快评」与「AI 推理过程」面板：进页先看抓取结论，可展开查看 AI 逐步推理
+- 自选股「异动监控 / 洞察」列表收敛为最近两周，并支持翻页加载更早记录
+- 低置信度归因不再展示异动卡片；归因失败时自动回退展示有效归因，避免空白
+- 重大事件时间线接入自选股预计财报披露行，事件与财报节点一屏可见
+- 报告详情页核心财务指标新增科目解释气泡，并合并指标分类列，查看更直观
+- 个股详情页财务 / 政策组件重构；预判历史页新增长周期命中率，预判卡统一共享区间行
+- 选股页三 Tab（趋势股 / 热门爆发 / 业绩预测）视觉统一：卡片样式、股票代码、行业标签与涨跌色完全对齐
+- 「我的」新增昵称：首次进入自动分配，并支持随时修改；恐贪指数页走势图提示框修复（仅悬浮显示、靠右不再被挤压）
+
+### 版本号
+
+- `versionName` 0.1.4 → **0.1.5**；`versionCode` 104 → **105**（manifest.json）
+- `src/modules/user/pages/profile.vue`：「关于洞见」版本号 0.1.4 → **0.1.5**（与 manifest 保持同步）
+- Web 端 `aistock-frontend/public/download/version.json`：同步 0.1.5 / 105 / `aistock-0.1.5.apk` / releaseDate 2026-10-07 / 新更新文案
+- 打包基线：PR #145（feat/analysis-frontend）、#146（junliang，自选股翻页/两周窗口、AI 异动解读推理面板、财报披露行、财务指标气泡）合并于 2026-10-07 23:50–23:52，早于打包时间，所得 8 条用户可见改动已并入上方更新文案
+
+---
+
+## [master] 2026-10-06 — 首页/选股页视觉统一、昵称分配与图表交互修复
+
+**开发者**: Aria
+
+### 改进
+
+- **选股页三 Tab 视觉统一**（`TrendStockInsightContent` / `HotBurstInsightContent` / `ForecastInsightContent`）：卡片外壳统一为白底 + `1rpx solid $line` + `$r-lg` + `$shadow-sm` + `$s-3` 内边距，列表间距 `$s-2`；名称统一 `$font-size-md`/600；股票代码统一纯文本 + `$ink-mute`；行业标签统一自绘灰底（机构调研股由组件库 `Tag` 改为同款，并移到代码旁，对齐趋势股结构）；涨跌色统一 `$up`/`$down`；清除 `#f43f5e`/`#22c55e`/`#9ca3af`/`#f0f2f5` 等硬编码与旧别名。趋势股评分/等级缩小（38→32rpx、56→44rpx），业绩预测文案「净利润预测」→「净利预测」
+- **三 Tab 列表上方 meta 行等高**：统一 `margin:$s-2 0` + `min-height:44rpx`（总高 76rpx），修掉首张卡上边缘错位
+- **首页时段洞见横条下线**：`MorningContent.vue` 移除 `TimeSlotInsightBar` 引用/import/`barResetKey`；**删除死代码** `TimeSlotInsightBar.vue` 与其挂载 spec，同步移除 vitest 白名单条目；`currentSlot` / `onBarNavigate` 等由 `DynamicInsightCard` 继续消费
+- **首页个股情报 / 自选股洞察固定 3 行**（`INTEL_ROW_COUNT` / `CAPTURE_ROW_COUNT` = 3），空态沿用 `EmptyState`（白底 + 图标 + 文案）并由 `.list-empty` 精确撑到 3 行高度
+- **「我的」昵称**：首次进入自动分配 `用户` + 5 位随机字母数字并落库（复用后端 `GET/PUT /api/user/profile`）；昵称行右侧新增「更改昵称」入口（就地切换输入框，乐观更新 + 失败回滚）
+- **时段洞见卡四入口条带去掉数量徽标**（原「风口 3条」）
+
+### 修复
+
+- **恐贪指数页历史走势图 tooltip**：①鼠标不在图表上不再常驻（加 `activeDayIdx !== null` 门控与容器 `@mouseleave`）；②固定 `width:200rpx` + 调整靠边锚点，修掉靠右时标签被挤压变窄
+- **进入「我的」昵称闪烁**：首帧无值（空→接口返回后出现）或先显示 `/users/me` 旧值。改为新增 `STORAGE_KEYS.PROFILE_NICKNAME` 本地镜像（`{ uid, nickname }`，按 uid 校验防串号）首帧同步读取 + `nicknameLoaded` 门闩 + 行高固定
+- **StockContent.spec 既有失败**：陈旧用例（组件早已移除 `.stock-search`）改写为当前 Tab 行为断言，并补全 `@/shared/components` 桩缺失的 `EmptyState` 导出
+
+### 文档
+
+- `src/modules/home/AGENTS.md`：补记 `StockContent.vue` / `AiPickContent.vue` 职责与自选双向切换契约；移除已删除的 `TimeSlotInsightBar` 条目
+- `src/modules/fear-greed/AGENTS.md`：补记走势图 tooltip 契约（仅交互时显示 + 固定宽度）
+- `tests/run-node-specs.mjs`：`EXPECTED_BASELINE` `281/278/3` → `281/279/2`（横条 spec 转绿），并更新已知残余失败说明
+
+### 说明
+
+- 午间报无播报卡片经排查确认为**预期行为**（后端不回填 `content.audio_path`，且午间报不消费广播条目），产品决定不新增播报卡片，仅补注释说明
+- 头像图标 `bear-smile-line` → `user-smile-line`（MainTabs / PageCard / profile / login 共 4 处）
+
+---
+
 ## [junliang] 2026-10-07 — 自选股异动/洞察列表：cursor 翻页 + `visible_only` 过滤前置 + 最近 14 个自然日窗口
 
 **开发者**: yueqili778-arch

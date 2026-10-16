@@ -13,7 +13,7 @@
       <!-- 统计概览 -->
       <view v-if="signals.length" class="stats-bar">
         <text class="stats-text">共 {{ signals.length }} 只热门股</text>
-        <text class="stats-time">近三天</text>
+        <text class="stats-time">近 3 个交易日</text>
       </view>
 
       <!-- 热门股列表 -->
@@ -74,6 +74,7 @@ import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { EmptyState, Tag, GuideCard } from '@/shared/components'
 import { useReportPodcast } from '@/shared/utils/useReportPodcast'
+import { shanghaiDateString } from '@/shared/utils/tradingTime'
 
 const { loadPodcast, openPodcast } = useReportPodcast('hot_burst')
 
@@ -145,7 +146,7 @@ async function loadData() {
     return
   }
   try {
-    signals.value = dedupeBySymbol(sortByChangePct(await stockApi.getHotBurstHistory({ days: 3, min_resonance: 2 })))
+    signals.value = dedupeBySymbol(sortByChangePct(await stockApi.getHotBurstHistory({ trading_days: 3, min_resonance: 2 })))
   } catch {
     signals.value = []
   }
@@ -157,7 +158,8 @@ function goStockDetail(symbol: string) {
 }
 
 function goAgentReport() {
-  const today = new Date().toISOString().split('T')[0]
+  // 上海自然日（toISOString 为 UTC，凌晨会取到前一天）
+  const today = shanghaiDateString()
   uni.navigateTo({
     url: `/modules/analytics/pages/hot-burst-report?date=${today}`
   })

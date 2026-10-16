@@ -44,11 +44,26 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *    基线漂移（exit 2）——**不得通过改本常量掩盖**。
  *  2026-10-06：预判验证口径重构终评修复新增 1 条
  *    （predictionHistory.spec.ts 的 computeStats 对齐 4.0 口径：旧版本/approximate 剔除 + long 单列）。
+ *  2026-10-06：首页时段洞见横条下线（`TimeSlotInsightBar` 从 `MorningContent.vue` 移除，时段与
+ *    navigate 分发由 `DynamicInsightCard` 承接），`MorningContent.spec.ts` 对应断言由「接入横条 + 顺序」
+ *    改为「横条已下线 + 洞见卡承接」，该条转绿 → 已知残余失败 3 → 2
+ *    （剩余：rhythm `pickVersion` 签名断言、RhythmCard「仓位文案」断言）。
  *  2026-10-07：datetime.spec.ts 新增 shanghaiDateKeyDaysAgo 三组固定时钟用例（+3 条，跨年/跨月/固定 UTC+8）。
- *  2026-10-07：合并 origin/master 后实测 284/281/3；⚠ 已知残余失败 3 条（MorningContent「时段洞见横条」
- *    顺序断言、rhythm pickVersion 签名断言、RhythmCard「仓位文案」断言），均非本任务引入。
+ *    → 采集总数 281 → 284；已知残余失败仍为 2（rhythm `pickVersion` 签名断言、RhythmCard「仓位文案」断言）。
+ *  2026-10-08（接入 CI 门禁时清零）：上面记录的 2 条残余失败已逐条定位修复——
+ *    ① `pickVersion` 签名断言（src/modules/rhythm/pages/index.spec.ts）：断言用跨行正则提取多行签名，
+ *       而本机 core.autocrlf=true 使工作区为 CRLF、git 内为 LF（无 .gitattributes），`\(\n` 漏匹配
+ *       → 该 spec 读源码后先归一化换行（CI 为 LF，此前属“仅 Windows 误报”的口径分裂）；
+ *    ② 「节奏卡改近几日摘要」断言（src/modules/home/components/MorningContent.spec.ts）：提交 16d36581
+ *       首页重构把内联 `band: formatBandText(...)` 改为局部常量 `const band = ...`（并新增 hint 消费），
+ *       断言已同步到新形状。
+ *    → 实测 284/284/0，已知残余失败清零；本常量随之为全绿基线。
+ *  2026-10-08（CI 首跑红→绿）：CI（ubuntu-latest）上报「期望 284/284/0、实际 ?/?/?」——**非回归**，
+ *    而是 node:test 的**默认报告器随环境变化**：stdout 非 TTY 时回落 TAP（输出 `# tests N`），
+ *    而下面的 metric() 按 spec 报告器的 `ℹ tests N` 解析 → 三个指标全取不到 → 误判漂移并 exit 2。
+ *    已用 `--test-reporter=spec` 显式锁定报告器（见下方 spawnSync），本地与 CI 输出一致。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '284/281/3'
+const EXPECTED_BASELINE = '284/284/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {
@@ -114,7 +129,11 @@ console.log(
   `[node-specs] 采集 ${toRun.length} 个 node:test spec（按 vitest 白名单排除 ${excludedAbs.size} 个 vitest 风格 spec）`,
 )
 
-const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', ...toRun], {
+// --test-reporter=spec：显式锁定 spec 报告器。node:test 的默认报告器随环境变化
+// （stdout 非 TTY 时回落 TAP，Node 22 = `# tests N`，而 spec 报告器是 `ℹ tests N`），
+// 下面的 metric() 按 `ℹ` 解析 → 不锁定会在 CI 上取到 '?'、被误判为「基线漂移」并 exit 2
+// （2026-10-08 CI 实测：期望 284/284/0、实际 ?/?/?）。
+const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', '--test-reporter=spec', ...toRun], {
   cwd: REPO,
   encoding: 'utf8',
 })

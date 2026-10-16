@@ -108,7 +108,7 @@ describe('AlertContent.vue 首页特别提醒', () => {
 
   // ===== 自选股洞察 - 旧预览 ListCell 形态 =====
 
-  it('接口成功 → 渲染 ≤4 行（mock 7 只不同股票的可归因事件 → 只渲染 4 行）', async () => {
+  it('接口成功 → 渲染 3 行（mock 7 只不同股票的可归因事件 → 只渲染前 3 行）', async () => {
     // 构造 7 条可归因事件（7 只不同股票，避免被同日同股聚合规则合并）
     const sevenMovements = Array.from({ length: 7 }, (_, i) => ({
       event_id: `mv:test:${i}`, trigger_revision: 1, symbol: `60000${i}`, stock_name: `测试股${i}`,
@@ -120,13 +120,11 @@ describe('AlertContent.vue 首页特别提醒', () => {
     stockTraceApiMock.list.mockResolvedValue({ items: sevenMovements, nextCursor: null })
     const wrapper = mount(AlertContent)
     await flushPromises()
-    // 洞察块 ListCell 应为 4 行（MAX_PREVIEW=4，第 5 条起被截断）
-    const cells = wrapper.findAll('.list-cell-stub')
-    // 个股情报块为空（无情报数据），所以所有 list-cell-stub 都来自洞察块
-    expect(cells.length).toBe(4)
-    // 验证前 4 条有标题，第 5 条不出现
+    // 洞察块固定 3 行（第 4 条起被截断）；个股情报块也固定 3 行，故按容器作用域取
+    const cells = wrapper.find('.capture-list').findAll('.list-cell-stub')
+    expect(cells.length).toBe(3)
     expect(cells[0].attributes('data-title')).toBe('测试股0')
-    expect(cells[3].attributes('data-title')).toBe('测试股3')
+    expect(cells[2].attributes('data-title')).toBe('测试股2')
   })
 
   it('同日同股多条异动 → 只渲染最新一条（2026-09-13 同日聚合）', async () => {
@@ -142,9 +140,9 @@ describe('AlertContent.vue 首页特别提醒', () => {
     stockTraceApiMock.list.mockResolvedValue({ items, nextCursor: null })
     const wrapper = mount(AlertContent)
     await flushPromises()
-    const cells = wrapper.findAll('.list-cell-stub')
-    // 洞察块固定 4 行（不足补占位）：聚合后仅 1 条数据 + 3 行占位
-    expect(cells.length).toBe(4)
+    const cells = wrapper.find('.capture-list').findAll('.list-cell-stub')
+    // 洞察块固定 3 行（不足补占位）：聚合后仅 1 条数据 + 2 行占位
+    expect(cells.length).toBe(3)
     // 保留当日最新一条的归因
     expect(cells[0].attributes('data-title')).toBe('金富科技')
     expect(cells[0].attributes('data-description')).toContain('午后主因')
@@ -180,11 +178,9 @@ describe('AlertContent.vue 首页特别提醒', () => {
     })
     const wrapper = mount(AlertContent)
     await flushPromises()
-    const cells = wrapper.findAll('.list-cell-stub')
-    // 仅有 2 条可归因行渲染（其余 2 行为空占位保持 4 行）
-    // 但空占位也渲染 ListCell（title='\u3000'），所以总共有 4 个 ListCell
-    // 其中 2 个有真实 title，2 个为空占位
-    expect(cells.length).toBe(4)
+    const cells = wrapper.find('.capture-list').findAll('.list-cell-stub')
+    // 仅有 2 条可归因行渲染（其余 1 行为空占位保持 3 行）
+    expect(cells.length).toBe(3)
     // 检查有真实标题的行
     const realCells = cells.filter((c) => {
       const title = c.attributes('data-title')
@@ -199,7 +195,7 @@ describe('AlertContent.vue 首页特别提醒', () => {
     stockTraceApiMock.list.mockResolvedValue({ items: [testMovements[0]], nextCursor: null })
     const wrapper = mount(AlertContent)
     await flushPromises()
-    const cells = wrapper.findAll('.list-cell-stub')
+    const cells = wrapper.find('.capture-list').findAll('.list-cell-stub')
     // 第 1 行有真实数据
     await cells[0].trigger('click')
     expect(uni.navigateTo).toHaveBeenCalledWith({
@@ -241,24 +237,32 @@ describe('AlertContent.vue 首页特别提醒', () => {
     stockApiMock.getTrendEvents.mockResolvedValue({ events: intelData })
     const wrapper = mount(AlertContent)
     await flushPromises()
-    const cells = wrapper.findAll('.list-cell-stub')
-    // 洞察块 6 行（无数据，全是占位）+ 情报块 4 行（1 条真实 + 3 条占位）
-    // 但洞察块空数据时显示 EmptyState，不渲染 ListCell
-    // 所以只有情报块的 4 行
-    // 洞察块没数据：captureList 为空 → EmptyState 显示 → 无 ListCell
-    // 情报块：1 条真实 + 3 占位 = 4 个 ListCell
-    expect(cells.length).toBe(4)
+    const cells = wrapper.find('.intel-list').findAll('.list-cell-stub')
+    // 情报块固定 3 行：1 条真实 + 2 条占位（洞察块也固定 3 行，故按容器作用域取）
+    expect(cells.length).toBe(3)
     // 第 1 行是真实数据
     expect(cells[0].attributes('data-title')).toBe('利好消息')
   })
 
-  it('个股情报模块：接口失败 → 空状态', async () => {
+  it('个股情报模块：接口失败 → 走 EmptyState（白底容器保持 3 行高度），不渲染数据行', async () => {
     stockApiMock.getTrendEvents.mockRejectedValue(new Error('network'))
     const wrapper = mount(AlertContent)
     await flushPromises()
-    const cells = wrapper.findAll('.list-cell-stub')
-    // 洞察块空（无数据）+ 情报块空（接口失败）
-    // 两个 EmptyState 展示，无 ListCell
-    expect(cells.length).toBe(0)
+    const intel = wrapper.find('.intel-list')
+    // 空态沿用 EmptyState 原样式，但外层 .list-empty 用 min-height 撑到 3 行高度
+    expect(intel.findAll('.list-cell-stub').length).toBe(0)
+    expect(intel.find('.list-empty').exists()).toBe(true)
+    expect(intel.find('.empty-stub').exists()).toBe(true)
+    expect(intel.text()).toContain('暂无情报数据')
+  })
+
+  it('自选股洞察：无数据时同样走 EmptyState 并保持 3 行高度', async () => {
+    // 默认 mock 为空列表
+    const wrapper = mount(AlertContent)
+    await flushPromises()
+    const capture = wrapper.find('.capture-list')
+    expect(capture.findAll('.list-cell-stub').length).toBe(0)
+    expect(capture.find('.list-empty').exists()).toBe(true)
+    expect(capture.text()).toContain('暂无异动数据')
   })
 })

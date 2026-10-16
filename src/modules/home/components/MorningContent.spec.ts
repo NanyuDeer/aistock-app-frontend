@@ -41,7 +41,13 @@ test('首页四宫格入口统一为「洞见」品牌词（风口/消息/市场
 
 test('节奏卡改近几日摘要：一次 getRhythmMasterCalendar 取多日，映射 position_band 仓位文案；不逐日 getRhythmMaster', () => {
   assert.match(componentSource, /agentApi\.getRhythmMasterCalendar\(HOME_RHYTHM_DAYS\)/)
-  assert.match(componentSource, /band: formatBandText\(d\.position_band\?\.text\)/)
+  // 2026-10-07 首页重构（提交 16d36581 起）把内联属性 `band: formatBandText(...)` 改成
+  // 局部常量 `const band = formatBandText(d.position_band?.text)`，同一值改为双处消费：
+  // 返回行的 band 字段 + 小字详情 hint（`${label} · 建议仓位${band}`）。
+  // 语义未变（position_band 文案仍统一经 formatBandText 归一），故断言同步到新形状。
+  assert.match(componentSource, /const band = formatBandText\(d\.position_band\?\.text\)/)
+  assert.match(componentSource, /basis_date: d\.basis_date,\s*band,/)
+  assert.match(componentSource, /hint: band \?/)
   // 首页摘要只消费日历聚合接口（含 position_band），避免为多日结论发 N 次单日报告请求
   assert.doesNotMatch(componentSource, /agentApi\.getRhythmMaster\(/)
   assert.doesNotMatch(componentSource, /rhythmSummary/)
@@ -67,18 +73,22 @@ test('节奏卡 loadRhythmHistory 失败/空数据兜底为空数组（不显示
   assert.doesNotMatch(onShowBlock, /loadRhythm\(\)/)
 })
 
-test('首页接入时段洞见横条：取数复用现有 ref，onShow 重算时段，navigate 分发到既有跳转', () => {
-  assert.match(componentSource, /import TimeSlotInsightBar from '\.\/TimeSlotInsightBar\.vue'/)
+test('首页时段洞见横条已下线：不再引入组件，时段仍由 DynamicInsightCard 消费', () => {
+  // 横条组件已从首页移除（2026-10-06），其取数 ref 与 navigate 分发由 DynamicInsightCard 继续使用
+  assert.doesNotMatch(componentSource, /import TimeSlotInsightBar from '\.\/TimeSlotInsightBar\.vue'/)
+  assert.doesNotMatch(componentSource, /<TimeSlotInsightBar/)
+  assert.doesNotMatch(componentSource, /barResetKey/)
+  assert.match(componentSource, /import DynamicInsightCard from '\.\/DynamicInsightCard\.vue'/)
   assert.match(componentSource, /getTradingTimeSlot/)
   assert.match(componentSource, /const currentSlot = ref<TradingTimeSlot>/)
   assert.match(componentSource, /:current-slot="currentSlot"/)
   assert.match(componentSource, /@navigate="onBarNavigate"/)
   assert.match(componentSource, /function onBarNavigate\(target: 'rhythm' \| 'sectors' \| 'events' \| 'trace'\)/)
-  // 横条插在 briefing-card 与 feature-grid 之间
+  // 洞见卡插在 briefing-card 与 feature-grid 之间
   const briefIdx = componentSource.indexOf('class="briefing-card"')
-  const barIdx = componentSource.indexOf('<TimeSlotInsightBar')
+  const cardIdx = componentSource.indexOf('<DynamicInsightCard')
   const gridIdx = componentSource.indexOf('class="feature-grid"')
-  assert.ok(briefIdx > -1 && barIdx > briefIdx && gridIdx > barIdx)
+  assert.ok(briefIdx > -1 && cardIdx > briefIdx && gridIdx > cardIdx)
   // onShow 内重算时段（与既有加载器并列）
   const onShowBlock = componentSource.match(/onShow\(\(\) => \{[\s\S]*?\n\s*\}\)/)?.[0] ?? ''
   assert.match(onShowBlock, /currentSlot\.value = getTradingTimeSlot\(\)/)

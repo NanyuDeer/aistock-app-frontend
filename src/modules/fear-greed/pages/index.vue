@@ -60,7 +60,7 @@
         <view v-if="historyChartSrc" class="fg-card">
           <text class="fg-card__title">历史走势 <text class="fg-card__sub">近 3 个月 · 滑动查看每日</text></text>
           <!-- 交互热区容器：覆盖整个图表，用于捕捉 hover/tap 事件 -->
-          <view class="fg-chart__hotzone-container">
+          <view class="fg-chart__hotzone-container" @mouseleave="clearDay">
             <image class="fg-chart__img" :src="historyChartSrc" mode="widthFix" />
             <!-- 每日透明热区：横向定位对齐 SVG 点位 -->
             <view
@@ -73,9 +73,9 @@
               @mousemove="selectDay(zone.idx)"
               @touchstart="selectDay(zone.idx)"
             />
-            <!-- 选中日 tooltip：显示日期 + 当日综合指数 -->
+            <!-- 选中日 tooltip：仅在鼠标悬停/点击热区时显示（未交互不常驻） -->
             <view
-              v-if="activeDayData"
+              v-if="activeDayIdx !== null && activeDayData"
               class="fg-chart__tooltip"
               :class="{ 'fg-chart__tooltip--right': activeDayLeftPct > 60, 'fg-chart__tooltip--left': activeDayLeftPct < 30 }"
               :style="{ left: activeDayLeftPct + '%' }"
@@ -457,6 +457,11 @@ const activeDayLeftPct = computed(() => {
 
 function selectDay(idx: number) {
   activeDayIdx.value = idx
+}
+
+/** 鼠标移出图表热区：清除选中，tooltip 随之隐藏（十字线回落到默认最新日） */
+function clearDay() {
+  activeDayIdx.value = null
 }
 
 /**
@@ -950,24 +955,26 @@ onShow(() => {
 .fg-chart__tooltip {
   position: absolute;
   top: 4rpx;
+  /* 固定宽度：绝对定位可用宽度 = 容器宽 − left，靠右时会被压缩导致标签变窄，故写死宽度 */
+  width: 200rpx;
   transform: translateX(-50%);
   z-index: 10;
   pointer-events: none;
-  /* 防止 tooltip 超出容器 */
-  max-width: 220rpx;
 }
 
-/* tooltip 太靠右时，向左对齐避免溢出 */
+/* tooltip 太靠右时，整块贴到锚点左侧（固定宽度下仍不出容器） */
 .fg-chart__tooltip--right {
-  transform: translateX(-85%);
+  transform: translateX(-100%);
 }
 
-/* tooltip 太靠左时，向右对齐避免溢出 */
+/* tooltip 太靠左时，整块贴到锚点右侧 */
 .fg-chart__tooltip--left {
-  transform: translateX(-15%);
+  transform: translateX(0);
 }
 
 .fg-chart__tooltip-content {
+  width: 100%;
+  box-sizing: border-box;
   padding: 12rpx 18rpx;
   border-radius: $r-md;
   background: rgba(11, 95, 255, 0.92);
@@ -975,7 +982,6 @@ onShow(() => {
   display: flex;
   flex-direction: column;
   gap: 4rpx;
-  min-width: 160rpx;
 }
 
 .fg-chart__tooltip-date {
@@ -983,6 +989,7 @@ onShow(() => {
   font-weight: 700;
   color: #fff;
   text-align: center;
+  white-space: nowrap;
   padding-bottom: 6rpx;
   margin-bottom: 4rpx;
   border-bottom: 1rpx solid rgba(255, 255, 255, 0.2);
@@ -993,6 +1000,7 @@ onShow(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12rpx;
+  white-space: nowrap;
 }
 
 .fg-chart__tooltip-label {

@@ -38,6 +38,12 @@ vi.mock('@/shared/components', () => ({
     props: ['text', 'size', 'layout'],
     template: '<div class="loading-stub" />',
   },
+  // HotBurstInsightContent 等子组件从 barrel 取 EmptyState；桩模块若缺该导出会整棵渲染失败
+  EmptyState: {
+    name: 'EmptyState',
+    props: ['title', 'description', 'icon', 'text'],
+    template: '<div class="empty-stub" />',
+  },
 }))
 
 // SvgIcon 桩：测试环境无真实 SVG 资源
@@ -54,11 +60,12 @@ vi.stubGlobal('uni', {
   setStorageSync: vi.fn(),
   getStorageSync: vi.fn(() => ''),
   navigateTo: vi.fn(),
+  showToast: vi.fn(),
 })
 
 import StockContent from './StockContent.vue'
 
-describe('StockContent 股票搜索框', () => {
+describe('StockContent 选股 Tab', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.useRealTimers()
@@ -68,39 +75,27 @@ describe('StockContent 股票搜索框', () => {
     vi.mocked(uni.navigateTo).mockClear()
   })
 
-  it('渲染股票搜索框，输入关键词实时搜索并展示匹配股票', async () => {
-    vi.useFakeTimers()
+  it('渲染 4 个 Tab（无「洞见」后缀），默认高亮「AI帮我选」', async () => {
     const wrapper = mount(StockContent)
     await flushPromises()
 
-    expect(wrapper.find('.stock-search').exists()).toBe(true)
+    const labels = wrapper.findAll('.stock-tabs__label').map(node => node.text())
+    expect(labels).toEqual(['AI帮我选', '趋势股', '机构热门股', '业绩预测'])
 
-    const input = wrapper.find('.stock-search__input')
-    await input.trigger('input', { detail: { value: '茅台' } })
-    // 推进 300ms 防抖后执行搜索
-    await vi.advanceTimersByTimeAsync(300)
-    await flushPromises()
-
-    expect(stockApiMock.getStockList).toHaveBeenCalledWith({ keyword: '茅台', page: 1, pageSize: 5 })
-    const resultItem = wrapper.find('.search-result-item')
-    expect(resultItem.exists()).toBe(true)
-    expect(resultItem.text()).toContain('贵州茅台')
-    vi.useRealTimers()
+    const active = wrapper.findAll('.stock-tabs__item.is-active')
+    expect(active).toHaveLength(1)
+    expect(active[0].text()).toBe('AI帮我选')
   })
 
-  it('点击搜索结果跳转个股详情页', async () => {
-    vi.useFakeTimers()
+  it('点击「机构热门股」Tab → 高亮切换且仅该 Tab 处于激活态', async () => {
     const wrapper = mount(StockContent)
     await flushPromises()
 
-    const input = wrapper.find('.stock-search__input')
-    await input.trigger('input', { detail: { value: '茅台' } })
-    await vi.advanceTimersByTimeAsync(300)
-    await flushPromises()
+    await wrapper.findAll('.stock-tabs__item')[2].trigger('tap')
 
-    await wrapper.find('.search-result-item').trigger('tap')
-    expect(uni.navigateTo).toHaveBeenCalledWith({ url: '/modules/favorites/pages/detail?symbol=600519' })
-    vi.useRealTimers()
+    const active = wrapper.findAll('.stock-tabs__item.is-active')
+    expect(active).toHaveLength(1)
+    expect(active[0].text()).toBe('机构热门股')
   })
 
   it('不再渲染大盘概览（MarketOverview 已由搜索框替代）', async () => {

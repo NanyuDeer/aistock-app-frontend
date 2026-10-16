@@ -1,0 +1,73 @@
+# 持续集成门禁：类型检查（vue-tsc）+ 单测（Vitest / node:test）+ H5 构建
+#
+# 目的：防止「类型错误 / 测试失败 / 构建失败」欠账再次累积。
+# 背景：本仓此前**没有任何 CI**（本文件即首个门禁）。配套的 aistock-agent-py 已先行建立同类
+# 门禁（装依赖 → lint → 类型检查 → 测试），本文件沿用同一结构，但**按本仓实际工具链取步骤**：
+# 本仓无 lint 工具（既无 eslint 依赖也无 lint 脚本），故门禁 = 类型检查 + 三套测试 + 构建，
+# 不硬塞一个不存在的 lint 步骤。
+#
+# 门禁当前即为绿（2026-10-08 本地实测，命令与下步骤逐字一致）：
+#   pnpm run type-check       → 0 错误（vue-tsc --noEmit，含 .vue 模板类型）
+#   pnpm run test             → 66 文件 / 630 用例全绿（Vitest 3.2）
+#   pnpm run test:node        → 284/284/0，无基线漂移（node:test 采集器自带基线哨兵）
+#   pnpm run test:vite-config → 2/2（vite 配置契约：样式合并、代理顺序）
+#   pnpm run build:h5         → 构建成功（本地约 20s）
+# 修绿过程处理了两处既有失败：1 条测试过时断言（业绩报告页评分位置，2026-08-17 d226f3de 有意改版）
+# 与 1 条 Windows CRLF 误报（node:test 跨行正则）；同批还补齐了 CardRenderer.spec 的 mp-html 桩
+# （与同目录 DeepAnalysisCard.spec 同一存量环境问题约定）。均只改测试、未动业务逻辑。
+
+name: CI
+
+on:
+  push:
+    branches: [master] # 本仓默认分支为 master（origin/HEAD -> origin/master）
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: 类型检查、单测与构建
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      # 包管理器以 lock 文件为准：本仓只有 pnpm-lock.yaml（lockfileVersion 9.0），无
+      # package-lock.json / yarn.lock。不传 version，直接读 package.json 的
+      # packageManager=pnpm@11.9.0（含 sha512 校验），避免两处版本号漂移。
+      - name: 安装 pnpm（按 package.json 的 packageManager）
+        uses: pnpm/action-setup@v4
+
+      # Node 版本依据：本仓无 engines / .nvmrc / Dockerfile，唯一线索是同仓群 aistock-frontend
+      # 的 release workflow 用 Node 22；且 22 为 LTS（依赖 vite 7 要求 ^20.19 || >=22.12）。
+      - name: 安装 Node.js 22（LTS）并缓存 pnpm store
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      # --frozen-lockfile：严格按 pnpm-lock.yaml 安装；package.json 与 lock 不一致时直接失败
+      # （顺带防住「改了依赖忘提交 lock」）
+      - name: 安装依赖（严格按 lock 文件）
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查（vue-tsc --noEmit）
+        run: pnpm run type-check
+
+      - name: Vitest 单测
+        run: pnpm run test
+
+      - name: node:test 单测（含基线哨兵）
+        run: pnpm run test:node
+
+      - name: vite 配置契约测试
+        run: pnpm run test:vite-config
+
+      # build:h5 能在 20s 内跑完且能抓住类型/打包/别名/样式注入错误；build:app 依赖 HBuilderX
+      # 云打包（本地不可复现），故门禁只做 H5 构建。
+      - name: H5 构建
+        run: pnpm run build:h5

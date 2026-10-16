@@ -1,6 +1,7 @@
 <template>
   <Card class="event-card" flat clickable @click="$emit('view-detail', event)">
-    <!-- 第一行：事件类型 + 来源 + 时间 + 重要程度 -->
+    <!-- 第一行单行紧凑（2026-10-02 用户口径）：类型→来源→链接(紧贴来源右侧无间隔)→时间 靠左，星级靠右对称；
+         gap 8rpx 保留适度空白；极窄屏类型/来源按需截断（max-width+省略号）避免换行 -->
     <view class="card-header">
       <view class="header-left">
         <Tag v-if="event.eventType" type="gray" size="sm" class="card-type-tag">
@@ -9,8 +10,7 @@
         <Tag size="sm" :type="sourceTagType" :class="sourceTagType === 'gray' ? 'source-tag-muted' : ''">
           {{ sourceLabel }}
         </Tag>
-        <text class="card-time">{{ formatDateTime(event.publishTime) }}</text>
-        <!-- 原文入口：链接图标，与事件时间同字号同色（22rpx / $ink-mute），点击打开原文 -->
+        <!-- 原文入口：链接图标紧贴来源右侧（margin-left 抵消 gap，无间隔），与事件时间同字号同色（22rpx / $ink-mute），点击打开原文 -->
         <SvgIcon
           v-if="event.sourceInfo?.url"
           name="links-line"
@@ -19,13 +19,17 @@
           class="card-link-icon"
           @click.stop="$emit('view-news', event)"
         />
+        <text class="card-time">{{ formatDateTime(event.publishTime) }}</text>
       </view>
-      <!-- 重要程度星级：由 chain 最大 impactStrength 映射；无有效评分时隐藏（不显示假评分） -->
+      <!-- 重要程度星级：由 chain 最大 impactStrength 映射；无有效评分时隐藏（不显示假评分）；靠右与类型对称 -->
       <Rate v-if="event.importance" :modelValue="event.importance" :readonly="true" type="gold" size="18rpx" :gap="2" />
     </view>
 
     <!-- 事件标题（最多2行）：点击整卡进入详情（机会洞见） -->
     <text class="card-title">{{ event.title }}</text>
+
+    <!-- 事件影响存活度小标（标题下方单独一行；no_observation / 无数据不渲染） -->
+    <VitalityBadge :vitality="event.impactVitality" class="card-vitality" />
 
     <!-- Top5 影响行业（排序后取前5，横向滑动查看完整名称，隐藏滚动条；空数据展示降级文案） -->
     <scroll-view scroll-x :show-scrollbar="false" class="card-top5">
@@ -89,6 +93,7 @@ import { formatDateTime } from '@/shared/utils/datetime'
 import { Card, Button, Tag } from '@/shared/components'
 import Rate from '@/shared/components/Rate.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
+import VitalityBadge from './VitalityBadge.vue'
 import wordmarkPng from '@/shared/components/insight-wordmark.png'
 
 /** AI 洞见徽标底图（洞见字标 PNG） */
@@ -147,23 +152,28 @@ const top5Industries = computed(() => {
   display: block;
 }
 
-/* ========== 第一行：事件类型 + 时间 + 重要程度 ========== */
+/* ========== 第一行单行紧凑：类型/来源/链接/时间 靠左 + 星级靠右（space-between 对称分布） ========== */
 .card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: space-between; /* 类型左移、星级右移对称；放不下时由 space-between 吸收 */
+  gap: 8rpx; /* 2026-10-02 紧凑化：12→8rpx，保留适度空白 */
   margin-bottom: 10rpx;
 }
 
+/* 左段：类型 + 来源 + 链接 + 时间，flex:1 吸收弹性、min-width:0 允许收缩；极窄屏按需截断而不是换行 */
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  gap: 8rpx;
+  flex: 1;
+  min-width: 0;
 }
 
 /* 事件类型：复用 <Tag type="gray"> 中性标签，不再按事件类型渲染多色 */
 .card-type-tag {
   flex-shrink: 0;
+  max-width: 200rpx; /* 极窄屏按需截断，不参与挤压右段 */
 }
 
 /* 事件类型 / 可验证来源 / 行业 标签统一白底，与卡片底色一致（覆盖 Tag gray 的 $bg-soft 浅灰） */
@@ -174,18 +184,31 @@ const top5Industries = computed(() => {
 }
 
 /* 事件类型文字：class 合并到 Tag 根节点，需命中内部的 .as-tag__text（后代）才生效；
-   统一为 $ink-mute(22rpx/400)，覆盖 Tag 默认更深的 $ink-soft 与 sm 的 20rpx/600 */
+   统一为 $ink-mute(22rpx/400)，覆盖 Tag 默认更深的 $ink-soft 与 sm 的 20rpx/600；极窄屏截断 */
 .card-type-tag :deep(.as-tag__text) {
   font-size: $font-size-xs;
   font-weight: 400;
   color: $ink-mute;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* 来源标签：同样命中内部的 .as-tag__text，统一为 $ink-mute(22rpx/400) */
+/* 来源标签：同样命中内部的 .as-tag__text，统一为 $ink-mute(22rpx/400)；极窄屏截断 */
+.source-tag-muted {
+  flex-shrink: 0;
+  max-width: 200rpx;
+}
+
 .source-tag-muted :deep(.as-tag__text) {
   font-size: $font-size-xs;
   font-weight: 400;
   color: $ink-mute;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .card-time {
@@ -194,12 +217,14 @@ const top5Industries = computed(() => {
   color: $ink-mute; /* 与来源/事件类型/洞见摘要同一灰阶 */
 }
 
-/* 原文链接图标：与左侧时间文本垂直居中对齐（覆写 SvgIcon 根节点 inline-flex 的默认对齐） */
+/* 原文链接图标：与左侧时间文本垂直居中对齐（覆写 SvgIcon 根节点 inline-flex 的默认对齐）；
+   margin-left:-8rpx 抵消 header-left 的 gap，实现「紧贴来源右侧无间隔」（2026-10-02 用户口径） */
 .card-link-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   align-self: center;
+  margin-left: -8rpx;
 }
 
 /* ========== 标题（最多2行，超出省略） ========== */
@@ -215,6 +240,11 @@ const top5Industries = computed(() => {
   margin-bottom: 12rpx;
   transition: color $t-fast;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* 事件影响存活度小标：标题下方单独一行（紧接标题，与 Top5 行业保持 12rpx 间距） */
+.card-vitality {
+  margin-bottom: 12rpx;
 }
 
 /* ========== AI 摘要（最多2行，超出省略） ========== */
@@ -263,7 +293,7 @@ const top5Industries = computed(() => {
 .card-top5-inner {
   display: inline-flex;
   flex-wrap: nowrap;
-  gap: 6rpx;
+  gap: 4rpx; /* 2026-10-02 紧凑化：行业间距 6→4rpx，窄屏观感更紧凑 */
 }
 
 /* 空行业降级文案（情况3：chain 为空时展示，不暴露系统内部异常） */
@@ -274,10 +304,12 @@ const top5Industries = computed(() => {
   white-space: nowrap;
 }
 
-/* 行业标签：复用 <Tag type="gray"> 中性容器（浅底灰黑字），不按涨跌染色 */
+/* 行业标签：复用 <Tag type="gray"> 中性容器（浅底灰黑字），不按涨跌染色；
+   2026-10-02 紧凑化：左右 padding 16→10rpx（!important 覆盖 Tag 组件默认），间距观感更紧凑 */
 .t5-tag {
   flex-shrink: 0;
   white-space: nowrap;
+  padding: 2rpx 10rpx !important;
 }
 
 /* 方向箭头：位于行业名右侧；保留小面积语义色（涨红 / 跌绿 / 中性灰），行业名保持中性 */

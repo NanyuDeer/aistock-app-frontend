@@ -151,6 +151,37 @@ export interface FavoriteStock {
   addedAt?: string | null
 }
 
+/** 单只自选股的行业别名（GET /cn/favorites/industry-aliases） */
+export interface FavoriteIndustryAlias {
+  /** 股票名称 */
+  name: string
+  /** 自选股侧行业名（Tushare stock_basic.industry） */
+  industry: string
+  /** 同族行业名集合（申万一级归组 + 旧名归一；无行业时为 []） */
+  aliases: string[]
+}
+
+/** 自选股行业别名映射：symbol → 别名信息 */
+export type FavoriteIndustryAliasMap = Record<string, FavoriteIndustryAlias>
+
+/** 自选股财报披露计划项（GET /cn/stocks/disclosure-schedule） */
+export interface DisclosureScheduleItem {
+  /** 6 位股票代码 */
+  symbol: string
+  /** 报告期 YYYYMMDD */
+  reportPeriod: string
+  /** 报告期中文标签，如「2026三季报」 */
+  reportPeriodLabel: string
+  /** 预计披露日期 YYYY-MM-DD */
+  preDate: string
+  /** 距今天数（0=今天） */
+  daysUntil: number
+}
+
+export interface DisclosureScheduleResponse {
+  items: DisclosureScheduleItem[]
+}
+
 // ---- 股票列表搜索接口类型 ----
 export interface StockListItem {
   symbol: string
@@ -288,8 +319,8 @@ export interface WindLeaderSector {
   type?: string
   /** 短线风口 / 长线风口 / 长线+短线风口 / 均不成立（AI 八字段推导），缺省按 short 兼容存量 */
   cycle?: 'short' | 'long' | 'both' | 'none'
-  frequency?: number | string
-  freq20?: number
+  freq120?: number | string
+  freq10?: number
   freq_delta?: number
   avg_change?: number
   today_change?: number
@@ -568,7 +599,7 @@ export const stockApi = {
   },
 
   /** 获取机构调研热门股历史记录，供 App 的近时段展示使用。 */
-  getHotBurstHistory(params: { days: number; min_resonance: number; limit?: number; offset?: number }) {
+  getHotBurstHistory(params: { days?: number; trading_days?: number; min_resonance: number; limit?: number; offset?: number }) {
     return request
       .get<HotBurstHistoryResponse>('/cn/institution-research/history', { params })
       .then((result) => normalizeHotBurstHistory(result.records))
@@ -603,6 +634,11 @@ export const stockApi = {
   /** 获取自选股（通过 /users/me 返回的用户信息提取） */
   getFavorites() {
     return request.get<UserFavoritesPayload>('/users/me').then(normalizeFavorites)
+  },
+
+  /** 获取自选股行业别名（需登录；未登录后端返回 401，调用方静默降级） */
+  getFavoriteIndustryAliases() {
+    return request.get<FavoriteIndustryAliasMap>('/cn/favorites/industry-aliases')
   },
 
   /** 添加自选股 */
@@ -750,6 +786,11 @@ export const stockApi = {
     reportPeriod?: string; sortBy?: string; sortOrder?: 'asc' | 'desc'; reportType?: string; page?: number; pageSize?: number
   }) {
     return request.get('/cn/stocks/performance-reports/ranking', { params })
+  },
+
+  /** 获取自选股财报披露计划（预计披露日，来自 Tushare disclosure_date.pre_date） */
+  getDisclosureSchedule(params: { symbols: string; days?: number }) {
+    return request.get<DisclosureScheduleResponse>('/cn/stocks/disclosure-schedule', { params })
   },
 }
 
