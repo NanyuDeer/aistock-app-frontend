@@ -272,13 +272,15 @@ const remainingCount = computed(() => {
   /* 间距用 margin 实现（见 .industry-tag），避免依赖 flex gap（部分旧 Android WebView 不渲染 gap） */
 }
 
-/* 行业标签：复用 <Tag type="gray"> 中性容器（md 默认，与普通事件列表卡 .t5-tag 一致；白底灰黑字，不按涨跌染色） */
+/* 行业标签：复用 <Tag type="gray"> 中性容器（md 默认，与普通事件列表卡 .t5-tag 一致；白底灰黑字，不按涨跌染色）；
+   2026-10-02 紧凑化：左右 padding 16→10rpx（!important 覆盖 Tag 组件默认）、间距 6→4rpx，3 行业 + "+N" 单行放下 */
 .industry-tag {
   flex-shrink: 0;
-  margin-right: 6rpx; /* 替代 flex gap 的横向间距 */
+  margin-right: 4rpx; /* 替代 flex gap 的横向间距 */
   margin-bottom: 2rpx; /* 换行后的最小行间距 */
   white-space: nowrap;
   background: $bg-card !important; /* 白底，与卡片正文区底色一致（覆盖 Tag gray 的 $bg-soft 浅灰） */
+  padding: 2rpx 10rpx !important;
 }
 
 /* 行业名过长省略兜底（命中 Tag 内部文字），防极端长名撑破 */
