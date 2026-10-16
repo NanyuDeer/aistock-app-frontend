@@ -273,13 +273,27 @@ async function loadMore() {
   }
 }
 
-/** 手动触发检测：洞察数据由后端 cron 周期采集，此处仅刷新列表 */
+/**
+ * 「立即检测」：真的调用后端检测接口（绕过交易时段强制检测一次），后端顺带为
+ * 「当日 active 但缺归因 job」的事件补入队（2026-10-15 修复——此前该按钮只刷新列表，
+ * 且即便调后端也不入队归因，非交易时段点出的事件会永久停在「归因中」）。
+ * 检测后刷新列表展示新卡片 / 新结论。
+ */
 async function handleDetect() {
   if (detecting.value) return
   detecting.value = true
   try {
-    fetchAlerts()
+    const { enqueued } = await stockTraceApi.detect()
+    uni.showToast({
+      title: enqueued > 0 ? `已触发检测，${enqueued} 条正在归因` : '已触发检测',
+      icon: 'none',
+    })
+  } catch (err) {
+    console.warn('[Monitor] 立即检测失败', err)
+    uni.showToast({ title: '检测失败，请稍后重试', icon: 'none' })
   } finally {
+    // 成功失败都刷新：列表是展示事实源
+    await fetchAlerts()
     detecting.value = false
   }
 }

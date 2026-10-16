@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 // mock stocktrace API（页面唯一数据源）
-const stockTraceApiMock = vi.hoisted(() => ({ list: vi.fn() }))
+const stockTraceApiMock = vi.hoisted(() => ({ list: vi.fn(), detect: vi.fn() }))
 vi.mock('@/shared/api/modules/stockTrace', () => ({ stockTraceApi: stockTraceApiMock }))
 
 // 仅 mock shanghaiDateKeyDaysAgo（返回固定串，避免断言依赖当日/本机时区漂移）；formatTime 等保持原样
@@ -122,6 +122,8 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
   beforeEach(() => {
     setActivePinia(createPinia())
     stockTraceApiMock.list.mockReset()
+    stockTraceApiMock.detect.mockReset()
+    stockTraceApiMock.detect.mockResolvedValue({ triggered: true, enqueued: 0 })
     favoritesStoreMock.fetchFavorites.mockReset()
     favoritesStoreMock.stocks = []
     appStoreMock.config.alertEnabled = false
@@ -129,6 +131,7 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     wsHandlers.onOpen = null
     wsHandlers.onMessage = null
     vi.mocked(uni.navigateTo).mockClear()
+    vi.mocked(uni.showToast).mockClear()
     // 逐用例清零 since 入参 mock，保证后续 toHaveBeenCalledWith(13) 是针对本次挂载/触底的调用（非跨用例累积）
     vi.mocked(shanghaiDateKeyDaysAgo).mockClear()
     stockTraceApiMock.list.mockResolvedValue({ items: [], nextCursor: null })
@@ -162,15 +165,46 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     expect(appStoreMock.update).toHaveBeenCalledWith({ alertEnabled: false })
   })
 
-  it('立即检测用组件库 Button 承载，点击重新拉取列表', async () => {
+  it('「立即检测」→ 真的调用后端检测接口（补归因入队）并回传条数，随后刷新列表', async () => {
+    stockTraceApiMock.detect.mockResolvedValue({ triggered: true, enqueued: 2 })
     const wrapper = mount(monitor)
     await flushPromises()
     const btn = wrapper.findAll('.as-btn').find((b) => b.text().includes('立即检测'))
     expect(btn).toBeTruthy()
     expect(stockTraceApiMock.list).toHaveBeenCalledTimes(1)
+    expect(stockTraceApiMock.detect).not.toHaveBeenCalled()
+
     await btn!.trigger('click')
     await flushPromises()
+
+    // 按钮名副其实：点击触发后端检测，而非只刷新列表（2026-10-15 修复）
+    expect(stockTraceApiMock.detect).toHaveBeenCalledTimes(1)
+    // 检测后刷新列表，展示新卡片 / 新结论
     expect(stockTraceApiMock.list).toHaveBeenCalledTimes(2)
+    // 补入队条数对用户可见
+    expect(uni.showToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: expect.stringContaining('2'),
+    }))
+    // 按钮恢复可用（detecting 已复位）
+    expect(btn!.text()).toContain('立即检测')
+  })
+
+  it('「立即检测」接口失败 → 提示失败，按钮恢复可用，仍刷新列表', async () => {
+    stockTraceApiMock.detect.mockRejectedValue(new Error('network'))
+    const wrapper = mount(monitor)
+    await flushPromises()
+    const btn = wrapper.findAll('.as-btn').find((b) => b.text().includes('立即检测'))
+
+    await btn!.trigger('click')
+    await flushPromises()
+
+    expect(stockTraceApiMock.detect).toHaveBeenCalledTimes(1)
+    expect(uni.showToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: expect.stringContaining('失败'),
+    }))
+    // 失败也刷新一次列表（列表是展示事实源）
+    expect(stockTraceApiMock.list).toHaveBeenCalledTimes(2)
+    expect(btn!.text()).toContain('立即检测')
   })
 
   it('列表行改用组件库 Card 三段式模板（event-top / event-title / event-bottom）', async () => {
