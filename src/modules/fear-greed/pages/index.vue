@@ -60,7 +60,7 @@
         <view v-if="historyChartSrc" class="fg-card">
           <text class="fg-card__title">历史走势 <text class="fg-card__sub">近 3 个月 · 滑动查看每日</text></text>
           <!-- 交互热区容器：覆盖整个图表，用于捕捉 hover/tap 事件 -->
-          <view class="fg-chart__hotzone-container" @mouseleave="clearDay">
+          <view class="fg-chart__hotzone-container" @mouseleave="clearDay" @touchstart="measureChartRect" @touchmove="onChartTouchMove">
             <image class="fg-chart__img" :src="historyChartSrc" mode="widthFix" />
             <!-- 每日透明热区：横向定位对齐 SVG 点位 -->
             <view
@@ -216,7 +216,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import { InsightCard } from '@/shared/components'
@@ -226,28 +226,14 @@ import { agentApi } from '@/shared/api/modules/agent'
 import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 import { formatRhythmSummary, getRhythmUrl, type RhythmSummary } from '../utils/fgRhythmSummary'
 import { localDayKey, decideRhythmRefresh, shouldSetErrorMsg } from '../utils/fgRhythmGate'
+import { FEAR_GREED_ZONES, type FearGreedZoneMeta } from '@/shared/utils/fearGreedZones'
 
 /**
  * 情绪分档（沸点/冰点生活化表述，去专业术语）。
- * 颜色沿用恐贪指数国际标准色：红=冰点（恐惧）、橙=寒冷、黄=常温、绿=温热、深绿=沸点。
+ * 颜色 / 边界 / 标签统一来自共享常量 FEAR_GREED_ZONES（与首页「恐贪胶囊」单一事实源，
+ * 避免两处配色漂移），本处仅补充各档位的文案与仓位锚点。
  */
-interface ZoneDef {
-  min: number
-  max: number
-  /** 生活化主标签（沸点/冰点） */
-  label: string
-  /** 通俗副标签 */
-  subLabel: string
-  /** 主色（数值文字色） */
-  color: string
-  /** 渐变起始色（深） */
-  start: string
-  /** 渐变结束色（浅） */
-  end: string
-  /** 呼吸灯颜色（rgba） */
-  pulseColor: string
-  /** 是否极端档（冰点/沸点），触发呼吸灯 */
-  isExtreme: boolean
+interface ZoneDef extends FearGreedZoneMeta {
   /** 投资建议 */
   advice: string
   /** 情绪总结话语（AI 洞见"为什么"部分） */
@@ -264,8 +250,7 @@ interface ZoneDef {
 
 const ZONES: ZoneDef[] = [
   {
-    min: 0, max: 20, label: '冰点', subLabel: '极度恐惧', color: '#00C853',
-    start: '#00C853', end: '#5AFF8F', pulseColor: 'rgba(0, 200, 83, 0.5)', isExtreme: true,
+    ...FEAR_GREED_ZONES[0],
     advice: '市场恐慌情绪降至冰点，优质资产或被错杀。建议保持耐心，可分批关注超跌的优质标的，等待企稳信号后再加大仓位。',
     summary: '市场情绪处于冰点，恐慌性抛售主导盘面，避险情绪浓厚',
     positionMin: 20, positionMax: 35,
@@ -277,8 +262,7 @@ const ZONES: ZoneDef[] = [
     actions: ['分批建仓，控制节奏', '设好止损，严守纪律', '等待放量企稳信号'],
   },
   {
-    min: 20, max: 45, label: '寒冷', subLabel: '恐惧', color: '#2E7D32',
-    start: '#2E7D32', end: '#5BA363', pulseColor: 'rgba(46, 125, 50, 0)', isExtreme: false,
+    ...FEAR_GREED_ZONES[1],
     advice: '市场情绪偏谨慎，建议控制仓位，优先配置业绩确定性高的防御性板块，耐心等待情绪修复。',
     summary: '市场情绪偏谨慎，投资者信心不足、交易活跃度偏低',
     positionMin: 30, positionMax: 50,
@@ -290,8 +274,7 @@ const ZONES: ZoneDef[] = [
     actions: ['控制仓位，不宜满仓', '关注业绩确定性高的标的', '耐心等待情绪修复信号'],
   },
   {
-    min: 45, max: 55, label: '常温', subLabel: '中性', color: '#FFCC00',
-    start: '#FFCC00', end: '#FFE066', pulseColor: 'rgba(255, 204, 0, 0)', isExtreme: false,
+    ...FEAR_GREED_ZONES[2],
     advice: '市场情绪平稳，多空力量均衡。建议维持现有仓位，多看少动，等待方向明朗后再做决策。',
     summary: '市场情绪平稳，多空力量均衡，观望气氛浓厚',
     positionMin: 50, positionMax: 60,
@@ -303,8 +286,7 @@ const ZONES: ZoneDef[] = [
     actions: ['维持现有仓位', '多看少动，等待方向', '关注新催化剂出现'],
   },
   {
-    min: 55, max: 80, label: '温热', subLabel: '贪婪', color: '#FF5252',
-    start: '#FF5252', end: '#FF8080', pulseColor: 'rgba(255, 82, 82, 0)', isExtreme: false,
+    ...FEAR_GREED_ZONES[3],
     advice: '市场情绪偏乐观，赚钱效应显现。建议注意追高风险，可考虑逢高分批止盈，锁定已有收益。',
     summary: '市场情绪升温，资金参与意愿增强，赚钱效应显现',
     positionMin: 40, positionMax: 60,
@@ -316,8 +298,7 @@ const ZONES: ZoneDef[] = [
     actions: ['分批止盈，锁定收益', '注意追高风险', '警惕高位放量滞涨信号'],
   },
   {
-    min: 80, max: 100, label: '沸点', subLabel: '极度贪婪', color: '#FF3B30',
-    start: '#FF3B30', end: '#FF6B60', pulseColor: 'rgba(255, 59, 48, 0.5)', isExtreme: true,
+    ...FEAR_GREED_ZONES[4],
     advice: '市场情绪已至沸点，追涨情绪浓烈，风险收益比显著下降。建议降低仓位、落袋为安，避免盲目追高。',
     summary: '市场情绪过热，非理性追涨主导，追高风险加大',
     positionMin: 20, positionMax: 40,
@@ -462,6 +443,45 @@ function selectDay(idx: number) {
 /** 鼠标移出图表热区：清除选中，tooltip 随之隐藏（十字线回落到默认最新日） */
 function clearDay() {
   activeDayIdx.value = null
+}
+
+/** 图表热区容器在页面中的几何信息（手指滑动 → 日期索引映射用；仅触摸交互） */
+const chartRect = ref<{ left: number; width: number } | null>(null)
+
+/** 量取图表热区容器的位置/宽度（图表渲染后调用；失败静默，滑动降级为不可用） */
+function measureChartRect() {
+  uni.createSelectorQuery()
+    .select('.fg-chart__hotzone-container')
+    .boundingClientRect((rect) => {
+      const r = Array.isArray(rect) ? rect[0] : rect
+      if (r && typeof r.left === 'number' && typeof r.width === 'number' && r.width > 0) {
+        chartRect.value = { left: r.left, width: r.width }
+      }
+    })
+    .exec()
+}
+
+/** 手指 clientX → 日期索引（映射到 SVG 绘图区，越界返回 null） */
+function dayIdxFromClientX(clientX: number): number | null {
+  const cd = chartData.value
+  const rect = chartRect.value
+  if (!cd || !rect || rect.width <= 0) return null
+  const xInSvg = ((clientX - rect.left) / rect.width) * cd.W
+  const idx = Math.floor((xInSvg - cd.padL) / cd.dayW)
+  return idx >= 0 && idx < cd.nDays ? idx : null
+}
+
+/**
+ * 图表手指滑动：跟随手指横向移动，实时切换选中日并显示该日数值框。
+ * 松手保持最后选中（不主动清除），与「滑动查看每日」需求一致；鼠标端保持既有 hover 行为。
+ */
+function onChartTouchMove(e: TouchEvent) {
+  const touches = e.touches as unknown as Array<{ clientX?: number; x?: number }>
+  const touch = touches?.[0]
+  const x = touch?.clientX ?? touch?.x
+  if (typeof x !== 'number') return
+  const idx = dayIdxFromClientX(x)
+  if (idx != null) selectDay(idx)
 }
 
 /**
@@ -764,6 +784,9 @@ async function load() {
   try {
     dashboard.value = await fearGreedApi.getDashboard('jq')
     dashboardLoadedDay.value = localDayKey()
+    // 图表渲染后量取热区容器几何，供手指滑动映射日期索引（仅触摸交互）
+    await nextTick()
+    measureChartRect()
     // 板块行情独立拉取：失败不影响主数据（引擎侧回退静态档位内容）
     fearGreedApi.getSectors().then((b) => { sectorBoard.value = b }).catch(() => { sectorBoard.value = null })
   } catch (e: unknown) {
