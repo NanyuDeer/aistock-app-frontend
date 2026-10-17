@@ -62,7 +62,9 @@
       </view>
 
       <!-- 时段动态洞见卡（方案D：头条 + 3条次要 + 四入口条带）；新增，暂不替换下方四宫格 -->
+      <!-- 2026-10-13 按要求暂时隐藏；组件、取数与 navigate 分发均保留，恢复只需删掉 v-if="false" -->
       <DynamicInsightCard
+        v-if="false"
         :leader-sectors="leaderSectors"
         :chain-events="chainEvents"
         :trace-reports="traceReports"

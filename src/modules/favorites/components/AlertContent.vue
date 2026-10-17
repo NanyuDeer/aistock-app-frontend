@@ -53,6 +53,7 @@
             </view>
             <text class="module-arrow">›</text>
           </view>
+          <!-- 未登录时为示例行（demo），不可点击：无真实 event_id，跳详情必 404 -->
           <view class="capture-list">
             <template v-if="captureList.length">
               <ListCell
@@ -60,8 +61,8 @@
                 :key="idx"
                 :title="item?.stock_name || '\u3000'"
                 :description="item ? `${item.detailText} · ${item.dateText}` : '\u3000'"
-                :clickable="!!item"
-                @click="item && goTrace(item.event_id)"
+                :clickable="!!item && !item.demo"
+                @click="item && !item.demo && goTrace(item.event_id)"
               >
                 <template #prefix>
                   <Tag v-if="item" :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
@@ -129,6 +130,8 @@ interface CaptureItem {
   dateText: string
   /** 事件时间戳（融合列表按此倒序排列） */
   sortTime: number
+  /** 未登录时的示例数据标记：不可点击（无真实 event_id，跳详情必 404） */
+  demo?: boolean
 }
 
 const captureList = ref<CaptureItem[]>([])
@@ -139,6 +142,22 @@ function fmtDateMMDD(t?: string): string {
   const date = new Date(t)
   if (Number.isNaN(date.getTime())) return '--'
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * 未登录示例数据（2026-10-13）：未登录没有自选股，异动链路也无数据，
+ * 首页「自选股洞察」块用 3 条示例填满固定行高（否则空态白占位）。
+ * 仅演示样张、不落任何真实 event_id → 行不可点击（点击跳详情必然 404）。
+ */
+const DEMO_CAPTURE_LIST: CaptureItem[] = [
+  { event_id: '', event_type: 'price', stock_name: '中国平安', direction: 'up', detailText: '主因：保险板块集体走强', dateText: '', sortTime: 0, demo: true },
+  { event_id: '', event_type: 'price', stock_name: '贵州茅台', direction: 'down', detailText: '主因：消费板块资金流出', dateText: '', sortTime: 0, demo: true },
+  { event_id: '', event_type: 'price', stock_name: '宁德时代', direction: 'up', detailText: '主因：新能源政策预期升温', dateText: '', sortTime: 0, demo: true },
+]
+
+function buildDemoCaptureList(): CaptureItem[] {
+  const today = fmtDateMMDD(new Date().toISOString())
+  return DEMO_CAPTURE_LIST.map((item) => ({ ...item, dateText: today }))
 }
 
 /** 价格异动（stocktrace 链路）→ 统一模型 */
@@ -161,6 +180,11 @@ function fromMovement(m: StockTraceEvent): CaptureItem {
 }
 
 async function loadCaptureList() {
+  // 2026-10-13：未登录不请求接口（无自选股、异动链路对匿名用户无数据），直接展示 3 条示例数据
+  if (!useUserStore().isLoggedIn()) {
+    captureList.value = buildDemoCaptureList()
+    return
+  }
   // 2026-08-30 链路合并：涨停雷达事件已并入 stock-trace（movements），列表只消费 movements
   try {
     const page = await stockTraceApi.list(20).catch(() => ({ items: [] as StockTraceEvent[] }))
@@ -353,11 +377,12 @@ onActivated(() => {
 onDeactivated(stopAutoRefresh)
 onUnmounted(stopAutoRefresh)
 
-// 登录/登出后，个股情报数据源会在全市场与自选股之间切换，需重新加载
+// 登录/登出后数据源切换：个股情报在全市场与自选股资讯间切换；自选股洞察在示例数据与真实异动间切换
 watch(
   () => useUserStore().token,
   () => {
     void loadIntelList()
+    void loadCaptureList()
   },
 )
 </script>

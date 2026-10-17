@@ -86,3 +86,41 @@ describe('AiPickContent 自选按钮（加/取消 双向切换）', () => {
     expect(favoritesMock.remove).not.toHaveBeenCalled()
   })
 })
+
+describe('AiPickContent 列表排序（按当日涨跌幅降序）', () => {
+  beforeEach(() => {
+    favoritesMock.favorites.clear()
+    favoritesMock.pending.clear()
+    vi.mocked(uni.showToast).mockClear()
+  })
+
+  it('涨跌幅降序：涨幅最大的排最前，与接口返回顺序无关', async () => {
+    selectionMock.getLatest.mockResolvedValue({
+      status: 'ready',
+      stocks: [
+        { symbol: '600001', name: '小涨股', price: 10, changePct: 1.2, reason: ['a'], rank: 1, recommendationLevel: '较高', riskTip: '' },
+        { symbol: '600002', name: '大涨股', price: 20, changePct: 9.8, reason: ['b'], rank: 2, recommendationLevel: '较高', riskTip: '' },
+        { symbol: '600003', name: '下跌股', price: 30, changePct: -3.5, reason: ['c'], rank: 3, recommendationLevel: '较高', riskTip: '' },
+      ],
+    })
+    const wrapper = mount(AiPickContent)
+    await vi.dynamicImportSettled()
+    const names = wrapper.findAll('.stock-name').map((el) => el.text())
+    expect(names).toEqual(['大涨股', '小涨股', '下跌股'])
+  })
+
+  it('涨跌幅缺失的股票排到最后（不插入涨幅序列中间）', async () => {
+    selectionMock.getLatest.mockResolvedValue({
+      status: 'ready',
+      stocks: [
+        { symbol: '600011', name: '停牌股', price: null, changePct: null, reason: ['a'], rank: 1, recommendationLevel: '较高', riskTip: '' },
+        { symbol: '600012', name: '小涨股', price: 10, changePct: 0.5, reason: ['b'], rank: 2, recommendationLevel: '较高', riskTip: '' },
+        { symbol: '600013', name: '大涨股', price: 20, changePct: 6.6, reason: ['c'], rank: 3, recommendationLevel: '较高', riskTip: '' },
+      ],
+    })
+    const wrapper = mount(AiPickContent)
+    await vi.dynamicImportSettled()
+    const names = wrapper.findAll('.stock-name').map((el) => el.text())
+    expect(names).toEqual(['大涨股', '小涨股', '停牌股'])
+  })
+})

@@ -1,5 +1,7 @@
 <template>
-  <!-- 条件化预判块（结构化传入）：档位区平铺所有档（每档基准方向）+ 互斥条件情景（分支点亮/置灰） -->
+  <!-- 条件化预判块（结构化传入）：档位区平铺所有档（每档基准方向）+ 互斥条件情景（分支点亮/置灰）
+       信息区次要灰字统一在基线类抬升（字号至少 22rpx + 颜色至 $ink-soft），
+       sentence / tags 两种形态一致受益；主信息（基准/方向/预判原文）仍为 $ink，层级不变 -->
   <view v-if="structured" class="as-insight-card__fc">
     <view class="as-insight-card__fc-head">
       <text class="as-insight-card__fc-key">预判</text>
@@ -575,11 +577,11 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   padding: 2rpx 12rpx;
 }
 
-/* 该档口径说明（板块/大盘共用；独占一行，缺失整行不渲染） */
+/* 该档口径说明（板块/大盘共用；独占一行，缺失整行不渲染）——次要说明灰字，两种形态统一 22rpx/$ink-soft */
 .as-insight-card__horizon-projection {
   flex-basis: 100%;
-  font-size: 20rpx;
-  color: $ink-faint;
+  font-size: $font-size-xs;
+  color: $ink-soft;
   line-height: 1.5;
 }
 
@@ -591,11 +593,11 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   color: $ink;
 }
 
-/* 影响阶段（大盘溯源模型透传；板块不传即不渲染） */
+/* 影响阶段（大盘溯源模型透传；板块不传即不渲染）——次要说明灰字，两种形态统一 22rpx/$ink-soft */
 .as-insight-card__horizon-phase {
   flex-shrink: 0;
-  font-size: 20rpx;
-  color: $ink-faint;
+  font-size: $font-size-xs;
+  color: $ink-soft;
 }
 
 .as-insight-card__ph-tt {
@@ -605,8 +607,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 
 .as-insight-card__remain {
   margin-left: auto;
-  font-size: 20rpx;
-  color: $ink-faint;
+  font-size: $font-size-xs;
+  color: $ink-soft;
 }
 
 /* 方向徽标（A股：看多=红 看空=绿 震荡=灰，文字随附消除歧义） */
@@ -639,8 +641,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__conf {
-  font-size: 22rpx;
-  color: $ink-mute;
+  font-size: $font-size-xs;
+  color: $ink-soft;
 }
 
 /* 互斥情景路径（每支一张卡；行间“或”分隔；触发点亮/未触发置灰/缺省待观察） */
@@ -667,8 +669,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-or-tx {
-  font-size: 22rpx;
-  color: $ink-faint;
+  font-size: $font-size-sm;
+  color: $ink-soft;
 }
 
 .as-insight-card__sc {
@@ -775,9 +777,9 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-more-tx {
-  font-size: 20rpx;
+  font-size: $font-size-xs;
   font-weight: 500;
-  color: $ink-mute;
+  color: $ink-soft;
   line-height: 1.4;
 }
 
@@ -804,14 +806,14 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-conn {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   font-weight: 600;
-  color: $ink-faint;
+  color: $ink-soft;
   flex: none;
 }
 
 .as-insight-card__sc-amp-chip {
-  color: $ink-mute;
+  color: $ink-soft;
 }
 
 .as-insight-card__sc--up.as-insight-card__sc--live .as-insight-card__sc-amp-chip {
@@ -847,9 +849,9 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   line-height: $lh-tight;
 }
 
-/* 幅度/目标位段（-3% ~ -5%、+3% 等）：弱化置灰；触发路径内随方向色 */
+/* 幅度/目标位段（-3% ~ -5%、+3% 等）：弱化不弱读（$ink-soft，最深只到次要信息层）；触发路径内随方向色 */
 .as-insight-card__sc-amp {
-  color: $ink-mute;
+  color: $ink-soft;
   font-weight: 600;
 }
 
@@ -903,9 +905,9 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__anchor-chip {
-  font-size: 20rpx;
+  font-size: $font-size-xs;
   line-height: 1.6;
-  color: $ink-mute;
+  color: $ink-soft;
   background: #f4f5f7;
   border: 1rpx solid #e6e8ee;
   border-radius: $r-full;
@@ -927,8 +929,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-hidden-tx {
-  font-size: 20rpx;
-  color: $ink-faint;
+  font-size: $font-size-xs;
+  color: $ink-soft;
   line-height: 1.5;
 }
 
@@ -941,16 +943,16 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-fold-tx {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   font-weight: 600;
-  color: $ink-mute;
+  color: $ink-soft;
 }
 
 /* 到期未命中标签（沿用 miss 中性灰，不与 hit 实心绿混用） */
 .as-insight-card__sc-miss {
-  font-size: 20rpx;
+  font-size: $font-size-xs;
   font-weight: 600;
-  color: $ink-mute;
+  color: $ink-soft;
   background: $bg-soft;
   border: 1rpx solid $line;
   border-radius: $r-full;
@@ -958,8 +960,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-empty {
-  font-size: 20rpx;
-  color: $ink-faint;
+  font-size: $font-size-xs;
+  color: $ink-soft;
   padding: 0 6rpx;
 }
 </style>

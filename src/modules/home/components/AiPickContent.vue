@@ -42,11 +42,23 @@ const favoritesStore = useFavoritesStore()
 const pageState = ref<'loading' | 'generating' | 'ready' | 'empty' | 'failed'>('loading')
 const items = ref<AiStockSelectionItem[]>([])
 const expandedReasons = ref<Set<string>>(new Set())
+
+/**
+ * 按当日涨跌幅降序（2026-10-13）：涨幅最大的排最前，与接口返回的 rank 顺序无关。
+ * 涨跌幅缺失（如停牌）视作最小，统一排到末尾，不插进有涨跌幅的序列中间。
+ */
+function byChangePctDesc(a: Recommendation, b: Recommendation): number {
+  const left = a.changePct ?? Number.NEGATIVE_INFINITY
+  const right = b.changePct ?? Number.NEGATIVE_INFINITY
+  if (left === right) return 0
+  return right > left ? 1 : -1
+}
+
 const recommendations = computed<Recommendation[]>(() => items.value.map((item) => ({
   ...item,
   reason: item.reason.filter(Boolean).join('；') || '暂无推荐理由',
   sparkline: item.sparkline || [],
-})))
+})).sort(byChangePctDesc))
 const stateText = computed(() => ({
   loading: '正在加载 AI 选股结果…',
   generating: '今日 AI 选股正在生成，请稍后查看。',

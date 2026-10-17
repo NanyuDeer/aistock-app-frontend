@@ -169,6 +169,7 @@
 - **子页面滚动容器（2026-08-19）**：H5 预览包装固定 `#app` 高度并 `overflow: hidden`，页面原生滚动被禁用。`insight.vue` / `insight-detail.vue` / `insight-detail-move.vue` 必须用 `SubPageCard2`（自带白色导航栏 + scroll-view）包裹（对应 pages.json `navigationStyle: "custom"`），否则长内容被裁剪、底部不可达。新增/改造子页面沿用此模式。
 
 ## 首页 AlertContent 自选股洞察（2026-09-04 还原为旧预览 ListCell 形态）
+- **2026-10-13 未登录示例数据**：`loadCaptureList()` 开头判 `useUserStore().isLoggedIn()`，为假则直接 `captureList = buildDemoCaptureList()`（3 条示例：中国平安↑/贵州茅台↓/宁德时代↑，日期取当日 `MM-DD`）并 **early return，不发 `stockTraceApi.list`**——匿名用户没有自选股、异动链路对其无数据，请求只会拿空数组把示例顶掉。`CaptureItem` 增 `demo?: boolean`，模板 `:clickable="!!item && !item.demo"` + `@click="item && !item.demo && goTrace(...)"`：示例行不可点击（`event_id` 为空，跳详情必 404）。登录态 `watch(token)` 补 `loadCaptureList()`（原先只重载个股情报），登出回落示例、登录立即切真实。**已登录路径零改动**。
 - `AlertContent.vue` 自选股洞察块还原为旧预览 ListCell 形态：`module-header`（标题"自选股洞察"+箭头，点跳 `/modules/favorites/pages/monitor` 自选股异动页）+ `ListCell` 列表（`CAPTURE_ROW_COUNT=6`）。行字段：`title=stock_name`、前缀 `Tag` 用方向（up/down, 红绿, 文案"涨/跌"）、`description=主因或状态 · MM-DD 时间`。点击行进 `insight-detail-move?event_id=`。
 - 数据源：`stockTraceApi.list(20)` → `.filter(m => !isUnattributableMovement(m))`（保留无法归因不展示）→ 取前 6 条（含空行占位至 6）。
 - 主因三段式兜底：`primary_cause` → `movement_view.primaryCandidate.verdict` → `analysis_status`（completed→归因完成 / processing→归因中 / failed→归因失败 / 其他→待归因）。
