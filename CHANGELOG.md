@@ -2,6 +2,28 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [junliang] 2026-10-15 — 自选股异动「立即检测」按钮接回真实检测 + 展示归因入队条数
+
+**开发者**: NanyuDeer
+
+### 变更
+
+- `modules/favorites/pages/monitor.vue`：`handleDetect` 由**只调 `fetchAlerts()` 刷新列表**改为**真正调用 `stockTraceApi.detect()`**（`POST /cn/favorites/movements/detect`），并按响应 `enqueued` 给出反馈 —— `enqueued > 0` 时 toast「已触发检测，N 条正在归因」，否则「已触发检测」；失败 toast「检测失败，请稍后重试」。`finally` 中仍 `await fetchAlerts()` 刷新列表 + 恢复 `detecting` 按钮态（沿用原有 `detecting` 并发守卫）。
+- `shared/api/modules/stockTrace.ts`：`detect()` 返回类型由 `{ triggered: boolean }` 扩展为 `{ triggered: boolean; enqueued: number }`（对齐后端加性响应字段）。
+
+### 修复
+
+- **「立即检测」按钮半成品**：此前按钮文案是"立即检测"，实际**只刷新列表**、不触发任何检测（`stockTraceApi.detect()` 为全仓零调用死代码），用户点完看不到新异动也无从判断是否真的检测过。现接回真实端点，并把后端补齐的归因入队条数回显到 toast，使"点了到底有没有用"可观测。
+
+### 测试
+
+- `modules/favorites/pages/monitor.spec.ts`：原「立即检测用组件库 Button 承载，点击重新拉取列表」1 例 → **2 例**：① 成功路径（`detect` 被调用 1 次 + `list` 调 2 次（进入页 + 点击后刷新）+ toast 含入队条数 + 按钮恢复）；② 失败路径（`detect` reject → toast 含「失败」+ 列表仍刷新 + 按钮恢复）。mock 新增 `detect: vi.fn()` 及 `mockReset` / `mockResolvedValue`。
+- `npx vue-tsc --noEmit` exit 0（本地验证）。
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增「立即检测」按钮 2026-10-15 修复说明，护栏用例数由 21 更新为 22。
+
 ## [xusiyun] 2026-10-15 — 事件影响存活度小标 + 自选股相关事件卡片
 
 **开发者**: xusiyun

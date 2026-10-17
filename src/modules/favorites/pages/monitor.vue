@@ -277,18 +277,26 @@ async function loadMore() {
 }
 
 /**
- * 手动触发检测：先让后端真正执行一次打点检测（POST /cn/favorites/movements/detect），
- * 再刷新列表。原实现只刷新列表、按钮文案却叫「立即检测」，名实不符。
+ * 「立即检测」：真的调用后端检测接口（绕过交易时段强制检测一次），后端顺带为
+ * 「当日 active 但缺归因 job」的事件补入队（2026-10-15 修复——此前该按钮只刷新列表，
+ * 且即便调后端也不入队归因，非交易时段点出的事件会永久停在「归因中」）。
+ * 检测后刷新列表展示新卡片 / 新结论。
  */
 async function handleDetect() {
   if (detecting.value) return
   detecting.value = true
   try {
-    await stockTraceApi.detect().catch((err) => {
-      console.warn('[monitor] detect failed:', err)
+    const { enqueued } = await stockTraceApi.detect()
+    uni.showToast({
+      title: enqueued > 0 ? `已触发检测，${enqueued} 条正在归因` : '已触发检测',
+      icon: 'none',
     })
-    await fetchAlerts()
+  } catch (err) {
+    console.warn('[Monitor] 立即检测失败', err)
+    uni.showToast({ title: '检测失败，请稍后重试', icon: 'none' })
   } finally {
+    // 成功失败都刷新：列表是展示事实源
+    await fetchAlerts()
     detecting.value = false
   }
 }
