@@ -42,6 +42,9 @@
     <!-- 全局 AI 对话栏（共享，不闪烁） -->
     <GlobalChatBar />
 
+    <!-- ① 首页悬浮「自选股消息卡」：一只股票一张卡，多股堆叠（最多 3 张，H5/App 左右跟手拖动切换、各端可上下滑动切换） -->
+    <FloatingStockAlertCards :cards="alertCards" @close="dismissAlert" @view-all="openPanel" />
+
     <!-- 播报悬浮窗（首页晨报等调用 podcastStore.open 后显示；仅首页前台时渲染） -->
     <FloatingPodcast :page-key="pageKey" />
 
@@ -58,10 +61,13 @@ import GlobalChatBar from '@/shared/components/GlobalChatBar.vue'
 import FloatingPodcast from '@/shared/components/FloatingPodcast.vue'
 import FearGreedIndex from '@/shared/components/FearGreedIndex.vue'
 import UpdateModal from '@/shared/components/UpdateModal.vue'
+import FloatingStockAlertCards from '@/shared/components/FloatingStockAlertCards.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import NotificationDropdown from '@/shared/components/NotificationDropdown.vue'
 import { usePodcastStore } from '@/shared/store/modules/podcast'
 import { useAdaptiveScreen } from '@/shared/utils/useAdaptiveScreen'
+import { useStockAlerts } from '@/shared/utils/useStockAlerts'
+import { useNotificationPanel } from '@/shared/utils/notificationPanel'
 import { px2rpx, getBottomFixedHeightPx } from '@/shared/utils/layout'
 import MorningContent from '@/modules/home/components/MorningContent.vue'
 import StockContent from '@/modules/home/components/StockContent.vue'
@@ -73,16 +79,28 @@ const pageKey = 'main-tabs'
 /** 多端适配：宽屏（平板/折叠屏展开/横屏）时内容限宽居中 */
 const { isWide } = useAdaptiveScreen()
 
+// 自选股消息卡（① 悬浮堆叠卡，仅首页实例化一次）
+const {
+  cards: alertCards,
+  fetchRecent: fetchAlerts,
+  dismiss: dismissAlert,
+  startPolling: startAlertPolling,
+  stopPolling: stopAlertPolling,
+} = useStockAlerts()
+
+/** 「查看全部」：唤起左上角铃铛通知面板（兄弟组件，经共享状态通信） */
+const { openPanel } = useNotificationPanel()
+
 // 页面可见性 → store.activePage：uni-h5 页面被 KeepAlive 缓存不卸载，
 // 悬浮球渲染权必须跟随前台页面（否则渲染在隐藏页面/多实例双播放）。
 // 关键：uni-app onShow/onHide 是页面实例级钩子，子组件注册的永不触发，
 // 必须用 Vue onActivated/onDeactivated（KeepAlive 缓存树内子组件可触发）维护。
 const podcastStore = usePodcastStore()
-onShow(() => { podcastStore.setActivePage(pageKey) })
-onHide(() => { podcastStore.clearActivePage(pageKey) })
-onActivated(() => { podcastStore.setActivePage(pageKey) })
-onDeactivated(() => { podcastStore.clearActivePage(pageKey) })
-onMounted(() => { podcastStore.setActivePage(pageKey) })
+onShow(() => { podcastStore.setActivePage(pageKey); void fetchAlerts(); startAlertPolling() })
+onHide(() => { podcastStore.clearActivePage(pageKey); stopAlertPolling() })
+onActivated(() => { podcastStore.setActivePage(pageKey); void fetchAlerts(); startAlertPolling() })
+onDeactivated(() => { podcastStore.clearActivePage(pageKey); stopAlertPolling() })
+onMounted(() => { podcastStore.setActivePage(pageKey); void fetchAlerts(); startAlertPolling() })
 
 const tabTitles: Record<string, string> = {
   morning: '早点听',

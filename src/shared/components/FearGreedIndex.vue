@@ -17,41 +17,30 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { fearGreedApi } from '@/shared/api/modules/fear-greed'
+import { fearGreedZoneOf, type FearGreedZoneMeta } from '@/shared/utils/fearGreedZones'
 
-/**
- * 恐贪指数分档定义（国际 Fear & Greed Index 标准配色）
- * 颜色为恐贪指数固定标准色，非设计 token，故在本组件内常量定义。
- */
-interface RangeDef {
+/** 未加载/拉取失败时的中性档（灰 + 占位文案）：不用任何真实档位冒充，避免展示假数值 */
+interface NeutralZone {
   min: number
   max: number
   label: string
   color: string
   start: string
   end: string
-  advice: string
   isExtreme: boolean
 }
-
-const RANGES: RangeDef[] = [
-  { min: 0, max: 20, label: '冰点', color: '#00C853', start: '#00C853', end: '#5AFF8F', advice: '市场恐慌，可能错配，可关注超跌机会', isExtreme: true },
-  { min: 20, max: 45, label: '寒冷', color: '#FF9500', start: '#FF9500', end: '#FFB84D', advice: '市场偏谨慎，建议控制仓位', isExtreme: false },
-  { min: 45, max: 55, label: '常温', color: '#FFCC00', start: '#FFCC00', end: '#FFE066', advice: '市场情绪平稳，保持观望', isExtreme: false },
-  { min: 55, max: 80, label: '温热', color: '#34C759', start: '#34C759', end: '#6AE07A', advice: '市场偏乐观，注意追高风险', isExtreme: false },
-  { min: 80, max: 100, label: '沸点', color: '#FF3B30', start: '#FF3B30', end: '#FF6B60', advice: '市场过热，谨防回调风险', isExtreme: true },
-]
-
-/** 未加载/拉取失败时的中性档（灰 + 占位文案）：不用任何真实档位冒充，避免展示假数值 */
-const NEUTRAL_RANGE: RangeDef = { min: 0, max: 0, label: '--', color: '#9ca3af', start: '#9ca3af', end: '#9ca3af', advice: '', isExtreme: false }
+const NEUTRAL_ZONE: NeutralZone = {
+  min: 0, max: 0, label: '--', color: '#9ca3af', start: '#9ca3af', end: '#9ca3af', isExtreme: false,
+}
 
 /** 指数数值（0-100）；未拉到数据时为 null（显示 --，不再用写死的 12 冒充真实值） */
 const indexValue = ref<number | null>(null)
 
-/** 当前分档（颜色 / 状态 / 建议） */
-const range = computed<RangeDef>(() => {
+/** 当前分档（颜色 / 标签）；未加载为中性占位档，已加载走共享的单一事实源 fearGreedZoneOf */
+const range = computed<FearGreedZoneMeta | NeutralZone>(() => {
   const v = indexValue.value
-  if (v == null) return NEUTRAL_RANGE
-  return RANGES.find((r) => v >= r.min && v < r.max) ?? RANGES[RANGES.length - 1]
+  if (v == null) return NEUTRAL_ZONE
+  return fearGreedZoneOf(v)
 })
 
 /** 按钮容器样式：软底背景跟随情绪色 */
@@ -69,7 +58,7 @@ onMounted(async () => {
     const d = await fearGreedApi.getDashboard('jq')
     if (d?.currentIndex != null) indexValue.value = d.currentIndex
   } catch {
-    // 拉取失败时保留默认值，不阻塞首页渲染
+    // 拉取失败时保持 null（显示 -- 占位），不阻塞首页渲染
   }
 })
 </script>

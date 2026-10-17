@@ -105,11 +105,13 @@ src/
 │   │   ├── useWebSocket.ts    # WebSocket hook
 │   │   ├── useTimer.ts        # 定时器 hook
 │   │   ├── usePushNotification.ts # 推送通知 hook
+│   │   ├── useStockAlerts.ts  # 首页自选股消息卡 composable（stock-trace 异动 + 通知 5 类消息两源合成，按股票聚合为卡片）
 │   │   ├── constants.ts       # 常量（AGENT_WS_BASE_URL 本地开发 fallback，P3-fix-2）
 │   │   ├── stock.ts           # 股票工具
 │   │   ├── tradingTime.ts     # 交易时间
 │   │   ├── datetime.ts        # 日期时间
 │   │   ├── platform.ts        # 平台判断
+│   │   ├── cardStackSwipe.ts  # 堆叠卡滑动手势纯逻辑（主轴锁定 / 跟手进度 / 切换判定 / 跟手倾斜 / 循环轮转）
 │   │   ├── cache.ts           # 缓存
 │   │   └── storage.ts         # 存储
 │   ├── types/           # 全局类型定义
@@ -361,6 +363,7 @@ import Card from '@/shared/components/Card.vue'
 | `KLineChart.vue` | [组件库] 无对应，从 analytics 提升 | 通用 K 线渲染（H5/APP-PLUS renderjs+klinecharts，MP-WEIXIN uCharts 画布），Props `{ title: string; data: TrendKLineData }` |
 | `AudioPlayer.vue` | [组件库] | 通用音频播放器（H5 HTMLAudioElement / App+小程序 InnerAudioContext 运行时分流），Props `{ src; title?; cover?; autoplay?; initialTime? }`，Emits `play`/`pause`/`ended`/`timeupdate`；卸载/换源时先 stop 再 destroy 确保音频立即停止（全局互斥抢占依赖此行为） |
 | `FloatingPodcast.vue` | App 专属 | 播报悬浮球/播放条（页面容器 MainTabs/SubPageCard/SubPageCard2 内渲染），消费 podcast store；渲染权跟随 `store.activePage === pageKey`（仅当前前台页面实例渲染 AudioPlayer，避免多实例双播放）。**注意：uni-app 的 onShow/onHide 是页面实例级钩子，子组件注册的永不触发——页面容器必须用 Vue 的 `onActivated`/`onDeactivated`（KeepAlive 缓存树内子组件可触发）维护 activePage，失活用 `clearActivePage(pageKey)` 防止旧页事件覆盖新页** |
+| `FloatingStockAlertCards.vue` | App 专属 | 首页悬浮「自选股消息卡」（MainTabs 内渲染，消费 `useStockAlerts`）：一只股票一张卡、最多堆叠 3 张、下层只露头部；**2026-10-16 起 H5/App 支持左右跟手拖动切换**（上层卡跟手水平位移 + 倾斜，下层卡按拖动进度实时升位放大，松手超阈值飞出后循环轮转顺序、未超阈值回弹；跟手期间关闭 CSS 过渡保证 1:1 跟手），各端保留原有的上下滑动切换；横向跟手以 `isH5 \|\| isApp` 限定（小程序不启用）。手势口径抽为纯函数 `shared/utils/cardStackSwipe.ts`；props `{ cards: StockAlertCard[] }`，emits `close(symbol)` / `viewAll(symbol)` |
 | `InsightTag.vue` | [组件库] | 洞察之眼标签（type ∈ emotion/fund/event/market，size ∈ sm/md/lg），MarketInsightCard 内由 InsightCard 使用 |
 | `InsightCard.vue` | [组件库] | 洞见卡（2026-09-02 升级：新增 `structured` prop 渲染条件化预判 + `tag-text` 标签覆盖；文本形态 trace/forecast 零破坏兼容）。structured 预判部分由内部通用块 ConditionalForecastBlock 承载（2026-09-02 抽取）。文本用法：title/trace/forecast/time/theme/showMeta/confidence，emit click；市场洞见页 MarketInsightCard 复用。**2026-09-17（P3' Task 4.2）**：`traceStructured` 加性扩展 `events?: InsightTraceEvent[]`（`{headline, ref?, source?}`，链上事件节点）——渲染在溯源行下方（空数组/缺省不渲染该区），胶囊点击 emit `eventSelect(ev)` 由调用方跳原文。**2026-09-17（弱依据提示，R16）**：`InsightTraceStructured` 再加性扩展 `weak?: boolean`（链级：`root.evidence_weak=true` → 摘要行旁中性灰小标「归因较弱」）与 `weakText?: string`（板块级：`child.extraction.weak=true` → 角色徽驱动行旁中性灰小标，文案由 `sectorInsight.extractionWeakLabel` 单点产出：「依据较弱」/「无归因依据」）；两者均**可选渲染**（字段缺失/正常日零标记、零变化），刻意不用告警色与涨跌色。**2026-09-18（R17）**：新增可选 `titleTag?: string` → 标题**上方**中性描边小标（`.as-insight-card__name-tag`，底色/文字走 `--ins-fc-bg`/`--ins-card-tx` 主题变量），供"标题是溯源主句、看不出板块名"的板块卡使用；缺省不渲染（其他调用方零变化） |
 | `ConditionalForecastBlock.vue` | [组件库] | 通用条件化预判块（2026-09-02 抽取，大盘/板块/个股凡有条件化预判一律复用，与板块洞见卡同款 UI）：props { structured: { horizons/conditions/dueLabel/verification } | null }——期段 Tab（短/中/长）+ 每期基准方向/置信/剩余 + 互斥分支（若 条件 → 方向 pill → scenario 幅度置灰）+ met 触发点亮/置灰 + 验证 pill + anchor threshold/metric chip。InsightCard structured 与 analytics MarketTracePrediction 共用。**2026-09-17 未触发折叠态（同日判定修正）**：折叠/过滤改按「当期有无已成立分支（`met===true`）」判定，**不再依赖 `resolvedDisplayMode` 降级**（后端只写 `condition_met=true`，未触发档无任何布尔 met，旧口径会降级 `full` 使折叠态不可达）；当期无已成立分支且该档有条件时，分支区不铺开、收为一行入口「查看条件化预判 ▾」/「收起条件化预判 ▴」（本地展开，切期段归零；展开后铺开该档全部分支），基准行照常；此形态下原空态文案不再显示（仅 `sentence` 形态保留）。折叠态若 `verification === 'miss'` → 入口旁中性灰「未命中」且头部同义 pill「验证未中」被抑制；有已成立分支时只渲染已成立分支 + 分支区末尾纯标注「另有 N 条条件未成立」。**2026-09-17 复审收口（同日第二修）**：折叠/过滤/隐藏标注/「未命中」标签**一律以 `displayMode === 'conclusion'` 收口**——未传或 `full` 的调用方（节奏大师洞见卡等）恒全量分支直显、无折叠入口（否则其卡内默认只剩一行入口 = 核心分支不可见）；空态文案还原改造前口径（`sentence` → 「该期暂无细分情景」、tags 结论态 → 「条件未成立 · 暂无已验证结论」）；三态渲染护栏见 `ConditionalForecastBlock.mount.spec.ts`（vitest 挂载 5 条） |

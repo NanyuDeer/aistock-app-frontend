@@ -2,6 +2,32 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [feat/fear-greed-node] 2026-10-16 — 首页自选股消息卡（含左右跟手滑动）+ 恐贪温度分档收敛
+
+**开发者**: 林晓研
+
+### 新增
+
+- **首页悬浮「自选股消息卡」** `shared/components/FloatingStockAlertCards.vue`：一只股票一张卡、最多堆叠 3 张、下层只露头部。**H5/App 支持左右跟手拖动切换**——上层卡跟手水平位移 + 倾斜，下层卡按拖动进度实时升位/放大/变清晰，松手超阈值则当前卡飞出后循环轮转顺序、未达阈值回弹；各端保留原有上下滑动切换（上滑看下一张 / 下滑看上一张）。跟手期间关闭 CSS 过渡保证 1:1 跟手；横向跟手以 `isH5 || isApp` 限定（小程序不启用）。手势口径抽为纯函数模块 `shared/utils/cardStackSwipe.ts`（主轴锁定 / 跟手进度 / 切换判定 / 跟手倾斜 / 循环轮转）。
+- `shared/utils/useStockAlerts.ts`：首页自选股消息卡 composable（stock-trace 异动 + 通知 5 类消息两源合成，按股票聚合为卡片，含未读统计与轮询）。
+- `shared/utils/notificationPanel.ts`：通知面板「开合 + 目标股票」的模块级共享状态——首页悬浮卡与铃铛面板是兄弟组件，无法 props/emit 通信，故以共享 ref 承载（不承载通知数据）。
+- `shared/utils/fearGreedZones.ts`：恐贪温度分档**单一事实源**（颜色 / 边界 / 标签 / 呼吸灯），首页「恐贪胶囊」与恐贪模块页共用。
+- 通知面板**自选股筛选**：`NotificationDropdown.vue` 新增就地下拉框（「全部自选股」+ 每只自选股，点面板其余区域收起），并把未读圆点与分类标签移入标题行；`shared/api/modules/notifications.ts` 列表接口新增 `symbol` 参数；`shared/utils/storage.ts` 新增 `NOTIFICATION_STOCK_FILTER` 持久化上次选择（下次打开恢复）。
+
+### 修复 / 改进
+
+- **恐贪档位配色两处不一致**：首页胶囊与恐贪模块页原先各自硬编码一套档位色（寒冷档橙 vs 深绿、温热档绿 vs 红），现统一到 `fearGreedZones.ts` 单一事实源，消除配色漂移；`FearGreedIndex.vue` 未拉到数据时保持 `--` 占位，不再用真实档位冒充。
+- **恐贪模块页历史走势图支持触屏**：新增 `touchstart`/`touchmove` 按触点横坐标定位当日热区（原先只有 `mouseleave`，移动端无法查看单日）。
+- `MainTabs.vue`：接入悬浮卡（拉取 / 轮询 / 关闭 / 「查看全部」唤起铃铛面板），并把「面板开合」交给共享状态。
+
+### 测试
+
+- 新增 `src/shared/utils/cardStackSwipe.spec.ts`（16 例，纯函数先红后绿）、`src/shared/components/FloatingStockAlertCards.spec.ts`（8 例，构造触摸事件断言跟手位移 / 下层升位 / 阈值轮转 / 回弹 / 保留上下滑动 / 小程序不启用）。
+- `src/shared/components/NotificationDropdown.spec.ts`：补自选股筛选 2 例（下拉选择带 `symbol` 重拉 + 持久化、本地恢复首屏按 `symbol` 拉取），并修复**模块级面板状态跨用例泄漏**（面板开合改共享状态后，未复位会导致后续用例点铃铛变成「关」）＋补 `useFavoritesStore` 桩（否则 setup 阶段报 "no active Pinia"）。
+- 相关 7 个 spec 全绿 **70 passed**；`npx vue-tsc --noEmit` exit 0。
+
+---
+
 ## [junliang] 2026-10-15 — 自选股异动「立即检测」按钮接回真实检测 + 展示归因入队条数
 
 **开发者**: NanyuDeer
@@ -23,6 +49,8 @@
 ### 文档
 
 - `modules/favorites/AGENTS.md`：新增「立即检测」按钮 2026-10-15 修复说明，护栏用例数由 21 更新为 22。
+
+---
 
 ## [xusiyun] 2026-10-15 — 事件影响存活度小标 + 自选股相关事件卡片
 
