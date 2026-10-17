@@ -151,6 +151,19 @@ export interface FavoriteStock {
   addedAt?: string | null
 }
 
+/** 单只自选股的行业别名（GET /cn/favorites/industry-aliases） */
+export interface FavoriteIndustryAlias {
+  /** 股票名称 */
+  name: string
+  /** 自选股侧行业名（Tushare stock_basic.industry） */
+  industry: string
+  /** 同族行业名集合（申万一级归组 + 旧名归一；无行业时为 []） */
+  aliases: string[]
+}
+
+/** 自选股行业别名映射：symbol → 别名信息 */
+export type FavoriteIndustryAliasMap = Record<string, FavoriteIndustryAlias>
+
 /** 自选股财报披露计划项（GET /cn/stocks/disclosure-schedule） */
 export interface DisclosureScheduleItem {
   /** 6 位股票代码 */
@@ -621,6 +634,11 @@ export const stockApi = {
   /** 获取自选股（通过 /users/me 返回的用户信息提取） */
   getFavorites() {
     return request.get<UserFavoritesPayload>('/users/me').then(normalizeFavorites)
+  },
+
+  /** 获取自选股行业别名（需登录；未登录后端返回 401，调用方静默降级） */
+  getFavoriteIndustryAliases() {
+    return request.get<FavoriteIndustryAliasMap>('/cn/favorites/industry-aliases')
   },
 
   /** 添加自选股 */
