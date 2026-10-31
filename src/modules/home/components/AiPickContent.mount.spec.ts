@@ -30,6 +30,8 @@ vi.mock('@/shared/api/modules/ai-stock-selection', () => ({
 vi.stubGlobal('uni', {
   showToast: vi.fn(),
   navigateTo: vi.fn(),
+  getStorageSync: vi.fn(() => ''),
+  setStorageSync: vi.fn(),
 })
 
 import AiPickContent from './AiPickContent.vue'
@@ -87,8 +89,109 @@ describe('AiPickContent 自选按钮（加/取消 双向切换）', () => {
   })
 })
 
+describe('AiPickContent 策略筛选（与结果同一页）', () => {
+  beforeEach(() => {
+    vi.mocked(uni.getStorageSync).mockReturnValue('')
+    vi.mocked(uni.setStorageSync).mockClear()
+    vi.mocked(uni.showToast).mockClear()
+    selectionMock.getLatest.mockResolvedValue({
+      status: 'ready',
+      stocks: [
+        { symbol: '600001', name: '大涨弱量', price: 20, changePct: 9, reason: ['a'], rank: 1, recommendationLevel: '较高', riskTip: '', factors: { mainNetRatio: 0.1, turnoverRatePct: 0.2, amount: 8, return5dPct: -2 } },
+        { symbol: '600002', name: '量价更强', price: 10, changePct: 1, reason: ['b'], rank: 2, recommendationLevel: '较高', riskTip: '', factors: { mainNetRatio: 15, turnoverRatePct: 9, amount: 900, return5dPct: 7, newsCount: 0, themeCount: 0, aboveMa5: false, aboveMa20: false, maxDrawdown20dPct: -12 } },
+      ],
+    })
+  })
+
+  it('默认是 AI综合：不展示方法，按涨跌幅排序', async () => {
+    const wrapper = mount(AiPickContent)
+    await vi.dynamicImportSettled()
+
+    expect(wrapper.find('.horizon-chip.active').text()).toBe('AI综合')
+    expect(wrapper.find('.filter-meta').text()).toBe('当前：AI综合')
+    expect(wrapper.find('.method-chip').exists()).toBe(false)
+    expect(wrapper.findAll('.stock-name').map((node) => node.text())).toEqual(['大涨弱量', '量价更强'])
+    expect(wrapper.text()).not.toContain('查看筛选依据')
+    expect(wrapper.text()).not.toContain('风险偏好')
+  })
+
+  it('新方法可多选，但不会将AI综合名单重排成独立方法的结果', async () => {
+    const wrapper = mount(AiPickContent)
+    await vi.dynamicImportSettled()
+    await wrapper.findAll('.horizon-chip').find((node) => node.text() === '短线机会')!.trigger('tap')
+
+    const methods = wrapper.findAll('.method-chip')
+    expect(methods.map((node) => node.text())).toEqual(['事件催化', '放量突破', '强势延续', '涨停打板'])
+    expect(wrapper.findAll('.method-chip.active').map((node) => node.text())).toEqual(['事件催化'])
+    await methods.find((node) => node.text() === '放量突破')!.trigger('tap')
+    await wrapper.findAll('.method-chip').find((node) => node.text() === '事件催化')!.trigger('tap')
+
+    expect(wrapper.findAll('.method-chip.active').map((node) => node.text())).toEqual(['放量突破'])
+    expect(wrapper.find('.stock-name').exists()).toBe(false)
+    expect(wrapper.find('.ai-pick-state').text()).toBe('暂无所选方法的选股结果')
+
+    await wrapper.findAll('.horizon-chip').find((node) => node.text() === 'AI综合')!.trigger('tap')
+    expect(wrapper.findAll('.stock-name').map((node) => node.text())).toEqual(['大涨弱量', '量价更强'])
+  })
+
+  it('选中方法显示取消图标，最后一个方法也可再次点击取消并保存', async () => {
+    const wrapper = mount(AiPickContent)
+    await vi.dynamicImportSettled()
+    await wrapper.findAll('.horizon-chip').find((node) => node.text() === '中长线配置')!.trigger('tap')
+    expect(wrapper.find('.filter-meta').text()).toBe('方法可多选')
+    expect(wrapper.find('.method-remove').exists()).toBe(true)
+    await wrapper.find('.method-remove').trigger('tap')
+
+    expect(wrapper.find('.method-chip.active').exists()).toBe(false)
+    expect(wrapper.find('.method-remove').exists()).toBe(false)
+    expect(uni.setStorageSync).toHaveBeenLastCalledWith('ai_stock_selection_strategy_preference', { v: 3, horizon: 'long', methods: [] })
+    expect(wrapper.find('.stock-name').exists()).toBe(false)
+    expect(wrapper.find('.ai-pick-state').text()).toBe('请选择选股方法')
+  })
+
+  it('重新进入时保留全部取消的方法选择', async () => {
+    vi.mocked(uni.getStorageSync).mockReturnValue({ v: 2, horizon: 'short', methods: [] } as never)
+    const wrapper = mount(AiPickContent)
+    await vi.dynamicImportSettled()
+
+    expect(wrapper.find('.horizon-chip.active').text()).toBe('短线机会')
+    expect(wrapper.findAll('.method-chip')).toHaveLength(4)
+    expect(wrapper.find('.method-chip.active').exists()).toBe(false)
+  })
+
+  it.each([
+    ['波段趋势', ['趋势跟随', '回踩企稳', '盈利预期上修', '行业强势']],
+    ['中长线配置', ['优质成长', '合理估值成长', '红利稳健']],
+  ])('%s展示确认的方法目录', async (horizon, expected) => {
+    const wrapper = mount(AiPickContent)
+    await vi.dynamicImportSettled()
+    await wrapper.findAll('.horizon-chip').find((node) => node.text() === horizon)!.trigger('tap')
+
+    expect(wrapper.findAll('.method-chip').map((node) => node.text())).toEqual(expected)
+    expect(wrapper.find('.stock-name').exists()).toBe(false)
+  })
+
+  it('迁移旧方法偏好到新目录', async () => {
+    vi.mocked(uni.getStorageSync).mockReturnValue({ v: 2, horizon: 'short', methods: ['volume_price', 'short_trend'] } as never)
+    const wrapper = mount(AiPickContent)
+    await vi.dynamicImportSettled()
+
+    expect(wrapper.findAll('.method-chip.active').map((node) => node.text())).toEqual(['放量突破', '强势延续'])
+  })
+
+  it('已移除的机构共振不会被误映射成新方法', async () => {
+    vi.mocked(uni.getStorageSync).mockReturnValue({ v: 2, horizon: 'swing', methods: ['institution_resonance'] } as never)
+    const wrapper = mount(AiPickContent)
+    await vi.dynamicImportSettled()
+
+    expect(wrapper.find('.method-chip.active').exists()).toBe(false)
+    expect(wrapper.find('.ai-pick-state').text()).toBe('请选择选股方法')
+  })
+})
+
 describe('AiPickContent 列表排序（按当日涨跌幅降序）', () => {
   beforeEach(() => {
+    vi.mocked(uni.getStorageSync).mockReturnValue('')
     favoritesMock.favorites.clear()
     favoritesMock.pending.clear()
     vi.mocked(uni.showToast).mockClear()
