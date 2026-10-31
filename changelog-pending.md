@@ -1,13 +1,41 @@
 # 待提交修改（aistock-app-frontend）
 
-## 2026-10-13 — AI帮我选按涨跌幅降序 + 未登录自选股洞察示例数据
+## 2026-10-31 — 0.1.6 版本升级（待打包发布）
+
+- `src/manifest.json`：`versionName` 0.1.5 → **0.1.6**、`versionCode` 105 → **106**（打包版本号）
+- `src/modules/user/pages/profile.vue`：「关于洞见」版本号 0.1.5 → **0.1.6**（App 内部版本说明，需与 manifest 同步）
+- `CHANGELOG.md`：新增 0.1.6 版本发布记录（含 App 更新文案 10 条）
+- Web 端 `aistock-frontend/public/download/version.json`：同步 0.1.6 / 106 / `aistock-0.1.6.apk` / releaseDate 2026-10-31 / 新更新文案（自选股消息卡、通知筛选、事件存活度与相关事件、立即检测、AI帮我选、恐贪分档等）
+- 更新文案口径：因下方 2026-10-17 条目将「AI帮我选」展示顺序回退为服务端 AI 排序，文案写作「按 AI 排序优先展示」，不描述为按涨跌幅重排
+- **打包后待办**：按实测 APK 大小修正 version.json 的 `fileSize`（暂沿用 22.98 MB），commit+push 两仓库后按 release 流程部署（上传 APK + web 构建部署 + 线上自检）
+
+## 2026-10-17 — AI帮我选展示顺序回退为服务端 AI 排序
 
 ### 变更文件
 
 - `src/modules/home/components/AiPickContent.vue`（「选股」Tab · AI帮我选）
-  - 新增 `byChangePctDesc` 比较器，`recommendations` computed 末尾 `.sort(byChangePctDesc)`：列表按当日涨跌幅降序，**涨幅最大的排最前，与接口返回的 `rank` 顺序无关**。
-  - 涨跌幅缺失（`changePct` 为 `null`/`undefined`，如停牌）视作 `Number.NEGATIVE_INFINITY`，**统一排到末尾**，不插进有涨跌幅的序列中间；等值保持原相对顺序（`Array.prototype.sort` 稳定）。
-  - 不改字段、不改接口、不改渲染模板（行内「推荐理由 / 迷你走势图 / 自选按钮」原样）。
+  - 删除 2026-10-13 新增的 `byChangePctDesc` 比较器与 `recommendations` computed 末尾的 `.sort(byChangePctDesc)`，**展示顺序恢复为服务端 AI 给出的顺序**（即接口数组/`rank` 顺序），前端不做任何重排；补一行中文注释固化该口径。
+  - 行内「推荐理由 / 迷你走势图 / 自选按钮（双向切换）」等其余逻辑未动。
+- `src/modules/home/components/AiPickContent.mount.spec.ts`
+  - 移除 2026-10-13 新增的 `describe('AiPickContent 列表排序（按当日涨跌幅降序）')` 两例（降序 / 缺失值排末尾）——该行为已不存在，避免留下反向护栏。
+  - 保留原有「自选按钮双向切换」3 例。
+- `src/modules/home/AGENTS.md`
+  - `components/AiPickContent.vue` 一条改回：**展示顺序遵循服务端 AI 给出的 `rank`，前端不做任何重排**（并注明 2026-10-17 曾短暂按涨跌幅降序、已回退）。
+
+### 原因
+
+按当日涨跌幅降序会打乱服务端 AI 已排定的优先级顺序，产品口径应以 AI 排序为准。
+
+### 验证
+
+- `node ./node_modules/vue-tsc/bin/vue-tsc.js --noEmit`：EXITCODE=0。
+- `node ./node_modules/vitest/vitest.mjs run src/modules/home/components/AiPickContent.mount.spec.ts src/modules/favorites/components/AlertContent.spec.ts`：2 files / **14 tests passed**（回退后由 16 → 14，减少的正是移除的两例排序断言）。
+- `npm run test:node`：`期望基线 284/284/0，实际 284/284/0`。
+
+## 2026-10-13 — 未登录自选股洞察示例数据
+
+### 变更文件
+
 - `src/modules/favorites/components/AlertContent.vue`（首页「提醒」Tab · 自选股洞察块）
   - **未登录**（`useUserStore().isLoggedIn()` 为假）：`loadCaptureList()` 直接返回 3 条**示例数据**（`buildDemoCaptureList()`），**不发 `stockTraceApi.list` 请求**（匿名用户无自选股、异动链路对其无数据，请求只会拿到空数组把示例数据顶掉）。
   - `CaptureItem` 新增 `demo?: boolean`；模板 `:clickable="!!item && !item.demo"` 与 `@click="item && !item.demo && goTrace(...)"` —— 示例行**不可点击**（`event_id` 为空，跳异动详情必 404）。
@@ -17,16 +45,14 @@
 
 ### 影响面
 
-- AI帮我选排序：仅影响该列表渲染顺序，纯前端派生，调用方与接口零改动。
-- 自选股洞察示例数据：仅未登录分支新增；已登录用户的首页洞察块行为与改动前逐字节一致。
+- 仅未登录分支新增；已登录用户的首页洞察块行为与改动前逐字节一致。
 
 ### 验证
 
 - `node ./node_modules/vue-tsc/bin/vue-tsc.js --noEmit`：EXITCODE=0。
-- `node ./node_modules/vitest/vitest.mjs run src/modules/home/components/AiPickContent.mount.spec.ts src/modules/favorites/components/AlertContent.spec.ts`：2 files / **16 tests passed**。
-  - 新增 4 例：涨跌幅降序（与返回顺序无关）/ 缺失值排末尾 / 未登录渲染 3 条示例且不请求接口 / 示例行不可点击不跳转。
-  - AlertContent spec 的 `useUserStore` 改为桩（`isLoggedIn` 可切换，默认已登录）；`ListCell` 桩补 `:data-clickable` 供断言。
-- `npm run test:node`：`期望基线 284/284/0，实际 284/284/0`（AI帮我选排序与首页示例数据均未被源码锚定护栏断言）。
+- `node ./node_modules/vitest/vitest.mjs run src/modules/favorites/components/AlertContent.spec.ts`：11 tests passed（新增 2 例：未登录渲染 3 条示例且不请求接口 / 示例行不可点击不跳转；`useUserStore` 改桩、`ListCell` 桩补 `:data-clickable`）。
+- `npm run test:node`：`期望基线 284/284/0，实际 284/284/0`。
+- **同期条目**：本次一并提交的「AI帮我选按涨跌幅降序」已于 2026-10-17 回退（见上方最新条目）。
 
 ## 2026-10-13 — 首页暂隐时段动态洞见卡
 
