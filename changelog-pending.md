@@ -1,5 +1,14 @@
 # 待提交修改（aistock-app-frontend）
 
+## 2026-11-03 — PR #151 合入（中性沿用标注 / 节奏卡去 score / 次行回退时效）
+
+- src/modules/rhythm/utils/rhythmInsight.ts：标题顺序改为「仓位动作 · 档位」；phase_evidence.stage_source == "inherited_prev_day" 时档位后缀「（中性沿用）」。
+- src/modules/rhythm/components/RhythmCard.vue：主视觉改为仓位动作长句，不再展示 score 数字（档位序号×20 会被误读为温度分）。
+- src/modules/fear-greed/utils/fgRhythmSummary.ts：次行回退加 5 自然日时效（FALLBACK_MAX_AGE_DAYS，isFreshBasis fail closed）。
+- 	ests/run-node-specs.mjs：node:test 基线 284 → **286**（hythmInsight.spec.ts 新增 2 例）。
+- 验证：vitest 68 passed；node specs 286/286/0；type-check 通过；CI 绿。
+- **待人工**：App 云打包（HBuilderX GUI + DCloud 账号），本次未执行。
+
 ## 2026-10-31 — 0.1.6 版本升级（待打包发布）
 
 - `src/manifest.json`：`versionName` 0.1.5 → **0.1.6**、`versionCode` 105 → **106**（打包版本号）
