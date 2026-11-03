@@ -21,11 +21,43 @@ export interface RhythmSummary {
 
 const MM = (d: string) => d.slice(5)
 
-export function formatRhythmSummary(days: RhythmCalendarDay[]): RhythmSummary | null {
+/** 次行回退的最大自然日龄：超过则认为该档位已过期，不再作为兜底展示（D4，2026-11-03） */
+export const FALLBACK_MAX_AGE_DAYS = 5
+
+/**
+ * 档位基准日是否仍在「可回退」时效内。
+ * basis_date 缺失/格式非法/晚于今天 → false（fail closed，不拿旧卡兜底）。
+ */
+export function isFreshBasis(
+  basisDate: string | null | undefined,
+  today: string,
+  maxAgeDays: number = FALLBACK_MAX_AGE_DAYS,
+): boolean {
+  if (!basisDate) return false
+  const basis = Date.parse(`${basisDate}T00:00:00Z`)
+  const now = Date.parse(`${today}T00:00:00Z`)
+  if (Number.isNaN(basis) || Number.isNaN(now)) return false
+  const ageDays = (now - basis) / 86400000
+  return ageDays >= 0 && ageDays <= maxAgeDays
+}
+
+/** 本地日期 YYYY-MM-DD（回退时效的默认「今天」；测试可显式注入） */
+function localToday(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export function formatRhythmSummary(
+  days: RhythmCalendarDay[],
+  today: string = localToday(),
+): RhythmSummary | null {
   if (!days.length) return null
   const primary = days[0]
   const secondary = days[1]
-  const row = primary?.level ? primary : (secondary?.level ? secondary : null)
+  // 主行有档位直接用；否则仅在次行档位仍在时效内时回退（避免把陈年旧卡当结论展示）
+  const row = primary?.level
+    ? primary
+    : (secondary?.level && isFreshBasis(secondary.basis_date ?? secondary.date, today) ? secondary : null)
   const fallbackRow = primary ?? null
 
   if (!row) {

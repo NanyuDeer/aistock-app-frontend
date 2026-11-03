@@ -32,17 +32,37 @@ describe('formatRhythmSummary', () => {
     const s = formatRhythmSummary([
       day({ date: '2026-09-14', basis_date: '2026-09-14' }),
       day({ date: '2026-09-11', level: 'normal', basis_date: '2026-09-11', position_band: { text: '建议仓位：五成~六成' } }),
-    ])
+    ], '2026-09-14')
     expect(s!.level).toBe('normal')
     expect(s!.dateLabel).toBe('沿用最近有效档位 09-11')
     expect(s!.urlDate).toBe('2026-09-11')
     expect(s!.bandText).toBe('五成~六成')
   })
+
+  it('次行档位已过期 → 不回退，显示暂无档位（D4）', () => {
+    const s = formatRhythmSummary([
+      day({ date: '2026-11-03', basis_date: '2026-11-02' }),
+      day({ date: '2026-10-20', level: 'low', basis_date: '2026-10-20', position_band: { text: '建议仓位：轻仓~观望' } }),
+    ], '2026-11-03')
+    expect(s!.level).toBeNull()
+    expect(s!.levelShort).toBe('')
+    expect(s!.levelColor).toBe(RHYTHM_GREY)
+    expect(s!.dateLabel).toBe('暂无档位')
+  })
+
+  it('次行档位仍在时效内（≤5 天）→ 照常回退（D4 不误伤）', () => {
+    const s = formatRhythmSummary([
+      day({ date: '2026-11-03', basis_date: '2026-11-02' }),
+      day({ date: '2026-11-02', level: 'low', basis_date: '2026-10-31', position_band: { text: '建议仓位：轻仓~观望' } }),
+    ], '2026-11-03')
+    expect(s!.level).toBe('low')
+    expect(s!.dateLabel).toBe('沿用最近有效档位 10-31')
+  })
   it('沿用行 basis_date≠date 时：标签取 basis_date、urlDate 取该行 date（落详情页 target_date）', () => {
     const s = formatRhythmSummary([
       day({ date: '2026-09-14', basis_date: '2026-09-14' }),
       day({ date: '2026-09-12', level: 'low', basis_date: '2026-09-11' }),
-    ])
+    ], '2026-09-14')
     expect(s!.dateLabel).toBe('沿用最近有效档位 09-11')
     expect(s!.urlDate).toBe('2026-09-12')
   })
