@@ -6,12 +6,13 @@
       <text class="rc-slot" v-if="slot">{{ slotLabel }}</text>
     </view>
 
-    <!-- 主档位卡（v3 R-J：恒渲染，缺失显示占位文字不留空白；档位词/仓位句已上移洞见卡） -->
+    <!-- 主档位卡（v3 R-J：恒渲染，缺失显示占位文字不留空白）
+         2026-11-03 语义收口：节奏卡只表达「仓位动作」，不再展示 score 数字——
+         该字段是档位序号×20（0/20/40/60/80）的查表值，单独上屏会被误读成温度分。
+         情绪强度改由「情绪温度」独立表达（temperature_series）。 -->
     <view class="rc-main">
       <view class="rc-bandline">
-        <text class="rc-score" v-if="card.score != null">{{ card.score }}</text>
-        <text class="rc-pos" v-else>档位数据不足</text>
-        <text class="rc-pos" v-if="card.position_band">{{ card.position_band.text }}</text>
+        <text class="rc-pos-main" v-if="card.position_band">{{ card.position_band.text }}</text>
         <text class="rc-pos rc-pos-missing" v-else>仓位建议暂缺</text>
       </view>
       <view class="rc-scale">
@@ -196,7 +197,8 @@ function tempValue(score: number): string {
 .rc-bandline { display: flex; align-items: center; gap: 16rpx; flex-wrap: wrap; }
 .rc-pos { font-size: 24rpx; color: $ink-soft; }
 .rc-pos-missing { font-style: normal; color: $ink-mute; }
-.rc-score { font-size: 72rpx; font-weight: 700; color: $primary; font-family: 'DIN Alternate', sans-serif; }
+/* 节奏卡主视觉＝仓位动作（空仓/轻仓/五成…），不再展示 score 数字 */
+.rc-pos-main { font-size: 44rpx; font-weight: 700; color: $primary; }
 
 .rc-scale { display: flex; height: 12rpx; border-radius: 999rpx; overflow: hidden; margin: 20rpx 0 10rpx; }
 .rc-seg { flex: 1; }

@@ -16,7 +16,7 @@ function branch(p: Partial<RhythmBranch>): RhythmBranch {
 
 test('title：非 conflict 拼接档位中文与仓位句；conflict 用背离文案', () => {
   const card = { level: 'active', position_band: { text: '建议仓位：七成~八成' }, conflict: false, branches: [] } as unknown as RhythmCard
-  assert.equal(toRhythmInsight(card, 'after_close', '2026-09-02')?.title, '活跃 · 七成~八成')
+  assert.equal(toRhythmInsight(card, 'after_close', '2026-09-02')?.title, '七成~八成 · 活跃')
   const conflict = { ...card, conflict: true, conflict_detail: '多空背离' } as unknown as RhythmCard
   assert.equal(toRhythmInsight(conflict, 'after_close', '2026-09-02')?.title, '信号背离 · 仅区间与提示')
 })
@@ -92,4 +92,26 @@ test('RhythmInsightCondition 接口含 direction / positionAction / anchor 字�
   assert.match(source, /direction\?: ['"]bullish['"] \| ['"]bearish['"] \| ['"]neutral['"]/)
   assert.match(source, /positionAction\?:/)
   assert.match(source, /anchor\?:/)
+})
+
+test('title：中性沿用的档位标注「中性沿用」，不与硬判混淆', () => {
+  const card = {
+    level: 'low',
+    position_band: { text: '建议仓位：轻仓~观望' },
+    phase_evidence: { stage_source: 'inherited_prev_day' },
+    conflict: false,
+    branches: [],
+  } as unknown as RhythmCard
+  assert.equal(toRhythmInsight(card, 'after_close', '2026-11-02')?.title, '轻仓~观望 · 低迷（中性沿用）')
+})
+
+test('title：computed 硬判不加沿用标注', () => {
+  const card = {
+    level: 'low',
+    position_band: { text: '建议仓位：空仓观望' },
+    phase_evidence: { stage_source: 'computed' },
+    conflict: false,
+    branches: [],
+  } as unknown as RhythmCard
+  assert.equal(toRhythmInsight(card, 'after_close', '2026-11-02')?.title, '空仓观望 · 低迷')
 })

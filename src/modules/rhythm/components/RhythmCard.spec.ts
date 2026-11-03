@@ -114,9 +114,11 @@ test('v3 色彩三色（R-I）：情绪周期 chip 中性化 + importance medium
   assert.match(source, /\.rc-evimp\.imp-high \{[^}]*\$up/)
 })
 
-test('v3 空态有字（R-J）：主档位卡恒渲染，position_band/score 缺失各显示占位', () => {
+test('v3 空态有字（R-J）：主档位卡恒渲染，仓位缺失显示占位；不再上屏 score 数字', () => {
   // rc-main 无整体 v-if 门控（恒渲染，缺失不留空白）
   assert.ok(!/"rc-main"\s*v-if/.test(source))
   assert.match(source, /仓位建议暂缺/)
-  assert.match(source, /档位数据不足/)
+  // 2026-11-03 语义收口：score 是档位序号×20 的查表值，单独上屏会被误读为温度分
+  assert.ok(!/rc-score/.test(source), '不应再渲染 score 数字')
+  assert.match(source, /rc-pos-main/)
 })
