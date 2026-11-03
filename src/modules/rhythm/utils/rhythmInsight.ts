@@ -90,9 +90,11 @@ export function toRhythmInsight(
     (card.phase_evidence as Record<string, unknown> | undefined)?.stage_source ?? '',
   )
   const levelText = stageSource === 'inherited_prev_day' && level ? `${level}（中性沿用）` : level
+  // 2026-11-03 语义收口：节奏卡以「仓位动作」为主语（空仓/轻仓/五成…），档位作为状态标签在后，
+  // 情绪强度由独立的「情绪温度」表达。避免用户把档位/score 当成温度分。
   const title = card.conflict
     ? '信号背离 · 仅区间与提示'
-    : [levelText, band].filter(Boolean).join(' · ')
+    : [band, levelText].filter(Boolean).join(' · ')
   if (!title) return null
 
   const structured = (card.branches ?? []).map(toCondition).filter((c): c is RhythmInsightCondition => c !== null)
