@@ -12,12 +12,14 @@
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pages/index.vue`                    | 节奏大师详情页（SubPageCard2 容器；内容流 = 顶部 RhythmCalendarPanel + 回退提示行（三态：未来日「尚未生成」/ 无报告「沿用前值」/ 无）+ 节奏洞见卡（InsightCard，:time 主行 slot 标签 + :time-note 生成时刻灰字）→ RhythmCard + EmptyState 兜底）。**2026-09-23 v3 极简**：三时点 pill 已删除——`pickVersion(versions, targetDate, today)` 单版本选取（今日=created_at 最新；历史日=after_close 优先、缺失降级最新）；`requestedDate`（用户点选原始日）与 `targetDate`（实际展示日）分离供提示行；pageTitle 统一「节奏（date）」；onShow 重拉数据（收盘后回前台自动切新版） |
 | `components/RhythmCalendarPanel.vue` | 顶部可折叠双模式日历面板（2026-09-03）：折叠 = 近 7 交易日紧凑条（左旧右新，点格切日）；展开 = 60 交易日自然周网格（默认展开，`rhythm.calendar.expanded` storage 记忆）；仓位/事件 Segmented 仅展开态；事件模式 = macro 角标（high 红点计数 / medium-low 灰点）+ 选中日事件行；点格以 `pick` 事件上抛切日（不导航）                             |
-| `components/RhythmCard.vue`          | 状态卡组件（瘦身后保留：score + 五档色带 / 情绪周期 chip / 温度曲线 / 事件日历 / conflict / data\_missing；仓位长句、档位 chip、证据行、关键节点分支已上移洞见卡——**同屏去重**）。**2026-09-21**：事件日历标题"未来 5 交易日事件日历"→"未来事件日历"（展示窗不再限 5 交易日，改全量）。**2026-09-23 v3**：事件区收敛为未来 3 个事件（`groupEventWindow`：date≥targetDate 升序、跳过锚点重复）+ 锚点卡 + 「更远事件（共 N 条）」折叠；`event_window_near_end_date` 消费已删；主档位卡恒渲染（R-J：`position_band`/`score` 缺失显示「仓位建议暂缺」/「档位数据不足」占位不留空白）；色彩三色（R-I：情绪周期 chip 中性化、importance medium 去橙，UI 装饰=蓝/墨/灰） |
-| `utils/rhythmInsight.ts`             | 洞见卡映射（2026-09-03）：`toRhythmInsight(card, slot, date, createdAt?)` → `RhythmInsightCard`（结构化子集对齐 ConditionalForecastBlock/InsightCard 入参；不可拼装返回 null → 整卡不渲染）。**2026-09-23 v3**：`time` 主行 = `MM-DD · slot 标签`（无 pill 后的版本标注）+ `timeNote` 灰字次行 = `HH:MM 生成`（created_at 上海时区恒真展示） |
+| `components/RhythmCard.vue`          | 状态卡组件（瘦身后保留：**主视觉=仓位动作长句**（`rc-pos-main`）/ 五档色带 / 情绪周期 chip / 温度曲线 / 事件日历 / conflict / data\_missing；档位 chip、证据行、关键节点分支已上移洞见卡——**同屏去重**）。**2026-11-03 语义收口**：不再展示 `score` 数字——该字段是档位序号×20（0/20/40/60/80）的查表值，单屏会被误读成温度分，情绪强度改由 `temperature_series` 独立表达。**2026-09-21**：事件日历标题"未来 5 交易日事件日历"→"未来事件日历"（展示窗不再限 5 交易日，改全量）。**2026-09-23 v3**：事件区收敛为未来 3 个事件（`groupEventWindow`：date≥targetDate 升序、跳过锚点重复）+ 锚点卡 + 「更远事件（共 N 条）」折叠；`event_window_near_end_date` 消费已删；主档位卡恒渲染（R-J：`position_band`/`score` 缺失显示「仓位建议暂缺」/「档位数据不足」占位不留空白）；色彩三色（R-I：情绪周期 chip 中性化、importance medium 去橙，UI 装饰=蓝/墨/灰） |
+| `utils/rhythmInsight.ts`             | 洞见卡映射（2026-09-03）：`toRhythmInsight(card, slot, date, createdAt?)` → `RhythmInsightCard`（结构化子集对齐 ConditionalForecastBlock/InsightCard 入参；不可拼装返回 null → 整卡不渲染）。**2026-09-23 v3**：`time` 主行 = `MM-DD · slot 标签`（无 pill 后的版本标注）+ `timeNote` 灰字次行 = `HH:MM 生成`（created_at 上海时区恒真展示）。**2026-11-03 语义收口**：标题顺序改为「仓位动作 · 档位」；`phase_evidence.stage_source=="inherited_prev_day"` 时档位后缀「（中性沿用）」，避免把「没信号沿用昨天」误读为当日硬判；`computed`/`inherited_basis` 文案不变 |
 
 ## 首页节奏卡（modules/home/components/MorningContent.vue）
 
 - 首页"节奏大师"卡展示**近 3 个交易日摘要行**（`getRhythmMasterCalendar(HOME_RHYTHM_DAYS)`，`HOME_RHYTHM_DAYS = 3`）：每行 = MM-DD + 档位色 chip + 建议仓位文本；点行进该日详情（带 `?date=`），整卡点击仍进默认（最近交易日）详情。
+
+- **次行回退时效（2026-11-03，D4）**：主行无档位时才回退次行，且次行 `basis_date` 已超过 `FALLBACK_MAX_AGE_DAYS`（5 个自然日）→ 视为过期、不回退（`isFreshBasis` fail closed：缺失/非法/晚于今天均 false），避免把陈年旧卡当结论展示。
 
 - 摘要数据统一走日历聚合接口（含 `position_band`），**不**逐日 `getRhythmMaster`（避免放大首页 onShow 刷新成本）。
 
@@ -47,7 +49,7 @@
 
 | 字段                             | 类型                                         | 说明                                                              |
 | ------------------------------ | ------------------------------------------ | --------------------------------------------------------------- |
-| `score` / `level`              | number? / string?                          | 状态评分与档位                                                         |
+| `score` / `level`              | number? / string?                          | 状态评分与档位（**2026-11-03 起 `score` 不再上屏**，仅作档位派生查表值 0/20/40/60/80，避免误读为温度分；`level` 由洞见卡展示）    |
 | `position_band`                | `{ min?, max?, text }`                     | 仓位区间（min/max 缺失=无区间语义，text 必须展示；`conflict=true` 时隐藏，G2 背离纪律）    |
 | `phase` / `phase_evidence`     | string? / record?                          | 阶段判定与证据                                                         |
 | `temperature_series`           | `{ date, score }[]`                        | 温度序列（分时点状态卡趋势）                                                  |

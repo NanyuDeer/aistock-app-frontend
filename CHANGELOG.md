@@ -2,6 +2,27 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-11-03 — 节奏卡语义收口 & 回退时效（PR #151 合入）
+
+**开发者**: 项目组（PR #151 changer-collab；CI 基线修复 NanyuDeer）
+
+### 变更
+
+- **洞见卡标注**：标题顺序改为「仓位动作 · 档位」；`phase_evidence.stage_source == "inherited_prev_day"` 时档位后缀「（中性沿用）」，区分「没信号沿用昨天」与「当日硬判」。
+- **节奏卡语义收口**：主视觉改为仓位动作长句（`rc-pos-main`），不再展示 `score` 数字——该字段是档位序号×20（0/20/40/60/80）的查表值，单屏会被误读成温度分；情绪强度由「情绪温度」（`temperature_series`）独立表达。
+- **回退时效（D4）**：首页节奏摘要次行回退需通过 `isFreshBasis`（`FALLBACK_MAX_AGE_DAYS = 5` 自然日，缺失/非法/晚于今天一律 fail closed），避免把陈年旧卡当结论展示。
+- **测试基线**：`rhythmInsight.spec.ts` 新增 2 条 node:test 用例，`tests/run-node-specs.mjs` 基线 284 → **286**。
+
+### 验证
+
+- `pnpm vitest run src/modules/fear-greed src/modules/rhythm` → 4 files / **68 passed**；`pnpm run test:node` → **286/286/0**；`pnpm run type-check` 通过；GitHub master CI 绿。
+
+### 待办
+
+- App 云打包需 HBuilderX GUI + DCloud 账号，本次未在本机执行（需人工按既有云打包流程出包）。
+
+---
+
 ## [master] 2026-10-31 — 0.1.6 版本发布
 
 **开发者**: 项目组
