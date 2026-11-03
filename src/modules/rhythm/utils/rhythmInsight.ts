@@ -84,9 +84,15 @@ export function toRhythmInsight(
   if (!card) return null
   const level = LEVEL_LABEL[card.level ?? ''] ?? ''
   const band = formatBandText(card.position_band?.text)
+  // 判定路径（问题 1）：中性兜底沿用前一交易日阶段时，档位并非当日独立判定结果，
+  // 加标注避免用户把「沿用」误读成「今日算出来的低迷」。
+  const stageSource = String(
+    (card.phase_evidence as Record<string, unknown> | undefined)?.stage_source ?? '',
+  )
+  const levelText = stageSource === 'inherited_prev_day' && level ? `${level}（中性沿用）` : level
   const title = card.conflict
     ? '信号背离 · 仅区间与提示'
-    : [level, band].filter(Boolean).join(' · ')
+    : [levelText, band].filter(Boolean).join(' · ')
   if (!title) return null
 
   const structured = (card.branches ?? []).map(toCondition).filter((c): c is RhythmInsightCondition => c !== null)

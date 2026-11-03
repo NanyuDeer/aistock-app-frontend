@@ -93,3 +93,25 @@ test('RhythmInsightCondition 接口含 direction / positionAction / anchor 字�
   assert.match(source, /positionAction\?:/)
   assert.match(source, /anchor\?:/)
 })
+
+test('title：中性沿用的档位标注「中性沿用」，不与硬判混淆', () => {
+  const card = {
+    level: 'low',
+    position_band: { text: '建议仓位：轻仓~观望' },
+    phase_evidence: { stage_source: 'inherited_prev_day' },
+    conflict: false,
+    branches: [],
+  } as unknown as RhythmCard
+  assert.equal(toRhythmInsight(card, 'after_close', '2026-11-02')?.title, '低迷（中性沿用） · 轻仓~观望')
+})
+
+test('title：computed 硬判不加沿用标注', () => {
+  const card = {
+    level: 'low',
+    position_band: { text: '建议仓位：空仓观望' },
+    phase_evidence: { stage_source: 'computed' },
+    conflict: false,
+    branches: [],
+  } as unknown as RhythmCard
+  assert.equal(toRhythmInsight(card, 'after_close', '2026-11-02')?.title, '低迷 · 空仓观望')
+})
