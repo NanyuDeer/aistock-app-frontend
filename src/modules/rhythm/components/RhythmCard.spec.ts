@@ -14,10 +14,9 @@ test('节奏状态卡渲染契约：免责横幅/区间倾向/温度曲线/空�
   assert.match(source, /rc-slot|slotLabel/)
 })
 
-test('设计稿：主档位卡含五档色带刻度 + target/basis/refresh 元信息', () => {
-  assert.match(source, /rc-scale/)
-  assert.match(source, /rc-lab/)
-  assert.match(source, /冰点.*低迷.*常温.*活跃.*亢奋/)
+test('设计稿（v4 修订）：主档位卡只留仓位主视觉 + target/basis/refresh 元信息', () => {
+  // 2026-11-04 语义收口：五档色带刻度下线，节奏改由仓位动作表达
+  assert.match(source, /rc-pos-main/)
   assert.match(source, /rc-meta/)
   assert.match(source, /targetDate/)
   assert.match(source, /basisDate/)
@@ -121,4 +120,15 @@ test('v3 空态有字（R-J）：主档位卡恒渲染，仓位缺失显示占�
   // 2026-11-03 语义收口：score 是档位序号×20 的查表值，单独上屏会被误读为温度分
   assert.ok(!/rc-score/.test(source), '不应再渲染 score 数字')
   assert.match(source, /rc-pos-main/)
+})
+
+test('v4 语义收口：卡片不再输出档位刻度与五档词，温度改由情绪温度区块表达', () => {
+  // 节奏＝操作建议（仓位），档位词不再上卡，避免与情绪温度分档同名冲突
+  assert.ok(!/rc-scale/.test(source), '不应再渲染档位刻度条')
+  assert.ok(!/rc-labels/.test(source), '不应再渲染五档标签行')
+  assert.ok(!/BAND_LABELS/.test(source), '不应再保留五档标签常量')
+  // 温度区块保留，且带当日值 + 分档文字
+  assert.match(source, /rc-temp-today/)
+  assert.match(source, /情绪温度/)
+  assert.match(source, /TEMP_BANDS/)
 })

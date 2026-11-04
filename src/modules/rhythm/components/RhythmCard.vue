@@ -15,12 +15,6 @@
         <text class="rc-pos-main" v-if="card.position_band">{{ card.position_band.text }}</text>
         <text class="rc-pos rc-pos-missing" v-else>仓位建议暂缺</text>
       </view>
-      <view class="rc-scale">
-        <view v-for="(s, i) in bandSegs" :key="i" class="rc-seg" :class="s.cls"></view>
-      </view>
-      <view class="rc-labels">
-        <text v-for="(l, i) in bandLabels" :key="i" class="rc-lab" :class="{ on: levelMeta.idx === i }">{{ l }}</text>
-      </view>
       <view class="rc-meta" v-if="targetDate || basisDate || refreshSlot">
         <text v-if="targetDate">target {{ targetDate }}</text>
         <text v-if="basisDate">basis {{ basisDate }}</text>
@@ -37,9 +31,13 @@
       </view>
     </view>
 
-    <!-- 近 7 日情绪温度迷你曲线（渐变柱 + 数值 + 日期） -->
+    <!-- 情绪温度（语义收口 2026-11-04：温度＝情绪强度，独立于节奏/仓位表达）
+         顶部给当日值 + 分档文字，下方保留近 7 日柱状图 -->
     <view class="rc-sec" v-if="card.temperature_series && card.temperature_series.length">
-      <text class="rc-sec-title">近 7 日情绪温度</text>
+      <view class="rc-temp-head">
+        <text class="rc-sec-title">情绪温度</text>
+        <text class="rc-temp-today" v-if="tempToday">{{ tempToday.score }} · {{ tempToday.label }}</text>
+      </view>
       <view class="rc-temp-bars">
         <view v-for="(t, i) in card.temperature_series" :key="i" class="rc-temp-col">
           <view class="rc-temp-bar" :style="{ height: tempBarHeight(t.score) }"></view>
@@ -127,20 +125,8 @@ const props = withDefaults(
   { title: '节奏状态卡', slot: '', targetDate: '', basisDate: '', refreshSlot: '' },
 )
 
-// ── 档位（五档语义复用 sentiment_level：冰点/低迷/常温/活跃/亢奋）──
-const LEVEL_META: Record<string, { label: string; idx: number; cls: string }> = {
-  ice: { label: '冰点', idx: 0, cls: 'lv-ice' },
-  low: { label: '低迷', idx: 1, cls: 'lv-low' },
-  normal: { label: '常温', idx: 2, cls: 'lv-normal' },
-  active: { label: '活跃', idx: 3, cls: 'lv-active' },
-  euphoria: { label: '亢奋', idx: 4, cls: 'lv-euphoria' },
-}
-const BAND_LABELS = ['冰点', '低迷', '常温', '活跃', '亢奋']
-const BAND_SEG_CLS = ['seg-ice', 'seg-low', 'seg-normal', 'seg-active', 'seg-euphoria']
-
-const levelMeta = computed(() => LEVEL_META[props.card.level ?? ''] ?? { label: '', idx: -1, cls: '' })
-const bandLabels = BAND_LABELS
-const bandSegs = BAND_SEG_CLS.map((cls, i) => ({ cls, on: levelMeta.value.idx === i }))
+// ── 语义收口（2026-11-04）：节奏＝操作建议（仓位），卡片不再输出五档档位词与刻度条。
+// 档位（level）仅保留在日历热力图与摘要卡中做颜色映射，不在本卡重复表达。
 
 // ── 情绪周期五态（对齐后端 stage：ice/launch/rally/overheat/ebb；G3 仅展示，实验性判定）──
 const PHASE_META: Record<string, string> = {
@@ -183,6 +169,30 @@ function tempValue(score: number): string {
   const n = Number(score)
   return Number.isFinite(n) ? String(Math.round(n)) : ''
 }
+
+// ── 情绪温度分档（阈值对齐后端 sentiment_temp.level：
+//    冰点 ≤20 / 低迷 (20,45] / 常温 (45,55] / 活跃 (55,80] / 亢奋 >80）──
+const TEMP_BANDS: { max: number; label: string }[] = [
+  { max: 20, label: '冰点' },
+  { max: 45, label: '低迷' },
+  { max: 55, label: '常温' },
+  { max: 80, label: '活跃' },
+  { max: 100, label: '亢奋' },
+]
+function tempLabel(score: number): string {
+  const n = Number(score)
+  if (!Number.isFinite(n)) return ''
+  for (const b of TEMP_BANDS) if (n <= b.max) return b.label
+  return '亢奋'
+}
+/** 当日温度：优先取与 basisDate 同日的那条（序列含展示窗内的其他日期） */
+const tempToday = computed(() => {
+  const series = props.card.temperature_series ?? []
+  if (!series.length) return null
+  const hit = props.basisDate ? series.find((t) => t.date === props.basisDate) : undefined
+  const item = hit ?? series[series.length - 1]
+  return { score: Math.round(Number(item.score)), label: tempLabel(item.score) }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -200,16 +210,6 @@ function tempValue(score: number): string {
 /* 节奏卡主视觉＝仓位动作（空仓/轻仓/五成…），不再展示 score 数字 */
 .rc-pos-main { font-size: 44rpx; font-weight: 700; color: $primary; }
 
-.rc-scale { display: flex; height: 12rpx; border-radius: 999rpx; overflow: hidden; margin: 20rpx 0 10rpx; }
-.rc-seg { flex: 1; }
-.rc-seg.seg-ice { background: #6b7f9e; }
-.rc-seg.seg-low { background: #4d7cfe; }
-.rc-seg.seg-normal { background: $primary; }
-.rc-seg.seg-active { background: $warning; }
-.rc-seg.seg-euphoria { background: $up; }
-.rc-labels { display: flex; }
-.rc-lab { flex: 1; text-align: center; font-size: 22rpx; color: $ink-soft; }
-.rc-lab.on { color: $ink; font-weight: 600; }
 
 .rc-meta { display: flex; gap: 24rpx; flex-wrap: wrap; font-size: 22rpx; color: $ink-soft; margin-top: 20rpx; padding-top: 20rpx; border-top: 1rpx dashed $line; }
 
@@ -220,6 +220,9 @@ function tempValue(score: number): string {
 .rc-chip { font-size: 24rpx; font-weight: 600; border-radius: 999rpx; padding: 6rpx 22rpx; color: $ink-soft; background: rgba($ink-soft, 0.12); }
 .rc-exp { font-size: 20rpx; color: $ink-soft; border: 1rpx dashed $line; border-radius: 8rpx; padding: 2rpx 10rpx; }
 
+.rc-temp-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16rpx; }
+.rc-temp-head .rc-sec-title { margin-bottom: 0; }
+.rc-temp-today { font-size: 32rpx; font-weight: 700; color: $primary; }
 .rc-temp-bars { display: flex; align-items: flex-end; gap: 14rpx; height: 200rpx; }
 .rc-temp-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6rpx; }
 .rc-temp-bar { width: 26rpx; border-radius: 8rpx 8rpx 4rpx 4rpx; background: linear-gradient(180deg, $primary, $primary-300); }

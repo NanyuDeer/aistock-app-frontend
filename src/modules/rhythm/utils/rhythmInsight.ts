@@ -84,17 +84,11 @@ export function toRhythmInsight(
   if (!card) return null
   const level = LEVEL_LABEL[card.level ?? ''] ?? ''
   const band = formatBandText(card.position_band?.text)
-  // 判定路径（问题 1）：中性兜底沿用前一交易日阶段时，档位并非当日独立判定结果，
-  // 加标注避免用户把「沿用」误读成「今日算出来的低迷」。
-  const stageSource = String(
-    (card.phase_evidence as Record<string, unknown> | undefined)?.stage_source ?? '',
-  )
-  const levelText = stageSource === 'inherited_prev_day' && level ? `${level}（中性沿用）` : level
-  // 2026-11-03 语义收口：节奏卡以「仓位动作」为主语（空仓/轻仓/五成…），档位作为状态标签在后，
-  // 情绪强度由独立的「情绪温度」表达。避免用户把档位/score 当成温度分。
+  // 语义收口（2026-11-04）：节奏＝操作建议。标题直接给仓位动作，不再拼档位词——
+  // 档位（冰点/低迷/…）与情绪温度分档同名词，并列会造成「低迷 + 亢奋」的观感冲突。
   const title = card.conflict
     ? '信号背离 · 仅区间与提示'
-    : [band, levelText].filter(Boolean).join(' · ')
+    : (band || level)  // 仓位缺失时退回档位，避免整卡不渲染
   if (!title) return null
 
   const structured = (card.branches ?? []).map(toCondition).filter((c): c is RhythmInsightCondition => c !== null)
