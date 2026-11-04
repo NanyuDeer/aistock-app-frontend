@@ -29,6 +29,49 @@
       </view>
     </view>
 
+    <!-- 溯源块（2026-11 T10 / spec §5.2）：只在后端产出 causality_text 时渲染，整块无壳。
+         门控须同时要求 ledger 存在：spec §8「旧卡无 position_ledger → 溯源块与变奏块整块不渲染」，
+         三块同源于 ledger，缺账本时单残留溯源句会成为无法追溯的孤立结论。
+         文案**原样展示**：前端不拼阈值、不算「差」、不改写数字（G19 前端禁推断）。 -->
+    <view class="rc-trace" v-if="ledger && card.causality_text">
+      <text class="rc-trace-label">溯源</text>
+      <text class="rc-trace-lead" v-if="card.causality_text.lead">{{ card.causality_text.lead }}</text>
+      <text v-for="(line, i) in traceLines" :key="i" class="rc-trace-line">{{ line }}</text>
+    </view>
+
+    <!-- 变奏观察点（spec §6）：只展示后端反解出的「当前未满足项」，最多 3 条。
+         排序由后端保证（sufficient_alone 优先 → gate > mainline > event），前端不重排。 -->
+    <view class="rc-watch" v-if="watchPoints.length">
+      <text class="rc-watch-label">变奏观察点</text>
+      <!-- 双闸同时阻塞：必须显式说明「只解一条仍为空仓」，否则用户会把单信号当加仓信号 -->
+      <view class="rc-watch-alert" v-if="doubleBlocked">
+        <text>两条须同时满足才回到轻仓</text>
+      </view>
+      <view class="rc-watch-item" v-for="(wp, i) in watchPoints" :key="wp.key + i">
+        <text class="rc-watch-cond">{{ wp.condition }}</text>
+        <text class="rc-watch-cur">{{ wp.current_text }}</text>
+        <text class="rc-watch-cands" v-if="candidateText(wp)">{{ candidateText(wp) }}</text>
+      </view>
+    </view>
+
+    <!-- 折叠仓位账本（spec §5.2）：默认收起；missing 项显示「数据不可用」，不得隐藏该行 -->
+    <view class="rc-ledger" v-if="ledger">
+      <view class="rc-ledger-head" @tap="ledgerExpanded = !ledgerExpanded">
+        <text v-if="!ledgerExpanded">展开依据 · 仓位账本（{{ ledgerItems.length }} 项输入）</text>
+        <text v-else>收起依据 · 仓位账本</text>
+      </view>
+      <view class="rc-ledger-body" v-if="ledgerExpanded">
+        <view class="rc-ledger-item" v-for="item in ledgerItems" :key="item.key" :class="{ 'rc-ledger-item--missing': item.status === 'missing' }">
+          <text class="rc-ledger-judge">{{ item.judgement }}</text>
+          <text class="rc-ledger-value">{{ item.value_text }}</text>
+          <!-- missing 项显式标注（spec §8「禁止用默认值伪装成中性」）：行不隐藏、value_text 原样保留，
+               仅额外加一枚状态标记，避免「有数字 = 有结论」的误读 -->
+          <text class="rc-ledger-flag" v-if="item.status === 'missing'">数据不可用</text>
+          <text class="rc-ledger-effect">{{ item.effect }}</text>
+        </view>
+      </view>
+    </view>
+
     <!-- 信号背离提示：只出区间 + 提示，不输出单一档（G2） -->
     <view class="rc-conflict" v-if="card.conflict">
       <text>{{ card.conflict_detail || '信号背离，仅提供区间与提示' }}</text>
@@ -94,7 +137,7 @@
 import { computed, ref } from 'vue'
 import { groupEventWindow } from '../utils/rhythmEventWindow'
 import { positionColor, positionShort } from '@/shared/utils/rhythmColors'
-import type { RhythmCard as RhythmCardData } from '@/shared/api/modules/agent'
+import type { RhythmCard as RhythmCardData, RhythmWatchPoint } from '@/shared/api/modules/agent'
 
 const props = withDefaults(
   defineProps<{
@@ -136,6 +179,23 @@ function importanceCls(imp: string): string {
   if (imp === 'medium') return 'imp-med'
   return 'imp-low'
 }
+
+// ── 溯源 / 变奏 / 折叠账本（2026-11-04 T10，spec §5.2 / §6）：三者同源于 position_ledger ──
+// 降级（spec §8）：position_ledger == null（旧报告）→ 三块整块不渲染，不留空壳、不报错；
+// causality_text == null 但 ledger 存在 → 只渲染变奏块与账本。
+const ledger = computed(() => props.card.position_ledger ?? null)
+/** 溯源行：后端已限 ≤2 条，前端再兜一次截断（防旧卡/异常数据撑开主区） */
+const traceLines = computed(() => (props.card.causality_text?.lines ?? []).slice(0, 2))
+/** 变奏观察点最多 3 条；顺序即后端给出的优先级，前端不重排 */
+const watchPoints = computed(() => (ledger.value?.watch_points ?? []).slice(0, 3))
+/** 双闸同时阻塞（闸门 + 无主线）：任一解除都不足以升档，块头须显式提示 */
+const doubleBlocked = computed(() => ledger.value?.gate_blocked === true && ledger.value.mainline_state === 'none')
+const ledgerItems = computed(() => ledger.value?.items ?? [])
+const ledgerExpanded = ref(false)
+/** 候选池并列展示（名称 + 超额原样，不做格式化、不推算间距） */
+function candidateText(wp: RhythmWatchPoint): string {
+  return (wp.candidates ?? []).map((c) => `${c.name} +${c.excess}pct`).join(' · ')
+}
 </script>
 
 <style lang="scss" scoped>
@@ -167,6 +227,31 @@ function importanceCls(imp: string): string {
 /* 「无主线即空仓」规则说明：L1 档位旁的可见说明（不是折叠证据区的脚注） */
 .rc-rule { margin-top: 12rpx; }
 .rc-rule-text { font-size: 22rpx; color: $ink-mute; }
+
+/* ── 溯源块（spec §5.2）：小标签 + lead + ≤2 行因果，全部原样展示 ── */
+.rc-trace { background: $bg-card; border: 1rpx solid $line; border-radius: 24rpx; padding: 24rpx 28rpx; margin-bottom: 20rpx; }
+.rc-trace-label { display: block; font-size: 22rpx; color: $ink-soft; letter-spacing: 1rpx; margin-bottom: 12rpx; }
+.rc-trace-lead { display: block; font-size: 28rpx; font-weight: 600; color: $ink; line-height: 1.5; }
+.rc-trace-line { display: block; font-size: 24rpx; color: $ink-soft; line-height: 1.6; margin-top: 8rpx; }
+
+/* ── 变奏观察点（spec §6）：condition 为主文本、current_text 为次要灰字 ── */
+.rc-watch { background: $bg-card; border: 1rpx solid $line; border-radius: 24rpx; padding: 24rpx 28rpx; margin-bottom: 20rpx; }
+.rc-watch-label { display: block; font-size: 22rpx; color: $ink-soft; letter-spacing: 1rpx; margin-bottom: 12rpx; }
+.rc-watch-alert { background: $warning-bg; border: 1rpx solid $warning-soft; border-radius: 12rpx; padding: 12rpx 16rpx; margin-bottom: 14rpx; font-size: 24rpx; color: $warning; }
+.rc-watch-item { margin-top: 16rpx; }
+.rc-watch-cond { display: block; font-size: 26rpx; color: $ink; line-height: 1.5; }
+.rc-watch-cur { display: block; font-size: 22rpx; color: $ink-mute; line-height: 1.5; margin-top: 4rpx; }
+.rc-watch-cands { display: block; font-size: 22rpx; color: $primary-700; line-height: 1.5; margin-top: 4rpx; }
+
+/* ── 折叠仓位账本（spec §5.2）：默认收起，只占一行摘要 ── */
+.rc-ledger { background: $bg-card; border: 1rpx solid $line; border-radius: 24rpx; padding: 20rpx 28rpx; margin-bottom: 20rpx; }
+.rc-ledger-head { font-size: 24rpx; color: $primary; }
+.rc-ledger-body { margin-top: 16rpx; }
+.rc-ledger-item { padding: 12rpx 0; border-top: 1rpx dashed $line; }
+.rc-ledger-judge { display: block; font-size: 26rpx; color: $ink; font-weight: 600; }
+.rc-ledger-value { display: block; font-size: 22rpx; color: $ink-soft; margin-top: 4rpx; }
+.rc-ledger-flag { display: inline-block; font-size: 20rpx; color: $warning; background: $warning-bg; border: 1rpx solid $warning-soft; border-radius: 8rpx; padding: 2rpx 10rpx; margin-top: 6rpx; }
+.rc-ledger-effect { display: block; font-size: 22rpx; color: $ink-mute; margin-top: 2rpx; }
 
 .rc-meta { display: flex; gap: 24rpx; flex-wrap: wrap; font-size: 22rpx; color: $ink-soft; margin-top: 20rpx; padding-top: 20rpx; border-top: 1rpx dashed $line; }
 

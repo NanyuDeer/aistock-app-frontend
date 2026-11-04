@@ -116,7 +116,7 @@
             </view>
 
             <!-- 结构化仓位动作徽标（add/reduce/hold + 成数，如 加仓 +2 成；后端 position_action 透传） -->
-            <view v-if="cond.positionAction" class="as-insight-card__sc-action" :class="actionClass(cond.positionAction.direction)">
+            <view v-if="cond.positionAction" class="as-insight-card__sc-action" :class="actionClass(cond.positionAction)">
               <text class="as-insight-card__sc-action-tx">{{ actionText(cond.positionAction) }}</text>
             </view>
 
@@ -203,8 +203,13 @@ interface StructuredCondition {
   scenario: string
   /** 简洁展示用关键词（1~2 个，单条 ≤10 字；仅新数据携带，旧记录无 → 走长句兜底） */
   keywords?: string[]
-  /** 结构化仓位动作（add/reduce/hold + 成数，如 "+2 成"；后端 position_action 透传，纯 UI 展示） */
-  positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string }
+  /** 结构化仓位动作（add/reduce/hold + 档数，如 "+2 档"；后端 position_action 透传，纯 UI 展示） */
+  positionAction?: {
+    direction: 'add' | 'reduce' | 'hold'
+    change: string
+    /** T9 闸门压制：true 时 change 已是完整结论（如「闸门未解除，暂不加」），不得再拼动词 */
+    blocked_by_gate?: boolean
+  }
   /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度，如 上探+3%~+5%） */
   scenario_keywords?: string[]
   /** 验证锚点（可选透传：threshold/metric 以 chip 展示） */
@@ -394,12 +399,23 @@ function hasAnchor(cond: StructuredCondition): boolean {
 }
 
 /** 仓位动作徽标 class（加仓=红 / 减仓=绿 / 观望=灰，对齐方向色语义） */
-function actionClass(d: 'add' | 'reduce' | 'hold'): string {
-  return d === 'add' ? 'is-add' : d === 'reduce' ? 'is-reduce' : 'is-hold'
+function actionClass(a: NonNullable<StructuredCondition['positionAction']>): string {
+  // 闸门压制：结论是「暂缓」而非「加仓/减仓」，不得沿用 direction 的语义色
+  // （否则会渲染出「一句说暂不加的话，配着加仓的红」）。走中性色。
+  if (a.blocked_by_gate === true) return 'is-blocked'
+  return a.direction === 'add' ? 'is-add' : a.direction === 'reduce' ? 'is-reduce' : 'is-hold'
 }
 
-/** 仓位动作文案：加仓/减仓/观望 + 成数（如 加仓 +2 成；change 由后端下发原文） */
+/**
+ * 仓位动作文案：加仓/减仓/观望 + 档数（如 加仓 +2 档；change 由后端下发原文）。
+ *
+ * T9 闸门压制：`blocked_by_gate === true` 时后端把 change 写成一句完整结论
+ * （「闸门未解除，暂不加」），再拼动词会渲染出「加仓 闸门未解除，暂不加」的自我矛盾
+ * （动词承诺加仓，后半句说暂不加）→ 该情形**只渲染 change 原文，不拼动词**。
+ * 仅此一种情形改变行为：其他消费者不带该字段（undefined）→ 与改动前逐字一致。
+ */
 function actionText(a: NonNullable<StructuredCondition['positionAction']>): string {
+  if (a.blocked_by_gate === true) return a.change
   const verb = a.direction === 'add' ? '加仓' : a.direction === 'reduce' ? '减仓' : '观望'
   return `${verb} ${a.change}`
 }
@@ -888,7 +904,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   border: 1rpx solid rgba(24, 160, 88, 0.35);
 }
 
-.as-insight-card__sc-action.is-hold {
+.as-insight-card__sc-action.is-hold,
+.as-insight-card__sc-action.is-blocked {
   color: $flat;
   background: $bg-soft;
   border: 1rpx solid $line;

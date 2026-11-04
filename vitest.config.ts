@@ -86,6 +86,9 @@ export default defineConfig({
       'src/modules/chat/pages/chat-report-detail.spec.ts',
       'src/modules/fear-greed/utils/fgAdvice.spec.ts',
       'src/shared/utils/rhythmColors.spec.ts',
+      // 节奏卡溯源/变奏/折叠账本的条件渲染语义（无则整块消失 / 超限截断 / missing 显式标注）
+      // 需真实挂载才能证明「DOM 中确实没有空壳」，源码正则无法覆盖。
+      'src/modules/rhythm/components/RhythmCard.mount.spec.ts',
       'src/modules/fear-greed/utils/fgRhythmSummary.spec.ts',
       'src/modules/fear-greed/utils/fgRhythmGate.spec.ts',
       'src/modules/fear-greed/pages/index.spec.ts',

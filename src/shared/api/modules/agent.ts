@@ -480,8 +480,15 @@ export interface RhythmEvent {
 }
 export interface RhythmPositionAction {
   direction: 'add' | 'reduce' | 'hold'
+  /** 文案单位是「档」不是「成」（+2 档 / -1 档 / 维持 / 闸门未解除，暂不加） */
   change: string
   band?: RhythmPositionBand | null
+  /** 本卡 position_index（缺失 = 旧报告 → 整组退化为旧静态文案） */
+  from_index?: number | null
+  /** 目标档位，clamp(from + delta, 0, 4) */
+  to_index?: number | null
+  /** 闸门命中时 bullish 被压制：to_index == from_index 且 change 为「闸门未解除，暂不加」 */
+  blocked_by_gate?: boolean
 }
 export interface RhythmAnchor {
   metric: 'index_close' | 'close' | 'high' | 'low'
@@ -504,6 +511,73 @@ export interface RhythmBranch {
   conclusion: { direction: 'bullish' | 'bearish' | 'neutral'; range?: string; validity: number; note?: string }
   event_ref?: { event_date: string; title: string }
 }
+/**
+ * 仓位推导账本项（`position_ledger.items`，2026-11 溯源/变奏唯一真相源）。
+ * status 语义：blocking 正在压低档位 / neutral 有数据无影响 / supporting 抬高档位 /
+ * **missing 数据不可用（不得当作 neutral，前端须显式标注「数据不可用」而非隐藏该行）**。
+ */
+export type RhythmLedgerItemKey = 'trend' | 'mainline' | 'event' | 'breadth'
+export type RhythmLedgerItemStatus = 'blocking' | 'neutral' | 'supporting' | 'missing'
+export interface RhythmLedgerItem {
+  key: RhythmLedgerItemKey
+  /** 原生数值文案（例 `3590.00 / ma20 3620.00`），前端原样展示不改写 */
+  value_text: string
+  /** 判定结论（例 `闸门命中` / `未成立` / `无修正` / `中性`） */
+  judgement: string
+  /** 对档位的作用（例 `base→0，禁止 +1`） */
+  effect: string
+  status: RhythmLedgerItemStatus
+}
+
+/** 变奏观察点候选池条目（仅 mainline 项携带，按超额降序，最多 3 个） */
+export interface RhythmWatchPointCandidate {
+  name: string
+  /** 5 日超额收益（pct） */
+  excess: number
+}
+
+/** 变奏观察点（one-at-a-time 反解，只产出当前未满足项） */
+export interface RhythmWatchPoint {
+  key: 'mainline' | 'gate' | 'event'
+  /** 触发条件文案（Python 侧生成，含阈值，前端不拼接） */
+  condition: string
+  /** 当前值与差距（例 `收盘 3590.00（差 30.00 点）`），指向真实卡住的约束 */
+  current_text: string
+  /** 单条满足是否足以升档（双阻塞时恒 false） */
+  sufficient_alone: boolean
+  candidates?: RhythmWatchPointCandidate[] | null
+}
+
+/**
+ * 仓位推导账本（`rhythm_card.position_ledger` / `evidence.position_ledger` 同源同值）。
+ * 契约字段恒为 4 项：缺失项 `status=missing`，**不得省略键**（spec §9.3）。
+ */
+export interface RhythmPositionLedger {
+  items: RhythmLedgerItem[]
+  base_index?: number | null
+  adjust?: number
+  final_index?: number | null
+  /** 仅指数闸门：close<ma20 且 ma5<ma10<ma20；**不可**用它代替 gate_blocked */
+  gate_hit?: boolean
+  /** 主线板块破位；null = 状态未知 */
+  mainline_breakdown?: boolean | null
+  /** K 线不足 20 根 */
+  insufficient?: boolean
+  /** 禁止 +1 的真实标志（gate_hit or mainline_breakdown or insufficient） */
+  gate_blocked?: boolean
+  mainline_state?: 'established' | 'none' | 'unavailable' | null
+  watch_points?: RhythmWatchPoint[]
+  ledger_version?: string
+}
+
+/** 溯源文案（Python 侧 render_causality 确定性生成）：前端原样展示，禁拼接/禁推断阈值 */
+export interface RhythmCausalityText {
+  /** 首句（例 `两条闸门同时压到底，任一解除都不能升档`） */
+  lead: string
+  /** 因果行（后端限制 ≤2 条，前端再兜一次截断） */
+  lines: string[]
+}
+
 export interface RhythmCard {
   /** @deprecated 2026-11 起废弃上屏：仅为未升级客户端保留，前端零引用（上色改取 position_index） */
   score?: number | null
@@ -524,6 +598,10 @@ export interface RhythmCard {
   conflict_detail?: string
   branches: RhythmBranch[]
   data_missing?: string[]
+  /** 仓位推导账本（2026-11 新增）：null/缺失 = 旧报告 → 溯源/变奏/折叠账本三块**整块不渲染** */
+  position_ledger?: RhythmPositionLedger | null
+  /** 溯源文案（2026-11 新增）：null = 只渲染变奏块与账本（ledger 存在时） */
+  causality_text?: RhythmCausalityText | null
 }
 export interface RhythmMasterContent {
   /** @deprecated 节奏大师不产双层 schema（spec §5.9 登记废止 08-29 的 2.0 要求）；该槽为历史契约遗留，勿新增消费方 */

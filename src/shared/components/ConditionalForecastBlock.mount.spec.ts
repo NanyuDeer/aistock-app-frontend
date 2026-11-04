@@ -143,3 +143,77 @@ describe('ConditionalForecastBlock 档位区平铺（2026-10-06 三粒度档位�
     expect(wrapper.findAll('.as-insight-card__horizon-projection')).toHaveLength(1)
   })
 })
+
+describe('ConditionalForecastBlock 仓位动作：T9 闸门压制（blocked_by_gate）', () => {
+  /** 仓位动作入参（对齐组件 positionAction 本地类型 + T9 扩展字段） */
+  interface PositionAction {
+    direction: 'add' | 'reduce' | 'hold'
+    change: string
+    blocked_by_gate?: boolean
+    band?: { min?: number; max?: number; text?: string }
+    from_index?: number
+    to_index?: number
+  }
+  /** 单分支 + 指定 position_action；band 一并带上，验证闸门态不会把「6~8 成，顺势持有」并列出来 */
+  const mountAction = (positionAction: PositionAction) =>
+    mount(ConditionalForecastBlock, {
+      props: {
+        structured: {
+          horizons: [{ horizon: 'short', direction: 'bullish', confidence: 'high' }],
+          conditions: [
+            {
+              horizon: 'short',
+              direction: 'bullish',
+              label: '放量突破',
+              condition: '若放量站上 5 日线',
+              scenario: '则上探 +3%',
+              keywords: ['站上5日线'],
+              scenario_keywords: ['+3%'],
+              positionAction,
+            },
+          ],
+        },
+        displayMode: 'full',
+      },
+    })
+  const ACTION = '.as-insight-card__sc-action'
+
+  it('blocked_by_gate=true → 只渲染 change（不拼「加仓」动词、不渲染 band 文案）', () => {
+    const wrapper = mountAction({
+      direction: 'add',
+      change: '闸门未解除，暂不加',
+      band: { min: 6, max: 8, text: '6~8 成，顺势持有' },
+      from_index: 0,
+      to_index: 0,
+      blocked_by_gate: true,
+    })
+
+    const action = wrapper.find(ACTION)
+    expect(action.exists()).toBe(true)
+    expect(action.text()).toBe('闸门未解除，暂不加')
+    expect(action.text()).not.toContain('加仓')
+    // band 文案不得与之并列（本组件本就不渲染 band.text，此断言守「将来别加回来」）
+    expect(wrapper.text()).not.toContain('顺势持有')
+    // 配色不得沿用 add 的语义色：结论是「暂缓」，走中性
+    expect(action.classes()).toContain('is-blocked')
+    expect(action.classes()).not.toContain('is-add')
+  })
+
+  it('blocked_by_gate=false（正常 +2 档）→ 仍拼动词「加仓 +2 档」', () => {
+    const wrapper = mountAction({ direction: 'add', change: '+2 档', from_index: 0, to_index: 2, blocked_by_gate: false })
+    expect(wrapper.find(ACTION).text()).toBe('加仓 +2 档')
+    expect(wrapper.find(ACTION).classes()).toContain('is-add')
+    expect(wrapper.find(ACTION).classes()).not.toContain('is-blocked')
+  })
+
+  it('无 blocked_by_gate 字段（旧报告/其他模块）→ 行为与改动前逐字一致', () => {
+    const wrapper = mountAction({ direction: 'add', change: '+2 成' })
+    expect(wrapper.find(ACTION).text()).toBe('加仓 +2 成')
+
+    const reduce = mountAction({ direction: 'reduce', change: '-1 成' })
+    expect(reduce.find(ACTION).text()).toBe('减仓 -1 成')
+
+    const hold = mountAction({ direction: 'hold', change: '维持' })
+    expect(hold.find(ACTION).text()).toBe('观望 维持')
+  })
+})
