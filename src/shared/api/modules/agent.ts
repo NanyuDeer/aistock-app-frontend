@@ -589,6 +589,8 @@ export interface RhythmCard {
   phase?: string | null
   phase_evidence?: Record<string, unknown>
   temperature_series: { date: string; score: number }[]
+  /** 证据区温度因子一行（T7）：后端生成，只含数值与斜率、不含分档词；无归档则缺省/空 */
+  temperature_note?: string | null
   event_window: Pick<RhythmEvent, 'date' | 'type' | 'title' | 'importance'>[]
   event_window_near_end_date?: string | null
   event_source_missing?: boolean

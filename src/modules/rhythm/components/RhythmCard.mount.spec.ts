@@ -180,6 +180,32 @@ describe('缺失与截断', () => {
     expect(rows[1].text()).toContain('数据缺失')
   })
 
+  it('temperature_note 有值 → 展开账本内出现温度因子行，且不计入 4 项账本输入', async () => {
+    const wrapper = mountCard(makeCard({
+      position_ledger: SAMPLE_LEDGER,
+      temperature_note: '情绪温度 62.4（近 3 日 +8.2）',
+    }))
+    // 收起态摘要的计数只统计账本输入项，温度行不得让它变成「5 项」
+    expect(wrapper.find('.rc-ledger-head').text()).toContain('4 项输入')
+
+    await wrapper.find('.rc-ledger-head').trigger('tap')
+
+    const note = wrapper.find('.rc-ledger-note')
+    expect(note.exists()).toBe(true)
+    expect(note.text()).toContain('温度因子')
+    expect(note.text()).toContain('情绪温度 62.4（近 3 日 +8.2）')
+    expect(note.text()).toContain('不改档位')
+    // 关键：温度行不进 4 项输入计数，否则「仓位账本（4 项输入）」摘要会与实际不符
+    expect(wrapper.findAll('.rc-ledger-item')).toHaveLength(4)
+  })
+
+  it('temperature_note 缺失（无归档）→ 温度行整条不渲染，不留空标签', async () => {
+    const wrapper = mountCard(makeCard({ position_ledger: SAMPLE_LEDGER }))
+    await wrapper.find('.rc-ledger-head').trigger('tap')
+    expect(wrapper.find('.rc-ledger-note').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('温度因子')
+  })
+
   it('watch_points 超过 3 条 → 只渲染前 3 条', () => {
     const wp = {
       key: 'gate' as const,

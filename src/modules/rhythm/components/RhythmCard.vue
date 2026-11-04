@@ -69,6 +69,14 @@
           <text class="rc-ledger-flag" v-if="item.status === 'missing'">数据不可用</text>
           <text class="rc-ledger-effect">{{ item.effect }}</text>
         </view>
+        <!-- 温度因子（T7 / 职责 spec §3）：温度是 stage 判定依据，不参与档位判定。
+             文案由后端生成（只含数值与斜率，不含分档词），前端原样展示不做加工。
+             独立类名：它不是 4 项账本输入之一，不得混入 rc-ledger-item 计数 -->
+        <view class="rc-ledger-note" v-if="card.temperature_note">
+          <text class="rc-ledger-judge">温度因子</text>
+          <text class="rc-ledger-value">{{ card.temperature_note }}</text>
+          <text class="rc-ledger-effect">判定阶段用，不改档位</text>
+        </view>
       </view>
     </view>
 
@@ -248,6 +256,16 @@ function candidateText(wp: RhythmWatchPoint): string {
 .rc-ledger-head { font-size: 24rpx; color: $primary; }
 .rc-ledger-body { margin-top: 16rpx; }
 .rc-ledger-item { padding: 12rpx 0; border-top: 1rpx dashed $line; }
+/* 温度因子行：属证据链参考项，不是档位输入项 → 独立类名 + 弱化视觉，
+   避免被读成「第 5 项账本输入」 */
+.rc-ledger-note {
+  padding: 12rpx 0;
+  border-top: 1rpx dashed $line;
+  opacity: 0.75;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
 .rc-ledger-judge { display: block; font-size: 26rpx; color: $ink; font-weight: 600; }
 .rc-ledger-value { display: block; font-size: 22rpx; color: $ink-soft; margin-top: 4rpx; }
 .rc-ledger-flag { display: inline-block; font-size: 20rpx; color: $warning; background: $warning-bg; border: 1rpx solid $warning-soft; border-radius: 8rpx; padding: 2rpx 10rpx; margin-top: 6rpx; }
