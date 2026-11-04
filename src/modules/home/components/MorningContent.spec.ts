@@ -39,18 +39,24 @@ test('首页四宫格入口统一为「洞见」品牌词（风口/消息/市场
   assert.ok(!/今日分析概览/.test(componentSource))
 })
 
-test('节奏卡改近几日摘要：一次 getRhythmMasterCalendar 取多日，映射 position_band 仓位文案；不逐日 getRhythmMaster', () => {
+test('节奏卡改近几日摘要：一次 getRhythmMasterCalendar 取多日，映射 position_band/position_index；不逐日 getRhythmMaster', () => {
   assert.match(componentSource, /agentApi\.getRhythmMasterCalendar\(HOME_RHYTHM_DAYS\)/)
-  // 2026-10-07 首页重构（提交 16d36581 起）把内联属性 `band: formatBandText(...)` 改成
-  // 局部常量 `const band = formatBandText(d.position_band?.text)`，同一值改为双处消费：
-  // 返回行的 band 字段 + 小字详情 hint（`${label} · 建议仓位${band}`）。
-  // 语义未变（position_band 文案仍统一经 formatBandText 归一），故断言同步到新形状。
+  // 2026-11-04 T3：档位来源从 level 改为 position_index（上色唯一依据），
+  // 仓位文案仍统一经 formatBandText 归一；小字详情优先仓位文案，缺失退化为档位全称。
   assert.match(componentSource, /const band = formatBandText\(d\.position_band\?\.text\)/)
   assert.match(componentSource, /basis_date: d\.basis_date,\s*band,/)
-  assert.match(componentSource, /hint: band \?/)
+  assert.match(componentSource, /position_index: d\.position_index \?\? null/)
+  assert.match(componentSource, /hint: band \|\| positionLabel\(d\.position_index\)/)
   // 首页摘要只消费日历聚合接口（含 position_band），避免为多日结论发 N 次单日报告请求
   assert.doesNotMatch(componentSource, /agentApi\.getRhythmMaster\(/)
   assert.doesNotMatch(componentSource, /rhythmSummary/)
+})
+
+test('T3 节奏摘要 chip：颜色/短码取 position_index，不再消费 level', () => {
+  assert.match(componentSource, /positionColor\(r\.position_index\)/)
+  assert.match(componentSource, /positionShort\(r\.position_index\)/)
+  assert.doesNotMatch(componentSource, /levelShort|levelLabel|RHYTHM_LEVEL_COLORS/)
+  assert.doesNotMatch(componentSource, /d\.level/)
 })
 
 test('节奏卡近几日行可点入对应交易日详情（带 date 参数），且 stop 防触整卡跳转', () => {

@@ -1,5 +1,6 @@
 import type { RhythmBranch, RhythmCard } from '@/shared/api/modules/agent'
 import { formatBandText } from '@/shared/utils/rhythmBand'
+import { positionShort } from '@/shared/utils/rhythmColors'
 import { shanghaiDateTimeParts } from '@/shared/utils/tradingTime'
 
 /** 洞见卡结构化预判子集（结构性对齐 ConditionalForecastBlock/InsightCard 入参，仅节奏用到的字段） */
@@ -26,8 +27,22 @@ export interface RhythmInsightCard {
   timeNote?: string
 }
 
-const LEVEL_LABEL: Record<string, string> = { ice: '冰点', low: '低迷', normal: '常温', active: '活跃', euphoria: '亢奋' }
 const SLOT_LABEL: Record<string, string> = { after_close: '收盘基准', morning: '盘前', midday: '午间' }
+
+/**
+ * 洞见卡标题两段式：`{仓位} · {压制原因}`（例「空仓观望 · 闸门压制」）。
+ * 压制原因由后端确定性产出（溯源链路 T8/T10）；**当前后端尚未提供该字段** →
+ * 恒缺 → 退化为纯仓位（只保留第一段，不补分隔符、不伪造第二段）。
+ * 接线时只改本函数，视图层不得自行拼字符串。
+ */
+export function composeRhythmTitle(positionText: string, reason?: string): string {
+  return [positionText, reason].filter(Boolean).join(' · ')
+}
+
+/** 标题第二段来源（后端未接线，恒 undefined） */
+function suppressReason(_card: RhythmCard): string | undefined {
+  return undefined
+}
 
 /** 剥离全角/半角括号段（与 ConditionalForecastBlock.condMain 展示口径一致），返回 [主干, 括号段|空] */
 function splitParen(text: string): [string, string] {
@@ -82,13 +97,13 @@ export function toRhythmInsight(
   createdAt?: string,
 ): RhythmInsightCard | null {
   if (!card) return null
-  const level = LEVEL_LABEL[card.level ?? ''] ?? ''
   const band = formatBandText(card.position_band?.text)
-  // 语义收口（2026-11-04）：节奏＝操作建议。标题直接给仓位动作，不再拼档位词——
-  // 档位（冰点/低迷/…）与情绪温度分档同名词，并列会造成「低迷 + 亢奋」的观感冲突。
+  // 语义收口（2026-11-04）：节奏＝仓位建议。标题恒取仓位文案（缺失时回退档位短码），
+  // 不再退回 level 档位词（冰点/低迷/…与情绪温度分档同名词，并列会造成「低迷 + 亢奋」的观感冲突）。
+  const positionText = band || positionShort(card.position_index)
   const title = card.conflict
     ? '信号背离 · 仅区间与提示'
-    : (band || level)  // 仓位缺失时退回档位，避免整卡不渲染
+    : composeRhythmTitle(positionText, suppressReason(card))
   if (!title) return null
 
   const structured = (card.branches ?? []).map(toCondition).filter((c): c is RhythmInsightCondition => c !== null)

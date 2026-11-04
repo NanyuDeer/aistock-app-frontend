@@ -9,8 +9,9 @@
         </view>
         <view v-if="rhythmSummary" class="fg-rhythm__row">
           <text class="fg-rhythm__label">节奏档位</text>
-          <view v-if="rhythmSummary.level" class="fg-rhythm__chip" :style="{ background: rhythmSummary.levelColor }">
-            <text class="fg-rhythm__chip-text">{{ rhythmSummary.levelShort }}</text>
+          <!-- 颜色＝建议仓位；position_index 缺失 → 不渲染色块（不拿 level 兜底） -->
+          <view v-if="rhythmSummary.positionIndex != null" class="fg-rhythm__chip" :style="{ background: rhythmSummary.positionColor }">
+            <text class="fg-rhythm__chip-text">{{ rhythmSummary.positionShort }}</text>
           </view>
           <text v-if="rhythmSummary.bandText" class="fg-rhythm__band">{{ rhythmSummary.bandText }}</text>
           <text class="fg-rhythm__date">{{ rhythmSummary.dateLabel }}</text>

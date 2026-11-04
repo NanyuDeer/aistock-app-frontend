@@ -505,8 +505,12 @@ export interface RhythmBranch {
   event_ref?: { event_date: string; title: string }
 }
 export interface RhythmCard {
+  /** @deprecated 2026-11 起废弃上屏：仅为未升级客户端保留，前端零引用（上色改取 position_index） */
   score?: number | null
+  /** @deprecated 2026-11 起废弃上屏：仅为未升级客户端保留，前端零引用（上色改取 position_index） */
   level?: string | null
+  /** 仓位档位序号 0-4（空/轻/半/重/满）；null/缺失 = 档位不可用 → 灰格 + 「仓位建议暂缺」 */
+  position_index?: number | null
   position_band: { min?: number | null; max?: number | null; text: string }
   phase?: string | null
   phase_evidence?: Record<string, unknown>
@@ -544,13 +548,20 @@ export interface RhythmPositionBand {
   text?: string
 }
 
-/** 节奏日历热力图行（契约 #7）：恒取 after_close 收盘基准；level 可空 = 灰格（行缺失/沿用前值）；
+/** 节奏日历热力图行（契约 #7）：恒取 after_close 收盘基准；
+ *  position_index（2026-11 新增）：日历上色的**唯一依据**，0-4；null/缺失 = 灰格（行缺失/沿用前值/旧数据），
+ *  **禁止**回退用 level 上色（level 是情绪强度语义，当仓位用会给出错误建议）；
+ *  level / score 仅为未升级客户端保留（新前端零引用）；
  *  events（2026-09-03 扩展）：该交易日 macro 事件（对外契约子集，后端恒下发，无事件 = []；前端可选以兼容旧缓存/降级） */
 export interface RhythmCalendarDay {
   date: string
   refresh_slot: 'after_close'
+  /** @deprecated 2026-11 起前端零引用（上色改取 position_index） */
   level: string | null
+  /** @deprecated 2026-11 起前端零引用 */
   score: number | null
+  /** 仓位档位序号 0-4（空/轻/半/重/满）；null/缺失 = 灰格 */
+  position_index?: number | null
   basis_date: string | null
   position_band: RhythmPositionBand | null
   events?: RhythmEvent[]
@@ -824,8 +835,9 @@ export const agentApi = {
   },
 
   /** 节奏日历热力图聚合（契约 #7）：最近 N 个交易日 after_close 收盘基准档位。
-   *  返回 { days: [{date, refresh_slot, level, score, basis_date, position_band}] }，
-   *  level 可空（灰格）；position_band 为空 = 该日无仓位语义（如实展示，不伪造）。 */
+   *  返回 { days: [{date, refresh_slot, level, score, position_index, basis_date, position_band}] }，
+   *  position_index 为日历上色唯一依据，null/缺失 → 灰格（禁止回退 level 上色；
+   *  level / score 仅为未升级客户端兼容保留）；position_band 为空 = 该日无仓位语义（如实展示，不伪造）。 */
   getRhythmMasterCalendar(days = 60, naturalDays = 0) {
     return request.get<RhythmCalendarResponse>('/agent/rhythm-master/calendar', {
       params: naturalDays > 0 ? { naturalDays } : { days },

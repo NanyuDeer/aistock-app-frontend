@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { toRhythmInsight, type RhythmInsightCondition } from './rhythmInsight'
+import { toRhythmInsight, composeRhythmTitle, type RhythmInsightCondition } from './rhythmInsight'
 import type { RhythmCard, RhythmBranch } from '@/shared/api/modules/agent'
 
 const source = readFileSync(new URL('./rhythmInsight.ts', import.meta.url), 'utf8')
@@ -14,11 +14,32 @@ function branch(p: Partial<RhythmBranch>): RhythmBranch {
   } as RhythmBranch
 }
 
-test('title：非 conflict 拼接档位中文与仓位句；conflict 用背离文案', () => {
-  const card = { level: 'active', position_band: { text: '建议仓位：七成~八成' }, conflict: false, branches: [] } as unknown as RhythmCard
-  assert.equal(toRhythmInsight(card, 'after_close', '2026-09-02')?.title, '七成~八成')
+test('title：非 conflict 恒取仓位文案；conflict 用背离文案', () => {
+  const card = { position_index: 3, position_band: { text: '建议仓位：重仓（七~八成）' }, conflict: false, branches: [] } as unknown as RhythmCard
+  assert.equal(toRhythmInsight(card, 'after_close', '2026-09-02')?.title, '重仓（七~八成）')
   const conflict = { ...card, conflict: true, conflict_detail: '多空背离' } as unknown as RhythmCard
   assert.equal(toRhythmInsight(conflict, 'after_close', '2026-09-02')?.title, '信号背离 · 仅区间与提示')
+})
+
+test('title 两段式：有压制原因拼 `{仓位} · {压制原因}`；缺失时退化为纯仓位（不补分隔符）', () => {
+  assert.equal(composeRhythmTitle('空仓观望', '闸门压制'), '空仓观望 · 闸门压制')
+  assert.equal(composeRhythmTitle('空仓观望'), '空仓观望')
+  assert.equal(composeRhythmTitle('空仓观望', ''), '空仓观望')
+  assert.equal(composeRhythmTitle('', '闸门压制'), '闸门压制')
+})
+
+test('title 仓位缺失回退 position_index 短码（不再退回 level 档位词）', () => {
+  const byIndex = { position_index: 0, conflict: false, branches: [] } as unknown as RhythmCard
+  assert.equal(toRhythmInsight(byIndex, 'after_close', '2026-09-02')?.title, '空')
+  // 旧报告：无 position_band 也无 position_index → 不臆造标题（整卡不渲染）
+  const empty = { conflict: false, branches: [] } as unknown as RhythmCard
+  assert.equal(toRhythmInsight(empty, 'after_close', '2026-09-02'), null)
+})
+
+test('T3：删除 LEVEL_LABEL，源码不再出现档位词表与 level 消费', () => {
+  assert.doesNotMatch(source, /LEVEL_LABEL/)
+  assert.doesNotMatch(source, /card\.level/)
+  assert.match(source, /positionShort\(card\.position_index\)/)
 })
 
 test('预判 structured 同时收 interval 与 enum（事件）分支；enum 用 indicator+value，不再透传 met', () => {
@@ -29,7 +50,7 @@ test('预判 structured 同时收 interval 与 enum（事件）分支；enum 用
     event_ref: { event_date: '2026-09-03', title: 'CPI 数据公布' },
     met: true,
   } as Partial<RhythmBranch> & { met?: boolean | null })
-  const card = { level: 'normal', position_band: { text: '建议仓位：五成~六成' }, conflict: false, branches: [interval, eventBranch] } as unknown as RhythmCard
+  const card = { position_index: 2, position_band: { text: '建议仓位：半仓（四~六成）' }, conflict: false, branches: [interval, eventBranch] } as unknown as RhythmCard
   const out = toRhythmInsight(card, 'morning', '2026-09-02')
   assert.equal(out?.structured?.conditions.length, 2)
   assert.equal(out?.structured?.conditions[0].condition, '收盘站上 4050 压力位')
@@ -41,7 +62,7 @@ test('预判 structured 同时收 interval 与 enum（事件）分支；enum 用
 
 test('括号阈值（放量（>xxx亿））→ anchor.threshold，主干保留', () => {
   const amt = branch({ condition: { kind: 'interval', indicator: '成交额', label: '放量（>120亿）', lo: 120, hi: null }, conclusion: { direction: 'bullish', range: '4050-4200', validity: 5, note: '放量突破压力位' } })
-  const card = { level: 'active', position_band: { text: '建议仓位：七成~八成' }, conflict: false, branches: [amt] } as unknown as RhythmCard
+  const card = { position_index: 3, position_band: { text: '建议仓位：重仓（七~八成）' }, conflict: false, branches: [amt] } as unknown as RhythmCard
   const out = toRhythmInsight(card, 'after_close', '2026-09-02')
   assert.equal(out?.structured?.conditions[0].condition, '放量')
   assert.equal(out?.structured?.conditions[0].anchor?.threshold, '>120亿')
@@ -49,9 +70,9 @@ test('括号阈值（放量（>xxx亿））→ anchor.threshold，主干保留',
 
 test('conflict 不阻断 structured；无分支则不产 structured；card 为空返回 null', () => {
   const b = branch({})
-  const c = { level: 'active', position_band: { text: 'x' }, conflict: true, branches: [b] } as unknown as RhythmCard
+  const c = { position_index: 3, position_band: { text: 'x' }, conflict: true, branches: [b] } as unknown as RhythmCard
   assert.equal(toRhythmInsight(c, 'after_close', '2026-09-02')?.structured?.conditions.length, 1)
-  const noBranches = { level: 'active', position_band: { text: 'x' }, conflict: false, branches: [] } as unknown as RhythmCard
+  const noBranches = { position_index: 3, position_band: { text: 'x' }, conflict: false, branches: [] } as unknown as RhythmCard
   assert.equal(toRhythmInsight(noBranches, 'after_close', '2026-09-02')?.structured, undefined)
   assert.equal(toRhythmInsight(null, 'after_close', '2026-09-02'), null)
 })
@@ -65,7 +86,7 @@ test('toCondition 透传 direction / positionAction / anchor（结构化仓位�
 })
 
 test('time：主行 slot 标签（版本标注）+ timeNote 生成时刻灰字（上海时区恒真展示，v3 R-H）', () => {
-  const card = { level: 'normal', position_band: { text: '建议仓位：五成~六成' }, conflict: false, branches: [] } as unknown as RhythmCard
+  const card = { position_index: 2, position_band: { text: '建议仓位：半仓（四~六成）' }, conflict: false, branches: [] } as unknown as RhythmCard
   // 无 createdAt → 只有主行 slot 标签，无 timeNote
   const noCreated = toRhythmInsight(card, 'midday', '2026-09-21')
   assert.equal(noCreated?.time, '09-21 · 午间')
@@ -96,18 +117,18 @@ test('RhythmInsightCondition 接口含 direction / positionAction / anchor 字�
 
 test('title：中性沿用的档位标注「中性沿用」，不与硬判混淆', () => {
   const card = {
-    level: 'low',
-    position_band: { text: '建议仓位：轻仓~观望' },
+    position_index: 1,
+    position_band: { text: '建议仓位：轻仓（≤三成）' },
     phase_evidence: { stage_source: 'inherited_prev_day' },
     conflict: false,
     branches: [],
   } as unknown as RhythmCard
-  assert.equal(toRhythmInsight(card, 'after_close', '2026-11-02')?.title, '轻仓~观望')
+  assert.equal(toRhythmInsight(card, 'after_close', '2026-11-02')?.title, '轻仓（≤三成）')
 })
 
 test('title：computed 硬判不加沿用标注', () => {
   const card = {
-    level: 'low',
+    position_index: 0,
     position_band: { text: '建议仓位：空仓观望' },
     phase_evidence: { stage_source: 'computed' },
     conflict: false,

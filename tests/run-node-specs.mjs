@@ -64,8 +64,12 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *    已用 `--test-reporter=spec` 显式锁定报告器（见下方 spawnSync），本地与 CI 输出一致。
  *  2026-11-03：PR #151「中性沿用标注」在 rhythmInsight.spec.ts 新增 2 条 node:test 用例（沿用/硬判）；
  *    → 采集总数 284 → 286，实测 286/286/0，已知残余失败仍为 0。
+ *  2026-11-04：节奏职责重定义 T3（前端 level → position_index 切换）——
+ *    rhythmColors.spec 改写为仓位语义（vitest，不计入本基线）、RhythmCalendarPanel.spec / RhythmCard.spec /
+ *    rhythmInsight.spec / MorningContent.spec 同步改断言，fgRhythmSummary.spec（vitest）增补 index=0 回归；
+ *    → 采集总数 286 → 293，实测 293/293/0，已知残余失败 0。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '286/286/0'
+const EXPECTED_BASELINE = '293/293/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {
