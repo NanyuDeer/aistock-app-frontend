@@ -13,9 +13,10 @@
 
 - `src/manifest.json`：`versionName` 0.1.5 → **0.1.6**、`versionCode` 105 → **106**（打包版本号）
 - `src/modules/user/pages/profile.vue`：「关于洞见」版本号 0.1.5 → **0.1.6**（App 内部版本说明，需与 manifest 同步）
-- `CHANGELOG.md`：新增 0.1.6 版本发布记录（含 App 更新文案 10 条）
-- Web 端 `aistock-frontend/public/download/version.json`：同步 0.1.6 / 106 / `aistock-0.1.6.apk` / releaseDate 2026-10-31 / 新更新文案（自选股消息卡、通知筛选、事件存活度与相关事件、立即检测、AI帮我选、恐贪分档等）
+- `CHANGELOG.md`：新增 0.1.6 版本发布记录（含 App 更新文案 12 条）
+- Web 端 `aistock-frontend/public/download/version.json`：同步 0.1.6 / 106 / `aistock-0.1.6.apk` / releaseDate 2026-11-05 / 新更新文案（12 条）
 - 更新文案口径：因下方 2026-10-17 条目将「AI帮我选」展示顺序回退为服务端 AI 排序，文案写作「按 AI 排序优先展示」，不描述为按涨跌幅重排
+- 2026-11-05 复核补充：0.1.6 版本提交后又合入 15 个提交（PR #151 节奏卡语义收口、#152 节奏前端切仓位档位 + 洞见卡溯源/变奏/折叠账本、#153「去问 AI」问句编码修复），已把节奏大师改版与乱码修复补入更新文案；版本号保持 0.1.6 / 106 不变
 - **打包后待办**：按实测 APK 大小修正 version.json 的 `fileSize`（暂沿用 22.98 MB），commit+push 两仓库后按 release 流程部署（上传 APK + web 构建部署 + 线上自检）
 
 ## 2026-10-17 — AI帮我选展示顺序回退为服务端 AI 排序
