@@ -10,10 +10,12 @@ test('展开态按月渲染自然日网格（含周末 cell）', () => {
   assert.match(source, /new Date\(year, month\s*\+?\s*1, 0\)\.getDate\(\)|getDaysInMonth|daysInMonth/)
 })
 
-test('周末/节假日格 level=null 但保留 pick 能力（可选中看 macro 事件）', () => {
-  // 自然日网格里每个 cell 都带 date，周末无档 level=null 也能 emit pick
+test('周末/节假日格 position_index=null 但保留 pick 能力（可选中看 macro 事件）', () => {
+  // 自然日网格里每个 cell 都带 date，周末无仓位档位 position_index=null 也能 emit pick
   assert.match(source, /monthCells|calendarCells|alignCells|monthGrid|buildMonthGrid/)
   assert.match(source, /pick\(/)
+  // 占位灰格显式带 position_index: null（契约字段，不靠 level 兜底）
+  assert.match(source, /position_index:\s*null/)
 })
 
 test('getRhythmMasterCalendar 支持自然日模式（naturalDays 参数）', () => {
@@ -50,4 +52,23 @@ test('控制器裁决①：overflow 占位（无 title/importance）不渲染空
   assert.match(source, /selectedOverflow/)
   assert.ok(source.includes('另有'), '事件区需有「另有 N 条」计数行')
   assert.match(source, /v-else-if="selectedOverflow > 0"|v-if="selectedEvents\.length \|\| selectedOverflow > 0"/)
+})
+
+test('T3 上色唯一来源 position_index：缺失 → 灰格，禁止回退 level 上色', () => {
+  // 上色走唯一入口 positionColor(position_index)
+  assert.match(source, /positionColor\(d\.position_index\)/)
+  // 不再消费 level 系列（档位键守卫 / levelShort / level 色板）
+  assert.doesNotMatch(source, /isRhythmLevelKey|levelShort|RHYTHM_LEVEL_COLORS/)
+  // index 0 是合法档位，必须用 `!= null` 判定而非真值判定（否则 0 档会被当成缺失）
+  assert.match(source, /d\.position_index != null/)
+  assert.match(source, /cell\.position_index != null/)
+  assert.doesNotMatch(source, /v-if="d\.position_index"/)
+  assert.doesNotMatch(source, /:class="\{ dim: !cell\.position_index \}"/)
+})
+
+test('T3 图例明写「颜色＝建议仓位」（冷→暖 = 0 空 → 4 满 + 灰＝无档位）', () => {
+  assert.ok(source.includes('颜色＝建议仓位'), '图例文案必须为「颜色＝建议仓位」')
+  assert.match(source, /POSITION_LEGEND/)
+  assert.match(source, /RHYTHM_POSITION_SHORT\.map/)
+  assert.ok(source.includes('无档位'), '图例需说明灰格＝无档位')
 })

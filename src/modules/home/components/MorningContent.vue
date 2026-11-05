@@ -138,7 +138,7 @@
             <text class="feature-more">›</text>
           </view>
           <text class="feature-sub">近 {{ HOME_RHYTHM_DAYS }} 日 · 收盘基准</text>
-          <!-- 近几日结论：每行 = 建议仓位 + 档位色块（最右，与其它功能卡"名称+Tag"同构）；点行进该日详情（stop 防触整卡跳转） -->
+          <!-- 近几日结论：每行 = 建议仓位 + 仓位档位色块（最右，与其它功能卡"名称+Tag"同构）；点行进该日详情（stop 防触整卡跳转） -->
           <view class="feature-list" v-if="rhythmRows.length">
             <view
               v-for="r in rhythmRows"
@@ -148,7 +148,7 @@
             >
               <text class="feature-value rhythm-band">{{ r.band || (r.basis_date ? '沿用前值' : '无报告') }}</text>
               <view class="rhythm-chip" :style="{ background: rhythmChipColor(r) }">
-                <text class="rhythm-chip-text">{{ rhythmLevelShort(r) }}</text>
+                <text class="rhythm-chip-text">{{ rhythmPositionShort(r) }}</text>
               </view>
             </view>
           </view>
@@ -191,7 +191,7 @@ import { shanghaiDateString, shanghaiDateTimeParts, addCalendarDays, getTradingT
 import { toMarketTraceViewModel, toMarketTracePresentation } from '@/modules/analytics/utils/marketTraceReview'
 import { toMarketInsightBrief } from '@/modules/analytics/utils/marketInsightBrief'
 import type { WindLeaderSector } from '@/shared/api/modules/stock'
-import { RHYTHM_LEVEL_COLORS, RHYTHM_GREY, levelShort, levelLabel, type RhythmLevelKey } from '@/shared/utils/rhythmColors'
+import { positionColor, positionLabel, positionShort } from '@/shared/utils/rhythmColors'
 import { formatBandText } from '@/shared/utils/rhythmBand'
 
 const {
@@ -452,40 +452,38 @@ function formatUpdatedAt(value?: string | null): string {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
-/** 首页节奏洞见卡：近几日摘要（收盘基准档位 + 建议仓位），每行点入该日详情 */
+/** 首页节奏洞见卡：近几日摘要（收盘基准仓位档位 + 建议仓位），每行点入该日详情 */
 const HOME_RHYTHM_DAYS = 3
 interface RhythmHistoryRow {
   date: string
-  level: string | null
-  score: number | null
+  /** 仓位档位序号 0-4（空/轻/半/重/满）；null = 该日无档位 */
+  position_index: number | null
   basis_date: string | null
   band: string
-  /** 洞见一句话结论（档位中文 + 建议仓位） */
+  /** 洞见一句话结论（建议仓位文案；缺失时回退档位全称） */
   hint?: string
 }
 const rhythmRows = ref<RhythmHistoryRow[]>([])
 
 const currentSlot = ref<TradingTimeSlot>(getTradingTimeSlot())
 
-// 档位色板/短码唯一副本见 shared/utils/rhythmColors.ts
+// 仓位色板/短码唯一副本见 shared/utils/rhythmColors.ts
 
 async function loadRhythmHistory() {
   try {
-    // 一次日历接口取数即可获得多日 level/score/position_band（契约 #7），避免逐日 getRhythmMaster 放大首页刷新成本
+    // 一次日历接口取数即可获得多日 position_index/position_band（契约 #7），避免逐日 getRhythmMaster 放大首页刷新成本
     const res = await agentApi.getRhythmMasterCalendar(HOME_RHYTHM_DAYS)
     const days = res?.days ?? []
     // 接口"最近在前"（降序）→ 卡片顶部为最新日期
     rhythmRows.value = days.map((d) => {
       const band = formatBandText(d.position_band?.text)
-      const label = levelLabel(d.level)
       return {
         date: d.date,
-        level: d.level,
-        score: d.score,
+        position_index: d.position_index ?? null,
         basis_date: d.basis_date,
         band,
-        // 小字详情＝洞见一句话结论：档位 + 建议仓位（无仓位语义时只给档位，不伪造）
-        hint: band ? `${label} · 建议仓位${band}` : label,
+        // 小字详情＝洞见一句话结论：建议仓位文案（缺失时只给档位全称，不伪造）
+        hint: band || positionLabel(d.position_index),
       }
     })
   } catch {
@@ -494,11 +492,11 @@ async function loadRhythmHistory() {
 }
 
 function rhythmChipColor(r: RhythmHistoryRow): string {
-  return (r.level && RHYTHM_LEVEL_COLORS[r.level as RhythmLevelKey]) || RHYTHM_GREY
+  // 颜色＝建议仓位；position_index 缺失 → 灰格（禁止回退 level 上色）
+  return positionColor(r.position_index)
 }
-function rhythmLevelShort(r: RhythmHistoryRow): string {
-  if (r.level) return levelShort(r.level)
-  return '沿'
+function rhythmPositionShort(r: RhythmHistoryRow): string {
+  return positionShort(r.position_index) || '沿'
 }
 
 function goRhythm() {
