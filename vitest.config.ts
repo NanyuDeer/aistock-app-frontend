@@ -43,6 +43,7 @@ export default defineConfig({
       'src/shared/utils/useChatStream.spec.ts',
       'src/shared/utils/useChatStream.http.spec.ts',
       'src/shared/utils/chatSuggestions.spec.ts',
+      'src/shared/utils/decodeQuery.spec.ts',
       'src/shared/utils/parseMarkdownSections.spec.ts',
       'src/shared/utils/scrollFollow.spec.ts',
       'src/shared/utils/sessionUsageMerge.spec.ts',

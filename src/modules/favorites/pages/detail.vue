@@ -2452,7 +2452,9 @@ function openDisclosureUrl() {
 function goChat() {
   const name = quote.value?.name || symbol.value
   const q = `帮我分析一下${name}(${symbol.value})的最新行情和投资建议`
-  uni.navigateTo({ url: `/modules/chat/pages/index?q=${q}` })
+  // 中文问句必须 encodeURIComponent：App/小程序端不会自动编码，未编码进 URL 会导致
+  // 落点页 chat/index 收到 %E5%... 转义串或乱码（历史回归：commit 7737fe7 误删编码）
+  uni.navigateTo({ url: `/modules/chat/pages/index?q=${encodeURIComponent(q)}` })
 }
 </script>
 
