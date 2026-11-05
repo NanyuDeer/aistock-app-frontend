@@ -99,6 +99,69 @@
         <Card>
           <view class="ai-personal-section">
             <text class="as-desc">AI 对话可能参考您的投资偏好与风险偏好进行个性化回答（昵称/投资偏好/风险偏好）。您可随时删除上述个性化信息，删除后 AI 将按通用方式回答。</text>
+
+            <!-- opt-in 开关：默认关闭；关闭只停采，不删已生成结果（spec §3.4/§3.9） -->
+            <view class="pref-block">
+              <view class="pref-head">
+                <text class="pref-label">AI 个性化分析</text>
+                <Switch
+                  v-model="profileMiningEnabled"
+                  class="profile-mining-switch"
+                  @change="onProfileMiningChange"
+                />
+              </view>
+              <text class="as-desc">开启后，系统会根据你的自选股、提问与洞察事件分析画像特征，仅用于个性化回答。可随时关闭；关闭只停止分析，不会自动删除已生成结果，如需删除请点击「清除 AI 推断结果」。</text>
+            </view>
+
+            <!-- 推断计数 + 清除（只展示计数，不展示推断内容） -->
+            <view class="pref-block">
+              <view class="pref-head">
+                <text class="pref-label">AI 已了解你的 {{ inferenceMeta.count }} 个特征</text>
+                <text class="pref-clear" @tap="handleClearInferences">清除 AI 推断结果</text>
+              </view>
+            </view>
+
+            <!-- 投资偏好：标签输入（画像自动挖掘一期，激活 Phase 4-3 空转链路） -->
+            <view class="pref-block">
+              <view class="pref-head">
+                <text class="pref-label">投资偏好</text>
+                <text class="pref-count">{{ investmentPreferences.length }}/{{ MAX_PREFERENCE_COUNT }}</text>
+              </view>
+              <view v-if="investmentPreferences.length" class="pref-tags">
+                <view v-for="item in investmentPreferences" :key="item" class="pref-tag">
+                  <text class="pref-tag__text">{{ item }}</text>
+                  <view class="pref-tag__remove" @tap="removeInvestmentPreference(item)">
+                    <SvgIcon name="close-line" size="22rpx" color="#0b5fff" />
+                  </view>
+                </view>
+              </view>
+              <view class="pref-input-row">
+                <Input
+                  v-model="preferenceDraft"
+                  class="pref-input"
+                  placeholder="如：白酒、半导体（单个不超过 20 字）"
+                  :maxlength="MAX_PREFERENCE_LENGTH"
+                />
+                <Button
+                  class="pref-add"
+                  size="sm"
+                  :disabled="investmentPreferences.length >= MAX_PREFERENCE_COUNT"
+                  @click="addInvestmentPreference"
+                >添加</Button>
+              </view>
+            </view>
+
+            <!-- 风险偏好：三档选择器（提交值必须在 conservative/balanced/aggressive 内） -->
+            <view class="pref-block">
+              <text class="pref-label">风险偏好</text>
+              <Segmented
+                :items="RISK_TOLERANCE_ITEMS"
+                :model-value="riskTolerance"
+                full-width
+                @change="onRiskToleranceChange"
+              />
+            </view>
+
             <Button type="danger" block @click="handleDeleteProfile">删除我的个性化信息</Button>
           </view>
         </Card>
@@ -163,11 +226,21 @@ import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { authApi, type UserSettings } from '@/shared/api/modules/auth'
-import { deleteUserProfile, getUserProfile, updateUserProfile } from '@/shared/api/modules/profile'
+import {
+  clearInferences,
+  deleteUserProfile,
+  getInferenceMeta,
+  getUserProfile,
+  isRiskTolerance,
+  updateUserProfile,
+  type InferenceMeta,
+  type RiskTolerance,
+  type UserProfile,
+} from '@/shared/api/modules/profile'
 import { checkAppUpdate } from '@/shared/utils/useAppUpdate'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
-import { Switch, ListCell, Card, Tag, Button, UpdateModal, ConfirmModal } from '@/shared/components'
+import { Switch, ListCell, Card, Tag, Button, UpdateModal, ConfirmModal, Input, Segmented } from '@/shared/components'
 import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 
 const userStore = useUserStore()
@@ -183,6 +256,27 @@ const DEFAULT_SETTINGS: UserSettings = {
 }
 const settings = ref<UserSettings>({ ...DEFAULT_SETTINGS })
 const favoriteStocks = computed(() => favoritesStore.stocks)
+
+/** 投资偏好：最多 10 项，每项不超过 20 字（与后端校验对齐，前端同步拦截） */
+const MAX_PREFERENCE_COUNT = 10
+const MAX_PREFERENCE_LENGTH = 20
+
+/** 风险偏好三档：value 必须落在 API 层 RiskTolerance 枚举内，禁止在页面自定义值域 */
+const RISK_TOLERANCE_ITEMS: Array<{ label: string; value: RiskTolerance }> = [
+  { label: '保守型', value: 'conservative' },
+  { label: '平衡型', value: 'balanced' },
+  { label: '积极型', value: 'aggressive' },
+]
+
+/** 显式画像编辑态（Phase 4-3 注入链路的数据源） */
+const investmentPreferences = ref<string[]>([])
+const preferenceDraft = ref('')
+const riskTolerance = ref<RiskTolerance | ''>('')
+
+/** 画像挖掘 opt-in：默认关闭（user_settings 无 profile_mining 行即关闭） */
+const profileMiningEnabled = ref(false)
+/** AI 推断元信息：只用于展示计数，绝不展示推断内容（spec §1.2 边界） */
+const inferenceMeta = ref<InferenceMeta>({ count: 0, dimensions: [], updated_at: null })
 
 /** 统一确认/信息弹窗状态（替换原生 uni.showModal，样式对齐版本更新弹窗） */
 interface ModalOptions {
@@ -208,7 +302,12 @@ function handleModalConfirm() {
 
 onShow(async () => {
   if (!isLoggedIn.value) return
-  await Promise.all([loadSettings(), loadNickname(), favoritesStore.fetchFavorites({ silent: true })])
+  await Promise.all([
+    loadSettings(),
+    loadNickname(),
+    loadInferenceMeta(),
+    favoritesStore.fetchFavorites({ silent: true }),
+  ])
 })
 
 /** 默认昵称前缀（首次进入自动分配：用户 + 5 位随机字母数字，如 用户A7k2Q） */
@@ -261,6 +360,7 @@ function generateNickname(): string {
 async function loadNickname() {
   try {
     const profile = await getUserProfile()
+    applyProfilePreferences(profile)
     const existing = (profile?.nickname || userInfo.value?.nickname || '').trim()
     if (existing) {
       nickname.value = existing
@@ -304,6 +404,79 @@ async function saveNickname() {
   }
 }
 
+/**
+ * 回填显式画像偏好（复用 loadNickname 的同一次 getUserProfile 响应，避免重复请求）。
+ * 风险偏好只接受枚举值：后端历史脏值一律忽略，避免三档选择器出现非法值。
+ */
+function applyProfilePreferences(profile: UserProfile | null) {
+  const preferences = profile?.investment_preferences
+  investmentPreferences.value = Array.isArray(preferences)
+    ? Array.from(
+        new Set(
+          preferences
+            .filter((item): item is string => typeof item === 'string' && !!item.trim())
+            .map((item) => item.trim()),
+        ),
+      ).slice(0, MAX_PREFERENCE_COUNT)
+    : []
+  const tolerance = profile?.risk_tolerance
+  riskTolerance.value = isRiskTolerance(tolerance) ? tolerance : ''
+}
+
+/** 投资偏好保存：乐观更新 + 失败回滚（后端 COALESCE 保留未传字段） */
+async function persistInvestmentPreferences(next: string[]) {
+  const previous = investmentPreferences.value
+  investmentPreferences.value = next
+  try {
+    await updateUserProfile({ investment_preferences: next })
+    uni.showToast({ title: '投资偏好已更新', icon: 'none' })
+  } catch {
+    investmentPreferences.value = previous
+    uni.showToast({ title: '保存失败，请重试', icon: 'none' })
+  }
+}
+
+/** 添加标签：空值 / 超长 / 重复 / 超上限均在提交前拦截 */
+function addInvestmentPreference() {
+  const value = preferenceDraft.value.trim()
+  if (!value) {
+    uni.showToast({ title: '请输入投资偏好', icon: 'none' })
+    return
+  }
+  if (value.length > MAX_PREFERENCE_LENGTH) {
+    uni.showToast({ title: `单个偏好不超过${MAX_PREFERENCE_LENGTH}字`, icon: 'none' })
+    return
+  }
+  if (investmentPreferences.value.includes(value)) {
+    uni.showToast({ title: '该偏好已添加', icon: 'none' })
+    return
+  }
+  if (investmentPreferences.value.length >= MAX_PREFERENCE_COUNT) {
+    uni.showToast({ title: `最多添加${MAX_PREFERENCE_COUNT}个偏好`, icon: 'none' })
+    return
+  }
+  preferenceDraft.value = ''
+  void persistInvestmentPreferences([...investmentPreferences.value, value])
+}
+
+function removeInvestmentPreference(value: string) {
+  void persistInvestmentPreferences(investmentPreferences.value.filter((item) => item !== value))
+}
+
+/** 风险偏好切换：提交值先过枚举守卫，再乐观更新（失败回滚） */
+async function onRiskToleranceChange(value: string | number) {
+  if (!isRiskTolerance(value)) return
+  const previous = riskTolerance.value
+  riskTolerance.value = value
+  try {
+    await updateUserProfile({ risk_tolerance: value })
+    uni.showToast({ title: '风险偏好已更新', icon: 'none' })
+  } catch {
+    riskTolerance.value = previous
+    uni.showToast({ title: '保存失败，请重试', icon: 'none' })
+  }
+}
+
 async function loadSettings() {
   try {
     const s = await authApi.getSettings() as unknown as {
@@ -326,6 +499,8 @@ async function loadSettings() {
       // PRD：自选股洞察推送默认开启；后端无该记录（首次进入）时回退为开启
       watchlist_insight_push: map.watchlist_insight_push ?? true,
     }
+    // 画像挖掘 opt-in：无 profile_mining 行 = 关闭（默认关闭）
+    profileMiningEnabled.value = map.profile_mining ?? false
   } catch (e) {
     // API 未实现或失败时，保持默认值
     settings.value = { ...DEFAULT_SETTINGS }
@@ -343,6 +518,55 @@ async function onSettingChange(key: keyof UserSettings, enabled: boolean) {
   }
 }
 
+/** 读取推断计数：失败静默保持上次状态，不阻断页面其它功能（spec §3.9） */
+async function loadInferenceMeta() {
+  try {
+    const meta = await getInferenceMeta()
+    inferenceMeta.value = {
+      count: Number(meta?.count) || 0,
+      dimensions: Array.isArray(meta?.dimensions) ? meta.dimensions : [],
+      updated_at: meta?.updated_at ?? null,
+    }
+  } catch {
+    // 接口失败不提示、不清零：保持上次展示的计数
+  }
+}
+
+/** opt-in 开关切换：乐观更新 + 失败回滚（关闭只停采，不删已生成结果） */
+async function onProfileMiningChange(enabled: boolean) {
+  profileMiningEnabled.value = enabled
+  try {
+    await authApi.updateSettings('profile_mining', { enabled })
+    uni.showToast({ title: enabled ? '已开启' : '已关闭', icon: 'none' })
+  } catch {
+    profileMiningEnabled.value = !enabled
+    uni.showToast({ title: '设置失败', icon: 'none' })
+  }
+}
+
+/** 清除推断结果：必须二次确认，取消不调用接口（spec §3.4） */
+function handleClearInferences() {
+  uni.showModal({
+    title: '清除 AI 推断结果',
+    content: '清除后不可恢复，AI 将不再参考已生成的推断结果（你手动填写的画像不受影响）。',
+    confirmText: '清除',
+    cancelText: '取消',
+    success: (res) => {
+      if (res.confirm) void confirmClearInferences()
+    },
+  })
+}
+
+async function confirmClearInferences() {
+  try {
+    await clearInferences()
+    inferenceMeta.value = { count: 0, dimensions: [], updated_at: null }
+    uni.showToast({ title: '已清除', icon: 'success' })
+  } catch {
+    uni.showToast({ title: '清除失败，请重试', icon: 'none' })
+  }
+}
+
 function handleLogout() {
   openModal({
     title: '确认退出',
@@ -350,6 +574,8 @@ function handleLogout() {
     onConfirm: () => {
       userStore.logout()
       settings.value = { ...DEFAULT_SETTINGS }
+      profileMiningEnabled.value = false
+      inferenceMeta.value = { count: 0, dimensions: [], updated_at: null }
       uni.showToast({ title: '已退出登录', icon: 'none' })
       // 退出后返回首页，避免停留在 profile 页面造成"没退出"的错觉
       setTimeout(() => {
@@ -570,6 +796,85 @@ function formatDate(dateStr: string): string {
   font-size: $font-size-sm;
   line-height: $lh-loose;
   color: $ink-soft;
+}
+
+/* ===== 投资偏好 / 风险偏好编辑区 ===== */
+.pref-block {
+  display: flex;
+  flex-direction: column;
+  gap: $s-2;
+}
+
+.pref-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pref-label {
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: $ink;
+}
+
+.pref-count {
+  font-size: $font-size-xs;
+  color: $ink-mute;
+}
+
+.pref-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $s-2;
+}
+
+.pref-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: $s-1;
+  padding: 6rpx 8rpx 6rpx $s-2;
+  border-radius: $r-full;
+  background: $primary-50;
+}
+
+.pref-tag__text {
+  font-size: $font-size-sm;
+  line-height: $lh-tight;
+  color: $primary;
+}
+
+.pref-tag__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36rpx;
+  height: 36rpx;
+}
+
+.pref-input-row {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+}
+
+.pref-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.pref-add {
+  flex-shrink: 0;
+}
+
+.profile-mining-switch {
+  flex-shrink: 0;
+}
+
+.pref-clear {
+  flex-shrink: 0;
+  padding: 4rpx 0 4rpx $s-2;
+  font-size: $font-size-sm;
+  color: $primary;
 }
 
 /* ===== 设置卡片 ===== */
