@@ -291,6 +291,7 @@ import { useChatStore } from '@/shared/store/modules/chat'
 import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { buildFavoritesQuestion } from '@/shared/utils/chatSuggestions'
+import { safeDecodeQuery } from '@/shared/utils/decodeQuery'
 import { storage, STORAGE_KEYS } from '@/shared/utils/storage'
 import { agentApi, type ChatMessage } from '@/shared/api/modules/agent'
 import {
@@ -313,7 +314,9 @@ onLoad((options: Record<string, string> | undefined) => {
   // G6（2026-08-17）：详情类跳转出口经全局事件通知本页记录阅读位置
   uni.$on('chat:leave-context', leaveChatContext)
   if (!chatStore.sessionId) chatStore.createSession()
-  const q = options?.q
+  // 容错解码：H5 侧 uni 已 decode、App/小程序端可能拿到 %E5%... 甚至双重编码，
+  // 统一在 shared/utils/decodeQuery 收口，避免把编码串当用户问题发给 Agent
+  const q = safeDecodeQuery(options?.q)
   if (!q) return
   nextTick(() => {
     // Phase 4-2：自选页「问 AI」跳转带 q 参数。仅新会话（尚无 user 消息）自动发送，
