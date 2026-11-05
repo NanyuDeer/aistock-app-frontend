@@ -100,6 +100,27 @@
           <view class="ai-personal-section">
             <text class="as-desc">AI 对话可能参考您的投资偏好与风险偏好进行个性化回答（昵称/投资偏好/风险偏好）。您可随时删除上述个性化信息，删除后 AI 将按通用方式回答。</text>
 
+            <!-- opt-in 开关：默认关闭；关闭只停采，不删已生成结果（spec §3.4/§3.9） -->
+            <view class="pref-block">
+              <view class="pref-head">
+                <text class="pref-label">AI 个性化分析</text>
+                <Switch
+                  v-model="profileMiningEnabled"
+                  class="profile-mining-switch"
+                  @change="onProfileMiningChange"
+                />
+              </view>
+              <text class="as-desc">开启后，系统会根据你的自选股、提问与洞察事件分析画像特征，仅用于个性化回答。可随时关闭；关闭只停止分析，不会自动删除已生成结果，如需删除请点击「清除 AI 推断结果」。</text>
+            </view>
+
+            <!-- 推断计数 + 清除（只展示计数，不展示推断内容） -->
+            <view class="pref-block">
+              <view class="pref-head">
+                <text class="pref-label">AI 已了解你的 {{ inferenceMeta.count }} 个特征</text>
+                <text class="pref-clear" @tap="handleClearInferences">清除 AI 推断结果</text>
+              </view>
+            </view>
+
             <!-- 投资偏好：标签输入（画像自动挖掘一期，激活 Phase 4-3 空转链路） -->
             <view class="pref-block">
               <view class="pref-head">
@@ -206,10 +227,13 @@ import { useUserStore } from '@/shared/store/modules/user'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { authApi, type UserSettings } from '@/shared/api/modules/auth'
 import {
+  clearInferences,
   deleteUserProfile,
+  getInferenceMeta,
   getUserProfile,
   isRiskTolerance,
   updateUserProfile,
+  type InferenceMeta,
   type RiskTolerance,
   type UserProfile,
 } from '@/shared/api/modules/profile'
@@ -249,6 +273,11 @@ const investmentPreferences = ref<string[]>([])
 const preferenceDraft = ref('')
 const riskTolerance = ref<RiskTolerance | ''>('')
 
+/** 画像挖掘 opt-in：默认关闭（user_settings 无 profile_mining 行即关闭） */
+const profileMiningEnabled = ref(false)
+/** AI 推断元信息：只用于展示计数，绝不展示推断内容（spec §1.2 边界） */
+const inferenceMeta = ref<InferenceMeta>({ count: 0, dimensions: [], updated_at: null })
+
 /** 统一确认/信息弹窗状态（替换原生 uni.showModal，样式对齐版本更新弹窗） */
 interface ModalOptions {
   title: string
@@ -273,7 +302,12 @@ function handleModalConfirm() {
 
 onShow(async () => {
   if (!isLoggedIn.value) return
-  await Promise.all([loadSettings(), loadNickname(), favoritesStore.fetchFavorites({ silent: true })])
+  await Promise.all([
+    loadSettings(),
+    loadNickname(),
+    loadInferenceMeta(),
+    favoritesStore.fetchFavorites({ silent: true }),
+  ])
 })
 
 /** 默认昵称前缀（首次进入自动分配：用户 + 5 位随机字母数字，如 用户A7k2Q） */
@@ -465,6 +499,8 @@ async function loadSettings() {
       // PRD：自选股洞察推送默认开启；后端无该记录（首次进入）时回退为开启
       watchlist_insight_push: map.watchlist_insight_push ?? true,
     }
+    // 画像挖掘 opt-in：无 profile_mining 行 = 关闭（默认关闭）
+    profileMiningEnabled.value = map.profile_mining ?? false
   } catch (e) {
     // API 未实现或失败时，保持默认值
     settings.value = { ...DEFAULT_SETTINGS }
@@ -482,6 +518,55 @@ async function onSettingChange(key: keyof UserSettings, enabled: boolean) {
   }
 }
 
+/** 读取推断计数：失败静默保持上次状态，不阻断页面其它功能（spec §3.9） */
+async function loadInferenceMeta() {
+  try {
+    const meta = await getInferenceMeta()
+    inferenceMeta.value = {
+      count: Number(meta?.count) || 0,
+      dimensions: Array.isArray(meta?.dimensions) ? meta.dimensions : [],
+      updated_at: meta?.updated_at ?? null,
+    }
+  } catch {
+    // 接口失败不提示、不清零：保持上次展示的计数
+  }
+}
+
+/** opt-in 开关切换：乐观更新 + 失败回滚（关闭只停采，不删已生成结果） */
+async function onProfileMiningChange(enabled: boolean) {
+  profileMiningEnabled.value = enabled
+  try {
+    await authApi.updateSettings('profile_mining', { enabled })
+    uni.showToast({ title: enabled ? '已开启' : '已关闭', icon: 'none' })
+  } catch {
+    profileMiningEnabled.value = !enabled
+    uni.showToast({ title: '设置失败', icon: 'none' })
+  }
+}
+
+/** 清除推断结果：必须二次确认，取消不调用接口（spec §3.4） */
+function handleClearInferences() {
+  uni.showModal({
+    title: '清除 AI 推断结果',
+    content: '清除后不可恢复，AI 将不再参考已生成的推断结果（你手动填写的画像不受影响）。',
+    confirmText: '清除',
+    cancelText: '取消',
+    success: (res) => {
+      if (res.confirm) void confirmClearInferences()
+    },
+  })
+}
+
+async function confirmClearInferences() {
+  try {
+    await clearInferences()
+    inferenceMeta.value = { count: 0, dimensions: [], updated_at: null }
+    uni.showToast({ title: '已清除', icon: 'success' })
+  } catch {
+    uni.showToast({ title: '清除失败，请重试', icon: 'none' })
+  }
+}
+
 function handleLogout() {
   openModal({
     title: '确认退出',
@@ -489,6 +574,8 @@ function handleLogout() {
     onConfirm: () => {
       userStore.logout()
       settings.value = { ...DEFAULT_SETTINGS }
+      profileMiningEnabled.value = false
+      inferenceMeta.value = { count: 0, dimensions: [], updated_at: null }
       uni.showToast({ title: '已退出登录', icon: 'none' })
       // 退出后返回首页，避免停留在 profile 页面造成"没退出"的错觉
       setTimeout(() => {
@@ -777,6 +864,17 @@ function formatDate(dateStr: string): string {
 
 .pref-add {
   flex-shrink: 0;
+}
+
+.profile-mining-switch {
+  flex-shrink: 0;
+}
+
+.pref-clear {
+  flex-shrink: 0;
+  padding: 4rpx 0 4rpx $s-2;
+  font-size: $font-size-sm;
+  color: $primary;
 }
 
 /* ===== 设置卡片 ===== */
