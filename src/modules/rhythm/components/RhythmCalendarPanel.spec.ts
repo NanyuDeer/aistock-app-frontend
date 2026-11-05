@@ -64,6 +64,11 @@ test('T3 上色唯一来源 position_index：缺失 → 灰格，禁止回退 le
   assert.match(source, /cell\.position_index != null/)
   assert.doesNotMatch(source, /v-if="d\.position_index"/)
   assert.doesNotMatch(source, /:class="\{ dim: !cell\.position_index \}"/)
+  // 无档位角标如实显示「—」：不得再渲染「沿用」（旧语义＝沿用基准卡档位，
+  // 与现在「没有数据」含义不同，会让人误以为该日仍有仓位建议）
+  assert.match(source, /v-else>—<\/text>/)
+  assert.match(source, /<text class="cal-lev dim" v-else>—<\/text>/)
+  assert.doesNotMatch(source, /v-else>沿用/)
 })
 
 test('T3 图例明写「颜色＝建议仓位」（冷→暖 = 0 空 → 4 满 + 灰＝无档位）', () => {
