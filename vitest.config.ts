@@ -106,6 +106,9 @@ export default defineConfig({
       'src/modules/market/pages/alert-analysis.spec.ts',
       'src/modules/home/components/DynamicInsightCard.mount.spec.ts',
       'src/modules/home/components/AiPickContent.mount.spec.ts',
+      // 画像自动挖掘一期 Task 8：画像 API 契约 + 设置页偏好编辑入口
+      'src/shared/api/modules/profile.spec.ts',
+      'src/modules/user/pages/profile.spec.ts',
     ],
   },
 })
