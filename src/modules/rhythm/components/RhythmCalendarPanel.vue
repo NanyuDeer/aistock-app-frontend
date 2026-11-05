@@ -24,7 +24,10 @@
       >
         <text class="day-date">{{ d.date.slice(5) }}</text>
         <text class="day-lev" v-if="d.position_index != null">{{ positionShort(d.position_index) }}</text>
-        <text class="day-pos" v-else>沿用</text>
+        <!-- 无档位（旧卡/未采集）→「—」如实缺省。
+             此前写「沿用」，那是旧语义（沿用基准卡档位），与现在的「没有数据」含义不同，
+             会让用户以为该日仍在沿用其它卡的仓位。 -->
+        <text class="day-pos" v-else>—</text>
         <text class="day-pos" v-if="d.position_index != null && bandShort(d)">{{ bandShort(d) }}</text>
       </view>
     </view>
@@ -55,6 +58,7 @@
           >
             <text class="cal-date" :class="{ dim: cell.position_index == null }">{{ cell.date.slice(8) }}</text>
             <text class="cal-lev" v-if="cell.position_index != null">{{ positionShort(cell.position_index) }}</text>
+            <text class="cal-lev dim" v-else>—</text>
             <view v-if="mode === 'event' && eventsOf(cell).length" class="ev-badge" :class="{ hasHigh: highCount(cell) > 0 }">
               <text v-if="highCount(cell) > 0" class="ev-badge-num">{{ highCount(cell) }}</text>
             </view>
