@@ -75,7 +75,7 @@
         <view class="rc-ledger-note" v-if="card.temperature_note">
           <text class="rc-ledger-judge">温度因子</text>
           <text class="rc-ledger-value">{{ card.temperature_note }}</text>
-          <text class="rc-ledger-effect">判定阶段用，不改档位</text>
+          <text class="rc-ledger-effect">只用于判断阶段，不影响仓位</text>
         </view>
       </view>
     </view>

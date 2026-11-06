@@ -194,7 +194,7 @@ describe('缺失与截断', () => {
     expect(note.exists()).toBe(true)
     expect(note.text()).toContain('温度因子')
     expect(note.text()).toContain('情绪温度 62.4（近 3 日 +8.2）')
-    expect(note.text()).toContain('不改档位')
+    expect(note.text()).toContain('不影响仓位')
     // 关键：温度行不进 4 项输入计数，否则「仓位账本（4 项输入）」摘要会与实际不符
     expect(wrapper.findAll('.rc-ledger-item')).toHaveLength(4)
   })
