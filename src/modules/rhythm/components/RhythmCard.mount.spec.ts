@@ -254,12 +254,12 @@ describe('标题第二段：suppressReason 纯映射（spec §4）', () => {
     return toRhythmInsight(makeCard({ ...base, position_ledger: ledger }), 'after_close', '2026-11-04')?.title
   }
 
-  it('gate_blocked + mainline_state=none → 双闸压制', () => {
-    expect(titleOf({ ...SAMPLE_LEDGER, gate_blocked: true, mainline_state: 'none' })).toBe('空仓观望 · 双闸压制')
+  it('gate_blocked + mainline_state=none → 两个条件都卡着', () => {
+    expect(titleOf({ ...SAMPLE_LEDGER, gate_blocked: true, mainline_state: 'none' })).toBe('空仓观望 · 两个条件都卡着')
   })
 
-  it('仅 gate_blocked → 闸门压制', () => {
-    expect(titleOf({ ...SAMPLE_LEDGER, gate_blocked: true, mainline_state: 'established' })).toBe('空仓观望 · 闸门压制')
+  it('仅 gate_blocked → 关键条件卡着', () => {
+    expect(titleOf({ ...SAMPLE_LEDGER, gate_blocked: true, mainline_state: 'established' })).toBe('空仓观望 · 关键条件卡着')
   })
 
   it('仅 mainline_state=none → 无主线', () => {

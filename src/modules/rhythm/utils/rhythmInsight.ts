@@ -27,10 +27,10 @@ export interface RhythmInsightCard {
   timeNote?: string
 }
 
-const SLOT_LABEL: Record<string, string> = { after_close: '收盘基准', morning: '盘前', midday: '午间' }
+const SLOT_LABEL: Record<string, string> = { after_close: '收盘后', morning: '盘前', midday: '午间' }
 
 /**
- * 洞见卡标题两段式：`{仓位} · {压制原因}`（例「空仓观望 · 双闸压制」）。
+ * 洞见卡标题两段式：`{仓位} · {压制原因}`（例「空仓观望 · 两个条件都卡着」）。
  * 压制原因由后端 `position_ledger` 三个字段**纯映射**得出（见 suppressReason），
  * 前端不做任何业务判断；ledger 缺失（旧报告）→ 退化为纯仓位（不补分隔符、不伪造第二段）。
  */
@@ -39,23 +39,23 @@ export function composeRhythmTitle(positionText: string, reason?: string): strin
 }
 
 /**
- * 标题第二段来源：由 `position_ledger` 纯映射（spec §4「双闸压制 / 闸门压制 / 无主线」）。
+ * 标题第二段来源：由 `position_ledger` 纯映射（spec §4「两个条件都卡着 / 关键条件卡着 / 无主线」）。
  *
  * ```text
- * gate_blocked && mainline_state === "none"  → 双闸压制
- * gate_blocked                               → 闸门压制
+ * gate_blocked && mainline_state === "none"  → 两个条件都卡着
+ * gate_blocked                               → 关键条件卡着
  * mainline_state === "none"                  → 无主线
  * 其他 / ledger 为 null（旧报告）             → undefined
  * ```
- * 前两条必须按此顺序判断：双闸是「闸门压制」的超集。
+ * 前两条必须按此顺序判断：两个条件都卡着是关键条件卡着的超集。
  */
 function suppressReason(card: RhythmCard): string | undefined {
   const ledger = card.position_ledger
   if (!ledger) return undefined
   const gateBlocked = ledger.gate_blocked === true
   const noMainline = ledger.mainline_state === 'none'
-  if (gateBlocked && noMainline) return '双闸压制'
-  if (gateBlocked) return '闸门压制'
+  if (gateBlocked && noMainline) return '两个条件都卡着'
+  if (gateBlocked) return '关键条件卡着'
   if (noMainline) return '无主线'
   return undefined
 }

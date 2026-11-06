@@ -22,10 +22,10 @@ test('title：非 conflict 恒取仓位文案；conflict 用背离文案', () =>
 })
 
 test('title 两段式：有压制原因拼 `{仓位} · {压制原因}`；缺失时退化为纯仓位（不补分隔符）', () => {
-  assert.equal(composeRhythmTitle('空仓观望', '闸门压制'), '空仓观望 · 闸门压制')
+  assert.equal(composeRhythmTitle('空仓观望', '关键条件卡着'), '空仓观望 · 关键条件卡着')
   assert.equal(composeRhythmTitle('空仓观望'), '空仓观望')
   assert.equal(composeRhythmTitle('空仓观望', ''), '空仓观望')
-  assert.equal(composeRhythmTitle('', '闸门压制'), '闸门压制')
+  assert.equal(composeRhythmTitle('', '关键条件卡着'), '关键条件卡着')
 })
 
 test('title 仓位缺失回退 position_index 短码（不再退回 level 档位词）', () => {
