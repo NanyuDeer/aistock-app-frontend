@@ -165,11 +165,11 @@ const props = withDefaults(
 
 // ── slot 标注 ──
 const slotLabel = computed(() => {
-  const m: Record<string, string> = { after_close: '收盘基准', morning: '盘前', midday: '午间' }
+  const m: Record<string, string> = { after_close: '收盘后', morning: '盘前', midday: '午间' }
   return m[props.slot] ?? props.slot
 })
 const refreshSlotLabel = computed(() => {
-  const m: Record<string, string> = { after_close: '收盘基准', morning: '盘前', midday: '午间' }
+  const m: Record<string, string> = { after_close: '收盘后', morning: '盘前', midday: '午间' }
   return `refresh ${m[props.refreshSlot] ?? props.refreshSlot}`
 })
 
