@@ -113,3 +113,17 @@ test('v3 极简：pageTitle 统一「节奏（date）」（删明日/今日 slot
   assert.doesNotMatch(pageSource, /今日节奏/)
   assert.match(pageSource, /节奏（\$\{targetDate\.value\}）/)
 })
+
+test('洞见卡统一用 InsightCard 默认样式，并显式声明 theme / line-placement（spec §8.3）', () => {
+  // 显式传 theme="light"：现有 5 处调用都显式传，避免默认值变更时节奏卡单独漂移
+  assert.match(pageSource, /theme="light"/)
+  // 变化行必须排在溯源之后（默认 before-trace 会把「较昨日」排到「溯源」前面）
+  assert.match(pageSource, /line-placement="after-trace"/)
+  // 不留自定义行样式
+  assert.doesNotMatch(pageSource, /rc-(trace|line)/)
+})
+
+test('变更行受 RHYTHM_DELTA_UI 开关控制（影子期默认关，spec §10）', () => {
+  assert.match(pageSource, /:lines="RHYTHM_DELTA_UI \? \(insightCard\.lines \?\? \[\]\) : \[\]"/)
+  assert.match(pageSource, /import \{ RHYTHM_DELTA_UI, toRhythmInsight \}/)
+})
