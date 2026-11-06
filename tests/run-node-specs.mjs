@@ -70,8 +70,10 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *    → 采集总数 286 → 293，实测 293/293/0，已知残余失败 0。
  *  2026-11-06：洞见卡溯源改取 causality_text + 新增变更/复盘行（rhythmInsight.spec.ts 新增 10 条）；
  *    → 采集总数 293 → 303，实测 303/303/0，已知残余失败 0。
+ *  2026-11-06（同日补）：节奏页显式 theme / line-placement + RHYTHM_DELTA_UI 影子开关守卫
+ *    （index.spec.ts 新增 2 条）→ 采集总数 303 → 305，实测 305/305/0。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '303/303/0'
+const EXPECTED_BASELINE = '305/305/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {

@@ -11,9 +11,12 @@
           tag-text="节奏洞见"
           :title="insightCard.title"
           :trace="insightCard.trace ?? ''"
+          :lines="RHYTHM_DELTA_UI ? (insightCard.lines ?? []) : []"
           :structured="insightCard.structured ?? null"
           :time="insightCard.time"
           :time-note="insightCard.timeNote"
+          theme="light"
+          line-placement="after-trace"
         />
       </view>
       <RhythmCard
@@ -38,7 +41,7 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import RhythmCard from '../components/RhythmCard.vue'
 import RhythmCalendarPanel from '../components/RhythmCalendarPanel.vue'
-import { toRhythmInsight } from '../utils/rhythmInsight'
+import { RHYTHM_DELTA_UI, toRhythmInsight } from '../utils/rhythmInsight'
 import type { RhythmInsightCard } from '../utils/rhythmInsight'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { RhythmMasterContent } from '@/shared/api/modules/agent'
