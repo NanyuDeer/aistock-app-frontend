@@ -206,7 +206,7 @@ describe('AiPickContent 盘后方法单选与多选', () => {
   })
 })
 
-describe('AiPickContent 列表排序（按当日涨跌幅降序）', () => {
+describe('AiPickContent 列表排序（保留服务端推荐顺序）', () => {
   beforeEach(() => {
     vi.mocked(uni.getStorageSync).mockReturnValue('')
     favoritesMock.favorites.clear()
@@ -214,7 +214,7 @@ describe('AiPickContent 列表排序（按当日涨跌幅降序）', () => {
     vi.mocked(uni.showToast).mockClear()
   })
 
-  it('涨跌幅降序：涨幅最大的排最前，与接口返回顺序无关', async () => {
+  it('AI综合保留服务端推荐顺序，不因实时涨幅更高而重排', async () => {
     selectionMock.getLatest.mockResolvedValue({
       status: 'ready',
       stocks: [
@@ -227,10 +227,10 @@ describe('AiPickContent 列表排序（按当日涨跌幅降序）', () => {
     const wrapper = mount(AiPickContent)
     await flushPromises()
     const names = wrapper.findAll('.stock-name').map((el) => el.text())
-    expect(names).toEqual(['大涨股', '小涨股', '下跌股'])
+    expect(names).toEqual(['小涨股', '大涨股', '下跌股'])
   })
 
-  it('涨跌幅缺失的股票排到最后（不插入涨幅序列中间）', async () => {
+  it('实时涨幅缺失不影响服务端推荐顺序', async () => {
     selectionMock.getLatest.mockResolvedValue({
       status: 'ready',
       stocks: [
@@ -243,7 +243,7 @@ describe('AiPickContent 列表排序（按当日涨跌幅降序）', () => {
     const wrapper = mount(AiPickContent)
     await flushPromises()
     const names = wrapper.findAll('.stock-name').map((el) => el.text())
-    expect(names).toEqual(['大涨股', '小涨股', '停牌股'])
+    expect(names).toEqual(['停牌股', '小涨股', '大涨股'])
   })
 })
 

@@ -1,5 +1,6 @@
 import type { RhythmBranch, RhythmCard } from '@/shared/api/modules/agent'
 import { formatBandText } from '@/shared/utils/rhythmBand'
+import { positionShort } from '@/shared/utils/rhythmColors'
 import { shanghaiDateTimeParts } from '@/shared/utils/tradingTime'
 
 /** 洞见卡结构化预判子集（结构性对齐 ConditionalForecastBlock/InsightCard 入参，仅节奏用到的字段） */
@@ -26,8 +27,38 @@ export interface RhythmInsightCard {
   timeNote?: string
 }
 
-const LEVEL_LABEL: Record<string, string> = { ice: '冰点', low: '低迷', normal: '常温', active: '活跃', euphoria: '亢奋' }
 const SLOT_LABEL: Record<string, string> = { after_close: '收盘基准', morning: '盘前', midday: '午间' }
+
+/**
+ * 洞见卡标题两段式：`{仓位} · {压制原因}`（例「空仓观望 · 双闸压制」）。
+ * 压制原因由后端 `position_ledger` 三个字段**纯映射**得出（见 suppressReason），
+ * 前端不做任何业务判断；ledger 缺失（旧报告）→ 退化为纯仓位（不补分隔符、不伪造第二段）。
+ */
+export function composeRhythmTitle(positionText: string, reason?: string): string {
+  return [positionText, reason].filter(Boolean).join(' · ')
+}
+
+/**
+ * 标题第二段来源：由 `position_ledger` 纯映射（spec §4「双闸压制 / 闸门压制 / 无主线」）。
+ *
+ * ```text
+ * gate_blocked && mainline_state === "none"  → 双闸压制
+ * gate_blocked                               → 闸门压制
+ * mainline_state === "none"                  → 无主线
+ * 其他 / ledger 为 null（旧报告）             → undefined
+ * ```
+ * 前两条必须按此顺序判断：双闸是「闸门压制」的超集。
+ */
+function suppressReason(card: RhythmCard): string | undefined {
+  const ledger = card.position_ledger
+  if (!ledger) return undefined
+  const gateBlocked = ledger.gate_blocked === true
+  const noMainline = ledger.mainline_state === 'none'
+  if (gateBlocked && noMainline) return '双闸压制'
+  if (gateBlocked) return '闸门压制'
+  if (noMainline) return '无主线'
+  return undefined
+}
 
 /** 剥离全角/半角括号段（与 ConditionalForecastBlock.condMain 展示口径一致），返回 [主干, 括号段|空] */
 function splitParen(text: string): [string, string] {
@@ -82,11 +113,13 @@ export function toRhythmInsight(
   createdAt?: string,
 ): RhythmInsightCard | null {
   if (!card) return null
-  const level = LEVEL_LABEL[card.level ?? ''] ?? ''
   const band = formatBandText(card.position_band?.text)
+  // 语义收口（2026-11-04）：节奏＝仓位建议。标题恒取仓位文案（缺失时回退档位短码），
+  // 不再退回 level 档位词（冰点/低迷/…与情绪温度分档同名词，并列会造成「低迷 + 亢奋」的观感冲突）。
+  const positionText = band || positionShort(card.position_index)
   const title = card.conflict
     ? '信号背离 · 仅区间与提示'
-    : [level, band].filter(Boolean).join(' · ')
+    : composeRhythmTitle(positionText, suppressReason(card))
   if (!title) return null
 
   const structured = (card.branches ?? []).map(toCondition).filter((c): c is RhythmInsightCondition => c !== null)

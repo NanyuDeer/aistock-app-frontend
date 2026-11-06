@@ -43,6 +43,7 @@ export default defineConfig({
       'src/shared/utils/useChatStream.spec.ts',
       'src/shared/utils/useChatStream.http.spec.ts',
       'src/shared/utils/chatSuggestions.spec.ts',
+      'src/shared/utils/decodeQuery.spec.ts',
       'src/shared/utils/parseMarkdownSections.spec.ts',
       'src/shared/utils/scrollFollow.spec.ts',
       'src/shared/utils/sessionUsageMerge.spec.ts',
@@ -88,6 +89,9 @@ export default defineConfig({
       'src/modules/chat/pages/chat-report-detail.spec.ts',
       'src/modules/fear-greed/utils/fgAdvice.spec.ts',
       'src/shared/utils/rhythmColors.spec.ts',
+      // 节奏卡溯源/变奏/折叠账本的条件渲染语义（无则整块消失 / 超限截断 / missing 显式标注）
+      // 需真实挂载才能证明「DOM 中确实没有空壳」，源码正则无法覆盖。
+      'src/modules/rhythm/components/RhythmCard.mount.spec.ts',
       'src/modules/fear-greed/utils/fgRhythmSummary.spec.ts',
       'src/modules/fear-greed/utils/fgRhythmGate.spec.ts',
       'src/modules/fear-greed/pages/index.spec.ts',
@@ -102,6 +106,9 @@ export default defineConfig({
       'src/modules/market/pages/alert-analysis.spec.ts',
       'src/modules/home/components/DynamicInsightCard.mount.spec.ts',
       'src/modules/home/components/AiPickContent.mount.spec.ts',
+      // 画像自动挖掘一期 Task 8：画像 API 契约 + 设置页偏好编辑入口
+      'src/shared/api/modules/profile.spec.ts',
+      'src/modules/user/pages/profile.spec.ts',
     ],
   },
 })

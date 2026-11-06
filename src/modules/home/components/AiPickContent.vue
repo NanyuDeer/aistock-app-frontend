@@ -163,13 +163,7 @@ function toggleMethod(code: string) {
   persistPreference()
 }
 
-function byChangePctDesc(left: Recommendation, right: Recommendation): number {
-  const leftChange = left.changePct ?? Number.NEGATIVE_INFINITY
-  const rightChange = right.changePct ?? Number.NEGATIVE_INFINITY
-  if (leftChange === rightChange) return 0
-  return rightChange > leftChange ? 1 : -1
-}
-
+// 保留服务端推荐顺序（rank）；实时行情更新不改变 AI综合或方法选股的排名。
 const recommendations = computed<Recommendation[]>(() => {
   const rows = items.value.map((item) => ({
     ...item,
@@ -180,7 +174,7 @@ const recommendations = computed<Recommendation[]>(() => {
     sparkline: liveSparkline(item),
     matchedTags: item.matchedTags || [],
   }))
-  return selectedHorizon.value === 'ai' ? rows.sort(byChangePctDesc) : rows
+  return rows
 })
 /** Retain actual historical closes, refreshing only the point for the latest quote's trading date. */
 function liveSparkline(item: AiStockSelectionItem): number[] {

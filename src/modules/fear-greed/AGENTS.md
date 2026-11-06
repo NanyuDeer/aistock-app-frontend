@@ -15,7 +15,7 @@
 ## 波段操作节奏入口卡（2026-09-15）
 
 - 页面顶部常驻「波段操作节奏」入口卡：外壳挂在 `.fg-page` 顶层，与 loading / error / dashboard 三分支链**并列**（不参与该 `v-if` 链），三态均显示。
-- 摘要取数走 `agentApi.getRhythmMasterCalendar(2)`（2 个交易日），格式化走纯函数 `utils/fgRhythmSummary.ts`（`formatRhythmSummary` / `getRhythmUrl`，单测 `fgRhythmSummary.spec.ts`）；档位色/短码引用 `src/shared/utils/rhythmColors.ts` 唯一副本，短码读取**统一走 `levelShort()`**、键守卫 `isRhythmLevelKey()`（唯一副本定义处漏键即编译报错）；仓位文案前缀剥离正则覆盖全角/半角冒号与空格，与节奏模块 `utils/rhythmInsight.ts` / `components/RhythmCalendarPanel.vue` **三处同源，改格式须同批改**。
+- 摘要取数走 `agentApi.getRhythmMasterCalendar(2)`（2 个交易日），格式化走纯函数 `utils/fgRhythmSummary.ts`（`formatRhythmSummary` / `getRhythmUrl`，单测 `fgRhythmSummary.spec.ts`）；仓位档位色/短码引用 `src/shared/utils/rhythmColors.ts` 唯一副本，短码读取**统一走 `positionShort()`**、取色**统一走 `positionColor()`**、序号守卫 `isRhythmPositionIndex()`（0 空 → 4 满；0 是合法档位，判定用 `!= null`）。**上色/短码唯一来源是 `position_index`，缺失即灰格 + 不渲染色块，禁止回退 `level`**。`RhythmSummary` 字段为 `positionIndex` / `positionShort` / `positionColor`。仓位文案前缀剥离正则覆盖全角/半角冒号与空格，与节奏模块 `utils/rhythmInsight.ts` / `components/RhythmCalendarPanel.vue` / `shared/utils/rhythmBand.ts` **四处同源，改格式须同批改**。
 - 拉取失败**静默降级**为纯导航卡（`rhythmSummary = null`，不置错误态）；两行均无档位时如实展示「暂无档位」，不伪造。
 - 跨日门控（2026-09-15 I2/I3 重构）：决策抽为纯函数 `utils/fgRhythmGate.ts` 的 `decideRhythmRefresh`（返回 `load` / `summary` / `none`）+ `localDayKey`（**本地自然日**）；主面板内存缓存另记拉取日 `dashboardLoadedDay`。**主面板缓存当日内有效、仅摘要跨日 → 只补拉摘要**（摘要接口持续失败时单请求隐式重试，不再连带重拉 dashboard/sectors）；**主面板跨日仍整体重拉**（顺带治愈内存缓存跨日 stale）。storage 键 `STORAGE_KEYS.FG_RHYTHM_SUMMARY_DATE`（`fg_rhythm_summary_date`）存摘要拉取日，仅拉取成功才写。
 - `errorMsg` 策略：跨日刷新失败且 `dashboard` 已有缓存时**保留缓存、不置错误态**；该策略由 `shouldSetErrorMsg`（`utils/fgRhythmGate.ts`，同一纯函数文件）承载，语义不变（有缓存保留数据、避免错误页覆盖）。

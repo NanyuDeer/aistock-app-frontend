@@ -25,7 +25,7 @@ const baseProps = {
   traceReports: [
     { name: '今日消费电子异动溯源', tag: '09-19', tagType: 'date', hint: '电子化学品跌幅扩大', updatedAt: '15:32' },
   ],
-  rhythmRows: [{ band: '五成~六成', basis_date: '2026-09-25', date: '2026-09-24', level: 'normal' }],
+  rhythmRows: [{ band: '半仓（四~六成）', basis_date: '2026-09-25', date: '2026-09-24', position_index: 2 }],
 }
 
 describe('DynamicInsightCard', () => {
@@ -162,11 +162,11 @@ describe('DynamicInsightCard', () => {
       props: {
         ...baseProps,
         rhythmRows: [{
-          band: '五成~六成',
+          band: '半仓（四~六成）',
           basis_date: '2026-09-25',
           date: '2026-09-24',
-          level: 'normal',
-          hint: '常温 · 建议仓位五成~六成',
+          position_index: 2,
+          hint: '半仓（四~六成）',
         }],
         currentSlot: 'post',
       },
@@ -174,7 +174,7 @@ describe('DynamicInsightCard', () => {
     vi.advanceTimersByTime(5000)
     await wrapper.vm.$nextTick()
     expect(wrapper.find('.dyn-card__module').text()).toBe('节奏')
-    expect(wrapper.find('.dyn-focus__hint').text()).toBe('常温 · 建议仓位五成~六成')
+    expect(wrapper.find('.dyn-focus__hint').text()).toBe('半仓（四~六成）')
   })
 
   it('四入口条带：4 项、仅图标 + 模块名（无数量徽标）、当前时段模块高亮', () => {

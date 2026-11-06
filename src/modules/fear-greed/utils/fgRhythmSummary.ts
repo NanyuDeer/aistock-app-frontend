@@ -3,13 +3,15 @@
  * 输入 getRhythmMasterCalendar(2) 的 days（降序，最近在前）；输出单行摘要或 null（无数据行 → 纯导航卡）。
  */
 import type { RhythmCalendarDay } from '@/shared/api/modules/agent'
-import { RHYTHM_LEVEL_COLORS, RHYTHM_GREY, isRhythmLevelKey, levelShort } from '@/shared/utils/rhythmColors'
+import { RHYTHM_GREY, positionColor, positionShort } from '@/shared/utils/rhythmColors'
 
 export interface RhythmSummary {
-  /** 档位 key；null = 暂无档位（如实展示，不伪造） */
-  level: string | null
-  levelShort: string
-  levelColor: string
+  /** 仓位档位序号 0-4（空/轻/半/重/满）；null = 暂无档位（如实展示，不伪造） */
+  positionIndex: number | null
+  /** 仓位短码（空/轻/半/重/满）；无档位 = 空串 */
+  positionShort: string
+  /** 仓位档位色（颜色＝建议仓位）；无档位 = 灰格 */
+  positionColor: string
   /** position_band.text 去「建议仓位」前缀；空串 = 无仓位语义 */
   bandText: string
   /** 「数据截至 MM-DD」/「沿用最近有效档位 MM-DD」（均 basis_date 优先回退行 date）/「暂无档位」 */
@@ -21,18 +23,55 @@ export interface RhythmSummary {
 
 const MM = (d: string) => d.slice(5)
 
-export function formatRhythmSummary(days: RhythmCalendarDay[]): RhythmSummary | null {
+/** 次行回退的最大自然日龄：超过则认为该档位已过期，不再作为兜底展示（D4，2026-11-03） */
+export const FALLBACK_MAX_AGE_DAYS = 5
+
+/**
+ * 档位基准日是否仍在「可回退」时效内。
+ * basis_date 缺失/格式非法/晚于今天 → false（fail closed，不拿旧卡兜底）。
+ */
+export function isFreshBasis(
+  basisDate: string | null | undefined,
+  today: string,
+  maxAgeDays: number = FALLBACK_MAX_AGE_DAYS,
+): boolean {
+  if (!basisDate) return false
+  const basis = Date.parse(`${basisDate}T00:00:00Z`)
+  const now = Date.parse(`${today}T00:00:00Z`)
+  if (Number.isNaN(basis) || Number.isNaN(now)) return false
+  const ageDays = (now - basis) / 86400000
+  return ageDays >= 0 && ageDays <= maxAgeDays
+}
+
+/** 本地日期 YYYY-MM-DD（回退时效的默认「今天」；测试可显式注入） */
+function localToday(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** 该行是否有仓位档位序号（0 是合法档位，不能用真值判断） */
+function hasPositionIndex(row: RhythmCalendarDay | undefined): row is RhythmCalendarDay {
+  return row?.position_index != null
+}
+
+export function formatRhythmSummary(
+  days: RhythmCalendarDay[],
+  today: string = localToday(),
+): RhythmSummary | null {
   if (!days.length) return null
   const primary = days[0]
   const secondary = days[1]
-  const row = primary?.level ? primary : (secondary?.level ? secondary : null)
+  // 主行有档位直接用；否则仅在次行档位仍在时效内时回退（避免把陈年旧卡当结论展示）
+  const row = hasPositionIndex(primary)
+    ? primary
+    : (hasPositionIndex(secondary) && isFreshBasis(secondary.basis_date ?? secondary.date, today) ? secondary : null)
   const fallbackRow = primary ?? null
 
   if (!row) {
     return {
-      level: null,
-      levelShort: '',
-      levelColor: RHYTHM_GREY,
+      positionIndex: null,
+      positionShort: '',
+      positionColor: RHYTHM_GREY,
       bandText: '',
       dateLabel: '暂无档位',
       urlDate: fallbackRow ? fallbackRow.date : null,
@@ -41,11 +80,12 @@ export function formatRhythmSummary(days: RhythmCalendarDay[]): RhythmSummary | 
 
   const usingFallback = row === secondary
   return {
-    level: row.level,
-    levelShort: levelShort(row.level),
-    levelColor: isRhythmLevelKey(row.level) ? RHYTHM_LEVEL_COLORS[row.level] : RHYTHM_GREY,
-    // 真实生产者（rhythm_engine.py:223）为「建议仓位：<阶梯文案>」（全角冒号），
-    // 兼容半角冒号/空格；无前缀文本原样返回
+    positionIndex: row.position_index ?? null,
+    positionShort: positionShort(row.position_index),
+    positionColor: positionColor(row.position_index),
+    // 真实生产者（rhythm_engine.py）为「建议仓位：<阶梯文案>」（全角冒号），
+    // 2026-11 阶梯文案重定为「空仓观望 / 轻仓（≤三成）/ 半仓（四~六成）/ 重仓（七~八成）/ 满仓（九成以上）」，
+    // 前缀未变；兼容半角冒号/空格；无前缀文本原样返回
     bandText: (row.position_band?.text?.trim() ?? '').replace(/^建议仓位[：:]*\s*/, ''),
     // 跳转恒取该行 date（= 详情页 report_date/target_date 键，落同一张卡）；dateLabel 仍用证据日 basis_date
     dateLabel: usingFallback ? `沿用最近有效档位 ${MM(row.basis_date ?? row.date)}` : `数据截至 ${MM(row.basis_date ?? row.date)}`,
