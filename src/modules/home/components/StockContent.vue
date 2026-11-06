@@ -14,7 +14,7 @@
 
       <!-- 使用 v-show 保留已挂载的 Tab 实例；切换时主动触发该子 Tab 刷新一次，
            否则 v-show 保活会让数据整天停留在首次挂载的快照（见 onTabTap）。 -->
-      <AiPickContent v-show="activeTab === 'ai'" />
+      <AiPickContent v-show="activeTab === 'ai'" :active="activeTab === 'ai'" />
       <TrendStockInsightContent v-show="activeTab === 'trend'" ref="trendRef" />
       <HotBurstInsightContent v-show="activeTab === 'hot'" ref="hotRef" />
       <ForecastInsightContent v-show="activeTab === 'forecast'" ref="forecastRef" />
@@ -50,7 +50,7 @@ const forecastRef = ref<RefreshableTab | null>(null)
 /**
  * 切换子 Tab：v-show 保活不销毁实例，因此切换时手动调一次子组件的 refresh()，
  * 拉取最新数据（否则上午进过选股页、下午切回来仍是上午的快照）。
- * AI帮我选在组件挂载时读取结果，目前无 refresh 入口，不参与。
+ * AI帮我选通过active属性控制行情刷新，重新进入时立即更新行情。
  */
 function onTabTap(key: TabKey) {
   activeTab.value = key
