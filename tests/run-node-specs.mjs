@@ -68,8 +68,10 @@ const VITEST_CONFIG = join(REPO, 'vitest.config.ts')
  *    rhythmColors.spec 改写为仓位语义（vitest，不计入本基线）、RhythmCalendarPanel.spec / RhythmCard.spec /
  *    rhythmInsight.spec / MorningContent.spec 同步改断言，fgRhythmSummary.spec（vitest）增补 index=0 回归；
  *    → 采集总数 286 → 293，实测 293/293/0，已知残余失败 0。
+ *  2026-11-06：洞见卡溯源改取 causality_text + 新增变更/复盘行（rhythmInsight.spec.ts 新增 10 条）；
+ *    → 采集总数 293 → 303，实测 303/303/0，已知残余失败 0。
  *  修改此常量须同时更新本注释说明的"已知残余失败"状态；若 README/项目记忆记录了该基线，需一并同步。 */
-const EXPECTED_BASELINE = '293/293/0'
+const EXPECTED_BASELINE = '303/303/0'
 
 /** 递归枚举目录下全部 *.spec.ts（绝对路径） */
 function walkSpecs(dir) {
