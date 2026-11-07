@@ -1,15 +1,21 @@
 <template>
-  <Card v-if="rows.length > 0" class="fav-related-card" flat>
-    <!-- 标题行：整行可点切换展开/收起 -->
-    <view class="frc-header" @tap="expanded = !expanded">
-      <text class="frc-title">我的自选股 · {{ rows.length }} 条相关</text>
+  <Card class="fav-related-card" flat>
+    <!-- 标题行始终渲染（含无相关事件时），整行可点切换展开/收起 -->
+    <view class="frc-header" :class="{ 'frc-header--expanded': expanded }" @tap="expanded = !expanded">
+      <view class="frc-head-main">
+        <view class="frc-accent-bar" />
+        <text class="frc-title">自选股相关重大事件</text>
+        <text v-if="rows.length > 0" class="frc-count">{{ rows.length }} 条相关</text>
+      </view>
       <view class="frc-toggle">
         <text class="frc-toggle-text">{{ expanded ? '收起' : '展开' }}</text>
-        <SvgIcon :name="expanded ? 'arrow-up-s-line' : 'arrow-down-s-line'" size="26rpx" color="#4b5a7a" />
+        <SvgIcon :name="expanded ? 'arrow-up-s-line' : 'arrow-down-s-line'" size="26rpx" color="#0b5fff" />
       </view>
     </view>
 
-    <view class="frc-list">
+    <view v-if="expanded" class="frc-list">
+      <!-- 无相关事件时的展开态提示 -->
+      <text v-if="rows.length === 0" class="frc-empty">暂未匹配到与自选股相关的事件</text>
       <view v-for="row in visibleRows" :key="row.event.eventId" class="frc-row">
         <view class="frc-row-head">
           <text class="frc-event-title" @tap="goEvent(row.event.eventId)">{{ row.event.title }}</text>
@@ -20,18 +26,15 @@
           :key="stock.symbol"
           class="frc-reason"
         >
-          <text class="frc-reason-text">影响板块：{{ stock.matchedIndustry }} → 你的自选股：</text>
+          <text class="frc-reason-text">影响板块：</text>
+          <text class="frc-industry" :class="'frc-industry--' + stock.direction">{{ stock.matchedIndustry }}</text>
+          <text class="frc-reason-text"> → 你的自选股：</text>
           <view class="frc-stock-pill" @tap="goStock(stock.symbol)">
             <text class="frc-stock-name">{{ stock.name }}</text>
             <text class="frc-stock-industry">（{{ stock.industry }}）</text>
           </view>
         </view>
       </view>
-    </view>
-
-    <!-- 收起态且有超出：底部提示可展开（与 Web 端一致） -->
-    <view v-if="!expanded && rows.length > COLLAPSED_COUNT" class="frc-more" @tap="expanded = true">
-      <text class="frc-more-text">还有 {{ rows.length - COLLAPSED_COUNT }} 条，点击展开</text>
     </view>
   </Card>
 </template>
@@ -40,8 +43,9 @@
 /**
  * FavoriteRelatedCard - 自选股相关事件卡片
  *
- * 事件传导列表页顶部可收折小卡片：筛出与用户自选股相关的事件，标注被影响的自选股。
- * rows 为空时不渲染（未登录 / 无自选股 / 无相关事件）。
+ * 事件传导列表页「重大事件」卡片下方可收折小卡片：筛出与用户自选股相关的事件，标注被影响的自选股。
+ * 默认全部收起（仅显示标题行），点击标题行展开。
+ * 标题行始终渲染；无相关事件（未登录 / 无自选股 / 无匹配）时展开显示空提示。
  */
 import { computed, ref } from 'vue'
 import type { RelatedEventRow } from '../favoriteRelated'
@@ -55,16 +59,15 @@ interface Props {
 
 const props = defineProps<Props>()
 
-/** 收起态展示条数（默认收起显示前 3 条） */
-const COLLAPSED_COUNT = 3
 /** 展开态上限（与数据层 MAX_ROWS 一致） */
 const MAX_COUNT = 20
 
+/** 默认全部收起：收起态不渲染任何事件行，仅保留标题行 */
 const expanded = ref(false)
 
-/** 收起态：前 COLLAPSED_COUNT 条；展开态：上限 MAX_COUNT 条 */
+/** 展开态展示全部（上限 MAX_COUNT）；收起态为空数组 */
 const visibleRows = computed(() => (
-  expanded.value ? props.rows.slice(0, MAX_COUNT) : props.rows.slice(0, COLLAPSED_COUNT)
+  expanded.value ? props.rows.slice(0, MAX_COUNT) : []
 ))
 
 /** 事件标题点击 → 事件详情页 */
@@ -82,19 +85,25 @@ function goStock(symbol: string) {
 @import '@/shared/styles/variables.scss';
 
 .fav-related-card.as-card {
-  padding: 20rpx 22rpx;
+  padding: 0;
   margin-bottom: 20rpx;
   border-radius: $r-lg;
   background: var(--ev-bg-card);
   border: 2rpx solid var(--ev-border);
+  overflow: hidden;
 }
 
-/* ===== 标题行 ===== */
+/* ===== 标题行：强调样式（左侧色条 + 品牌浅底 + 计数徽标） ===== */
 .frc-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 12rpx;
+  gap: 12rpx;
+  padding: 24rpx 22rpx;
+  background: var(--ev-accent-bg);
+}
+
+.frc-header--expanded {
   border-bottom: 2rpx solid var(--ev-border-light);
 }
 
@@ -102,26 +111,62 @@ function goStock(symbol: string) {
   opacity: 0.7;
 }
 
+.frc-head-main {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.frc-accent-bar {
+  width: 6rpx;
+  height: 30rpx;
+  border-radius: 4rpx;
+  background: var(--ev-accent);
+  flex-shrink: 0;
+}
+
 .frc-title {
-  font-size: 26rpx;
+  font-size: 30rpx;
   font-weight: 700;
   color: var(--ev-text-primary);
+  letter-spacing: 0.5rpx;
+}
+
+.frc-count {
+  flex-shrink: 0;
+  padding: 2rpx 12rpx;
+  border-radius: 9999rpx;
+  background: var(--ev-accent-soft);
+  color: var(--ev-accent);
+  font-size: 22rpx;
+  font-weight: 600;
 }
 
 .frc-toggle {
   display: flex;
   align-items: center;
   gap: 4rpx;
+  flex-shrink: 0;
 }
 
 .frc-toggle-text {
   font-size: 24rpx;
-  color: var(--ev-text-secondary);
+  font-weight: 600;
+  color: var(--ev-accent);
 }
 
 /* ===== 列表 ===== */
 .frc-list {
-  padding-top: 12rpx;
+  padding: 16rpx 22rpx 22rpx;
+}
+
+.frc-empty {
+  display: block;
+  padding: 8rpx 0;
+  font-size: 24rpx;
+  color: var(--ev-text-muted);
 }
 
 .frc-row + .frc-row {
@@ -172,6 +217,24 @@ function goStock(symbol: string) {
   margin-right: 4rpx;
 }
 
+/* 影响板块名称方向着色（A 股红涨绿跌，与时间轴 sector-tag 口径一致，无底色） */
+.frc-industry {
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.frc-industry--bullish {
+  color: var(--ev-negative);
+}
+
+.frc-industry--bearish {
+  color: var(--ev-positive);
+}
+
+.frc-industry--neutral {
+  color: var(--ev-text-secondary);
+}
+
 .frc-stock-pill {
   display: inline-flex;
   align-items: baseline;
@@ -189,17 +252,6 @@ function goStock(symbol: string) {
 
 .frc-stock-industry {
   font-size: 20rpx;
-  color: var(--ev-text-muted);
-}
-
-/* ===== 收起态底部「展开更多」提示 ===== */
-.frc-more {
-  padding: 12rpx 0 4rpx;
-  text-align: center;
-}
-
-.frc-more-text {
-  font-size: 22rpx;
   color: var(--ev-text-muted);
 }
 </style>

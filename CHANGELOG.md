@@ -2,6 +2,25 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [xusiyun] 2026-11-07 — 自选股相关重大事件卡片：位置下移、默认收起、标题强化
+
+**开发者**: xusiyun
+
+### 改进
+
+- `src/modules/chat/event/components/FavoriteRelatedCard.vue`：标题由「我的自选股」改为「自选股相关重大事件」；去掉卡片外层 `v-if`，标题行与展开/收起按钮**始终渲染**（有数据追加「· N 条相关」，无数据展开显示空提示）；默认全部收起；标题行改为强调样式（品牌色竖条 + 浅底 + 放大加粗 + 计数徽标 + 品牌色展开文案）；影响板块名称按 `direction` 着色（bullish=红 / bearish=绿 / neutral=灰）。
+- `src/modules/chat/event/favoriteRelated.ts`：数据层补 `direction` 字段。
+- `src/modules/chat/pages/event/list.vue`：卡片由页面顶部下移到「重大事件」双卡下方。
+- `src/pages-sub-app/event-chain/index.vue`：旧入口页同步接入该卡片（重大事件 section 下方、分隔线之前），新增独立 `loadFavoriteRelated()`，不影响主列表分页。
+- `src/shared/styles/global.scss`：修复 `--ev-accent-soft` / `--ev-accent-bg` 的 Sass 插值写法（`rgba(#{$primary}, …)` → `#{rgba($primary, …)}`），此前 token 输出非法 CSS 导致相关浅底透明。
+- `src/modules/chat/AGENTS.md`：同步事件卡片说明。
+
+### 验证
+
+- `npx vue-tsc --noEmit` 通过。
+
+---
+
 ## [xusiyun] 2026-10-15 — 事件影响存活度小标 + 自选股相关事件卡片
 
 **开发者**: xusiyun

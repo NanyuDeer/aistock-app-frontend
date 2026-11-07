@@ -1,9 +1,6 @@
 <template>
   <SubPageCard title="事件传导">
     <view class="event-list-content">
-      <!-- 自选股相关事件卡片：rows 为空时不渲染 -->
-      <FavoriteRelatedCard :rows="favoriteRelatedRows" />
-
       <!-- AI关注焦点区域：标题行（含时间线入口图标）始终显示，卡片仅在有焦点事件时渲染 -->
       <view class="ai-focus-section">
         <!-- 标题行：重大事件（左）+ 时间轴入口（行最右，文字+淡色图标） -->
@@ -40,6 +37,9 @@
           />
         </view>
       </view>
+
+      <!-- 自选股相关事件卡片：位于重大事件卡片下方，默认收起；标题行始终渲染 -->
+      <FavoriteRelatedCard :rows="favoriteRelatedRows" />
 
       <!-- 分类Tab -->
       <scroll-view scroll-x class="tab-scroll" :show-scrollbar="false">
