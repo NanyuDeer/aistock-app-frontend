@@ -42,6 +42,8 @@ const favoritesStore = useFavoritesStore()
 const pageState = ref<'loading' | 'generating' | 'ready' | 'empty' | 'failed'>('loading')
 const items = ref<AiStockSelectionItem[]>([])
 const expandedReasons = ref<Set<string>>(new Set())
+
+// 展示顺序＝服务端 AI 给出的顺序（rank），前端不再重排
 const recommendations = computed<Recommendation[]>(() => items.value.map((item) => ({
   ...item,
   reason: item.reason.filter(Boolean).join('；') || '暂无推荐理由',

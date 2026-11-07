@@ -2,6 +2,85 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [master] 2026-11-03 — 节奏卡语义收口 & 回退时效（PR #151 合入）
+
+**开发者**: 项目组（PR #151 changer-collab；CI 基线修复 NanyuDeer）
+
+### 变更
+
+- **洞见卡标注**：标题顺序改为「仓位动作 · 档位」；`phase_evidence.stage_source == "inherited_prev_day"` 时档位后缀「（中性沿用）」，区分「没信号沿用昨天」与「当日硬判」。
+- **节奏卡语义收口**：主视觉改为仓位动作长句（`rc-pos-main`），不再展示 `score` 数字——该字段是档位序号×20（0/20/40/60/80）的查表值，单屏会被误读成温度分；情绪强度由「情绪温度」（`temperature_series`）独立表达。
+- **回退时效（D4）**：首页节奏摘要次行回退需通过 `isFreshBasis`（`FALLBACK_MAX_AGE_DAYS = 5` 自然日，缺失/非法/晚于今天一律 fail closed），避免把陈年旧卡当结论展示。
+- **测试基线**：`rhythmInsight.spec.ts` 新增 2 条 node:test 用例，`tests/run-node-specs.mjs` 基线 284 → **286**。
+
+### 验证
+
+- `pnpm vitest run src/modules/fear-greed src/modules/rhythm` → 4 files / **68 passed**；`pnpm run test:node` → **286/286/0**；`pnpm run type-check` 通过；GitHub master CI 绿。
+
+### 待办
+
+- App 云打包需 HBuilderX GUI + DCloud 账号，本次未在本机执行（需人工按既有云打包流程出包）。
+
+---
+
+## [master] 2026-10-31 — 0.1.6 版本发布
+
+**开发者**: 项目组
+
+### 发布说明（App 更新文案）
+
+- 首页新增悬浮「自选股消息卡」：一只股票一张卡、最多堆叠 3 张，支持左右跟手拖动切换（上下滑动保留）
+- 通知面板新增自选股筛选：可按股票过滤通知，并记住上次选择
+- 节奏大师改版：主视觉改为「仓位动作」、不再显示分数；洞见卡新增溯源、变奏观察点与折叠账本（含温度因子行）
+- 节奏摘要回退旧档位时标注时效（超 5 天显示「暂无档位」）；「中性沿用」档位在卡上明确标注，避免误读
+- 重大事件页新增「影响存活度」小标（持续中 / 减弱 / 消退）与「自选股相关事件」卡片（默认收起 3 条、可展开）
+- 事件卡片与时间轴布局紧凑化，行业标签与首行信息单行排布
+- 自选股异动「立即检测」接入真实检测，并提示正在归因的条数
+- 「AI 帮我选」接入真实 AI 选股结果，按 AI 排序优先展示
+- 恐贪指数温度分档统一：首页胶囊与恐贪页配色一致，历史走势图支持触屏查看单日
+- 交易日历接入后端：法定节假日不再误判为交易日，行情状态与刷新更准确
+- 自选列表、选股、提醒 Tab 在交易时段每 60 秒自动刷新，切换 Tab 主动更新
+- 修复个股详情「去问 AI」问句未编码导致的对话乱码；风口龙头默认改短线口径；晚报空态文案修复
+
+### 版本号
+
+- `versionName` 0.1.5 → **0.1.6**；`versionCode` 105 → **106**（manifest.json）
+- `src/modules/user/pages/profile.vue`：「关于洞见」版本号 0.1.5 → **0.1.6**（与 manifest 保持同步）
+- Web 端 `aistock-frontend/public/download/version.json`：同步 0.1.6 / 106 / `aistock-0.1.6.apk` / releaseDate 2026-11-05 / 新更新文案（12 条）
+
+### 说明
+
+- 口径提示：本地工作区存在 2026-10-17「AI帮我选展示顺序回退为服务端 AI 排序」未提交改动（见 `changelog-pending.md`），打包将包含该回退，故更新文案写作「按 AI 排序优先展示」，不承诺前端按涨跌幅重排
+- 打包基线包含 PR #147–#153（AI帮我选真实结果、事件存活度与自选股事件卡、立即检测接真实检测、首页自选股消息卡 + 恐贪分档收敛、节奏卡语义收口、节奏前端切仓位档位 + 洞见卡溯源/变奏/折叠账本、去问 AI 问句编码修复）
+- 2026-11-05 复核：0.1.6 版本号提交后再合入 15 个提交（PR #151–#153），已将节奏大师改版与「去问 AI」乱码修复补入更新文案，版本号仍保持 0.1.6 / 106
+
+---
+
+## [feat/fear-greed-node] 2026-10-16 — 首页自选股消息卡（含左右跟手滑动）+ 恐贪温度分档收敛
+
+**开发者**: 林晓研
+
+### 新增
+
+- **首页悬浮「自选股消息卡」** `shared/components/FloatingStockAlertCards.vue`：一只股票一张卡、最多堆叠 3 张、下层只露头部。**H5/App 支持左右跟手拖动切换**——上层卡跟手水平位移 + 倾斜，下层卡按拖动进度实时升位/放大/变清晰，松手超阈值则当前卡飞出后循环轮转顺序、未达阈值回弹；各端保留原有上下滑动切换（上滑看下一张 / 下滑看上一张）。跟手期间关闭 CSS 过渡保证 1:1 跟手；横向跟手以 `isH5 || isApp` 限定（小程序不启用）。手势口径抽为纯函数模块 `shared/utils/cardStackSwipe.ts`（主轴锁定 / 跟手进度 / 切换判定 / 跟手倾斜 / 循环轮转）。
+- `shared/utils/useStockAlerts.ts`：首页自选股消息卡 composable（stock-trace 异动 + 通知 5 类消息两源合成，按股票聚合为卡片，含未读统计与轮询）。
+- `shared/utils/notificationPanel.ts`：通知面板「开合 + 目标股票」的模块级共享状态——首页悬浮卡与铃铛面板是兄弟组件，无法 props/emit 通信，故以共享 ref 承载（不承载通知数据）。
+- `shared/utils/fearGreedZones.ts`：恐贪温度分档**单一事实源**（颜色 / 边界 / 标签 / 呼吸灯），首页「恐贪胶囊」与恐贪模块页共用。
+- 通知面板**自选股筛选**：`NotificationDropdown.vue` 新增就地下拉框（「全部自选股」+ 每只自选股，点面板其余区域收起），并把未读圆点与分类标签移入标题行；`shared/api/modules/notifications.ts` 列表接口新增 `symbol` 参数；`shared/utils/storage.ts` 新增 `NOTIFICATION_STOCK_FILTER` 持久化上次选择（下次打开恢复）。
+
+### 修复 / 改进
+
+- **恐贪档位配色两处不一致**：首页胶囊与恐贪模块页原先各自硬编码一套档位色（寒冷档橙 vs 深绿、温热档绿 vs 红），现统一到 `fearGreedZones.ts` 单一事实源，消除配色漂移；`FearGreedIndex.vue` 未拉到数据时保持 `--` 占位，不再用真实档位冒充。
+- **恐贪模块页历史走势图支持触屏**：新增 `touchstart`/`touchmove` 按触点横坐标定位当日热区（原先只有 `mouseleave`，移动端无法查看单日）。
+- `MainTabs.vue`：接入悬浮卡（拉取 / 轮询 / 关闭 / 「查看全部」唤起铃铛面板），并把「面板开合」交给共享状态。
+
+### 测试
+
+- 新增 `src/shared/utils/cardStackSwipe.spec.ts`（16 例，纯函数先红后绿）、`src/shared/components/FloatingStockAlertCards.spec.ts`（8 例，构造触摸事件断言跟手位移 / 下层升位 / 阈值轮转 / 回弹 / 保留上下滑动 / 小程序不启用）。
+- `src/shared/components/NotificationDropdown.spec.ts`：补自选股筛选 2 例（下拉选择带 `symbol` 重拉 + 持久化、本地恢复首屏按 `symbol` 拉取），并修复**模块级面板状态跨用例泄漏**（面板开合改共享状态后，未复位会导致后续用例点铃铛变成「关」）＋补 `useFavoritesStore` 桩（否则 setup 阶段报 "no active Pinia"）。
+- 相关 7 个 spec 全绿 **70 passed**；`npx vue-tsc --noEmit` exit 0。
+
+---
 ## [junliang] 2026-10-16 — 同步 `sector_news`（板块消息）证据类型
 
 **开发者**: NanyuDeer
@@ -46,6 +125,8 @@
 ### 文档
 
 - `modules/favorites/AGENTS.md`：新增「立即检测」按钮 2026-10-15 修复说明，护栏用例数由 21 更新为 22。
+
+---
 
 ## [xusiyun] 2026-10-15 — 事件影响存活度小标 + 自选股相关事件卡片
 

@@ -34,6 +34,20 @@ vi.mock('@/shared/store/modules/user', () => ({
   useUserStore: () => userStoreMock,
 }))
 
+// 自选股筛选（面板内下拉框）依赖自选股列表；未 mock 会在 setup 阶段触发
+// "no active Pinia"，5 条既有用例全挂。
+const favoritesStoreMock = vi.hoisted(() => ({
+  stocks: [] as Array<{ symbol: string; name: string }>,
+  fetchFavorites: vi.fn(),
+}))
+
+vi.mock('@/shared/store/modules/favorites', () => ({
+  useFavoritesStore: () => favoritesStoreMock,
+}))
+
+const storageGetMock = vi.hoisted(() => vi.fn((_: string): string => ''))
+const storageSetMock = vi.hoisted(() => vi.fn())
+
 vi.mock('@/shared/components/SvgIcon.vue', () => ({
   default: { name: 'SvgIcon', template: '<view class="svg-stub" />' },
 }))
@@ -52,9 +66,12 @@ vi.mock('@/shared/components/NotificationInsightModal.vue', () => ({
 
 vi.stubGlobal('uni', {
   navigateTo: vi.fn(),
+  getStorageSync: storageGetMock,
+  setStorageSync: storageSetMock,
 })
 
 import NotificationDropdown from './NotificationDropdown.vue'
+import { useNotificationPanel } from '@/shared/utils/notificationPanel'
 
 const firstItem = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -93,7 +110,17 @@ describe('NotificationDropdown', () => {
     userStoreMock.userInfo = { openid: 'test-openid' }
     userStoreMock.isLoggedIn.mockReturnValue(true)
     userStoreMock.clearSession.mockReset()
+    favoritesStoreMock.stocks = []
+    favoritesStoreMock.fetchFavorites.mockReset()
+    storageGetMock.mockReset()
+    storageGetMock.mockImplementation(() => '')
+    storageSetMock.mockReset()
     vi.mocked(uni.navigateTo).mockReset()
+    // 面板开合已于 2026-10-16 改为模块级共享状态（供首页悬浮卡跨组件唤起），
+    // 不复位会跨用例泄漏：上一次点开面板 → 本次点铃铛变成「关」，面板内容为空。
+    const panel = useNotificationPanel()
+    panel.open.value = false
+    panel.targetSymbol.value = null
 
     notificationApiMock.list.mockImplementation(({ cursor }: { cursor?: string }) => Promise.resolve(
       cursor
@@ -172,5 +199,63 @@ describe('NotificationDropdown', () => {
     await flushPromises()
 
     expect(notificationApiMock.list).toHaveBeenCalledWith({ limit: 20, cursor: 'next-page', unread: undefined })
+  })
+
+  it('自选股筛选：下拉框含「全部自选股」+ 每只自选股，选择后带 symbol 重拉并持久化', async () => {
+    const maotai = {
+      ...firstItem,
+      id: 'maotai-item',
+      symbol: '600519',
+      stockName: '贵州茅台',
+      title: '贵州茅台：公告披露',
+    }
+    notificationApiMock.list.mockResolvedValue({
+      items: [firstItem, maotai],
+      nextCursor: null,
+      unreadCount: 2,
+    })
+    favoritesStoreMock.stocks = [
+      { symbol: '002850', name: '科达利' },
+      { symbol: '600519', name: '贵州茅台' },
+    ]
+
+    const wrapper = mount(NotificationDropdown)
+    await flushPromises()
+    await wrapper.find('.bell-button').trigger('tap')
+    await flushPromises()
+
+    expect(wrapper.find('.notification-stockbar__label').text()).toBe('全部自选股')
+    await wrapper.find('.notification-stockbar').trigger('tap')
+    await flushPromises()
+
+    const options = wrapper.findAll('.stock-option')
+    expect(options).toHaveLength(3)
+    expect(options[0].text()).toContain('全部自选股')
+    expect(options[2].text()).toContain('贵州茅台')
+
+    await options[2].trigger('tap')
+    await flushPromises()
+
+    expect(notificationApiMock.list).toHaveBeenLastCalledWith({
+      limit: 20, cursor: undefined, unread: undefined, symbol: '600519',
+    })
+    expect(storageSetMock).toHaveBeenCalledWith('notification_stock_filter', '600519')
+    expect(wrapper.find('.notification-stockbar__label').text()).toBe('贵州茅台')
+    expect(wrapper.findAll('.notification-item')).toHaveLength(1)
+    expect(wrapper.find('.notification-item__title').text()).toBe(maotai.title)
+  })
+
+  it('自选股筛选：上次选择的股票从本地恢复，首屏即按该 symbol 拉取', async () => {
+    storageGetMock.mockImplementation((key: string) => (key === 'notification_stock_filter' ? '600519' : ''))
+
+    const wrapper = mount(NotificationDropdown)
+    await flushPromises()
+    await wrapper.find('.bell-button').trigger('tap')
+    await flushPromises()
+
+    expect(notificationApiMock.list).toHaveBeenCalledWith({
+      limit: 20, cursor: undefined, unread: undefined, symbol: '600519',
+    })
+    expect(wrapper.find('.notification-stockbar__label').text()).toBe('600519')
   })
 })

@@ -14,6 +14,12 @@ const stockTraceApiMock = vi.hoisted(() => ({
 }))
 vi.mock('@/shared/api/modules/stockTrace', () => ({ stockTraceApi: stockTraceApiMock }))
 
+// 用户 store 桩：登录态可切换（未登录时自选股洞察走 3 条模拟数据分支）
+const userStoreMock = vi.hoisted(() => ({ isLoggedIn: vi.fn(() => true) }))
+vi.mock('@/shared/store/modules/user', () => ({
+  useUserStore: () => ({ isLoggedIn: userStoreMock.isLoggedIn, token: '' }),
+}))
+
 // 价格异动（stocktrace 链路）测试数据
 const testMovements = [
   {
@@ -72,12 +78,12 @@ vi.mock('@/shared/components/Segmented.vue', () => ({
   },
 }))
 
-// ListCell 桩（保留 title/description 属性供断言）
+// ListCell 桩（保留 title/description/clickable 属性供断言）
 vi.mock('@/shared/components/ListCell.vue', () => ({
   default: {
     name: 'ListCell',
     props: ['title', 'description', 'clickable'],
-    template: '<view class="list-cell-stub" :data-title="title" :data-description="description"><slot name="prefix" /></view>',
+    template: '<view class="list-cell-stub" :data-title="title" :data-description="description" :data-clickable="String(clickable)"><slot name="prefix" /></view>',
   },
 }))
 
@@ -99,6 +105,8 @@ describe('AlertContent.vue 首页特别提醒', () => {
     stockApiMock.getTrendEvents.mockReset()
     stockApiMock.getFavoritesNews.mockReset()
     stockTraceApiMock.list.mockReset()
+    // 默认已登录（历史用例均针对真实数据链路）；未登录模拟数据分支由专项用例切换
+    userStoreMock.isLoggedIn.mockReturnValue(true)
     vi.mocked(uni.navigateTo).mockClear()
     // 默认：个股情报为空，自选股洞察为空
     stockApiMock.getTrendEvents.mockResolvedValue({ events: [] })
@@ -228,9 +236,35 @@ describe('AlertContent.vue 首页特别提醒', () => {
     expect(wrapper.text()).toContain('暂无异动数据')
   })
 
+  // ===== 未登录：3 条模拟数据（2026-10-13） =====
+
+  it('未登录 → 自选股洞察渲染 3 条模拟数据（无占位行），且不请求接口', async () => {
+    userStoreMock.isLoggedIn.mockReturnValue(false)
+    const wrapper = mount(AlertContent)
+    await flushPromises()
+    const cells = wrapper.find('.capture-list').findAll('.list-cell-stub')
+    expect(cells.length).toBe(3)
+    // 3 行均为真实数据行（无 \u3000 占位）
+    expect(cells.map((c) => c.attributes('data-title'))).not.toContain('\u3000')
+    // 未登录不消费接口（避免 401 空态覆盖模拟数据）
+    expect(stockTraceApiMock.list).not.toHaveBeenCalled()
+  })
+
+  it('未登录的模拟数据行不可点击 → 不跳转不存在的异动详情', async () => {
+    userStoreMock.isLoggedIn.mockReturnValue(false)
+    const wrapper = mount(AlertContent)
+    await flushPromises()
+    const first = wrapper.find('.capture-list').findAll('.list-cell-stub')[0]
+    expect(first.attributes('data-clickable')).toBe('false')
+    await first.trigger('click')
+    expect(uni.navigateTo).not.toHaveBeenCalled()
+  })
+
   // ===== 个股情报模块（保留原有测试） =====
 
   it('个股情报模块：接口成功 → 渲染情报列表', async () => {
+    // 未登录走 getTrendEvents（全市场）；登录后改走 getFavoritesNews
+    userStoreMock.isLoggedIn.mockReturnValue(false)
     const intelData = [
       { event_id: 'i1', stock_code: '601318', event_time: '2026-08-19T07:00:00Z', title: '利好消息', ai_impact: '利好', cycle: 'short' },
     ]
