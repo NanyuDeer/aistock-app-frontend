@@ -2,6 +2,28 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [junliang] 2026-11-07 — App 端「生成完整洞察报告」无反应修复
+
+**开发者**: 项目组
+
+### 变更
+
+- `src/modules/favorites/utils/useInsightReportSSE.ts`：App 端（`uniPlatform` 为 `app` / `app-plus`）改为 `uni.request` 整包读取，**不再依赖 `enableChunked`**。该选项只有微信小程序基座会触发 `onChunkReceived`，App 基座不触发，`success` 只拿到状态码、拿不到正文，表现为按钮点了没反应且无报错。H5 仍走 `fetch + ReadableStream`，小程序仍走分块。
+- 同一文件把 `active` 布尔改为 `requestId` 自增令牌：`stop()` 后迟到的响应/分帧不再改写界面。
+- `src/modules/favorites/utils/useInsightReportSSE.spec.ts`：25 → **26 例**（新增「原生 App 无分块回调也能展示完整报告」）。
+- `src/modules/favorites/AGENTS.md`：补充 2026-11-07 根因与改法记录。
+
+### 验证
+
+- `vitest run src/modules/favorites/utils/useInsightReportSSE.spec.ts` → **26 passed**；全量 `vitest run` → **72 files / 717 passed**；`node tests/run-node-specs.mjs` → **305/305**。
+- `vue-tsc --noEmit` → exit 0；`uni build -p app` → 成功，`dist/build/app/app-service.js` 已含 `app-plus` 整包分支。
+
+### 待办
+
+- 出 0.1.7 前需将 `src/manifest.json` 的 `versionCode` 106 → **107**，否则已装 0.1.6 的用户收不到更新提示；APK 仍需 HBuilderX 云打包 + 正式签名证书。
+
+---
+
 ## [master] 2026-11-03 — 节奏卡语义收口 & 回退时效（PR #151 合入）
 
 **开发者**: 项目组（PR #151 changer-collab；CI 基线修复 NanyuDeer）
@@ -81,6 +103,28 @@
 - 相关 7 个 spec 全绿 **70 passed**；`npx vue-tsc --noEmit` exit 0。
 
 ---
+## [junliang] 2026-10-16 — 同步 `sector_news`（板块消息）证据类型
+
+**开发者**: NanyuDeer
+
+### 变更
+
+- `shared/api/modules/stockTrace.ts`：`TraceEvidence.kind` 联合补 `sector_news`，与 app-api `types.ts`、agent-py `schemas/stock_trace.py` 的 `SourceKind` 对齐。
+- `modules/favorites/components/PriceMovementAnalysisContent.vue`：`kindText()` 补 `sector_news → 板块消息`（该组件消费 `artifactJson.evidence_index`，漏补会把原始英文 kind 直接展示给用户）。
+
+### 说明
+
+- **无渲染逻辑改动**：完整洞察报告的「证据清单」由 agent-py `_KIND_LABELS` 中文化，前端只按 `block.type` 渲染；本次仅补本地 kind 词表与类型契约。
+- 其余 favorites 页面（monitor / insight / insight-detail-move / AlertContent）不依赖 evidence kind，未改动。
+
+### 测试
+
+- `npx vitest run src/modules/favorites/components/PriceMovementAnalysisContent.spec.ts` → **1 passed**
+- `npx vue-tsc --noEmit` **exit 0**
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增「板块消息证据类型 sector_news」段落
 
 ## [junliang] 2026-10-15 — 自选股异动「立即检测」按钮接回真实检测 + 展示归因入队条数
 

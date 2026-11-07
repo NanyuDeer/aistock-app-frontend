@@ -74,7 +74,7 @@ function layerText(value?: string): string { return ({ company: '公司', sector
 function statusText(value?: string): string { return ({ supported: '支撑', weak: '偏弱', rejected: '排除', insufficient: '证据不足' } as Record<string, string>)[value || ''] || value || '' }
 function confidenceText(value?: string): string { return ({ high: '高置信', medium: '中置信', low: '低置信' } as Record<string, string>)[value || ''] || value || '' }
 function stageText(value?: string): string { return ({ structural_root: '结构根源', trigger: '触发', transmission: '传导', exposure: '暴露', repricing: '重新定价', observable_result: '可见结果' } as Record<string, string>)[value || ''] || value || '' }
-function kindText(value?: string): string { return ({ trigger_fact: '触发事实', quote_fact: '行情事实', sector_fact: '板块事实', market_fact: '市场事实', announcement: '公告', news: '新闻', capital_fact: '资金事实', technical_fact: '技术事实' } as Record<string, string>)[value || ''] || value || '' }
+function kindText(value?: string): string { return ({ trigger_fact: '触发事实', quote_fact: '行情事实', sector_fact: '板块事实', sector_news: '板块消息', market_fact: '市场事实', announcement: '公告', news: '新闻', capital_fact: '资金事实', technical_fact: '技术事实' } as Record<string, string>)[value || ''] || value || '' }
 function formatTime(value: string): string { const date = new Date(value); return Number.isNaN(date.getTime()) ? '--' : `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` }
 function evidenceExcerpt(evidence: TraceEvidence): string {
   if (evidence.kind === 'market_fact') { const match = String(evidence.content_excerpt).match(/change\s+([-+]?[\d.]+%)\.?\s*$/); if (match) return `涨跌幅 ${match[1]}` }
