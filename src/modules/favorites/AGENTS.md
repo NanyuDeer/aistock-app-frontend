@@ -194,3 +194,10 @@
 - **最终可见性**：恢复出的主因是「证据不足，异动原因未明」（快照缺 `article_context`，无新闻/公告支撑）→ 命中既有「无结论不展示」规则（`hasNoUsableCause` 的 `证据不足` 提示词）→ **该日两条都按正常规则不展示**，卡片保持隐藏，但原因从"归因卡住"变为"归因完成但无有效结论"。
 - **尚未闭环（agent-py 侧）**：`TriggerEvent` 的修复**仍未部署到生产**；且 app-api 侧 `buildTriggerEvent` 的 `isLimitUp` 是**无条件**写入（`Boolean(...)`），**先发 app-api 会把"1 条卡住"放大成"每条新事件归因全挂"** —— 发布顺序必须 agent-py 先、app-api 后。
 - **已知未处理（另一处独立缺陷）**：`dead_letter` 的 job 在 `listUserEvents` 的 `analysis_status` 派生里仍落 `processing`（该 CASE 只看 `stock_trace_results`，无 result 即与"仍在归因"不可区分）→ 任何"归因 job 永久失败"的事件都会长期显示「归因中」。属 app-api 侧口径问题，待后续按需处理。
+
+## 板块消息证据类型 sector_news（2026-10-16）
+
+- 背景：stock_trace 新增 `sector_news` 证据（板块消息 → 关联个股，见 app-api `modules/stock-trace/AGENTS.md`）。**前端不改渲染逻辑**：完整洞察报告的证据清单由 agent-py 中文化（`_KIND_LABELS` → 「板块消息」），前端只按 `block.type` 渲染。
+- 本仓仅两处契约同步：`shared/api/modules/stockTrace.ts` 的 `TraceEvidence.kind` 联合补 `sector_news`；`components/PriceMovementAnalysisContent.vue` 的 `kindText()` 补「板块消息」文案（该组件消费 `artifactJson.evidence_index`，漏补会显示原始英文串）。
+- `modules/favorites` 其余页面（monitor / insight / insight-detail-move / AlertContent）均按 `block.type` 或状态字段消费，**不依赖 evidence kind**，无需改动。
+

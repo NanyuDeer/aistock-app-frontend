@@ -2,6 +2,29 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [junliang] 2026-10-16 — 同步 `sector_news`（板块消息）证据类型
+
+**开发者**: NanyuDeer
+
+### 变更
+
+- `shared/api/modules/stockTrace.ts`：`TraceEvidence.kind` 联合补 `sector_news`，与 app-api `types.ts`、agent-py `schemas/stock_trace.py` 的 `SourceKind` 对齐。
+- `modules/favorites/components/PriceMovementAnalysisContent.vue`：`kindText()` 补 `sector_news → 板块消息`（该组件消费 `artifactJson.evidence_index`，漏补会把原始英文 kind 直接展示给用户）。
+
+### 说明
+
+- **无渲染逻辑改动**：完整洞察报告的「证据清单」由 agent-py `_KIND_LABELS` 中文化，前端只按 `block.type` 渲染；本次仅补本地 kind 词表与类型契约。
+- 其余 favorites 页面（monitor / insight / insight-detail-move / AlertContent）不依赖 evidence kind，未改动。
+
+### 测试
+
+- `npx vitest run src/modules/favorites/components/PriceMovementAnalysisContent.spec.ts` → **1 passed**
+- `npx vue-tsc --noEmit` **exit 0**
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增「板块消息证据类型 sector_news」段落
+
 ## [junliang] 2026-10-15 — 自选股异动「立即检测」按钮接回真实检测 + 展示归因入队条数
 
 **开发者**: NanyuDeer
