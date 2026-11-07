@@ -80,7 +80,7 @@ describe('StockContent 选股 Tab', () => {
     await flushPromises()
 
     const labels = wrapper.findAll('.stock-tabs__label').map(node => node.text())
-    expect(labels).toEqual(['AI帮我选', '趋势股', '机构热门股', '业绩预测'])
+    expect(labels).toEqual(['AI帮我选', '趋势选股', '机构热门选股', '业绩预测选股'])
 
     const active = wrapper.findAll('.stock-tabs__item.is-active')
     expect(active).toHaveLength(1)
@@ -95,7 +95,7 @@ describe('StockContent 选股 Tab', () => {
 
     const active = wrapper.findAll('.stock-tabs__item.is-active')
     expect(active).toHaveLength(1)
-    expect(active[0].text()).toBe('机构热门股')
+    expect(active[0].text()).toBe('机构热门选股')
   })
 
   it('不再渲染大盘概览（MarketOverview 已由搜索框替代）', async () => {

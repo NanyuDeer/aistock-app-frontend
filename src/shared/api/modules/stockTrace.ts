@@ -61,7 +61,7 @@ export interface StockTraceArtifact {
 
 export interface TraceEvidence {
   source_id: string
-  kind: 'trigger_fact' | 'quote_fact' | 'sector_fact' | 'market_fact' | 'announcement' | 'news' | 'capital_fact' | 'technical_fact'
+  kind: 'trigger_fact' | 'quote_fact' | 'sector_fact' | 'sector_news' | 'market_fact' | 'announcement' | 'news' | 'capital_fact' | 'technical_fact'
   provider: string
   source_level: 'A' | 'B' | 'C' | 'D'
   title: string
@@ -144,8 +144,11 @@ export const stockTraceApi = {
   markRead(eventId: string) {
     return request.post<{ event_id: string; read: true }>(`/cn/favorites/movements/${encodeURIComponent(eventId)}/read`)
   },
-  /** 手动触发一次异动检测（绕过交易时段限制，非交易日也能检测） */
+  /**
+   * 手动触发一次异动检测（绕过交易时段限制，非交易日也能检测）。
+   * `enqueued`：后端顺带补齐归因入队的当日 active 事件数（2026-10-15 起返回）。
+   */
   detect() {
-    return request.post<{ triggered: boolean }>('/cn/favorites/movements/detect')
+    return request.post<{ triggered: boolean; enqueued: number }>('/cn/favorites/movements/detect')
   },
 }

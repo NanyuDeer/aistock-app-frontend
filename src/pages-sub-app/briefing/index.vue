@@ -137,14 +137,14 @@
           />
         </template>
 
-        <!-- 头条卡片：今日最重要研判（仅晨报展示） -->
+        <!-- 头条卡片：今日最重要研判（仅晨报展示）
+             版式（2026-10-11 调整）：蓝色小标签改为报告标题（晨间市场展望），结论升为大标题位、不再单列灰色小字 -->
         <view v-if="headlineItem && broadcastType !== 'evening' && broadcastType !== 'midday'" class="headline-card">
           <view class="headline-label">
             <text class="headline-star">★</text>
-            <text class="headline-label-text">今日头条</text>
+            <text class="headline-label-text">{{ headlineItem.title }}</text>
           </view>
-          <text class="headline-title">{{ headlineItem.title }}</text>
-          <text class="headline-conclusion">{{ headlineItem.conclusion }}</text>
+          <text class="headline-title">{{ headlineItem.conclusion }}</text>
           <view v-if="headlineItem.relatedTags.length" class="headline-tags">
             <text
               v-for="tag in headlineItem.relatedTags"
@@ -851,14 +851,6 @@ onLoad((options) => {
   line-height: 1.4;
   display: block;
   margin-bottom: 16rpx;
-}
-
-.headline-conclusion {
-  font-size: 26rpx;
-  color: #4b5563;
-  line-height: 1.6;
-  display: block;
-  margin-bottom: 20rpx;
 }
 
 .headline-tags {

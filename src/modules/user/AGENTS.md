@@ -30,3 +30,23 @@
 - 密码登录/注册（2026-09-26）: 后端 `POST /auth/password/login` 仅**账号维度**节流（同账号 15 分钟内失败达 10 次才 429），429 仅提示「尝试过于频繁，请稍后再试」，**不降级**；注册走 `POST /auth/register`（注册即登录），存量账号（未设密码）也可用此接口**补设密码**，已设密码返回 409 → 引导「去登录」
 - 设置密码: 后端仅支持「首次设置密码」（无修改/重置接口）；`/users/me` 返回 `hasPassword`（服务端权威），`userStore.hasPassword` 由 `fetchUserInfo()` 同步；设置入口在 `account-security.vue`（验证码发到已绑定身份，手机号优先）；登录成功且未设密码时会一次性引导
 - 401 错误不强制跳转登录页，仅清除 token
+
+## 设置页「AI 个性化服务」区（画像自动挖掘一期，2026-11-05）
+
+`pages/profile.vue` 单个 section 内按顺序四块，**改动时保持这个顺序与语义分工**：
+
+| 块 | 职责 | 数据来源 |
+|---|---|---|
+| 说明文案 | 隐私告知：采集范围（自选股/提问/洞察事件）、用途（个性化回答）、可随时关闭 | 静态 |
+| opt-in 开关 | `profileMiningEnabled`，默认**关**（`user_settings` 无 `profile_mining` 行 = 关闭） | `authApi.updateSettings('profile_mining', { enabled })`，乐观更新 + 失败回滚 |
+| 推断计数 + 清除 | 「AI 已了解你的 N 个特征」+「清除 AI 推断结果」（`uni.showModal` 二次确认，取消不调接口） | `getInferenceMeta()` / `clearInferences()` |
+| 投资偏好 + 风险偏好 | 显式画像编辑（激活 Phase 4-3 空转链路）：标签输入 ≤10 项/每项 ≤20 字；风险三档 `conservative\|balanced\|aggressive` | `updateUserProfile()` |
+
+硬约束：
+
+- **只展示计数，绝不渲染推断内容**（spec §1.2 边界）；dimensions 名称也不上屏
+- 关闭开关 ≠ 删除：文案必须点明「关闭只停止分析，不会自动删除已生成结果」
+- 风险偏好枚举单一真源在 `@/shared/api/modules/profile`（`RISK_TOLERANCE_VALUES` / `isRiskTolerance`），页面**不要**自定义值域
+- 该区 `v-if="isLoggedIn"`；登出时重置开关与计数（防换账号短暂显示上一账号计数）
+- 新增 vitest spec 必须注册进 `vitest.config.ts` 的 `include` 白名单，否则静默跳过
+

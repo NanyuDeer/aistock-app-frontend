@@ -1,5 +1,7 @@
 <template>
-  <!-- 条件化预判块（结构化传入）：档位区平铺所有档（每档基准方向）+ 互斥条件情景（分支点亮/置灰） -->
+  <!-- 条件化预判块（结构化传入）：档位区平铺所有档（每档基准方向）+ 互斥条件情景（分支点亮/置灰）
+       信息区次要灰字统一在基线类抬升（字号至少 22rpx + 颜色至 $ink-soft），
+       sentence / tags 两种形态一致受益；主信息（基准/方向/预判原文）仍为 $ink，层级不变 -->
   <view v-if="structured" class="as-insight-card__fc">
     <view class="as-insight-card__fc-head">
       <text class="as-insight-card__fc-key">预判</text>
@@ -116,7 +118,7 @@
             </view>
 
             <!-- 结构化仓位动作徽标（add/reduce/hold + 成数，如 加仓 +2 成；后端 position_action 透传） -->
-            <view v-if="cond.positionAction" class="as-insight-card__sc-action" :class="actionClass(cond.positionAction.direction)">
+            <view v-if="cond.positionAction" class="as-insight-card__sc-action" :class="actionClass(cond.positionAction)">
               <text class="as-insight-card__sc-action-tx">{{ actionText(cond.positionAction) }}</text>
             </view>
 
@@ -203,8 +205,13 @@ interface StructuredCondition {
   scenario: string
   /** 简洁展示用关键词（1~2 个，单条 ≤10 字；仅新数据携带，旧记录无 → 走长句兜底） */
   keywords?: string[]
-  /** 结构化仓位动作（add/reduce/hold + 成数，如 "+2 成"；后端 position_action 透传，纯 UI 展示） */
-  positionAction?: { direction: 'add' | 'reduce' | 'hold'; change: string }
+  /** 结构化仓位动作（add/reduce/hold + 档数，如 "+2 档"；后端 position_action 透传，纯 UI 展示） */
+  positionAction?: {
+    direction: 'add' | 'reduce' | 'hold'
+    change: string
+    /** T9 闸门压制：true 时 change 已是完整结论（如「闸门未解除，暂不加」），不得再拼动词 */
+    blocked_by_gate?: boolean
+  }
   /** 预判关键词（2026-09-03 起新数据携带：scenario 摘要，侧重方向+幅度，如 上探+3%~+5%） */
   scenario_keywords?: string[]
   /** 验证锚点（可选透传：threshold/metric 以 chip 展示） */
@@ -394,12 +401,23 @@ function hasAnchor(cond: StructuredCondition): boolean {
 }
 
 /** 仓位动作徽标 class（加仓=红 / 减仓=绿 / 观望=灰，对齐方向色语义） */
-function actionClass(d: 'add' | 'reduce' | 'hold'): string {
-  return d === 'add' ? 'is-add' : d === 'reduce' ? 'is-reduce' : 'is-hold'
+function actionClass(a: NonNullable<StructuredCondition['positionAction']>): string {
+  // 闸门压制：结论是「暂缓」而非「加仓/减仓」，不得沿用 direction 的语义色
+  // （否则会渲染出「一句说暂不加的话，配着加仓的红」）。走中性色。
+  if (a.blocked_by_gate === true) return 'is-blocked'
+  return a.direction === 'add' ? 'is-add' : a.direction === 'reduce' ? 'is-reduce' : 'is-hold'
 }
 
-/** 仓位动作文案：加仓/减仓/观望 + 成数（如 加仓 +2 成；change 由后端下发原文） */
+/**
+ * 仓位动作文案：加仓/减仓/观望 + 档数（如 加仓 +2 档；change 由后端下发原文）。
+ *
+ * T9 闸门压制：`blocked_by_gate === true` 时后端把 change 写成一句完整结论
+ * （「闸门未解除，暂不加」），再拼动词会渲染出「加仓 闸门未解除，暂不加」的自我矛盾
+ * （动词承诺加仓，后半句说暂不加）→ 该情形**只渲染 change 原文，不拼动词**。
+ * 仅此一种情形改变行为：其他消费者不带该字段（undefined）→ 与改动前逐字一致。
+ */
 function actionText(a: NonNullable<StructuredCondition['positionAction']>): string {
+  if (a.blocked_by_gate === true) return a.change
   const verb = a.direction === 'add' ? '加仓' : a.direction === 'reduce' ? '减仓' : '观望'
   return `${verb} ${a.change}`
 }
@@ -575,11 +593,11 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   padding: 2rpx 12rpx;
 }
 
-/* 该档口径说明（板块/大盘共用；独占一行，缺失整行不渲染） */
+/* 该档口径说明（板块/大盘共用；独占一行，缺失整行不渲染）——次要说明灰字，两种形态统一 22rpx/$ink-soft */
 .as-insight-card__horizon-projection {
   flex-basis: 100%;
-  font-size: 20rpx;
-  color: $ink-faint;
+  font-size: $font-size-xs;
+  color: $ink-soft;
   line-height: 1.5;
 }
 
@@ -591,11 +609,11 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   color: $ink;
 }
 
-/* 影响阶段（大盘溯源模型透传；板块不传即不渲染） */
+/* 影响阶段（大盘溯源模型透传；板块不传即不渲染）——次要说明灰字，两种形态统一 22rpx/$ink-soft */
 .as-insight-card__horizon-phase {
   flex-shrink: 0;
-  font-size: 20rpx;
-  color: $ink-faint;
+  font-size: $font-size-xs;
+  color: $ink-soft;
 }
 
 .as-insight-card__ph-tt {
@@ -605,8 +623,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 
 .as-insight-card__remain {
   margin-left: auto;
-  font-size: 20rpx;
-  color: $ink-faint;
+  font-size: $font-size-xs;
+  color: $ink-soft;
 }
 
 /* 方向徽标（A股：看多=红 看空=绿 震荡=灰，文字随附消除歧义） */
@@ -639,8 +657,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__conf {
-  font-size: 22rpx;
-  color: $ink-mute;
+  font-size: $font-size-xs;
+  color: $ink-soft;
 }
 
 /* 互斥情景路径（每支一张卡；行间“或”分隔；触发点亮/未触发置灰/缺省待观察） */
@@ -667,8 +685,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-or-tx {
-  font-size: 22rpx;
-  color: $ink-faint;
+  font-size: $font-size-sm;
+  color: $ink-soft;
 }
 
 .as-insight-card__sc {
@@ -775,9 +793,9 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-more-tx {
-  font-size: 20rpx;
+  font-size: $font-size-xs;
   font-weight: 500;
-  color: $ink-mute;
+  color: $ink-soft;
   line-height: 1.4;
 }
 
@@ -804,14 +822,14 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-conn {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   font-weight: 600;
-  color: $ink-faint;
+  color: $ink-soft;
   flex: none;
 }
 
 .as-insight-card__sc-amp-chip {
-  color: $ink-mute;
+  color: $ink-soft;
 }
 
 .as-insight-card__sc--up.as-insight-card__sc--live .as-insight-card__sc-amp-chip {
@@ -847,9 +865,9 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   line-height: $lh-tight;
 }
 
-/* 幅度/目标位段（-3% ~ -5%、+3% 等）：弱化置灰；触发路径内随方向色 */
+/* 幅度/目标位段（-3% ~ -5%、+3% 等）：弱化不弱读（$ink-soft，最深只到次要信息层）；触发路径内随方向色 */
 .as-insight-card__sc-amp {
-  color: $ink-mute;
+  color: $ink-soft;
   font-weight: 600;
 }
 
@@ -888,7 +906,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
   border: 1rpx solid rgba(24, 160, 88, 0.35);
 }
 
-.as-insight-card__sc-action.is-hold {
+.as-insight-card__sc-action.is-hold,
+.as-insight-card__sc-action.is-blocked {
   color: $flat;
   background: $bg-soft;
   border: 1rpx solid $line;
@@ -903,9 +922,9 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__anchor-chip {
-  font-size: 20rpx;
+  font-size: $font-size-xs;
   line-height: 1.6;
-  color: $ink-mute;
+  color: $ink-soft;
   background: #f4f5f7;
   border: 1rpx solid #e6e8ee;
   border-radius: $r-full;
@@ -927,8 +946,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-hidden-tx {
-  font-size: 20rpx;
-  color: $ink-faint;
+  font-size: $font-size-xs;
+  color: $ink-soft;
   line-height: 1.5;
 }
 
@@ -941,16 +960,16 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-fold-tx {
-  font-size: 22rpx;
+  font-size: $font-size-xs;
   font-weight: 600;
-  color: $ink-mute;
+  color: $ink-soft;
 }
 
 /* 到期未命中标签（沿用 miss 中性灰，不与 hit 实心绿混用） */
 .as-insight-card__sc-miss {
-  font-size: 20rpx;
+  font-size: $font-size-xs;
   font-weight: 600;
-  color: $ink-mute;
+  color: $ink-soft;
   background: $bg-soft;
   border: 1rpx solid $line;
   border-radius: $r-full;
@@ -958,8 +977,8 @@ function splitCondition(text: string): Array<{ t: string; kind: 'key' | 'note' }
 }
 
 .as-insight-card__sc-empty {
-  font-size: 20rpx;
-  color: $ink-faint;
+  font-size: $font-size-xs;
+  color: $ink-soft;
   padding: 0 6rpx;
 }
 </style>

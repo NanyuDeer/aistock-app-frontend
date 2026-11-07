@@ -480,8 +480,15 @@ export interface RhythmEvent {
 }
 export interface RhythmPositionAction {
   direction: 'add' | 'reduce' | 'hold'
+  /** 文案单位是「档」不是「成」（+2 档 / -1 档 / 维持 / 闸门未解除，暂不加） */
   change: string
   band?: RhythmPositionBand | null
+  /** 本卡 position_index（缺失 = 旧报告 → 整组退化为旧静态文案） */
+  from_index?: number | null
+  /** 目标档位，clamp(from + delta, 0, 4) */
+  to_index?: number | null
+  /** 闸门命中时 bullish 被压制：to_index == from_index 且 change 为「闸门未解除，暂不加」 */
+  blocked_by_gate?: boolean
 }
 export interface RhythmAnchor {
   metric: 'index_close' | 'close' | 'high' | 'low'
@@ -504,13 +511,131 @@ export interface RhythmBranch {
   conclusion: { direction: 'bullish' | 'bearish' | 'neutral'; range?: string; validity: number; note?: string }
   event_ref?: { event_date: string; title: string }
 }
+/**
+ * 仓位推导账本项（`position_ledger.items`，2026-11 溯源/变奏唯一真相源）。
+ * status 语义：blocking 正在压低档位 / neutral 有数据无影响 / supporting 抬高档位 /
+ * **missing 数据不可用（不得当作 neutral，前端须显式标注「数据不可用」而非隐藏该行）**。
+ */
+export type RhythmLedgerItemKey = 'trend' | 'mainline' | 'event' | 'breadth'
+export type RhythmLedgerItemStatus = 'blocking' | 'neutral' | 'supporting' | 'missing'
+export interface RhythmLedgerItem {
+  key: RhythmLedgerItemKey
+  /** 原生数值文案（例 `3590.00 / ma20 3620.00`），前端原样展示不改写 */
+  value_text: string
+  /** 判定结论（例 `闸门命中` / `未成立` / `无修正` / `中性`） */
+  judgement: string
+  /** 对档位的作用（例 `base→0，禁止 +1`） */
+  effect: string
+  status: RhythmLedgerItemStatus
+}
+
+/** 变奏观察点候选池条目（仅 mainline 项携带，按超额降序，最多 3 个） */
+export interface RhythmWatchPointCandidate {
+  name: string
+  /** 5 日超额收益（pct） */
+  excess: number
+}
+
+/** 变奏观察点（one-at-a-time 反解，只产出当前未满足项） */
+export interface RhythmWatchPoint {
+  key: 'mainline' | 'gate' | 'event'
+  /** 触发条件文案（Python 侧生成，含阈值，前端不拼接） */
+  condition: string
+  /** 当前值与差距（例 `收盘 3590.00（差 30.00 点）`），指向真实卡住的约束 */
+  current_text: string
+  /** 单条满足是否足以升档（双阻塞时恒 false） */
+  sufficient_alone: boolean
+  candidates?: RhythmWatchPointCandidate[] | null
+}
+
+/**
+ * 仓位推导账本（`rhythm_card.position_ledger` / `evidence.position_ledger` 同源同值）。
+ * 契约字段恒为 4 项：缺失项 `status=missing`，**不得省略键**（spec §9.3）。
+ */
+export interface RhythmPositionLedger {
+  items: RhythmLedgerItem[]
+  base_index?: number | null
+  adjust?: number
+  final_index?: number | null
+  /** 仅指数闸门：close<ma20 且 ma5<ma10<ma20；**不可**用它代替 gate_blocked */
+  gate_hit?: boolean
+  /** 主线板块破位；null = 状态未知 */
+  mainline_breakdown?: boolean | null
+  /** K 线不足 20 根 */
+  insufficient?: boolean
+  /** 禁止 +1 的真实标志（gate_hit or mainline_breakdown or insufficient） */
+  gate_blocked?: boolean
+  mainline_state?: 'established' | 'none' | 'unavailable' | null
+  watch_points?: RhythmWatchPoint[]
+  ledger_version?: string
+}
+
+/** 溯源文案（Python 侧 render_causality 确定性生成）：前端原样展示，禁拼接/禁推断阈值 */
+export interface RhythmCausalityText {
+  /** 首句（例 `两条闸门同时压到底，任一解除都不能升档`） */
+  lead: string
+  /** 因果行（后端限制 ≤2 条，前端再兜一次截断） */
+  lines: string[]
+}
+
+/** 跨日变更里某一条约束的距离变化（与后端 DeltaGap 对齐） */
+export interface RhythmDeltaGap {
+  key: 'gate' | 'mainline' | 'event'
+  from_gap?: number | null
+  to_gap?: number | null
+  unit?: string
+}
+
+/** 昨日复盘事实（仅 after_close 卡产出；up_ratio 缺失时前端省略「N% 的股票上涨」半句） */
+export interface RhythmDeltaReview {
+  prev_target_date: string
+  prev_position_text: string
+  index_pct_chg: number
+  up_ratio?: number | null
+}
+
+/** 跨卡变更归因（后端 RhythmDelta 透传；契约见 spec §5.2） */
+export interface RhythmDelta {
+  prev: {
+    target_date: string
+    slot: string
+    created_at?: string | null
+    /** 与上一条卡相隔交易日数；>1 说明中间卡缺失 */
+    lag_days?: number
+    /** 严格上一条缺失，已回落取更早的 slot */
+    slot_fallback?: boolean
+  }
+  position: { from_index?: number | null; to_index?: number | null; changed?: boolean }
+  stage?: Record<string, string | null>
+  /** 约束项的解决/新增/延续；后端真实取值域为 `"trend" | "mainline" | "event"`，
+   *  此处用 string[] 保持宽松（前端只做展示、不做判断） */
+  blocking?: { resolved?: string[]; added?: string[]; persisting?: string[] }
+  gaps?: RhythmDeltaGap[]
+  mainline?: {
+    from_name?: string | null
+    to_name?: string | null
+    from_excess?: number | null
+    to_excess?: number | null
+    strength_changed?: boolean
+  } | null
+  review?: RhythmDeltaReview | null
+  default_key?: 'position' | 'gate' | 'mainline' | 'event' | 'none'
+  version?: string
+}
+
 export interface RhythmCard {
+  /** @deprecated 2026-11 起废弃上屏：仅为未升级客户端保留，前端零引用（上色改取 position_index） */
   score?: number | null
+  /** @deprecated 2026-11 起废弃上屏：仅为未升级客户端保留，前端零引用（上色改取 position_index） */
   level?: string | null
+  /** 仓位档位序号 0-4（空/轻/半/重/满）；null/缺失 = 档位不可用 → 灰格 + 「仓位建议暂缺」 */
+  position_index?: number | null
   position_band: { min?: number | null; max?: number | null; text: string }
   phase?: string | null
   phase_evidence?: Record<string, unknown>
   temperature_series: { date: string; score: number }[]
+  /** 证据区温度因子一行（T7）：后端生成，只含数值与斜率、不含分档词；无归档则缺省/空 */
+  temperature_note?: string | null
   event_window: Pick<RhythmEvent, 'date' | 'type' | 'title' | 'importance'>[]
   event_window_near_end_date?: string | null
   event_source_missing?: boolean
@@ -520,6 +645,14 @@ export interface RhythmCard {
   conflict_detail?: string
   branches: RhythmBranch[]
   data_missing?: string[]
+  /** 仓位推导账本（2026-11 新增）：null/缺失 = 旧报告 → 溯源/变奏/折叠账本三块**整块不渲染** */
+  position_ledger?: RhythmPositionLedger | null
+  /** 溯源文案（2026-11 新增）：null = 只渲染变奏块与账本（ledger 存在时） */
+  causality_text?: RhythmCausalityText | null
+  /** 跨日变更（2026-11 新增）：null/缺失 = 无上一条卡或后端开关未开 → 不渲染变更行 */
+  delta?: RhythmDelta | null
+  /** 变更一句话（后端已过文案校验；缺失时前端不渲染变更行） */
+  delta_narrative?: string | null
 }
 export interface RhythmMasterContent {
   /** @deprecated 节奏大师不产双层 schema（spec §5.9 登记废止 08-29 的 2.0 要求）；该槽为历史契约遗留，勿新增消费方 */
@@ -544,13 +677,20 @@ export interface RhythmPositionBand {
   text?: string
 }
 
-/** 节奏日历热力图行（契约 #7）：恒取 after_close 收盘基准；level 可空 = 灰格（行缺失/沿用前值）；
+/** 节奏日历热力图行（契约 #7）：恒取 after_close 收盘基准；
+ *  position_index（2026-11 新增）：日历上色的**唯一依据**，0-4；null/缺失 = 灰格（行缺失/沿用前值/旧数据），
+ *  **禁止**回退用 level 上色（level 是情绪强度语义，当仓位用会给出错误建议）；
+ *  level / score 仅为未升级客户端保留（新前端零引用）；
  *  events（2026-09-03 扩展）：该交易日 macro 事件（对外契约子集，后端恒下发，无事件 = []；前端可选以兼容旧缓存/降级） */
 export interface RhythmCalendarDay {
   date: string
   refresh_slot: 'after_close'
+  /** @deprecated 2026-11 起前端零引用（上色改取 position_index） */
   level: string | null
+  /** @deprecated 2026-11 起前端零引用 */
   score: number | null
+  /** 仓位档位序号 0-4（空/轻/半/重/满）；null/缺失 = 灰格 */
+  position_index?: number | null
   basis_date: string | null
   position_band: RhythmPositionBand | null
   events?: RhythmEvent[]
@@ -824,8 +964,9 @@ export const agentApi = {
   },
 
   /** 节奏日历热力图聚合（契约 #7）：最近 N 个交易日 after_close 收盘基准档位。
-   *  返回 { days: [{date, refresh_slot, level, score, basis_date, position_band}] }，
-   *  level 可空（灰格）；position_band 为空 = 该日无仓位语义（如实展示，不伪造）。 */
+   *  返回 { days: [{date, refresh_slot, level, score, position_index, basis_date, position_band}] }，
+   *  position_index 为日历上色唯一依据，null/缺失 → 灰格（禁止回退 level 上色；
+   *  level / score 仅为未升级客户端兼容保留）；position_band 为空 = 该日无仓位语义（如实展示，不伪造）。 */
   getRhythmMasterCalendar(days = 60, naturalDays = 0) {
     return request.get<RhythmCalendarResponse>('/agent/rhythm-master/calendar', {
       params: naturalDays > 0 ? { naturalDays } : { days },

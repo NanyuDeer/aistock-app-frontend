@@ -1,10 +1,11 @@
 /**
- * useInsightReportSSE 单测：帧解码 / 通道选择 / 两条通道（fetch 流 + uni.request 分块）/ 错误分支 / 中止。
+ * useInsightReportSSE 单测：帧解码 / 通道选择 / 三种读法（fetch 流 / App 整包 / 小程序分块）/ 错误分支 / 中止。
  *
- * 两条通道：
+ * 三种读法：
  * - H5（有 fetch + ReadableStream）→ fetch + ReadableStream，用 ReadableStream 构造响应桩；
- * - App 端 / 小程序（无 ReadableStream）→ `uni.request({ enableChunked })` + `onChunkReceived`，
- *   用 uni.request 桩捕获 success/fail 与分块回调。**该通道在 H5 上跑不到，故由本文件的单测锁定。**
+ * - App（uniPlatform === 'app'）→ `uni.request` 整包读取（不带 enableChunked），success 回调整体喂给解码器；
+ * - 小程序（无 ReadableStream、无 fetch）→ `uni.request({ enableChunked })` + `onChunkReceived`。
+ *   后两条在 H5 上跑不到，故由本文件的单测锁定。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
@@ -49,6 +50,32 @@ describe('buildInsightReportStreamUrl', () => {
 })
 
 describe('useInsightReportSSE', () => {
+  it('原生 App 无分块回调也能展示完整报告', async () => {
+    const request = vi.fn((options: { success: (res: { statusCode: number; data: string }) => void }) => {
+      options.success({
+        statusCode: 200,
+        data: 'data: {"type":"start","header":"异动溯源"}\n\ndata: {"type":"done"}\n\n',
+      })
+      return { abort: vi.fn() }
+    })
+    vi.stubGlobal('uni', {
+      getStorageSync: () => 'app-token',
+      getSystemInfoSync: () => ({ uniPlatform: 'app' }),
+      request,
+    })
+
+    const report = useInsightReportSSE()
+    await report.start('mv:1:up')
+
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      enableChunked: false,
+      header: { Authorization: 'Bearer app-token' },
+    }))
+    expect(report.header.value).toBe('异动溯源')
+    expect(report.done.value).toBe(true)
+    expect(report.error.value).toBe('')
+  })
+
   beforeEach(() => {
     vi.stubGlobal('uni', { getStorageSync: vi.fn(() => 'tk') })
   })

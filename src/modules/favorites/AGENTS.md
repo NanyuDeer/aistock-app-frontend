@@ -82,6 +82,12 @@
 >   - ⚠️ `TWO_WEEK_WINDOW_DAYS = 13`（定义在 `shared/utils/datetime.ts`，附「为何是 13 而非 14」注释）：**"含今天共 14 个自然日" 等价于"回退 13 天"**；写成 `14` 会多算一天（今天 10-07 → 正确 `since = 2026-09-24`）。浏览器实测请求即为 `since=2026-09-24`。
 >   - 实测（mxfff）：同日两页卡片由改动前的 ~60 张收敛到 **8 张**（日期范围 09-24 → 09-30，**无早于 09-24 的卡片**），首屏即「没有更多」。
 
+> **2026-11-07 修复（App 端「点击生成完整洞察报告」无反应）**：0.1.6 真机复现，H5 正常，App 点击后既无内容也无错误提示。
+> - **根因**：App 端原先走 `uni.request({ enableChunked: true }) + onChunkReceived`，但 `enableChunked` 在 uni-app 文档中只是**微信小程序能力**；App 基座不会触发 `onChunkReceived`，`success` 又不带正文 → `header` / `sections` 恒空且无错误 → 界面看起来"没反应"。
+> - **改法**：`useInsightReportSSE.start()` 先读 `uni.getSystemInfoSync().uniPlatform`，`app` / `app-plus` 时走 **`readReportViaChunked(..., buffered = true)`**——不带 `enableChunked`，`dataType` / `responseType` 设为 `text`，由 `success` 一次性把全文喂给同一个 `createReportStreamDecoder`。服务端写完 `done` 就 `res.end()`（app-api `stock-trace/controller.ts`），整包读取不会挂住。
+> - **并发保护**：原 `active` 布尔改为 `requestId` 自增令牌，`stop()` 后迟到的响应/分帧不再改写界面状态。
+> - **测试**：`useInsightReportSSE.spec.ts` 25 → **26 例**（新增「原生 App 无分块回调也能展示完整报告」）全部通过；`vue-tsc --noEmit` exit 0。**App 真机验证待下次出包**（本机无 HBuilderX/adb）。
+
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。
 - 展示优先级（`AlertContent.vue` 的 `fromMovement()`、`monitor.vue` 的 `movementToAlertItem()`、`insight.vue` 价格异动映射三处一致）：
@@ -104,6 +110,8 @@
 - **目标**：与「自选股洞察」列表页（`pages/insight.vue`）/「个股情报」页（`event-catcher.vue`）**完全同款**模板，消除原先 `InsightAlertCard`（蓝渐变头部 + 左侧色条）的独立视觉。
 - **容器**：保持 `SubPageCard2 title="自选股异动" subtitle="AI 实时盯盘 · 盘中异动推送"`。
 - **保留的页面特有区块**（仅此处有，未改功能）：订阅状态卡（监控范围 N 只自选股 + **组件库 `Switch`** 开关）、区块标题行（「异动提醒」+ 市场状态 + **组件库 `Button`**「立即检测」）、App 端 WS 连接状态行。
+- **「立即检测」按钮（2026-10-15 修复，按钮名副其实）**：此前 `handleDetect` **只调 `fetchAlerts()` 刷新列表**（`stockTraceApi.detect()` 因此是全仓零调用的死代码）——用户点「立即检测」实际什么都没检测。现改为：`await stockTraceApi.detect()`（`POST /cn/favorites/movements/detect`，绕过交易时段强制检测，后端顺带为「当日 active 但缺归因 job」的事件补入队）→ 成功 toast「已触发检测，N 条正在归因」/ 无补入队「已触发检测」/ 失败 toast「检测失败，请稍后重试」→ **成功失败都再 `fetchAlerts()`**（列表是展示事实源）。`stockTraceApi.detect()` 返回类型同步扩展为 `{ triggered: boolean; enqueued: number }`。
+  - ⚠️ 沿用 `detect` 既有语义：非交易时段点击时，若当日事件已在 15:05/15:10 落定，后端会为同一 (股, 方向) 新建一条当日事件（展示层由 `dedupeDailyMovements` 聚合为一张卡，但会多一次归因与一条通知）。
 - **筛选栏**：`filter-bar` + `Segmented`「全部 / 上涨 / 下跌」（与 insight.vue 同款）；**前端本地过滤 `direction`，不新增接口**。
 - **列表行**：组件库 `Card` 三段式，与 insight.vue 逐节点同名同义——`.event-top`（`.stock-name` / `.stock-code` / `.stock-move` 红涨绿跌 | 方向 `Tag`）→ `.event-title`（主因正文，三段式兜底同上）→ `.event-bottom`（左 = `Badge`「涨停」**仅 `is_limit_up === true`** + 日期 `MM-DD`；右 `.meta-right` = 「报告 ›」+ 时间）。
 - **洞察报告入口**：由原「卡片下方整行按钮」改为**下行右侧小字按钮「报告 ›」**（`.report-link`），**仅 `analysis_status === 'completed'` 时渲染**（`reportable`）。（**2026-09-25 起**）点击不再直接下载 PDF，而是 `navigateToInsightDetail(eventId, 'price', { autostart: '1' })` 跳详情页并自动开始流式生成（列表页不展开长报告）。`InsightAlertCard.vue` 自此**无生产调用方**（保留在 `shared/` 未删，处置待组长定）。
@@ -115,7 +123,7 @@
   - 测试护栏：`monitor.spec.ts` 用 `connectSocket` 桩捕获 `onMessage` 回调后直接投喂报文（4 例：created 插入 / severity_upgraded 就地更新 / a_grade_major_cause 更新主因与报告入口 / insight.created 被忽略）。
 - **后端载荷（2026-09-24 已补齐，本仓零代码改动）**：`toPublicEvent` 现透出 `is_limit_up`，且 `analysis_status` 由硬编码 `'pending'` 对齐为 `'processing'`（与列表派生口径一致）；`listUserEvents`/`listRecentEvents` 的 SELECT 已带 `e.window_end_at` → 列表/WS 卡的 `window_end_at || triggered_at`「最近异动时刻」语义真正生效。`primary_cause`/`movement_view` 仍不在**新建**推送里——新建时本就无归因结果，由 `movement.updated` 二次推送补。
 - **未改动**：数据源 `stockTraceApi.list(20)`、`isUnattributableMovement` 过滤、`dedupeDailyMovements` 同日同股聚合、倒序、空态 `EmptyState`（文案随开关态：已开启「暂无异动提醒」/ 已关闭「异动监控已关闭」）、点击跳 `navigateToInsightDetail`、`onReport` 的 toast 兜底。（`reportBusy` 防抖已随 2026-09-25 PDF 链路移除而删除。）
-- **护栏**：`pages/monitor.spec.ts` **整体重写**（原 2 例断言 09-04 已移除的涨停雷达数据源 = 存量红，已随本次修正），现 **14 例**：筛选栏 / 订阅卡（组件库 `Switch` 的 `is-on` 与点击回调）/ 「立即检测」为组件库 `Button` 且点击重拉列表 / Card 三段式 + 上行字段 + 主因正文 / 涨停 Badge 仅涨停行 / 上涨下跌筛选 / 点击跳转 / 报告入口仅 completed 行且点击跳 `navigateTo`（断言 URL 含 `&autostart=1`，**2026-09-25 起**由"触发下载"改为"跳详情页自动生成"）/ 空态 / WS 四例（见上「WS 报文契约」）。
+- **护栏**：`pages/monitor.spec.ts` **整体重写**（原 2 例断言 09-04 已移除的涨停雷达数据源 = 存量红，已随本次修正），现 **22 例**：筛选栏 / 订阅卡（组件库 `Switch` 的 `is-on` 与点击回调）/ 「立即检测」两条用例（**2026-10-15 起**：成功路径断言真的调用 `detect()` + 随后刷新列表 + toast 含补入队条数；失败路径断言 toast 失败 + 按钮恢复可用 + 仍刷新列表）/ Card 三段式 + 上行字段 + 主因正文 / 涨停 Badge 仅涨停行 / 上涨下跌筛选 / 点击跳转 / 报告入口仅 completed 行且点击跳 `navigateTo`（断言 URL 含 `&autostart=1`，**2026-09-25 起**由"触发下载"改为"跳详情页自动生成"）/ 空态 / 分页 5 例（首屏入参 / 触底追加 / nextCursor null / 跨页同 event_id / 失败不推进 cursor / onShow 重置）/ WS 四例（见上「WS 报文契约」）。
 
 ## 异动详情页（insight-detail-move.vue）
 - **当前形态（2026-09-25 / 2026-09-26）**：报价头 + 一句话主因卡 + **「生成完整洞察报告」按钮 + 按钮下方流式渲染区**。
@@ -169,6 +177,7 @@
 - **子页面滚动容器（2026-08-19）**：H5 预览包装固定 `#app` 高度并 `overflow: hidden`，页面原生滚动被禁用。`insight.vue` / `insight-detail.vue` / `insight-detail-move.vue` 必须用 `SubPageCard2`（自带白色导航栏 + scroll-view）包裹（对应 pages.json `navigationStyle: "custom"`），否则长内容被裁剪、底部不可达。新增/改造子页面沿用此模式。
 
 ## 首页 AlertContent 自选股洞察（2026-09-04 还原为旧预览 ListCell 形态）
+- **2026-10-13 未登录示例数据**：`loadCaptureList()` 开头判 `useUserStore().isLoggedIn()`，为假则直接 `captureList = buildDemoCaptureList()`（3 条示例：中国平安↑/贵州茅台↓/宁德时代↑，日期取当日 `MM-DD`）并 **early return，不发 `stockTraceApi.list`**——匿名用户没有自选股、异动链路对其无数据，请求只会拿空数组把示例顶掉。`CaptureItem` 增 `demo?: boolean`，模板 `:clickable="!!item && !item.demo"` + `@click="item && !item.demo && goTrace(...)"`：示例行不可点击（`event_id` 为空，跳详情必 404）。登录态 `watch(token)` 补 `loadCaptureList()`（原先只重载个股情报），登出回落示例、登录立即切真实。**已登录路径零改动**。
 - `AlertContent.vue` 自选股洞察块还原为旧预览 ListCell 形态：`module-header`（标题"自选股洞察"+箭头，点跳 `/modules/favorites/pages/monitor` 自选股异动页）+ `ListCell` 列表（`CAPTURE_ROW_COUNT=6`）。行字段：`title=stock_name`、前缀 `Tag` 用方向（up/down, 红绿, 文案"涨/跌"）、`description=主因或状态 · MM-DD 时间`。点击行进 `insight-detail-move?event_id=`。
 - 数据源：`stockTraceApi.list(20)` → `.filter(m => !isUnattributableMovement(m))`（保留无法归因不展示）→ 取前 6 条（含空行占位至 6）。
 - 主因三段式兜底：`primary_cause` → `movement_view.primaryCandidate.verdict` → `analysis_status`（completed→归因完成 / processing→归因中 / failed→归因失败 / 其他→待归因）。
@@ -192,3 +201,10 @@
 - **最终可见性**：恢复出的主因是「证据不足，异动原因未明」（快照缺 `article_context`，无新闻/公告支撑）→ 命中既有「无结论不展示」规则（`hasNoUsableCause` 的 `证据不足` 提示词）→ **该日两条都按正常规则不展示**，卡片保持隐藏，但原因从"归因卡住"变为"归因完成但无有效结论"。
 - **尚未闭环（agent-py 侧）**：`TriggerEvent` 的修复**仍未部署到生产**；且 app-api 侧 `buildTriggerEvent` 的 `isLimitUp` 是**无条件**写入（`Boolean(...)`），**先发 app-api 会把"1 条卡住"放大成"每条新事件归因全挂"** —— 发布顺序必须 agent-py 先、app-api 后。
 - **已知未处理（另一处独立缺陷）**：`dead_letter` 的 job 在 `listUserEvents` 的 `analysis_status` 派生里仍落 `processing`（该 CASE 只看 `stock_trace_results`，无 result 即与"仍在归因"不可区分）→ 任何"归因 job 永久失败"的事件都会长期显示「归因中」。属 app-api 侧口径问题，待后续按需处理。
+
+## 板块消息证据类型 sector_news（2026-10-16）
+
+- 背景：stock_trace 新增 `sector_news` 证据（板块消息 → 关联个股，见 app-api `modules/stock-trace/AGENTS.md`）。**前端不改渲染逻辑**：完整洞察报告的证据清单由 agent-py 中文化（`_KIND_LABELS` → 「板块消息」），前端只按 `block.type` 渲染。
+- 本仓仅两处契约同步：`shared/api/modules/stockTrace.ts` 的 `TraceEvidence.kind` 联合补 `sector_news`；`components/PriceMovementAnalysisContent.vue` 的 `kindText()` 补「板块消息」文案（该组件消费 `artifactJson.evidence_index`，漏补会显示原始英文串）。
+- `modules/favorites` 其余页面（monitor / insight / insight-detail-move / AlertContent）均按 `block.type` 或状态字段消费，**不依赖 evidence kind**，无需改动。
+

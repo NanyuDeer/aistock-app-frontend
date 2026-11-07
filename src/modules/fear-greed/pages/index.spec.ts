@@ -90,14 +90,16 @@ const sectorBoardFixture = {
   sectors: { topGainers: [], topInflows: [], topLosers: [], topOutflows: [] },
 }
 
-/** 摘要夹具：level=active（chip 短码「活」/色 #f59e0b）、position_band.text 用**真实生产者格式**（全角冒号），
- *  使「剥离前缀」断言对旧版正则（只吃「建议仓位」+ 其后的空白）具备鉴别力：旧正则会残留「：」→ 断言必红 */
+/** 摘要夹具：position_index=3（重仓，chip 短码「重」/色 #f59e0b）、position_band.text 用**真实生产者格式**（全角冒号），
+ *  使「剥离前缀」断言对旧版正则（只吃「建议仓位」+ 其后的空白）具备鉴别力：旧正则会残留「：」→ 断言必红。
+ *  夹具故意同时保留 level='active'（旧客户端兼容层照常返回）：若前端回退 level 上色/短码，断言会得到「活」→ 必红。 */
 const summaryDaysFixture = [
   {
     date: '2026-09-14',
     refresh_slot: 'after_close',
     level: 'active',
     score: null,
+    position_index: 3,
     basis_date: '2026-09-14',
     position_band: { text: '建议仓位：5 成' },
   },
@@ -161,10 +163,10 @@ describe('fear-greed/pages/index.vue 入口卡接线层', () => {
     expect(wrapper.find('.fg-state').text()).toContain('network')
   })
 
-  it('摘要态渲染：档位短码 + 档位色 + 仓位文本 + 数据截至标签', async () => {
+  it('摘要态渲染：仓位短码 + 仓位色 + 仓位文本 + 数据截至标签', async () => {
     const wrapper = await mountAndShow()
     expect(wrapper.find('.fg-rhythm__row').exists()).toBe(true)
-    expect(wrapper.find('.fg-rhythm__chip-text').text()).toBe('活')
+    expect(wrapper.find('.fg-rhythm__chip-text').text()).toBe('重')
     expect(inlineStyleHasColor(wrapper.find('.fg-rhythm__chip').attributes('style'), '#f59e0b')).toBe(true)
     expect(wrapper.find('.fg-rhythm__band').text()).toBe('5 成')
     expect(wrapper.find('.fg-rhythm__date').text()).toBe('数据截至 09-14')
@@ -188,6 +190,7 @@ describe('fear-greed/pages/index.vue 入口卡接线层', () => {
           refresh_slot: 'after_close',
           level: 'active',
           score: null,
+          position_index: 3,
           basis_date: '2026-09-13',
           position_band: { text: '建议仓位：七成~八成' },
         },

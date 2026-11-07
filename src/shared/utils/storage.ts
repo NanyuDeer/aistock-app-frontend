@@ -62,5 +62,7 @@ export const STORAGE_KEYS = {
   // 存量账号「首次设置密码」一次性引导已展示标记（2026-09-26）
   PWD_HINT_SHOWN: 'pwd_hint_shown',
   // 我的页昵称本地镜像（{ uid, nickname }）：首帧同步渲染，避免进页面时昵称由空/旧值切换造成闪烁
-  PROFILE_NICKNAME: 'profile_nickname'
+  PROFILE_NICKNAME: 'profile_nickname',
+  // 自选消息面板「自选股筛选」上次选择（6 位股票代码；空/缺省 = 全部自选股）
+  NOTIFICATION_STOCK_FILTER: 'notification_stock_filter'
 } as const

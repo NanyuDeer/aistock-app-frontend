@@ -43,9 +43,9 @@
             <text v-if="head.updatedAt" class="dyn-uniq__chip">更新 {{ head.updatedAt }}</text>
           </template>
 
-          <!-- 节奏：档位色标 + 仓位基准日 -->
+          <!-- 节奏：仓位档位色标 + 仓位基准日 -->
           <template v-else>
-            <text class="dyn-uniq__level" :style="{ background: rhythmColor(head.level) }">{{ levelShort(head.level) || '沿' }}</text>
+            <text class="dyn-uniq__level" :style="{ background: positionColor(head.positionIndex) }">{{ positionShort(head.positionIndex) || '沿' }}</text>
             <text v-if="head.basisDate" class="dyn-uniq__chip">{{ head.basisDate }} 基准</text>
           </template>
         </view>
@@ -66,11 +66,11 @@
       >
         <text class="dyn-sec__chip">{{ moduleLabel(it.module) }}</text>
         <text class="dyn-sec__title">{{ it.name }}</text>
-        <!-- 尾部标签与四宫格同款：风口/市场用组件库 Tag；节奏用档位色块 -->
+        <!-- 尾部标签与四宫格同款：风口/市场用组件库 Tag；节奏用仓位档位色块 -->
         <view
           v-if="it.badge && it.module === 'rhythm'"
           class="dyn-sec__rhythm"
-          :style="{ background: rhythmColor(it.level) }"
+          :style="{ background: positionColor(it.positionIndex) }"
         >
           <text class="dyn-sec__rhythm-text">{{ it.badge }}</text>
         </view>
@@ -105,7 +105,7 @@ import { computed, ref, watch, onUnmounted } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import Tag from '@/shared/components/Tag.vue'
 import { getTradingTimeSlot, type TradingTimeSlot } from '@/shared/utils/tradingTime'
-import { levelShort, isRhythmLevelKey, RHYTHM_LEVEL_COLORS, RHYTHM_GREY } from '@/shared/utils/rhythmColors'
+import { positionColor, positionShort } from '@/shared/utils/rhythmColors'
 import wordmarkPng from '@/shared/components/insight-wordmark.png'
 
 /** 洞见字标底图（与洞见卡头部字标同源；卡片为白底，用深色版字标） */
@@ -137,10 +137,11 @@ interface PreviewItem {
 
 interface RhythmRow {
   date?: string | null
-  level?: string | null
+  /** 仓位档位序号 0-4（空/轻/半/重/满）；null/缺失 = 无档位 → 灰格 */
+  position_index?: number | null
   band: string
   basis_date: string | null
-  /** 洞见一句话结论（档位 + 建议仓位） */
+  /** 洞见一句话结论（建议仓位文案） */
   hint?: string
 }
 
@@ -208,7 +209,8 @@ interface FocusItem {
   rank?: number
   sectors?: ReadonlyArray<PreviewSector>
   updatedAt?: string
-  level?: string | null
+  /** 节奏：仓位档位序号 0-4 */
+  positionIndex?: number | null
   basisDate?: string | null
 }
 
@@ -240,10 +242,10 @@ const pools = computed<Record<ModuleKey, FocusItem[]>>(() => ({
   rhythm: props.rhythmRows.map(r => ({
     module: 'rhythm' as const,
     name: r.band || (r.basis_date ? '沿用前值' : '无报告'),
-    badge: levelShort(r.level) || '沿',
+    badge: positionShort(r.position_index) || '沿',
     badgeTone: 'neutral' as const,
     hint: r.hint,
-    level: r.level,
+    positionIndex: r.position_index,
     basisDate: r.basis_date,
   })),
 }))
@@ -289,11 +291,6 @@ watch(slot, () => {
 }, { immediate: true })
 
 onUnmounted(stopCarousel)
-
-/** 节奏档位色标：非法/缺失档位回退中性灰 */
-function rhythmColor(level?: string | null): string {
-  return level && isRhythmLevelKey(level) ? RHYTHM_LEVEL_COLORS[level] : RHYTHM_GREY
-}
 
 const head = computed<FocusItem | null>(() => pools.value[headModule.value][0] ?? null)
 const headDetail = computed(() =>

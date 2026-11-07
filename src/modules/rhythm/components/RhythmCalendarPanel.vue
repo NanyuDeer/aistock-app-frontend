@@ -18,14 +18,17 @@
         v-for="d in stripDays"
         :key="d.date"
         class="day-cell"
-        :class="{ active: d.date === targetDate, dim: !d.level }"
+        :class="{ active: d.date === targetDate, dim: d.position_index == null }"
         :style="{ background: dayCellBg(d) }"
         @tap="pick(d)"
       >
         <text class="day-date">{{ d.date.slice(5) }}</text>
-        <text class="day-lev" v-if="d.level">{{ levelShort(d.level) }}</text>
-        <text class="day-pos" v-else>沿用</text>
-        <text class="day-pos" v-if="d.level && bandShort(d)">{{ bandShort(d) }}</text>
+        <text class="day-lev" v-if="d.position_index != null">{{ positionShort(d.position_index) }}</text>
+        <!-- 无档位（旧卡/未采集）→「—」如实缺省。
+             此前写「沿用」，那是旧语义（沿用基准卡档位），与现在的「没有数据」含义不同，
+             会让用户以为该日仍在沿用其它卡的仓位。 -->
+        <text class="day-pos" v-else>—</text>
+        <text class="day-pos" v-if="d.position_index != null && bandShort(d)">{{ bandShort(d) }}</text>
       </view>
     </view>
 
@@ -53,8 +56,9 @@
             :style="{ background: dayCellBg(cell) }"
             @tap="pick(cell)"
           >
-            <text class="cal-date" :class="{ dim: !cell.level }">{{ cell.date.slice(8) }}</text>
-            <text class="cal-lev" v-if="cell.level">{{ levelShort(cell.level) }}</text>
+            <text class="cal-date" :class="{ dim: cell.position_index == null }">{{ cell.date.slice(8) }}</text>
+            <text class="cal-lev" v-if="cell.position_index != null">{{ positionShort(cell.position_index) }}</text>
+            <text class="cal-lev dim" v-else>—</text>
             <view v-if="mode === 'event' && eventsOf(cell).length" class="ev-badge" :class="{ hasHigh: highCount(cell) > 0 }">
               <text v-if="highCount(cell) > 0" class="ev-badge-num">{{ highCount(cell) }}</text>
             </view>
@@ -82,6 +86,21 @@
         <text v-else class="ev-empty">当日无已登记事件</text>
       </view>
     </view>
+
+    <!-- 图例：颜色语义＝建议仓位（冷→暖 = 0 空 → 4 满）；灰＝无档位/未生成 -->
+    <view class="cal-legend">
+      <text class="cal-legend-title">颜色＝建议仓位</text>
+      <view class="cal-legend-items">
+        <view v-for="item in POSITION_LEGEND" :key="item.label" class="cal-legend-item">
+          <view class="cal-legend-dot" :style="{ background: item.color }"></view>
+          <text class="cal-legend-text">{{ item.label }}</text>
+        </view>
+        <view class="cal-legend-item">
+          <view class="cal-legend-dot" :style="{ background: RHYTHM_GREY }"></view>
+          <text class="cal-legend-text">无档位</text>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -90,7 +109,7 @@ import { computed, ref } from 'vue'
 import { Segmented } from '@/shared/components'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { RhythmCalendarDay, RhythmEvent } from '@/shared/api/modules/agent'
-import { RHYTHM_LEVEL_COLORS, RHYTHM_GREY, isRhythmLevelKey, levelShort } from '@/shared/utils/rhythmColors'
+import { RHYTHM_POSITION_COLORS, RHYTHM_POSITION_SHORT, RHYTHM_GREY, positionColor, positionShort } from '@/shared/utils/rhythmColors'
 import { formatBandText } from '@/shared/utils/rhythmBand'
 
 const props = withDefaults(defineProps<{ targetDate?: string }>(), { targetDate: '' })
@@ -109,11 +128,15 @@ const ascending = computed(() => [...dayList.value].reverse())
 const stripDays = computed(() => ascending.value.slice(-7))
 
 function dayCellBg(d: RhythmCalendarDay): string {
-  return isRhythmLevelKey(d.level) ? RHYTHM_LEVEL_COLORS[d.level] : RHYTHM_GREY
+  // 上色唯一依据 position_index；缺失/旧数据 → 灰格（禁止回退 level 上色：语义是情绪强度，不是仓位）
+  return positionColor(d.position_index)
 }
 function bandShort(d: RhythmCalendarDay): string {
   return formatBandText(d.position_band?.text)
 }
+
+/** 图例项：0-4 档（空/轻/半/重/满），与色板唯一副本同源 */
+const POSITION_LEGEND = RHYTHM_POSITION_SHORT.map((label, i) => ({ label, color: RHYTHM_POSITION_COLORS[i] }))
 
 // 今日高亮：模板以 todayStr() 调用取当日 YYYY-MM-DD 串（brief 样例漏了括号——函数引用恒不等于字符串，今日格永不亮，此处修正）
 function todayStr(): string {
@@ -148,14 +171,14 @@ const selectedDay = computed<RhythmCalendarDay | undefined>(() => {
 const selectedEvents = computed<RhythmEvent[]>(() => (selectedDay.value ? eventsOf(selectedDay.value) : []))
 const selectedOverflow = computed<number>(() => (selectedDay.value ? overflowCount(selectedDay.value) : 0))
 
-// —— 展开网格：自然月铺满（周一列开头；含周末/节假日 cell=灰格 level=null；每行恒 7 列）——
+// —— 展开网格：自然月铺满（周一列开头；含周末/节假日 cell=灰格 position_index=null；每行恒 7 列）——
 const WEEK_COL: Record<number, number> = { 0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 } // jsDay(0=周日) → col(0=周一)
 type GridCell = RhythmCalendarDay | null
 const p = (n: number) => String(n).padStart(2, '0')
 
-/** 自然月网格的空缺日占位灰格：无档位/无事件，仍可 pick；refresh_slot 仅为满足 RhythmCalendarDay 必填类型，无业务语义 */
+/** 自然月网格的空缺日占位灰格：无仓位档位/无事件，仍可 pick；refresh_slot 仅为满足 RhythmCalendarDay 必填类型，无业务语义 */
 function greyCell(date: string): GridCell {
-  return { date, refresh_slot: 'after_close', level: null, score: null, basis_date: null, position_band: null, events: [] }
+  return { date, refresh_slot: 'after_close', level: null, score: null, position_index: null, basis_date: null, position_band: null, events: [] }
 }
 
 /** 当前展示月份（YYYY-MM，默认当前自然月） */
@@ -166,7 +189,7 @@ function defaultMonth(): string {
 const currentMonth = ref(defaultMonth())
 
 /** 按 YYYY-MM 构造该自然月的完整网格：上/下个月前导后置空列置 null；月中每一天都渲染（含周末） ->
- *  命中 dayListRaw 带真实档位/事件；否则 level=null 灰格如实展示，但仍可 pick（看当日 macro 事件）。 */
+ *  命中 dayListRaw 带真实仓位档位/事件；否则 position_index=null 灰格如实展示，但仍可 pick（看当日 macro 事件）。 */
 function buildMonthGrid(month: string): GridCell[][] {
   const [year, monthIdx] = month.split('-').map(Number) // monthIdx 1-based(1~12)
   const daysInMonth = new Date(year, monthIdx, 0).getDate() // 当月总天数
@@ -295,6 +318,14 @@ agentApi.getRhythmMasterCalendar(60).then((res) => { dayList.value = res?.days ?
 .cal-date { font-size: 22rpx; font-weight: 600; color: $ink; }
 .cal-date.dim { color: $ink-soft; }
 .cal-lev { font-size: 20rpx; color: #fff; background: rgba(0, 0, 0, 0.18); border-radius: 8rpx; padding: 1rpx 8rpx; }
+
+/* —— 图例：颜色＝建议仓位（0 空 → 4 满；灰＝无档位）—— */
+.cal-legend { margin-top: 12rpx; }
+.cal-legend-title { font-size: 20rpx; color: $ink-mute; }
+.cal-legend-items { display: flex; flex-wrap: wrap; align-items: center; gap: 14rpx; margin-top: 6rpx; }
+.cal-legend-item { display: flex; align-items: center; gap: 6rpx; }
+.cal-legend-dot { width: 16rpx; height: 16rpx; border-radius: 4rpx; }
+.cal-legend-text { font-size: 20rpx; color: $ink-soft; }
 
 /* —— 事件角标：hasHigh 红点+计数；否则小灰点 —— */
 .ev-badge {
