@@ -82,6 +82,12 @@
 >   - ⚠️ `TWO_WEEK_WINDOW_DAYS = 13`（定义在 `shared/utils/datetime.ts`，附「为何是 13 而非 14」注释）：**"含今天共 14 个自然日" 等价于"回退 13 天"**；写成 `14` 会多算一天（今天 10-07 → 正确 `since = 2026-09-24`）。浏览器实测请求即为 `since=2026-09-24`。
 >   - 实测（mxfff）：同日两页卡片由改动前的 ~60 张收敛到 **8 张**（日期范围 09-24 → 09-30，**无早于 09-24 的卡片**），首屏即「没有更多」。
 
+> **2026-11-07 修复（App 端「点击生成完整洞察报告」无反应）**：0.1.6 真机复现，H5 正常，App 点击后既无内容也无错误提示。
+> - **根因**：App 端原先走 `uni.request({ enableChunked: true }) + onChunkReceived`，但 `enableChunked` 在 uni-app 文档中只是**微信小程序能力**；App 基座不会触发 `onChunkReceived`，`success` 又不带正文 → `header` / `sections` 恒空且无错误 → 界面看起来"没反应"。
+> - **改法**：`useInsightReportSSE.start()` 先读 `uni.getSystemInfoSync().uniPlatform`，`app` / `app-plus` 时走 **`readReportViaChunked(..., buffered = true)`**——不带 `enableChunked`，`dataType` / `responseType` 设为 `text`，由 `success` 一次性把全文喂给同一个 `createReportStreamDecoder`。服务端写完 `done` 就 `res.end()`（app-api `stock-trace/controller.ts`），整包读取不会挂住。
+> - **并发保护**：原 `active` 布尔改为 `requestId` 自增令牌，`stop()` 后迟到的响应/分帧不再改写界面状态。
+> - **测试**：`useInsightReportSSE.spec.ts` 25 → **26 例**（新增「原生 App 无分块回调也能展示完整报告」）全部通过；`vue-tsc --noEmit` exit 0。**App 真机验证待下次出包**（本机无 HBuilderX/adb）。
+
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。
 - 展示优先级（`AlertContent.vue` 的 `fromMovement()`、`monitor.vue` 的 `movementToAlertItem()`、`insight.vue` 价格异动映射三处一致）：

@@ -2,6 +2,28 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [junliang] 2026-11-07 — App 端「生成完整洞察报告」无反应修复
+
+**开发者**: 项目组
+
+### 变更
+
+- `src/modules/favorites/utils/useInsightReportSSE.ts`：App 端（`uniPlatform` 为 `app` / `app-plus`）改为 `uni.request` 整包读取，**不再依赖 `enableChunked`**。该选项只有微信小程序基座会触发 `onChunkReceived`，App 基座不触发，`success` 只拿到状态码、拿不到正文，表现为按钮点了没反应且无报错。H5 仍走 `fetch + ReadableStream`，小程序仍走分块。
+- 同一文件把 `active` 布尔改为 `requestId` 自增令牌：`stop()` 后迟到的响应/分帧不再改写界面。
+- `src/modules/favorites/utils/useInsightReportSSE.spec.ts`：25 → **26 例**（新增「原生 App 无分块回调也能展示完整报告」）。
+- `src/modules/favorites/AGENTS.md`：补充 2026-11-07 根因与改法记录。
+
+### 验证
+
+- `vitest run src/modules/favorites/utils/useInsightReportSSE.spec.ts` → **26 passed**；全量 `vitest run` → **72 files / 717 passed**；`node tests/run-node-specs.mjs` → **305/305**。
+- `vue-tsc --noEmit` → exit 0；`uni build -p app` → 成功，`dist/build/app/app-service.js` 已含 `app-plus` 整包分支。
+
+### 待办
+
+- 出 0.1.7 前需将 `src/manifest.json` 的 `versionCode` 106 → **107**，否则已装 0.1.6 的用户收不到更新提示；APK 仍需 HBuilderX 云打包 + 正式签名证书。
+
+---
+
 ## [master] 2026-11-03 — 节奏卡语义收口 & 回退时效（PR #151 合入）
 
 **开发者**: 项目组（PR #151 changer-collab；CI 基线修复 NanyuDeer）
