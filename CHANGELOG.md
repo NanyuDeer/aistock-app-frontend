@@ -2,6 +2,34 @@
 
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
+## [xusiyun] 2026-11-10 — 事件关注（纯前端本地快照）+ 关注按钮即时切换修复
+
+**开发者**: xusiyun
+
+### 新增
+
+- `src/modules/chat/event/eventFollowStore.ts`：事件关注本地快照存储（key `event_followed_entries`，`[{ event, followedAt }]`；倒序、按 `eventId` 去重并置顶、上限 100 条、脏数据逐条丢弃；快照不存 `impactVitality`）。
+- `src/modules/chat/pages/event/followed.vue` + `src/pages.json`：事件关注聚合页（卡片复用 `EventItemCard`，取关即移除；空态引导去事件传导）。
+- `src/modules/user/pages/profile.vue`：我的页「自选股」下方新增「事件关注」入口。
+- `src/modules/chat/pages/event/list.vue`：「重大事件」标题行改为「关注 · N」入口，`onShow` 刷新角标并校正卡片关注态。
+- 测试：`eventFollowStore.spec.ts`、`useEventList.spec.ts`、`EventItemCard.follow.mount.spec.ts`（含双向切换、父级不回传 prop、store 双实例三处回归）。
+
+### 修复
+
+- 事件卡片关注按钮点击后不切换：根因是按钮文案为 `Button` 插槽内容，uni-app H5 下父组件更新只 patch 属性、插槽文本不 patch（实测 class 已变、文案不变）。改为卡片本地 `ref` 乐观切换 + `watch(followRevision)` / `watch(props.event.isFollowed)` 校正，并给 `Button` 加 `:key` 强制重建节点。
+- `eventApi.followEvent/unfollowEvent` 由「显式抛错」改为写本地快照；`useEventFollow.toggleFollow(event)` 以本地真实状态判断方向；`eventAdapter` 两处 `isFollowed` 取自 `isEventFollowed`。
+
+### 改进
+
+- `FavoriteRelatedCard.vue`：自选股相关事件卡去掉展开/收起，固定展示前 3 条、超出在卡片内滚动。
+- `VitalityBadge.vue` / `constants.ts`：存活度只标注「影响已消散」（expired），其余状态不渲染。
+
+### 验证
+
+- `npm test`：76 files / 759 tests passed；`npx vue-tsc --noEmit` exit 0；浏览器实操「关注 ↔ 已关注」多次切换一致。
+
+---
+
 ## [xusiyun] 2026-11-07 — 自选股相关重大事件卡片：位置下移、默认收起、标题强化
 
 **开发者**: xusiyun

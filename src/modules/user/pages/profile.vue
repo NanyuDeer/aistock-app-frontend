@@ -175,6 +175,11 @@
               <SvgIcon name="bar-chart-line" size="36rpx" color="#4b5a7a" />
             </template>
           </ListCell>
+          <ListCell title="事件关注" clickable showArrow :border="true" @click="goFollowedEvents">
+            <template #prefix>
+              <SvgIcon name="bookmark-3-line" size="36rpx" color="#4b5a7a" />
+            </template>
+          </ListCell>
           <ListCell title="账号与安全" description="绑定邮箱 / 微信" clickable showArrow :border="true" @click="goAccountSecurity">
             <template #prefix>
               <SvgIcon name="shield-check-line" size="36rpx" color="#4b5a7a" />
@@ -608,6 +613,11 @@ function goLogin() {
 
 function goFavorites() {
   uni.navigateTo({ url: '/modules/favorites/pages/favorites' })
+}
+
+/** 事件关注：本地关注快照聚合页（服务端暂无关注能力） */
+function goFollowedEvents() {
+  uni.navigateTo({ url: '/modules/chat/pages/event/followed' })
 }
 
 function goAccountSecurity() {

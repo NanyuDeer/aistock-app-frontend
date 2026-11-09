@@ -1,14 +1,19 @@
 <template>
   <SubPageCard title="事件传导">
     <view class="event-list-content">
-      <!-- AI关注焦点区域：标题行（含时间线入口图标）始终显示，卡片仅在有焦点事件时渲染 -->
+      <!-- AI关注焦点区域：标题行（含关注 / 时间轴入口）始终显示，卡片仅在有焦点事件时渲染 -->
       <view class="ai-focus-section">
-        <!-- 标题行：重大事件（左）+ 时间轴入口（行最右，文字+淡色图标） -->
-        <view class="section-title-row" @tap="goToTimeline">
+        <!-- 标题行：重大事件（左）+ 关注/时间轴入口（行最右，文字+淡色图标） -->
+        <view class="section-title-row">
           <text class="section-title">重大事件</text>
-          <view class="timeline-entry">
-            <text class="timeline-entry-text">时间轴</text>
-            <SvgIcon name="calendar-line" size="26rpx" color="#4b5a7a" />
+          <view class="section-entries">
+            <view class="section-entry" @tap.stop="goToFollowed">
+              <text class="section-entry-text">关注 · {{ followedCountValue }}</text>
+            </view>
+            <view class="section-entry" @tap.stop="goToTimeline">
+              <text class="section-entry-text">时间轴</text>
+              <SvgIcon name="calendar-line" size="26rpx" color="#4b5a7a" />
+            </view>
           </view>
         </view>
         <!-- 固定左利好/右利空；单一时单卡全宽，不保留空白卡位 -->
@@ -38,7 +43,7 @@
         </view>
       </view>
 
-      <!-- 自选股相关事件卡片：位于重大事件卡片下方，默认收起；标题行始终渲染 -->
+      <!-- 自选股相关事件卡片：位于重大事件卡片下方，固定展示 3 条、其余内部滚动；标题行始终渲染 -->
       <FavoriteRelatedCard :rows="favoriteRelatedRows" />
 
       <!-- 分类Tab -->
@@ -107,6 +112,7 @@
  * 支持分类筛选、分页加载、关注事件。
  */
 import { computed, onMounted, ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import type { EventItem } from '@/modules/chat/event/types'
 import type { FocusEventViewModel } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
@@ -121,6 +127,7 @@ import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
 import FavoriteRelatedCard from '@/modules/chat/event/components/FavoriteRelatedCard.vue'
 import { EVENT_TYPES } from '@/modules/chat/event/constants'
+import { followedCount, isEventFollowed } from '@/modules/chat/event/eventFollowStore'
 
 // ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
 const tabItems = [{ label: '全部', value: '全部' }, ...EVENT_TYPES.map(v => ({ label: v, value: v }))]
@@ -172,11 +179,27 @@ const {
 
 const { toggleFollow } = useEventFollow()
 
+/** 已关注条数（「关注 · N」入口角标） */
+const followedCountValue = ref(0)
+
+/** 从本地关注快照同步条数：关注/取关、从关注页返回时都要刷新 */
+function syncFollowedCount() {
+  followedCountValue.value = followedCount()
+}
+
 // ========== 生命周期 ==========
 onMounted(() => {
   refresh()
   loadFocusEvents()
   loadFavoriteRelated()
+})
+
+// 从关注页返回时可能已取关：不重新拉接口，只用本地真实状态校正内存中的卡片
+onShow(() => {
+  syncFollowedCount()
+  events.value.forEach((event) => {
+    updateFollowStatus(event.eventId, isEventFollowed(event.eventId))
+  })
 })
 
 // ========== 事件处理 ==========
@@ -207,6 +230,13 @@ function goToTimeline() {
   })
 }
 
+/** 跳转「事件关注」聚合页（本地快照，类比收藏夹） */
+function goToFollowed() {
+  uni.navigateTo({
+    url: '/modules/chat/pages/event/followed',
+  })
+}
+
 /** 点击事件标题 → 跨端跳转原文：H5 新标签打开，APP 内 web-view 打开；无链接友好提示 */
 function goToNews(event: EventItem) {
   const url = event.sourceInfo?.url
@@ -232,12 +262,11 @@ function openNewsUrl(url?: string) {
   // #endif
 }
 
-/** 关注/取消关注 */
+/** 关注/取消关注（toggleFollow 返回切换后的真实状态） */
 async function handleFollow(event: EventItem) {
-  const success = await toggleFollow(event.eventId, event.isFollowed)
-  if (success) {
-    updateFollowStatus(event.eventId, !event.isFollowed)
-  }
+  const followed = await toggleFollow(event)
+  updateFollowStatus(event.eventId, followed)
+  syncFollowedCount()
 }
 </script>
 
@@ -277,16 +306,12 @@ async function handleFollow(event: EventItem) {
   margin-bottom: 20rpx;
 }
 
-/* 标题行：重大事件（左）+ 时间轴入口（行最右，space-between 撑满整行） */
+/* 标题行：重大事件（左）+ 关注/时间轴入口（行最右，space-between 撑满整行） */
 .section-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10rpx;
-}
-
-.section-title-row:active {
-  opacity: 0.7;
 }
 
 .section-title {
@@ -297,14 +322,27 @@ async function handleFollow(event: EventItem) {
   letter-spacing: 0.5rpx;
 }
 
-/* 时间轴入口：次要文字色（ink-soft #4b5a7a）+ 图标，紧贴行最右侧 */
-.timeline-entry {
+/* 标题行右侧入口组：关注 / 时间轴并排（行本身不可点，各自独立热区） */
+.section-entries {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  flex-shrink: 0;
+}
+
+/* 单个入口：次要文字色（ink-soft #4b5a7a）+ 图标；padding 撑大热区，避免小字难点 */
+.section-entry {
   display: flex;
   align-items: center;
   gap: 6rpx;
+  padding: 8rpx 2rpx;
 }
 
-.timeline-entry-text {
+.section-entry:active {
+  opacity: 0.6;
+}
+
+.section-entry-text {
   font-size: 24rpx;
   color: #4b5a7a;
 }

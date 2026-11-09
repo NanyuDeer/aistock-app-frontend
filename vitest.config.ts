@@ -52,6 +52,12 @@ export default defineConfig({
       'src/shared/utils/speechInput.spec.ts',
       'src/shared/utils/traceDate.spec.ts',
       'src/modules/chat/event/api/eventService.spec.ts',
+      // 事件关注本地快照存储（关注按钮生效 + 关注聚合页的数据源）
+      'src/modules/chat/event/eventFollowStore.spec.ts',
+      // 列表关注状态的不可变更新契约（点击关注后卡片按钮必须重渲染）
+      'src/modules/chat/event/composables/useEventList.spec.ts',
+      // 卡片关注按钮端到端：点击 → emit → 本地快照 → 按钮文案切换
+      'src/modules/chat/event/components/EventItemCard.follow.mount.spec.ts',
       'src/pages-sub-app/chat/ReasoningPanel.spec.ts',
       'src/shared/store/modules/market.spec.ts',
       'src/modules/home/components/StockContent.spec.ts',

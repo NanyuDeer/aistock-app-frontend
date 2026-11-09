@@ -27,7 +27,7 @@
         </view>
       </view>
 
-      <!-- 自选股相关事件：位于重大事件卡片下方，默认收起；标题行始终渲染 -->
+      <!-- 自选股相关事件：位于重大事件卡片下方，固定展示 3 条、其余内部滚动；标题行始终渲染 -->
       <FavoriteRelatedCard :rows="favoriteRelatedRows" />
 
       <!-- 分隔线 -->
@@ -223,12 +223,10 @@ function goToNews(event: EventItem) {
   // #endif
 }
 
-/** 关注/取消关注 */
+/** 关注/取消关注（toggleFollow 返回切换后的真实状态） */
 async function handleFollow(event: EventItem) {
-  const success = await toggleFollow(event.eventId, event.isFollowed)
-  if (success) {
-    updateFollowStatus(event.eventId, !event.isFollowed)
-  }
+  const followed = await toggleFollow(event)
+  updateFollowStatus(event.eventId, followed)
 }
 </script>
 
