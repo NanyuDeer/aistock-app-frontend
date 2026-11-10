@@ -131,12 +131,22 @@ export function useEventList() {
 
   /**
    * 本地更新关注状态（乐观更新）
+   *
+   * 【必须替换元素引用，不能原地改字段】卡片按钮的文案绑定在 `event.isFollowed` 上，
+   * 原地 mutate（event.isFollowed = followed）在列表页不会让 EventItemCard 重渲染，
+   * 表现为「点了关注但按钮还是显示关注」（关注聚合页因为整表替换所以正常）。
+   * 这里用不可变更新：换一个新对象写回数组，v-for 的 key（eventId）不变、DOM 复用，
+   * 但子组件拿到新 prop 会重渲染。
+   * 状态未变化时直接返回，避免 onShow 同步时整表无意义重渲染。
    */
   function updateFollowStatus(eventId: string, followed: boolean): void {
-    const event = events.value.find(e => e.eventId === eventId)
-    if (event) {
-      event.isFollowed = followed
-    }
+    const index = events.value.findIndex(e => e.eventId === eventId)
+    if (index === -1) return
+
+    const current = events.value[index]
+    if (current.isFollowed === followed) return
+
+    events.value[index] = { ...current, isFollowed: followed }
   }
 
   return {
