@@ -207,6 +207,14 @@ export function useStockAlerts(pollIntervalMs = 60_000) {
     }
   }
 
+  /** 一键关闭：把当前所有卡片（含被堆叠遮挡的）一次性隐藏，语义与单卡 × 一致（仅本次会话） */
+  function dismissAll(): void {
+    const symbols = cards.value.map((card) => card.symbol)
+    if (!symbols.length) return
+    const merged = new Set([...dismissedSymbols.value, ...symbols])
+    dismissedSymbols.value = Array.from(merged)
+  }
+
   let timer: ReturnType<typeof setInterval> | null = null
 
   /** 仅交易时段轮询（与 AlertContent 同口径，避免非盘中空转） */
@@ -233,6 +241,7 @@ export function useStockAlerts(pollIntervalMs = 60_000) {
     dismissedSymbols,
     fetchRecent,
     dismiss,
+    dismissAll,
     isDismissed,
     startPolling,
     stopPolling,

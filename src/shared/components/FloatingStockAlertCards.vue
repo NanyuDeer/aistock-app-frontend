@@ -1,6 +1,7 @@
 <template>
   <!-- ① 首页悬浮「自选股消息卡」：一只股票一张卡，多股堆叠（最多 3 张，下层只露头部）；
-       H5/App 支持左右跟手拖动切换（iOS 式堆叠回弹），各端保留上下滑动切换 -->
+       上滑拖出即可叉掉该卡（H5 桌面用鼠标上拖演示；左右/下滑不响应）；
+       点击下层卡把它置顶（只浏览，不关闭）；右上角圆钮一键关闭全部（本次会话隐藏） -->
   <view v-if="stack.length" class="fsac" :style="wrapStyle">
     <!-- measured 前只渲染最上层卡：拿不到实测高度时下层定位不可靠，避免"被完全遮住"的错误视觉 -->
     <template v-for="(card, idx) in stack" :key="card.symbol">
@@ -9,10 +10,12 @@
         class="fsac__card"
         :class="{ 'is-lower': idx > 0, 'is-dragging': following }"
         :style="cardStyle(idx)"
-        @touchstart="onTouchStart"
-        @touchmove="onTouchMove"
-        @touchend="onTouchEnd"
-        @touchcancel="onTouchCancel"
+        @touchstart="onTouchStart($event, idx)"
+        @touchmove="onTouchMove($event, idx)"
+        @touchend="onTouchEnd($event, idx)"
+        @touchcancel="onTouchCancel(idx)"
+        @mousedown="onMouseDown($event, idx)"
+        @tap="idx > 0 && promote(card.symbol)"
       >
       <!-- 头部：股票名 + 代码 + 涨跌幅（下层卡露出这一行；最后一层留空，只作堆叠边条） -->
       <view class="fsac__head" :class="{ 'is-blank': !showHead(idx) }">
@@ -51,6 +54,11 @@
       </template>
       </view>
     </template>
+
+    <!-- 一键关闭全部：堆叠右上角悬浮圆钮，贴在卡片顶边之上（本次会话隐藏全部卡片） -->
+    <view v-if="measured" class="fsac__close-all-float" :style="floatCloseStyle" @tap.stop="emit('closeAll')">
+      <SvgIcon name="close-line" size="28rpx" color="#8a96b0" />
+    </view>
   </view>
 </template>
 
@@ -58,34 +66,25 @@
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { getTabBarBottomPx, getTabBarHeightPx, rpx2px } from '@/shared/utils/layout'
-import { isApp, isH5 } from '@/shared/utils/platform'
+import { isH5 } from '@/shared/utils/platform'
 import {
   dragProgress,
-  lerp,
   resolveDragAxis,
-  resolveSwipeDirection,
-  rotateOrder,
-  tiltDegrees,
   type DragAxis,
-  type SwipeDirection,
 } from '@/shared/utils/cardStackSwipe'
 import type { StockAlertCard } from '@/shared/utils/useStockAlerts'
 
-/** 最多同时堆叠的卡片数（其余股票需滑动查看） */
+/** 最多同时堆叠的卡片数（其余股票需关闭上层卡或点击下层卡置顶查看） */
 const MAX_STACK = 3
-/** 纵向滑动切换阈值（px）：上/下滑沿用原有手感，未改动 */
-const SWIPE_THRESHOLD_PX = 30
-/** 横向拖动判定切换的距离（px，约卡片宽度的 1/3），同时作为跟手进度 1 的基准 */
-const SWITCH_DISTANCE_PX = rpx2px(240)
-/** 跟手倾斜上限（deg）：拖动到 SWITCH_DISTANCE_PX 时达到该角度，超出按上限截断 */
-const MAX_TILT_DEG = 4
-/** 飞出动画时长（ms）：必须与 .fsac__card 的 transition 时长一致，否则顺序轮转早于动画结束会闪跳 */
+/** 上滑关闭阈值（px）：向上拖出超过该距离松手即叉掉该卡（约卡片高度的 0.8 倍） */
+const DISMISS_DISTANCE_PX = rpx2px(220)
+/** 飞出动画时长（ms）：必须与 .fsac__card 的 transition 时长一致，否则复位早于动画结束会闪跳 */
 const FLY_OUT_MS = 220
-/** 横向跟手拖动仅在 H5 / App 端启用：小程序（原生 swiper 生态不同、触摸事件语义有差异）保持原有上下滑动 */
-const HORIZONTAL_SWIPE_ENABLED = isH5 || isApp
+/** 鼠标拖动仅 H5 启用：电脑端用鼠标演示同一套「拖出即关闭」手势 */
+const MOUSE_DRAG_ENABLED = isH5
 
 const props = defineProps<{ cards: StockAlertCard[] }>()
-const emit = defineEmits<{ close: [symbol: string]; viewAll: [symbol: string] }>()
+const emit = defineEmits<{ close: [symbol: string]; closeAll: []; viewAll: [symbol: string] }>()
 
 const instance = getCurrentInstance()
 
@@ -216,49 +215,59 @@ function layerSlot(k: number): LayerSlot {
   }
 }
 
-/** 跟手拖动状态：dragX = 手指水平位移（px），dragAxis = 已锁定的手势主轴，flyingOut = 上层卡正在飞出 */
-const dragX = ref(0)
+/** 跟手拖动状态：dragY = 手指（鼠标）纵向位移（px，仅向上为负），dragAxis = 已锁定的手势主轴 */
+const dragY = ref(0)
 const dragAxis = ref<DragAxis>('none')
-const flyingOut = ref(false)
-let touchStartX = 0
-let touchStartY = 0
-let flyOutTimer: ReturnType<typeof setTimeout> | null = null
+/** 上滑达阈值：上层卡向上飞出后关闭（叉掉该卡） */
+const dismissing = ref(false)
+let dragStartX = 0
+let dragStartY = 0
+let settleTimer: ReturnType<typeof setTimeout> | null = null
+/** 鼠标拖动监听是否已挂到 window（仅 H5 桌面演示用） */
+let mouseListening = false
 
-/** 拖动进度 0~1：驱动下层卡升位、上层卡淡出；飞出阶段固定为 1（下一张已就位） */
-const progress = computed(() => (flyingOut.value ? 1 : dragProgress(dragX.value, SWITCH_DISTANCE_PX)))
-
-/** 是否处于「跟手」阶段：此间必须关闭 CSS 过渡，卡片才能 1:1 跟随手指 */
-const following = computed(() => dragAxis.value === 'horizontal' && !flyingOut.value)
+/** 是否处于「跟手」阶段：此间必须关闭 CSS 过渡，卡片才能 1:1 跟随手指/鼠标 */
+const following = computed(() => dragAxis.value !== 'none' && !dismissing.value)
 
 /**
  * 逐层定位：
- *   idx=0 完整展开卡 —— 跟手位移 + 倾斜（松手后的回弹 / 飞出交给 transition）
- *   idx>0 下层卡 —— 底边、缩放、透明度、模糊按 progress 从「第 idx 层位」过渡到「第 idx-1 层位」，
- *                   进度满时下一张正好落到完整展开位，因此顺序轮转时不会跳变
+ *   idx=0 完整展开卡 —— 上滑跟手位移（松手后回弹 / 飞出交给 transition）；左右/下滑不响应
+ *   idx>0 下层卡 —— 静态堆叠位（底边、缩放、透明度、模糊按层固定；点击可置顶）
  */
 function cardStyle(idx: number): Record<string, string> {
-  const p = progress.value
   if (idx === 0) {
-    const tilt = tiltDegrees(dragX.value, MAX_TILT_DEG, SWITCH_DISTANCE_PX)
+    // 拖出进度只用于淡出；下层卡不随拖动升位（切换改为点击下层卡置顶）
+    const dragProgressValue = dragProgress(dragY.value, DISMISS_DISTANCE_PX)
     return {
       bottom: '0px',
       zIndex: '100',
-      transform: `translateX(${dragX.value}px) rotate(${tilt}deg) scale(1)`,
+      transform: `translateY(${dragY.value}px) scale(1)`,
       transformOrigin: 'bottom center',
-      opacity: String(flyingOut.value ? 0 : 1 - p * 0.45),
+      opacity: String(dismissing.value ? 0 : 1 - dragProgressValue * 0.45),
     }
   }
-  const from = layerSlot(idx)
-  const to = layerSlot(idx - 1)
+  const slot = layerSlot(idx)
   return {
-    bottom: `${lerp(from.bottom, to.bottom, p)}px`,
+    bottom: `${slot.bottom}px`,
     zIndex: String(100 - idx),
-    transform: `scale(${lerp(from.scale, to.scale, p)})`,
+    transform: `scale(${slot.scale})`,
     transformOrigin: 'bottom center',
-    opacity: String(lerp(from.opacity, to.opacity, p)),
-    filter: `blur(${lerp(from.blur, to.blur, p)}px)`,
+    opacity: String(slot.opacity),
+    filter: `blur(${slot.blur}px)`,
   }
 }
+
+/** 一键关闭全部：贴在堆叠卡顶边之上（依赖于最上层卡实测高度） */
+const floatCloseStyle = computed(() => ({
+  bottom: `${(cardHeights.value[0] || 0) + 8}px`,
+}))
+
+/** 点击下层卡：把它置顶（只改变浏览顺序，不关闭任何卡） */
+function promote(symbol: string): void {
+  if (!order.value.includes(symbol)) return
+  order.value = [symbol, ...order.value.filter((s) => s !== symbol)]
+}
+
 
 // 最上层卡的内容（行数/股票）变化后重新测量高度，驱动下层卡重新定位
 watch(
@@ -276,78 +285,129 @@ watch(measured, (ready) => { if (ready) void nextTick(measureCards) })
 // 卡片清空（全部关闭/登出）后复位，下次数据到达时重新走「先测高、再渲染下层」
 watch(() => stack.value.length, (len) => { if (!len) measured.value = false })
 
-function onTouchStart(event: TouchEvent): void {
-  if (flyingOut.value) return
-  const touch = event.touches?.[0]
-  touchStartX = touch?.clientX ?? 0
-  touchStartY = touch?.clientY ?? 0
+/** 起手：记录起点并清空位移（关闭动画进行中不再接受新手势） */
+function beginDrag(x: number, y: number): void {
+  if (dismissing.value) return
+  dragStartX = x
+  dragStartY = y
   dragAxis.value = 'none'
-  dragX.value = 0
-}
-
-function onTouchMove(event: TouchEvent): void {
-  // 单张卡无从切换，不进入跟手拖动
-  if (!HORIZONTAL_SWIPE_ENABLED || flyingOut.value || order.value.length < 2) return
-  const touch = event.touches?.[0]
-  if (!touch) return
-  const dx = (touch.clientX ?? 0) - touchStartX
-  const dy = (touch.clientY ?? 0) - touchStartY
-  // 首次越过锁定阈值才定主轴：纵向手势直接让位给原有上下滑动，不做跟手
-  if (dragAxis.value === 'none') {
-    dragAxis.value = resolveDragAxis(dx, dy)
-    if (dragAxis.value !== 'horizontal') return
-  }
-  if (dragAxis.value !== 'horizontal') return
-  dragX.value = dx
-}
-
-function onTouchEnd(event: TouchEvent): void {
-  if (flyingOut.value) return
-  const endY = event.changedTouches?.[0]?.clientY ?? touchStartY
-
-  // 横向跟手拖动：达阈值则飞出并轮转，未达阈值回弹归位
-  if (dragAxis.value === 'horizontal') {
-    dragAxis.value = 'none'
-    const dir = resolveSwipeDirection(dragX.value, SWITCH_DISTANCE_PX)
-    if (dir === 0) {
-      dragX.value = 0
-      return
-    }
-    flyOut(dir)
-    return
-  }
-
-  // 纵向（含未锁定方向的小幅手势）：沿用原有上下滑动切换，上滑看下一张、下滑看上一张
-  const delta = endY - touchStartY
-  if (Math.abs(delta) < SWIPE_THRESHOLD_PX || order.value.length < 2) return
-  dragX.value = 0
-  order.value = rotateOrder(order.value, delta < 0 ? -1 : 1)
-}
-
-/** 手指中断/被系统抢占：直接回弹归位，避免卡片停在半路 */
-function onTouchCancel(): void {
-  if (flyingOut.value) return
-  dragAxis.value = 'none'
-  dragX.value = 0
+  dragY.value = 0
 }
 
 /**
- * 松手达阈值：上层卡沿手势方向飞出淡出，动画结束后再轮转展示顺序并复位。
- * 动画结束时下一张卡已按 progress=1 停在完整展开位，故轮转不会产生位置跳变。
+ * 跟手移动：只响应「向上」的纵向手势（关闭手势）。
+ * 左右与下滑一律不跟手（用户已确认取消：左右滑/下滑不做事）。
  */
-function flyOut(dir: SwipeDirection): void {
-  flyingOut.value = true
-  dragX.value = dir * SWITCH_DISTANCE_PX * 1.6
-  flyOutTimer = setTimeout(() => {
-    flyOutTimer = null
-    order.value = rotateOrder(order.value, dir)
-    flyingOut.value = false
-    dragX.value = 0
+function applyDrag(x: number, y: number): void {
+  if (dismissing.value) return
+  const dx = x - dragStartX
+  const dy = y - dragStartY
+  if (dragAxis.value === 'none') dragAxis.value = resolveDragAxis(dx, dy)
+
+  if (dragAxis.value === 'vertical') {
+    dragY.value = Math.min(0, dy)
+    return
+  }
+  // 横向手势：不跟手、不关闭
+  if (dragAxis.value === 'horizontal') dragY.value = 0
+}
+
+/** 松手结算：上滑超过阈值即叉掉该卡；其余情况（左右/下滑/位移不足）一律回弹归位 */
+function settleDrag(x: number, y: number): void {
+  if (dismissing.value) return
+  const dy = y - dragStartY
+  const axis = dragAxis.value
+  dragAxis.value = 'none'
+
+  if (axis === 'vertical' && dy <= -DISMISS_DISTANCE_PX) {
+    flyAway()
+    return
+  }
+  dragY.value = 0
+}
+
+/**
+ * 只有最上层卡参与拖动（下层卡被上层遮住大半，点它 = 置顶）。
+ * 之前把监听挂在每张卡上，拖动下层卡会移动上层卡，是「左右滑动有 bug」的来源之一。
+ */
+function onTouchStart(event: TouchEvent, idx: number): void {
+  if (idx !== 0) return
+  const touch = event.touches?.[0]
+  beginDrag(touch?.clientX ?? 0, touch?.clientY ?? 0)
+}
+
+function onTouchMove(event: TouchEvent, idx: number): void {
+  if (idx !== 0) return
+  const touch = event.touches?.[0]
+  if (!touch) return
+  applyDrag(touch.clientX ?? 0, touch.clientY ?? 0)
+}
+
+function onTouchEnd(event: TouchEvent, idx: number): void {
+  if (idx !== 0) return
+  const touch = event.changedTouches?.[0]
+  settleDrag(touch?.clientX ?? dragStartX, touch?.clientY ?? dragStartY)
+}
+
+/** 手指中断/被系统抢占：直接回弹归位，避免卡片停在半路 */
+function onTouchCancel(idx: number): void {
+  if (idx !== 0 || dismissing.value) return
+  dragAxis.value = 'none'
+  dragY.value = 0
+}
+
+/**
+ * H5 桌面：触摸事件不会触发，改用鼠标拖动，让「上滑关闭」在电脑上也能演示。
+ * 卡内按钮（单卡关闭 ×/一键关闭/查看全部）不参与拖动，避免点按钮时误触发手势。
+ */
+function onMouseDown(event: MouseEvent, idx: number): void {
+  if (idx !== 0 || !MOUSE_DRAG_ENABLED || typeof window === 'undefined') return
+  const target = event.target as HTMLElement | null
+  if (target?.closest?.('.fsac__close, .fsac__more, .fsac__close-all-float')) return
+  beginDrag(event.clientX, event.clientY)
+  if (!mouseListening) {
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    mouseListening = true
+  }
+  event.preventDefault()
+}
+
+function onMouseMove(event: MouseEvent): void {
+  applyDrag(event.clientX, event.clientY)
+}
+
+function onMouseUp(event: MouseEvent): void {
+  settleDrag(event.clientX, event.clientY)
+  stopMouseListeners()
+}
+
+function stopMouseListeners(): void {
+  if (!mouseListening || typeof window === 'undefined') return
+  window.removeEventListener('mousemove', onMouseMove)
+  window.removeEventListener('mouseup', onMouseUp)
+  mouseListening = false
+}
+
+/**
+ * 上滑达阈值：上层卡向上飞出淡出，动画结束后 emit close 交给父组件
+ * （本次会话关闭该卡）。
+ */
+function flyAway(): void {
+  const symbol = stack.value[0]?.symbol
+  dismissing.value = true
+  dragY.value = -((cardHeights.value[0] || 0) + 80)
+  settleTimer = setTimeout(() => {
+    settleTimer = null
+    dismissing.value = false
+    dragY.value = 0
+    if (symbol) emit('close', symbol)
   }, FLY_OUT_MS)
 }
 
 onBeforeUnmount(() => {
-  if (flyOutTimer) clearTimeout(flyOutTimer)
+  if (settleTimer) clearTimeout(settleTimer)
+  stopMouseListeners()
 })
 
 function shortSymbol(symbol: string): string {
@@ -531,10 +591,31 @@ function countText(card: StockAlertCard): string {
   font-size: $font-size-xs;
 }
 
+/* 底部右侧：查看全部 */
 .fsac__more {
   display: inline-flex;
   align-items: center;
   gap: 2rpx;
+}
+
+/* 一键关闭全部：堆叠右上角悬浮圆钮（贴在堆叠卡顶边之上） */
+.fsac__close-all-float {
+  position: absolute;
+  right: 0;
+  z-index: 101;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52rpx;
+  height: 52rpx;
+  border: 2rpx solid $line;
+  border-radius: 50%;
+  background: $bg-card;
+  box-shadow: $shadow-sm;
+}
+
+.fsac__close-all-float:active {
+  opacity: 0.6;
 }
 
 .fsac__more-text {
