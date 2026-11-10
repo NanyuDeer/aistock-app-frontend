@@ -42,8 +42,8 @@
     <!-- 全局 AI 对话栏（共享，不闪烁） -->
     <GlobalChatBar />
 
-    <!-- ① 首页悬浮「自选股消息卡」：一只股票一张卡，多股堆叠（最多 3 张，H5/App 左右跟手拖动切换、各端可上下滑动切换） -->
-    <FloatingStockAlertCards :cards="alertCards" @close="dismissAlert" @view-all="openPanel" />
+    <!-- ① 首页悬浮「自选股消息卡」：一只股票一张卡，多股堆叠（最多 3 张；上滑叉掉该卡、左右/下滑不响应，H5 桌面支持鼠标上拖），点击下层卡置顶，右上角圆钮一键关闭全部 -->
+    <FloatingStockAlertCards :cards="alertCards" @close="dismissAlert" @close-all="dismissAllAlerts" @view-all="openPanel" />
 
     <!-- 播报悬浮窗（首页晨报等调用 podcastStore.open 后显示；仅首页前台时渲染） -->
     <FloatingPodcast :page-key="pageKey" />
@@ -84,6 +84,7 @@ const {
   cards: alertCards,
   fetchRecent: fetchAlerts,
   dismiss: dismissAlert,
+  dismissAll: dismissAllAlerts,
   startPolling: startAlertPolling,
   stopPolling: stopAlertPolling,
 } = useStockAlerts()
