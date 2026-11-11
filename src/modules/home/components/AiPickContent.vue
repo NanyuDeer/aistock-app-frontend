@@ -65,13 +65,21 @@
               <line x1="0" y1="62" x2="120" y2="62" stroke="#edf0f5" stroke-width="1" />
             </svg>
           </view>
-          <view class="reason-line" @tap.stop="toggleReason(item.symbol, item.reason)">
-            <view class="reason-label">推荐理由</view>
-            <view v-if="item.matchedTags.length" class="match-tags">
-              <text v-for="tag in item.matchedTags" :key="tag" class="match-tag">{{ tag }}</text>
+          <view v-if="item.entry" class="entry-line">
+            <text>入选以来</text>
+            <text :class="item.entryReturn == null || item.entryReturn === 0 ? '' : item.entryReturn < 0 ? 'is-down' : 'is-up'">
+              {{ item.entryReturn == null ? '—' : formatChange(item.entryReturn) }}
+            </text>
+            <text>· {{ item.entry.sessions === 1 ? '本轮首次入选' : `连续入选 ${item.entry.sessions} 个交易日` }}</text>
+          </view>
+          <view class="reason-line" @tap.stop="toggleReason(item.symbol)">
+            <view class="reason-label">洞见</view>
+            <view class="reason-body">
+              <view :class="['reason-text', { expanded: isReasonExpanded(item.symbol) }]">{{ item.reason }}</view>
+              <view class="reason-text reason-measure" aria-hidden="true">{{ item.reason }}</view>
+              <view class="reason-limit" aria-hidden="true"></view>
             </view>
-            <view :class="['reason-text', { expanded: isReasonExpanded(item.symbol) }]">{{ item.reason }}</view>
-            <view v-if="isLongReason(item.reason)" class="reason-toggle"><text>{{ isReasonExpanded(item.symbol) ? '⌃' : '⌄' }}</text></view>
+            <view v-if="overflowingReasons.has(item.symbol)" class="reason-toggle"><text>{{ isReasonExpanded(item.symbol) ? '⌃' : '⌄' }}</text></view>
           </view>
         </view>
       </template>
@@ -80,13 +88,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onActivated, onDeactivated, onMounted, onUnmounted } from 'vue'
+import { computed, getCurrentInstance, nextTick, ref, watch, onActivated, onDeactivated, onMounted, onUnmounted } from 'vue'
 import { aiStockSelectionApi, type AiStockSelectionItem, type SelectionLiveQuote } from '@/shared/api/modules/ai-stock-selection'
 import { useFavoritesStore } from '@/shared/store'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { horizons, methodsByHorizon, legacyMethodCodes, availableMethodCodes, type HorizonCode } from './aiPickStrategies'
 
-type Recommendation = Omit<AiStockSelectionItem, 'reason' | 'sparkline'> & { reason: string; sparkline: number[]; matchedTags: string[]; changeAmount: number | null }
+type Recommendation = Omit<AiStockSelectionItem, 'reason' | 'sparkline'> & { reason: string; sparkline: number[]; changeAmount: number | null; entryReturn: number | null }
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true })
 const STRATEGY_PREFERENCE_KEY = 'ai_stock_selection_strategy_preference'
 const favoritesStore = useFavoritesStore()
@@ -113,6 +121,7 @@ function methodCodes(horizon: HorizonCode): string[] {
 }
 
 function defaultMethods(horizon: HorizonCode): string[] {
+  if (horizon === 'short') return ['volume_breakout']
   const codes = methodCodes(horizon)
   return codes.length ? [codes.find(code => availableMethodCodes.has(code)) || codes[0]] : []
 }
@@ -163,16 +172,44 @@ function toggleMethod(code: string) {
   persistPreference()
 }
 
+const nextQuoteTradeDate = ref<string | null>(null)
+
+function returnSinceEntry(item: AiStockSelectionItem): number | null {
+  const closeReturn = item.entry?.closeReturn
+  if (closeReturn == null) return null
+  const quote = liveQuotes.value[item.symbol]
+  if (nextQuoteTradeDate.value && quote?.price != null && quote.tradeDate === nextQuoteTradeDate.value && quote.changeAmount != null) {
+    // The quote's reference close incorporates the exchange's ex-rights adjustment.
+    const reference = quote.price - quote.changeAmount
+    if (reference > 0) return ((1 + closeReturn / 100) * quote.price / reference - 1) * 100
+  }
+  return closeReturn
+}
+
+const methodNames = Object.values(methodsByHorizon).flat().map(method => method.name)
+
+function conciseInsight(item: AiStockSelectionItem): string {
+  const text = item.reason.flatMap(reason => reason.split(/[；;。\n]+/)).map(part => {
+    let detail = part.trim()
+    for (const name of methodNames) {
+      if (detail === name) return ''
+      if (detail.startsWith(name)) detail = detail.slice(name.length).replace(/^[：:\s]+/, '')
+    }
+    return detail
+  }).filter(Boolean)
+  return [...new Set(text)].slice(0, 2).map(detail => detail.length > 42 ? `${detail.slice(0, 42)}…` : detail).join('；') || '暂无洞见'
+}
+
 // 保留服务端推荐顺序（rank）；实时行情更新不改变 AI综合或方法选股的排名。
 const recommendations = computed<Recommendation[]>(() => {
   const rows = items.value.map((item) => ({
     ...item,
+    entryReturn: returnSinceEntry(item),
     price: liveQuotes.value[item.symbol]?.price ?? null,
     changePct: liveQuotes.value[item.symbol]?.changePct ?? null,
     changeAmount: liveQuotes.value[item.symbol]?.changeAmount ?? null,
-    reason: item.reason.filter(Boolean).join('；') || '暂无推荐理由',
+    reason: conciseInsight(item),
     sparkline: liveSparkline(item),
-    matchedTags: item.matchedTags || [],
   }))
   return rows
 })
@@ -235,10 +272,27 @@ async function refreshQuotes(initial = false) {
     if (version === quoteVersion && quotesEnabled.value) quoteTimer = setTimeout(() => { void refreshQuotes() }, 60_000)
   }
 }
-function isLongReason(reason: string): boolean { return reason.length > 34 }
+const overflowingReasons = ref(new Set<string>())
+const component = getCurrentInstance()?.proxy
+let measurementVersion = 0
+
+async function measureReasons() {
+  const version = ++measurementVersion
+  await nextTick()
+  if (version !== measurementVersion || typeof uni.createSelectorQuery !== 'function') return
+  const symbols = recommendations.value.map(item => item.symbol)
+  if (!symbols.length) { overflowingReasons.value = new Set(); return }
+  const query = uni.createSelectorQuery().in(component)
+  query.selectAll('.reason-measure').boundingClientRect()
+  query.selectAll('.reason-limit').boundingClientRect()
+  query.exec(([full, limits]) => {
+    if (version !== measurementVersion || full?.length !== symbols.length || limits?.length !== symbols.length) return
+    overflowingReasons.value = new Set(symbols.filter((_, index) => full[index].height > limits[index].height + 1))
+  })
+}
 function isReasonExpanded(symbol: string): boolean { return expandedReasons.value.has(symbol) }
-function toggleReason(symbol: string, reason: string) {
-  if (!isLongReason(reason)) return
+function toggleReason(symbol: string) {
+  if (!overflowingReasons.value.has(symbol)) return
   const next = new Set(expandedReasons.value)
   if (next.has(symbol)) next.delete(symbol)
   else next.add(symbol)
@@ -266,16 +320,18 @@ async function loadSelection() {
   liveQuotes.value = {}
   quoteState.value = 'idle'
   selectionDate.value = ''
+  nextQuoteTradeDate.value = null
   expandedReasons.value = new Set()
-  if (horizon !== 'ai' && (!methods.length || methods.some(m => !availableMethodCodes.has(m)) || horizon === 'long')) {
+  if (horizon !== 'ai' && (!methods.length || methods.some(m => !availableMethodCodes.has(m)))) {
     pageState.value = methods.length ? 'unsupported' : 'empty'
     return
   }
   pageState.value = 'loading'
   try {
-    const result = horizon === 'ai' ? await aiStockSelectionApi.getLatest() : await aiStockSelectionApi.getResults(horizon as 'short' | 'swing', methods)
+    const result = horizon === 'ai' ? await aiStockSelectionApi.getLatest() : await aiStockSelectionApi.getResults(horizon, methods)
     if (version !== requestVersion) return
     items.value = result.stocks || []
+    nextQuoteTradeDate.value = 'nextQuoteTradeDate' in result ? result.nextQuoteTradeDate ?? null : null
     liveQuotes.value = aiStockSelectionApi.getCachedQuotes(items.value.map(item => item.symbol))
     selectionDate.value = /^\d{4}-\d{2}-\d{2}/.test(result.tradeDate || '') ? result.tradeDate!.slice(0, 10) : ''
     pageState.value = result.status === 'ready' ? (items.value.length ? 'ready' : 'empty') : result.status
@@ -288,13 +344,20 @@ async function loadSelection() {
 }
 restorePreference()
 watch(() => `${selectedHorizon.value}:${[...selectedMethods.value].sort().join(',')}`, loadSelection, { immediate: true })
+watch(items, () => { overflowingReasons.value = new Set(); void measureReasons() }, { flush: 'post' })
 watch(quotesEnabled, enabled => { if (enabled) void refreshQuotes(); else stopQuotes() })
 function onVisibilityChange() { pageVisible.value = !document.hidden }
-onMounted(() => { if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibilityChange) })
-onActivated(() => { componentActive.value = true })
+onMounted(() => {
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibilityChange)
+  uni.onWindowResize?.(measureReasons)
+  void measureReasons()
+})
+onActivated(() => { componentActive.value = true; void measureReasons() })
 onDeactivated(() => { componentActive.value = false })
 onUnmounted(() => {
   ++requestVersion
+  ++measurementVersion
+  uni.offWindowResize?.(measureReasons)
   stopQuotes()
   if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityChange)
 })
@@ -348,8 +411,6 @@ async function toggleFavorite(item: Recommendation) {
 .stock-change { font-size: 23rpx; font-weight: 600; }
 .stock-price.is-up, .stock-change.is-up { color: $up; }
 .stock-price.is-down, .stock-change.is-down { color: $down; }
-.match-tags { display: flex; flex: 0 0 auto; gap: 6rpx; margin-top: 2rpx; }
-.match-tag { color: $ink-mute; font-size: 20rpx; line-height: 1.3; }
 .favorite-button { width: 26rpx; height: 26rpx; border: 2rpx solid $primary; border-radius: $r-full; background: $primary-50; text-align: center; line-height: 23rpx; }
 .favorite-button text { color: $primary; font-size: 22rpx; font-weight: 650; }
 .favorite-button.added { border-color: $primary; background: $primary; }
@@ -357,9 +418,15 @@ async function toggleFavorite(item: Recommendation) {
 .favorite-button.disabled { opacity: .5; }
 .mini-chart { width: 220rpx; height: 78rpx; flex: 0 0 220rpx; }
 .mini-chart polyline { vector-effect: non-scaling-stroke; }
+.entry-line { display: flex; flex-wrap: wrap; gap: 8rpx; margin: 10rpx 0; color: $ink-soft; font-size: 22rpx; }
 .reason-line { display: flex !important; align-items: flex-start; gap: 6rpx; padding-top: $s-2; border-top: 1rpx solid $line-soft; }
 .reason-label { display: block; flex: 0 0 auto; margin-top: 1rpx; padding: 3rpx 7rpx; color: $primary; background: $primary-50; font-size: 20rpx; line-height: 1.25; }
-.reason-text { display: -webkit-box; overflow: hidden; flex: 1; color: $ink-soft; font-size: 22rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.reason-body { position: relative; flex: 1; min-width: 0; }
+.reason-line { position: relative; padding-right: 32rpx; }
+.reason-measure.reason-text, .reason-limit { position: absolute; inset: 0 0 auto; visibility: hidden; pointer-events: none; }
+.reason-measure.reason-text { display: block; overflow: visible; }
+.reason-limit { height: 66rpx; }
+.reason-text { display: -webkit-box; overflow: hidden; flex: 1; color: $ink-soft; font-size: 22rpx; line-height: 33rpx; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .reason-text.expanded { display: block; overflow: visible; }
-.reason-toggle { width: 26rpx; flex: 0 0 26rpx; margin-top: 2rpx; color: $ink-soft; font-size: 24rpx; line-height: 30rpx; text-align: center; }
+.reason-toggle { position: absolute; right: 0; width: 26rpx; flex: 0 0 26rpx; margin-top: 2rpx; color: $ink-soft; font-size: 24rpx; line-height: 30rpx; text-align: center; }
 </style>

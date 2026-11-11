@@ -114,12 +114,36 @@ describe('AiPickContent 盘后方法单选与多选', () => {
     await flushPromises()
     expect(selectionMock.getResults).toHaveBeenLastCalledWith('short', ['volume_breakout'])
     expect(wrapper.findAll('.stock-name').map(n => n.text())).toEqual(['方法股600001', '方法股600002'])
+    expect(wrapper.find('.reason-label').text()).toBe('洞见')
     expect(wrapper.text()).not.toContain('数据日期')
     expect(wrapper.text()).not.toContain('盘后确认 · 符合任一所选方法即可入选，综合表现优先')
     expect(wrapper.text()).toContain('放量突破')
     expect(wrapper.text()).not.toContain('跌破支撑重新评估')
     expect(wrapper.find('.risk-note').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('AI综合股')
+  })
+
+  it('洞见只在实际高度超过两行时显示展开按钮', async () => {
+    const query = {
+      in: () => query,
+      selectAll: () => query,
+      boundingClientRect: () => query,
+      exec: (callback: (bounds: Array<Array<{ height: number }>>) => void) =>
+        callback([[{ height: 30 }, { height: 45 }], [{ height: 30 }, { height: 30 }]]),
+    }
+    Object.assign(uni, { createSelectorQuery: () => query })
+    try {
+      const wrapper = mount(AiPickContent)
+      await wrapper.findAll('.horizon-chip').find(node => node.text() === '短线机会')!.trigger('tap')
+      await flushPromises()
+      const cards = wrapper.findAll('.ai-pick-row')
+      expect(cards[0].find('.reason-toggle').exists()).toBe(false)
+      expect(cards[1].find('.reason-toggle').exists()).toBe(true)
+      await cards[1].find('.reason-line').trigger('tap')
+      expect(cards[1].find('.reason-text').classes()).toContain('expanded')
+    } finally {
+      Reflect.deleteProperty(uni, 'createSelectorQuery')
+    }
   })
 
   it('同周期多选一次请求传全部方法，切换周期后只传当前周期方法', async () => {
@@ -147,18 +171,21 @@ describe('AiPickContent 盘后方法单选与多选', () => {
     expect(uni.setStorageSync).toHaveBeenLastCalledWith('ai_stock_selection_strategy_preference', { v: 3, horizon: 'short', methods: [] })
   })
 
-  it('未上线方法不选入，也不调用综合接口伪造结果', async () => {
+  it('新增三种方法按各自大类发送到统一接口', async () => {
     const wrapper = mount(AiPickContent)
     await wrapper.findAll('.horizon-chip').find(n => n.text() === '短线机会')!.trigger('tap')
     await flushPromises()
-    const calls = selectionMock.getResults.mock.calls.length
     await wrapper.findAll('.method-chip').find(n => n.text() === '事件催化')!.trigger('tap')
-    expect(selectionMock.getResults).toHaveBeenCalledTimes(calls)
-    expect(wrapper.findAll('.method-chip.active').map(n => n.text())).toEqual(['放量突破'])
+    expect(selectionMock.getResults).toHaveBeenLastCalledWith('short', ['volume_breakout', 'event_catalyst'])
+    await wrapper.findAll('.horizon-chip').find(n => n.text() === '波段趋势')!.trigger('tap')
+    await wrapper.findAll('.method-chip').find(n => n.text() === '盈利预期上修')!.trigger('tap')
+    expect(selectionMock.getResults).toHaveBeenLastCalledWith('swing', ['trend_following', 'earnings_revision'])
     await wrapper.findAll('.horizon-chip').find(n => n.text() === '中长线配置')!.trigger('tap')
-    await flushPromises()
-    expect(wrapper.find('.stock-name').exists()).toBe(false)
-    expect(wrapper.text()).toContain('正在筹备中')
+    expect(selectionMock.getResults).toHaveBeenLastCalledWith('long', ['quality_growth'])
+    await wrapper.findAll('.method-chip').find(n => n.text() === '合理估值成长')!.trigger('tap')
+    expect(selectionMock.getResults).toHaveBeenLastCalledWith('long', ['quality_growth', 'garp'])
+    await wrapper.findAll('.method-chip').find(n => n.text() === '红利稳健')!.trigger('tap')
+    expect(selectionMock.getResults).toHaveBeenLastCalledWith('long', ['quality_growth', 'garp', 'stable_dividend'])
   })
 
   it('恢复多选偏好、迁移旧方法，保留全部取消状态', async () => {
