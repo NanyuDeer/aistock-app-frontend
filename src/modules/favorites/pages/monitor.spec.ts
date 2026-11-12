@@ -6,6 +6,12 @@ import { createPinia, setActivePinia } from 'pinia'
 const stockTraceApiMock = vi.hoisted(() => ({ list: vi.fn(), detect: vi.fn() }))
 vi.mock('@/shared/api/modules/stockTrace', () => ({ stockTraceApi: stockTraceApiMock }))
 
+const tradingDayMock = vi.hoisted(() => vi.fn(() => true))
+vi.mock('@/shared/utils/tradingTime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/shared/utils/tradingTime')>()
+  return { ...actual, isTradingDay: tradingDayMock }
+})
+
 // 仅 mock shanghaiDateKeyDaysAgo（返回固定串，避免断言依赖当日/本机时区漂移）；formatTime 等保持原样
 vi.mock('@/shared/utils/datetime', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/shared/utils/datetime')>()
@@ -124,6 +130,7 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     stockTraceApiMock.list.mockReset()
     stockTraceApiMock.detect.mockReset()
     stockTraceApiMock.detect.mockResolvedValue({ triggered: true, enqueued: 0 })
+    tradingDayMock.mockReturnValue(true)
     favoritesStoreMock.fetchFavorites.mockReset()
     favoritesStoreMock.stocks = []
     appStoreMock.config.alertEnabled = false
@@ -207,6 +214,22 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     expect(btn!.text()).toContain('立即检测')
   })
 
+  it.each(['client', 'server'])('休市由 %s 判定时保留卡片并提示休市', async (side) => {
+    stockTraceApiMock.list.mockResolvedValue({ items: [movement()], nextCursor: null })
+    if (side === 'client') tradingDayMock.mockReturnValue(false)
+    else stockTraceApiMock.detect.mockResolvedValue({ triggered: false, enqueued: 0, reason: 'market_closed' })
+    const wrapper = mount(monitor)
+    await flushPromises()
+    const btn = wrapper.findAll('.as-btn').find((b) => b.text().includes('立即检测'))
+    await btn!.trigger('click')
+    await flushPromises()
+    expect(stockTraceApiMock.detect).toHaveBeenCalledTimes(side === 'client' ? 0 : 1)
+    expect(stockTraceApiMock.list).toHaveBeenCalledTimes(1)
+    expect(wrapper.findAll('.as-card')).toHaveLength(1)
+    expect(uni.showToast).toHaveBeenCalledWith(expect.objectContaining({ title: '休市中，可查看最近异动' }))
+    expect(btn!.text()).toContain('立即检测')
+  })
+
   it('列表行改用组件库 Card 三段式模板（event-top / event-title / event-bottom）', async () => {
     stockTraceApiMock.list.mockResolvedValue({ items: [movement()], nextCursor: null })
     const wrapper = mount(monitor)
@@ -221,7 +244,7 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     expect(card.find('.stock-code').text()).toBe('601318')
     expect(card.find('.stock-move').text()).toBe('+8.5%')
     // 中行：主因正文
-    expect(card.find('.event-title').text()).toBe('主因：大盘系统性下跌')
+    expect(card.find('.event-title').text()).toBe('大盘系统性下跌')
   })
 
   it('下行只在涨停事件上渲染「涨停」Badge', async () => {
@@ -357,7 +380,7 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
       },
     })
     expect(wrapper.findAll('.as-card').length).toBe(1)
-    expect(wrapper.find('.event-title').text()).toBe('主因：白酒板块集体走强')
+    expect(wrapper.find('.event-title').text()).toBe('白酒板块集体走强')
     expect(wrapper.find('.report-link').exists()).toBe(true)
   })
 
@@ -483,7 +506,7 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
       nextCursor: null,
     })
     const wrapper = await mountWithWs()
-    expect(wrapper.find('.event-title').text()).toBe('主因：白酒板块集体走强')
+    expect(wrapper.find('.event-title').text()).toBe('白酒板块集体走强')
     await pushWs({
       type: 'movement.updated',
       data: { event_id: 'mv:merge', trigger_revision: 2, change_pct: 12.1, push_reason: 'severity_upgraded' },
@@ -491,6 +514,6 @@ describe('monitor.vue 自选股异动页（模板统一到个股情报/自选股
     expect(wrapper.findAll('.as-card').length).toBe(1)
     expect(wrapper.find('.stock-move').text()).toBe('+12.1%')
     // primary_cause 未被浅合并清空
-    expect(wrapper.find('.event-title').text()).toBe('主因：白酒板块集体走强')
+    expect(wrapper.find('.event-title').text()).toBe('白酒板块集体走强')
   })
 })
