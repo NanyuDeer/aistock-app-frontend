@@ -143,9 +143,9 @@ const selectionUpdateText = computed(() => {
   const publishedAt = Date.parse(iso)
   if (Number.isFinite(publishedAt) && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso)) {
     const shanghai = new Date(publishedAt + 8 * 60 * 60 * 1000).toISOString()
-    return `名单更新 ${shanghai.slice(5, 10)} ${shanghai.slice(11, 16)}`
+    return `名单更新 ${shanghai.slice(0, 10)}`
   }
-  return selectionDate.value ? `名单日期 ${selectionDate.value.slice(5)}` : '刷新名单'
+  return selectionDate.value ? `名单日期 ${selectionDate.value.slice(0, 10)}` : '刷新名单'
 })
 const componentActive = ref(true)
 const pageVisible = ref(typeof document === 'undefined' || !document.hidden)
