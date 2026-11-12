@@ -82,6 +82,12 @@
 >   - ⚠️ `TWO_WEEK_WINDOW_DAYS = 13`（定义在 `shared/utils/datetime.ts`，附「为何是 13 而非 14」注释）：**"含今天共 14 个自然日" 等价于"回退 13 天"**；写成 `14` 会多算一天（今天 10-07 → 正确 `since = 2026-09-24`）。浏览器实测请求即为 `since=2026-09-24`。
 >   - 实测（mxfff）：同日两页卡片由改动前的 ~60 张收敛到 **8 张**（日期范围 09-24 → 09-30，**无早于 09-24 的卡片**），首屏即「没有更多」。
 
+> **2026-11-07 修复（App 端「点击生成完整洞察报告」无反应）**：0.1.6 真机复现，H5 正常，App 点击后既无内容也无错误提示。
+> - **根因**：App 端原先走 `uni.request({ enableChunked: true }) + onChunkReceived`，但 `enableChunked` 在 uni-app 文档中只是**微信小程序能力**；App 基座不会触发 `onChunkReceived`，`success` 又不带正文 → `header` / `sections` 恒空且无错误 → 界面看起来"没反应"。
+> - **改法**：`useInsightReportSSE.start()` 先读 `uni.getSystemInfoSync().uniPlatform`，`app` / `app-plus` 时走 **`readReportViaChunked(..., buffered = true)`**——不带 `enableChunked`，`dataType` / `responseType` 设为 `text`，由 `success` 一次性把全文喂给同一个 `createReportStreamDecoder`。服务端写完 `done` 就 `res.end()`（app-api `stock-trace/controller.ts`），整包读取不会挂住。
+> - **并发保护**：原 `active` 布尔改为 `requestId` 自增令牌，`stop()` 后迟到的响应/分帧不再改写界面状态。
+> - **测试**：`useInsightReportSSE.spec.ts` 25 → **26 例**（新增「原生 App 无分块回调也能展示完整报告」）全部通过；`vue-tsc --noEmit` exit 0。**App 真机验证待下次出包**（本机无 HBuilderX/adb）。
+
 ## 异动卡片主因展示（价格异动）
 - 数据源：stocktrace movements API 返回的 `StockTraceEvent.primary_cause`（LLM 生成的 ≤20 字简短主因短语）。
 - 展示优先级（`AlertContent.vue` 的 `fromMovement()`、`monitor.vue` 的 `movementToAlertItem()`、`insight.vue` 价格异动映射三处一致）：
@@ -195,3 +201,10 @@
 - **最终可见性**：恢复出的主因是「证据不足，异动原因未明」（快照缺 `article_context`，无新闻/公告支撑）→ 命中既有「无结论不展示」规则（`hasNoUsableCause` 的 `证据不足` 提示词）→ **该日两条都按正常规则不展示**，卡片保持隐藏，但原因从"归因卡住"变为"归因完成但无有效结论"。
 - **尚未闭环（agent-py 侧）**：`TriggerEvent` 的修复**仍未部署到生产**；且 app-api 侧 `buildTriggerEvent` 的 `isLimitUp` 是**无条件**写入（`Boolean(...)`），**先发 app-api 会把"1 条卡住"放大成"每条新事件归因全挂"** —— 发布顺序必须 agent-py 先、app-api 后。
 - **已知未处理（另一处独立缺陷）**：`dead_letter` 的 job 在 `listUserEvents` 的 `analysis_status` 派生里仍落 `processing`（该 CASE 只看 `stock_trace_results`，无 result 即与"仍在归因"不可区分）→ 任何"归因 job 永久失败"的事件都会长期显示「归因中」。属 app-api 侧口径问题，待后续按需处理。
+
+## 板块消息证据类型 sector_news（2026-10-16）
+
+- 背景：stock_trace 新增 `sector_news` 证据（板块消息 → 关联个股，见 app-api `modules/stock-trace/AGENTS.md`）。**前端不改渲染逻辑**：完整洞察报告的证据清单由 agent-py 中文化（`_KIND_LABELS` → 「板块消息」），前端只按 `block.type` 渲染。
+- 本仓仅两处契约同步：`shared/api/modules/stockTrace.ts` 的 `TraceEvidence.kind` 联合补 `sector_news`；`components/PriceMovementAnalysisContent.vue` 的 `kindText()` 补「板块消息」文案（该组件消费 `artifactJson.evidence_index`，漏补会显示原始英文串）。
+- `modules/favorites` 其余页面（monitor / insight / insight-detail-move / AlertContent）均按 `block.type` 或状态字段消费，**不依赖 evidence kind**，无需改动。
+

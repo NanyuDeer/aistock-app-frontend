@@ -1,5 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+
+// 面板开合是模块级共享状态：用例间必须卸载旧实例，否则残留实例的 watch(open)
+// 会抢先把「查看全部」的一次性意图消费掉，导致后续用例断言到错误实例上。
+enableAutoUnmount(afterEach)
 
 const notificationApiMock = vi.hoisted(() => ({
   list: vi.fn(),
@@ -257,5 +261,112 @@ describe('NotificationDropdown', () => {
       limit: 20, cursor: undefined, unread: undefined, symbol: '600519',
     })
     expect(wrapper.find('.notification-stockbar__label').text()).toBe('600519')
+  })
+
+  it('悬浮卡「查看全部」唤起动作为一次性意图：开面板即筛到目标股票，列表不混入其它股票', async () => {
+    const maotai = {
+      ...firstItem,
+      id: 'maotai-item',
+      symbol: '600519',
+      stockName: '贵州茅台',
+      title: '贵州茅台：公告披露',
+    }
+    notificationApiMock.list.mockResolvedValue({
+      items: [firstItem, maotai],
+      nextCursor: null,
+      unreadCount: 2,
+    })
+    const wrapper = mount(NotificationDropdown)
+    await flushPromises()
+
+    // 悬浮卡「查看全部」= 兄弟组件经共享状态唤起
+    useNotificationPanel().openPanel('600519')
+    await flushPromises()
+
+    expect(notificationApiMock.list).toHaveBeenLastCalledWith({
+      limit: 20, cursor: undefined, unread: undefined, symbol: '600519',
+    })
+    expect(wrapper.findAll('.notification-item')).toHaveLength(1)
+    expect(wrapper.find('.notification-item__title').text()).toBe(maotai.title)
+    // 意图已被消费，重复开面板不应无限期沿用
+    expect(useNotificationPanel().targetSymbol.value).toBeNull()
+  })
+
+  it('面板已展开时点悬浮卡「查看全部」：仍要筛到目标股票，不能停留在全部股票', async () => {
+    const maotai = {
+      ...firstItem,
+      id: 'maotai-item',
+      symbol: '600519',
+      stockName: '贵州茅台',
+      title: '贵州茅台：公告披露',
+    }
+    const ningde = {
+      ...firstItem,
+      id: 'ningde-item',
+      symbol: '300750',
+      stockName: '宁德时代',
+      title: '宁德时代：异动',
+    }
+    notificationApiMock.list.mockResolvedValue({
+      items: [maotai, ningde],
+      nextCursor: null,
+      unreadCount: 2,
+    })
+    const wrapper = mount(NotificationDropdown)
+    await flushPromises()
+
+    // 先手动展开面板：此时无筛选，两只股票的消息都在
+    await wrapper.find('.bell-button').trigger('tap')
+    await flushPromises()
+    expect(wrapper.findAll('.notification-item')).toHaveLength(2)
+
+    // 面板不关，直接点悬浮卡「查看全部」（真实布局：铃铛在左上、悬浮卡在底部，二者可同时可见）
+    useNotificationPanel().openPanel('600519')
+    await flushPromises()
+
+    expect(notificationApiMock.list).toHaveBeenLastCalledWith({
+      limit: 20, cursor: undefined, unread: undefined, symbol: '600519',
+    })
+    expect(wrapper.findAll('.notification-item')).toHaveLength(1)
+    expect(wrapper.find('.notification-item__title').text()).toBe(maotai.title)
+    expect(useNotificationPanel().targetSymbol.value).toBeNull()
+  })
+
+  it('归属错配的消息不展示：贵州茅台列表不得出现「江波龙：资讯异动」（后端脏数据兜底）', async () => {
+    const maotai = {
+      ...firstItem,
+      id: 'maotai-item',
+      symbol: '600519',
+      stockName: '贵州茅台',
+      title: '贵州茅台：资讯异动',
+    }
+    // 后端历史脏行：同一篇文章被多只股票抓到、冲突更新只改了名字没改 symbol，
+    // 于是 symbol=600519 但 stockName=江波龙
+    const dirty = {
+      ...firstItem,
+      id: 'dirty-item',
+      symbol: '600519',
+      stockName: '江波龙',
+      title: '江波龙：资讯异动',
+    }
+    notificationApiMock.list.mockResolvedValue({
+      items: [maotai, dirty],
+      nextCursor: null,
+      unreadCount: 2,
+    })
+    favoritesStoreMock.stocks = [{ symbol: '600519', name: '贵州茅台' }]
+
+    const wrapper = mount(NotificationDropdown)
+    await flushPromises()
+    await wrapper.find('.bell-button').trigger('tap')
+    await flushPromises()
+    await wrapper.find('.notification-stockbar').trigger('tap')
+    await flushPromises()
+    await wrapper.findAll('.stock-option')[1].trigger('tap')
+    await flushPromises()
+
+    expect(wrapper.find('.notification-stockbar__label').text()).toBe('贵州茅台')
+    expect(wrapper.findAll('.notification-item')).toHaveLength(1)
+    expect(wrapper.find('.notification-item__title').text()).toBe(maotai.title)
   })
 })

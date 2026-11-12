@@ -30,6 +30,7 @@ import type {
   ImpactVitality,  // 事件影响存活度（annotation-only 标注）
 } from '../types'
 import { EVENT_TYPES } from '../constants'
+import { isEventFollowed } from '../eventFollowStore'
 
 // ==================== 后端响应类型定义 ====================
 
@@ -165,7 +166,8 @@ export interface BackendEventDetailData {
  *
  * 字段映射：
  * - summary → aiSummary（字段名映射）
- * - eventType、importance、affectedIndustries、isFollowed → 降级默认值
+ * - eventType、importance、affectedIndustries → 降级默认值
+ * - isFollowed → 本地关注快照（服务端暂无关注能力）
  */
 export function adaptEventList(backend: BackendEventListData): EventListResponse {
   return {
@@ -281,7 +283,8 @@ function computeImportance(
  * - 直接映射：eventId, title, source, publishTime
  * - 字段名映射：summary → aiSummary
  * - sourceInfo：从 source 构建（真实来源 URL）
- * - 降级字段：eventType, importance, affectedIndustries, isFollowed
+ * - 降级字段：eventType, importance, affectedIndustries
+ * - isFollowed：取本地关注快照
  */
 function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventItem {
   return {
@@ -305,7 +308,8 @@ function adaptEventItem(backendEvent: BackendEventListData['events'][0]): EventI
     // 第三阶段：优先消费后端直出的 chain_summary（旧数据缺失时回退 []）
     affectedIndustries: extractAffectedIndustriesFromSummary(backendEvent.chain_summary),
     chain_summary: backendEvent.chain_summary,
-    isFollowed: false,      // 功能暂不实现
+    // 关注状态以本地快照为准（服务端暂无关注能力）
+    isFollowed: isEventFollowed(backendEvent.eventId),
 
     // 透传字段
     globalImportanceRank: backendEvent.globalImportanceRank,
@@ -361,7 +365,8 @@ export function adaptEventDetail(backend: BackendEventDetailData): EventDetailRe
         ?? computeImportanceFromStrengths((analysis.event_transmission?.chain ?? []).map((n) => n.impactStrength)),
       affectedIndustries,
       aiSummary: analysis.event_understanding?.summary || '',
-      isFollowed: false,      // 功能暂不实现
+      // 关注状态以本地快照为准（服务端暂无关注能力）
+      isFollowed: isEventFollowed(content.eventId),
       // 事件影响存活度（annotation-only 标注；无数据 null → 前端不渲染）
       impactVitality: backend.impactVitality ?? null,
     },

@@ -11,9 +11,12 @@
           tag-text="节奏洞见"
           :title="insightCard.title"
           :trace="insightCard.trace ?? ''"
+          :lines="RHYTHM_DELTA_UI ? (insightCard.lines ?? []) : []"
           :structured="insightCard.structured ?? null"
           :time="insightCard.time"
           :time-note="insightCard.timeNote"
+          theme="light"
+          line-placement="after-trace"
         />
       </view>
       <RhythmCard
@@ -38,7 +41,7 @@ import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import RhythmCard from '../components/RhythmCard.vue'
 import RhythmCalendarPanel from '../components/RhythmCalendarPanel.vue'
-import { toRhythmInsight } from '../utils/rhythmInsight'
+import { RHYTHM_DELTA_UI, toRhythmInsight } from '../utils/rhythmInsight'
 import type { RhythmInsightCard } from '../utils/rhythmInsight'
 import { agentApi } from '@/shared/api/modules/agent'
 import type { RhythmMasterContent } from '@/shared/api/modules/agent'
@@ -56,7 +59,7 @@ const isFallback = ref(false)
 /** 用户面板点选的原始日期（提示行用；回退后与 targetDate 分离，spec §4.3） */
 const requestedDate = ref('')
 
-const SLOT_LABEL: Record<string, string> = { after_close: '收盘基准', morning: '盘前', midday: '午间' }
+const SLOT_LABEL: Record<string, string> = { after_close: '收盘后', morning: '盘前', midday: '午间' }
 function slotLabel(s: string) { return SLOT_LABEL[s] ?? s }
 
 /** v3 极简版本选取（spec §4.2）：今日 = created_at 最新；历史日 = after_close 优先（缺失降级最新，时间行如实标注实际版本） */

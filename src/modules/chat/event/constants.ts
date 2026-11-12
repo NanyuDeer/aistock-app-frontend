@@ -133,22 +133,20 @@ export function isPureMarketEvent(title: string): boolean {
 // ==================== 事件影响存活度（Impact Vitality） ====================
 
 /**
- * 存活度分档文案：alive=影响持续中 / fading=影响减弱 / expired=影响消退。
- * no_observation（映射不到板块）不在表内 → 前端不渲染（与后端「禁判 expired」口径一致）。
+ * 存活度分档文案：只标注「影响已消散」（expired）。
+ * alive（影响仍在有效期内）/ fading（观察中但未形成定向传导）是默认预期，不标注；
+ * no_observation（映射不到板块）不在表内 → 前端不渲染。
  */
 export const VITALITY_LABELS: Partial<Record<ImpactVitalityStatus, string>> = {
-  alive: '影响持续中',
-  fading: '影响减弱',
-  expired: '影响消退',
+  expired: '影响已消散',
 }
 
 /**
- * 是否展示存活度小标：仅 alive/fading/expired 三档且已有可观测分值。
- * no_observation / 无数据（null）→ 不渲染（避免暴露"无法观测"这类用户无法理解的状态）。
+ * 是否展示存活度小标：仅 expired（影响已消散）需要主动告知。
+ * alive / fading 是默认预期，no_observation / 无数据（null）→ 一律不渲染。
  */
 export function isVitalityVisible(vitality?: ImpactVitality | null): vitality is ImpactVitality {
-  if (!vitality) return false
-  return vitality.status === 'alive' || vitality.status === 'fading' || vitality.status === 'expired'
+  return !!vitality && vitality.status === 'expired'
 }
 
 // ==================== 分页 ====================

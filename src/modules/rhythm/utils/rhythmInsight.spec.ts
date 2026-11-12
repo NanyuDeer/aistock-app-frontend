@@ -1,10 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { toRhythmInsight, composeRhythmTitle, type RhythmInsightCondition } from './rhythmInsight'
+import { toRhythmInsight, composeRhythmTitle, RHYTHM_DELTA_UI, type RhythmInsightCondition } from './rhythmInsight'
 import type { RhythmCard, RhythmBranch } from '@/shared/api/modules/agent'
 
 const source = readFileSync(new URL('./rhythmInsight.ts', import.meta.url), 'utf8')
+
+function makeCard(p: Record<string, unknown>): RhythmCard {
+  return {
+    position_index: 0,
+    position_band: { text: '建议仓位：空仓观望' },
+    conflict: false,
+    branches: [],
+    ...p,
+  } as unknown as RhythmCard
+}
 
 function branch(p: Partial<RhythmBranch>): RhythmBranch {
   return {
@@ -22,10 +32,10 @@ test('title：非 conflict 恒取仓位文案；conflict 用背离文案', () =>
 })
 
 test('title 两段式：有压制原因拼 `{仓位} · {压制原因}`；缺失时退化为纯仓位（不补分隔符）', () => {
-  assert.equal(composeRhythmTitle('空仓观望', '闸门压制'), '空仓观望 · 闸门压制')
+  assert.equal(composeRhythmTitle('空仓观望', '关键条件卡着'), '空仓观望 · 关键条件卡着')
   assert.equal(composeRhythmTitle('空仓观望'), '空仓观望')
   assert.equal(composeRhythmTitle('空仓观望', ''), '空仓观望')
-  assert.equal(composeRhythmTitle('', '闸门压制'), '闸门压制')
+  assert.equal(composeRhythmTitle('', '关键条件卡着'), '关键条件卡着')
 })
 
 test('title 仓位缺失回退 position_index 短码（不再退回 level 档位词）', () => {
@@ -135,4 +145,109 @@ test('title：computed 硬判不加沿用标注', () => {
     branches: [],
   } as unknown as RhythmCard
   assert.equal(toRhythmInsight(card, 'after_close', '2026-11-02')?.title, '空仓观望')
+})
+
+test('trace 取 causality_text（lead + lines 用「；」连接），不再取 phase_evidence.reason', () => {
+  const card = makeCard({
+    causality_text: {
+      lead: '两个条件同时卡着，只解决一个也还不能加仓',
+      lines: ['指数 3689.91 点跌破 20 日均线 3701.53 点', '没有板块近 5 天超额领先第二名 2.0 个百分点以上'],
+    },
+    phase_evidence: { reason: '主线：无清晰主线｜指数破位' },
+  })
+  const out = toRhythmInsight(card, 'after_close', '2026-11-06')!
+  assert.equal(
+    out.trace,
+    '两个条件同时卡着，只解决一个也还不能加仓；指数 3689.91 点跌破 20 日均线 3701.53 点；没有板块近 5 天超额领先第二名 2.0 个百分点以上',
+  )
+  assert.ok(!String(out.trace).includes('指数破位'))
+})
+
+test('trace 同时包含 lead 与全部 lines 片段', () => {
+  const card = makeCard({
+    causality_text: { lead: 'A', lines: ['B', 'C'] },
+  })
+  const out = toRhythmInsight(card, 'after_close', '2026-11-06')!
+  for (const piece of ['A', 'B', 'C']) assert.ok(out.trace!.includes(piece))
+})
+
+test('lines：变更行取 delta_narrative，after_close 标签是「较昨日」', () => {
+  const card = makeCard({
+    delta: {
+      prev: { target_date: '2026-11-05', slot: 'after_close', lag_days: 1 },
+      position: { from_index: 0, to_index: 0, changed: false },
+      default_key: 'gate',
+      gaps: [{ key: 'gate', from_gap: 21.53, to_gap: 11.62, unit: '点' }],
+    },
+    delta_narrative: '离加仓还差 11.62 点，仓位仍是空仓观望',
+  })
+  const out = toRhythmInsight(card, 'after_close', '2026-11-06')!
+  assert.deepEqual(out.lines?.[0], { key: '较昨日', text: '离加仓还差 11.62 点，仓位仍是空仓观望' })
+})
+
+test('morning 标签「较昨收」、midday 标签「较早盘」', () => {
+  const card = makeCard({
+    delta: { prev: { target_date: 't', slot: 'after_close' }, position: {}, default_key: 'none' },
+    delta_narrative: '仓位维持空仓观望',
+  })
+  assert.equal(toRhythmInsight(card, 'morning', '2026-11-06')!.lines?.[0].key, '较昨收')
+  assert.equal(toRhythmInsight(card, 'midday', '2026-11-06')!.lines?.[0].key, '较早盘')
+})
+
+test('lag_days > 1 时标签写「较 N 个交易日前」，不得伪称「较昨日」', () => {
+  const card = makeCard({
+    delta: { prev: { target_date: 't', slot: 'after_close', lag_days: 3 }, position: {}, default_key: 'none' },
+    delta_narrative: '仓位维持空仓观望',
+  })
+  assert.equal(toRhythmInsight(card, 'after_close', '2026-11-06')!.lines?.[0].key, '较 3 个交易日前')
+})
+
+test('复盘行：只陈述事实，key 是「昨日」；up_ratio 缺失时不留半句', () => {
+  const card = makeCard({
+    delta: {
+      prev: { target_date: '2026-11-05', slot: 'after_close', lag_days: 1 },
+      position: { from_index: 0, to_index: 0 },
+      review: { prev_target_date: '2026-11-05', prev_position_text: '建议仓位：轻仓~三成', index_pct_chg: -0.62, up_ratio: null },
+    },
+    delta_narrative: '离加仓还差 11.62 点，仓位仍是空仓观望',
+  })
+  const out = toRhythmInsight(card, 'after_close', '2026-11-06')!
+  assert.deepEqual(out.lines?.[1], { key: '昨日', text: '昨日说轻仓~三成，昨天上证 -0.62%' })
+})
+
+test('复盘行：有 up_ratio 时补「N% 的股票上涨」', () => {
+  const card = makeCard({
+    delta: {
+      prev: { target_date: '2026-11-05', slot: 'after_close' },
+      position: {},
+      review: { prev_target_date: '2026-11-05', prev_position_text: '空仓观望', index_pct_chg: 1.2, up_ratio: 41.4 },
+    },
+  })
+  const out = toRhythmInsight(card, 'after_close', '2026-11-06')!
+  assert.deepEqual(out.lines?.[0], { key: '昨日', text: '昨日说空仓观望，昨天上证 +1.20%，41% 的股票上涨' })
+})
+
+test('旧卡（无 delta）不渲染变更行，也不报错', () => {
+  const out = toRhythmInsight(makeCard({}), 'after_close', '2026-11-06')!
+  assert.equal(out.lines, undefined)
+})
+
+test('lines 的 key 只有「较昨日/较昨收/较早盘」与「昨日」两类，不许出现「原因/依据」', () => {
+  const card = makeCard({
+    delta: {
+      prev: { target_date: 't', slot: 'after_close', lag_days: 1 },
+      position: {},
+      review: { prev_target_date: 't', prev_position_text: '空仓观望', index_pct_chg: 0, up_ratio: null },
+    },
+    delta_narrative: '仓位维持空仓观望',
+  })
+  const out = toRhythmInsight(card, 'after_close', '2026-11-06')!
+  const allowed = new Set(['较昨日', '较昨收', '较早盘', '昨日'])
+  for (const line of out.lines ?? []) {
+    assert.ok(allowed.has(line.key) || /^较 \d+ 个交易日前$/.test(line.key), line.key)
+  }
+})
+
+test('影子期渲染开关默认关闭（转正时才改 true 发版）', () => {
+  assert.equal(RHYTHM_DELTA_UI, false)
 })

@@ -136,6 +136,15 @@ const stockFilterName = computed(() => {
   if (!stockFilter.value) return '全部自选股'
   return favoritesStore.stocks.find(stock => stock.symbol === stockFilter.value)?.name || stockFilter.value
 })
+/**
+ * 筛选股票的权威名称（仅当该股票还在自选列表里时才有值）。
+ * 用于二次校验消息归属：后端历史脏数据存在「symbol 一致、stock_name 却是别家股票」的行
+ * （同一篇文章被多只股票抓到、冲突更新只改名不改代码），这类消息不属于当前股票，必须挡掉。
+ */
+const stockFilterAuthoritativeName = computed<string | null>(() => {
+  if (!stockFilter.value) return null
+  return favoritesStore.stocks.find(stock => stock.symbol === stockFilter.value)?.name || null
+})
 /** 空态文案随「未读」与「自选股筛选」两个维度变化，避免筛选中误读为整体无消息 */
 const emptyText = computed(() => {
   if (unreadOnly.value) return stockFilter.value ? '该股票暂无未读消息' : '暂无未读消息'
@@ -148,7 +157,13 @@ const emptyText = computed(() => {
  */
 const displayItems = computed(() => {
   let list = items.value
-  if (stockFilter.value) list = list.filter(item => item.symbol === stockFilter.value)
+  if (stockFilter.value) {
+    list = list.filter(item => item.symbol === stockFilter.value)
+    // 二次校验归属：后端历史脏行可能出现 symbol 一致、stock_name 是别家股票的情况，
+    // 只按 symbol 过滤会把别家资讯留在当前股票下（如贵州茅台列表出现「江波龙：资讯异动」）。
+    const authoritative = stockFilterAuthoritativeName.value
+    if (authoritative) list = list.filter(item => !item.stockName || item.stockName === authoritative)
+  }
   if (unreadOnly.value) list = list.filter(item => !item.readAt)
   return list
 })
@@ -300,21 +315,38 @@ function toggle() {
   open.value = !open.value
 }
 
-// 面板展开时拉取数据（含首页悬浮卡「查看全部」跨组件唤起）；收起时同步关掉自选股下拉
+/** 应用「查看全部」带过来的目标股票：筛选 + 重拉 + 补齐（意图一次性，先清空再拉） */
+async function applyTargetSymbol(symbol: string): Promise<void> {
+  targetSymbol.value = null
+  stockPickerOpen.value = false
+  applyStockFilter(symbol)
+  await load()
+  await fillUntilVisible()
+}
+
+// 面板展开时拉取数据；收起时同步关掉自选股下拉
 watch(open, async (visible) => {
   if (!visible) {
     stockPickerOpen.value = false
     return
   }
   if (!loggedIn.value) return
-  // 悬浮卡「查看全部」唤起时带股票代码 → 自动筛选到该股票（一次性意图，消费后清空）
-  if (targetSymbol.value) {
-    applyStockFilter(targetSymbol.value)
-    targetSymbol.value = null
-  }
+  // 「查看全部」会同时置位 open 与 targetSymbol：本次拉取交给下面的 targetSymbol watcher 统一处理，
+  // 避免同一意图触发两次请求
+  if (targetSymbol.value) return
   await load()
   // 持久化的筛选股票可能不在首屏，补齐后再展示（避免误显示空态）
   await fillUntilVisible()
+})
+
+/**
+ * 「查看全部」意图单独监听：面板已展开时再点悬浮卡「查看全部」，`open` 不会变化，
+ * 只监听 open 会把这次筛选整个丢掉 —— 列表仍停留在全部股票（出现与该股票无关的消息）。
+ * 未登录/面板未展开时保留意图，等 open 时再消费。
+ */
+watch(targetSymbol, async (symbol) => {
+  if (!symbol || !open.value || !loggedIn.value) return
+  await applyTargetSymbol(symbol)
 })
 
 function loadMore() {

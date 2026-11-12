@@ -19,8 +19,8 @@ page {
 
   /* 强调色 */
   --ev-accent: #{$primary};
-  --ev-accent-soft: rgba(#{$primary}, 0.12);
-  --ev-accent-bg: rgba(#{$primary}, 0.06);
+  --ev-accent-soft: #{rgba($primary, 0.12)};
+  --ev-accent-bg: #{rgba($primary, 0.06)};
 
   /* 正向 / 负向（A 股：positive=绿/跌，negative=红/涨） */
   --ev-positive: #{$down};

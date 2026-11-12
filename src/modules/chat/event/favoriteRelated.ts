@@ -17,6 +17,9 @@ import { storage } from '@/shared/utils/storage'
 import { getEventList } from './api/eventApi'
 import type { EventItem } from './types'
 
+/** 行业影响方向（A 股红涨绿跌：bullish=红 / bearish=绿 / 其余=灰） */
+type ImpactDirection = 'bullish' | 'bearish' | 'neutral'
+
 /** 被事件影响的自选股 */
 export interface MatchedStock {
   symbol: string
@@ -24,6 +27,13 @@ export interface MatchedStock {
   industry: string
   /** 命中的事件侧行业名（已去罗马后缀），用于理由行「影响板块：X」 */
   matchedIndustry: string
+  /** 命中行业的影响方向，驱动板块名称着色 */
+  direction: ImpactDirection
+}
+
+/** 方向归一：仅 bullish/bearish 保留，其余（mixed/缺失）统一 neutral */
+function normalizeDirection(direction: string | undefined): ImpactDirection {
+  return direction === 'bullish' || direction === 'bearish' ? direction : 'neutral'
 }
 
 /** 一条自选股相关事件（事件 + 命中的自选股） */
@@ -86,10 +96,10 @@ export async function loadFavoriteRelatedEvents(): Promise<RelatedEventRow[]> {
   }
   if (Object.keys(aliasMap).length === 0) return []
 
-  // ④ 反向索引：stripRoman(行业别名) → 自选股（matchedIndustry 命中时才补，此处不带）
-  const index = new Map<string, Array<Omit<MatchedStock, 'matchedIndustry'>>>()
+  // ④ 反向索引：stripRoman(行业别名) → 自选股（matchedIndustry/direction 命中时才补，此处不带）
+  const index = new Map<string, Array<Omit<MatchedStock, 'matchedIndustry' | 'direction'>>>()
   for (const [symbol, info] of Object.entries(aliasMap)) {
-    const stock: Omit<MatchedStock, 'matchedIndustry'> = {
+    const stock: Omit<MatchedStock, 'matchedIndustry' | 'direction'> = {
       symbol,
       name: String(info?.name ?? ''),
       industry: String(info?.industry ?? ''),
@@ -123,7 +133,11 @@ export async function loadFavoriteRelatedEvents(): Promise<RelatedEventRow[]> {
       for (const stock of index.get(key) ?? []) {
         if (seen.has(stock.symbol)) continue
         seen.add(stock.symbol)
-        matchedStocks.push({ ...stock, matchedIndustry: stripRoman(summary.industry) })
+        matchedStocks.push({
+          ...stock,
+          matchedIndustry: stripRoman(summary.industry),
+          direction: normalizeDirection(summary.direction),
+        })
       }
     }
     if (matchedStocks.length === 0) continue

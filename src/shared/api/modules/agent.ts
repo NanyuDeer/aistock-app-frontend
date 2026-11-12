@@ -578,6 +578,51 @@ export interface RhythmCausalityText {
   lines: string[]
 }
 
+/** 跨日变更里某一条约束的距离变化（与后端 DeltaGap 对齐） */
+export interface RhythmDeltaGap {
+  key: 'gate' | 'mainline' | 'event'
+  from_gap?: number | null
+  to_gap?: number | null
+  unit?: string
+}
+
+/** 昨日复盘事实（仅 after_close 卡产出；up_ratio 缺失时前端省略「N% 的股票上涨」半句） */
+export interface RhythmDeltaReview {
+  prev_target_date: string
+  prev_position_text: string
+  index_pct_chg: number
+  up_ratio?: number | null
+}
+
+/** 跨卡变更归因（后端 RhythmDelta 透传；契约见 spec §5.2） */
+export interface RhythmDelta {
+  prev: {
+    target_date: string
+    slot: string
+    created_at?: string | null
+    /** 与上一条卡相隔交易日数；>1 说明中间卡缺失 */
+    lag_days?: number
+    /** 严格上一条缺失，已回落取更早的 slot */
+    slot_fallback?: boolean
+  }
+  position: { from_index?: number | null; to_index?: number | null; changed?: boolean }
+  stage?: Record<string, string | null>
+  /** 约束项的解决/新增/延续；后端真实取值域为 `"trend" | "mainline" | "event"`，
+   *  此处用 string[] 保持宽松（前端只做展示、不做判断） */
+  blocking?: { resolved?: string[]; added?: string[]; persisting?: string[] }
+  gaps?: RhythmDeltaGap[]
+  mainline?: {
+    from_name?: string | null
+    to_name?: string | null
+    from_excess?: number | null
+    to_excess?: number | null
+    strength_changed?: boolean
+  } | null
+  review?: RhythmDeltaReview | null
+  default_key?: 'position' | 'gate' | 'mainline' | 'event' | 'none'
+  version?: string
+}
+
 export interface RhythmCard {
   /** @deprecated 2026-11 起废弃上屏：仅为未升级客户端保留，前端零引用（上色改取 position_index） */
   score?: number | null
@@ -604,6 +649,10 @@ export interface RhythmCard {
   position_ledger?: RhythmPositionLedger | null
   /** 溯源文案（2026-11 新增）：null = 只渲染变奏块与账本（ledger 存在时） */
   causality_text?: RhythmCausalityText | null
+  /** 跨日变更（2026-11 新增）：null/缺失 = 无上一条卡或后端开关未开 → 不渲染变更行 */
+  delta?: RhythmDelta | null
+  /** 变更一句话（后端已过文案校验；缺失时前端不渲染变更行） */
+  delta_narrative?: string | null
 }
 export interface RhythmMasterContent {
   /** @deprecated 节奏大师不产双层 schema（spec §5.9 登记废止 08-29 的 2.0 要求）；该槽为历史契约遗留，勿新增消费方 */

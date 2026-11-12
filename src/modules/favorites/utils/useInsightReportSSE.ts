@@ -1,16 +1,19 @@
 /**
- * 完整洞察报告流式读取（2026-09-25 替代原 PDF 下载；2026-09-26 blocks 化 + 双通道）。
+ * 完整洞察报告读取（2026-09-25 替代原 PDF 下载；2026-09-26 blocks 化 + 双通道；
+ * 2026-11-07 App 端改为整包读取）。
  *
- * 两条通道（同一份代码编多端，按**运行时能力**择一，不用条件编译——`#ifdef` 在 vitest 下不裁剪，
- * 会让两条分支同时执行、无法测）：
+ * 两条通道（同一份代码编多端，按**运行时平台/能力**择一，不用条件编译——`#ifdef` 在 vitest 下不裁剪）：
  * - `fetch`   ：H5。`fetch + ReadableStream` 能带 `Authorization` 头（`EventSource` 不能），
  *               且能直接读 HTTP 状态码；但部分 App WebView 的 fetch 不支持 body 流。
- * - `chunked` ：App 端 / 小程序。`uni.request({ enableChunked: true })` + `onChunkReceived`
- *               逐块回调（项目记忆：WebView 可能不支持 `ReadableStream`，故 App 端不能指望 fetch）。
- *               `uni.request` 可设 header，因此同样没有 `EventSource` 的鉴权限制。
+ * - `uni.request`：App 端与小程序，按平台再分两种读法：
+ *   - App（`uniPlatform === 'app' | 'app-plus'`）：**整包读取**（`buffered`，不带 `enableChunked`）。
+ *     `enableChunked` / `onChunkReceived` 是**微信小程序能力**（uni-app 文档未在 App 端提供），
+ *     App 上即便传了也收不到分块 → 报告区一直空白。服务端写完 `done` 即 `res.end()`，
+ *     因此 `success` 回调能一次拿到全文，再交给同一个分帧解码器。
+ *   - 小程序：`enableChunked: true` + `onChunkReceived` 逐块回调。
  *
- * 通道取舍与回退：优先 `fetch`；探测到没有 `ReadableStream`/`fetch` 直接走 `chunked`；
- * 若 `fetch` 拿到响应却没有可读流（WebView 常见），再回退 `chunked` 重试一次。
+ * 通道取舍与回退：App 直接整包；H5 优先 `fetch`；若 `fetch` 拿到响应却没有可读流（WebView 常见），
+ * 再回退 `uni.request` 分块通道重试一次。
  *
  * 协议：成功时 app-api 逐条写 `data: {"type":"start|section|done|error", ...}\n\n`；
  * `section` 帧携带 `blocks`（判别联合，见 ReportBlock）。两条通道都把字节喂给同一个
@@ -99,7 +102,7 @@ export interface ReportStreamDecoder {
 export function createReportStreamDecoder(
   handle: (evt: Record<string, unknown>) => boolean,
 ): ReportStreamDecoder {
-  const textDecoder = new TextDecoder()
+  let textDecoder: TextDecoder | undefined
   let buffer = ''
   let raw = ''
   let finished = false
@@ -111,6 +114,7 @@ export function createReportStreamDecoder(
       text = chunk
     } else {
       const bytes = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk)
+      textDecoder ??= new TextDecoder()
       text = textDecoder.decode(bytes, { stream: true })
     }
     buffer += text
@@ -172,7 +176,7 @@ async function readReportViaFetch(
 }
 
 /**
- * 通道 B：`uni.request` 分块传输（App 端 / 小程序）。返回 HTTP 状态码。
+ * 通道 B：`uni.request`，原生 App 收取完整文本，小程序使用分块传输。
  * 前置校验失败时服务端回的是普通 JSON（非 SSE），会被 decoder 累计进 `rawText` 供调用方取 message。
  */
 export function readReportViaChunked(
@@ -180,19 +184,25 @@ export function readReportViaChunked(
   token: string,
   decoder: ReportStreamDecoder,
   setCancel: (cancel: () => void) => void,
+  buffered = false,
 ): Promise<number> {
   return new Promise<number>((resolve, reject) => {
     const options = {
       url,
       method: 'GET',
       header: token ? { Authorization: `Bearer ${token}` } : {},
-      // App 端 / 小程序：服务端分块下发，逐块经 onChunkReceived 回调（H5 不支持该选项，也不走本通道）
-      enableChunked: true,
-      success: (res: { statusCode: number }): void => { resolve(res.statusCode) },
+      enableChunked: !buffered,
+      dataType: 'text',
+      responseType: 'text',
+      success: (res: { statusCode: number; data?: unknown }): void => {
+        if (buffered && typeof res.data === 'string') decoder.feed(res.data)
+        resolve(res.statusCode)
+      },
       fail: (err: unknown): void => { reject(err) },
     }
     const task = uni.request(options as unknown as UniApp.RequestOptions) as unknown as ChunkedRequestTask
     setCancel(() => { task.abort() })
+    if (buffered) return
     if (typeof task.onChunkReceived !== 'function') {
       // 老基座没有分块能力（enableChunked 被忽略）→ 明确报"不支持"，不静默等到超时
       task.abort()
@@ -230,7 +240,7 @@ export function useInsightReportSSE() {
   let cancelStream: (() => void) | null = null
   let timeoutTimer: ReturnType<typeof setTimeout> | null = null
   /** stop() 后到达的响应不应再改写界面状态（否则用户点了"停止"却看到错误提示） */
-  let active = false
+  let requestId = 0
 
   function clearTimer(): void {
     if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null }
@@ -261,7 +271,7 @@ export function useInsightReportSSE() {
 
   async function start(eventId: string): Promise<void> {
     stop()
-    active = true
+    const currentRequest = requestId
     header.value = ''
     sections.value = []
     error.value = ''
@@ -273,18 +283,23 @@ export function useInsightReportSSE() {
       cancelStream?.()
     }, REQUEST_TIMEOUT_MS)
 
-    const url = buildInsightReportStreamUrl(eventId)
-    const token = String(uni.getStorageSync('token') || '')
-    const decoder = createReportStreamDecoder(handleEvent)
     const registerCancel = (cancel: () => void): void => { cancelStream = cancel }
 
     try {
+      const url = buildInsightReportStreamUrl(eventId)
+      const token = String(uni.getStorageSync('token') || '')
+      const decoder = createReportStreamDecoder((evt) =>
+        currentRequest !== requestId || handleEvent(evt))
+      const platform = uni.getSystemInfoSync?.()?.uniPlatform
       let status: number
-      if (pickReportStreamChannel() === 'fetch') {
+      if (platform === 'app' || platform === 'app-plus') {
+        status = await readReportViaChunked(url, token, decoder, registerCancel, true)
+      } else if (pickReportStreamChannel() === 'fetch') {
         try {
           status = await readReportViaFetch(url, token, decoder, registerCancel)
         } catch (err) {
           if (!(err instanceof ReportStreamUnsupportedError)) throw err
+          if (currentRequest !== requestId || error.value) return
           // 响应到达但拿不到可读流（部分 App WebView 的 fetch）→ 回退 uni.request 分块通道重试一次
           status = await readReportViaChunked(url, token, decoder, registerCancel)
         }
@@ -293,7 +308,7 @@ export function useInsightReportSSE() {
       }
 
       // 已 stop()：迟到的响应不再改写界面（否则用户点了"停止"却看到错误提示）
-      if (!active) return
+      if (currentRequest !== requestId) return
 
       if (status !== 200) {
         // 前置校验失败：真实状态码 + JSON（message 已可直接展示）
@@ -305,20 +320,22 @@ export function useInsightReportSSE() {
     } catch (err) {
       // 主动 stop()/超时导致的 abort 不覆盖已有提示
       if (isAbortError(err)) return
-      if (active && !error.value) {
+      if (currentRequest === requestId && !error.value) {
         error.value = err instanceof ReportStreamUnsupportedError
           ? err.message
           : '连接失败，请检查网络后重试'
       }
     } finally {
-      clearTimer()
-      cancelStream = null
-      loading.value = false
+      if (currentRequest === requestId) {
+        clearTimer()
+        cancelStream = null
+        loading.value = false
+      }
     }
   }
 
   function stop(): void {
-    active = false
+    requestId++
     clearTimer()
     cancelStream?.()
     cancelStream = null

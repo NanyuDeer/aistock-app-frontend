@@ -1,6 +1,6 @@
 <template>
   <!-- 事件影响存活度小标（标题下方单独一行）：
-       仅 alive/fading/expired 三档渲染；no_observation / 无数据不渲染（见 isVitalityVisible）。 -->
+       仅 expired（影响已消散）渲染；alive/fading/no_observation / 无数据不渲染（见 isVitalityVisible）。 -->
   <view v-if="visible" class="vitality-badge" :class="'is-' + statusKey">
     <view class="vb-dot" />
     <text class="vb-text">{{ label }}</text>
@@ -12,8 +12,9 @@
  * 事件影响存活度小标（列表卡片 / 详情 Hero 卡共用）
  *
  * 语义：判断已推送重大事件的影响是否仍在推动相关板块（后端 annotation-only 标注）。
- * 展示口径（用户已确认）：标题下方单独一行小标；alive=影响持续中 / fading=影响减弱 / expired=影响消退；
- * no_observation 或无数据不渲染。语义色避开红涨绿跌 → alive=蓝 / fading=琥珀 / expired=浅灰。
+ * 展示口径（用户已确认）：只标注「影响已消散」（expired）。
+ * alive（影响仍在有效期内）/ fading（观察中但未形成定向传导）是默认预期，不标注；
+ * no_observation 或无数据不渲染。语义色避开红涨绿跌 → expired=浅灰。
  *
  * Props:
  * - vitality: ImpactVitality | null — 后端 impactVitality 字段
@@ -55,33 +56,7 @@ const statusKey = computed(() => props.vitality?.status ?? '')
   font-weight: 500;
 }
 
-/* 影响持续中：蓝（存活，语义色避开红涨绿跌） */
-.vitality-badge.is-alive {
-  background: $primary-50;
-
-  .vb-dot {
-    background: $primary;
-  }
-
-  .vb-text {
-    color: $primary;
-  }
-}
-
-/* 影响减弱：琥珀 */
-.vitality-badge.is-fading {
-  background: $warning-soft;
-
-  .vb-dot {
-    background: $warning;
-  }
-
-  .vb-text {
-    color: $warning;
-  }
-}
-
-/* 影响消退：浅灰（已钝化，弱化视觉权重） */
+/* 影响已消散：浅灰（已钝化，弱化视觉权重） */
 .vitality-badge.is-expired {
   background: $bg-soft;
 

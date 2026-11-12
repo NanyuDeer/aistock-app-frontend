@@ -27,6 +27,9 @@
         </view>
       </view>
 
+      <!-- 自选股相关事件：位于重大事件卡片下方，固定展示 3 条、其余内部滚动；标题行始终渲染 -->
+      <FavoriteRelatedCard :rows="favoriteRelatedRows" />
+
       <!-- 分隔线 -->
       <view class="section-divider" />
 
@@ -101,7 +104,7 @@
  * - AI 关注焦点区域（顶部高亮卡片）
  * - 全部事件列表（真实事件数据）
  */
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import type { EventItem } from '@/modules/chat/event/types'
 import { useEventList } from '@/modules/chat/event/composables/useEventList'
 import { useEventFollow } from '@/modules/chat/event/composables/useEventFollow'
@@ -110,6 +113,9 @@ import SvgIcon from '@/shared/components/SvgIcon.vue'
 import Segmented from '@/shared/components/Segmented.vue'
 import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
+import FavoriteRelatedCard from '@/modules/chat/event/components/FavoriteRelatedCard.vue'
+import { loadFavoriteRelatedEvents } from '@/modules/chat/event/favoriteRelated'
+import type { RelatedEventRow } from '@/modules/chat/event/favoriteRelated'
 import { EVENT_TYPES } from '@/modules/chat/event/constants'
 
 // ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
@@ -167,9 +173,18 @@ const headlineCount = computed(() => {
   return (headlinePositive.value ? 1 : 0) + (headlineNegative.value ? 1 : 0)
 })
 
+// ========== 自选股相关事件（独立拉取，不干扰主列表分页） ==========
+const favoriteRelatedRows = ref<RelatedEventRow[]>([])
+
+/** 加载自选股相关事件：未登录 / 无自选股 / 无相关事件时为空数组 */
+async function loadFavoriteRelated() {
+  favoriteRelatedRows.value = await loadFavoriteRelatedEvents()
+}
+
 // ========== 生命周期 ==========
 onMounted(() => {
   refresh()
+  loadFavoriteRelated()
 })
 
 // ========== 事件处理 ==========
@@ -208,12 +223,10 @@ function goToNews(event: EventItem) {
   // #endif
 }
 
-/** 关注/取消关注 */
+/** 关注/取消关注（toggleFollow 返回切换后的真实状态） */
 async function handleFollow(event: EventItem) {
-  const success = await toggleFollow(event.eventId, event.isFollowed)
-  if (success) {
-    updateFollowStatus(event.eventId, !event.isFollowed)
-  }
+  const followed = await toggleFollow(event)
+  updateFollowStatus(event.eventId, followed)
 }
 </script>
 

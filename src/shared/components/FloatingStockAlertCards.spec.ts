@@ -78,6 +78,11 @@ function translateXOf(el: VueWrapper): number {
   return matched ? Number(matched[1]) : 0
 }
 
+function translateYOf(el: VueWrapper): number {
+  const matched = /translateY\((-?[\d.]+)px\)/.exec(styleOf(el))
+  return matched ? Number(matched[1]) : 0
+}
+
 function scaleOf(el: VueWrapper): number {
   const matched = /scale\(([\d.]+)\)/.exec(styleOf(el))
   return matched ? Number(matched[1]) : 1
@@ -93,6 +98,14 @@ async function dragTo(wrapper: VueWrapper, dx: number): Promise<void> {
   const top = cards(wrapper)[0].element
   fireTouch(top, 'touchstart', 200, 400)
   fireTouch(top, 'touchmove', 200 + dx, 400)
+  await nextTick()
+}
+
+/** 上滑拖动到指定位移后保持按住 */
+async function dragUp(wrapper: VueWrapper, dy: number): Promise<void> {
+  const top = cards(wrapper)[0].element
+  fireTouch(top, 'touchstart', 200, 400)
+  fireTouch(top, 'touchmove', 200, 400 - dy)
   await nextTick()
 }
 
@@ -117,19 +130,19 @@ describe('FloatingStockAlertCards 左右跟手堆叠滑动（方案 A）', () =>
     vi.useRealTimers()
   })
 
-  it('拖动中上层卡 1:1 跟手位移并关闭 CSS 过渡', async () => {
+  it('上滑时上层卡 1:1 跟手位移并关闭 CSS 过渡', async () => {
     const wrapper = mountStack()
     await nextTick()
-    await dragTo(wrapper, -60)
+    await dragUp(wrapper, 60)
 
     const top = cards(wrapper)[0]
-    expect(translateXOf(top)).toBe(-60)
+    expect(translateYOf(top)).toBe(-60)
     expect(top.classes()).toContain('is-dragging')
     // 跟手阶段必须无过渡，否则卡片会滞后于手指
-    expect(styleOf(top)).toContain('rotate(-1.92')
+    expect(styleOf(top)).toContain('translateY(-60px)')
   })
 
-  it('拖动进度驱动下一张卡升位（底边下移、放大、变清晰）', async () => {
+  it('拖动中下层卡保持静态堆叠位（不随拖动升位，切换改为点击置顶）', async () => {
     const wrapper = mountStack()
     await nextTick()
     const next = cards(wrapper)[1]
@@ -138,13 +151,12 @@ describe('FloatingStockAlertCards 左右跟手堆叠滑动（方案 A）', () =>
     expect(restingBottom).toBeGreaterThan(0)
     expect(restingScale).toBeLessThan(1)
 
-    await dragTo(wrapper, -60)
-    // 进度 = 60 / 124.8 ≈ 0.48 → 底边按比例向完整展开位（0）收敛
-    expect(bottomOf(next)).toBeCloseTo(restingBottom * (1 - 60 / 124.8), 1)
-    expect(scaleOf(next)).toBeGreaterThan(restingScale)
+    await dragUp(wrapper, 60)
+    expect(bottomOf(next)).toBeCloseTo(restingBottom, 1)
+    expect(scaleOf(next)).toBeCloseTo(restingScale, 2)
   })
 
-  it('左滑达到切换距离：上层卡飞出后顺序轮转（看下一张）', async () => {
+  it('左右滑动已取消：不跟手、不关闭', async () => {
     const wrapper = mountStack()
     await nextTick()
     expect(topCardName(wrapper)).toBe('平安银行')
@@ -154,35 +166,48 @@ describe('FloatingStockAlertCards 左右跟手堆叠滑动（方案 A）', () =>
     vi.advanceTimersByTime(300)
     await nextTick()
 
-    expect(topCardName(wrapper)).toBe('宁德时代')
-    expect(cards(wrapper)).toHaveLength(3)
-    // 轮转后回到静态堆叠位（无残余位移）
     expect(translateXOf(cards(wrapper)[0])).toBe(0)
-  })
-
-  it('右滑达到切换距离：顺序反向轮转（看上一张）', async () => {
-    const wrapper = mountStack()
-    await nextTick()
+    expect(topCardName(wrapper)).toBe('平安银行')
+    expect(wrapper.emitted('close')).toBeUndefined()
 
     await dragTo(wrapper, 160)
     releaseAt(wrapper, 360, 400)
     vi.advanceTimersByTime(300)
     await nextTick()
 
-    expect(topCardName(wrapper)).toBe('中国平安')
+    expect(translateXOf(cards(wrapper)[0])).toBe(0)
+    expect(wrapper.emitted('close')).toBeUndefined()
   })
 
-  it('未达切换距离：回弹归位且顺序不变', async () => {
+  it('下滑已取消：不跟手、不关闭', async () => {
+    const wrapper = mountStack()
+    await nextTick()
+    const top = cards(wrapper)[0].element
+
+    fireTouch(top, 'touchstart', 200, 400)
+    fireTouch(top, 'touchmove', 200, 560)
+    await nextTick()
+    expect(translateYOf(cards(wrapper)[0])).toBe(0)
+
+    fireTouch(top, 'touchend', 200, 560)
+    vi.advanceTimersByTime(300)
+    await nextTick()
+    expect(wrapper.emitted('close')).toBeUndefined()
+    expect(topCardName(wrapper)).toBe('平安银行')
+  })
+
+  it('上滑未达阈值：回弹归位且不关闭', async () => {
     const wrapper = mountStack()
     await nextTick()
 
-    await dragTo(wrapper, -60)
-    releaseAt(wrapper, 140, 400)
+    await dragUp(wrapper, 60)
+    releaseAt(wrapper, 200, 340)
     vi.advanceTimersByTime(300)
     await nextTick()
 
+    expect(wrapper.emitted('close')).toBeUndefined()
     expect(topCardName(wrapper)).toBe('平安银行')
-    expect(translateXOf(cards(wrapper)[0])).toBe(0)
+    expect(translateYOf(cards(wrapper)[0])).toBe(0)
     expect(cards(wrapper)[0].classes()).not.toContain('is-dragging')
   })
 
@@ -190,37 +215,128 @@ describe('FloatingStockAlertCards 左右跟手堆叠滑动（方案 A）', () =>
     const wrapper = mountStack()
     await nextTick()
 
-    await dragTo(wrapper, -60)
-    fireTouch(cards(wrapper)[0].element, 'touchcancel', 140, 400)
+    await dragUp(wrapper, 60)
+    fireTouch(cards(wrapper)[0].element, 'touchcancel', 200, 340)
     await nextTick()
 
-    expect(translateXOf(cards(wrapper)[0])).toBe(0)
+    expect(translateYOf(cards(wrapper)[0])).toBe(0)
     expect(cards(wrapper)[0].classes()).not.toContain('is-dragging')
   })
 
-  it('保留上下滑动：上滑看下一张、下滑看上一张，且不产生横向跟手位移', async () => {
+  it('上滑达关闭阈值：卡片向上飞出后 emit close（叉掉该卡，不再用于切换）', async () => {
     const wrapper = mountStack()
     await nextTick()
     const top = cards(wrapper)[0].element
 
     fireTouch(top, 'touchstart', 200, 400)
-    fireTouch(top, 'touchmove', 200, 340)
+    fireTouch(top, 'touchmove', 200, 260) // 上移 140px > 关闭阈值（220rpx ≈ 114.4px）
     await nextTick()
-    // 纵向手势不进入跟手：无 is-dragging、无横向位移
-    expect(cards(wrapper)[0].classes()).not.toContain('is-dragging')
+    // 跟手：只向上位移，不产生横向位移
+    expect(translateYOf(cards(wrapper)[0])).toBe(-140)
     expect(translateXOf(cards(wrapper)[0])).toBe(0)
+    expect(cards(wrapper)[0].classes()).toContain('is-dragging')
 
-    fireTouch(top, 'touchend', 200, 340)
+    fireTouch(top, 'touchend', 200, 260)
+    vi.advanceTimersByTime(300)
     await nextTick()
-    expect(topCardName(wrapper)).toBe('宁德时代')
 
-    fireTouch(top, 'touchstart', 200, 400)
-    fireTouch(top, 'touchend', 200, 460)
-    await nextTick()
+    expect(wrapper.emitted('close')).toEqual([['SH600000']])
+    // 关闭不是切换：顺序不轮转（真实场景由父组件把该卡从 cards 中移除）
     expect(topCardName(wrapper)).toBe('平安银行')
   })
 
-  it('小程序（非 H5/App）不启用横向跟手拖动，仅保留上下滑动', async () => {
+  it('上滑未达关闭阈值：回弹归位，既不关闭也不切换', async () => {
+    const wrapper = mountStack()
+    await nextTick()
+    const top = cards(wrapper)[0].element
+
+    fireTouch(top, 'touchstart', 200, 400)
+    fireTouch(top, 'touchmove', 200, 360) // 上移 40px，未达关闭阈值
+    await nextTick()
+    fireTouch(top, 'touchend', 200, 360)
+    vi.advanceTimersByTime(300)
+    await nextTick()
+
+    expect(wrapper.emitted('close')).toBeUndefined()
+    expect(translateYOf(cards(wrapper)[0])).toBe(0)
+    expect(cards(wrapper)[0].classes()).not.toContain('is-dragging')
+    expect(topCardName(wrapper)).toBe('平安银行')
+  })
+
+  it('H5 桌面：鼠标上下拖动同样叉掉卡片（电脑端演示）', async () => {
+    const wrapper = mountStack()
+    await nextTick()
+    const top = cards(wrapper)[0].element
+
+    top.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 200, clientY: 400 }))
+    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 200, clientY: 260 }))
+    await nextTick()
+    expect(cards(wrapper)[0].classes()).toContain('is-dragging')
+    expect(translateYOf(cards(wrapper)[0])).toBe(-140)
+
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 200, clientY: 260 }))
+    vi.advanceTimersByTime(300)
+    await nextTick()
+    expect(wrapper.emitted('close')).toEqual([['SH600000']])
+  })
+
+  it('H5 桌面：鼠标左右拖动已取消（不跟手、不关闭）', async () => {
+    const wrapper = mountStack()
+    await nextTick()
+    const top = cards(wrapper)[0].element
+
+    top.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 200, clientY: 400 }))
+    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 60, clientY: 402 }))
+    await nextTick()
+    expect(translateXOf(cards(wrapper)[0])).toBe(0)
+    expect(translateYOf(cards(wrapper)[0])).toBe(0)
+
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 60, clientY: 402 }))
+    vi.advanceTimersByTime(300)
+    await nextTick()
+    expect(wrapper.emitted('close')).toBeUndefined()
+    expect(topCardName(wrapper)).toBe('平安银行')
+  })
+
+  it('拖动下层卡不移动上层卡（此前鼠标拖动「拖错卡」的回归护栏）', async () => {
+    const wrapper = mountStack()
+    await nextTick()
+    const lower = cards(wrapper)[1].element
+
+    lower.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 200, clientY: 470 }))
+    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 60, clientY: 470 }))
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 60, clientY: 470 }))
+    vi.advanceTimersByTime(300)
+    await nextTick()
+
+    expect(translateXOf(cards(wrapper)[0])).toBe(0)
+    expect(cards(wrapper)[0].classes()).not.toContain('is-dragging')
+    expect(wrapper.emitted('close')).toBeUndefined()
+  })
+
+  it('点击下层卡把它置顶（浏览其它卡不关闭）', async () => {
+    const wrapper = mountStack()
+    await nextTick()
+    expect(topCardName(wrapper)).toBe('平安银行')
+
+    await cards(wrapper)[1].trigger('tap')
+    await nextTick()
+
+    expect(topCardName(wrapper)).toBe('宁德时代')
+    expect(wrapper.emitted('close')).toBeUndefined()
+  })
+
+  it('一键关闭：右上角悬浮圆钮 emit closeAll', async () => {
+    const wrapper = mountStack()
+    await nextTick()
+
+    await wrapper.find('.fsac__close-all-float').trigger('tap')
+    expect(wrapper.emitted('closeAll')).toHaveLength(1)
+    // 单卡关闭 × 与一键关闭是两个不同事件，不能互相串
+    expect(wrapper.emitted('close')).toBeUndefined()
+  })
+
+  it('小程序：上滑同样可叉掉（关闭手势不区分平台），横拖无效果', async () => {
     vi.resetModules()
     vi.doMock('@/shared/utils/platform', () => ({ isH5: false, isApp: false, isMp: true }))
     const { default: MpComponent } = await import('./FloatingStockAlertCards.vue')
@@ -228,15 +344,24 @@ describe('FloatingStockAlertCards 左右跟手堆叠滑动（方案 A）', () =>
     mounted.push(wrapper as unknown as VueWrapper)
     await nextTick()
 
-    const top = cards(wrapper as unknown as VueWrapper)[0]
-    fireTouch(top.element, 'touchstart', 200, 400)
-    fireTouch(top.element, 'touchmove', 40, 400)
+    const mpCards = cards(wrapper as unknown as VueWrapper)
+    // 横拖：不跟手、不关闭
+    fireTouch(mpCards[0].element, 'touchstart', 200, 400)
+    fireTouch(mpCards[0].element, 'touchmove', 40, 400)
     await nextTick()
-    expect(translateXOf(top)).toBe(0)
-
-    fireTouch(top.element, 'touchend', 40, 400)
+    expect(translateXOf(mpCards[0])).toBe(0)
+    fireTouch(mpCards[0].element, 'touchend', 40, 400)
     vi.advanceTimersByTime(300)
     await nextTick()
-    expect(top.find('.fsac__name').text()).toBe('平安银行')
+    expect(wrapper.emitted('close')).toBeUndefined()
+
+    // 上滑：超阈值关闭
+    fireTouch(mpCards[0].element, 'touchstart', 200, 400)
+    fireTouch(mpCards[0].element, 'touchmove', 200, 260)
+    await nextTick()
+    fireTouch(mpCards[0].element, 'touchend', 200, 260)
+    vi.advanceTimersByTime(300)
+    await nextTick()
+    expect(wrapper.emitted('close')).toEqual([['SH600000']])
   })
 })

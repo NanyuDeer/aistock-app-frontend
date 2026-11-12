@@ -29,16 +29,6 @@
       </view>
     </view>
 
-    <!-- 溯源块（2026-11 T10 / spec §5.2）：只在后端产出 causality_text 时渲染，整块无壳。
-         门控须同时要求 ledger 存在：spec §8「旧卡无 position_ledger → 溯源块与变奏块整块不渲染」，
-         三块同源于 ledger，缺账本时单残留溯源句会成为无法追溯的孤立结论。
-         文案**原样展示**：前端不拼阈值、不算「差」、不改写数字（G19 前端禁推断）。 -->
-    <view class="rc-trace" v-if="ledger && card.causality_text">
-      <text class="rc-trace-label">溯源</text>
-      <text class="rc-trace-lead" v-if="card.causality_text.lead">{{ card.causality_text.lead }}</text>
-      <text v-for="(line, i) in traceLines" :key="i" class="rc-trace-line">{{ line }}</text>
-    </view>
-
     <!-- 变奏观察点（spec §6）：只展示后端反解出的「当前未满足项」，最多 3 条。
          排序由后端保证（sufficient_alone 优先 → gate > mainline > event），前端不重排。 -->
     <view class="rc-watch" v-if="watchPoints.length">
@@ -75,7 +65,7 @@
         <view class="rc-ledger-note" v-if="card.temperature_note">
           <text class="rc-ledger-judge">温度因子</text>
           <text class="rc-ledger-value">{{ card.temperature_note }}</text>
-          <text class="rc-ledger-effect">判定阶段用，不改档位</text>
+          <text class="rc-ledger-effect">只用于判断阶段，不影响仓位</text>
         </view>
       </view>
     </view>
@@ -165,11 +155,11 @@ const props = withDefaults(
 
 // ── slot 标注 ──
 const slotLabel = computed(() => {
-  const m: Record<string, string> = { after_close: '收盘基准', morning: '盘前', midday: '午间' }
+  const m: Record<string, string> = { after_close: '收盘后', morning: '盘前', midday: '午间' }
   return m[props.slot] ?? props.slot
 })
 const refreshSlotLabel = computed(() => {
-  const m: Record<string, string> = { after_close: '收盘基准', morning: '盘前', midday: '午间' }
+  const m: Record<string, string> = { after_close: '收盘后', morning: '盘前', midday: '午间' }
   return `refresh ${m[props.refreshSlot] ?? props.refreshSlot}`
 })
 
@@ -188,12 +178,10 @@ function importanceCls(imp: string): string {
   return 'imp-low'
 }
 
-// ── 溯源 / 变奏 / 折叠账本（2026-11-04 T10，spec §5.2 / §6）：三者同源于 position_ledger ──
-// 降级（spec §8）：position_ledger == null（旧报告）→ 三块整块不渲染，不留空壳、不报错；
-// causality_text == null 但 ledger 存在 → 只渲染变奏块与账本。
+// ── 变奏 / 折叠账本（2026-11-04 T10，spec §5.2 / §6）：两者同源于 position_ledger ──
+// 降级（spec §8）：position_ledger == null（旧报告）→ 两块整块不渲染，不留空壳、不报错。
+// 溯源已并入洞见卡 trace（490f299），详情卡不再重复渲染。
 const ledger = computed(() => props.card.position_ledger ?? null)
-/** 溯源行：后端已限 ≤2 条，前端再兜一次截断（防旧卡/异常数据撑开主区） */
-const traceLines = computed(() => (props.card.causality_text?.lines ?? []).slice(0, 2))
 /** 变奏观察点最多 3 条；顺序即后端给出的优先级，前端不重排 */
 const watchPoints = computed(() => (ledger.value?.watch_points ?? []).slice(0, 3))
 /** 双闸同时阻塞（闸门 + 无主线）：任一解除都不足以升档，块头须显式提示 */
@@ -235,12 +223,6 @@ function candidateText(wp: RhythmWatchPoint): string {
 /* 「无主线即空仓」规则说明：L1 档位旁的可见说明（不是折叠证据区的脚注） */
 .rc-rule { margin-top: 12rpx; }
 .rc-rule-text { font-size: 22rpx; color: $ink-mute; }
-
-/* ── 溯源块（spec §5.2）：小标签 + lead + ≤2 行因果，全部原样展示 ── */
-.rc-trace { background: $bg-card; border: 1rpx solid $line; border-radius: 24rpx; padding: 24rpx 28rpx; margin-bottom: 20rpx; }
-.rc-trace-label { display: block; font-size: 22rpx; color: $ink-soft; letter-spacing: 1rpx; margin-bottom: 12rpx; }
-.rc-trace-lead { display: block; font-size: 28rpx; font-weight: 600; color: $ink; line-height: 1.5; }
-.rc-trace-line { display: block; font-size: 24rpx; color: $ink-soft; line-height: 1.6; margin-top: 8rpx; }
 
 /* ── 变奏观察点（spec §6）：condition 为主文本、current_text 为次要灰字 ── */
 .rc-watch { background: $bg-card; border: 1rpx solid $line; border-radius: 24rpx; padding: 24rpx 28rpx; margin-bottom: 20rpx; }

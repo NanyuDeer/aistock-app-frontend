@@ -18,19 +18,37 @@ export interface RhythmInsightCondition {
 export interface RhythmInsightStructured {
   conditions: RhythmInsightCondition[]
 }
+/** 与 InsightCard 内部 InsightLine 结构一致；组件未导出该类型，此处按需复刻，字段变更须同步 */
+export interface RhythmInsightLine {
+  key: string
+  text: string
+  tone?: 'positive' | 'risk' | 'default'
+}
+
 export interface RhythmInsightCard {
   title: string
   trace?: string
+  lines?: RhythmInsightLine[]
   structured?: RhythmInsightStructured | null
   time: string
   /** 生成时刻灰字（次行；created_at 上海时区 HH:MM，恒真展示，不做补偿） */
   timeNote?: string
 }
 
-const SLOT_LABEL: Record<string, string> = { after_close: '收盘基准', morning: '盘前', midday: '午间' }
+const SLOT_LABEL: Record<string, string> = { after_close: '收盘后', morning: '盘前', midday: '午间' }
+
+/** 影子期渲染开关（spec §10）：后端 delta 计算与前端展示**双开关**。
+ * 部署后先保持 false 看 3 个交易日，转正时改 true 单独发一次前端，不需后端再发。 */
+export const RHYTHM_DELTA_UI = false
+
+const SLOT_KEY: Record<string, string> = {
+  after_close: '较昨日',
+  morning: '较昨收',
+  midday: '较早盘',
+}
 
 /**
- * 洞见卡标题两段式：`{仓位} · {压制原因}`（例「空仓观望 · 双闸压制」）。
+ * 洞见卡标题两段式：`{仓位} · {压制原因}`（例「空仓观望 · 两个条件都卡着」）。
  * 压制原因由后端 `position_ledger` 三个字段**纯映射**得出（见 suppressReason），
  * 前端不做任何业务判断；ledger 缺失（旧报告）→ 退化为纯仓位（不补分隔符、不伪造第二段）。
  */
@@ -39,23 +57,23 @@ export function composeRhythmTitle(positionText: string, reason?: string): strin
 }
 
 /**
- * 标题第二段来源：由 `position_ledger` 纯映射（spec §4「双闸压制 / 闸门压制 / 无主线」）。
+ * 标题第二段来源：由 `position_ledger` 纯映射（spec §4「两个条件都卡着 / 关键条件卡着 / 无主线」）。
  *
  * ```text
- * gate_blocked && mainline_state === "none"  → 双闸压制
- * gate_blocked                               → 闸门压制
+ * gate_blocked && mainline_state === "none"  → 两个条件都卡着
+ * gate_blocked                               → 关键条件卡着
  * mainline_state === "none"                  → 无主线
  * 其他 / ledger 为 null（旧报告）             → undefined
  * ```
- * 前两条必须按此顺序判断：双闸是「闸门压制」的超集。
+ * 前两条必须按此顺序判断：两个条件都卡着是关键条件卡着的超集。
  */
 function suppressReason(card: RhythmCard): string | undefined {
   const ledger = card.position_ledger
   if (!ledger) return undefined
   const gateBlocked = ledger.gate_blocked === true
   const noMainline = ledger.mainline_state === 'none'
-  if (gateBlocked && noMainline) return '双闸压制'
-  if (gateBlocked) return '闸门压制'
+  if (gateBlocked && noMainline) return '两个条件都卡着'
+  if (gateBlocked) return '关键条件卡着'
   if (noMainline) return '无主线'
   return undefined
 }
@@ -124,24 +142,46 @@ export function toRhythmInsight(
 
   const structured = (card.branches ?? []).map(toCondition).filter((c): c is RhythmInsightCondition => c !== null)
   const trace = buildTrace(card)
+  const lines = [buildDeltaLine(card, slot), buildReviewLine(card)].filter(
+    (x): x is RhythmInsightLine => x !== null,
+  )
   const { time, timeNote } = formatCardTimeParts(targetDate, slot, createdAt)
 
   return {
     title,
     trace,
+    lines: lines.length ? lines : undefined,
     structured: structured.length ? { conditions: structured } : undefined,
     time,
     timeNote,
   }
 }
 
+/** 溯源行：一句因果 + 全部明细，用「；」连接（key 由 InsightCard 的 traceWord 渲染成「溯源」）。
+ * 数据源是后端确定性 causality_text；phase_evidence.reason 已被它覆盖，不再上屏。 */
 function buildTrace(card: RhythmCard): string | undefined {
-  const ev = card.phase_evidence
-  if (ev && typeof ev === 'object') {
-    const reason = String(ev.reason ?? '')
-    const slope = ev.slope != null ? `斜率 ${ev.slope}` : ''
-    const text = [reason, slope].filter(Boolean).join(' · ')
-    if (text) return text
-  }
-  return undefined
+  const ct = card.causality_text
+  if (!ct) return undefined
+  const parts = [ct.lead, ...(ct.lines ?? [])].map((s) => String(s || '').trim()).filter(Boolean)
+  return parts.length ? parts.join('；') : undefined
+}
+
+/** 变更行：文案由后端给（已过五条校验，永不空）；缺失则整行不渲染 */
+function buildDeltaLine(card: RhythmCard, slot: string): RhythmInsightLine | null {
+  const text = String(card.delta_narrative || '').trim()
+  if (!text) return null
+  const lag = card.delta?.prev?.lag_days ?? 0
+  const key = lag > 1 ? `较 ${lag} 个交易日前` : (SLOT_KEY[slot] ?? '较上一条')
+  return { key, text }
+}
+
+/** 昨日复盘行：只陈述事实，不判对错、不打分；up_ratio 缺失时整半句不渲染 */
+function buildReviewLine(card: RhythmCard): RhythmInsightLine | null {
+  const r = card.delta?.review
+  if (!r) return null
+  const pos = String(r.prev_position_text || '').replace('建议仓位：', '') || '未给出仓位'
+  const sign = r.index_pct_chg >= 0 ? '+' : ''
+  const head = `昨日说${pos}，昨天上证 ${sign}${r.index_pct_chg.toFixed(2)}%`
+  const text = r.up_ratio == null ? head : `${head}，${Math.round(r.up_ratio)}% 的股票上涨`
+  return { key: '昨日', text }
 }

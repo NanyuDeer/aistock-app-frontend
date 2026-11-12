@@ -1,5 +1,73 @@
 # 待提交修改（aistock-app-frontend）
 
+## 2026-11-08 — 首页自选股悬浮卡：上滑叉掉 + 一键关闭全部（手势收敛为只保留上滑）
+
+### 变更文件
+
+- `src/shared/components/FloatingStockAlertCards.vue`
+  - **上滑叉掉该卡**：最上层卡跟手向上位移，松手超过 `DISMISS_DISTANCE_PX`（220rpx ≈ 114px）→ 向上飞出并 `emit('close', symbol)`（本次会话不再展示）；未达阈值回弹。
+  - **取消左右滑动与下滑**（用户确认）：横向/向下不再跟手、不再关闭，也不再用于切换卡片（原有「左右拖动切换」一并移除，`flyingOut`/`progress`/`rotateOrder` 相关分支删除）。
+  - **点击下层卡置顶**：替代原拖动切换，只改 `order` 顺序、不关闭任何卡。
+  - **拖动只作用于最上层卡**（`idx === 0`）：修复此前「拖动下层卡却移动上层卡」的鼠标拖动手感问题。
+  - **H5 桌面鼠标拖动**：`mousedown/mousemove/mouseup` 驱动同一套上滑手势（仅 `isH5`，卡内按钮不参与拖动）。
+  - **右上角悬浮圆钮「一键关闭全部」**：贴堆叠卡顶边，`emit('closeAll')`。
+- `src/shared/utils/useStockAlerts.ts`：新增 `dismissAll()`（把当前所有卡合并进 `dismissedSymbols`，仅本次会话、不持久化）。
+- `src/shared/components/MainTabs.vue`：绑定 `@close-all="dismissAllAlerts"`。
+- `src/shared/components/FloatingStockAlertCards.spec.ts`：按新语义重写用例（上滑跟手/达阈值关闭/未达回弹/触控中断/鼠标上拖关闭/左右与下滑无效果/拖动下层卡不动上层卡/点击下层卡置顶/一键关闭/小程序上滑可用）。
+- `AGENTS.md`：共享组件表中本组件的交互与事件说明同步为最新口径。
+
+### 验证
+
+- `npx vitest run src/shared/components/FloatingStockAlertCards.spec.ts`：**14 passed**。
+- `npx vue-tsc --noEmit`：EXITCODE=0。
+- 真实 H5 页面（localhost:5173/h5）实测：鼠标上拖 150px 松手 → 顶层卡消失、下一张补位；点击第二层卡 → 置顶且不关闭；点右上角圆钮 → 全部悬浮卡消失。
+
+---
+
+## 2026-11-07 — 修复：自选消息按股票筛选时混入别家自选股的资讯（前端归属护栏）
+
+**现象**：筛选到「贵州茅台」，列表仍出现「江波龙：资讯异动」「中际旭创：资讯异动」。
+
+**根因（后端数据归属，非筛选逻辑）**：实测请求已正确带 `symbol=600519`、筛选栏也显示贵州茅台，
+但返回行里 3 条的 `stock_name` 是别的股票 —— 即库里 `symbol=600519` + `stock_name=江波龙` 的错配行。
+后端 `stock_info_judgements.dedupe_key` 按「文章」去重（`source|info_type|source_id`），同一篇文章会被
+多只股票的新闻搜索返回；冲突更新执行 `DO UPDATE SET stock_name = EXCLUDED.stock_name` 而 `symbol`
+不在 SET 列表，于是留下错配行，建通知时用 `symbol` 决定归属、用 `stock_name` 拼标题，别家资讯就挂到了当前股票下。
+（后端修复见 `aistock-app-api`：入库不再改写 `stock_name` + 建通知前用 `stocks` 权威名称校验；
+ 历史脏数据清理脚本 `aistock-app-api/docs/sql/fix_stock_info_attribution.sql`）
+
+**本次前端改动（显示层护栏，防后端同类回归）**：
+- `shared/components/NotificationDropdown.vue`：新增 `stockFilterAuthoritativeName`（当前筛选股票在自选列表里的权威名称）；
+  `displayItems` 在按 `symbol` 过滤后**再按名称挡一层** —— `stockName` 与该股票权威名称不一致的消息不展示
+  （`stockName` 为空时保留，避免误伤）。后端脏数据或未来回归都不会再把别家资讯显示在当前股票下。
+
+**测试**：
+- `NotificationDropdown.spec.ts` 新增 1 例「归属错配的消息不展示」：mock 返回 `symbol=600519` 且
+  `stockName` 分别为「贵州茅台」「江波龙」的两条，筛选贵州茅台后只展示前者。
+- 该 spec 现 **10 passed**；`npx vue-tsc --noEmit` exit 0。
+- 真实页面复验（登录态、硬刷新后）：筛选「贵州茅台」列表仅剩「贵州茅台：资讯异动」「贵州茅台：业绩预测更新」，
+  江波龙 / 中际旭创 均已消失。
+
+---
+
+## 2026-11-07 — 修复：自选消息面板「查看全部」在面板已展开时筛选失效（混入其它股票消息）
+
+**现象**：点某只自选股悬浮卡的「查看全部」，通知面板里出现与该股票无关的其它股票消息（如贵州茅台的消息列表里混入宁德时代等）。
+
+**根因**（`shared/components/NotificationDropdown.vue`）：`targetSymbol`（「查看全部」带过来的目标股票）是一次性意图，但只在 `watch(open)` 里、且仅当 `open` 由 false→true 时消费。真实布局下铃铛在左上、悬浮卡在底部可同时可见 —— 若面板已展开再点「查看全部」，`open` 不变 → watcher 不触发 → 筛选被整个丢弃，列表停留在「全部自选股」，于是目标股票的消息里混入其它股票。同时该意图会滞留，后续用铃铛开面板时会突然跳到上一次的股票。
+
+**修复**：
+- `watch(targetSymbol)` 独立监听：面板已展开时也生效（清空意图 → 应用筛选 → 重拉 → 补齐）。
+- `watch(open)` 中存在待消费意图时不再自行 `load()`，交由上述 watcher 统一处理，避免同一意图触发两次请求。
+- 未登录/面板未展开时保留意图，等 `open` 时再消费；抽出 `applyTargetSymbol()` 复用。
+
+**测试**：
+- `NotificationDropdown.spec.ts` 新增 2 例：`openPanel(symbol)` 开面板即筛选（一次性意图消费后置空）；**面板已展开时点「查看全部」仍要筛到目标股票**（修复前红、修复后绿）。
+- 补 `enableAutoUnmount(afterEach)`：面板开合是模块级共享状态，用例间不卸载旧实例会让残留实例抢先把意图消费掉（此前该 spec 存在跨用例污染）。
+- 验证：`NotificationDropdown` + `FloatingStockAlertCards` + `cardStackSwipe` 三个 spec **33 passed**；`npx vue-tsc --noEmit` exit 0。
+
+---
+
 ## 2026-11-03 — PR #151 合入（中性沿用标注 / 节奏卡去 score / 次行回退时效）
 
 - src/modules/rhythm/utils/rhythmInsight.ts：标题顺序改为「仓位动作 · 档位」；phase_evidence.stage_source == "inherited_prev_day" 时档位后缀「（中性沿用）」。

@@ -5,7 +5,8 @@ import { toRhythmInsight } from '../utils/rhythmInsight'
 import type { RhythmCard as RhythmCardData, RhythmPositionLedger } from '@/shared/api/modules/agent'
 
 /**
- * T10 溯源 / 变奏观察点 / 折叠账本渲染契约（spec §5.2 / §6 / §8）。
+ * T10 变奏观察点 / 折叠账本渲染契约（spec §5.2 / §6 / §8），
+ * 以及溯源已并入洞见卡后详情卡不再重复渲染（spec §8.2）。
  *
  * 为什么是挂载测试而非源码正则：本批三条渲染规则都是「有则渲染、无则整块消失、超限截断、
  * 缺数据显式标注」的**条件渲染**语义，源码正则无法证明 DOM 真的没有空壳。
@@ -73,16 +74,15 @@ function mountCard(card: RhythmCardData) {
   return mount(RhythmCard, { props: { card } })
 }
 
-describe('溯源 / 变奏 / 账本：完整数据', () => {
-  it('三块全部渲染，溯源与变奏文案逐字一致（前端不改写数字/阈值）', () => {
+describe('变奏 / 账本：完整数据', () => {
+  it('变奏与账本渲染，溯源文案不再出现在详情卡（已并入洞见卡）', () => {
     const wrapper = mountCard(makeCard({ position_ledger: SAMPLE_LEDGER, causality_text: SAMPLE_CAUSALITY }))
 
-    // 溯源块
-    const trace = wrapper.find('.rc-trace')
-    expect(trace.exists()).toBe(true)
-    expect(trace.text()).toContain('溯源')
-    expect(trace.text()).toContain(SAMPLE_CAUSALITY.lead)
-    for (const line of SAMPLE_CAUSALITY.lines) expect(trace.text()).toContain(line)
+    // 溯源（spec §8.2）：同一件事只说一遍，详情卡整块不再渲染
+    expect(wrapper.find('.rc-trace').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('溯源')
+    expect(wrapper.text()).not.toContain(SAMPLE_CAUSALITY.lead)
+    for (const line of SAMPLE_CAUSALITY.lines) expect(wrapper.text()).not.toContain(line)
 
     // 变奏块：condition 主文本 + current_text 次文本原样
     const watch = wrapper.find('.rc-watch')
@@ -122,6 +122,11 @@ describe('溯源 / 变奏 / 账本：完整数据', () => {
     const alert = wrapper.find('.rc-watch-alert')
     expect(alert.exists()).toBe(true)
     expect(alert.text()).toContain('两条须同时满足才回到轻仓')
+  })
+
+  it('不再渲染溯源块（已合并到洞见卡）', () => {
+    const wrapper = mountCard(makeCard({ position_ledger: SAMPLE_LEDGER, causality_text: SAMPLE_CAUSALITY }))
+    expect(wrapper.find('.rc-trace').exists()).toBe(false)
   })
 })
 
@@ -194,7 +199,7 @@ describe('缺失与截断', () => {
     expect(note.exists()).toBe(true)
     expect(note.text()).toContain('温度因子')
     expect(note.text()).toContain('情绪温度 62.4（近 3 日 +8.2）')
-    expect(note.text()).toContain('不改档位')
+    expect(note.text()).toContain('不影响仓位')
     // 关键：温度行不进 4 项输入计数，否则「仓位账本（4 项输入）」摘要会与实际不符
     expect(wrapper.findAll('.rc-ledger-item')).toHaveLength(4)
   })
@@ -228,17 +233,6 @@ describe('缺失与截断', () => {
     expect(wrapper.find('.rc-watch').text()).not.toContain('条件四')
   })
 
-  it('causality_text.lines 超过 2 条 → 前端兜底截断为 2 行', () => {
-    const wrapper = mountCard(
-      makeCard({
-        position_ledger: { ...SAMPLE_LEDGER, watch_points: [] },
-        causality_text: { lead: '首句', lines: ['行一', '行二', '行三'] },
-      }),
-    )
-    expect(wrapper.findAll('.rc-trace-line')).toHaveLength(2)
-    expect(wrapper.find('.rc-trace').text()).not.toContain('行三')
-  })
-
   it('watch_points 为空 → 变奏块不渲染（不留空标签）', () => {
     const wrapper = mountCard(makeCard({ position_ledger: { ...SAMPLE_LEDGER, watch_points: [] } }))
     expect(wrapper.find('.rc-watch').exists()).toBe(false)
@@ -254,12 +248,12 @@ describe('标题第二段：suppressReason 纯映射（spec §4）', () => {
     return toRhythmInsight(makeCard({ ...base, position_ledger: ledger }), 'after_close', '2026-11-04')?.title
   }
 
-  it('gate_blocked + mainline_state=none → 双闸压制', () => {
-    expect(titleOf({ ...SAMPLE_LEDGER, gate_blocked: true, mainline_state: 'none' })).toBe('空仓观望 · 双闸压制')
+  it('gate_blocked + mainline_state=none → 两个条件都卡着', () => {
+    expect(titleOf({ ...SAMPLE_LEDGER, gate_blocked: true, mainline_state: 'none' })).toBe('空仓观望 · 两个条件都卡着')
   })
 
-  it('仅 gate_blocked → 闸门压制', () => {
-    expect(titleOf({ ...SAMPLE_LEDGER, gate_blocked: true, mainline_state: 'established' })).toBe('空仓观望 · 闸门压制')
+  it('仅 gate_blocked → 关键条件卡着', () => {
+    expect(titleOf({ ...SAMPLE_LEDGER, gate_blocked: true, mainline_state: 'established' })).toBe('空仓观望 · 关键条件卡着')
   })
 
   it('仅 mainline_state=none → 无主线', () => {
