@@ -87,7 +87,7 @@
           </view>
           <view v-if="item.entry" class="entry-line">
             <view class="entry-metric">
-              <text>入选以来</text>
+              <text>推荐后累计涨幅</text>
               <text v-if="item.entry.sessions === 1" class="entry-first">本轮首次入选</text>
               <text v-else class="entry-value" :class="{ 'is-up': (item.entryReturn ?? 0) > 0, 'is-down': (item.entryReturn ?? 0) < 0 }">
                 {{ item.entryReturn == null ? '—' : formatChange(item.entryReturn) }}
@@ -127,7 +127,7 @@ const quoteState = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
 const selectionDate = ref('')
 const selectionPublishedAt = ref('')
 const refreshingSelection = ref(false)
-const sortOptions = ['默认排序', '当日涨跌幅 ↓', '当日涨跌幅 ↑', '入选以来 ↓', '入选以来 ↑']
+const sortOptions = ['推荐后累计涨幅 ↓', '推荐后累计涨幅 ↑', '当日涨跌幅 ↓', '当日涨跌幅 ↑']
 const sortIndex = ref(0)
 
 const sortOpen = ref(false)
@@ -258,9 +258,8 @@ const recommendations = computed<Recommendation[]>(() => {
     reason: conciseInsight(item),
     sparkline: liveSparkline(item),
   }))
-  if (sortIndex.value === 0) return rows
-  const field = sortIndex.value <= 2 ? 'changePct' : 'entryReturn'
-  const direction = sortIndex.value % 2 === 0 ? 1 : -1
+  const field = sortIndex.value < 2 ? 'entryReturn' : 'changePct'
+  const direction = sortIndex.value % 2 === 0 ? -1 : 1
   return rows.sort((left, right) => {
     const a = field === 'entryReturn' && left.entry?.sessions === 1 ? null : left[field]
     const b = field === 'entryReturn' && right.entry?.sessions === 1 ? null : right[field]

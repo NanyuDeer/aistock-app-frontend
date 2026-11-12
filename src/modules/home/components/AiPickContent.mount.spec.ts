@@ -137,12 +137,12 @@ describe('AiPickContent 盘后方法单选与多选', () => {
     await flushPromises()
     expect(wrapper.get('.selection-update').text()).toBe('名单更新 2026-11-04')
     const symbols = () => wrapper.findAll('.stock-symbol').map(node => node.text())
-    expect(symbols()).toEqual(['600001', '600002', '600003'])
-    expect(wrapper.get('.entry-line').text()).toContain('本轮首次入选')
-    expect(wrapper.get('.entry-line').find('.entry-value').exists()).toBe(false)
+    expect(symbols()).toEqual(['600002', '600003', '600001'])
+    const firstEntry = wrapper.findAll('.entry-line').find(node => node.text().includes('本轮首次入选'))!
+    expect(firstEntry.find('.entry-value').exists()).toBe(false)
 
     await wrapper.get('.selection-sort').trigger('tap')
-    await wrapper.findAll('.selection-sort-option')[4].trigger('tap')
+    await wrapper.findAll('.selection-sort-option')[1].trigger('tap')
     expect(wrapper.find('.selection-sort-menu').exists()).toBe(false)
     await flushPromises()
     expect(symbols()).toEqual(['600003', '600002', '600001'])
@@ -152,7 +152,7 @@ describe('AiPickContent 盘后方法单选与多选', () => {
     await flushPromises()
     expect(selectionMock.getResults).toHaveBeenCalledTimes(2)
     expect(symbols()).toEqual(['600003', '600002', '600001'])
-    expect(wrapper.get('.selection-sort').text()).toContain('入选以来 ↑')
+    expect(wrapper.get('.selection-sort').text()).toContain('推荐后累计涨幅 ↑')
     expect(wrapper.get('.selection-update').text()).toBe('名单更新 2026-11-04')
   })
 
