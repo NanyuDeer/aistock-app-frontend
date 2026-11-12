@@ -123,7 +123,7 @@ describe('AiPickContent 盘后方法单选与多选', () => {
     expect(wrapper.text()).not.toContain('AI综合股')
   })
 
-  it('显示上海名单更新时间，按入选涨跌排序，刷新失败保留当前结果', async () => {
+  it('显示上海名单更新日期，按入选涨跌排序，刷新失败保留当前结果', async () => {
     const wrapper = mount(AiPickContent)
     selectionMock.getResults.mockResolvedValueOnce({
       status: 'ready', tradeDate: '2026-11-04', generatedAt: '2026-11-04 11:30:00+00',
@@ -135,7 +135,7 @@ describe('AiPickContent 盘后方法单选与多选', () => {
     })
     await wrapper.findAll('.horizon-chip').find(node => node.text() === '短线机会')!.trigger('tap')
     await flushPromises()
-    expect(wrapper.get('.selection-update').text()).toContain('名单更新 11-04 19:30')
+    expect(wrapper.get('.selection-update').text()).toBe('名单更新 2026-11-04')
     const symbols = () => wrapper.findAll('.stock-symbol').map(node => node.text())
     expect(symbols()).toEqual(['600001', '600002', '600003'])
     expect(wrapper.get('.entry-line').text()).toContain('本轮首次入选')
@@ -153,7 +153,7 @@ describe('AiPickContent 盘后方法单选与多选', () => {
     expect(selectionMock.getResults).toHaveBeenCalledTimes(2)
     expect(symbols()).toEqual(['600003', '600002', '600001'])
     expect(wrapper.get('.selection-sort').text()).toContain('入选以来 ↑')
-    expect(wrapper.get('.selection-update').text()).toContain('名单更新 11-04 19:30')
+    expect(wrapper.get('.selection-update').text()).toBe('名单更新 2026-11-04')
   })
 
   it('洞见只在实际高度超过两行时显示展开按钮', async () => {
