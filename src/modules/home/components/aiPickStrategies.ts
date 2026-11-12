@@ -5,8 +5,8 @@ export interface PickMethod {
   name: string
 }
 
-/** Phase 1 methods; the remaining catalogue remains visible but cannot silently fall back to AI results. */
-export const availableMethodCodes = new Set(['volume_breakout', 'momentum_continuation', 'trend_following', 'pullback_stabilization'])
+/** Methods backed by the unified selection API. */
+export const availableMethodCodes = new Set(['volume_breakout', 'momentum_continuation', 'trend_following', 'pullback_stabilization', 'industry_strength', 'limit_up_breakout', 'quality_growth', 'garp', 'stable_dividend', 'earnings_revision', 'event_catalyst'])
 
 export const horizons: Array<{ code: HorizonCode; name: string }> = [
   { code: 'ai', name: 'AI综合' },

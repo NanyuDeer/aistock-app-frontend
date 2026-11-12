@@ -28,6 +28,7 @@ export interface AiStockSelectionItem {
   changePct?: number | null
   /** 后端基于真实日 K 收盘价返回的最近 20 个交易日序列 */
   sparkline?: number[]
+  entry?: { date: string; sessions: number; price: number | null; closeReturn: number | null }
   matchedMethods?: string[]
   matchedTags?: string[]
   compositeScore?: number
@@ -35,6 +36,7 @@ export interface AiStockSelectionItem {
 }
 
 export interface AiStockSelectionLatest {
+  nextQuoteTradeDate?: string | null
   runId: number
   tradeDate: string
   status: 'generating' | 'ready' | 'failed'
@@ -49,7 +51,8 @@ export interface AiStockSelectionLatest {
 export interface MethodSelectionResult {
   runId: string | null
   tradeDate: string | null
-  expectedTradeDate: string
+  nextQuoteTradeDate?: string | null
+  expectedTradeDate: string | null
   dataAsOf: string | null
   generatedAt: string | null
   status: 'ready' | 'generating' | 'failed' | 'empty' | 'stale' | 'unavailable'
@@ -90,7 +93,7 @@ export const aiStockSelectionApi = {
     for (const quote of quotes) if (quote.price !== null) quoteCache.set(quote.symbol, { quote, savedAt: Date.now() })
     return quotes
   },
-  getResults(horizon: 'short' | 'swing', methods: string[]) {
+  getResults(horizon: 'short' | 'swing' | 'long', methods: string[]) {
     return request.get<MethodSelectionResult>('/stock-selection/results', {
       params: { horizon, methods: [...methods].sort().join(','), mode: 'blend', limit: 15 },
     })
