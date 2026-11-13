@@ -65,6 +65,8 @@ export const STORAGE_KEYS = {
   PROFILE_NICKNAME: 'profile_nickname',
   // 自选消息面板「自选股筛选」上次选择（6 位股票代码；空/缺省 = 全部自选股）
   NOTIFICATION_STOCK_FILTER: 'notification_stock_filter',
+  // 个股情报页「股票筛选」上次选择（6 位股票代码；空/缺省 = 全部股票）
+  STOCK_INTEL_STOCK_FILTER: 'stock_intel_stock_filter',
   // 事件关注列表（本地快照 [{ event, followedAt }]；服务端暂无关注能力，见 chat/event/eventFollowStore）
   EVENT_FOLLOWED_ENTRIES: 'event_followed_entries'
 } as const

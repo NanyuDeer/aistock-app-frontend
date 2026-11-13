@@ -1,5 +1,27 @@
 # CHANGELOG.md — aistock-app-frontend 变更记录
 
+## [master] 2026-11-13 — 风口页三档（今日风口默认）+ 个股情报按股票筛选
+
+**开发者**: Aria
+
+### 新增
+
+- `src/modules/market/pages/leaders.vue`：风口页改为三档（今日风口榜默认 / 波段风口榜 / 长线风口榜）；今日档展示更新时间、非交易日提示、泡泡图（大小按成交额）与排行卡片（名次/涨跌幅/成交额/龙头股），失败仅影响今日档并可重试。
+- `src/modules/market/pages/event-catcher.vue`：新增股票筛选下拉（自选股列表、选择持久化、切周期保留、筛选空态可查看全部），请求带序号避免旧响应覆盖。
+- `src/shared/api/modules/stock.ts`：新增 `TodayHotSpot*` 类型与 `getTodayHotSpots(limit)`；`getFavoritesNews` 支持 `stock_code`。
+- `src/shared/utils/storage.ts`：新增 `STOCK_INTEL_STOCK_FILTER` 存储 key。
+
+### 改进
+
+- 涨跌幅为 null 时统一显示 `--` 且不上色，去掉 `?? 0` 造成的 `+0.00%`。
+- `createStockAnalysis` 客户端超时 120s → 180s，与后端 120s 对齐（任务 3 App 侧）。
+
+### 验证
+
+- `npx vue-tsc --noEmit` 通过；H5 预览三档 Tab 与筛选交互正常。
+
+---
+
 ## [junliang] 2026-11-11 — 异动溯源 P0 补充与体验修复
 
 **开发者**: junliang

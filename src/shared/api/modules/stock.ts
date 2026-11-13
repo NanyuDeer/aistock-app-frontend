@@ -352,6 +352,36 @@ export interface WindLeaderResponse {
   hot_sectors: WindLeaderSector[]
 }
 
+/** 今日风口榜板块的龙头股（可能缺失） */
+export interface TodayHotSpotStock {
+  code: string
+  name: string
+}
+
+/** 今日风口榜板块（同花顺 mrpm 当日涨幅榜 + 实时成交额补全） */
+export interface TodayHotSpotBoard {
+  board_code: string
+  board_name: string
+  /** 榜单名次（1 起） */
+  rank: number
+  /** 当日涨幅；实时源缺失且无收盘回退时为 null */
+  change_pct: number | null
+  /** 当日成交额（元） */
+  amount: number | null
+  /** 涨幅来源：realtime / latest_close / unavailable */
+  change_source?: string
+  leading_stock?: TodayHotSpotStock | null
+}
+
+export interface TodayHotSpotsResponse {
+  trading_date?: string
+  /** false = 非交易日/实时源不可用，已回退最近交易日收盘榜 */
+  is_live: boolean
+  update_time?: string
+  source?: string
+  boards: TodayHotSpotBoard[]
+}
+
 export interface HotBurstSignal {
   symbol: string
   stockName?: string
@@ -559,8 +589,11 @@ export const stockApi = {
     return request.get(`/cn/stocks/${symbol}/news`, { params })
   },
 
-  /** 获取自选股资讯（异动捕手/个股情报列表） */
-  getFavoritesNews(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number }) {
+  /**
+   * 获取自选股资讯（异动捕手/个股情报列表）
+   * stock_code：按股票筛选（6 位代码）；不传 = 全部自选股，其它调用方行为不变
+   */
+  getFavoritesNews(params?: { cycle?: string; change_type?: string; limit?: number; offset?: number; stock_code?: string }) {
     return request.get('/cn/favorites/news', { params }).then((res: Record<string, unknown>) => res)
   },
 
@@ -583,6 +616,11 @@ export const stockApi = {
    *  timeout 放宽到 30s：服务器 getAnalysis 缓存 miss 时会实时抓取成分股行情，响应可达 8s+ */
   getWindLeaders(limit = 8) {
     return request.get<WindLeaderResponse>('/cn/wind-leaders', { params: { limit }, timeout: 30000 })
+  },
+
+  /** 获取今日风口榜（当日涨幅榜前 N 板块 + 龙头股；非交易日回退最近交易日收盘榜，is_live=false） */
+  getTodayHotSpots(limit = 10) {
+    return request.get<TodayHotSpotsResponse>('/cn/wind-leaders/today', { params: { limit }, timeout: 30000 })
   },
 
   /** 获取板块日 K 线（同花顺 bk_ 源，近 N 日，默认 120；服务器需抓取同花顺，放宽超时） */
@@ -683,7 +721,8 @@ export const stockApi = {
 
   /** 创建个股 AI 资讯分析（触发后端生成） */
   createStockAnalysis(symbol: string) {
-    return request.post(`/cn/stocks/${symbol}/analysis`, {}, { timeout: 120000 }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
+    // 后端大模型超时默认 120s，客户端留 60s 冗余（原 120s 会先于服务端返回而中断）
+    return request.post(`/cn/stocks/${symbol}/analysis`, {}, { timeout: 180000 }).then((res: Record<string, unknown>) => (res?.data as Record<string, unknown>) || res)
   },
 
   /** 获取个股 AI 分析历史 */

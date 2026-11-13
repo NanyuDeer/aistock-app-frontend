@@ -23,20 +23,39 @@
         <text class="spe-arrow">›</text>
       </view>
 
-      <!-- 长线/短线风口两档切换 -->
-      <view v-if="sectors.length" class="cycle-tabs">
+      <!-- 今日/波段/长线风口三档切换（cycle 枚举不变：today 为新增实时涨幅榜，short/long 仍走 /cn/wind-leaders） -->
+      <view class="cycle-tabs">
         <view
           v-for="opt in CYCLE_OPTIONS"
           :key="opt.value"
           class="cycle-tab"
           :class="{ active: activeCycle === opt.value }"
-          @tap="activeCycle = opt.value as 'long' | 'short'"
+          @tap="activeCycle = opt.value"
         >
           <text class="cycle-tab-text">{{ opt.label }}</text>
         </view>
       </view>
 
-      <Card v-if="errorMessage" class="state-section">
+      <!-- 今日档顶部：更新时间 + 非交易日回退提示（仅 is_live=false 时） -->
+      <view v-if="activeCycle === 'today' && !todayError && (todayUpdateTime || !todayIsLive)" class="today-meta">
+        <text v-if="todayUpdateTime" class="today-meta-text">数据更新于 {{ formatTime(todayUpdateTime) }}</text>
+        <text v-if="!todayIsLive" class="today-meta-tip">非交易日，展示最近交易日榜单</text>
+      </view>
+
+      <!-- 波段/长线档排序口径说明 -->
+      <view v-else-if="activeCycle !== 'today'" class="cycle-sort-hint">
+        <text class="cycle-sort-hint-text">{{ sortHint }}</text>
+      </view>
+
+      <Card v-if="activeCycle === 'today' && todayError" class="state-section">
+        <EmptyState :title="todayError" description="请检查网络连接后重新加载">
+          <Button size="sm" :loading="todayLoading" :disabled="todayLoading" @click="loadTodayHotSpots">
+            {{ todayLoading ? '加载中...' : '重新加载' }}
+          </Button>
+        </EmptyState>
+      </Card>
+
+      <Card v-else-if="activeCycle !== 'today' && errorMessage" class="state-section">
         <EmptyState :title="errorMessage" description="请检查网络连接后重新加载">
           <Button size="sm" :loading="loading" :disabled="loading" @click="loadData">
             {{ loading ? '加载中...' : '重新加载' }}
@@ -44,15 +63,15 @@
         </EmptyState>
       </Card>
 
-      <LoadingState v-else-if="loading && !sectors.length" text="正在加载风口龙头数据..." />
+      <LoadingState v-else-if="currentLoading" :text="currentLoadingText" />
 
-      <EmptyState v-else-if="!sectors.length" title="暂无风口龙头数据" description="数据更新后将在这里展示" />
+      <EmptyState v-else-if="currentEmpty" :title="listEmptyTitle" description="数据更新后将在这里展示" />
 
-      <!-- 风口概念泡泡图 -->
-      <view v-if="displaySectors.length" class="bubble-card">
+      <!-- 风口概念泡泡图（今日档：泡泡大小=当日成交额） -->
+      <view v-if="bubbleData.length" class="bubble-card">
         <view class="bubble-title-row">
-          <text class="bubble-title">{{ activeCycle === 'long' ? '长线风口概念' : '短线风口概念' }}</text>
-          <text class="bubble-hint">泡泡越大持续越久，颜色越深确定性越高</text>
+          <text class="bubble-title">{{ bubbleTitle }}</text>
+          <text class="bubble-hint">{{ bubbleHint }}</text>
         </view>
         <view class="bubble-wrap" :style="{ height: bubbleHeight + 'px' }">
           <!-- bubble-layer 尺寸 = 泡泡群包围盒（自适应），由 bubble-wrap flex 居中：
@@ -70,7 +89,7 @@
                 class="bubble-change"
                 :style="{ fontSize: (b.fontSize - 3) + 'px' }"
               >
-                {{ b.days }}天
+                {{ b.subLabel }}
               </text>
             </view>
           </view>
@@ -78,10 +97,52 @@
       </view>
 
       <EmptyState
-        v-else-if="sectors.length"
+        v-else-if="activeCycle !== 'today' && sectors.length"
         :title="cycleEmptyTitle"
         description="该档位暂无板块数据"
       />
+
+      <!-- 今日风口排行卡片（实时涨幅榜）：点击进入板块详情 -->
+      <view v-if="activeCycle === 'today' && todayBoards.length" class="sector-list">
+        <view
+          v-for="(board, idx) in todayBoards"
+          :key="board.board_code || board.board_name"
+          class="stats-card sector-entry"
+          @tap="goTodayBoardDetail(board)"
+        >
+          <view class="stats-header">
+            <view class="stats-title-row">
+              <Badge size="sm">No.{{ board.rank || idx + 1 }}</Badge>
+              <text class="stats-name">{{ board.board_name }}</text>
+            </view>
+            <Badge v-if="board.change_source === 'latest_close'" size="sm">收盘涨幅</Badge>
+          </view>
+          <StatGrid
+            class="leader-stat-grid"
+            :items="todayBoardStatItems(board)"
+            :columns="2"
+            :highlight="board.change_pct != null"
+          />
+          <!-- 龙头股（缺失显示 --，不阻塞榜单） -->
+          <view
+            v-if="board.leading_stock"
+            class="leader-mini-row"
+            @tap.stop="goStockDetail(board.leading_stock?.code || '')"
+          >
+            <view class="leader-mini-left">
+              <text class="leader-mini-name">{{ board.leading_stock?.name }}</text>
+              <text class="leader-mini-code">{{ board.leading_stock?.code }}</text>
+            </view>
+          </view>
+          <view v-else class="leader-mini-row">
+            <view class="leader-mini-left">
+              <text class="leader-mini-label">龙头股</text>
+              <text class="leader-mini-name">--</text>
+            </view>
+          </view>
+          <view class="card-arrow"><text class="sector-arrow">›</text></view>
+        </view>
+      </view>
 
       <!-- 板块列表（入口卡片，点击进入板块详情子页面） -->
       <view v-if="displaySectors.length" class="sector-list">
@@ -110,8 +171,13 @@
           <Badge v-if="boardCount(sector) > 0" size="sm">上榜 {{ boardCount(sector) }} 次</Badge>
         </view>
         <!-- 统计行 -->
-        <StatGrid class="leader-stat-grid" :items="sectorStatItems(sector)" :columns="3" />
-        <!-- 龙头股（分档：长线=趋势龙头 / 短线=短线领涨），跨板块去重 -->
+        <StatGrid
+          class="leader-stat-grid"
+          :items="sectorStatItems(sector)"
+          :columns="3"
+          :highlight="sector.today_change != null && sector.avg_change != null"
+        />
+        <!-- 龙头股（分档：长线=趋势龙头 / 波段=波段领涨），跨板块去重 -->
         <view v-if="getSectorLeader(sector)" class="leader-mini-row" @tap.stop="goStockDetail(getSectorLeader(sector)!.code)">
           <view class="leader-mini-left">
             <text class="leader-mini-name">{{ getSectorLeader(sector)!.name }}</text>
@@ -154,7 +220,7 @@
 import { ref, computed, getCurrentInstance, watch, nextTick } from 'vue'
 import { onShow, onReady } from '@dcloudio/uni-app'
 import { stockApi } from '@/shared/api/modules/stock'
-import type { WindLeaderAiAnalysis, WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
+import type { TodayHotSpotBoard, WindLeaderAiAnalysis, WindLeaderSector, WindLeaderStock } from '@/shared/api/modules/stock'
 import { shanghaiDateString } from '@/shared/utils/tradingTime'
 import SubPageCard from '@/shared/components/SubPageCard.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
@@ -162,6 +228,7 @@ import { LoadingState, EmptyState, Tag, Badge, Button, Card, GuideCard, StatGrid
 import type { StatGridItem } from '@/shared/components'
 import { useReportPodcast } from '@/shared/utils/useReportPodcast'
 import { calcBubbleColor, calcBubbleRadius, getSectorDays, getSectorStrength } from '@/modules/market/utils/windLeaderBubble'
+import type { CycleKind } from '@/modules/market/utils/windLeaderBubble'
 
 const { loadPodcast, openPodcast } = useReportPodcast('wind_leader')
 
@@ -171,47 +238,100 @@ const sectors = ref<WindLeaderSector[]>([])
 const updateTime = ref('')
 const favoriteSet = ref<Set<string>>(new Set())
 
+// ===== 今日风口榜（实时涨幅榜，独立数据源，失败不影响波段/长线档） =====
+const todayLoading = ref(false)
+const todayError = ref('')
+const todayBoards = ref<TodayHotSpotBoard[]>([])
+const todayUpdateTime = ref('')
+/** false = 非交易日/实时源不可用，后端已回退最近交易日收盘榜 */
+const todayIsLive = ref(true)
+
 // ===== 泡泡图数据 =====
 interface Bubble {
   name: string
-  change: number
-  days: number     // 该档位持续天数（长线=long_term_days，短线=short_term_days）
-  radius: number   // px 半径
-  color: string    // 泡泡填充色（长线蓝系=置信度，短线橙红系=热度）
+  change: number | null
+  subLabel: string  // 泡泡内副标签（波段/长线=持续天数，今日=当日涨跌幅）
+  radius: number    // px 半径
+  color: string     // 泡泡填充色（长线蓝系=置信度，波段橙红系=热度，今日=涨跌色）
   fontSize: number
 }
 
-// ===== 短线/长线风口两档切换（无"全部"档；both 同时归属两档；默认展示短线） =====
-const CYCLE_OPTIONS = [
-  { label: '短线风口榜', value: 'short' },
+// ===== 今日/波段/长线风口三档切换（cycle 枚举不变：today 为实时涨幅榜，short 值保留） =====
+type CycleTab = 'today' | 'short' | 'long'
+
+const CYCLE_OPTIONS: Array<{ label: string; value: CycleTab }> = [
+  { label: '今日风口榜', value: 'today' },
+  { label: '波段风口榜', value: 'short' },
   { label: '长线风口榜', value: 'long' },
 ]
 
-const activeCycle = ref<'long' | 'short'>('short')
+const activeCycle = ref<CycleTab>('today')
+
+/** 波段/长线的周期档位；今日档为实时涨幅榜，不参与双榜排序 */
+const cycleKind = computed<CycleKind | null>(() => (activeCycle.value === 'today' ? null : activeCycle.value))
 
 /** 当前档位展示的板块：统一先按上榜次数降序、再按该档位持续时间（影响天数）降序，各取 top8。
- * 长线上榜次数=近120交易日 freq120、短线=近10交易日 freq10；持续时间=长线 long_term_days / 短线 short_term_days。
+ * 长线上榜次数=近120交易日 freq120、波段=近10交易日 freq10；持续时间=长线 long_term_days / 波段 short_term_days。
  * 先过滤掉该档位天数为 0 的板块（另一链被裁剪或长短线均不成立的板块），
- * 宁少勿滥，避免短线档塞满 0 天补位板块。 */
-const displaySectors = computed(() =>
-  [...sectors.value]
-    .filter(s => getSectorDays(s, activeCycle.value) > 0)
+ * 宁少勿滥，避免波段档塞满 0 天补位板块。 */
+const displaySectors = computed(() => {
+  const kind = cycleKind.value
+  if (!kind) return []
+  return [...sectors.value]
+    .filter(s => getSectorDays(s, kind) > 0)
     .sort((a, b) => {
-      // 上榜次数（长线 freq120 / 短线 freq10）降序优先
+      // 上榜次数（长线 freq120 / 波段 freq10）降序优先
       const freqDiff =
-        activeCycle.value === 'short'
+        kind === 'short'
           ? Number(b.freq10 ?? 0) - Number(a.freq10 ?? 0)
           : Number(b.freq120 ?? 0) - Number(a.freq120 ?? 0)
       if (freqDiff !== 0) return freqDiff
       // 上榜次数相同时按该档持续时间（影响天数）降序
-      return getSectorDays(b, activeCycle.value) - getSectorDays(a, activeCycle.value)
+      return getSectorDays(b, kind) - getSectorDays(a, kind)
     })
     .slice(0, 8)
-)
+})
 
 /** 切换档位为空时的标题 */
-const cycleEmptyTitle = computed(() =>
-  activeCycle.value === 'long' ? '暂无长线风口数据' : '暂无短线风口数据'
+const cycleEmptyTitle = computed(() => {
+  if (activeCycle.value === 'today') return '暂无今日风口数据'
+  return activeCycle.value === 'long' ? '暂无长线风口数据' : '暂无波段风口数据'
+})
+
+/** 首屏空态标题（未拉到任何数据时） */
+const listEmptyTitle = computed(() => (activeCycle.value === 'today' ? '暂无今日风口数据' : '暂无风口龙头数据'))
+
+/** 当前档位的加载态/空态：今日档只看今日接口，不影响波段/长线档 */
+const currentLoading = computed(() =>
+  activeCycle.value === 'today'
+    ? todayLoading.value && !todayBoards.value.length
+    : loading.value && !sectors.value.length
+)
+
+const currentLoadingText = computed(() =>
+  activeCycle.value === 'today' ? '正在加载今日风口数据...' : '正在加载风口龙头数据...'
+)
+
+const currentEmpty = computed(() =>
+  activeCycle.value === 'today' ? !todayBoards.value.length : !sectors.value.length
+)
+
+/** 排序口径说明（今日档为涨幅榜名次，无此说明） */
+const sortHint = computed(() =>
+  activeCycle.value === 'short'
+    ? '排序：近 10 个交易日涨幅榜上榜次数'
+    : '排序：近 120 个交易日涨幅榜上榜次数'
+)
+
+const bubbleTitle = computed(() => {
+  if (activeCycle.value === 'today') return '今日风口概念'
+  return activeCycle.value === 'long' ? '长线风口概念' : '波段风口概念'
+})
+
+const bubbleHint = computed(() =>
+  activeCycle.value === 'today'
+    ? '泡泡越大成交额越高，红色上涨、绿色下跌'
+    : '泡泡越大持续越久，颜色越深确定性越高'
 )
 
 // 泡泡布局结果
@@ -258,24 +378,41 @@ function measureBubbleWidth() {
 
 onReady(measureBubbleWidth)
 
-// sectors 异步加载完成后，.bubble-wrap 才进入 DOM（v-if="sectors.length"），
-// onReady 时测量不到，需在数据首次到达后重新测量。
-watch(sectors, (val) => {
-  if (val.length) {
+// 数据异步加载完成后，.bubble-wrap 才进入 DOM，onReady 时测量不到，
+// 需在任一档位数据首次到达后重新测量。
+watch([sectors, todayBoards], ([sectorList, boardList]) => {
+  if (sectorList.length || boardList.length) {
     nextTick(measureBubbleWidth)
   }
 })
 
 const bubbleData = computed<Bubble[]>(() => {
-  const kind = activeCycle.value
+  // 今日档：泡泡大小 = 当日成交额（开方归一，面积近似与成交额成正比，避免头部板块吞噬画布）
+  if (activeCycle.value === 'today') {
+    const maxAmount = Math.max(0, ...todayBoards.value.map(b => b.amount ?? 0))
+    return todayBoards.value.slice(0, 10).map(b => {
+      const ratio = maxAmount > 0 ? Math.sqrt((b.amount ?? 0) / maxAmount) : 0
+      const r = Math.min(50, Math.max(20, 20 + ratio * 30))
+      return {
+        name: b.board_name,
+        change: b.change_pct,
+        subLabel: formatSignedPct(b.change_pct),
+        radius: r,
+        color: todayBubbleColor(b.change_pct),
+        fontSize: r > 50 ? 14 : (r > 38 ? 12 : 10),
+      }
+    })
+  }
+  const kind = cycleKind.value
+  if (!kind) return []
   return displaySectors.value.slice(0, 10).map(s => {
     const days = getSectorDays(s, kind)
     const strength = getSectorStrength(s, kind)
     const r = calcBubbleRadius(kind, days)
     return {
       name: s.name,
-      change: s.today_change ?? 0,
-      days,
+      change: s.today_change ?? null,
+      subLabel: `${days}天`,
       radius: r,
       color: calcBubbleColor(kind, strength),
       fontSize: r > 50 ? 14 : (r > 38 ? 12 : 10),
@@ -413,7 +550,7 @@ const bubbleLayerStyle = computed(() => ({
   height: bubbleLayout.value.layerH + 'px',
 }))
 
-// 颜色：长线蓝系（置信度）/ 短线橙红系（热度），深浅由 calcBubbleColor 按强度色阶插值
+// 颜色：长线蓝系（置信度）/ 波段橙红系（热度），深浅由 calcBubbleColor 按强度色阶插值
 function bubbleItemStyle(b: BubbleLayout) {
   return {
     width: b.radius * 2 + 'px',
@@ -460,6 +597,27 @@ async function loadData() {
   }
 }
 
+async function loadTodayHotSpots() {
+  if (todayLoading.value) return
+  todayLoading.value = true
+  try {
+    const data = await stockApi.getTodayHotSpots(10)
+    const boards = Array.isArray(data?.boards) ? data.boards : []
+    todayBoards.value = boards.filter(
+      (board): board is TodayHotSpotBoard => Boolean(board && typeof board.board_name === 'string' && board.board_name.trim())
+    )
+    todayUpdateTime.value = typeof data?.update_time === 'string' ? data.update_time : ''
+    todayIsLive.value = data?.is_live !== false
+    todayError.value = ''
+  } catch {
+    todayBoards.value = []
+    todayUpdateTime.value = ''
+    todayError.value = '今日风口数据加载失败'
+  } finally {
+    todayLoading.value = false
+  }
+}
+
 // 加载用户自选股列表
 async function loadFavorites() {
   try {
@@ -496,6 +654,18 @@ function formatPct(val?: number | null): string {
   return Number(val).toFixed(2) + '%'
 }
 
+/** 带符号涨跌幅：null 显示 --（禁止 Number(x) || 0 造成 0.00%） */
+function formatSignedPct(val?: number | null): string {
+  if (val === undefined || val === null) return '--'
+  return (val >= 0 ? '+' : '') + formatPct(val)
+}
+
+/** 今日档泡泡颜色沿用 A 股涨跌色：红涨绿跌；无涨跌幅数据用中性灰 */
+function todayBubbleColor(change: number | null): string {
+  if (change === null) return '#9ca3af'
+  return change >= 0 ? '#e54d5e' : '#18a058'
+}
+
 function formatAmount(val?: number | null): string {
   // 成交额（元，同花顺实时；原净流入 net_inflow 已下线）。0 视为无数据，避免显示误导性的"0元"
   if (val === undefined || val === null || val === 0) return '--'
@@ -505,12 +675,12 @@ function formatAmount(val?: number | null): string {
 }
 
 // ===== 上榜次数与档位标签（cycle 仅用于双榜分流，不再展示三态标签） =====
-/** 上榜次数：短线档显示近10日 freq10，长线档显示近120日 freq120 */
+/** 上榜次数：波段档显示近10日 freq10，长线档显示近120日 freq120 */
 function boardCount(s: WindLeaderSector): number {
-  return activeCycle.value === 'short' ? Number(s.freq10 ?? 0) : Number(s.freq120 ?? 0)
+  return cycleKind.value === 'short' ? Number(s.freq10 ?? 0) : Number(s.freq120 ?? 0)
 }
 
-/** 短线热度阶段标签（heat_stage：启动期/发酵期/高潮期/衰退期），高潮期用 warning 色、其余品牌色 */
+/** 波段热度阶段标签（heat_stage：启动期/发酵期/高潮期/衰退期），高潮期用 warning 色、其余品牌色 */
 function heatStageText(s: WindLeaderSector): string {
   const ai = s.ai_analysis
   if (!ai || typeof ai === 'string') return ''
@@ -532,13 +702,32 @@ function logicTypeTagType(s: WindLeaderSector): 'down' | 'warning' {
   return logicTypeText(s) === '无支撑' ? 'warning' : 'down'
 }
 
+/** 板块卡片统计项：涨跌幅为 null 时显示 --，颜色交由 StatGrid highlight 关闭（不上色） */
 function sectorStatItems(sector: WindLeaderSector): StatGridItem[] {
-  const todayChange = sector.today_change ?? 0
-  const avgChange = sector.avg_change ?? 0
   return [
-    { label: '今日涨幅', value: (todayChange >= 0 ? '+' : '') + formatPct(sector.today_change), color: todayChange >= 0 ? 'up' : 'down' },
-    { label: '均涨幅', value: (avgChange >= 0 ? '+' : '') + formatPct(sector.avg_change), color: avgChange >= 0 ? 'up' : 'down' },
+    {
+      label: '今日涨幅',
+      value: formatSignedPct(sector.today_change),
+      color: sector.today_change != null && sector.today_change >= 0 ? 'up' : 'down',
+    },
+    {
+      label: '均涨幅',
+      value: formatSignedPct(sector.avg_change),
+      color: sector.avg_change != null && sector.avg_change >= 0 ? 'up' : 'down',
+    },
     { label: '成交额', value: formatAmount(sector.amount) },
+  ]
+}
+
+/** 今日档排行卡片统计项（涨跌幅 + 成交额） */
+function todayBoardStatItems(board: TodayHotSpotBoard): StatGridItem[] {
+  return [
+    {
+      label: '涨跌幅',
+      value: formatSignedPct(board.change_pct),
+      color: board.change_pct != null && board.change_pct >= 0 ? 'up' : 'down',
+    },
+    { label: '成交额', value: formatAmount(board.amount) },
   ]
 }
 
@@ -666,15 +855,26 @@ function goSectorLoop() {
 }
 
 // 跳转到板块详情子页面，传递板块名称用于数据筛选
+function navigateSectorDetail(name: string, code?: string) {
+  if (!name) return
+  const encodedName = encodeURIComponent(name)
+  const encodedCode = code ? encodeURIComponent(code) : ''
+  uni.navigateTo({ url: `/modules/market/pages/sector-detail?name=${encodedName}${encodedCode ? '&code=' + encodedCode : ''}` })
+}
+
 function goSectorDetail(sector: WindLeaderSector) {
   if (!sector?.name) return
-  const name = encodeURIComponent(sector.name)
-  const code = sector.code ? encodeURIComponent(sector.code) : ''
-  uni.navigateTo({ url: `/modules/market/pages/sector-detail?name=${name}${code ? '&code=' + code : ''}` })
+  navigateSectorDetail(sector.name, sector.code)
+}
+
+/** 今日档排行卡片 → 板块详情（板块名/代码取自今日榜字段） */
+function goTodayBoardDetail(board: TodayHotSpotBoard) {
+  navigateSectorDetail(board.board_name, board.board_code)
 }
 
 onShow(() => {
   loadData()
+  void loadTodayHotSpots()
   // 静默预拉取播报稿，保证标题栏播报按钮可即时使用
   void loadPodcast()
 })
@@ -821,7 +1021,7 @@ onShow(() => {
   gap: 20rpx;
 }
 
-/* 长线/短线风口两档切换 */
+/* 长线/波段/今日三档切换 */
 .cycle-tabs {
   display: flex;
   gap: 16rpx;
@@ -852,6 +1052,37 @@ onShow(() => {
 .cycle-tab.active .cycle-tab-text {
   color: $primary-color;
   font-weight: 600;
+}
+
+/* 今日档顶部：更新时间 + 非交易日回退提示条 */
+.today-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-bottom: 24rpx;
+}
+
+.today-meta-text {
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.today-meta-tip {
+  font-size: 22rpx;
+  color: $warning;
+  background: rgba(245, 158, 11, 0.08);
+  border-radius: 8rpx;
+  padding: 8rpx 16rpx;
+}
+
+/* 波段/长线档排序口径说明 */
+.cycle-sort-hint {
+  margin-bottom: 24rpx;
+}
+
+.cycle-sort-hint-text {
+  font-size: 22rpx;
+  color: #9ca3af;
 }
 
 /* stats-card 卡片（与板块详情页一致） */
@@ -928,6 +1159,11 @@ onShow(() => {
   font-size: 28rpx;
   color: $ink;
   font-weight: 600;
+}
+
+.leader-mini-label {
+  font-size: 22rpx;
+  color: $ink-soft;
 }
 
 .leader-mini-code {

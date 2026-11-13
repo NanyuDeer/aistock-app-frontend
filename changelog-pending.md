@@ -1,5 +1,17 @@
 # 待提交修改（aistock-app-frontend）
 
+## 2026-11-12 — 短线洞见加载卡死修复（超时对齐 + 失败提示）
+
+### 变更文件
+
+- `src/shared/api/modules/stock.ts`
+  - `createStockAnalysis` timeout 120000 → 180000（服务端大模型超时已改为默认 120s，客户端留 60s 冗余；原 120s 会先于服务端返回而中断）
+- `src/modules/favorites/pages/detail.vue`
+  - 新增 `aiError` 状态：生成失败时卡片展示「AI 分析暂时不可用，请点击右上角刷新重试」，并纳入 `hasAiInfoCardData`
+  - `loadAiAnalysis` / `refreshAiAnalysis` 在开始与成功时清空错误态
+
+验证：`npm run type-check` 通过。
+
 ## 2026-11-08 — 首页自选股悬浮卡：上滑叉掉 + 一键关闭全部（手势收敛为只保留上滑）
 
 ### 变更文件
