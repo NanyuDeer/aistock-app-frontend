@@ -38,5 +38,6 @@
 - 长线风口数据通过 `stockApi.getWindLeaders(limit)` 获取，API 不可用时显示错误状态
 - 每个板块带 cycle 字段（short/long），Agent 报告内分节展示
 - `leaders.vue` 为概览入口页，板块详情在 `sector-detail.vue` 子页面展示（通过 name 参数筛选）
-- `sector-detail.vue` 调用同一 API 并按板块名称过滤，支持精确匹配和模糊匹配
+- 今日风口档：只展示前 8；泡泡大小=成交额线性 20~50px，颜色=涨跌幅 19 档（红 9 / 绿 9 / 灰 1，每 1% 一档）；榜单 3 列（今日涨幅 / 成交额 / 领涨股涨幅+名称），无单独龙头股行；榜单卡片与泡泡点击都跳 `sector-detail?code=&name=&source=today`
+- `sector-detail.vue` 调用同一 API 并按板块名称过滤，支持精确匹配和模糊匹配；`source=today` 时改调 `GET /api/cn/wind-leaders/today/detail`，统计项为今日涨幅 / 成交额 / 领涨股涨幅
 - 长线风口页面包含泡泡图可视化布局

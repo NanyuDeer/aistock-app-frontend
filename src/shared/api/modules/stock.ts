@@ -356,6 +356,8 @@ export interface WindLeaderResponse {
 export interface TodayHotSpotStock {
   code: string
   name: string
+  /** 领涨股当日涨幅（%）；缺失为 null/undefined，前端显示 -- */
+  change_pct?: number | null
 }
 
 /** 今日风口榜板块（同花顺 mrpm 当日涨幅榜 + 实时成交额补全） */
@@ -380,6 +382,15 @@ export interface TodayHotSpotsResponse {
   update_time?: string
   source?: string
   boards: TodayHotSpotBoard[]
+}
+
+/** 今日板块详情：sector 与 /cn/wind-leaders 的 hot_sectors 同构，供详情页复用 */
+export interface TodayHotSpotDetail {
+  trading_date?: string
+  is_live: boolean
+  update_time?: string
+  source?: string
+  sector: WindLeaderSector
 }
 
 export interface HotBurstSignal {
@@ -621,6 +632,14 @@ export const stockApi = {
   /** 获取今日风口榜（当日涨幅榜前 N 板块 + 龙头股；非交易日回退最近交易日收盘榜，is_live=false） */
   getTodayHotSpots(limit = 10) {
     return request.get<TodayHotSpotsResponse>('/cn/wind-leaders/today', { params: { limit }, timeout: 30000 })
+  },
+
+  /** 今日板块详情（供风口详情页 source=today 复用；成分股失败时后端降级返回空） */
+  getTodayHotSpotDetail(code: string, name?: string) {
+    const params: Record<string, string> = {}
+    if (code) params.code = code
+    if (name) params.name = name
+    return request.get<TodayHotSpotDetail>('/cn/wind-leaders/today/detail', { params, timeout: 30000 })
   },
 
   /** 获取板块日 K 线（同花顺 bk_ 源，近 N 日，默认 120；服务器需抓取同花顺，放宽超时） */

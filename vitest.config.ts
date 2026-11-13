@@ -108,6 +108,8 @@ export default defineConfig({
       'src/shared/components/AttributionChainView.mount.spec.ts',
       'src/modules/analytics/pages/traceability.mount.spec.ts',
       'src/modules/market/utils/useAlertSSE.spec.ts',
+      // 今日风口榜泡泡：线性半径 + 19 档色阶（红 9 / 绿 9 / 灰 1）
+      'src/modules/market/utils/windLeaderBubble.spec.ts',
       'src/modules/market/components/AlertReasoningPanel.spec.ts',
       'src/modules/market/pages/alert-analysis.spec.ts',
       'src/modules/home/components/DynamicInsightCard.mount.spec.ts',

@@ -12,7 +12,10 @@
       </Card>
 
       <!-- 空状态 -->
-      <EmptyState v-else-if="!sector" title="未找到该板块数据" />
+      <EmptyState
+        v-else-if="!sector"
+        :title="detailSource === 'today' ? '未找到该板块今日数据' : '未找到该板块数据'"
+      />
 
       <!-- 板块详情 -->
       <template v-else>
@@ -292,6 +295,9 @@ const loading = ref(false)
 const errorMessage = ref('')
 const sector = ref<WindLeaderSector | null>(null)
 const sectorName = ref('')
+/** 详情来源：today = 今日风口榜（走今日快照详情接口），default = 波段/长线（原 getWindLeaders 逻辑） */
+const detailSource = ref<'default' | 'today'>('default')
+const sectorCode = ref('')
 
 /** 板块 K 线（近120日） */
 const boardKline = ref<TrendKLineData | null>(null)
@@ -315,6 +321,13 @@ function formatPct(value: unknown): string {
   const num = toFiniteNumber(value)
   if (num === null) return '--'
   return num.toFixed(2) + '%'
+}
+
+/** 带符号涨跌幅：null 返回 --，避免拼出 "+--" */
+function formatSignedPct(value: unknown): string {
+  const num = toFiniteNumber(value)
+  if (num === null) return '--'
+  return (num >= 0 ? '+' : '') + num.toFixed(2) + '%'
 }
 
 function formatAmount(value: unknown): string {
@@ -357,6 +370,22 @@ const persistenceTagType = computed<'down' | 'neutral' | 'warning'>(() => {
 const sectorStatItems = computed<StatGridItem[]>(() => {
   if (!sector.value) return []
   const s = sector.value
+  // 今日档：今日快照没有「均涨幅」，第三列改为领涨股涨幅（副标题写名称）
+  if (detailSource.value === 'today') {
+    return [
+      {
+        label: '今日涨幅',
+        value: formatSignedPct(s.today_change),
+        color: s.today_change != null && s.today_change >= 0 ? 'up' : 'down',
+      },
+      { label: '成交额', value: formatAmount(s.amount) },
+      {
+        label: '领涨股涨幅',
+        value: formatSignedPct(s.leading_stock_info?.change_pct),
+        subtitle: s.leading_stock_info?.name || '--',
+      },
+    ]
+  }
   const todayChange = s.today_change ?? 0
   const avgChange = s.avg_change ?? 0
   return [
@@ -658,13 +687,33 @@ async function loadSectorInsight() {
 }
 
 async function loadData() {
-  if (!sectorName.value) {
+  if (!sectorName.value && !sectorCode.value) {
     errorMessage.value = '缺少板块名称参数'
     return
   }
   loading.value = true
   errorMessage.value = ''
   try {
+    // 今日档：走今日快照详情接口，后端已组装成与 hot_sectors 同构的对象
+    if (detailSource.value === 'today') {
+      const res: any = await stockApi.getTodayHotSpotDetail(sectorCode.value, sectorName.value)
+      const found: WindLeaderSector | null = (res?.data ?? res)?.sector ?? null
+      sector.value = found
+      boardKline.value = null
+      if (found?.code) {
+        klineLoading.value = true
+        void stockApi.getBoardKline(found.code, 120).then((data) => {
+          boardKline.value = data
+          klineLoading.value = false
+        })
+      }
+      if (found) {
+        void loadSectorInsight()
+      } else {
+        errorMessage.value = '未找到该板块今日数据'
+      }
+      return
+    }
     const res: any = await stockApi.getWindLeaders(40)
     const data = res?.data ?? res
     const sectors: WindLeaderSector[] = data?.hot_sectors ?? []
@@ -690,7 +739,11 @@ async function loadData() {
     }
   } catch (error) {
     console.error('板块详情数据加载失败:', error)
-    errorMessage.value = '板块数据加载失败'
+    const status = (error as { statusCode?: number; response?: { status?: number } })?.statusCode
+      ?? (error as { response?: { status?: number } })?.response?.status
+    errorMessage.value = detailSource.value === 'today'
+      ? (status === 404 ? '未找到该板块今日数据' : '今日板块详情加载失败')
+      : '板块数据加载失败'
   } finally {
     loading.value = false
   }
@@ -699,6 +752,8 @@ async function loadData() {
 onLoad((options) => {
   const name = options?.name || options?.sector || ''
   sectorName.value = decodeURIComponent(name)
+  sectorCode.value = typeof options?.code === 'string' ? decodeURIComponent(options.code) : ''
+  detailSource.value = options?.source === 'today' ? 'today' : 'default'
   loadData()
 })
 </script>

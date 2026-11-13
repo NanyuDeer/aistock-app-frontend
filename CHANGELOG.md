@@ -1,5 +1,30 @@
 # CHANGELOG.md — aistock-app-frontend 变更记录
 
+## [master] 2026-11-13 — 今日风口榜重设计（详情复用 / 前 8 三列 / 19 档泡泡）+ 洞见加载失败提示
+
+**开发者**: Aria
+
+### 新增
+
+- `src/modules/market/utils/windLeaderBubble.ts`：今日泡泡新口径——半径按成交额线性 20~50px；颜色红 9 档 + 绿 9 档 + 灰 1 档（每 1% 一档，≥9% 封顶，0/null 灰）。
+- `src/shared/api/modules/stock.ts`：新增 `TodayHotSpotDetail` 类型与 `stockApi.getTodayHotSpotDetail(code, name?)`；`TodayHotSpotStock` 增加 `change_pct`。
+- `src/modules/market/pages/sector-detail.vue`：支持 `source=today`，改走今日详情接口，统计项为今日涨幅 / 成交额 / 领涨股涨幅，空态「未找到该板块今日数据」。
+
+### 改进
+
+- `src/modules/market/pages/leaders.vue` 今日档：榜单与泡泡统一只取前 8；榜单改 3 列（今日涨幅 / 成交额 / 领涨股涨幅，副标题显示领涨股名称）；删除今日档单独龙头股行；泡泡半径 <30px 只显示名称（两行截断）；榜单卡片与泡泡点击都进板块详情（`source=today`）。
+- `src/modules/favorites/pages/detail.vue`：AI 分析生成失败时显示「AI 分析暂时不可用，请点击右上角刷新重试」，不再无声空置被误认为加载卡死。
+
+### 修复
+
+- 今日风口榜部分板块点击无详情页：今日榜来自 mrpm 全量概念榜，多数不在 `getWindLeaders` 的 hot_sectors 中，改为按今日快照提供详情数据并复用 `sector-detail.vue`。
+
+### 验证
+
+- `npx vitest run src/modules/market/utils/windLeaderBubble.spec.ts`：6 passed；`npx vue-tsc --noEmit` 通过；H5 未手测（本地后端/DB 不可用）。
+
+---
+
 ## [master] 2026-11-13 — 风口页三档（今日风口默认）+ 个股情报按股票筛选
 
 **开发者**: Aria

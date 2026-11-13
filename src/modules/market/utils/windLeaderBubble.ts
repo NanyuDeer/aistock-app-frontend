@@ -48,3 +48,50 @@ export function getSectorStrength(s: WindLeaderSector, kind: CycleKind): number 
   const a = typeof s.ai_analysis === 'object' ? s.ai_analysis : undefined
   return kind === 'long' ? a?.long_confidence ?? 0 : a?.short_heat ?? 0
 }
+
+// ===== 今日风口榜泡泡：成交额线性大小 + 涨跌幅 19 档颜色（红 9 / 绿 9 / 灰 1） =====
+
+export const TODAY_BUBBLE_NEUTRAL = '#9ca3af'
+
+/** 上涨 9 档（浅 → 深），每 1% 一档 */
+export const TODAY_BUBBLE_RED_SCALE = [
+  '#f7b3b3',
+  '#f28e8e',
+  '#ec6a6a',
+  '#e54d5e',
+  '#cf3b4b',
+  '#b52d3c',
+  '#97222f',
+  '#761a24',
+  '#55111a',
+] as const
+
+/** 下跌 9 档（浅 → 深），按跌幅绝对值每 1% 一档 */
+export const TODAY_BUBBLE_GREEN_SCALE = [
+  '#a7dcb8',
+  '#86cfa0',
+  '#63c187',
+  '#18a058',
+  '#158a4c',
+  '#127340',
+  '#0f5c34',
+  '#0b4628',
+  '#07301c',
+] as const
+
+/** 今日泡泡半径：成交额线性映射 20~50px（与波段/长线同区间，最大成交额归一） */
+export function calcTodayBubbleRadius(amount: number | null | undefined, maxAmount: number): number {
+  const value = typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? amount : 0
+  const ratio = maxAmount > 0 ? Math.min(1, value / maxAmount) : 0
+  return 20 + ratio * 30
+}
+
+/** 今日泡泡颜色：涨红 9 档 + 跌绿 9 档 + 平/无数据灰，每 1% 一档，≥8% 封顶第 9 档 */
+export function calcTodayBubbleColor(changePct: number | null | undefined): string {
+  if (changePct === null || changePct === undefined || !Number.isFinite(changePct) || changePct === 0) {
+    return TODAY_BUBBLE_NEUTRAL
+  }
+  const scale = changePct > 0 ? TODAY_BUBBLE_RED_SCALE : TODAY_BUBBLE_GREEN_SCALE
+  const step = Math.min(9, Math.max(1, Math.ceil(Math.abs(changePct))))
+  return scale[step - 1]
+}
