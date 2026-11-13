@@ -61,7 +61,7 @@ export interface StockTraceArtifact {
 
 export interface TraceEvidence {
   source_id: string
-  kind: 'trigger_fact' | 'quote_fact' | 'sector_fact' | 'market_fact' | 'announcement' | 'news' | 'capital_fact' | 'technical_fact'
+  kind: 'trigger_fact' | 'quote_fact' | 'sector_fact' | 'sector_news' | 'market_fact' | 'announcement' | 'news' | 'capital_fact' | 'technical_fact'
   provider: string
   source_level: 'A' | 'B' | 'C' | 'D'
   title: string
@@ -149,6 +149,6 @@ export const stockTraceApi = {
    * `enqueued`：后端顺带补齐归因入队的当日 active 事件数（2026-10-15 起返回）。
    */
   detect() {
-    return request.post<{ triggered: boolean; enqueued: number }>('/cn/favorites/movements/detect')
+    return request.post<{ triggered: boolean; enqueued: number; reason?: 'market_closed' }>('/cn/favorites/movements/detect')
   },
 }

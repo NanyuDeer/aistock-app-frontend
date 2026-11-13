@@ -1,6 +1,84 @@
 # CHANGELOG.md — aistock-app-frontend 变更记录
 
+## [junliang] 2026-11-11 — 异动溯源 P0 补充与体验修复
+
+**开发者**: junliang
+
+- 洞察列表、监控页和首页统一直接显示归因摘要，独立展示主因、大盘联动、板块联动或归因线索标签。
+- 非交易日点击立即检测提示休市并保留列表；交易日由后端 market_closed 响应判断交易时段。
+- 同步列表与 WebSocket 更新的摘要断言，补充前后端休市判定的回归用例。
+- 验证：洞察列表、监控页及报告流测试 64 项通过，vue-tsc --noEmit 通过。
+
+---
+
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
+
+## [xusiyun] 2026-11-10 — 事件关注（纯前端本地快照）+ 关注按钮即时切换修复
+
+**开发者**: xusiyun
+
+### 新增
+
+- `src/modules/chat/event/eventFollowStore.ts`：事件关注本地快照存储（key `event_followed_entries`，`[{ event, followedAt }]`；倒序、按 `eventId` 去重并置顶、上限 100 条、脏数据逐条丢弃；快照不存 `impactVitality`）。
+- `src/modules/chat/pages/event/followed.vue` + `src/pages.json`：事件关注聚合页（卡片复用 `EventItemCard`，取关即移除；空态引导去事件传导）。
+- `src/modules/user/pages/profile.vue`：我的页「自选股」下方新增「事件关注」入口。
+- `src/modules/chat/pages/event/list.vue`：「重大事件」标题行改为「关注 · N」入口，`onShow` 刷新角标并校正卡片关注态。
+- 测试：`eventFollowStore.spec.ts`、`useEventList.spec.ts`、`EventItemCard.follow.mount.spec.ts`（含双向切换、父级不回传 prop、store 双实例三处回归）。
+
+### 修复
+
+- 事件卡片关注按钮点击后不切换：根因是按钮文案为 `Button` 插槽内容，uni-app H5 下父组件更新只 patch 属性、插槽文本不 patch（实测 class 已变、文案不变）。改为卡片本地 `ref` 乐观切换 + `watch(followRevision)` / `watch(props.event.isFollowed)` 校正，并给 `Button` 加 `:key` 强制重建节点。
+- `eventApi.followEvent/unfollowEvent` 由「显式抛错」改为写本地快照；`useEventFollow.toggleFollow(event)` 以本地真实状态判断方向；`eventAdapter` 两处 `isFollowed` 取自 `isEventFollowed`。
+
+### 改进
+
+- `FavoriteRelatedCard.vue`：自选股相关事件卡去掉展开/收起，固定展示前 3 条、超出在卡片内滚动。
+- `VitalityBadge.vue` / `constants.ts`：存活度只标注「影响已消散」（expired），其余状态不渲染。
+
+### 验证
+
+- `npm test`：76 files / 759 tests passed；`npx vue-tsc --noEmit` exit 0；浏览器实操「关注 ↔ 已关注」多次切换一致。
+
+---
+
+## [xusiyun] 2026-11-07 — 自选股相关重大事件卡片：位置下移、默认收起、标题强化
+
+**开发者**: xusiyun
+
+### 改进
+
+- `src/modules/chat/event/components/FavoriteRelatedCard.vue`：标题由「我的自选股」改为「自选股相关重大事件」；去掉卡片外层 `v-if`，标题行与展开/收起按钮**始终渲染**（有数据追加「· N 条相关」，无数据展开显示空提示）；默认全部收起；标题行改为强调样式（品牌色竖条 + 浅底 + 放大加粗 + 计数徽标 + 品牌色展开文案）；影响板块名称按 `direction` 着色（bullish=红 / bearish=绿 / neutral=灰）。
+- `src/modules/chat/event/favoriteRelated.ts`：数据层补 `direction` 字段。
+- `src/modules/chat/pages/event/list.vue`：卡片由页面顶部下移到「重大事件」双卡下方。
+- `src/pages-sub-app/event-chain/index.vue`：旧入口页同步接入该卡片（重大事件 section 下方、分隔线之前），新增独立 `loadFavoriteRelated()`，不影响主列表分页。
+- `src/shared/styles/global.scss`：修复 `--ev-accent-soft` / `--ev-accent-bg` 的 Sass 插值写法（`rgba(#{$primary}, …)` → `#{rgba($primary, …)}`），此前 token 输出非法 CSS 导致相关浅底透明。
+- `src/modules/chat/AGENTS.md`：同步事件卡片说明。
+
+### 验证
+
+- `npx vue-tsc --noEmit` 通过。
+
+## [junliang] 2026-11-07 — App 端「生成完整洞察报告」无反应修复
+
+**开发者**: 项目组
+
+### 变更
+
+- `src/modules/favorites/utils/useInsightReportSSE.ts`：App 端（`uniPlatform` 为 `app` / `app-plus`）改为 `uni.request` 整包读取，**不再依赖 `enableChunked`**。该选项只有微信小程序基座会触发 `onChunkReceived`，App 基座不触发，`success` 只拿到状态码、拿不到正文，表现为按钮点了没反应且无报错。H5 仍走 `fetch + ReadableStream`，小程序仍走分块。
+- 同一文件把 `active` 布尔改为 `requestId` 自增令牌：`stop()` 后迟到的响应/分帧不再改写界面。
+- `src/modules/favorites/utils/useInsightReportSSE.spec.ts`：25 → **26 例**（新增「原生 App 无分块回调也能展示完整报告」）。
+- `src/modules/favorites/AGENTS.md`：补充 2026-11-07 根因与改法记录。
+
+### 验证
+
+- `vitest run src/modules/favorites/utils/useInsightReportSSE.spec.ts` → **26 passed**；全量 `vitest run` → **72 files / 717 passed**；`node tests/run-node-specs.mjs` → **305/305**。
+- `vue-tsc --noEmit` → exit 0；`uni build -p app` → 成功，`dist/build/app/app-service.js` 已含 `app-plus` 整包分支。
+
+### 待办
+
+- 出 0.1.7 前需将 `src/manifest.json` 的 `versionCode` 106 → **107**，否则已装 0.1.6 的用户收不到更新提示；APK 仍需 HBuilderX 云打包 + 正式签名证书。
+
+---
 
 ## [master] 2026-11-03 — 节奏卡语义收口 & 回退时效（PR #151 合入）
 
@@ -81,6 +159,28 @@
 - 相关 7 个 spec 全绿 **70 passed**；`npx vue-tsc --noEmit` exit 0。
 
 ---
+## [junliang] 2026-10-16 — 同步 `sector_news`（板块消息）证据类型
+
+**开发者**: NanyuDeer
+
+### 变更
+
+- `shared/api/modules/stockTrace.ts`：`TraceEvidence.kind` 联合补 `sector_news`，与 app-api `types.ts`、agent-py `schemas/stock_trace.py` 的 `SourceKind` 对齐。
+- `modules/favorites/components/PriceMovementAnalysisContent.vue`：`kindText()` 补 `sector_news → 板块消息`（该组件消费 `artifactJson.evidence_index`，漏补会把原始英文 kind 直接展示给用户）。
+
+### 说明
+
+- **无渲染逻辑改动**：完整洞察报告的「证据清单」由 agent-py `_KIND_LABELS` 中文化，前端只按 `block.type` 渲染；本次仅补本地 kind 词表与类型契约。
+- 其余 favorites 页面（monitor / insight / insight-detail-move / AlertContent）不依赖 evidence kind，未改动。
+
+### 测试
+
+- `npx vitest run src/modules/favorites/components/PriceMovementAnalysisContent.spec.ts` → **1 passed**
+- `npx vue-tsc --noEmit` **exit 0**
+
+### 文档
+
+- `modules/favorites/AGENTS.md`：新增「板块消息证据类型 sector_news」段落
 
 ## [junliang] 2026-10-15 — 自选股异动「立即检测」按钮接回真实检测 + 展示归因入队条数
 

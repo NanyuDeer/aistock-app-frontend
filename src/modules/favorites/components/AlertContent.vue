@@ -67,6 +67,9 @@
                 <template #prefix>
                   <Tag v-if="item" :type="captureTagType(item.direction)" size="sm">{{ badgeLabel(item.direction) }}</Tag>
                 </template>
+                <template v-if="item?.causeLabel" #value>
+                  <Tag type="neutral" size="sm">{{ item.causeLabel }}</Tag>
+                </template>
               </ListCell>
             </template>
             <!-- 空态：沿用原 EmptyState 样式（白底 + 图标 + 文案），高度对齐固定 3 行 -->
@@ -89,6 +92,7 @@ import EmptyState from '@/shared/components/EmptyState.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import { stockApi } from '@/shared/api/modules/stock'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
+import { formatStockTraceCause } from '@/modules/favorites/utils/formatStockTraceCause'
 import { useUserStore } from '@/shared/store/modules/user'
 import { isTradingTime } from '@/shared/utils/tradingTime'
 import { isUnattributableMovement, dedupeDailyMovements } from './insightCards'
@@ -126,6 +130,7 @@ interface CaptureItem {
   direction: 'up' | 'down'
   /** 描述文案：主因：xxx / 主因待验证 / 归因中 / 待归因 */
   detailText: string
+  causeLabel?: string
   /** MM-DD 日期 */
   dateText: string
   /** 事件时间戳（融合列表按此倒序排列） */
@@ -150,9 +155,9 @@ function fmtDateMMDD(t?: string): string {
  * 仅演示样张、不落任何真实 event_id → 行不可点击（点击跳详情必然 404）。
  */
 const DEMO_CAPTURE_LIST: CaptureItem[] = [
-  { event_id: '', event_type: 'price', stock_name: '中国平安', direction: 'up', detailText: '主因：保险板块集体走强', dateText: '', sortTime: 0, demo: true },
-  { event_id: '', event_type: 'price', stock_name: '贵州茅台', direction: 'down', detailText: '主因：消费板块资金流出', dateText: '', sortTime: 0, demo: true },
-  { event_id: '', event_type: 'price', stock_name: '宁德时代', direction: 'up', detailText: '主因：新能源政策预期升温', dateText: '', sortTime: 0, demo: true },
+  { event_id: '', event_type: 'price', stock_name: '中国平安', direction: 'up', detailText: '保险板块集体走强', dateText: '', sortTime: 0, demo: true },
+  { event_id: '', event_type: 'price', stock_name: '贵州茅台', direction: 'down', detailText: '消费板块资金流出', dateText: '', sortTime: 0, demo: true },
+  { event_id: '', event_type: 'price', stock_name: '宁德时代', direction: 'up', detailText: '新能源政策预期升温', dateText: '', sortTime: 0, demo: true },
 ]
 
 function buildDemoCaptureList(): CaptureItem[] {
@@ -163,8 +168,8 @@ function buildDemoCaptureList(): CaptureItem[] {
 /** 价格异动（stocktrace 链路）→ 统一模型 */
 function fromMovement(m: StockTraceEvent): CaptureItem {
   let detailText = '待归因'
-  if (m.primary_cause) detailText = `主因：${m.primary_cause}`
-  else if (m.movement_view?.primaryCandidate?.verdict) detailText = `主因：${m.movement_view.primaryCandidate.verdict}`
+  const cause = formatStockTraceCause(m)
+  if (cause) detailText = cause.text
   else if (m.analysis_status === 'completed') detailText = '归因完成'
   else if (m.analysis_status === 'processing') detailText = '归因中'
   else if (m.analysis_status === 'failed') detailText = '归因失败'
@@ -174,6 +179,7 @@ function fromMovement(m: StockTraceEvent): CaptureItem {
     stock_name: m.stock_name,
     direction: m.direction,
     detailText,
+    causeLabel: cause?.label,
     dateText: fmtDateMMDD(m.triggered_at),
     sortTime: m.triggered_at ? new Date(m.triggered_at).getTime() : 0,
   }

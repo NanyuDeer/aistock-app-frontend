@@ -59,14 +59,18 @@
         <text class="ai-text">{{ event.aiSummary }}</text>
       </view>
       <view class="card-actions">
+        <!-- key 随关注态切换：uni-app H5 下 Button 的插槽文本不会随父组件更新而 patch
+             （实测取关后 class 已更新、按钮文案仍停在「已关注」），
+             换 key 强制重建节点，保证文案与状态始终一致 -->
         <Button
+          :key="isFollowed ? 'followed' : 'unfollowed'"
           type="secondary"
           size="sm"
           class="follow-btn"
-          :class="{ followed: event.isFollowed }"
-          @click.stop="$emit('toggle-follow', event)"
+          :class="{ followed: isFollowed }"
+          @click.stop="handleToggleFollow"
         >
-          {{ event.isFollowed ? '已关注' : '关注' }}
+          {{ isFollowed ? '已关注' : '关注' }}
         </Button>
       </view>
     </view>
@@ -87,13 +91,16 @@
  *
  * 视觉层已对齐组件库：Card 容器 + Rate 重要性 + Tag 来源标签 + SvgIcon 图标。
  */
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { EventItem } from '../types'
 import { formatDateTime } from '@/shared/utils/datetime'
-import { Card, Button, Tag } from '@/shared/components'
+import Card from '@/shared/components/Card.vue'
+import Button from '@/shared/components/Button.vue'
+import Tag from '@/shared/components/Tag.vue'
 import Rate from '@/shared/components/Rate.vue'
 import SvgIcon from '@/shared/components/SvgIcon.vue'
 import VitalityBadge from './VitalityBadge.vue'
+import { followRevision, isEventFollowed } from '../eventFollowStore'
 import wordmarkPng from '@/shared/components/insight-wordmark.png'
 
 /** AI 洞见徽标底图（洞见字标 PNG） */
@@ -109,13 +116,43 @@ const props = defineProps<Props>()
 
 // ========== Emits ==========
 
-defineEmits<{
+const emit = defineEmits<{
   'toggle-follow': [event: EventItem]
   'view-detail': [event: EventItem]
   'view-news': [event: EventItem]
 }>()
 
-// ========== 计算属性 ==========
+// ========== 关注态 ==========
+
+/**
+ * 关注态：卡片本地状态，点击时立即乐观切换。
+ *
+ * 为什么不用 computed 直接派生 store / props：
+ * 按钮文案曾长期「点了不变」——只依赖父组件回传的新 `event` prop 或跨模块的
+ * 响应式版本号时，这条传播链在 H5 HMR、App、分包等运行形态下并不可靠
+ * （实测：关注计数与本地存储已写入，按钮文案却仍是「关注」）。
+ * 本地 ref 由本组件自己持有，赋值必然触发自身重渲染，与外部传播无关。
+ */
+const isFollowed = ref(isEventFollowed(props.event.eventId))
+
+/** 关注/取关写入后，以本地快照为真值校正（覆盖写入失败或外部改动） */
+watch(followRevision, () => {
+  isFollowed.value = isEventFollowed(props.event.eventId)
+})
+
+/** 父组件替换了事件数据时校正（如列表 onShow 重新同步关注态） */
+watch(
+  () => props.event.isFollowed,
+  (value) => {
+    if (typeof value === 'boolean') isFollowed.value = value
+  },
+)
+
+function handleToggleFollow(): void {
+  // 先切本地状态：按钮立刻响应，不等异步关注流程与父级数据回传
+  isFollowed.value = !isFollowed.value
+  emit('toggle-follow', props.event)
+}
 
 /** 来源标签文案 */
 const sourceLabel = computed(() => {

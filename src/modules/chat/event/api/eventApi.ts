@@ -5,9 +5,13 @@
  * 通过 eventAdapter 处理数据映射和降级逻辑。
  */
 
-import type { EventListResponse, EventListParams, EventDetailResponse, EventGraph, NewsArticle, EventTimelineQuery, EventTimelineResponse } from '../types'
+import type { EventListResponse, EventListParams, EventDetailResponse, EventGraph, NewsArticle, EventTimelineQuery, EventTimelineResponse, EventItem } from '../types'
 import type { BackendEventListData, BackendEventDetailData } from './eventAdapter'
 import { adaptEventList, adaptEventDetail } from './eventAdapter'
+import {
+  followEvent as followEventLocally,
+  unfollowEvent as unfollowEventLocally,
+} from '../eventFollowStore'
 import request from '@/shared/api/request'
 
 /**
@@ -59,27 +63,27 @@ export async function getEventGraph(eventId: string): Promise<EventGraph> {
 /**
  * 关注事件
  *
- * 后端关注接口尚未提供。**显式抛错**而非静默 resolve——原实现静默成功会让
- * 调用方（useEventFollow → 列表/传导页）乐观地把按钮置为「已关注」，
- * 造成「看起来能用、实际未落库」的假象。
+ * 服务端暂无关注能力（无关注表 / 无关注接口），当前落到本地快照存储：
+ * 关注时把事件展示字段整体存入本机，关注页直接读快照渲染。
  *
- * @param eventId - 事件ID
+ * 本函数是**未来接入后端关注接口的唯一替换点**——接后端时只改这里，
+ * 上层（useEventFollow → 列表页 / 传导页 / 关注页）无需改动。
+ *
+ * @param event - 事件卡片数据（快照来源）
  */
-export async function followEvent(eventId: string): Promise<void> {
-  console.warn('[eventApi] followEvent 后端接口未实现:', eventId)
-  throw new Error('关注功能暂未上线')
+export async function followEvent(event: EventItem): Promise<void> {
+  followEventLocally(event)
 }
 
 /**
  * 取消关注事件
  *
- * 同上：后端未实现，显式失败避免 UI 假成功。
+ * 同上：当前移除本地快照；未来接后端时在此调用取消关注接口。
  *
  * @param eventId - 事件ID
  */
 export async function unfollowEvent(eventId: string): Promise<void> {
-  console.warn('[eventApi] unfollowEvent 后端接口未实现:', eventId)
-  throw new Error('关注功能暂未上线')
+  unfollowEventLocally(eventId)
 }
 
 /**

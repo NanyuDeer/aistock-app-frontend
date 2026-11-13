@@ -2,38 +2,31 @@
  * 事件关注 - 业务逻辑
  *
  * 职责：
- * - 关注/取消关注事件
+ * - 关注 / 取消关注事件（当前落到本地快照存储，见 eventFollowStore）
  * - loading 状态
+ *
+ * 服务端接入关注接口后只需替换 eventApi，本文件无需改动。
  */
 
 import { ref } from 'vue'
+import type { EventItem } from '../types'
 import { followEvent, unfollowEvent } from '../api/eventApi'
-
-/** 后端关注接口未上线：失败时给一次明确提示，避免用户以为操作成功了 */
-const UNIMPLEMENTED_HINT = '关注功能开发中，敬请期待'
-
-function notifyUnavailable(): void {
-  try {
-    uni.showToast({ title: UNIMPLEMENTED_HINT, icon: 'none' })
-  } catch {
-    /* 无 UI 上下文（单测）忽略 */
-  }
-}
+import { isEventFollowed } from '../eventFollowStore'
 
 export function useEventFollow() {
   const loading = ref(false)
 
   /**
    * 关注事件
+   * @returns 是否成功（本地写入成功即视为成功）
    */
-  async function follow(eventId: string): Promise<boolean> {
+  async function follow(event: EventItem): Promise<boolean> {
     loading.value = true
     try {
-      await followEvent(eventId)
+      await followEvent(event)
       return true
     } catch (err) {
       console.error('[useEventFollow] follow failed:', err)
-      notifyUnavailable()
       return false
     } finally {
       loading.value = false
@@ -50,7 +43,6 @@ export function useEventFollow() {
       return true
     } catch (err) {
       console.error('[useEventFollow] unfollow failed:', err)
-      notifyUnavailable()
       return false
     } finally {
       loading.value = false
@@ -59,9 +51,16 @@ export function useEventFollow() {
 
   /**
    * 切换关注状态
+   *
+   * 以本地存储的真实状态为准，而不是卡片上的 isFollowed——
+   * 列表卡片可能是旧渲染（如别处已取消关注），用它判断会切换反方向。
+   *
+   * @returns 切换后的关注状态
    */
-  async function toggleFollow(eventId: string, currentState: boolean): Promise<boolean> {
-    return currentState ? unfollow(eventId) : follow(eventId)
+  async function toggleFollow(event: EventItem): Promise<boolean> {
+    const shouldFollow = !isEventFollowed(event.eventId)
+    const success = shouldFollow ? await follow(event) : await unfollow(event.eventId)
+    return success ? shouldFollow : isEventFollowed(event.eventId)
   }
 
   return {

@@ -39,6 +39,7 @@
           <!-- 下行：涨停标记 + 日期 | 时间 -->
           <view class="event-bottom">
             <view class="meta-left">
+              <Tag v-if="item.causeLabel" class="cause-label" type="neutral" size="sm">{{ item.causeLabel }}</Tag>
               <Badge v-if="item.is_limit_up" type="danger" size="sm">涨停</Badge>
               <text class="meta-text">{{ item.dateText }}</text>
             </view>
@@ -61,6 +62,7 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
+import { formatStockTraceCause } from '@/modules/favorites/utils/formatStockTraceCause'
 // 逐文件引入（barrel `@/shared/components` 会连带编译 KLineChart.vue 的 renderjs 双 script，
 // vitest 下编译失败；单文件引入是 AGENTS 4.8 的 ✅ 示例写法）
 import Badge from '@/shared/components/Badge.vue'
@@ -85,6 +87,7 @@ interface InsightListItem {
   is_limit_up: boolean
   /** 主因正文：主因：xxx / 归因完成 / 归因中 / 待归因 */
   causeText: string
+  causeLabel?: string
   /** MM-DD 日期 */
   dateText: string
   /** HH:mm（跨日含 MM-DD） */
@@ -133,8 +136,8 @@ function fmtDateMMDD(t?: string): string {
 /** 价格异动（stocktrace 链路）→ 统一模型 */
 function fromMovement(m: StockTraceEvent): InsightListItem {
   let causeText = '待归因'
-  if (m.primary_cause) causeText = `主因：${m.primary_cause}`
-  else if (m.movement_view?.primaryCandidate?.verdict) causeText = `主因：${m.movement_view.primaryCandidate.verdict}`
+  const cause = formatStockTraceCause(m)
+  if (cause) causeText = cause.text
   else if (m.analysis_status === 'completed') causeText = '归因完成'
   else if (m.analysis_status === 'processing') causeText = '归因中'
   else if (m.analysis_status === 'failed') causeText = '归因失败'
@@ -149,6 +152,7 @@ function fromMovement(m: StockTraceEvent): InsightListItem {
     change_pct: m.change_pct,
     is_limit_up: m.is_limit_up === true,
     causeText,
+    causeLabel: cause?.label,
     dateText: fmtDateMMDD(recent),
     timeText: formatTime(recent),
     sortTime: recent ? new Date(recent).getTime() : 0,

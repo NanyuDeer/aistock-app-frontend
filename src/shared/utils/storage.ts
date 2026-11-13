@@ -64,5 +64,7 @@ export const STORAGE_KEYS = {
   // 我的页昵称本地镜像（{ uid, nickname }）：首帧同步渲染，避免进页面时昵称由空/旧值切换造成闪烁
   PROFILE_NICKNAME: 'profile_nickname',
   // 自选消息面板「自选股筛选」上次选择（6 位股票代码；空/缺省 = 全部自选股）
-  NOTIFICATION_STOCK_FILTER: 'notification_stock_filter'
+  NOTIFICATION_STOCK_FILTER: 'notification_stock_filter',
+  // 事件关注列表（本地快照 [{ event, followedAt }]；服务端暂无关注能力，见 chat/event/eventFollowStore）
+  EVENT_FOLLOWED_ENTRIES: 'event_followed_entries'
 } as const
