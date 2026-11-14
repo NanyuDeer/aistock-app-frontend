@@ -370,7 +370,7 @@ const persistenceTagType = computed<'down' | 'neutral' | 'warning'>(() => {
 const sectorStatItems = computed<StatGridItem[]>(() => {
   if (!sector.value) return []
   const s = sector.value
-  // 今日档：今日快照没有「均涨幅」，第三列改为领涨股涨幅（副标题写名称）
+  // 今日档：今日快照没有「均涨幅」，第三列展示领涨股名称
   if (detailSource.value === 'today') {
     return [
       {
@@ -379,11 +379,7 @@ const sectorStatItems = computed<StatGridItem[]>(() => {
         color: s.today_change != null && s.today_change >= 0 ? 'up' : 'down',
       },
       { label: '成交额', value: formatAmount(s.amount) },
-      {
-        label: '领涨股涨幅',
-        value: formatSignedPct(s.leading_stock_info?.change_pct),
-        subtitle: s.leading_stock_info?.name || '--',
-      },
+      { label: '领涨股', value: s.leading_stock_info?.name || s.leading_stock || '--' },
     ]
   }
   const todayChange = s.today_change ?? 0

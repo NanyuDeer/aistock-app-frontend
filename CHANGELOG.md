@@ -1,5 +1,24 @@
 # CHANGELOG.md — aistock-app-frontend 变更记录
 
+## [master] 2026-11-15 — 今日风口榜第三列改为领涨股名称
+
+**开发者**: Aria
+
+### 改进
+
+- `src/modules/market/pages/leaders.vue` 今日档卡片：第三列由「领涨股涨幅 + 副标题名称」改为标题「领涨股」、值直接显示股票名称，不再展示涨幅百分比。
+- `src/modules/market/pages/sector-detail.vue` 今日档统计项同步（优先 `leading_stock_info.name`，回退 `leading_stock`）。
+
+### 修复
+
+- `src/shared/components/StatGrid.vue`：非 `labelFirst` 布局也渲染 `subtitle`，修复推送历史等页面副标题被吞。
+
+### 验证
+
+- `npm run type-check` 通过；H5 重建后实测今日风口榜第三列为「领涨股」+ 股票名称。
+
+---
+
 ## [master] 2026-11-13 — 今日风口榜重设计（详情复用 / 前 8 三列 / 19 档泡泡）+ 洞见加载失败提示
 
 **开发者**: Aria

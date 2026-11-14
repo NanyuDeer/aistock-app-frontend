@@ -38,6 +38,6 @@
 - 长线风口数据通过 `stockApi.getWindLeaders(limit)` 获取，API 不可用时显示错误状态
 - 每个板块带 cycle 字段（short/long），Agent 报告内分节展示
 - `leaders.vue` 为概览入口页，板块详情在 `sector-detail.vue` 子页面展示（通过 name 参数筛选）
-- 今日风口档：只展示前 8；泡泡大小=成交额线性 20~50px，颜色=涨跌幅 19 档（红 9 / 绿 9 / 灰 1，每 1% 一档）；榜单 3 列（今日涨幅 / 成交额 / 领涨股涨幅+名称），无单独龙头股行；榜单卡片与泡泡点击都跳 `sector-detail?code=&name=&source=today`
-- `sector-detail.vue` 调用同一 API 并按板块名称过滤，支持精确匹配和模糊匹配；`source=today` 时改调 `GET /api/cn/wind-leaders/today/detail`，统计项为今日涨幅 / 成交额 / 领涨股涨幅
+- 今日风口档：只展示前 8；泡泡大小=成交额线性 20~50px，颜色=涨跌幅 19 档（红 9 / 绿 9 / 灰 1，每 1% 一档）；榜单 3 列（今日涨幅 / 成交额 / 领涨股名称），无单独龙头股行；榜单卡片与泡泡点击都跳 `sector-detail?code=&name=&source=today`。**2026-11-15 调整**：第三列标题改为「领涨股」、值直接显示股票名称（不再展示涨幅百分比，避免旧快照的负涨幅龙头误导）；**2026-11-14 修复**：`StatGrid` 非 `labelFirst` 布局也渲染 `subtitle`（此前名称被吞），领涨股涨幅补 `color: up/down` 实现红涨绿跌（不再默认品牌蓝）；`sector-detail` 今日档统计项同步
+- `sector-detail.vue` 调用同一 API 并按板块名称过滤，支持精确匹配和模糊匹配；`source=today` 时改调 `GET /api/cn/wind-leaders/today/detail`，统计项为今日涨幅 / 成交额 / 领涨股名称
 - 长线风口页面包含泡泡图可视化布局

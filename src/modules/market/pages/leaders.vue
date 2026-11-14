@@ -716,7 +716,7 @@ function sectorStatItems(sector: WindLeaderSector): StatGridItem[] {
   ]
 }
 
-/** 今日档排行卡片统计项（3 列与另两档同构，第三列带领涨股名称） */
+/** 今日档排行卡片统计项（3 列与另两档同构，第三列展示领涨股名称） */
 function todayBoardStatItems(board: TodayHotSpotBoard): StatGridItem[] {
   return [
     {
@@ -725,11 +725,7 @@ function todayBoardStatItems(board: TodayHotSpotBoard): StatGridItem[] {
       color: board.change_pct != null && board.change_pct >= 0 ? 'up' : 'down',
     },
     { label: '成交额', value: formatAmount(board.amount) },
-    {
-      label: '领涨股涨幅',
-      value: formatSignedPct(board.leading_stock?.change_pct),
-      subtitle: board.leading_stock?.name || '--',
-    },
+    { label: '领涨股', value: board.leading_stock?.name || '--' },
   ]
 }
 
