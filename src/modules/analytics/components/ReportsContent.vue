@@ -7,7 +7,7 @@
           :model-value="keyword"
           search-icon
           clearable
-          placeholder="搜索股票代码/简称"
+          placeholder="搜索代码/简称/拼音首字母"
           @update:model-value="handleSearchInput"
           @clear="handleReset"
         />
@@ -142,6 +142,7 @@ import { Input, Segmented, Card, Tag, BottomSheet, EmptyState, LoadingState } fr
 interface ReportItem {
   code: string
   name: string
+  pinyin?: string
   period: string
   tag: string
   revenue: string
@@ -167,6 +168,18 @@ const SORT_LABELS: Record<SortField, string> = {
   updateTime: '更新时间',
 }
 const sortLabels = ['净利规模', '净利增速', '营收规模', '营收增速', '更新时间']
+
+// 股票简称 → 拼音首字母（mock 阶段用；接入真实接口后改用后端返回的 pinyin 字段）
+const PINYIN_INITIALS: Record<string, string> = {
+  贵州茅台: 'gzmt',
+  宁德时代: 'ndsd',
+  比亚迪: 'byd',
+  美的集团: 'mdjt',
+  长江电力: 'cjdl',
+  五粮液: 'wly',
+  中国平安: 'zgpa',
+  招商银行: 'zsyh',
+}
 
 const STORAGE_KEY = 'report_filter_sort'
 
@@ -323,7 +336,10 @@ function fetchData(append = false) {
     const all = generateMockList()
     const kw = keyword.value.trim().toLowerCase()
     const filtered = kw
-      ? all.filter(item => item.code.includes(kw) || item.name.includes(kw))
+      ? all.filter(item =>
+          item.code.includes(kw)
+          || item.name.includes(kw)
+          || (item.pinyin || PINYIN_INITIALS[item.name] || '').includes(kw))
       : all
     total.value = filtered.length
     const start = (page.value - 1) * pageSize
