@@ -9,7 +9,7 @@ export interface PickMethod {
 export const availableMethodCodes = new Set(['volume_breakout', 'momentum_continuation', 'trend_following', 'pullback_stabilization', 'industry_strength', 'limit_up_breakout', 'quality_growth', 'garp', 'stable_dividend', 'earnings_revision', 'event_catalyst'])
 
 export const horizons: Array<{ code: HorizonCode; name: string }> = [
-  { code: 'ai', name: 'AI综合' },
+  { code: 'ai', name: '综合' },
   { code: 'short', name: '短线机会' },
   { code: 'swing', name: '波段趋势' },
   { code: 'long', name: '中长线配置' },

@@ -161,7 +161,7 @@ const selectedMethods = ref<string[]>([])
 const canRefreshSelection = computed(() => selectedHorizon.value === 'ai' ||
   (selectedMethods.value.length > 0 && selectedMethods.value.every(code => availableMethodCodes.has(code))))
 const currentMethods = computed(() => selectedHorizon.value === 'ai' ? [] : methodsByHorizon[selectedHorizon.value])
-const currentHorizonName = computed(() => horizons.find((option) => option.code === selectedHorizon.value)?.name || 'AI综合')
+const currentHorizonName = computed(() => horizons.find((option) => option.code === selectedHorizon.value)?.name || '综合')
 
 function methodCodes(horizon: HorizonCode): string[] {
   return horizon === 'ai' ? [] : methodsByHorizon[horizon].map((method) => method.code)
