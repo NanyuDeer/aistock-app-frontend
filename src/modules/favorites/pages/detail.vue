@@ -136,6 +136,9 @@
             <view v-if="aiLoading" class="ai-loading">
               <text class="ai-loading-text">正在生成AI分析...</text>
             </view>
+            <view v-else-if="aiError" class="ai-loading">
+              <text class="ai-loading-text">{{ aiError }}</text>
+            </view>
             <template v-else-if="aiAnalysis && aiAnalysis.conclusion">
               <view class="ai-conclusion">
                 <text :class="['conclusion-badge', aiConclusionClass]">{{ aiAnalysis.conclusion }}</text>
@@ -906,6 +909,7 @@ const disclosureUrl = ref('')
 const symbol = ref('')
 const aiAnalysis = ref<any>(null)
 const aiLoading = ref(false)
+const aiError = ref('')
 const newsList = ref<any[]>([])
 const newsExpanded = ref(false)
 const stockEvents = ref<any[]>([])
@@ -1071,7 +1075,7 @@ const {
 
 const visibleNewsList = computed(() => newsExpanded.value ? newsList.value : newsList.value.slice(0, 3))
 const hasAiInfoCardData = computed(() => Boolean(
-  aiLoading.value || aiAnalysis.value?.conclusion || newsList.value.length
+  aiLoading.value || aiError.value || aiAnalysis.value?.conclusion || newsList.value.length
 ))
 const hasTradingData = computed(() => {
   const q = quote.value
@@ -2227,6 +2231,7 @@ function mapAnalysisPayload(payload: any) {
 
 async function loadAiAnalysis() {
   aiLoading.value = true
+  aiError.value = ''
   aiAnalysis.value = {}
   let payload: any = null
   try {
@@ -2244,12 +2249,15 @@ async function loadAiAnalysis() {
   // 解包后仍无分析字段（如 GET 返回 200+null、未登录 401）时置空对象，卡片仅展示新闻；
   // 不置 null，避免模板 aiAnalysis.analysisDate 空访问导致渲染中断
   aiAnalysis.value = payload && hasAnalysisFields(payload) ? mapAnalysisPayload(payload) : {}
+  // 生成失败时明确提示可重试，避免卡片无声空置被误认为加载卡死
+  aiError.value = aiAnalysis.value.conclusion ? '' : 'AI 分析暂时不可用，请点击右上角刷新重试'
   aiLoading.value = false
 }
 
 async function refreshAiAnalysis() {
   if (!symbol.value) return
   aiLoading.value = true
+  aiError.value = ''
   aiAnalysis.value = {}
   try {
     const res: any = await stockApi.createStockAnalysis(symbol.value)
@@ -2258,9 +2266,11 @@ async function refreshAiAnalysis() {
       aiAnalysis.value = mapAnalysisPayload(payload)
       uni.showToast({ title: '已刷新', icon: 'none' })
     } else {
+      aiError.value = 'AI 分析暂时不可用，请稍后重试'
       uni.showToast({ title: '刷新失败', icon: 'none' })
     }
   } catch {
+    aiError.value = 'AI 分析暂时不可用，请稍后重试'
     uni.showToast({ title: '刷新失败', icon: 'none' })
   } finally {
     aiLoading.value = false

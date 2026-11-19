@@ -1,5 +1,92 @@
 # CHANGELOG.md — aistock-app-frontend 变更记录
 
+## [junliang] 2026-11-17 — 异动原因标题复用洞见Logo
+
+**开发者**: junliang
+
+### 改进
+- 自选股洞察详情页在“异动原因”标题前展示市场洞见已有的Logo，复用现有图片资源。
+- 标题与Logo横向对齐，保留右侧可信度徽标布局。
+
+---
+
+## [master] 2026-11-15 — 今日风口榜第三列改为领涨股名称
+
+**开发者**: Aria
+
+### 改进
+
+- `src/modules/market/pages/leaders.vue` 今日档卡片：第三列由「领涨股涨幅 + 副标题名称」改为标题「领涨股」、值直接显示股票名称，不再展示涨幅百分比。
+- `src/modules/market/pages/sector-detail.vue` 今日档统计项同步（优先 `leading_stock_info.name`，回退 `leading_stock`）。
+
+### 修复
+
+- `src/shared/components/StatGrid.vue`：非 `labelFirst` 布局也渲染 `subtitle`，修复推送历史等页面副标题被吞。
+
+### 验证
+
+- `npm run type-check` 通过；H5 重建后实测今日风口榜第三列为「领涨股」+ 股票名称。
+
+---
+
+## [master] 2026-11-13 — 今日风口榜重设计（详情复用 / 前 8 三列 / 19 档泡泡）+ 洞见加载失败提示
+
+**开发者**: Aria
+
+### 新增
+
+- `src/modules/market/utils/windLeaderBubble.ts`：今日泡泡新口径——半径按成交额线性 20~50px；颜色红 9 档 + 绿 9 档 + 灰 1 档（每 1% 一档，≥9% 封顶，0/null 灰）。
+- `src/shared/api/modules/stock.ts`：新增 `TodayHotSpotDetail` 类型与 `stockApi.getTodayHotSpotDetail(code, name?)`；`TodayHotSpotStock` 增加 `change_pct`。
+- `src/modules/market/pages/sector-detail.vue`：支持 `source=today`，改走今日详情接口，统计项为今日涨幅 / 成交额 / 领涨股涨幅，空态「未找到该板块今日数据」。
+
+### 改进
+
+- `src/modules/market/pages/leaders.vue` 今日档：榜单与泡泡统一只取前 8；榜单改 3 列（今日涨幅 / 成交额 / 领涨股涨幅，副标题显示领涨股名称）；删除今日档单独龙头股行；泡泡半径 <30px 只显示名称（两行截断）；榜单卡片与泡泡点击都进板块详情（`source=today`）。
+- `src/modules/favorites/pages/detail.vue`：AI 分析生成失败时显示「AI 分析暂时不可用，请点击右上角刷新重试」，不再无声空置被误认为加载卡死。
+
+### 修复
+
+- 今日风口榜部分板块点击无详情页：今日榜来自 mrpm 全量概念榜，多数不在 `getWindLeaders` 的 hot_sectors 中，改为按今日快照提供详情数据并复用 `sector-detail.vue`。
+
+### 验证
+
+- `npx vitest run src/modules/market/utils/windLeaderBubble.spec.ts`：6 passed；`npx vue-tsc --noEmit` 通过；H5 未手测（本地后端/DB 不可用）。
+
+---
+
+## [master] 2026-11-13 — 风口页三档（今日风口默认）+ 个股情报按股票筛选
+
+**开发者**: Aria
+
+### 新增
+
+- `src/modules/market/pages/leaders.vue`：风口页改为三档（今日风口榜默认 / 波段风口榜 / 长线风口榜）；今日档展示更新时间、非交易日提示、泡泡图（大小按成交额）与排行卡片（名次/涨跌幅/成交额/龙头股），失败仅影响今日档并可重试。
+- `src/modules/market/pages/event-catcher.vue`：新增股票筛选下拉（自选股列表、选择持久化、切周期保留、筛选空态可查看全部），请求带序号避免旧响应覆盖。
+- `src/shared/api/modules/stock.ts`：新增 `TodayHotSpot*` 类型与 `getTodayHotSpots(limit)`；`getFavoritesNews` 支持 `stock_code`。
+- `src/shared/utils/storage.ts`：新增 `STOCK_INTEL_STOCK_FILTER` 存储 key。
+
+### 改进
+
+- 涨跌幅为 null 时统一显示 `--` 且不上色，去掉 `?? 0` 造成的 `+0.00%`。
+- `createStockAnalysis` 客户端超时 120s → 180s，与后端 120s 对齐（任务 3 App 侧）。
+
+### 验证
+
+- `npx vue-tsc --noEmit` 通过；H5 预览三档 Tab 与筛选交互正常。
+
+---
+
+## [junliang] 2026-11-11 — 异动溯源 P0 补充与体验修复
+
+**开发者**: junliang
+
+- 洞察列表、监控页和首页统一直接显示归因摘要，独立展示主因、大盘联动、板块联动或归因线索标签。
+- 非交易日点击立即检测提示休市并保留列表；交易日由后端 market_closed 响应判断交易时段。
+- 同步列表与 WebSocket 更新的摘要断言，补充前后端休市判定的回归用例。
+- 验证：洞察列表、监控页及报告流测试 64 项通过，vue-tsc --noEmit 通过。
+
+---
+
 > 所有修改记录按时间倒序排列。每条记录标注分支、时间、开发者。
 
 ## [xusiyun] 2026-11-10 — 事件关注（纯前端本地快照）+ 关注按钮即时切换修复

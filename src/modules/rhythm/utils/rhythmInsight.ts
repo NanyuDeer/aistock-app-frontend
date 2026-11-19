@@ -35,7 +35,7 @@ export interface RhythmInsightCard {
   timeNote?: string
 }
 
-const SLOT_LABEL: Record<string, string> = { after_close: '收盘后', morning: '盘前', midday: '午间' }
+const SLOT_LABEL: Record<string, string> = { after_close: '收盘后', morning: '盘前', midday: '午间', tail: '尾盘' }
 
 /** 影子期渲染开关（spec §10）：后端 delta 计算与前端展示**双开关**。
  * 部署后先保持 false 看 3 个交易日，转正时改 true 单独发一次前端，不需后端再发。 */

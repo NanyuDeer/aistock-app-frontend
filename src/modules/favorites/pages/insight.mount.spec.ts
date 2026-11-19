@@ -99,7 +99,35 @@ describe('insight.vue 自选股洞察列表页（对齐个股情报模板）', (
     stockTraceApiMock.list.mockResolvedValue({ items: [movement()], nextCursor: null })
     const wrapper = mount(insight)
     await flushPromises()
-    expect(wrapper.find('.event-title').text()).toBe('主因：白酒板块集体走强')
+    expect(wrapper.find('.event-title').text()).toBe('白酒板块集体走强')
+  })
+
+  it.each(['market', 'sector'] as const)('保留 %s 假设的具体归因摘要', async (layer) => {
+    const event = movement({
+      movement_view: {
+        schemaVersion: 'movement-view-v2',
+        eventId: 'mv:1',
+        artifactId: 'artifact-1',
+        artifactVersion: 1,
+        status: 'hypothesis',
+        primaryCandidate: {
+          layer,
+          status: 'supported',
+          verdict: '联动是可能解释',
+          supportingEvidenceIds: ['quote-1'],
+        },
+        alternatives: [],
+        unresolvedQuestions: [],
+        suggestedActions: [],
+        evidenceCount: 1,
+        generatedAt: '2026-09-18T07:10:00.000Z',
+      },
+    })
+    stockTraceApiMock.list.mockResolvedValue({ items: [event], nextCursor: null })
+    const wrapper = mount(insight)
+    await flushPromises()
+    expect(wrapper.find('.event-title').text()).toBe('白酒板块集体走强')
+    expect(wrapper.find('.cause-label').text()).toBe(layer === 'market' ? '大盘联动' : '板块联动')
   })
 
   it('下行只在涨停事件上渲染「涨停」Badge，普通异动不渲染 Badge', async () => {

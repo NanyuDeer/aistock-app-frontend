@@ -85,7 +85,10 @@
       <!-- ===== 一句话主因（精简版详情；完整归因见下方流式报告） ===== -->
       <view v-if="oneLineCause" class="section main-cause-simple">
         <view class="main-title-row">
-          <text class="section-title">异动原因</text>
+          <view class="cause-heading">
+            <view class="cause-wordmark" :style="{ backgroundImage: `url(${insightWordmark})` }" />
+            <text class="section-title">异动原因</text>
+          </view>
           <view class="title-right">
             <text v-if="confidenceLevel === 'high'" class="badge is-gold">可信度高</text>
           </view>
@@ -134,6 +137,7 @@ import { computed, ref } from 'vue'
 import { onLoad, onUnload } from '@dcloudio/uni-app'
 import { stockTraceApi, type StockTraceEvent, type StockTraceAnalysisResponse } from '@/shared/api/modules/stockTrace'
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
+import insightWordmark from '@/shared/components/insight-wordmark.png'
 import InsightReportBody from '@/modules/favorites/components/InsightReportBody.vue'
 import { useInsightReportSSE } from '@/modules/favorites/utils/useInsightReportSSE'
 
@@ -308,6 +312,19 @@ onLoad(async (query) => {
   justify-content: space-between;
   gap: $s-2;
   margin-bottom: $s-2;
+}
+.cause-heading {
+  display: flex;
+  align-items: center;
+  gap: $s-2;
+  .section-title { margin-bottom: 0; }
+}
+.cause-wordmark {
+  width: 58rpx;
+  height: 40rpx;
+  flex: 0 0 auto;
+  background: center / contain no-repeat;
+  filter: drop-shadow(3rpx 5rpx 8rpx rgba($primary, 0.25));
 }
 .title-right {
   display: flex;

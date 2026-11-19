@@ -23,7 +23,7 @@
             <input
               v-model="keyword"
               class="search-input"
-              placeholder="搜索股票代码/简称"
+              placeholder="搜索代码/简称/拼音首字母"
               confirm-type="search"
               @input="handleSearchInput"
               @confirm="handleSearch"

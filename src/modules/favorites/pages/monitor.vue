@@ -59,6 +59,7 @@
           <!-- 下行：涨停标记 + 日期 | 报告入口 + 时间 -->
           <view class="event-bottom">
             <view class="meta-left">
+              <Tag v-if="alert.causeLabel" class="cause-label" type="neutral" size="sm">{{ alert.causeLabel }}</Tag>
               <Badge v-if="alert.isLimitUp" type="danger" size="sm">涨停</Badge>
               <text class="meta-text">{{ alert.dateText }}</text>
             </view>
@@ -97,7 +98,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useFavoritesStore } from '@/shared/store/modules/favorites'
 import { useAppStore } from '@/shared/store/modules/app'
-import { getMarketStatus, isTradingTime } from '@/shared/utils/tradingTime'
+import { getMarketStatus, isTradingDay, isTradingTime } from '@/shared/utils/tradingTime'
 import { formatTime, shanghaiDateKeyDaysAgo, TWO_WEEK_WINDOW_DAYS } from '@/shared/utils/datetime'
 import EmptyState from '@/shared/components/EmptyState.vue'
 import LoadingState from '@/shared/components/LoadingState.vue'
@@ -111,6 +112,7 @@ import Tag from '@/shared/components/Tag.vue'
 // vitest 下编译失败；单文件引入是 AGENTS 4.8 的 ✅ 示例写法）
 import SubPageCard2 from '@/shared/components/SubPageCard2.vue'
 import { stockTraceApi, type StockTraceEvent } from '@/shared/api/modules/stockTrace'
+import { formatStockTraceCause } from '@/modules/favorites/utils/formatStockTraceCause'
 import { WS_BASE_URL } from '@/shared/utils/constants'
 import { isApp } from '@/shared/utils/platform'
 import { navigateToInsightDetail } from '@/shared/utils/insightNavigation'
@@ -129,6 +131,7 @@ interface AlertItem {
   isLimitUp: boolean
   /** 主因正文：主因：xxx / 归因完成 / 归因中 / 待归因 */
   causeText: string
+  causeLabel?: string
   /** MM-DD 日期 */
   dateText: string
   /** HH:mm（跨日含 MM-DD） */
@@ -200,8 +203,8 @@ function fmtDateMMDD(t?: string): string {
 /** 价格异动（stocktrace 链路）→ 三段式卡片模型 */
 function movementToAlertItem(m: StockTraceEvent): AlertItem {
   let causeText = '待归因'
-  if (m.primary_cause) causeText = `主因：${m.primary_cause}`
-  else if (m.movement_view?.primaryCandidate?.verdict) causeText = `主因：${m.movement_view.primaryCandidate.verdict}`
+  const cause = formatStockTraceCause(m)
+  if (cause) causeText = cause.text
   else if (m.analysis_status === 'completed') causeText = '归因完成'
   else if (m.analysis_status === 'processing') causeText = '归因中'
   else if (m.analysis_status === 'failed') causeText = '归因失败'
@@ -216,6 +219,7 @@ function movementToAlertItem(m: StockTraceEvent): AlertItem {
     changePct: m.change_pct,
     isLimitUp: m.is_limit_up === true,
     causeText,
+    causeLabel: cause?.label,
     dateText: fmtDateMMDD(recent),
     timeText: formatTime(recent),
     reportable: m.analysis_status === 'completed',
@@ -277,26 +281,29 @@ async function loadMore() {
 }
 
 /**
- * 「立即检测」：真的调用后端检测接口（绕过交易时段强制检测一次），后端顺带为
- * 「当日 active 但缺归因 job」的事件补入队（2026-10-15 修复——此前该按钮只刷新列表，
- * 且即便调后端也不入队归因，非交易时段点出的事件会永久停在「归因中」）。
- * 检测后刷新列表展示新卡片 / 新结论。
+ * 「立即检测」：非交易日保留当前列表，交易日由后端确认是否在交易时段。
  */
 async function handleDetect() {
   if (detecting.value) return
+  if (!isTradingDay()) {
+    uni.showToast({ title: '休市中，可查看最近异动', icon: 'none' })
+    return
+  }
   detecting.value = true
+  let marketClosed = false
   try {
-    const { enqueued } = await stockTraceApi.detect()
+    const { enqueued, reason } = await stockTraceApi.detect()
+    marketClosed = reason === 'market_closed'
     uni.showToast({
-      title: enqueued > 0 ? `已触发检测，${enqueued} 条正在归因` : '已触发检测',
+      title: marketClosed ? '休市中，可查看最近异动'
+        : enqueued > 0 ? `已触发检测，${enqueued} 条正在归因` : '已触发检测',
       icon: 'none',
     })
   } catch (err) {
     console.warn('[Monitor] 立即检测失败', err)
     uni.showToast({ title: '检测失败，请稍后重试', icon: 'none' })
   } finally {
-    // 成功失败都刷新：列表是展示事实源
-    await fetchAlerts()
+    if (!marketClosed) await fetchAlerts()
     detecting.value = false
   }
 }

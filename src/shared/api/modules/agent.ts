@@ -516,7 +516,7 @@ export interface RhythmBranch {
  * status 语义：blocking 正在压低档位 / neutral 有数据无影响 / supporting 抬高档位 /
  * **missing 数据不可用（不得当作 neutral，前端须显式标注「数据不可用」而非隐藏该行）**。
  */
-export type RhythmLedgerItemKey = 'trend' | 'mainline' | 'event' | 'breadth'
+export type RhythmLedgerItemKey = 'trend' | 'mainline' | 'event' | 'breadth' | 'retreat'
 export type RhythmLedgerItemStatus = 'blocking' | 'neutral' | 'supporting' | 'missing'
 export interface RhythmLedgerItem {
   key: RhythmLedgerItemKey

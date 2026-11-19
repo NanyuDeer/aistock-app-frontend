@@ -24,6 +24,7 @@
           :class="highlight ? `is-${item.color || 'brand'}` : ''"
         >{{ item.value }}<text v-if="item.unit" class="as-stat-grid__unit">{{ item.unit }}</text></text>
         <text class="as-stat-grid__label">{{ item.label }}</text>
+        <text v-if="item.subtitle" class="as-stat-grid__subtitle">{{ item.subtitle }}</text>
       </template>
     </view>
   </view>
