@@ -28,7 +28,7 @@ export interface AiStockSelectionItem {
   changePct?: number | null
   /** 后端基于真实日 K 收盘价返回的最近 20 个交易日序列 */
   sparkline?: number[]
-  entry?: { date: string; sessions: number; price: number | null; closeReturn: number | null }
+  entry?: { date: string; sessions: number; price: number | null; closeReturn: number | null; liveBasePrice?: number | null }
   matchedMethods?: string[]
   matchedTags?: string[]
   compositeScore?: number

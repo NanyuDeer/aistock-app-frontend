@@ -222,9 +222,13 @@ function toggleMethod(code: string) {
 const nextQuoteTradeDate = ref<string | null>(null)
 
 function returnSinceEntry(item: AiStockSelectionItem): number | null {
+  const quote = liveQuotes.value[item.symbol]
+  const opening = item.entry?.liveBasePrice
+  if (opening != null && opening > 0 && quote?.price != null && quote.tradeDate === item.entry?.date) {
+    return (quote.price / opening - 1) * 100
+  }
   const closeReturn = item.entry?.closeReturn
   if (closeReturn == null) return null
-  const quote = liveQuotes.value[item.symbol]
   if (nextQuoteTradeDate.value && quote?.price != null && quote.tradeDate === nextQuoteTradeDate.value && quote.changeAmount != null) {
     // The quote's reference close incorporates the exchange's ex-rights adjustment.
     const reference = quote.price - quote.changeAmount

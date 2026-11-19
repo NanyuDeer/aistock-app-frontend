@@ -407,3 +407,19 @@ describe('AiPickContent 实时行情', () => {
     expect(wrapper.find('.stock-price').text()).toBe('30.00')
   })
 })
+
+describe('AiPickContent 综合开盘价累计基准', () => {
+  it('当天缺盘后快照时按冻结开盘价计算，拒绝用其他交易日行情套算', async () => {
+    vi.mocked(uni.getStorageSync).mockReturnValue('')
+    const item = { symbol: '600001', name: '开盘基准', reason: ['真实依据'], rank: 1, riskTip: '',
+      recommendationLevel: '关注', entry: { date: '2026-11-20', sessions: 1, price: 10, closeReturn: null, liveBasePrice: 10 } }
+    selectionMock.getLatest.mockResolvedValue({ status: 'ready', tradeDate: '2026-11-20', stocks: [item] })
+    selectionMock.getQuotes.mockResolvedValue([{ symbol: '600001', price: 11, changeAmount: 2, changePct: 22.22, tradeDate: '2026-11-20' }])
+    const wrapper = mount(AiPickContent)
+    await flushPromises()
+    const vm = wrapper.vm as unknown as { returnSinceEntry: (value: typeof item) => number | null }
+    expect(vm.returnSinceEntry(item)).toBeCloseTo(10)
+    expect(wrapper.text()).toContain('本轮首次入选')
+    expect(vm.returnSinceEntry({ ...item, entry: { ...item.entry, date: '2026-11-19' } })).toBeNull()
+  })
+})
