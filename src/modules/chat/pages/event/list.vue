@@ -3,16 +3,34 @@
     <view class="event-list-content">
       <!-- AI关注焦点区域：标题行（含关注 / 时间轴入口）始终显示，卡片仅在有焦点事件时渲染 -->
       <view class="ai-focus-section">
-        <!-- 标题行：重大事件（左）+ 关注/时间轴入口（行最右，文字+淡色图标） -->
+        <!-- 标题行：重大事件（左）+ 关注/时间轴入口（行最右，胶囊按钮） -->
         <view class="section-title-row">
           <text class="section-title">重大事件</text>
           <view class="section-entries">
-            <view class="section-entry" @tap.stop="goToFollowed">
-              <text class="section-entry-text">关注 · {{ followedCountValue }}</text>
-            </view>
-            <view class="section-entry" @tap.stop="goToTimeline">
-              <text class="section-entry-text">时间轴</text>
-              <SvgIcon name="calendar-line" size="26rpx" color="#4b5a7a" />
+            <!-- 关注 / 时间轴合并为一个分段控件：单一胶囊外轮廓 + 内部细分割线，两段统一主题蓝。
+                 关注数量以右上角角标呈现，0 件时不渲染角标（避免被误认为未读提醒）。
+                 仍用 v-if/v-else 两个带 key 的节点整体切态：实测同一节点只刷新文案、
+                 动态 class 与图标未跟随，整节点重建可确保配色和图标同步切换 -->
+            <view class="seg">
+              <view
+                v-if="followedCountValue > 0"
+                key="followed"
+                class="seg-item seg-item--badged"
+                @tap.stop="goToFollowed"
+              >
+                <SvgIcon name="bookmark-fill" size="24rpx" color="#0b5fff" />
+                <text class="seg-text">已关注</text>
+                <view class="seg-badge">{{ followedCountValue }}</view>
+              </view>
+              <view v-else key="unfollowed" class="seg-item" @tap.stop="goToFollowed">
+                <SvgIcon name="bookmark-line" size="24rpx" color="#0b5fff" />
+                <text class="seg-text">关注</text>
+              </view>
+              <view class="seg-split" />
+              <view class="seg-item" @tap.stop="goToTimeline">
+                <SvgIcon name="calendar-line" size="24rpx" color="#0b5fff" />
+                <text class="seg-text">时间轴</text>
+              </view>
             </view>
           </view>
         </view>
@@ -127,7 +145,7 @@ import EventItemCard from '@/modules/chat/event/components/EventItemCard.vue'
 import EventHeadlineCard from '@/modules/chat/event/components/EventHeadlineCard.vue'
 import FavoriteRelatedCard from '@/modules/chat/event/components/FavoriteRelatedCard.vue'
 import { EVENT_TYPES } from '@/modules/chat/event/constants'
-import { followedCount, isEventFollowed } from '@/modules/chat/event/eventFollowStore'
+import { followRevision, followedCount, isEventFollowed } from '@/modules/chat/event/eventFollowStore'
 
 // ========== 分类 Tab 项（全部 + 事件类型，对齐 Segmented items 格式） ==========
 const tabItems = [{ label: '全部', value: '全部' }, ...EVENT_TYPES.map(v => ({ label: v, value: v }))]
@@ -179,13 +197,15 @@ const {
 
 const { toggleFollow } = useEventFollow()
 
-/** 已关注条数（「关注 · N」入口角标） */
-const followedCountValue = ref(0)
-
-/** 从本地关注快照同步条数：关注/取关、从关注页返回时都要刷新 */
-function syncFollowedCount() {
-  followedCountValue.value = followedCount()
-}
+/** 已关注条数（「关注/已关注 · N」入口角标）
+ *
+ * 用 computed 订阅 followRevision：关注写入（本页卡片、关注页取关、详情页关注）
+ * 都会自增版本号，角标随存储真值自动重算，不依赖各调用点手动同步。
+ */
+const followedCountValue = computed(() => {
+  void followRevision.value
+  return followedCount()
+})
 
 // ========== 生命周期 ==========
 onMounted(() => {
@@ -196,7 +216,6 @@ onMounted(() => {
 
 // 从关注页返回时可能已取关：不重新拉接口，只用本地真实状态校正内存中的卡片
 onShow(() => {
-  syncFollowedCount()
   events.value.forEach((event) => {
     updateFollowStatus(event.eventId, isEventFollowed(event.eventId))
   })
@@ -262,11 +281,10 @@ function openNewsUrl(url?: string) {
   // #endif
 }
 
-/** 关注/取消关注（toggleFollow 返回切换后的真实状态） */
+/** 关注/取消关注（toggleFollow 返回切换后的真实状态；角标由 followRevision 自动联动） */
 async function handleFollow(event: EventItem) {
   const followed = await toggleFollow(event)
   updateFollowStatus(event.eventId, followed)
-  syncFollowedCount()
 }
 </script>
 
@@ -322,29 +340,92 @@ async function handleFollow(event: EventItem) {
   letter-spacing: 0.5rpx;
 }
 
-/* 标题行右侧入口组：关注 / 时间轴并排（行本身不可点，各自独立热区） */
+/* 标题行右侧入口组：关注 / 时间轴合并为一个分段控件（行本身不可点，两段各自独立热区） */
 .section-entries {
   display: flex;
   align-items: center;
-  gap: 24rpx;
   flex-shrink: 0;
 }
 
-/* 单个入口：次要文字色（ink-soft #4b5a7a）+ 图标；padding 撑大热区，避免小字难点 */
-.section-entry {
+/* 分段控件：单一胶囊外轮廓包住两个入口，内部用细分割线区分。
+   两段统一使用主题蓝，避免两套色系并排后色块打架。
+   1rpx 在高 DPI 下会被渲染成 0.5px，描边发虚导致轮廓感弱，故用 2rpx 实描边；
+   再加一层极轻投影把控件从白色卡片背景上托起来 */
+.seg {
+  display: flex;
+  align-items: center;
+  padding: 6rpx;
+  background: #ffffff;
+  border: 2rpx solid #d9e3f2;
+  border-radius: 9999rpx;
+  box-shadow: 0 2rpx 8rpx rgba(11, 95, 255, 0.06);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* 单个分段：独立热区；position 供右上角数量角标定位。
+   过渡 + hover/active 让用户明确感知"这里可以点" */
+.seg-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6rpx;
-  padding: 8rpx 2rpx;
+  padding: 8rpx 18rpx;
+  border-radius: 9999rpx;
+  transition: background-color 0.15s ease, transform 0.12s ease;
 }
 
-.section-entry:active {
-  opacity: 0.6;
+/* 已关注态：右侧留出角标空间，避免圆形角标压到「已关注」文字右上角 */
+.seg-item--badged {
+  padding-right: 22rpx;
 }
 
-.section-entry-text {
+/* hover 只在支持悬停的设备（H5 桌面鼠标）生效，避免触屏端出现 sticky hover */
+@media (hover: hover) {
+  .seg-item:hover {
+    background: rgba(11, 95, 255, 0.07);
+  }
+}
+
+/* 按下反馈：H5 点击与移动端手指按下都生效 */
+.seg-item:active {
+  background: rgba(11, 95, 255, 0.13);
+  transform: scale(0.96);
+}
+
+.seg-text {
   font-size: 24rpx;
-  color: #4b5a7a;
+  font-weight: 600;
+  line-height: 1;
+  color: #0b5fff;
+}
+
+/* 两段之间的细分割线 */
+.seg-split {
+  width: 1rpx;
+  height: 22rpx;
+  background: #e1e9f5;
+  flex-shrink: 0;
+}
+
+/* 关注数量角标：右上角；0 件时模板不渲染该节点。
+   top/right 取 -6rpx（等于 .seg 的 padding），让角标贴齐胶囊外轮廓但**不溢出**——
+   溢出到胶囊外会被父级裁切导致圆形被遮挡一点 */
+.seg-badge {
+  position: absolute;
+  top: -6rpx;
+  right: -6rpx;
+  z-index: 1;
+  min-width: 26rpx;
+  height: 26rpx;
+  padding: 0 6rpx;
+  box-sizing: border-box;
+  border-radius: 9999rpx;
+  background: #0b5fff;
+  color: #ffffff;
+  font-size: 17rpx;
+  font-weight: 700;
+  line-height: 26rpx;
+  text-align: center;
 }
 
 .headline-cards {
