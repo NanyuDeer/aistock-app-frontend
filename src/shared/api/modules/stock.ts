@@ -417,6 +417,7 @@ interface HotBurstHistoryRecord {
 }
 
 interface HotBurstHistoryResponse {
+  total: number
   records?: HotBurstHistoryRecord[]
 }
 
@@ -656,10 +657,16 @@ export const stockApi = {
   },
 
   /** 获取机构调研热门股历史记录，供 App 的近时段展示使用。 */
-  getHotBurstHistory(params: { days?: number; trading_days?: number; min_resonance: number; limit?: number; offset?: number }) {
-    return request
-      .get<HotBurstHistoryResponse>('/cn/institution-research/history', { params })
-      .then((result) => normalizeHotBurstHistory(result.records))
+  async getHotBurstHistory(params: { days?: number; trading_days?: number; min_resonance: number; limit?: number; offset?: number }) {
+    // 完整窗口由后端单条查询读取，避免offset跨页时新增记录导致漏股。
+    const fetchAll = params.trading_days !== undefined && params.limit === undefined && params.offset === undefined
+    const result = await request.get<HotBurstHistoryResponse>('/cn/institution-research/history', {
+      params: { ...params, ...(fetchAll ? { all: true } : {}) },
+    })
+    if (fetchAll && result.records?.length !== result.total) {
+      throw new Error('热门股完整窗口未完整返回，请更新服务端后重试')
+    }
+    return normalizeHotBurstHistory(result.records)
   },
 
   /** 获取个股异动事件（重磅消息） */

@@ -148,7 +148,7 @@ async function loadData() {
   try {
     signals.value = dedupeBySymbol(sortByChangePct(await stockApi.getHotBurstHistory({ trading_days: 3, min_resonance: 2 })))
   } catch {
-    signals.value = []
+    console.warn('热门股更新失败，保留上次榜单')
   }
 }
 
