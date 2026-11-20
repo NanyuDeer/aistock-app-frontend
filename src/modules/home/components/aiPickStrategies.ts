@@ -17,10 +17,10 @@ export const horizons: Array<{ code: HorizonCode; name: string }> = [
 
 export const methodsByHorizon: Record<Exclude<HorizonCode, 'ai'>, PickMethod[]> = {
   short: [
-    { code: 'event_catalyst', name: '事件催化' },
     { code: 'volume_breakout', name: '放量突破' },
     { code: 'momentum_continuation', name: '强势延续' },
     { code: 'limit_up_breakout', name: '涨停打板' },
+    { code: 'event_catalyst', name: '事件催化' },
   ],
   swing: [
     { code: 'trend_following', name: '趋势跟随' },

@@ -151,6 +151,7 @@ describe('AiPickContent 盘后方法单选与多选', () => {
     await wrapper.get('.selection-update').trigger('tap')
     await flushPromises()
     expect(selectionMock.getResults).toHaveBeenCalledTimes(2)
+    expect(selectionMock.getResults).toHaveBeenLastCalledWith('short', ['volume_breakout'], { force: true })
     expect(symbols()).toEqual(['600003', '600002', '600001'])
     expect(wrapper.get('.selection-sort').text()).toContain('推荐后累计涨幅 ↑')
     expect(wrapper.get('.selection-update').text()).toBe('名单更新 2026-11-04')

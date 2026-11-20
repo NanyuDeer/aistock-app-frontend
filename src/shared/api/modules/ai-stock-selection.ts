@@ -61,6 +61,36 @@ export interface MethodSelectionResult {
   stocks: AiStockSelectionItem[]
 }
 
+type SelectionResult = MethodSelectionResult | AiStockSelectionLatest
+const selectionCache = new Map<string, { savedAt: number; result: SelectionResult }>()
+const selectionRequests = new Map<string, Promise<SelectionResult>>()
+const SELECTION_CACHE_MS = 60_000
+
+async function readSelection<T extends SelectionResult>(key: string, load: () => Promise<T>, force = false): Promise<T> {
+  const now = Date.now()
+  // Bound memory and expire even when the clock moves backwards or Shanghai crosses midnight.
+  const day = new Date(now + 8 * 3600_000).toISOString().slice(0, 10)
+  key = `${day}:${key}`
+  for (const [cachedKey, entry] of selectionCache) {
+    if (!cachedKey.startsWith(`${day}:`) || now < entry.savedAt || now - entry.savedAt >= SELECTION_CACHE_MS) selectionCache.delete(cachedKey)
+  }
+  const pending = selectionRequests.get(key)
+  if (pending) return pending as Promise<T>
+  const cached = selectionCache.get(key)
+  if (!force && cached) return cached.result as T
+  if (force) selectionCache.delete(key)
+  const request = load().then(result => {
+    // Failures and unfinished batches must remain immediately retryable; valid empty lists are cacheable.
+    if (result.status === 'ready' || result.status === 'empty') {
+      if (selectionCache.size >= 40) selectionCache.delete(selectionCache.keys().next().value!)
+      selectionCache.set(key, { savedAt: Date.now(), result })
+    }
+    return result
+  }).finally(() => selectionRequests.delete(key))
+  selectionRequests.set(key, request)
+  return request
+}
+
 /** 读取服务端最近一次 AI 帮我选生成结果；普通用户只有读取权限。 */
 export const aiStockSelectionApi = {
   /** Recent real quotes only; never use the recommendation's closing-price snapshot as live data. */
@@ -93,14 +123,18 @@ export const aiStockSelectionApi = {
     for (const quote of quotes) if (quote.price !== null) quoteCache.set(quote.symbol, { quote, savedAt: Date.now() })
     return quotes
   },
-  getResults(horizon: 'short' | 'swing' | 'long', methods: string[]) {
-    return request.get<MethodSelectionResult>('/stock-selection/results', {
-      params: { horizon, methods: [...methods].sort().join(','), mode: 'blend', limit: 15 },
-    })
+  getResults(horizon: 'short' | 'swing' | 'long', methods: string[], options: { force?: boolean } = {}) {
+    const normalized = [...new Set(methods)].sort().join(',')
+    return readSelection(`methods:${horizon}:${normalized}`, () => request.get<MethodSelectionResult>('/stock-selection/results', {
+      // Published results also load entry history; allow for slower database connections.
+      timeout: 60_000,
+      params: { horizon, methods: normalized, mode: 'blend', limit: 15 },
+    }), options.force)
   },
-  getLatest(date?: string) {
-    return request.get<AiStockSelectionLatest>('/ai-stock-selection/latest', {
+  getLatest(date?: string, options: { force?: boolean } = {}) {
+    return readSelection(`ai:${date || 'latest'}`, () => request.get<AiStockSelectionLatest>('/ai-stock-selection/latest', {
+      timeout: 60_000,
       params: date ? { date } : undefined,
-    })
+    }), options.force)
   },
 }

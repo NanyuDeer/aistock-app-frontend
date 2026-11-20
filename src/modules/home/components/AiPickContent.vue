@@ -168,7 +168,6 @@ function methodCodes(horizon: HorizonCode): string[] {
 }
 
 function defaultMethods(horizon: HorizonCode): string[] {
-  if (horizon === 'short') return ['volume_breakout']
   const codes = methodCodes(horizon)
   return codes.length ? [codes.find(code => availableMethodCodes.has(code)) || codes[0]] : []
 }
@@ -399,7 +398,9 @@ async function loadSelection(manual = false) {
   }
   if (!keepResults) pageState.value = 'loading'
   try {
-    const result = horizon === 'ai' ? await aiStockSelectionApi.getLatest() : await aiStockSelectionApi.getResults(horizon, methods)
+    const result = horizon === 'ai'
+      ? await (manual ? aiStockSelectionApi.getLatest(undefined, { force: true }) : aiStockSelectionApi.getLatest())
+      : await (manual ? aiStockSelectionApi.getResults(horizon, methods, { force: true }) : aiStockSelectionApi.getResults(horizon, methods))
     if (version !== requestVersion) return
     if (keepResults && result.status !== 'ready' && result.status !== 'empty') {
       uni.showToast({ title: '暂未获取到最新名单', icon: 'none' })
