@@ -390,10 +390,10 @@ function mapApiItem(item: any): ReportItem {
   const toYi = (val: number | null) => {
     if (val == null) return ''
     const yi = val / 1e8
-    return yi.toFixed(2)
+    return yi.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   }
 
-  // 同比增速（后端已计算：相对上一期报告的变动，单位 %）
+  // 同比增速（后端已计算：与去年同期对比，单位 %）
   const revenueYoy = item['营收同比(%)'] != null ? Number(item['营收同比(%)']) : null
   const profitYoy = item['净利同比(%)'] != null ? Number(item['净利同比(%)']) : null
 
@@ -461,7 +461,7 @@ function mapRankingItem(item: any): ReportItem {
   // 金额（后端已转亿元）
   const toYi = (val: number | null) => {
     if (val == null) return ''
-    return val.toFixed(2)
+    return val.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   }
 
   return {
