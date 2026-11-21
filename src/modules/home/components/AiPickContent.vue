@@ -161,14 +161,13 @@ const selectedMethods = ref<string[]>([])
 const canRefreshSelection = computed(() => selectedHorizon.value === 'ai' ||
   (selectedMethods.value.length > 0 && selectedMethods.value.every(code => availableMethodCodes.has(code))))
 const currentMethods = computed(() => selectedHorizon.value === 'ai' ? [] : methodsByHorizon[selectedHorizon.value])
-const currentHorizonName = computed(() => horizons.find((option) => option.code === selectedHorizon.value)?.name || 'AI综合')
+const currentHorizonName = computed(() => horizons.find((option) => option.code === selectedHorizon.value)?.name || '综合')
 
 function methodCodes(horizon: HorizonCode): string[] {
   return horizon === 'ai' ? [] : methodsByHorizon[horizon].map((method) => method.code)
 }
 
 function defaultMethods(horizon: HorizonCode): string[] {
-  if (horizon === 'short') return ['volume_breakout']
   const codes = methodCodes(horizon)
   return codes.length ? [codes.find(code => availableMethodCodes.has(code)) || codes[0]] : []
 }
@@ -222,9 +221,13 @@ function toggleMethod(code: string) {
 const nextQuoteTradeDate = ref<string | null>(null)
 
 function returnSinceEntry(item: AiStockSelectionItem): number | null {
+  const quote = liveQuotes.value[item.symbol]
+  const opening = item.entry?.liveBasePrice
+  if (opening != null && opening > 0 && quote?.price != null && quote.tradeDate === item.entry?.date) {
+    return (quote.price / opening - 1) * 100
+  }
   const closeReturn = item.entry?.closeReturn
   if (closeReturn == null) return null
-  const quote = liveQuotes.value[item.symbol]
   if (nextQuoteTradeDate.value && quote?.price != null && quote.tradeDate === nextQuoteTradeDate.value && quote.changeAmount != null) {
     // The quote's reference close incorporates the exchange's ex-rights adjustment.
     const reference = quote.price - quote.changeAmount
@@ -395,7 +398,9 @@ async function loadSelection(manual = false) {
   }
   if (!keepResults) pageState.value = 'loading'
   try {
-    const result = horizon === 'ai' ? await aiStockSelectionApi.getLatest() : await aiStockSelectionApi.getResults(horizon, methods)
+    const result = horizon === 'ai'
+      ? await (manual ? aiStockSelectionApi.getLatest(undefined, { force: true }) : aiStockSelectionApi.getLatest())
+      : await (manual ? aiStockSelectionApi.getResults(horizon, methods, { force: true }) : aiStockSelectionApi.getResults(horizon, methods))
     if (version !== requestVersion) return
     if (keepResults && result.status !== 'ready' && result.status !== 'empty') {
       uni.showToast({ title: '暂未获取到最新名单', icon: 'none' })
