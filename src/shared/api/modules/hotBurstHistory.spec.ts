@@ -12,10 +12,11 @@ test('完整窗口单次读取超过200条；显式分页保留；旧后端截�
     let truncated = false
     request.get = async (_url: string, options: { params: { all?: boolean; limit?: number } }) => {
       calls.push(options.params)
-      return { total: 203, records: Array.from({ length: truncated ? 50 : 203 }, (_, i) => ({ symbol: String(i) })) }
+      return { total: 203, records: Array.from({ length: truncated ? 50 : 203 }, (_, i) => ({ symbol: String(i), source_details: { cls: { status: 'passed', matched_concepts: ['机器人'] } } })) }
     }
     const result = await stockApi.getHotBurstHistory({ trading_days: 3, min_resonance: 2 })
     assert.equal(result.length, 203)
+    assert.equal(result[0].source_details.cls.status, 'passed')
     assert.equal(calls.length, 1)
     assert.equal(calls[0].all, true)
     await stockApi.getHotBurstHistory({ trading_days: 3, min_resonance: 2, limit: 200 })

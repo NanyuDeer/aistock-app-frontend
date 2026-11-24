@@ -393,7 +393,16 @@ export interface TodayHotSpotDetail {
   sector: WindLeaderSector
 }
 
+export type HotBurstSourceStatus = 'passed' | 'not_passed' | 'unavailable' | 'unknown'
+export interface HotBurstSourceDetails {
+  cls: { status: HotBurstSourceStatus; matched_concepts: string[] }
+  glh: { status: HotBurstSourceStatus; matched_concepts: string[] }
+  qq: { status: HotBurstSourceStatus; stock_mention_count: number; evidence_message_ids: number[] }
+  ths: { status: HotBurstSourceStatus; matched_sectors: { code: string; name: string; rank: number }[] }
+}
+
 export interface HotBurstSignal {
+  source_details?: HotBurstSourceDetails
   symbol: string
   stockName?: string
   price?: number | null
@@ -406,6 +415,7 @@ export interface HotBurstSignal {
 }
 
 interface HotBurstHistoryRecord {
+  source_details?: HotBurstSourceDetails
   symbol: string
   stock_name?: string
   price?: number | null
@@ -425,6 +435,7 @@ function normalizeHotBurstHistory(records: HotBurstHistoryRecord[] | undefined):
   return (records ?? []).map((record) => ({
     symbol: record.symbol,
     stockName: record.stock_name,
+    source_details: record.source_details,
     price: record.price,
     changePct: record.change_pct,
     triggerTags: record.keywords?.split(/[、，,]/).map((tag) => tag.trim()).filter(Boolean),
