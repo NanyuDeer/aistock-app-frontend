@@ -393,7 +393,16 @@ export interface TodayHotSpotDetail {
   sector: WindLeaderSector
 }
 
+export type HotBurstSourceStatus = 'passed' | 'not_passed' | 'unavailable' | 'unknown'
+export interface HotBurstSourceDetails {
+  cls: { status: HotBurstSourceStatus; matched_concepts: string[] }
+  glh: { status: HotBurstSourceStatus; matched_concepts: string[] }
+  qq: { status: HotBurstSourceStatus; stock_mention_count: number; evidence_message_ids: number[] }
+  ths: { status: HotBurstSourceStatus; matched_sectors: { code: string; name: string; rank: number }[] }
+}
+
 export interface HotBurstSignal {
+  source_details?: HotBurstSourceDetails
   symbol: string
   stockName?: string
   price?: number | null
@@ -406,6 +415,7 @@ export interface HotBurstSignal {
 }
 
 interface HotBurstHistoryRecord {
+  source_details?: HotBurstSourceDetails
   symbol: string
   stock_name?: string
   price?: number | null
@@ -417,6 +427,7 @@ interface HotBurstHistoryRecord {
 }
 
 interface HotBurstHistoryResponse {
+  total: number
   records?: HotBurstHistoryRecord[]
 }
 
@@ -424,6 +435,7 @@ function normalizeHotBurstHistory(records: HotBurstHistoryRecord[] | undefined):
   return (records ?? []).map((record) => ({
     symbol: record.symbol,
     stockName: record.stock_name,
+    source_details: record.source_details,
     price: record.price,
     changePct: record.change_pct,
     triggerTags: record.keywords?.split(/[、，,]/).map((tag) => tag.trim()).filter(Boolean),
@@ -656,10 +668,16 @@ export const stockApi = {
   },
 
   /** 获取机构调研热门股历史记录，供 App 的近时段展示使用。 */
-  getHotBurstHistory(params: { days?: number; trading_days?: number; min_resonance: number; limit?: number; offset?: number }) {
-    return request
-      .get<HotBurstHistoryResponse>('/cn/institution-research/history', { params })
-      .then((result) => normalizeHotBurstHistory(result.records))
+  async getHotBurstHistory(params: { days?: number; trading_days?: number; min_resonance: number; limit?: number; offset?: number }) {
+    // 完整窗口由后端单条查询读取，避免offset跨页时新增记录导致漏股。
+    const fetchAll = params.trading_days !== undefined && params.limit === undefined && params.offset === undefined
+    const result = await request.get<HotBurstHistoryResponse>('/cn/institution-research/history', {
+      params: { ...params, ...(fetchAll ? { all: true } : {}) },
+    })
+    if (fetchAll && result.records?.length !== result.total) {
+      throw new Error('热门股完整窗口未完整返回，请更新服务端后重试')
+    }
+    return normalizeHotBurstHistory(result.records)
   },
 
   /** 获取个股异动事件（重磅消息） */

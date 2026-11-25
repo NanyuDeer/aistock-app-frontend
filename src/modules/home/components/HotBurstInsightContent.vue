@@ -18,7 +18,7 @@ function levelLabel(level: HotBurstSignal['resonanceLevel']) { const labels: Rec
 function levelTagType(level: HotBurstSignal['resonanceLevel']): 'warning' | 'up' | 'neutral' | 'down' { if (level === 'critical') return 'warning'; if (level === 'high') return 'up'; if (level === 'medium') return 'neutral'; return 'down' }
 function sortByChangePct(items: HotBurstSignal[]) { return [...items].sort((a, b) => (b.changePct ?? Number.NEGATIVE_INFINITY) - (a.changePct ?? Number.NEGATIVE_INFINITY)) }
 function dedupeBySymbol(items: HotBurstSignal[]) { const seen = new Set<string>(); return items.filter((item) => { const symbol = item.symbol?.trim(); if (!symbol) return true; if (seen.has(symbol)) return false; seen.add(symbol); return true }) }
-async function loadData() { try { signals.value = dedupeBySymbol(sortByChangePct(await stockApi.getHotBurstHistory({ trading_days: 3, min_resonance: 2 }))) } catch { signals.value = [] } }
+async function loadData() { try { signals.value = dedupeBySymbol(sortByChangePct(await stockApi.getHotBurstHistory({ trading_days: 3, min_resonance: 2 }))) } catch { console.warn('热门股更新失败，保留上次榜单') } }
 function goStockDetail(symbol: string) { if (symbol) uni.navigateTo({ url: `/modules/favorites/pages/detail?symbol=${symbol}` }) }
 function goAll() { uni.navigateTo({ url: '/modules/market/pages/hot-burst' }) }
 function openPodcast() { showPodcast('机构调研播报') }
